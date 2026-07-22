@@ -1,0 +1,139 @@
+<?php
+
+namespace App\Actions\Onboarding;
+
+use App\Jobs\DeployModulePlacement;
+use App\Models\Client;
+use App\Models\CoreModule;
+use App\Models\Role;
+use App\Models\RoleAssignment;
+use App\Models\SecurityDuty;
+use App\Models\Tenant;
+use App\Models\TenantMembership;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use LogicException;
+use RuntimeException;
+
+class RegisterBusiness
+{
+    /**
+     * @param  array{name:string,email:string,password:string,business_name:string,module_ids:list<string>}  $data
+     */
+    public function handle(array $data): User
+    {
+        return DB::transaction(function () use ($data): User {
+            $moduleIds = CoreModule::query()
+                ->whereIn('id', $data['module_ids'])
+                ->where('status', 'available')
+                ->pluck('id');
+
+            if ($moduleIds->count() !== count(array_unique($data['module_ids']))) {
+                throw new RuntimeException('One or more selected modules are not available.');
+            }
+            $slug = $this->uniqueSlug($data['business_name']);
+            $user = User::create([
+                'name' => $data['name'],
+                'email' => Str::lower($data['email']),
+                'password' => $data['password'],
+            ]);
+            $client = Client::create([
+                'legal_name' => $data['business_name'],
+                'slug' => $slug,
+                'status' => 'active',
+            ]);
+            $tenant = Tenant::create([
+                'client_id' => $client->id,
+                'name' => $data['business_name'],
+                'slug' => $slug,
+                'status' => 'active',
+            ]);
+            $profile = (string) config('coreerp.deployment.profile');
+            $placement = (string) config('coreerp.deployment.placement');
+            if (! in_array($profile, ['pooled', 'isolated'], true) || ! preg_match('/^[a-z0-9][a-z0-9-]{0,119}$/', $placement)) {
+                throw new LogicException('CoreERP deployment profile or placement is invalid.');
+            }
+            if ($profile === 'isolated') {
+                $placement .= '-'.Str::lower($tenant->id);
+            }
+            DB::table('tenant_deployments')->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $tenant->id,
+                'profile' => $profile,
+                'placement' => $placement,
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $membership = TenantMembership::create([
+                'tenant_id' => $tenant->id,
+                'user_id' => $user->id,
+                'system_role' => 'owner',
+                'status' => 'active',
+            ]);
+
+            foreach ($moduleIds as $moduleId) {
+                $tenant->entitlements()->create([
+                    'module_id' => $moduleId,
+                    'status' => 'active',
+                    'starts_at' => now(),
+                    'ends_at' => null,
+                ]);
+            }
+
+            $ownerRole = Role::create([
+                'tenant_id' => $tenant->id,
+                'name' => 'Owner',
+                'is_active' => true,
+            ]);
+            $ownerRole->duties()->sync(
+                SecurityDuty::query()->whereIn('module_id', $moduleIds)->pluck('code'),
+            );
+            RoleAssignment::create([
+                'membership_id' => $membership->id,
+                'role_id' => $ownerRole->id,
+                'source' => 'automatic',
+                'status' => 'active',
+                'valid_from' => now(),
+            ])->organizationScope()->create([
+                'organization_id' => null,
+                'hierarchy_id' => null,
+                'hierarchy_version_id' => null,
+                'include_descendants' => false,
+            ]);
+
+            DB::afterCommit(function () use ($moduleIds, $placement): void {
+                foreach ($moduleIds as $moduleId) {
+                    $ready = DB::table('module_placements')
+                        ->where('module_id', $moduleId)
+                        ->where('placement', $placement)
+                        ->where('artifact_status', 'placed')
+                        ->where('migration_status', 'succeeded')
+                        ->where('runtime_status', 'ready')
+                        ->whereNotNull('ready_at')
+                        ->exists();
+                    if ($ready) {
+                        continue;
+                    }
+
+                    DeployModulePlacement::dispatch($moduleId, $placement);
+                }
+            });
+
+            return $user;
+        });
+    }
+
+    private function uniqueSlug(string $name): string
+    {
+        $base = Str::slug($name) ?: 'business';
+        $slug = $base;
+
+        while (Tenant::query()->where('slug', $slug)->exists() || Client::query()->where('slug', $slug)->exists()) {
+            $slug = $base.'-'.Str::lower(Str::random(6));
+        }
+
+        return $slug;
+    }
+}

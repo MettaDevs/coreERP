@@ -1,0 +1,338 @@
+import { Head, useForm } from '@inertiajs/react';
+import { Building2, KeyRound, Package } from 'lucide-react';
+import { useState } from 'react';
+
+import PasswordInput from '@/components/password-input';
+import TextLink from '@/components/text-link';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    Field,
+    FieldError,
+    FieldGroup,
+    FieldLegend,
+    FieldSet,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+
+type ModuleOption = { id: string; name: string; description: string };
+type Props = { passwordRules: string; modules: ModuleOption[] };
+type Step = 'business' | 'products' | 'security';
+
+export default function Register({ passwordRules, modules }: Props) {
+    const [step, setStep] = useState<Step>('business');
+    const form = useForm({
+        name: '',
+        business_name: '',
+        email: '',
+        module_ids: [] as string[],
+        password: '',
+        password_confirmation: '',
+    });
+    const businessComplete =
+        form.data.name.trim() !== '' &&
+        form.data.business_name.trim() !== '' &&
+        form.data.email.trim() !== '';
+    const productsComplete = form.data.module_ids.length > 0;
+
+    const submit = () => {
+        form.post('/register', {
+            onError: (errors) => {
+                if (errors.name || errors.business_name || errors.email) {
+                    setStep('business');
+                } else if (errors.module_ids) {
+                    setStep('products');
+                } else {
+                    setStep('security');
+                }
+            },
+        });
+    };
+
+    return (
+        <>
+            <Head title="Pendaftaran bisnis" />
+            <Tabs
+                value={step}
+                onValueChange={(value) => setStep(value as Step)}
+            >
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="business">1. Bisnis</TabsTrigger>
+                    <TabsTrigger value="products" disabled={!businessComplete}>
+                        2. Produk
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="security"
+                        disabled={!businessComplete || !productsComplete}
+                    >
+                        3. Keamanan
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="business">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Pemilik dan bisnis</CardTitle>
+                            <CardDescription>
+                                Isi identitas pemilik akun dan nama bisnis.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <FieldGroup>
+                                <Field data-invalid={Boolean(form.errors.name)}>
+                                    <Input
+                                        label="Nama pemilik"
+                                        value={form.data.name}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'name',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(form.errors.name)}
+                                        autoComplete="name"
+                                        autoFocus
+                                    />
+                                    <FieldError>{form.errors.name}</FieldError>
+                                </Field>
+                                <Field
+                                    data-invalid={Boolean(
+                                        form.errors.business_name,
+                                    )}
+                                >
+                                    <Input
+                                        label="Nama bisnis"
+                                        value={form.data.business_name}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'business_name',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.business_name,
+                                        )}
+                                        autoComplete="organization"
+                                    />
+                                    <FieldError>
+                                        {form.errors.business_name}
+                                    </FieldError>
+                                </Field>
+                                <Field
+                                    data-invalid={Boolean(form.errors.email)}
+                                >
+                                    <Input
+                                        label="Email pemilik"
+                                        type="email"
+                                        value={form.data.email}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'email',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.email,
+                                        )}
+                                        autoComplete="email"
+                                    />
+                                    <FieldError>{form.errors.email}</FieldError>
+                                </Field>
+                            </FieldGroup>
+                        </CardContent>
+                        <CardFooter className="justify-end">
+                            <Button
+                                type="button"
+                                disabled={!businessComplete}
+                                onClick={() => setStep('products')}
+                            >
+                                Lanjutkan
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="products">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Produk awal</CardTitle>
+                            <CardDescription>
+                                Struktur perusahaan diatur setelah pendaftaran,
+                                sesuai keadaan bisnis yang sebenarnya.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <FieldSet
+                                data-invalid={Boolean(form.errors.module_ids)}
+                            >
+                                <FieldLegend hint="Produk yang tidak dipilih belum dapat digunakan oleh bisnis Anda. Proses pemasangannya berlangsung terpisah.">
+                                    Pilihan produk
+                                </FieldLegend>
+                                <ToggleGroup
+                                    type="multiple"
+                                    variant="outline"
+                                    spacing={2}
+                                    className="grid w-full gap-3 md:grid-cols-2"
+                                    value={form.data.module_ids}
+                                    onValueChange={(values) =>
+                                        form.setData('module_ids', values)
+                                    }
+                                >
+                                    {modules.map((module) => (
+                                        <ToggleGroupItem
+                                            key={module.id}
+                                            value={module.id}
+                                            className="h-auto min-h-24 w-full items-start justify-start p-4 text-left whitespace-normal"
+                                        >
+                                            <Package />
+                                            <span className="flex flex-col gap-1">
+                                                <span className="font-medium">
+                                                    {module.name}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {module.description}
+                                                </span>
+                                            </span>
+                                        </ToggleGroupItem>
+                                    ))}
+                                </ToggleGroup>
+                                <FieldError>
+                                    {form.errors.module_ids}
+                                </FieldError>
+                            </FieldSet>
+                        </CardContent>
+                        <CardFooter className="justify-between">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setStep('business')}
+                            >
+                                Kembali
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={!productsComplete}
+                                onClick={() => setStep('security')}
+                            >
+                                Lanjutkan
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="security">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Keamanan dan konfirmasi</CardTitle>
+                            <CardDescription>
+                                Buat kata sandi untuk akun pemilik bisnis.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <FieldGroup>
+                                <Alert>
+                                    <Building2 />
+                                    <AlertTitle>
+                                        {form.data.business_name}
+                                    </AlertTitle>
+                                    <AlertDescription>
+                                        {form.data.module_ids.length} produk
+                                        dipilih. Legal entity dan unit
+                                        operasional dibuat setelah tenant aktif.
+                                    </AlertDescription>
+                                </Alert>
+                                <Field
+                                    data-invalid={Boolean(form.errors.password)}
+                                >
+                                    <PasswordInput
+                                        label="Kata sandi"
+                                        value={form.data.password}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'password',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.password,
+                                        )}
+                                        autoComplete="new-password"
+                                        passwordrules={passwordRules}
+                                    />
+                                    <FieldError>
+                                        {form.errors.password}
+                                    </FieldError>
+                                </Field>
+                                <Field
+                                    data-invalid={Boolean(
+                                        form.errors.password_confirmation,
+                                    )}
+                                >
+                                    <PasswordInput
+                                        label="Konfirmasi kata sandi"
+                                        value={form.data.password_confirmation}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'password_confirmation',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.password_confirmation,
+                                        )}
+                                        autoComplete="new-password"
+                                        passwordrules={passwordRules}
+                                    />
+                                    <FieldError>
+                                        {form.errors.password_confirmation}
+                                    </FieldError>
+                                </Field>
+                            </FieldGroup>
+                        </CardContent>
+                        <CardFooter className="justify-between">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setStep('products')}
+                            >
+                                Kembali
+                            </Button>
+                            <Button
+                                type="button"
+                                disabled={
+                                    form.processing ||
+                                    form.data.password === '' ||
+                                    form.data.password_confirmation === ''
+                                }
+                                onClick={submit}
+                            >
+                                {form.processing ? <Spinner /> : <KeyRound />}
+                                Buat tenant
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+
+            <p className="text-center text-sm text-muted-foreground">
+                Sudah punya akun? <TextLink href="/login">Masuk</TextLink>
+            </p>
+        </>
+    );
+}
+
+Register.layout = {
+    title: 'Pendaftaran bisnis',
+    description: 'Isi data pemilik akun dan pilih produk untuk bisnis Anda.',
+};

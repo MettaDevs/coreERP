@@ -1,0 +1,5 @@
+asyncapi: 3.0.0
+info:
+  title: CoreERP Management Asset events
+  version: 0.1.0
+channels: {}

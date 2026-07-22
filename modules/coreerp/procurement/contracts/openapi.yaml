@@ -1,0 +1,48 @@
+openapi: 3.1.0
+info:
+  title: CoreERP Procurement API
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      operationId: procurementHealth
+      responses:
+        '200':
+          description: Module is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/v1/hello:
+    get:
+      operationId: procurementHello
+      responses:
+        '200':
+          description: Procurement hello response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HelloResponse'
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status, module]
+          properties:
+            status: { type: string, const: ok }
+            module: { type: string, const: procurement }
+    HelloResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [message, module, version]
+          properties:
+            message: { type: string }
+            module: { type: string, const: procurement }
+            version: { type: string }

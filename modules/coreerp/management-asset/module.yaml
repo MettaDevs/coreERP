@@ -1,0 +1,24 @@
+id: management-asset
+publisher: coreerp
+version: 0.1.0
+kind: business-module
+requires:
+  core: ^0.1
+dependsOn: []
+api:
+  image: registry.coreerp.local/modules/management-asset-api:0.1.0
+  openapi: contracts/openapi.yaml
+ui:
+  image: registry.coreerp.local/modules/management-asset-ui:0.1.0
+  entry: /modules/management-asset/
+database:
+  logicalName: core_module_management_asset
+  migrations: database/migrations
+events:
+  asyncapi: contracts/asyncapi.yaml
+permissions:
+  - management-asset.asset.read
+  - management-asset.asset.create
+  - management-asset.asset.update
+  - management-asset.asset.retire
+  - management-asset.settings.manage
