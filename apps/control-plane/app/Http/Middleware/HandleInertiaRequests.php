@@ -2,8 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\CoreApp;
 use App\Models\TenantMembership;
 use App\Support\CurrentWorkspace;
+use App\Support\LaunchableAppCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
@@ -105,17 +107,17 @@ class HandleInertiaRequests extends Middleware
         $entitledIds = $membership->tenant->entitlements()
             ->where('status', 'active')
             ->whereRaw('(ends_at is null or ends_at > ?)', [now()])
-            ->pluck('module_id');
+            ->pluck('app_id');
         /** @var array<int, array<string, mixed>> $catalog */
-        $catalog = $this->moduleCatalog();
+        $catalog = $this->appCatalog();
 
         return array_values(collect($catalog)
-            ->filter(fn (array $module): bool => $entitledIds->contains($module['id'] ?? null))
-            ->map(fn (array $module): array => [
-                'id' => (string) $module['id'],
-                'name' => (string) $module['name'],
-                'description' => (string) ($module['description'] ?? ''),
-                'href' => (string) $module['ui_entry'],
+            ->filter(fn (array $app): bool => $entitledIds->contains($app['id'] ?? null))
+            ->map(fn (array $app): array => [
+                'id' => (string) $app['id'],
+                'name' => (string) $app['name'],
+                'description' => (string) ($app['description'] ?? ''),
+                'href' => '/apps/'.$app['id'],
             ])
             ->values()
             ->all());
@@ -128,64 +130,22 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        $authorizedModuleIds = DB::table('role_assignments as assignments')
-            ->join('roles', 'roles.id', '=', 'assignments.role_id')
-            ->join('security_role_duties as role_duties', 'role_duties.role_id', '=', 'assignments.role_id')
-            ->join('security_duty_privileges as duty_privileges', 'duty_privileges.duty_code', '=', 'role_duties.duty_code')
-            ->join('security_privilege_permissions as privilege_permissions', 'privilege_permissions.privilege_code', '=', 'duty_privileges.privilege_code')
-            ->join('permissions', 'permissions.code', '=', 'privilege_permissions.permission_code')
-            ->where('assignments.membership_id', $membership->id)
-            ->where('assignments.status', 'active')
-            ->where('roles.is_active', true)
-            ->where('assignments.valid_from', '<=', now())
-            ->where(fn ($query) => $query->whereNull('assignments.valid_until')->orWhere('assignments.valid_until', '>', now()))
-            ->distinct()
-            ->pluck('permissions.module_id');
-
-        $readyIds = $membership->tenant->entitlements()
-            ->where('status', 'active')
-            ->whereIn('module_id', $authorizedModuleIds)
-            ->whereRaw('(ends_at is null or ends_at > ?)', [now()])
-            ->whereExists(fn ($query) => $query
-                ->selectRaw('1')
-                ->from('tenant_deployments')
-                ->join('module_placements', 'module_placements.placement', '=', 'tenant_deployments.placement')
-                ->whereColumn('tenant_deployments.tenant_id', 'tenant_module_entitlements.tenant_id')
-                ->whereColumn('module_placements.module_id', 'tenant_module_entitlements.module_id')
-                ->whereColumn('module_placements.profile', 'tenant_deployments.profile')
-                ->where('tenant_deployments.status', 'active')
-                ->where('module_placements.artifact_status', 'placed')
-                ->where('module_placements.migration_status', 'succeeded')
-                ->where('module_placements.runtime_status', 'ready')
-                ->whereNotNull('module_placements.ready_at'))
-            ->pluck('module_id');
-        $catalog = $this->moduleCatalog();
-
-        return array_values(collect($catalog)
-            ->filter(fn (array $module): bool => $readyIds->contains($module['id'] ?? null))
-            ->map(fn (array $module): array => [
-                'id' => (string) $module['id'],
-                'name' => (string) $module['name'],
-                'description' => (string) ($module['description'] ?? ''),
-                'href' => (string) $module['ui_entry'],
-            ])->values()->all());
+        return app(LaunchableAppCatalog::class)->for($membership);
     }
 
     /** @return list<array<string, mixed>> */
-    private function moduleCatalog(): array
+    private function appCatalog(): array
     {
-        $configured = config('coreerp.module_catalog');
-        if (! is_array($configured)) {
-            return [];
-        }
-
-        $catalog = [];
-        foreach ($configured as $module) {
-            if (is_array($module)) {
-                $catalog[] = $module;
-            }
-        }
-
-        return $catalog;
+        return CoreApp::query()
+            ->where('status', 'available')
+            ->whereNotNull('ui_entry')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description', 'ui_entry'])
+            ->map(fn (CoreApp $app): array => [
+                'id' => $app->id,
+                'name' => $app->name,
+                'description' => $app->description ?? '',
+                'ui_entry' => $app->ui_entry,
+            ])->all();
     }
 }

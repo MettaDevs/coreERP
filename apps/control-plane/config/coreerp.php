@@ -1,7 +1,7 @@
 <?php
 
 return [
-    // Canonical official modules. Entitlements and releases reference these IDs.
+    // Canonical official apps. Entitlements and releases reference these IDs.
     'database' => 'core_erp',
     'deployment' => [
         'profile' => env('COREERP_DEPLOYMENT_PROFILE', 'pooled'),
@@ -19,52 +19,15 @@ return [
         'value_stream' => 'Value stream',
         'retail_channel' => 'Retail channel',
     ],
-    'module_catalog' => [
-        [
-            'id' => 'procurement',
-            'name' => 'Procurement',
-            'version' => '0.1.0',
-            'status' => 'available',
-            'database' => 'core_module_procurement',
-            'ui_entry' => env('COREERP_PROCUREMENT_UI_ENTRY', '/modules/procurement/'),
-            'description' => 'Official independent Procurement module.',
-            'duties' => [
-                'procurement.requisition.maintain' => [
-                    'name' => 'Kelola permintaan pengadaan',
-                    'permissions' => [
-                        'procurement.requisition.read',
-                        'procurement.requisition.create',
-                        'procurement.requisition.update',
-                    ],
-                ],
-                'procurement.requisition.approve' => [
-                    'name' => 'Setujui permintaan pengadaan',
-                    'permissions' => [
-                        'procurement.requisition.read',
-                        'procurement.requisition.approve',
-                    ],
-                ],
-                'procurement.settings.manage' => [
-                    'name' => 'Kelola pengaturan pengadaan',
-                    'permissions' => ['procurement.settings.manage'],
-                ],
-            ],
-            'permissions' => [
-                'procurement.requisition.read' => 'Read procurement requisitions',
-                'procurement.requisition.create' => 'Create procurement requisitions',
-                'procurement.requisition.update' => 'Update procurement requisitions',
-                'procurement.requisition.approve' => 'Approve procurement requisitions',
-                'procurement.settings.manage' => 'Manage procurement settings',
-            ],
-        ],
+    'app_catalog' => [
         [
             'id' => 'management-asset',
             'name' => 'Management Asset',
             'version' => '0.1.0',
             'status' => 'available',
-            'database' => 'core_module_management_asset',
-            'ui_entry' => env('COREERP_MANAGEMENT_ASSET_UI_ENTRY', '/modules/management-asset/'),
-            'description' => 'Official independent Management Asset module.',
+            'database' => 'core_app_management_asset',
+            'ui_entry' => env('COREERP_MANAGEMENT_ASSET_UI_ENTRY', '/apps/management-asset/'),
+            'description' => 'Official independent Management Asset app.',
             'duties' => [
                 'management-asset.asset.maintain' => [
                     'name' => 'Kelola aset',

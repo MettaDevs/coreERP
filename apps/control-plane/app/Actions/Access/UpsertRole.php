@@ -17,13 +17,13 @@ class UpsertRole
         if (! $actor->canManageAccess() || ($role && $role->tenant_id !== $actor->tenant_id)) {
             throw new AuthorizationException;
         }
-        $entitledModuleIds = DB::table('tenant_module_entitlements')
+        $entitledAppIds = DB::table('tenant_app_entitlements')
             ->where('tenant_id', $actor->tenant_id)
             ->where('status', 'active')
             ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
-            ->pluck('module_id');
+            ->pluck('app_id');
         $validDuties = SecurityDuty::query()
-            ->whereIn('module_id', $entitledModuleIds)
+            ->whereIn('app_id', $entitledAppIds)
             ->whereIn('code', $data['duty_codes'])
             ->pluck('code');
 

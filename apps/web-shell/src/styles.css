@@ -1,0 +1,19 @@
+@import '../../../packages/ui/src/styles.css';
+
+:root { font-family: var(--apperp-font); color: var(--apperp-foreground); background: var(--apperp-background); }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.shell { min-height: 100vh; }
+.header { align-items: center; background: var(--apperp-surface); border-bottom: 1px solid var(--apperp-border); display: flex; gap: 24px; min-height: 64px; padding: 0 28px; }
+.brand { color: inherit; font-weight: 800; text-decoration: none; }
+.context { flex: 1; font-size: 14px; }
+.launcher-button { background: var(--apperp-background); border: 0; border-radius: 999px; cursor: pointer; font-size: 28px; height: 42px; width: 42px; }
+.launcher { background: var(--apperp-surface); border: 1px solid var(--apperp-border); border-radius: 20px; box-shadow: 0 18px 45px #0f172a24; display: grid; gap: 12px; grid-template-columns: repeat(3, 100px); padding: 18px; position: absolute; right: 28px; top: 76px; }
+.app-card { align-items: center; border-radius: 12px; color: inherit; display: flex; flex-direction: column; font-size: 13px; gap: 8px; padding: 10px 4px; text-align: center; text-decoration: none; }
+.app-card:hover, .app-card:focus-visible { background: #e0f2fe; outline: none; }
+.app-icon { align-items: center; background: var(--apperp-primary); border-radius: 14px; color: var(--apperp-primary-foreground); display: flex; font-size: 22px; font-weight: 700; height: 44px; justify-content: center; width: 44px; }
+.welcome { margin: 140px auto; max-width: 640px; padding: 24px; text-align: center; }
+.eyebrow { color: var(--apperp-primary); font-weight: 700; text-transform: uppercase; }
+.welcome h1 { font-size: clamp(32px, 6vw, 52px); margin: 12px 0; }
+.empty, .error { color: #475569; grid-column: 1 / -1; margin: 6px; text-align: center; }
+.error { color: #b91c1c; }

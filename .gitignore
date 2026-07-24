@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 node_modules/
+dist/
 vendor/
 public/build/
 public/hot
@@ -10,3 +11,4 @@ storage/*.key
 storage/pail/
 .phpunit.cache/
 .phpunit.result.cache
+/graphify-out

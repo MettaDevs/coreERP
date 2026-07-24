@@ -2,9 +2,9 @@
 
 namespace App\Actions\Onboarding;
 
-use App\Jobs\DeployModulePlacement;
+use App\Jobs\DeployAppPlacement;
 use App\Models\Client;
-use App\Models\CoreModule;
+use App\Models\CoreApp;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\SecurityDuty;
@@ -19,18 +19,18 @@ use RuntimeException;
 class RegisterBusiness
 {
     /**
-     * @param  array{name:string,email:string,password:string,business_name:string,module_ids:list<string>}  $data
+     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>}  $data
      */
     public function handle(array $data): User
     {
         return DB::transaction(function () use ($data): User {
-            $moduleIds = CoreModule::query()
-                ->whereIn('id', $data['module_ids'])
+            $appIds = CoreApp::query()
+                ->whereIn('id', $data['app_ids'])
                 ->where('status', 'available')
                 ->pluck('id');
 
-            if ($moduleIds->count() !== count(array_unique($data['module_ids']))) {
-                throw new RuntimeException('One or more selected modules are not available.');
+            if ($appIds->count() !== count(array_unique($data['app_ids']))) {
+                throw new RuntimeException('One or more selected apps are not available.');
             }
             $slug = $this->uniqueSlug($data['business_name']);
             $user = User::create([
@@ -73,9 +73,9 @@ class RegisterBusiness
                 'status' => 'active',
             ]);
 
-            foreach ($moduleIds as $moduleId) {
+            foreach ($appIds as $appId) {
                 $tenant->entitlements()->create([
-                    'module_id' => $moduleId,
+                    'app_id' => $appId,
                     'status' => 'active',
                     'starts_at' => now(),
                     'ends_at' => null,
@@ -88,7 +88,7 @@ class RegisterBusiness
                 'is_active' => true,
             ]);
             $ownerRole->duties()->sync(
-                SecurityDuty::query()->whereIn('module_id', $moduleIds)->pluck('code'),
+                SecurityDuty::query()->whereIn('app_id', $appIds)->pluck('code'),
             );
             RoleAssignment::create([
                 'membership_id' => $membership->id,
@@ -103,10 +103,10 @@ class RegisterBusiness
                 'include_descendants' => false,
             ]);
 
-            DB::afterCommit(function () use ($moduleIds, $placement): void {
-                foreach ($moduleIds as $moduleId) {
-                    $ready = DB::table('module_placements')
-                        ->where('module_id', $moduleId)
+            DB::afterCommit(function () use ($appIds, $placement): void {
+                foreach ($appIds as $appId) {
+                    $ready = DB::table('app_placements')
+                        ->where('app_id', $appId)
                         ->where('placement', $placement)
                         ->where('artifact_status', 'placed')
                         ->where('migration_status', 'succeeded')
@@ -117,7 +117,7 @@ class RegisterBusiness
                         continue;
                     }
 
-                    DeployModulePlacement::dispatch($moduleId, $placement);
+                    DeployAppPlacement::dispatch($appId, $placement);
                 }
             });
 

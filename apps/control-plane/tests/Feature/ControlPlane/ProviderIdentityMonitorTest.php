@@ -4,7 +4,7 @@ namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\User;
-use Database\Seeders\ModuleCatalogSeeder;
+use Database\Seeders\AppCatalogSeeder;
 use Database\Seeders\ProviderAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -16,7 +16,7 @@ class ProviderIdentityMonitorTest extends TestCase
     public function test_provider_seed_is_idempotent_and_monitor_does_not_grant_tenant_ownership(): void
     {
         config()->set('coreerp.provider.password', 'LocalProviderPassword!123');
-        $this->seed(ModuleCatalogSeeder::class);
+        $this->seed(AppCatalogSeeder::class);
         $this->seed(ProviderAdminSeeder::class);
         $this->seed(ProviderAdminSeeder::class);
 
@@ -27,7 +27,7 @@ class ProviderIdentityMonitorTest extends TestCase
         app(RegisterBusiness::class)->handle([
             'name' => 'Owner',
             'business_name' => 'PT Metta',
-            'module_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['procurement', 'management-asset'],
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);
@@ -40,11 +40,11 @@ class ProviderIdentityMonitorTest extends TestCase
 
     public function test_tenant_owner_cannot_open_provider_monitor(): void
     {
-        $this->seed(ModuleCatalogSeeder::class);
+        $this->seed(AppCatalogSeeder::class);
         $owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner',
             'business_name' => 'PT Metta',
-            'module_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['procurement', 'management-asset'],
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);

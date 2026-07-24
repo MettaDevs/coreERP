@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
-use Database\Seeders\ModuleCatalogSeeder;
+use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Fortify\Features;
@@ -17,7 +17,7 @@ class RegistrationTest extends TestCase
         parent::setUp();
 
         $this->skipUnlessFortifyHas(Features::registration());
-        $this->seed(ModuleCatalogSeeder::class);
+        $this->seed(AppCatalogSeeder::class);
         Queue::fake();
     }
 
@@ -33,7 +33,7 @@ class RegistrationTest extends TestCase
         $response = $this->post(route('register.store'), [
             'name' => 'Test User',
             'business_name' => 'PT Test',
-            'module_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['procurement', 'management-asset'],
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -42,9 +42,9 @@ class RegistrationTest extends TestCase
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
         $this->assertDatabaseHas('tenant_memberships', ['system_role' => 'owner']);
-        $this->assertDatabaseCount('tenant_module_entitlements', 2);
+        $this->assertDatabaseCount('tenant_app_entitlements', 2);
         $this->assertDatabaseCount('tenant_deployments', 1);
         $this->assertDatabaseCount('organizations', 0);
-        $this->assertDatabaseCount('roles', 0);
+        $this->assertDatabaseCount('roles', 1);
     }
 }

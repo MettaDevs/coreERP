@@ -7,7 +7,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::table('tenant_module_entitlements')
+        DB::table('tenant_app_entitlements')
             ->where('status', '!=', 'active')
             ->update(['status' => 'active']);
     }

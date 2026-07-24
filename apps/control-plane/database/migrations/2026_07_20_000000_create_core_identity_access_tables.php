@@ -63,7 +63,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'user_id']);
         });
 
-        Schema::create('modules', function (Blueprint $table) {
+        Schema::create('apps', function (Blueprint $table) {
             $table->string('id', 80)->primary();
             $table->string('name');
             $table->string('version', 40);
@@ -73,16 +73,16 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        Schema::create('tenant_module_entitlements', function (Blueprint $table) {
+        Schema::create('tenant_app_entitlements', function (Blueprint $table) {
             $table->id();
             $table->foreignUlid('tenant_id')->constrained()->cascadeOnDelete();
-            $table->string('module_id', 80);
+            $table->string('app_id', 80);
             $table->string('status', 20)->default('active');
             $table->timestamp('starts_at');
             $table->timestamp('ends_at')->nullable();
             $table->timestamps();
-            $table->foreign('module_id')->references('id')->on('modules')->restrictOnDelete();
-            $table->unique(['tenant_id', 'module_id']);
+            $table->foreign('app_id')->references('id')->on('apps')->restrictOnDelete();
+            $table->unique(['tenant_id', 'app_id']);
         });
 
         Schema::create('tenant_deployments', function (Blueprint $table) {
@@ -96,9 +96,9 @@ return new class extends Migration
             $table->index(['placement', 'status']);
         });
 
-        Schema::create('module_placements', function (Blueprint $table) {
+        Schema::create('app_placements', function (Blueprint $table) {
             $table->ulid('id')->primary();
-            $table->string('module_id', 80);
+            $table->string('app_id', 80);
             $table->string('release_version', 40);
             $table->string('profile', 30);
             $table->string('placement', 120);
@@ -107,13 +107,13 @@ return new class extends Migration
             $table->string('runtime_status', 30)->default('pending');
             $table->timestamp('ready_at')->nullable();
             $table->timestamps();
-            $table->foreign('module_id')->references('id')->on('modules')->restrictOnDelete();
-            $table->unique(['module_id', 'placement']);
+            $table->foreign('app_id')->references('id')->on('apps')->restrictOnDelete();
+            $table->unique(['app_id', 'placement']);
         });
 
-        Schema::create('module_installations', function (Blueprint $table) {
+        Schema::create('app_installations', function (Blueprint $table) {
             $table->ulid('id')->primary();
-            $table->foreignUlid('module_placement_id')->constrained('module_placements')->cascadeOnDelete();
+            $table->foreignUlid('app_placement_id')->constrained('app_placements')->cascadeOnDelete();
             $table->string('operation', 20);
             $table->string('release_version', 40);
             $table->string('status', 20);
@@ -122,37 +122,37 @@ return new class extends Migration
             $table->timestamp('started_at');
             $table->timestamp('finished_at')->nullable();
             $table->timestamps();
-            $table->index(['module_placement_id', 'started_at']);
+            $table->index(['app_placement_id', 'started_at']);
         });
 
-        Schema::create('module_entry_points', function (Blueprint $table) {
+        Schema::create('app_entry_points', function (Blueprint $table) {
             $table->string('code', 160)->primary();
-            $table->string('module_id', 80);
+            $table->string('app_id', 80);
             $table->string('name');
             $table->string('type', 30);
             $table->timestamps();
-            $table->foreign('module_id')->references('id')->on('modules')->cascadeOnDelete();
+            $table->foreign('app_id')->references('id')->on('apps')->cascadeOnDelete();
         });
 
         Schema::create('permissions', function (Blueprint $table) {
             $table->string('code', 160)->primary();
-            $table->string('module_id', 80);
+            $table->string('app_id', 80);
             $table->string('entry_point_code', 160);
             $table->string('access_level', 30);
             $table->string('name');
             $table->text('description')->nullable();
             $table->timestamps();
-            $table->foreign('module_id')->references('id')->on('modules')->cascadeOnDelete();
-            $table->foreign('entry_point_code')->references('code')->on('module_entry_points')->cascadeOnDelete();
+            $table->foreign('app_id')->references('id')->on('apps')->cascadeOnDelete();
+            $table->foreign('entry_point_code')->references('code')->on('app_entry_points')->cascadeOnDelete();
         });
 
         Schema::create('security_privileges', function (Blueprint $table) {
             $table->string('code', 160)->primary();
-            $table->string('module_id', 80);
+            $table->string('app_id', 80);
             $table->string('name');
             $table->text('description')->nullable();
             $table->timestamps();
-            $table->foreign('module_id')->references('id')->on('modules')->cascadeOnDelete();
+            $table->foreign('app_id')->references('id')->on('apps')->cascadeOnDelete();
         });
 
         Schema::create('security_privilege_permissions', function (Blueprint $table) {
@@ -165,11 +165,11 @@ return new class extends Migration
 
         Schema::create('security_duties', function (Blueprint $table) {
             $table->string('code', 160)->primary();
-            $table->string('module_id', 80);
+            $table->string('app_id', 80);
             $table->string('name');
             $table->text('description')->nullable();
             $table->timestamps();
-            $table->foreign('module_id')->references('id')->on('modules')->cascadeOnDelete();
+            $table->foreign('app_id')->references('id')->on('apps')->cascadeOnDelete();
         });
 
         Schema::create('security_duty_privileges', function (Blueprint $table) {
@@ -250,12 +250,12 @@ return new class extends Migration
         Schema::dropIfExists('security_privilege_permissions');
         Schema::dropIfExists('security_privileges');
         Schema::dropIfExists('permissions');
-        Schema::dropIfExists('module_entry_points');
-        Schema::dropIfExists('module_installations');
-        Schema::dropIfExists('module_placements');
+        Schema::dropIfExists('app_entry_points');
+        Schema::dropIfExists('app_installations');
+        Schema::dropIfExists('app_placements');
         Schema::dropIfExists('tenant_deployments');
-        Schema::dropIfExists('tenant_module_entitlements');
-        Schema::dropIfExists('modules');
+        Schema::dropIfExists('tenant_app_entitlements');
+        Schema::dropIfExists('apps');
         Schema::dropIfExists('tenant_memberships');
         Schema::dropIfExists('operating_units');
         Schema::dropIfExists('legal_entities');

@@ -8,7 +8,7 @@ use App\Models\Organization;
 use App\Models\Role;
 use App\Models\TenantMembership;
 use App\Models\User;
-use Database\Seeders\ModuleCatalogSeeder;
+use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -22,11 +22,11 @@ class InvitationAccessTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(ModuleCatalogSeeder::class);
+        $this->seed(AppCatalogSeeder::class);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner',
             'business_name' => 'PT Metta',
-            'module_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['procurement', 'management-asset'],
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);
@@ -104,7 +104,7 @@ class InvitationAccessTest extends TestCase
             'management-asset.asset.retire',
         ]);
 
-        $this->assertDatabaseCount('security_role_duties', 2);
+        $this->assertSame(2, DB::table('security_role_duties')->where('role_id', $role->id)->count());
         $this->assertDatabaseHas('roles', ['id' => $role->id, 'name' => 'Multi-job manager']);
     }
 

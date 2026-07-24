@@ -43,9 +43,9 @@ class Tenant extends Model
         return $this->hasMany(Role::class);
     }
 
-    /** @return HasMany<TenantModuleEntitlement, $this> */
+    /** @return HasMany<TenantAppEntitlement, $this> */
     public function entitlements(): HasMany
     {
-        return $this->hasMany(TenantModuleEntitlement::class);
+        return $this->hasMany(TenantAppEntitlement::class);
     }
 }

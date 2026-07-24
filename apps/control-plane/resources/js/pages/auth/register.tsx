@@ -26,17 +26,17 @@ import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
-type ModuleOption = { id: string; name: string; description: string };
-type Props = { passwordRules: string; modules: ModuleOption[] };
+type AppOption = { id: string; name: string; description: string };
+type Props = { passwordRules: string; apps: AppOption[] };
 type Step = 'business' | 'products' | 'security';
 
-export default function Register({ passwordRules, modules }: Props) {
+export default function Register({ passwordRules, apps }: Props) {
     const [step, setStep] = useState<Step>('business');
     const form = useForm({
         name: '',
         business_name: '',
         email: '',
-        module_ids: [] as string[],
+        app_ids: [] as string[],
         password: '',
         password_confirmation: '',
     });
@@ -44,14 +44,14 @@ export default function Register({ passwordRules, modules }: Props) {
         form.data.name.trim() !== '' &&
         form.data.business_name.trim() !== '' &&
         form.data.email.trim() !== '';
-    const productsComplete = form.data.module_ids.length > 0;
+    const productsComplete = form.data.app_ids.length > 0;
 
     const submit = () => {
         form.post('/register', {
             onError: (errors) => {
                 if (errors.name || errors.business_name || errors.email) {
                     setStep('business');
-                } else if (errors.module_ids) {
+                } else if (errors.app_ids) {
                     setStep('products');
                 } else {
                     setStep('security');
@@ -174,7 +174,7 @@ export default function Register({ passwordRules, modules }: Props) {
                         </CardHeader>
                         <CardContent>
                             <FieldSet
-                                data-invalid={Boolean(form.errors.module_ids)}
+                                data-invalid={Boolean(form.errors.app_ids)}
                             >
                                 <FieldLegend hint="Produk yang tidak dipilih belum dapat digunakan oleh bisnis Anda. Proses pemasangannya berlangsung terpisah.">
                                     Pilihan produk
@@ -184,31 +184,31 @@ export default function Register({ passwordRules, modules }: Props) {
                                     variant="outline"
                                     spacing={2}
                                     className="grid w-full gap-3 md:grid-cols-2"
-                                    value={form.data.module_ids}
+                                    value={form.data.app_ids}
                                     onValueChange={(values) =>
-                                        form.setData('module_ids', values)
+                                        form.setData('app_ids', values)
                                     }
                                 >
-                                    {modules.map((module) => (
+                                    {apps.map((app) => (
                                         <ToggleGroupItem
-                                            key={module.id}
-                                            value={module.id}
+                                            key={app.id}
+                                            value={app.id}
                                             className="h-auto min-h-24 w-full items-start justify-start p-4 text-left whitespace-normal"
                                         >
                                             <Package />
                                             <span className="flex flex-col gap-1">
                                                 <span className="font-medium">
-                                                    {module.name}
+                                                    {app.name}
                                                 </span>
                                                 <span className="text-xs text-muted-foreground">
-                                                    {module.description}
+                                                    {app.description}
                                                 </span>
                                             </span>
                                         </ToggleGroupItem>
                                     ))}
                                 </ToggleGroup>
                                 <FieldError>
-                                    {form.errors.module_ids}
+                                    {form.errors.app_ids}
                                 </FieldError>
                             </FieldSet>
                         </CardContent>
@@ -247,7 +247,7 @@ export default function Register({ passwordRules, modules }: Props) {
                                         {form.data.business_name}
                                     </AlertTitle>
                                     <AlertDescription>
-                                        {form.data.module_ids.length} produk
+                                        {form.data.app_ids.length} produk
                                         dipilih. Legal entity dan unit
                                         operasional dibuat setelah tenant aktif.
                                     </AlertDescription>

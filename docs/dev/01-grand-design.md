@@ -1,8 +1,8 @@
-# Grand design: SaaS ERP modular
+# Grand design: SaaS ERP berbasis app
 
 ## Keputusan arsitektur
 
-CoreERP dibangun sebagai **module platform API-first**. Setiap module adalah service deployable, bukan folder fitur di dalam aplikasi utama. Satu versi image module dapat dipakai pada cloud pooled, cloud isolated, maupun on-prem perpetual; yang berubah adalah placement, manifest instalasi, dan kanal update, bukan source business logic.
+CoreERP dibangun sebagai **app platform API-first**. Setiap app adalah release unit deployable dengan repository sendiri, bukan folder fitur di dalam aplikasi utama. Satu versi image app dapat dipakai pada cloud pooled, cloud isolated, maupun on-prem perpetual; yang berubah adalah placement, manifest instalasi, dan kanal update, bukan source business logic.
 
 ```mermaid
 flowchart LR
@@ -41,29 +41,29 @@ Diagram di atas berlaku untuk profile SaaS (`pooled` dan `isolated`). On-prem pe
 
 ## Invarian yang tidak boleh dilanggar
 
-1. Module tidak membaca atau menulis database module lain.
+1. App tidak membaca atau menulis database app lain.
 2. Semua request business API membawa `TenantContext` yang diterbitkan identity service; `tenant_id` dari body request tidak dipercaya.
 3. Database credential hanya tersedia untuk service pemiliknya. Control plane menyimpan `secret_ref`, bukan password database.
-4. Semua integrasi antarmodule memakai OpenAPI, event contract, atau extension point yang dipublikasikan.
-5. Aplikasi customer tidak mendapatkan source/artifact module yang tidak dilisensikan pada deployment on-prem.
+4. Semua integrasi antar-app memakai OpenAPI, event contract, atau extension point yang dipublikasikan.
+5. Aplikasi customer tidak mendapatkan source/artifact app yang tidak dilisensikan pada deployment on-prem.
 6. On-prem perpetual tidak memiliki telemetry, heartbeat, atau validasi lisensi online yang wajib. Server customer boleh online untuk penggunanya tanpa membuka koneksi ke vendor.
-7. Silo bukan izin fork source. Semua profile menjalankan release module yang kompatibel dengan matriks versi yang sama.
+7. Silo bukan izin fork source. Semua profile menjalankan release app yang kompatibel dengan matriks versi yang sama.
 8. Organization identity tidak menyimpan parent/depth permanen; relasi parent-child berada dalam purpose-scoped hierarchy version.
 9. Katalog, entitlement, installation, dan runtime readiness adalah fakta berbeda dengan sumber kebenaran berbeda.
 
 ## Deployment profile
 
-| Profile | Compute module | Database module | Kapan dipilih |
+| Profile | Compute app | Database app | Kapan dipilih |
 | --- | --- | --- | --- |
-| `pooled` | Service/API dipakai banyak tenant | Satu database logis per module; setiap row tenant-scoped membawa `tenant_id` | Default cloud, biaya efisien |
-| `isolated` | Shared atau dedicated menurut SLA | Database module dedicated untuk satu tenant; optional compute dedicated | Regulasi, noisy neighbor, data residency, SLA |
-| `onprem-perpetual` | Docker Compose di infrastruktur customer, memakai manifest dan state instalasi lokal | Database module hanya untuk module yang dibeli customer | Customer membeli putus, menjalankan dan memperbarui sendiri |
+| `pooled` | Service/API dipakai banyak tenant | Satu database logis per app; setiap row tenant-scoped membawa `tenant_id` | Default cloud, biaya efisien |
+| `isolated` | Shared atau dedicated menurut SLA | Database app dedicated untuk satu tenant; optional compute dedicated | Regulasi, noisy neighbor, data residency, SLA |
+| `onprem-perpetual` | Docker Compose di infrastruktur customer, memakai manifest dan state instalasi lokal | Database app hanya untuk app yang dibeli customer | Customer membeli putus, menjalankan dan memperbarui sendiri |
 
-"Satu module satu database" berarti **satu ownership database logis dan satu database role per module**. Ia tidak selalu berarti satu VM atau satu PostgreSQL cluster per module.
+"Satu app satu database" berarti **satu ownership database logis dan satu database role per app**. Ia tidak selalu berarti satu VM atau satu PostgreSQL cluster per app.
 
 - Pool dapat menempatkan `pos_pool_db` dan `booking_pool_db` dalam cluster PostgreSQL managed yang sama, dengan role dan credential berbeda.
 - Isolated/on-prem dapat menempatkan `pos_tenant_acme_db` dan `booking_tenant_acme_db` pada PostgreSQL instance/container khusus bila tier mensyaratkannya.
-- Citus adalah opsi scale-out untuk database pooled sebuah module setelah volume memerlukannya. Tabel dalam database module itu tetap didistribusikan oleh `tenant_id` agar data tenant colocated.
+- Citus adalah opsi scale-out untuk database pooled sebuah app setelah volume memerlukannya. Tabel dalam database app itu tetap didistribusikan oleh `tenant_id` agar data tenant colocated.
 
 ## Control-plane model
 
@@ -72,24 +72,24 @@ Pada SaaS, control plane merupakan sumber kebenaran placement, entitlement, dan 
 | Aggregate | Tanggung jawab |
 | --- | --- |
 | `tenants` | Kontrak customer, status, edition, dan isolation profile. |
-| `tenant_module_entitlements` | Hak komersial tenant, masa berlaku, dan quota; bukan installation state. |
-| `module_catalog` / `module_releases` | Publisher, manifest, image digest, kontrak, dan compatibility matrix. |
+| `tenant_app_entitlements` | Hak komersial tenant, masa berlaku, dan quota; bukan installation state. |
+| `app_catalog` / `app_releases` | Publisher, manifest, image digest, kontrak, dan compatibility matrix. |
 | `tenant_deployments` | Satu tenant SaaS ditempatkan pada target pooled atau isolated mana. |
-| `module_placements` | Endpoint API/UI, secret reference database, image release, dan health per module deployment. |
-| `module_installations` | Riwayat install, migration, enable, disable, upgrade, dan uninstall. |
-| `usage_records` | Metering per tenant/module untuk billing dan observability SaaS. |
+| `app_placements` | Endpoint API/UI, secret reference database, image release, dan health per app deployment. |
+| `app_installations` | Riwayat install, migration, enable, disable, upgrade, dan uninstall. |
+| `usage_records` | Metering per tenant/app untuk billing dan observability SaaS. |
 
 ## Application-plane model
 
-Setiap module memiliki:
+Setiap app memiliki:
 
 ```text
-module = API service + UI artifact + database + migrator + contracts + manifest
+app = API service + UI artifact + database + migrator + contracts + manifest
 ```
 
-Pada SaaS, gateway/UI shell meminta launch manifest setelah token tervalidasi. Entry module hanya dapat dimuat bila entitlement aktif, installation registry menyatakan release pada placement `ready`, dan user memiliki permission entry point. Pada on-prem perpetual, gateway membaca manifest bertanda tangan serta installation state lokal; local core runtime menyimpan administrator dan lisensi lokal.
+Pada SaaS, gateway/UI shell meminta launch manifest setelah token tervalidasi. Entry app hanya dapat dimuat bila entitlement aktif, installation registry menyatakan release pada placement `ready`, dan user memiliki permission entry point. Pada on-prem perpetual, gateway membaca manifest bertanda tangan serta installation state lokal; local core runtime menyimpan administrator dan lisensi lokal.
 
-Dalam pooled cloud, code module boleh dideploy satu kali untuk satu placement yang melayani banyak tenant. Installation registry tetap mencatat artifact, release, migration, dan readiness placement; tenant binding serta entitlement dicatat terpisah. Dalam isolated cloud, install juga membentuk resource dan menjalankan migration database khusus. Dalam on-prem perpetual, installer lokal memverifikasi bundle dan lisensi bertanda tangan, lalu mencatat lifecycle pada installation state lokal; ia tidak melaporkan runtime health ke vendor.
+Dalam pooled cloud, code app boleh dideploy satu kali untuk satu placement yang melayani banyak tenant. Installation registry tetap mencatat artifact, release, migration, dan readiness placement; tenant binding serta entitlement dicatat terpisah. Dalam isolated cloud, install juga membentuk resource dan menjalankan migration database khusus. Dalam on-prem perpetual, installer lokal memverifikasi bundle dan lisensi bertanda tangan, lalu mencatat lifecycle pada installation state lokal; ia tidak melaporkan runtime health ke vendor.
 
 ## Silo dan customisasi
 

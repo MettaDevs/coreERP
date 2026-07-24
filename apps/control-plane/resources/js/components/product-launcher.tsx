@@ -4,7 +4,6 @@ import {
     Building2,
     Grid3X3,
     PackageSearch,
-    ShoppingCart,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -21,7 +20,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { EntitledProduct } from '@/types/auth';
 
 const productIcons: Record<string, LucideIcon> = {
-    procurement: ShoppingCart,
     'management-asset': PackageSearch,
 };
 

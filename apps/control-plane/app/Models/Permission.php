@@ -12,5 +12,5 @@ class Permission extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['code', 'module_id', 'entry_point_code', 'access_level', 'name', 'description'];
+    protected $fillable = ['code', 'app_id', 'entry_point_code', 'access_level', 'name', 'description'];
 }

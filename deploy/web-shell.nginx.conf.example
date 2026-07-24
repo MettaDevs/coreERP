@@ -1,0 +1,9 @@
+# Production: browser stays on one public domain.
+location /apps-content/management-asset/ {
+    proxy_pass http://management-asset-ui:80/;
+    proxy_set_header Host $host;
+}
+
+# Set COREERP_MANAGEMENT_ASSET_UI_ENTRY=/apps-content/management-asset/
+# in Control Plane production environment. The launcher opens /apps/management-asset,
+# which renders the shared Core layout and loads this content path inside it.

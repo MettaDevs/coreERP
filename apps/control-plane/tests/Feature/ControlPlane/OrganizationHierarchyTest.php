@@ -7,7 +7,7 @@ use App\Models\Organization;
 use App\Models\OrganizationHierarchyVersion;
 use App\Models\TenantMembership;
 use App\Models\User;
-use Database\Seeders\ModuleCatalogSeeder;
+use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,11 +20,11 @@ class OrganizationHierarchyTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(ModuleCatalogSeeder::class);
+        $this->seed(AppCatalogSeeder::class);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner',
             'business_name' => 'PT Metta',
-            'module_ids' => ['procurement'],
+            'app_ids' => ['procurement'],
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);

@@ -1,0 +1,18 @@
+:root { font-family: Inter, system-ui, sans-serif; color: #182438; background: #f4f7fb; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 900px; margin: 48px auto; padding: 0 24px; }
+header { display: flex; align-items: start; justify-content: space-between; gap: 24px; }
+p { margin: 0; }
+header p { font-size: .75rem; font-weight: 700; letter-spacing: .08em; color: #476887; }
+h1 { margin: 6px 0; font-size: 2rem; }
+header span, li span { color: #617289; }
+button { border: 0; border-radius: 8px; padding: 11px 16px; background: #078bc5; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+button:disabled { opacity: .7; cursor: wait; }
+.message, .empty { margin-top: 32px; padding: 16px; border-radius: 8px; background: #fff; }
+.message { color: #a92c2c; }
+ul { padding: 0; margin: 32px 0; list-style: none; display: grid; gap: 12px; }
+li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; border: 1px solid #d8e2ec; border-radius: 10px; background: #fff; }
+li div { display: grid; gap: 4px; }
+small { white-space: nowrap; color: #476887; }
+@media (max-width: 600px) { header, li { align-items: stretch; flex-direction: column; } }

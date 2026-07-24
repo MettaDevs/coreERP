@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Actions\Fortify\CreateNewUser;
 /* @end-chisel-registration */
 use App\Actions\Fortify\ResetUserPassword;
+use App\Models\CoreApp;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -77,17 +78,15 @@ class FortifyServiceProvider extends ServiceProvider
         /* @chisel-registration */
         Fortify::registerView(fn () => Inertia::render('auth/register', [
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
-            'modules' => array_map(static function (mixed $module): array {
-                if (! is_array($module)) {
-                    return [];
-                }
-
-                return [
-                    'id' => (string) ($module['id'] ?? ''),
-                    'name' => (string) ($module['name'] ?? ''),
-                    'description' => (string) ($module['description'] ?? ''),
-                ];
-            }, (array) config('coreerp.module_catalog', [])),
+            'apps' => CoreApp::query()
+                ->where('status', 'available')
+                ->orderBy('name')
+                ->get(['id', 'name', 'description'])
+                ->map(fn (CoreApp $app): array => [
+                    'id' => $app->id,
+                    'name' => $app->name,
+                    'description' => $app->description ?? '',
+                ])->values(),
         ]));
         /* @end-chisel-registration */
 

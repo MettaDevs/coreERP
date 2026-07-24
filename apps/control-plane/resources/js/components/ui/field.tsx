@@ -48,7 +48,7 @@ function FieldLegend({
       )}
       {...props}
     >
-      <span className="inline-flex items-center gap-2">
+      <span className="inline-flex items-center gap-1">
         {children}
         {hint && (
           <Tooltip>

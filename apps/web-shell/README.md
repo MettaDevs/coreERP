@@ -1,5 +1,7 @@
 # Web Shell
 
-React SPA customer yang memuat UI artifact module berlisensi dan mengarahkan request ke API module. Ia tidak memiliki domain model POS, Booking, atau module bisnis lain.
+React SPA yang menjadi header bersama dan launcher aplikasi. Ia membaca `GET /api/v1/launch-manifest` dari Control Plane, lalu hanya menampilkan aplikasi yang siap dibuka oleh user aktif.
 
-Rujukan: [application-plane model](../../docs/dev/01-grand-design.md), [standar module](../../docs/dev/02-module-standard.md), dan [API governance](../../docs/dev/04-api-and-integration.md).
+Web Shell tidak memiliki domain atau database aplikasi bisnis. Klik aplikasi mengarahkan user ke UI artifact app tersebut dengan session SSO yang sama.
+
+Untuk development, salin `.env.example` ke `.env` bila Control Plane tidak berjalan di `http://127.0.0.1:8000`, lalu jalankan `npm run dev`. Vite meneruskan request `/api` ke Control Plane agar launcher tetap memakai session yang sama.

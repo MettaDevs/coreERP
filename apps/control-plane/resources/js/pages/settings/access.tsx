@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { Check, Copy, Pencil, UserPlus, Users } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -42,10 +42,9 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-type Duty = { code: string; module_id: string; name: string };
-type Module = { id: string; name: string; duties: Duty[] };
+type Duty = { code: string; app_id: string; name: string };
+type App = { id: string; name: string; duties: Duty[] };
 type Role = { id: string; name: string; duties: Duty[] };
 type Member = {
     id: string;
@@ -75,7 +74,7 @@ type Props = {
     tenant: { id: string; name: string };
     canManage: boolean;
     members: Member[];
-    modules: Module[];
+    apps: App[];
     roles: Role[];
     organizations: Organization[];
     hierarchies: Hierarchy[];
@@ -88,7 +87,7 @@ const toggle = (values: string[], value: string, checked: boolean) =>
         ? [...new Set([...values, value])]
         : values.filter((item) => item !== value);
 
-function RoleForm({ modules }: { modules: Module[] }) {
+function RoleForm({ apps }: { apps: App[] }) {
     const [open, setOpen] = useState(false);
     const form = useForm({ name: '', duty_codes: [] as string[] });
 
@@ -135,12 +134,12 @@ function RoleForm({ modules }: { modules: Module[] }) {
                                 Tanggung jawab bisnis
                             </FieldLegend>
                             <div className="max-h-72 space-y-4 overflow-auto rounded-md border p-3">
-                                {modules.map((module) => (
-                                    <div key={module.id} className="space-y-2">
+                                {apps.map((app) => (
+                                    <div key={app.id} className="space-y-2">
                                         <p className="text-sm font-medium">
-                                            {module.name}
+                                            {app.name}
                                         </p>
-                                        {module.duties.map((duty) => (
+                                        {app.duties.map((duty) => (
                                             <label
                                                 key={duty.code}
                                                 className="flex items-center gap-3 text-sm"
@@ -527,13 +526,18 @@ export default function Access({
     tenant,
     canManage,
     members,
-    modules,
+    apps,
     roles,
     organizations,
     hierarchies,
     invitations,
     newInvitationCode,
 }: Props) {
+    const section = new URLSearchParams(usePage().url.split('?')[1]).get(
+        'section',
+    );
+    const activeSection =
+        section === 'roles' || section === 'invitations' ? section : 'members';
     const [editingMember, setEditingMember] = useState<Member | null>(null);
     const memberColumns: DataTableColumn<Member>[] = [
         {
@@ -594,7 +598,7 @@ export default function Access({
             id: 'products',
             header: 'Produk terkait',
             cell: (role) =>
-                [...new Set(role.duties.map((duty) => duty.module_id))].join(
+                [...new Set(role.duties.map((duty) => duty.app_id))].join(
                     ', ',
                 ),
         },
@@ -664,93 +668,83 @@ export default function Access({
                         </AlertDescription>
                     </Alert>
                 )}
-                <Tabs defaultValue="members">
-                    <TabsList>
-                        <TabsTrigger value="members">Anggota</TabsTrigger>
-                        <TabsTrigger value="roles">Role</TabsTrigger>
-                        <TabsTrigger value="invitations">Undangan</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="members">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Anggota</CardTitle>
-                                <CardDescription>
-                                    Identity dengan membership tenant aktif.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <DataTable
-                                    columns={memberColumns}
-                                    data={members}
-                                    getRowKey={(member) => member.id}
+                {activeSection === 'members' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Anggota</CardTitle>
+                            <CardDescription>
+                                Identity dengan membership tenant aktif.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <DataTable
+                                columns={memberColumns}
+                                data={members}
+                                getRowKey={(member) => member.id}
+                            />
+                        </CardContent>
+                    </Card>
+                )}
+                {activeSection === 'roles' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Security role</CardTitle>
+                            <CardDescription>
+                                Susun role dari tanggung jawab bisnis, termasuk
+                                lintas produk.
+                            </CardDescription>
+                            {canManage && <RoleForm apps={apps} />}
+                        </CardHeader>
+                        <CardContent>
+                            <DataTable
+                                columns={roleColumns}
+                                data={roles}
+                                getRowKey={(role) => role.id}
+                            />
+                        </CardContent>
+                    </Card>
+                )}
+                {activeSection === 'invitations' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Kode undangan</CardTitle>
+                            <CardDescription>
+                                Kode asli tidak disimpan setelah ditampilkan.
+                            </CardDescription>
+                            {canManage && (
+                                <InviteForm
+                                    roles={roles}
+                                    organizations={organizations}
+                                    hierarchies={hierarchies}
                                 />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    <TabsContent value="roles">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Security role</CardTitle>
-                                <CardDescription>
-                                    Susun role dari tanggung jawab bisnis,
-                                    termasuk lintas produk.
-                                </CardDescription>
-                                {canManage && <RoleForm modules={modules} />}
-                            </CardHeader>
-                            <CardContent>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                            {invitations.length ? (
                                 <DataTable
-                                    columns={roleColumns}
-                                    data={roles}
-                                    getRowKey={(role) => role.id}
+                                    columns={invitationColumns}
+                                    data={invitations}
+                                    getRowKey={(invitation) => invitation.id}
                                 />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    <TabsContent value="invitations">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Kode undangan</CardTitle>
-                                <CardDescription>
-                                    Kode asli tidak disimpan setelah
-                                    ditampilkan.
-                                </CardDescription>
-                                {canManage && (
-                                    <InviteForm
-                                        roles={roles}
-                                        organizations={organizations}
-                                        hierarchies={hierarchies}
-                                    />
-                                )}
-                            </CardHeader>
-                            <CardContent>
-                                {invitations.length ? (
-                                    <DataTable
-                                        columns={invitationColumns}
-                                        data={invitations}
-                                        getRowKey={(invitation) =>
-                                            invitation.id
-                                        }
-                                    />
-                                ) : (
-                                    <Empty>
-                                        <EmptyHeader>
-                                            <EmptyMedia variant="icon">
-                                                <Users />
-                                            </EmptyMedia>
-                                            <EmptyTitle>
-                                                Belum ada undangan
-                                            </EmptyTitle>
-                                            <EmptyDescription>
-                                                Buat kode pertama untuk anggota
-                                                baru.
-                                            </EmptyDescription>
-                                        </EmptyHeader>
-                                    </Empty>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
+                            ) : (
+                                <Empty>
+                                    <EmptyHeader>
+                                        <EmptyMedia variant="icon">
+                                            <Users />
+                                        </EmptyMedia>
+                                        <EmptyTitle>
+                                            Belum ada undangan
+                                        </EmptyTitle>
+                                        <EmptyDescription>
+                                            Buat kode pertama untuk anggota
+                                            baru.
+                                        </EmptyDescription>
+                                    </EmptyHeader>
+                                </Empty>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
                 <MemberAccessDialog
                     key={editingMember?.id ?? 'closed'}
                     member={editingMember}

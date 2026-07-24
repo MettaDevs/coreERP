@@ -18,15 +18,15 @@ class CreateNewUser implements CreatesNewUsers
     /**
      * Validate and create a newly registered user.
      *
-     * @param  array{name:string,email:string,password:string,business_name:string,module_ids:list<string>}  $input
+     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>}  $input
      */
     public function create(array $input): User
     {
         Validator::make($input, [
             ...$this->profileRules(),
             'business_name' => ['required', 'string', 'max:255'],
-            'module_ids' => ['required', 'array', 'min:1'],
-            'module_ids.*' => ['required', 'string', 'distinct', 'exists:modules,id'],
+            'app_ids' => ['required', 'array', 'min:1'],
+            'app_ids.*' => ['required', 'string', 'distinct', 'exists:apps,id'],
             'password' => $this->passwordRules(),
         ])->validate();
 
@@ -35,7 +35,7 @@ class CreateNewUser implements CreatesNewUsers
             'email' => $input['email'],
             'password' => $input['password'],
             'business_name' => $input['business_name'],
-            'module_ids' => $input['module_ids'],
+            'app_ids' => $input['app_ids'],
         ]);
     }
 }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Access;
 
 use App\Http\Controllers\Controller;
-use App\Models\CoreModule;
+use App\Models\CoreApp;
 use App\Models\InvitationCode;
 use App\Models\Organization;
 use App\Models\OrganizationHierarchy;
@@ -48,14 +48,14 @@ class AccessController extends Controller
                         'can_edit_access' => $member->system_role !== 'owner' || $member->id === $membership->id,
                     ];
                 }),
-            'modules' => CoreModule::query()
+            'apps' => CoreApp::query()
                 ->whereHas('duties')
-                ->with('duties:code,module_id,name,description')
+                ->with('duties:code,app_id,name,description')
                 ->get(['id', 'name']),
             'roles' => Role::query()
                 ->where('tenant_id', $tenantId)
                 ->where('is_active', true)
-                ->with('duties:code,name,module_id')
+                ->with('duties:code,name,app_id')
                 ->orderBy('name')
                 ->get(),
             'organizations' => Organization::query()

@@ -783,7 +783,7 @@ export default function UiPlayground() {
                                         value="settings"
                                         className="rounded-lg border p-4 text-sm"
                                     >
-                                        Module configuration.
+                                        Konfigurasi aplikasi.
                                     </TabsContent>
                                 </Tabs>
                                 <Accordion type="single" collapsible>
@@ -951,12 +951,12 @@ export default function UiPlayground() {
                             description="Searchable action list commonly used in internal applications."
                         >
                             <Command className="rounded-lg border">
-                                <CommandInput placeholder="Search modules..." />
+                                <CommandInput placeholder="Cari aplikasi..." />
                                 <CommandList>
                                     <CommandEmpty>
-                                        No module found.
+                                        Aplikasi tidak ditemukan.
                                     </CommandEmpty>
-                                    <CommandGroup heading="Modules">
+                                    <CommandGroup heading="Aplikasi">
                                         <CommandItem>
                                             <CreditCard /> Finance
                                         </CommandItem>

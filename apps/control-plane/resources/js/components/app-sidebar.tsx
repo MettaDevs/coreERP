@@ -1,6 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
-    Boxes,
     Building2,
     KeyRound,
     LayoutDashboard,
@@ -11,58 +10,139 @@ import {
     Users,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import { Sidebar } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
+type NavigationItem = {
+    label: string;
+    icon: typeof LayoutDashboard;
+    href: string;
+};
+type PrimaryNavigationItem = NavigationItem & {
+    children: NavigationItem[];
+};
+
 export function AppSidebar() {
     const { url, props } = usePage();
-    const childItems = [
+    const path = url.split('?')[0];
+    const primaryItems: PrimaryNavigationItem[] = [
         {
             label: 'Dashboard',
             icon: LayoutDashboard,
             href: '/dashboard',
+            children: [
+                {
+                    label: 'Ringkasan',
+                    icon: LayoutDashboard,
+                    href: '/dashboard',
+                },
+            ],
         },
-        {
-            label: 'Organization',
-            icon: Building2,
-            href: '/settings/organization',
-        },
-        {
-            label: 'Identity & access',
-            icon: KeyRound,
-            href: '/settings/access',
-        },
+        ...(props.auth.membership
+            ? [
+                  {
+                      label: 'Organization',
+                      icon: Building2,
+                      href: '/settings/organization',
+                      children: [
+                          {
+                              label: 'Organisasi',
+                              icon: Building2,
+                              href: '/settings/organization',
+                          },
+                      ],
+                  },
+                  {
+                      label: 'Identity & access',
+                      icon: KeyRound,
+                      href: '/settings/access?section=members',
+                      children: [
+                          {
+                              label: 'Anggota',
+                              icon: Users,
+                              href: '/settings/access?section=members',
+                          },
+                          {
+                              label: 'Role',
+                              icon: KeyRound,
+                              href: '/settings/access?section=roles',
+                          },
+                          {
+                              label: 'Undangan',
+                              icon: Users,
+                              href: '/settings/access?section=invitations',
+                          },
+                      ],
+                  },
+              ]
+            : []),
         {
             label: 'Profile',
             icon: UserRound,
             href: '/settings/profile',
+            children: [
+                {
+                    label: 'Profil',
+                    icon: UserRound,
+                    href: '/settings/profile',
+                },
+            ],
         },
         {
             label: 'Security',
             icon: ShieldCheck,
             href: '/settings/security',
+            children: [
+                {
+                    label: 'Keamanan akun',
+                    icon: ShieldCheck,
+                    href: '/settings/security',
+                },
+            ],
         },
         {
             label: 'Appearance',
             icon: Palette,
             href: '/settings/appearance',
+            children: [
+                {
+                    label: 'Tampilan',
+                    icon: Palette,
+                    href: '/settings/appearance',
+                },
+            ],
         },
         ...(props.auth.provider_admin
             ? [
                   {
-                      label: 'Identity monitor',
-                      icon: Users,
-                      href: '/control/identities',
-                  },
-                  {
-                      label: 'Module catalog',
+                      label: 'Operations',
                       icon: Package,
-                      href: '/control/modules',
+                      href: '/control/identities',
+                      children: [
+                          {
+                              label: 'Identity monitor',
+                              icon: Users,
+                              href: '/control/identities',
+                          },
+                          {
+                              label: 'Katalog aplikasi',
+                              icon: Package,
+                              href: '/control/apps',
+                          },
+                      ],
                   },
               ]
             : []),
     ];
+    const selectedItem =
+        primaryItems.find((item) =>
+            item.children.some((child) => path === child.href.split('?')[0]),
+        ) ?? primaryItems[0];
+    const isChildActive = (item: NavigationItem) =>
+        url === item.href ||
+        (item.href === '/settings/access?section=members' &&
+            path === '/settings/access' &&
+            !url.includes('?section='));
 
     return (
         <Sidebar
@@ -71,44 +151,57 @@ export function AppSidebar() {
             style={{ '--sidebar-width': '20rem' } as React.CSSProperties}
         >
             <div className="flex h-full w-full">
-                <aside className="flex w-16 shrink-0 flex-col items-center gap-3 border-r border-sidebar-border py-3">
+                <aside className="flex w-24 shrink-0 flex-col items-center gap-3 border-r border-sidebar-border py-3">
                     <Link
                         href="/dashboard"
-                        className="flex flex-col items-center gap-1 text-[10px] font-semibold text-sidebar-primary"
+                        className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground"
+                        aria-label="Beranda"
                     >
-                        <span className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">
-                            CE
-                        </span>
-                        <span>Core</span>
+                        CE
                     </Link>
-                    <nav aria-label="Modules" className="flex flex-col gap-1">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto min-h-11 flex-col gap-0.5 bg-sidebar-accent px-1 py-1 text-[10px] text-sidebar-accent-foreground"
-                            aria-label="Core"
-                        >
-                            <Boxes />
-                            <span>Core</span>
-                        </Button>
+                    <nav
+                        aria-label="Menu utama"
+                        className="flex flex-col gap-1"
+                    >
+                        {primaryItems.map((item) => (
+                            <Link
+                                key={item.label}
+                                href={item.href}
+                                className={cn(
+                                    'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1 text-center text-[10px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&_svg]:size-4',
+                                    selectedItem.label === item.label &&
+                                        'bg-sidebar-accent font-semibold text-sidebar-accent-foreground',
+                                )}
+                            >
+                                <item.icon />
+                                <span className="w-full leading-tight break-words whitespace-normal">
+                                    {item.label}
+                                </span>
+                            </Link>
+                        ))}
                     </nav>
                 </aside>
 
-                <nav className="min-w-0 flex-1" aria-label="CoreERP navigation">
+                <nav
+                    className="min-w-0 flex-1"
+                    aria-label={`${selectedItem.label} navigation`}
+                >
                     <div className="border-b border-sidebar-border px-3 py-3">
                         <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                             Menu
                         </p>
-                        <h2 className="text-base font-semibold">Core</h2>
+                        <h2 className="text-base font-semibold">
+                            {selectedItem.label}
+                        </h2>
                     </div>
                     <div className="flex flex-col gap-1 px-3 py-3">
-                        {childItems.map((item) => (
+                        {selectedItem.children.map((item) => (
                             <Link
                                 key={item.label}
                                 href={item.href}
                                 className={cn(
                                     'flex h-9 items-center gap-3 rounded-md px-3 text-xs text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:h-10 lg:text-sm [&_svg]:size-4 lg:[&_svg]:size-5',
-                                    url.startsWith(item.href) &&
+                                    isChildActive(item) &&
                                         'bg-sidebar-accent font-semibold text-sidebar-accent-foreground',
                                 )}
                             >

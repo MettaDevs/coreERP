@@ -19,8 +19,8 @@ export default function Heading({
         <header
             className={
                 variant === 'small'
-                    ? 'flex items-center justify-between gap-3'
-                    : 'mb-8 flex items-center justify-between gap-3'
+                    ? 'flex items-center gap-1'
+                    : 'mb-8 flex items-center gap-1'
             }
         >
             <h2

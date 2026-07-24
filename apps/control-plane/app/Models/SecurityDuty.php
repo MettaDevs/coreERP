@@ -13,7 +13,7 @@ class SecurityDuty extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['code', 'module_id', 'name', 'description'];
+    protected $fillable = ['code', 'app_id', 'name', 'description'];
 
     /** @return BelongsToMany<SecurityPrivilege, $this> */
     public function privileges(): BelongsToMany

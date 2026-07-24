@@ -20,6 +20,13 @@ Modern frontend patterns for React, Next.js, and performant user interfaces.
 
 ## Component Patterns
 
+### Hint Placement
+
+- Render a field or card title and its hint trigger in the same inline flex group with a small gap.
+- Do not place a contextual hint in `CardAction` or another corner of the card; reserve those areas for actions such as create, edit, or close.
+- Apply the same rule to `Heading` and `DialogHeader`: do not use `justify-between`, a trailing grid column, or `margin-left: auto` for a hint trigger.
+- Use a tooltip for optional short clarification. Use supporting text below the label when users need the information before they can continue.
+
 ### Composition Over Inheritance
 
 ```typescript

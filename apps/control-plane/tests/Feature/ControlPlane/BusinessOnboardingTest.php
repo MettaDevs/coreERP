@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Jobs\DeployModulePlacement;
+use App\Jobs\DeployAppPlacement;
 use App\Models\User;
-use Database\Seeders\ModuleCatalogSeeder;
+use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -19,7 +19,7 @@ class BusinessOnboardingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(ModuleCatalogSeeder::class);
+        $this->seed(AppCatalogSeeder::class);
         Queue::fake();
     }
 
@@ -28,7 +28,7 @@ class BusinessOnboardingTest extends TestCase
         $response = $this->postJson('/api/v1/business-registrations', [
             'name' => 'Owner Metta',
             'business_name' => 'PT Metta',
-            'module_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['management-asset'],
             'email' => 'owner@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -40,11 +40,11 @@ class BusinessOnboardingTest extends TestCase
         $this->assertDatabaseCount('tenants', 1);
         $this->assertDatabaseCount('organizations', 0);
         $this->assertDatabaseHas('tenant_memberships', ['system_role' => 'owner', 'status' => 'active']);
-        $this->assertDatabaseCount('tenant_module_entitlements', 2);
+        $this->assertDatabaseCount('tenant_app_entitlements', 1);
         $this->assertDatabaseCount('tenant_deployments', 1);
         $this->assertDatabaseCount('roles', 1);
         $this->assertDatabaseCount('role_assignments', 1);
-        $this->assertDatabaseCount('security_role_duties', 6);
+        $this->assertDatabaseCount('security_role_duties', 3);
     }
 
     public function test_registration_dispatches_placement_jobs_after_the_transaction_commits(): void
@@ -52,20 +52,20 @@ class BusinessOnboardingTest extends TestCase
         $this->postJson('/api/v1/business-registrations', [
             'name' => 'Owner Metta',
             'business_name' => 'PT Metta',
-            'module_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['management-asset'],
             'email' => 'after-commit@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertCreated();
 
-        Queue::assertPushed(DeployModulePlacement::class, 2);
+        Queue::assertPushed(DeployAppPlacement::class, 1);
     }
 
     public function test_registration_reuses_an_existing_ready_pooled_placement(): void
     {
-        DB::table('module_placements')->insert([
+        DB::table('app_placements')->insert([
             'id' => (string) Str::ulid(),
-            'module_id' => 'procurement',
+            'app_id' => 'management-asset',
             'release_version' => '0.1.0',
             'placement' => 'pooled-primary',
             'profile' => 'pooled',
@@ -80,13 +80,13 @@ class BusinessOnboardingTest extends TestCase
         $this->postJson('/api/v1/business-registrations', [
             'name' => 'Pooled Owner',
             'business_name' => 'Pooled Tenant',
-            'module_ids' => ['procurement'],
+            'app_ids' => ['management-asset'],
             'email' => 'pooled@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertCreated();
 
-        Queue::assertNotPushed(DeployModulePlacement::class);
+        Queue::assertNotPushed(DeployAppPlacement::class);
     }
 
     public function test_duplicate_email_rolls_back_without_creating_a_second_tenant(): void
@@ -94,7 +94,7 @@ class BusinessOnboardingTest extends TestCase
         $payload = [
             'name' => 'Owner Metta',
             'business_name' => 'PT Metta',
-            'module_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['management-asset'],
             'email' => 'owner@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -105,30 +105,29 @@ class BusinessOnboardingTest extends TestCase
         $this->assertDatabaseCount('tenants', 1);
     }
 
-    public function test_registration_only_entitles_selected_modules(): void
+    public function test_registration_only_entitles_selected_apps(): void
     {
         $this->postJson('/api/v1/business-registrations', [
-            'name' => 'Procurement Owner',
-            'business_name' => 'Procurement Only',
-            'module_ids' => ['procurement'],
-            'email' => 'procurement@metta.test',
+            'name' => 'Asset Owner',
+            'business_name' => 'Asset Only',
+            'app_ids' => ['management-asset'],
+            'email' => 'asset@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertCreated();
 
-        $this->assertDatabaseCount('tenant_module_entitlements', 1);
-        $this->assertDatabaseHas('tenant_module_entitlements', ['module_id' => 'procurement']);
-        $this->assertDatabaseMissing('tenant_module_entitlements', ['module_id' => 'management-asset']);
+        $this->assertDatabaseCount('tenant_app_entitlements', 1);
+        $this->assertDatabaseHas('tenant_app_entitlements', ['app_id' => 'management-asset']);
         $this->assertDatabaseCount('roles', 1);
         $this->assertDatabaseCount('role_assignments', 1);
 
-        $owner = User::query()->where('email', 'procurement@metta.test')->firstOrFail();
+        $owner = User::query()->where('email', 'asset@metta.test')->firstOrFail();
         $this->actingAs($owner)
             ->get('/dashboard')
             ->assertInertia(fn (Assert $page) => $page
                 ->has('entitledProducts', 1)
-                ->where('entitledProducts.0.id', 'procurement')
-                ->where('entitledProducts.0.href', config('coreerp.module_catalog.0.ui_entry'))
+                ->where('entitledProducts.0.id', 'management-asset')
+                ->where('entitledProducts.0.href', '/apps/management-asset')
                 ->has('launchableProducts', 0)
             );
     }
@@ -138,15 +137,15 @@ class BusinessOnboardingTest extends TestCase
         $this->postJson('/api/v1/business-registrations', [
             'name' => 'Owner',
             'business_name' => 'PT Ready',
-            'module_ids' => ['procurement'],
+            'app_ids' => ['management-asset'],
             'email' => 'ready@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertCreated();
         $owner = User::query()->where('email', 'ready@metta.test')->firstOrFail();
-        DB::table('module_placements')->insert([
+        DB::table('app_placements')->insert([
             'id' => (string) Str::ulid(),
-            'module_id' => 'procurement',
+            'app_id' => 'management-asset',
             'release_version' => '0.1.0',
             'placement' => 'pooled-primary',
             'profile' => 'pooled',
@@ -160,6 +159,11 @@ class BusinessOnboardingTest extends TestCase
 
         $this->actingAs($owner)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
             ->has('launchableProducts', 1)
-            ->where('launchableProducts.0.id', 'procurement'));
+            ->where('launchableProducts.0.id', 'management-asset'));
+
+        $this->actingAs($owner)->getJson('/api/v1/launch-manifest')
+            ->assertOk()
+            ->assertJsonPath('data.apps.0.id', 'management-asset')
+            ->assertJsonPath('data.apps.0.entry', '/apps/management-asset');
     }
 }
