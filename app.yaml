@@ -1,0 +1,43 @@
+id: management-asset
+publisher: apperp
+version: 0.1.0
+kind: business-app
+requires:
+  core: ^0.1
+dependsOn: []
+api:
+  image: registry.apperp.local/apps/management-asset-api:0.1.0
+  openapi: contracts/openapi.yaml
+ui:
+  image: registry.apperp.local/apps/management-asset-ui:0.1.0
+  entry: /apps/management-asset/
+  navigation:
+    rail:
+      - id: dashboard
+        label: Dashboard
+      - id: master
+        label: Master
+    sidebar:
+      master:
+        - id: assets
+          label: Aset
+          entryPoint: management-asset.assets.read
+        - id: categories
+          label: Kategori
+          entryPoint: management-asset.categories.read
+        - id: groups
+          label: Grup
+          entryPoint: management-asset.groups.read
+database:
+  logicalName: app_erp_management_asset
+  migrations: database/migrations
+events:
+  asyncapi: contracts/asyncapi.yaml
+permissions:
+  - management-asset.assets.read
+  - management-asset.assets.create
+  - management-asset.assets.update
+  - management-asset.categories.read
+  - management-asset.categories.manage
+  - management-asset.groups.read
+  - management-asset.groups.manage
