@@ -16,7 +16,7 @@ class Organization extends Model
 {
     use HasUlids;
 
-    protected $fillable = ['tenant_id', 'code', 'name', 'classification', 'status'];
+    protected $fillable = ['tenant_id', 'name', 'classification', 'status'];
 
     /** @return BelongsTo<Tenant, $this> */
     public function tenant(): BelongsTo

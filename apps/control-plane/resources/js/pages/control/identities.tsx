@@ -4,18 +4,18 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 
 import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { DataTable } from '@/components/ui/data-table';
-import type { DataTableColumn } from '@/components/ui/data-table';
+import { Badge } from '@apperp/ui/badge';
+import { Card, CardContent } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyMedia,
     EmptyTitle,
-} from '@/components/ui/empty';
-import { Input } from '@/components/ui/input';
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
 
 type Identity = {
     id: number;

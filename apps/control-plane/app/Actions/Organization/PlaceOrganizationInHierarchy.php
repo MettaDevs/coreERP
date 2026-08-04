@@ -29,6 +29,9 @@ class PlaceOrganizationInHierarchy
         if (! $organization || ! $parent) {
             throw ValidationException::withMessages(['organization_id' => 'Organisasi dan parent harus berasal dari tenant serta versi yang sama.']);
         }
+        if ($version->nodes()->where('organization_id', $organization->id)->exists()) {
+            throw ValidationException::withMessages(['organization_id' => 'Organisasi ini sudah ada pada draft hierarchy.']);
+        }
 
         DB::transaction(function () use ($version, $organization, $parent): void {
             $version->nodes()->create([

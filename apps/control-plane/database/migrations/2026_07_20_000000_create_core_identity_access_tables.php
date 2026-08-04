@@ -213,15 +213,11 @@ return new class extends Migration
             $table->foreignUlid('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('code_hash', 64)->unique();
             $table->string('system_role', 20);
-            $table->ulid('organization_id')->nullable();
-            $table->ulid('hierarchy_id')->nullable();
-            $table->boolean('include_descendants')->default(false);
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
             $table->timestamp('expires_at');
             $table->timestamp('used_at')->nullable();
             $table->timestamp('revoked_at')->nullable();
             $table->timestamps();
-            $table->foreign('organization_id')->references('id')->on('organizations')->restrictOnDelete();
         });
 
         Schema::create('invitation_role_assignments', function (Blueprint $table) {

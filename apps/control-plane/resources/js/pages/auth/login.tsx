@@ -2,11 +2,11 @@ import { Form, Head } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@apperp/ui/button';
+import { Checkbox } from '@apperp/ui/checkbox';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { Spinner } from '@apperp/ui/spinner';
 /* @chisel-registration */
 import { register } from '@/routes';
 /* @end-chisel-registration */

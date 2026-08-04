@@ -2,20 +2,22 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 
 /**
  * @property string $id
  * @property string $tenant_id
  * @property string $system_role
  * @property int $created_by
- * @property Carbon $expires_at
- * @property Carbon|null $used_at
+ * @property string|null $code_ciphertext
+ * @property Carbon|null $expires_at
  * @property Carbon|null $revoked_at
  * @property-read Collection<int, Role> $roles
  */
@@ -26,25 +28,20 @@ class InvitationCode extends Model
     protected $fillable = [
         'tenant_id',
         'code_hash',
+        'code_ciphertext',
         'system_role',
-        'organization_id',
-        'hierarchy_id',
-        'include_descendants',
         'created_by',
         'expires_at',
-        'used_at',
         'revoked_at',
     ];
 
-    protected $hidden = ['code_hash'];
+    protected $hidden = ['code_hash', 'code_ciphertext'];
 
     protected function casts(): array
     {
         return [
             'expires_at' => 'datetime',
-            'used_at' => 'datetime',
             'revoked_at' => 'datetime',
-            'include_descendants' => 'boolean',
         ];
     }
 
@@ -58,5 +55,18 @@ class InvitationCode extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function accessibleCode(): ?string
+    {
+        if ($this->code_ciphertext === null) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($this->code_ciphertext);
+        } catch (DecryptException) {
+            return null;
+        }
     }
 }

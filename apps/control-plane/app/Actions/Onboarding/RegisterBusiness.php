@@ -2,8 +2,11 @@
 
 namespace App\Actions\Onboarding;
 
+use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
+use App\Actions\ReferenceData\ProvisionDefaultUnitsOfMeasure;
 use App\Jobs\DeployAppPlacement;
 use App\Models\Client;
+use App\Models\AppDataPolicy;
 use App\Models\CoreApp;
 use App\Models\Role;
 use App\Models\RoleAssignment;
@@ -12,6 +15,7 @@ use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use LogicException;
 use RuntimeException;
@@ -23,7 +27,9 @@ class RegisterBusiness
      */
     public function handle(array $data): User
     {
-        return DB::transaction(function () use ($data): User {
+        $hashedPassword = Hash::make($data['password']);
+
+        return DB::transaction(function () use ($data, $hashedPassword): User {
             $appIds = CoreApp::query()
                 ->whereIn('id', $data['app_ids'])
                 ->where('status', 'available')
@@ -36,7 +42,7 @@ class RegisterBusiness
             $user = User::create([
                 'name' => $data['name'],
                 'email' => Str::lower($data['email']),
-                'password' => $data['password'],
+                'password' => $hashedPassword,
             ]);
             $client = Client::create([
                 'legal_name' => $data['business_name'],
@@ -49,6 +55,7 @@ class RegisterBusiness
                 'slug' => $slug,
                 'status' => 'active',
             ]);
+            app(ProvisionDefaultUnitsOfMeasure::class)->forTenant($tenant->id);
             $profile = (string) config('coreerp.deployment.profile');
             $placement = (string) config('coreerp.deployment.placement');
             if (! in_array($profile, ['pooled', 'isolated'], true) || ! preg_match('/^[a-z0-9][a-z0-9-]{0,119}$/', $placement)) {
@@ -90,20 +97,27 @@ class RegisterBusiness
             $ownerRole->duties()->sync(
                 SecurityDuty::query()->whereIn('app_id', $appIds)->pluck('code'),
             );
-            RoleAssignment::create([
+            $ownerAssignment = RoleAssignment::create([
                 'membership_id' => $membership->id,
                 'role_id' => $ownerRole->id,
                 'source' => 'automatic',
                 'status' => 'active',
                 'valid_from' => now(),
-            ])->organizationScope()->create([
-                'organization_id' => null,
-                'hierarchy_id' => null,
-                'hierarchy_version_id' => null,
-                'include_descendants' => false,
             ]);
+            foreach (AppDataPolicy::query()->whereIn('app_id', $appIds)->get() as $policy) {
+                $ownerAssignment->dataPolicyScopes()->create([
+                    'tenant_id' => $tenant->id,
+                    'policy_code' => $policy->code,
+                    'legal_entity_id' => null,
+                    'organization_id' => null,
+                    'hierarchy_id' => null,
+                    'hierarchy_version_id' => null,
+                    'include_descendants' => false,
+                    'valid_from' => now(),
+                ]);
+            }
 
-            DB::afterCommit(function () use ($appIds, $placement): void {
+            DB::afterCommit(function () use ($appIds, $placement, $tenant): void {
                 foreach ($appIds as $appId) {
                     $ready = DB::table('app_placements')
                         ->where('app_id', $appId)
@@ -119,6 +133,8 @@ class RegisterBusiness
 
                     DeployAppPlacement::dispatch($appId, $placement);
                 }
+
+                app(EnsureNumberSequenceDrafts::class)->forReadyTenant($tenant->id);
             });
 
             return $user;

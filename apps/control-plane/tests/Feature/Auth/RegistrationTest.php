@@ -33,7 +33,7 @@ class RegistrationTest extends TestCase
         $response = $this->post(route('register.store'), [
             'name' => 'Test User',
             'business_name' => 'PT Test',
-            'app_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['management-aset'],
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -42,7 +42,7 @@ class RegistrationTest extends TestCase
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
         $this->assertDatabaseHas('tenant_memberships', ['system_role' => 'owner']);
-        $this->assertDatabaseCount('tenant_app_entitlements', 2);
+        $this->assertDatabaseCount('tenant_app_entitlements', 1);
         $this->assertDatabaseCount('tenant_deployments', 1);
         $this->assertDatabaseCount('organizations', 0);
         $this->assertDatabaseCount('roles', 1);

@@ -64,24 +64,6 @@ return new class extends Migration
             $table->primary(['version_id', 'ancestor_organization_id', 'descendant_organization_id']);
         });
 
-        Schema::create('role_assignment_org_scopes', function (Blueprint $table) {
-            $table->id();
-            $table->foreignUlid('assignment_id')->constrained('role_assignments')->cascadeOnDelete();
-            $table->ulid('organization_id')->nullable();
-            $table->ulid('hierarchy_id')->nullable();
-            $table->ulid('hierarchy_version_id')->nullable();
-            $table->boolean('include_descendants')->default(false);
-            $table->timestamps();
-            $table->foreign('organization_id')->references('id')->on('organizations')->restrictOnDelete();
-            $table->foreign('hierarchy_id')->references('id')->on('organization_hierarchies')->restrictOnDelete();
-            $table->foreign('hierarchy_version_id')->references('id')->on('organization_hierarchy_versions')->restrictOnDelete();
-            $table->unique('assignment_id');
-        });
-
-        Schema::table('invitation_codes', function (Blueprint $table) {
-            $table->foreign('hierarchy_id')->references('id')->on('organization_hierarchies')->restrictOnDelete();
-        });
-
         $now = now();
         DB::table('hierarchy_purposes')->insert([
             ['id' => (string) Str::ulid(), 'code' => 'management', 'name' => 'Management reporting', 'description' => 'Struktur untuk pelaporan dan pengelolaan internal.', 'created_at' => $now, 'updated_at' => $now],
@@ -93,10 +75,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('invitation_codes', function (Blueprint $table) {
-            $table->dropForeign(['hierarchy_id']);
-        });
-        Schema::dropIfExists('role_assignment_org_scopes');
         Schema::dropIfExists('organization_hierarchy_closures');
         Schema::dropIfExists('organization_hierarchy_nodes');
         Schema::dropIfExists('organization_hierarchy_versions');

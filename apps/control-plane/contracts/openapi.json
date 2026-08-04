@@ -16,9 +16,9 @@
         }
     ],
     "paths": {
-        "/control/modules": {
+        "/control/apps": {
             "get": {
-                "operationId": "control.modules.index",
+                "operationId": "control.apps.index",
                 "responses": {
                     "200": {
                         "description": "",
@@ -28,7 +28,10 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "string"
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CoreApp"
+                                            }
                                         }
                                     },
                                     "required": [
@@ -40,6 +43,397 @@
                     }
                 },
                 "security": []
+            }
+        },
+        "/provider/apps": {
+            "get": {
+                "operationId": "provider.apps.index",
+                "tags": [
+                    "AppCatalog"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                ""
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "provider.apps.store",
+                "tags": [
+                    "AppCatalog"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AppCatalogRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/launch-manifest": {
+            "get": {
+                "operationId": "launch-manifest.show",
+                "tags": [
+                    "AppLaunchManifest"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "tenant": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "name": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "name"
+                                                    ]
+                                                },
+                                                "apps": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "": {},
+                                                            "entry": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            null,
+                                                            "entry"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "tenant",
+                                                "apps"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                ""
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/provider/apps/{app}/releases": {
+            "post": {
+                "operationId": "provider.app-releases.store",
+                "tags": [
+                    "AppRelease"
+                ],
+                "parameters": [
+                    {
+                        "name": "app",
+                        "in": "path",
+                        "required": true,
+                        "description": "The app ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AppReleaseRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "app_id": {
+                                                    "type": "string"
+                                                },
+                                                "version": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                },
+                                                "manifest_sha256": {
+                                                    "type": "string"
+                                                },
+                                                "api_image": {
+                                                    "type": "string"
+                                                },
+                                                "ui_image": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "app_id",
+                                                "version",
+                                                "status",
+                                                "manifest_sha256",
+                                                "api_image",
+                                                "ui_image"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/provider/apps/{app}/service-credentials": {
+            "post": {
+                "operationId": "provider.app-service-credentials.store",
+                "tags": [
+                    "AppServiceCredential"
+                ],
+                "parameters": [
+                    {
+                        "name": "app",
+                        "in": "path",
+                        "required": true,
+                        "description": "The app ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 150
+                                    },
+                                    "tenant_id": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "description": "Binding a credential to one tenant limits the blast radius of a leaked token to that tenant. Leaving\nit null preserves the older shared-app behaviour for callers that still need it."
+                                    }
+                                },
+                                "required": [
+                                    "name"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The plaintext token is returned exactly once; Core only stores its digest.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "tenant_id": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ]
+                                                },
+                                                "token": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "tenant_id",
+                                                "token"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                ""
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
             }
         },
         "/business-registrations": {
@@ -98,6 +492,394 @@
                     }
                 },
                 "security": []
+            }
+        },
+        "/fiscal-calendars": {
+            "get": {
+                "operationId": "fiscal-calendars.index",
+                "tags": [
+                    "FiscalCalendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "calendars": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "code": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "name": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "years": {
+                                                                        "type": "array",
+                                                                        "items": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                                "id": {
+                                                                                    "type": "string"
+                                                                                },
+                                                                                "name": {
+                                                                                    "type": "string"
+                                                                                },
+                                                                                "starts_on": {
+                                                                                    "type": "string"
+                                                                                },
+                                                                                "ends_on": {
+                                                                                    "type": "string"
+                                                                                },
+                                                                                "periods": {
+                                                                                    "type": "array",
+                                                                                    "items": {
+                                                                                        "type": "object",
+                                                                                        "properties": {
+                                                                                            "ordinal": {
+                                                                                                "type": "integer"
+                                                                                            },
+                                                                                            "name": {
+                                                                                                "type": "string"
+                                                                                            },
+                                                                                            "starts_on": {
+                                                                                                "type": "string"
+                                                                                            },
+                                                                                            "ends_on": {
+                                                                                                "type": "string"
+                                                                                            }
+                                                                                        },
+                                                                                        "required": [
+                                                                                            "ordinal",
+                                                                                            "name",
+                                                                                            "starts_on",
+                                                                                            "ends_on"
+                                                                                        ]
+                                                                                    }
+                                                                                }
+                                                                            },
+                                                                            "required": [
+                                                                                "id",
+                                                                                "name",
+                                                                                "starts_on",
+                                                                                "ends_on",
+                                                                                "periods"
+                                                                            ]
+                                                                        }
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "id",
+                                                                    "code",
+                                                                    "name",
+                                                                    "years"
+                                                                ]
+                                                            }
+                                                        },
+                                                        "legal_entities": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "name": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "company_code": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "fiscal_calendar_id": {
+                                                                        "type": [
+                                                                            "string",
+                                                                            "null"
+                                                                        ]
+                                                                    }
+                                                                },
+                                                                "required": [
+                                                                    "id",
+                                                                    "name",
+                                                                    "company_code",
+                                                                    "fiscal_calendar_id"
+                                                                ]
+                                                            }
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "calendars",
+                                                        "legal_entities"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "fiscal-calendars.store",
+                "tags": [
+                    "FiscalCalendar"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FiscalCalendarRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/fiscal-calendars/{calendar}/years": {
+            "post": {
+                "operationId": "fiscal-calendars.years.store",
+                "tags": [
+                    "FiscalCalendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "calendar",
+                        "in": "path",
+                        "required": true,
+                        "description": "The calendar ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/FiscalYearRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/fiscal-calendars/{calendar}/assign": {
+            "post": {
+                "operationId": "fiscal-calendars.assign",
+                "tags": [
+                    "FiscalCalendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "calendar",
+                        "in": "path",
+                        "required": true,
+                        "description": "The calendar ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "legal_entity_id": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "legal_entity_id"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "legal_entity_id": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "legal_entity_id"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                ""
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
             }
         },
         "/control/identities": {
@@ -334,7 +1116,10 @@
                                                     "type": "string"
                                                 },
                                                 "expires_at": {
-                                                    "type": "string",
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
                                                     "format": "date-time"
                                                 }
                                             },
@@ -571,6 +1356,363 @@
                 }
             }
         },
+        "/number-sequences": {
+            "get": {
+                "operationId": "number-sequences.index",
+                "tags": [
+                    "NumberSequence"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "string"
+                                                            },
+                                                            "reference_code": {
+                                                                "type": "string"
+                                                            },
+                                                            "reference_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "app_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "allowed_scopes": {
+                                                                "type": "array",
+                                                                "items": {}
+                                                            },
+                                                            "profile_code": {
+                                                                "type": "string"
+                                                            },
+                                                            "scope_type": {
+                                                                "type": "string"
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            },
+                                                            "is_continuous": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "allow_manual": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "reset_period": {
+                                                                "type": "string"
+                                                            },
+                                                            "preallocation_enabled": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "preallocation_quantity": {
+                                                                "type": "integer"
+                                                            },
+                                                            "minimum_number": {
+                                                                "type": "integer"
+                                                            },
+                                                            "maximum_number": {
+                                                                "type": [
+                                                                    "integer",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "segments": {
+                                                                "type": "array",
+                                                                "items": {}
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "id",
+                                                            "reference_code",
+                                                            "reference_name",
+                                                            "app_name",
+                                                            "allowed_scopes",
+                                                            "profile_code",
+                                                            "scope_type",
+                                                            "status",
+                                                            "is_continuous",
+                                                            "allow_manual",
+                                                            "reset_period",
+                                                            "preallocation_enabled",
+                                                            "preallocation_quantity",
+                                                            "minimum_number",
+                                                            "maximum_number",
+                                                            "segments"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/number-sequences/{sequence}": {
+            "patch": {
+                "operationId": "number-sequences.update",
+                "tags": [
+                    "NumberSequence"
+                ],
+                "parameters": [
+                    {
+                        "name": "sequence",
+                        "in": "path",
+                        "required": true,
+                        "description": "The sequence ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NumberSequenceSettingsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {
+                                                            "type": "string"
+                                                        },
+                                                        "reference_code": {
+                                                            "type": "string"
+                                                        },
+                                                        "reference_name": {
+                                                            "type": "string"
+                                                        },
+                                                        "app_name": {
+                                                            "type": "string"
+                                                        },
+                                                        "allowed_scopes": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        },
+                                                        "profile_code": {
+                                                            "type": "string"
+                                                        },
+                                                        "scope_type": {
+                                                            "type": "string"
+                                                        },
+                                                        "status": {
+                                                            "type": "string"
+                                                        },
+                                                        "is_continuous": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "allow_manual": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "reset_period": {
+                                                            "type": "string"
+                                                        },
+                                                        "preallocation_enabled": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "preallocation_quantity": {
+                                                            "type": "integer"
+                                                        },
+                                                        "minimum_number": {
+                                                            "type": "integer"
+                                                        },
+                                                        "maximum_number": {
+                                                            "type": [
+                                                                "integer",
+                                                                "null"
+                                                            ]
+                                                        },
+                                                        "segments": {
+                                                            "type": "array",
+                                                            "items": {}
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "id",
+                                                        "reference_code",
+                                                        "reference_name",
+                                                        "app_name",
+                                                        "allowed_scopes",
+                                                        "profile_code",
+                                                        "scope_type",
+                                                        "status",
+                                                        "is_continuous",
+                                                        "allow_manual",
+                                                        "reset_period",
+                                                        "preallocation_enabled",
+                                                        "preallocation_quantity",
+                                                        "minimum_number",
+                                                        "maximum_number",
+                                                        "segments"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/number-sequences/{sequence}/advance": {
+            "post": {
+                "operationId": "number-sequences.advance",
+                "tags": [
+                    "NumberSequence"
+                ],
+                "parameters": [
+                    {
+                        "name": "sequence",
+                        "in": "path",
+                        "required": true,
+                        "description": "The sequence ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "next_number": {
+                                        "type": "integer",
+                                        "minimum": 1
+                                    },
+                                    "legal_entity_id": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "org_unit_id": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "next_number"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "const": "Nomor berikutnya diperbarui."
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "An error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Error overview.",
+                                            "examples": [
+                                                ""
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/organizations": {
             "get": {
                 "operationId": "organizations.index",
@@ -661,6 +1803,74 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/AuthorizationException"
+                    }
+                }
+            }
+        },
+        "/organizations/{organization}": {
+            "patch": {
+                "operationId": "organizations.update",
+                "tags": [
+                    "Organization"
+                ],
+                "parameters": [
+                    {
+                        "name": "organization",
+                        "in": "path",
+                        "required": true,
+                        "description": "The organization ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateOrganizationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "$ref": "#/components/schemas/Organization"
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
                     },
                     "401": {
                         "$ref": "#/components/responses/AuthenticationException"
@@ -934,6 +2144,521 @@
                 }
             }
         },
+        "/units-of-measure": {
+            "get": {
+                "operationId": "units-of-measure.index",
+                "tags": [
+                    "UnitOfMeasure"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "anyOf": [
+                                        {
+                                            "type": "object"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "classes": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "systems": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        },
+                                                        "units": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/components/schemas/UnitOfMeasure"
+                                                            }
+                                                        },
+                                                        "conversions": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object"
+                                                            }
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "classes",
+                                                        "systems",
+                                                        "units",
+                                                        "conversions"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "units-of-measure.store",
+                "tags": [
+                    "UnitOfMeasure"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z0-9._-]+$",
+                                        "maxLength": 50
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 150
+                                    },
+                                    "symbol": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 30
+                                    },
+                                    "decimal_places": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 12
+                                    },
+                                    "uom_class_id": {
+                                        "type": "string"
+                                    },
+                                    "uom_system_id": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "code",
+                                    "name",
+                                    "decimal_places",
+                                    "uom_class_id"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Satuan ditambahkan."
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/units-of-measure/classes": {
+            "post": {
+                "operationId": "units-of-measure.classes.store",
+                "tags": [
+                    "UnitOfMeasure"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z0-9._-]+$",
+                                        "maxLength": 50
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 150
+                                    }
+                                },
+                                "required": [
+                                    "code",
+                                    "name"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Kelas satuan ditambahkan."
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/units-of-measure/systems": {
+            "post": {
+                "operationId": "units-of-measure.systems.store",
+                "tags": [
+                    "UnitOfMeasure"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "code": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z0-9._-]+$",
+                                        "maxLength": 50
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 150
+                                    }
+                                },
+                                "required": [
+                                    "code",
+                                    "name"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Sistem satuan ditambahkan."
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/units-of-measure/{unit}": {
+            "patch": {
+                "operationId": "units-of-measure.update",
+                "tags": [
+                    "UnitOfMeasure"
+                ],
+                "parameters": [
+                    {
+                        "name": "unit",
+                        "in": "path",
+                        "required": true,
+                        "description": "The unit ID",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "maxLength": 150
+                                    },
+                                    "symbol": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ],
+                                        "maxLength": 30
+                                    },
+                                    "decimal_places": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 12
+                                    },
+                                    "active": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Satuan diperbarui."
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ModelNotFoundException"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
+        "/units-of-measure/conversions": {
+            "post": {
+                "operationId": "units-of-measure.conversions.store",
+                "tags": [
+                    "UnitOfMeasure"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "from_unit_id": {
+                                        "type": "string"
+                                    },
+                                    "to_unit_id": {
+                                        "type": "string"
+                                    },
+                                    "factor": {
+                                        "type": "number"
+                                    },
+                                    "offset": {
+                                        "type": [
+                                            "number",
+                                            "null"
+                                        ]
+                                    },
+                                    "rounding_scale": {
+                                        "type": [
+                                            "integer",
+                                            "null"
+                                        ],
+                                        "minimum": 0,
+                                        "maximum": 12
+                                    }
+                                },
+                                "required": [
+                                    "from_unit_id",
+                                    "to_unit_id",
+                                    "factor"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Aturan konversi disimpan."
+                                                }
+                                            },
+                                            "required": [
+                                                "message"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/AuthenticationException"
+                    }
+                }
+            }
+        },
         "/workspace-context": {
             "put": {
                 "operationId": "workspace-context.update",
@@ -1025,6 +2750,468 @@
             }
         },
         "schemas": {
+            "AppCatalogRequest": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]*$",
+                        "maxLength": 80
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "maxLength": 2000
+                    },
+                    "version": {
+                        "type": "string",
+                        "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$",
+                        "maxLength": 40
+                    },
+                    "database_name": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*$",
+                        "maxLength": 120
+                    },
+                    "ui_entry": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^\\/(?!\\/)",
+                        "maxLength": 2048
+                    },
+                    "navigation": {
+                        "type": "object",
+                        "properties": {
+                            "rail": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "pattern": "^[a-z0-9][a-z0-9-]*$",
+                                            "maxLength": 80
+                                        },
+                                        "label": {
+                                            "type": "string",
+                                            "maxLength": 80
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "label"
+                                    ]
+                                },
+                                "minItems": 1
+                            },
+                            "sidebar": {
+                                "type": "array",
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "pattern": "^[a-z0-9][a-z0-9-]*$",
+                                                "maxLength": 80
+                                            },
+                                            "label": {
+                                                "type": "string",
+                                                "maxLength": 100
+                                            },
+                                            "permission": {
+                                                "type": "string",
+                                                "maxLength": 160
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "label",
+                                            "permission"
+                                        ]
+                                    },
+                                    "minItems": 1
+                                }
+                            }
+                        }
+                    },
+                    "repository_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "contract_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri",
+                        "maxLength": 2048
+                    },
+                    "security": {
+                        "type": "object",
+                        "properties": {
+                            "entry_points": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                                            "maxLength": 160
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "maxLength": 150
+                                        },
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "form",
+                                                "menu_item",
+                                                "api",
+                                                "report",
+                                                "action"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "name",
+                                        "type"
+                                    ]
+                                },
+                                "minItems": 1
+                            },
+                            "permissions": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                                            "maxLength": 160
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "maxLength": 150
+                                        },
+                                        "entry_point": {
+                                            "type": "string",
+                                            "maxLength": 160
+                                        },
+                                        "access": {
+                                            "type": "string",
+                                            "enum": [
+                                                "read",
+                                                "update",
+                                                "create",
+                                                "correct",
+                                                "delete",
+                                                "invoke"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "name",
+                                        "entry_point",
+                                        "access"
+                                    ]
+                                },
+                                "minItems": 1
+                            },
+                            "privileges": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                                            "maxLength": 160
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "maxLength": 150
+                                        },
+                                        "permissions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "maxLength": 160
+                                            },
+                                            "minItems": 1
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "name",
+                                        "permissions"
+                                    ]
+                                },
+                                "minItems": 1
+                            },
+                            "duties": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                                            "maxLength": 160
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "maxLength": 150
+                                        },
+                                        "privileges": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "maxLength": 160
+                                            },
+                                            "minItems": 1
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "name",
+                                        "privileges"
+                                    ]
+                                },
+                                "minItems": 1
+                            },
+                            "data_policies": {
+                                "type": [
+                                    "array",
+                                    "null"
+                                ],
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                                            "maxLength": 160
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "maxLength": 150
+                                        },
+                                        "protected_permissions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "maxLength": 160
+                                            },
+                                            "minItems": 1
+                                        },
+                                        "requires_legal_entity": {
+                                            "type": "boolean"
+                                        },
+                                        "requires_operating_unit": {
+                                            "type": "boolean"
+                                        },
+                                        "allows_descendants": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "name",
+                                        "protected_permissions",
+                                        "requires_legal_entity",
+                                        "requires_operating_unit",
+                                        "allows_descendants"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "entry_points",
+                            "permissions",
+                            "privileges",
+                            "duties"
+                        ]
+                    },
+                    "number_sequences": {
+                        "type": "object",
+                        "properties": {
+                            "references": {
+                                "type": [
+                                    "array",
+                                    "null"
+                                ],
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                                            "maxLength": 160
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "maxLength": 150
+                                        },
+                                        "default_prefix": {
+                                            "type": "string",
+                                            "pattern": "^[A-Z]{4}$",
+                                            "minLength": 4,
+                                            "maxLength": 4
+                                        },
+                                        "allowed_scopes": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "tenant",
+                                                    "legal_entity",
+                                                    "operating_unit"
+                                                ]
+                                            },
+                                            "minItems": 1
+                                        }
+                                    },
+                                    "required": [
+                                        "code",
+                                        "name",
+                                        "default_prefix",
+                                        "allowed_scopes"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "workflow_types": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "code": {
+                                    "type": "string",
+                                    "pattern": "^[a-z0-9][a-z0-9._-]*$",
+                                    "maxLength": 120
+                                },
+                                "name": {
+                                    "type": "string",
+                                    "maxLength": 160
+                                },
+                                "decision_context_schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "minItems": 1
+                                }
+                            },
+                            "required": [
+                                "code",
+                                "name",
+                                "decision_context_schema"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "version",
+                    "database_name",
+                    "navigation",
+                    "security",
+                    "number_sequences"
+                ],
+                "title": "AppCatalogRequest"
+            },
+            "AppReleaseRequest": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$",
+                        "maxLength": 40
+                    },
+                    "manifest_sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$",
+                        "minLength": 64,
+                        "maxLength": 64
+                    },
+                    "api_image": {
+                        "type": "string",
+                        "pattern": "^.+@sha256:[a-f0-9]{64}$",
+                        "maxLength": 500
+                    },
+                    "ui_image": {
+                        "type": "string",
+                        "pattern": "^.+@sha256:[a-f0-9]{64}$",
+                        "maxLength": 500
+                    },
+                    "bundle_path": {
+                        "type": "string",
+                        "pattern": "#^(?!.*\\.\\.)[A-Za-z0-9_./-]+$#",
+                        "maxLength": 255
+                    },
+                    "compose_file": {
+                        "type": "string",
+                        "pattern": "#^(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.ya?ml$#",
+                        "maxLength": 120
+                    },
+                    "compose_project": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]*$",
+                        "maxLength": 120
+                    },
+                    "api_service": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]*$",
+                        "maxLength": 120
+                    },
+                    "ui_service": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]*$",
+                        "maxLength": 120
+                    },
+                    "database_service": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]*$",
+                        "maxLength": 120
+                    }
+                },
+                "required": [
+                    "version",
+                    "manifest_sha256",
+                    "api_image",
+                    "ui_image",
+                    "bundle_path",
+                    "compose_file",
+                    "compose_project",
+                    "api_service",
+                    "ui_service",
+                    "database_service"
+                ],
+                "title": "AppReleaseRequest"
+            },
             "BusinessRegistrationRequest": {
                 "type": "object",
                 "properties": {
@@ -1036,7 +3223,7 @@
                         "type": "string",
                         "maxLength": 255
                     },
-                    "module_ids": {
+                    "app_ids": {
                         "type": "array",
                         "items": {
                             "type": "string"
@@ -1058,12 +3245,162 @@
                 "required": [
                     "name",
                     "business_name",
-                    "module_ids",
+                    "app_ids",
                     "email",
                     "password",
                     "password_confirmation"
                 ],
                 "title": "BusinessRegistrationRequest"
+            },
+            "CoreApp": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "database_name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "ui_entry": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "repository_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "contract_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "navigation": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {}
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "version",
+                    "status",
+                    "database_name",
+                    "description",
+                    "created_at",
+                    "updated_at",
+                    "ui_entry",
+                    "repository_url",
+                    "contract_url",
+                    "navigation"
+                ],
+                "title": "CoreApp"
+            },
+            "FiscalCalendarRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9._-]+$",
+                        "maxLength": 50
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    }
+                },
+                "required": [
+                    "code",
+                    "name"
+                ],
+                "title": "FiscalCalendarRequest"
+            },
+            "FiscalYearRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 40
+                    },
+                    "starts_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "months": {
+                        "type": "integer",
+                        "description": "`months` builds evenly spaced monthly periods, which covers the ordinary case. Explicit periods stay\navailable for calendars that do not divide into months, such as 4-4-5.",
+                        "minimum": 1,
+                        "maximum": 24
+                    },
+                    "periods": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "maxLength": 40
+                                },
+                                "starts_on": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                "ends_on": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "starts_on",
+                                "ends_on"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 24
+                    }
+                },
+                "required": [
+                    "name",
+                    "starts_on"
+                ],
+                "title": "FiscalYearRequest"
             },
             "InvitationCode": {
                 "type": "object",
@@ -1090,16 +3427,12 @@
                         ]
                     },
                     "include_descendants": {
-                        "type": "boolean"
+                        "type": "string"
                     },
                     "created_by": {
                         "type": "integer"
                     },
                     "expires_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "used_at": {
                         "type": [
                             "string",
                             "null"
@@ -1137,7 +3470,6 @@
                     "include_descendants",
                     "created_by",
                     "expires_at",
-                    "used_at",
                     "revoked_at",
                     "created_at",
                     "updated_at"
@@ -1154,32 +3486,61 @@
                             "admin"
                         ]
                     },
-                    "role_ids": {
+                    "assignments": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "object",
+                            "properties": {
+                                "role_id": {
+                                    "type": "string"
+                                },
+                                "policy_scopes": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "policy_code": {
+                                                "type": "string"
+                                            },
+                                            "legal_entity_id": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "organization_id": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "hierarchy_id": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "include_descendants": {
+                                                "type": "boolean"
+                                            }
+                                        },
+                                        "required": [
+                                            "policy_code",
+                                            "include_descendants"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "role_id",
+                                "policy_scopes"
+                            ]
                         }
-                    },
-                    "organization_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "hierarchy_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "include_descendants": {
-                        "type": "boolean"
                     }
                 },
                 "required": [
                     "system_role",
-                    "role_ids",
-                    "include_descendants"
+                    "assignments"
                 ],
                 "title": "InvitationRequest"
             },
@@ -1226,34 +3587,178 @@
                             "owner"
                         ]
                     },
-                    "role_ids": {
-                        "type": "array",
+                    "assignments": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
                         "items": {
-                            "type": "string"
+                            "type": "object",
+                            "properties": {
+                                "role_id": {
+                                    "type": "string"
+                                },
+                                "policy_scopes": {
+                                    "type": [
+                                        "array",
+                                        "null"
+                                    ],
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "policy_code": {
+                                                "type": "string",
+                                                "maxLength": 160
+                                            },
+                                            "legal_entity_id": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "organization_id": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "hierarchy_id": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "include_descendants": {
+                                                "type": "boolean"
+                                            }
+                                        },
+                                        "required": [
+                                            "policy_code",
+                                            "include_descendants"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "role_id"
+                            ]
                         }
-                    },
-                    "organization_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "hierarchy_id": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
-                    },
-                    "include_descendants": {
-                        "type": "boolean"
                     }
                 },
                 "required": [
-                    "system_role",
-                    "role_ids",
-                    "include_descendants"
+                    "system_role"
                 ],
                 "title": "MembershipRequest"
+            },
+            "NumberSequenceSettingsRequest": {
+                "type": "object",
+                "properties": {
+                    "profile_code": {
+                        "type": "string"
+                    },
+                    "scope_type": {
+                        "type": "string",
+                        "enum": [
+                            "tenant",
+                            "legal_entity",
+                            "operating_unit"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "active",
+                            "stopped"
+                        ]
+                    },
+                    "is_continuous": {
+                        "type": "boolean"
+                    },
+                    "allow_manual": {
+                        "type": "boolean"
+                    },
+                    "reset_period": {
+                        "type": "string",
+                        "enum": [
+                            "never",
+                            "calendar_year",
+                            "fiscal_year",
+                            "fiscal_period"
+                        ]
+                    },
+                    "preallocation_enabled": {
+                        "type": "boolean"
+                    },
+                    "preallocation_quantity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000
+                    },
+                    "minimum_number": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "maximum_number": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "segments": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "constant",
+                                        "number",
+                                        "year",
+                                        "scope",
+                                        "fiscal_year",
+                                        "fiscal_period"
+                                    ]
+                                },
+                                "value": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ],
+                                    "maxLength": 80
+                                },
+                                "length": {
+                                    "type": [
+                                        "integer",
+                                        "null"
+                                    ],
+                                    "minimum": 1,
+                                    "maximum": 18
+                                }
+                            },
+                            "required": [
+                                "type"
+                            ]
+                        },
+                        "minItems": 1,
+                        "maxItems": 10
+                    }
+                },
+                "required": [
+                    "profile_code",
+                    "scope_type",
+                    "status",
+                    "is_continuous",
+                    "allow_manual",
+                    "reset_period",
+                    "preallocation_enabled",
+                    "preallocation_quantity",
+                    "minimum_number",
+                    "segments"
+                ],
+                "title": "NumberSequenceSettingsRequest"
             },
             "Organization": {
                 "type": "object",
@@ -1262,9 +3767,6 @@
                         "type": "string"
                     },
                     "tenant_id": {
-                        "type": "string"
-                    },
-                    "code": {
                         "type": "string"
                     },
                     "name": {
@@ -1294,7 +3796,6 @@
                 "required": [
                     "id",
                     "tenant_id",
-                    "code",
                     "name",
                     "classification",
                     "status",
@@ -1313,11 +3814,6 @@
                             "operating_unit"
                         ]
                     },
-                    "code": {
-                        "type": "string",
-                        "pattern": "^[A-Za-z0-9_-]+$",
-                        "maxLength": 50
-                    },
                     "name": {
                         "type": "string",
                         "maxLength": 150
@@ -1327,7 +3823,7 @@
                             "string",
                             "null"
                         ],
-                        "maxLength": 50
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{1,15}$"
                     },
                     "country_code": {
                         "type": [
@@ -1354,7 +3850,6 @@
                 },
                 "required": [
                     "classification",
-                    "code",
                     "name"
                 ],
                 "title": "OrganizationRequest"
@@ -1412,6 +3907,13 @@
                             "type": "string"
                         },
                         "minItems": 1
+                    },
+                    "child_role_ids": {
+                        "type": "array",
+                        "description": "Role turunan: pemegang role ini ikut memperoleh hak seluruh\nturunannya. Kepemilikan tenant dan larangan lingkaran diperiksa\npada action, bukan di sini.",
+                        "items": {
+                            "type": "string"
+                        }
                     }
                 },
                 "required": [
@@ -1463,6 +3965,122 @@
                     "updated_at"
                 ],
                 "title": "TenantMembership"
+            },
+            "UnitOfMeasure": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "tenant_id": {
+                        "type": "string"
+                    },
+                    "uom_class_id": {
+                        "type": "string"
+                    },
+                    "uom_system_id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "symbol": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "decimal_places": {
+                        "type": "integer"
+                    },
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "deleted_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "required": [
+                    "id",
+                    "tenant_id",
+                    "uom_class_id",
+                    "uom_system_id",
+                    "code",
+                    "name",
+                    "symbol",
+                    "decimal_places",
+                    "active",
+                    "deleted_at",
+                    "created_at",
+                    "updated_at"
+                ],
+                "title": "UnitOfMeasure"
+            },
+            "UpdateOrganizationRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 150
+                    },
+                    "company_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{1,15}$"
+                    },
+                    "country_code": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "minLength": 2,
+                        "maxLength": 2
+                    },
+                    "operating_unit_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "business_unit",
+                            "department",
+                            "cost_center",
+                            "value_stream",
+                            "retail_channel",
+                            null
+                        ]
+                    }
+                },
+                "required": [
+                    "name"
+                ],
+                "title": "UpdateOrganizationRequest"
             },
             "User": {
                 "type": "object",

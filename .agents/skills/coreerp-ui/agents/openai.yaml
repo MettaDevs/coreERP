@@ -1,0 +1,4 @@
+interface:
+  display_name: "CoreERP UI"
+  short_description: "Build consistent CoreERP interfaces with @apperp/ui"
+  default_prompt: "Use @apperp/ui and the CoreERP theme bridge for this UI change."

@@ -8,20 +8,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (! DB::table('apps')->where('id', 'management-asset')->exists()) {
+        if (! DB::table('apps')->where('id', 'management-aset')->exists()) {
             return;
         }
 
         $deployments = DB::table('tenant_deployments as deployments')
             ->join('tenant_app_entitlements as entitlements', 'entitlements.tenant_id', '=', 'deployments.tenant_id')
-            ->where('entitlements.app_id', 'management-asset')
+            ->where('entitlements.app_id', 'management-aset')
             ->where('entitlements.status', 'active')
             ->where('deployments.status', 'active')
             ->get(['deployments.placement', 'deployments.profile']);
 
         foreach ($deployments as $deployment) {
             DB::table('app_placements')->updateOrInsert(
-                ['app_id' => 'management-asset', 'placement' => $deployment->placement],
+                ['app_id' => 'management-aset', 'placement' => $deployment->placement],
                 [
                     'id' => (string) Str::ulid(),
                     'release_version' => '0.1.0',
@@ -39,6 +39,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::table('app_placements')->where('app_id', 'management-asset')->delete();
+        DB::table('app_placements')->where('app_id', 'management-aset')->delete();
     }
 };

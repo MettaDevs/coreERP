@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Models\CoreApp;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueueAfterCommit;
@@ -46,7 +47,12 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
 
         if ($placementQuery->exists()) {
             $existing = $placementQuery->first();
-            if ($existing->release_version === $app->version && $existing->runtime_status === 'ready') {
+            if (
+                $existing->release_version === $app->version
+                && $existing->runtime_status === 'ready'
+                && filled($existing->ui_entry)
+                && $app->releases()->where('version', $existing->release_version)->where('status', 'available')->exists()
+            ) {
                 return;
             }
             if ($existing->release_version !== $app->version) {
@@ -105,7 +111,7 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
             $stage = 'migration';
             $this->setPlacement($placementId, ['migration_status' => 'running']);
             $this->run($process, [...$base, 'up', '-d', '--wait', '--wait-timeout', '300', $release['db_service']], $stage);
-            $this->run($process, [...$base, 'exec', '-T', $release['db_service'], 'sh', '/coreerp/migrate.sh'], $stage);
+            $this->run($process, [...$base, 'run', '--rm', '--no-deps', $release['api_service'], 'sh', '/coreerp/migrate.sh'], $stage);
             $this->setPlacement($placementId, ['migration_status' => 'succeeded']);
 
             $stage = 'runtime';
@@ -116,6 +122,7 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
             $this->setPlacement($placementId, [
                 'artifact_status' => 'placed',
                 'runtime_status' => 'ready',
+                'ui_entry' => $app->ui_entry,
                 'ready_at' => $finished,
             ]);
             DB::table('app_installations')->where('id', $installationId)->update([
@@ -123,6 +130,7 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
                 'finished_at' => $finished,
                 'updated_at' => $finished,
             ]);
+            app(EnsureNumberSequenceDrafts::class)->forReadyApp($app->id);
         } catch (Throwable $exception) {
             $message = $stage.' stage failed.';
             $failedColumn = match ($stage) {
@@ -165,7 +173,28 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
     /** @return array{deploy_path:string,compose_file:string,project:string,api_service:string,ui_service:string,db_service:string} */
     private function release(CoreApp $app): array
     {
-        throw new RuntimeException("Release artifact for {$app->id} has not been registered.");
+        $release = $app->releases()
+            ->where('version', $app->version)
+            ->where('status', 'available')
+            ->first();
+
+        if (! $release) {
+            throw new RuntimeException("Release artifact for {$app->id} has not been registered.");
+        }
+
+        $releaseRoot = rtrim((string) config('coreerp.deployment.release_root'), '/\\');
+        if ($releaseRoot === '') {
+            throw new RuntimeException('Release root has not been configured.');
+        }
+
+        return [
+            'deploy_path' => $releaseRoot.DIRECTORY_SEPARATOR.$release->bundle_path,
+            'compose_file' => $release->compose_file,
+            'project' => $release->compose_project,
+            'api_service' => $release->api_service,
+            'ui_service' => $release->ui_service,
+            'db_service' => $release->database_service,
+        ];
     }
 
     /** @param list<string> $command */

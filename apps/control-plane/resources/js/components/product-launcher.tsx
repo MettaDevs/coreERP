@@ -1,13 +1,8 @@
 import { Link, usePage } from '@inertiajs/react';
-import {
-    Boxes,
-    Building2,
-    Grid3X3,
-    PackageSearch,
-} from 'lucide-react';
+import { Boxes, Building2, Grid3X3, PackageSearch } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@apperp/ui/button';
 import {
     Popover,
     PopoverContent,
@@ -15,12 +10,12 @@ import {
     PopoverHeader,
     PopoverTitle,
     PopoverTrigger,
-} from '@/components/ui/popover';
-import { ScrollArea } from '@/components/ui/scroll-area';
+} from '@apperp/ui/popover';
+import { ScrollArea } from '@apperp/ui/scroll-area';
 import type { EntitledProduct } from '@/types/auth';
 
 const productIcons: Record<string, LucideIcon> = {
-    'management-asset': PackageSearch,
+    'management-aset': PackageSearch,
 };
 
 function ProductLink({
@@ -45,14 +40,18 @@ function ProductLink({
                         <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-foreground">
                             <Icon />
                         </span>
-                        <span className="w-full truncate text-xs">{product.name}</span>
+                        <span className="w-full truncate text-xs">
+                            {product.name}
+                        </span>
                     </Link>
                 ) : (
                     <a href={product.href} title={product.description}>
                         <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-foreground">
                             <Icon />
                         </span>
-                        <span className="w-full truncate text-xs">{product.name}</span>
+                        <span className="w-full truncate text-xs">
+                            {product.name}
+                        </span>
                     </a>
                 )
             ) : (
@@ -60,7 +59,9 @@ function ProductLink({
                     <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-foreground">
                         <Icon />
                     </span>
-                    <span className="w-full truncate text-xs">{product.name}</span>
+                    <span className="w-full truncate text-xs">
+                        {product.name}
+                    </span>
                 </span>
             )}
         </Button>
@@ -78,7 +79,9 @@ export function ProductLauncher() {
         },
         ...entitledProducts,
     ];
-    const launchableIds = new Set(launchableProducts.map((product) => product.id));
+    const launchableIds = new Set(
+        launchableProducts.map((product) => product.id),
+    );
 
     return (
         <Popover>
@@ -102,18 +105,29 @@ export function ProductLauncher() {
                 </PopoverHeader>
                 <ScrollArea className="max-h-96">
                     <div className="grid grid-cols-3 gap-1 p-1">
-                        {products.filter((product, index, all) => all.findIndex((item) => item.id === product.id) === index).map((product) => (
-                            <ProductLink
-                                key={product.id}
-                                product={product}
-                                icon={
-                                    product.id === 'core'
-                                        ? Building2
-                                        : (productIcons[product.id] ?? Boxes)
-                                }
-                                launchable={product.id === 'core' || launchableIds.has(product.id)}
-                            />
-                        ))}
+                        {products
+                            .filter(
+                                (product, index, all) =>
+                                    all.findIndex(
+                                        (item) => item.id === product.id,
+                                    ) === index,
+                            )
+                            .map((product) => (
+                                <ProductLink
+                                    key={product.id}
+                                    product={product}
+                                    icon={
+                                        product.id === 'core'
+                                            ? Building2
+                                            : (productIcons[product.id] ??
+                                              Boxes)
+                                    }
+                                    launchable={
+                                        product.id === 'core' ||
+                                        launchableIds.has(product.id)
+                                    }
+                                />
+                            ))}
                     </div>
                 </ScrollArea>
             </PopoverContent>

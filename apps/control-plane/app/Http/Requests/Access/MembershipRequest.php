@@ -17,23 +17,32 @@ class MembershipRequest extends FormRequest
     {
         return [
             'system_role' => ['required', Rule::in(['user', 'admin', 'owner'])],
-            'role_ids' => ['present', 'array'],
-            'role_ids.*' => ['required', 'string'],
-            'organization_id' => ['nullable', 'string'],
-            'hierarchy_id' => [Rule::requiredIf($this->boolean('include_descendants')), 'nullable', 'string'],
-            'include_descendants' => ['required', 'boolean'],
+            'assignments' => ['nullable', 'array'],
+            'assignments.*.role_id' => ['required', 'string', 'distinct'],
+            'assignments.*.policy_scopes' => ['nullable', 'array'],
+            'assignments.*.policy_scopes.*.policy_code' => ['required', 'string', 'max:160'],
+            'assignments.*.policy_scopes.*.legal_entity_id' => ['nullable', 'string'],
+            'assignments.*.policy_scopes.*.organization_id' => ['nullable', 'string'],
+            'assignments.*.policy_scopes.*.hierarchy_id' => ['nullable', 'string'],
+            'assignments.*.policy_scopes.*.include_descendants' => ['required', 'boolean'],
         ];
     }
 
-    /** @return array{system_role:string,role_ids:list<string>,organization_id:?string,hierarchy_id:?string,include_descendants:bool} */
+    /** @return array{system_role:string,assignments:list<array{role_id:string,policy_scopes:list<array<string,mixed>>}>} */
     public function payload(): array
     {
         return [
             'system_role' => $this->string('system_role')->toString(),
-            'role_ids' => array_values($this->collect('role_ids')->map(fn (mixed $id): string => (string) $id)->all()),
-            'organization_id' => $this->string('organization_id')->toString() ?: null,
-            'hierarchy_id' => $this->string('hierarchy_id')->toString() ?: null,
-            'include_descendants' => $this->boolean('include_descendants'),
+            'assignments' => $this->collect('assignments')->map(fn (mixed $assignment): array => [
+                'role_id' => (string) data_get($assignment, 'role_id'),
+                'policy_scopes' => collect(data_get($assignment, 'policy_scopes', []))->map(fn (mixed $scope): array => [
+                    'policy_code' => (string) data_get($scope, 'policy_code'),
+                    'legal_entity_id' => (string) data_get($scope, 'legal_entity_id') ?: null,
+                    'organization_id' => (string) data_get($scope, 'organization_id') ?: null,
+                    'hierarchy_id' => (string) data_get($scope, 'hierarchy_id') ?: null,
+                    'include_descendants' => (bool) data_get($scope, 'include_descendants'),
+                ])->all(),
+            ])->all(),
         ];
     }
 }

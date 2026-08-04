@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Actions\ReferenceData\ProvisionDefaultUnitsOfMeasure;
+use App\Models\Tenant;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -15,8 +17,9 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            AppCatalogSeeder::class,
             ProviderAdminSeeder::class,
+            NumberSequenceProfileSeeder::class,
         ]);
+        Tenant::query()->pluck('id')->each(fn (string $tenantId) => app(ProvisionDefaultUnitsOfMeasure::class)->forTenant($tenantId));
     }
 }

@@ -1,7 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
 import { Building2, Check, ChevronDown, MapPin } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@apperp/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,7 +9,7 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@apperp/ui/dropdown-menu';
 import type { Workspace } from '@/types';
 
 type PageProps = {

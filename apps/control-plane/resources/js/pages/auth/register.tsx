@@ -4,8 +4,8 @@ import { useState } from 'react';
 
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
+import { Button } from '@apperp/ui/button';
 import {
     Card,
     CardContent,
@@ -13,18 +13,18 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
+} from '@apperp/ui/card';
 import {
     Field,
     FieldError,
     FieldGroup,
     FieldLegend,
     FieldSet,
-} from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import { Spinner } from '@/components/ui/spinner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+} from '@apperp/ui/field';
+import { Input } from '@apperp/ui/input';
+import { Spinner } from '@apperp/ui/spinner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
+import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 
 type AppOption = { id: string; name: string; description: string };
 type Props = { passwordRules: string; apps: AppOption[] };
@@ -207,9 +207,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                         </ToggleGroupItem>
                                     ))}
                                 </ToggleGroup>
-                                <FieldError>
-                                    {form.errors.app_ids}
-                                </FieldError>
+                                <FieldError>{form.errors.app_ids}</FieldError>
                             </FieldSet>
                         </CardContent>
                         <CardFooter className="justify-between">
@@ -326,6 +324,9 @@ export default function Register({ passwordRules, apps }: Props) {
             </Tabs>
 
             <p className="text-center text-sm text-muted-foreground">
+                Punya kode akses?{' '}
+                <TextLink href="/join">Daftar sebagai anggota</TextLink>
+                <span className="mx-2">·</span>
                 Sudah punya akun? <TextLink href="/login">Masuk</TextLink>
             </p>
         </>

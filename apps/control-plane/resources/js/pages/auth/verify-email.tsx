@@ -1,8 +1,8 @@
 // Components
 import { Form, Head } from '@inertiajs/react';
 import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@apperp/ui/button';
+import { Spinner } from '@apperp/ui/spinner';
 import { logout } from '@/routes';
 import { send } from '@/routes/verification';
 

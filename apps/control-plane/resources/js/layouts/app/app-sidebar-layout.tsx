@@ -25,7 +25,7 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                 variant="sidebar"
                 className="overflow-x-clip bg-muted/30 py-2 pr-2 pl-0"
             >
-                <div className="flex min-h-svh w-full flex-col rounded-2xl border bg-background shadow-sm">
+                <div className="flex min-h-[calc(100svh-1rem)] w-full flex-col rounded-2xl border bg-background shadow-sm">
                     <AppSidebarHeader isScrolled={isScrolled} />
                     <div className="min-w-0 flex-1 bg-muted/30">{children}</div>
                 </div>

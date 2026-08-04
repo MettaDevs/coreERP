@@ -19,7 +19,7 @@ class RoleController extends Controller
         return response()->json(['data' => Role::query()
             ->where('tenant_id', $membership->tenant_id)
             ->where('is_active', true)
-            ->with('duties')
+            ->with('duties', 'children:id,name')
             ->get()]);
     }
 
@@ -35,7 +35,7 @@ class RoleController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($role->tenant_id === $membership->tenant_id, 404);
 
-        return response()->json(['data' => $role->load('duties')]);
+        return response()->json(['data' => $role->load('duties', 'children:id,name')]);
     }
 
     public function update(RoleRequest $request, Role $role, UpsertRole $action): JsonResponse|RedirectResponse

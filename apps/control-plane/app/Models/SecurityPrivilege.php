@@ -13,7 +13,7 @@ class SecurityPrivilege extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['code', 'app_id', 'name', 'description'];
+    protected $fillable = ['code', 'app_id', 'tenant_id', 'name', 'description', 'source', 'status', 'published_at'];
 
     /** @return BelongsToMany<Permission, $this> */
     public function permissions(): BelongsToMany

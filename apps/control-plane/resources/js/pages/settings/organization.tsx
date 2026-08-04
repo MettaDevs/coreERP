@@ -1,10 +1,20 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Building2, Network, Plus } from 'lucide-react';
+import { Building2, Network, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import Heading from '@/components/heading';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@apperp/ui/alert-dialog';
 import {
     Card,
     CardAction,
@@ -12,9 +22,9 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
-import { DataTable } from '@/components/ui/data-table';
-import type { DataTableColumn } from '@/components/ui/data-table';
+} from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
     Dialog,
     DialogContent,
@@ -22,14 +32,14 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
+} from '@apperp/ui/dialog';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyMedia,
     EmptyTitle,
-} from '@/components/ui/empty';
+} from '@apperp/ui/empty';
 import {
     Field,
     FieldDescription,
@@ -37,14 +47,21 @@ import {
     FieldGroup,
     FieldLegend,
     FieldSet,
-} from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+} from '@apperp/ui/field';
+import { Input } from '@apperp/ui/input';
+import { NativeSelect } from '@apperp/ui/native-select';
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@apperp/ui/sheet';
+import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 
 type Organization = {
     id: string;
-    code: string;
     name: string;
     classification: 'legal_entity' | 'operating_unit';
     status: string;
@@ -86,7 +103,6 @@ function CreateOrganizationDialog({
     const [open, setOpen] = useState(false);
     const form = useForm({
         classification: 'legal_entity',
-        code: '',
         name: '',
         company_code: '',
         country_code: 'ID',
@@ -149,17 +165,154 @@ function CreateOrganizationDialog({
                                 {form.errors.classification}
                             </FieldError>
                         </Field>
-                        <Field data-invalid={Boolean(form.errors.code)}>
+                        <Field data-invalid={Boolean(form.errors.name)}>
                             <Input
-                                label="Kode"
-                                value={form.data.code}
+                                label="Nama organisasi"
+                                value={form.data.name}
                                 onChange={(event) =>
-                                    form.setData('code', event.target.value)
+                                    form.setData('name', event.target.value)
                                 }
-                                aria-invalid={Boolean(form.errors.code)}
+                                aria-invalid={Boolean(form.errors.name)}
                             />
-                            <FieldError>{form.errors.code}</FieldError>
+                            <FieldError>{form.errors.name}</FieldError>
                         </Field>
+                        {legalEntity ? (
+                            <>
+                                <Field
+                                    data-invalid={Boolean(
+                                        form.errors.company_code,
+                                    )}
+                                >
+                                    <Input
+                                        label="Kode perusahaan"
+                                        value={form.data.company_code}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'company_code',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.company_code,
+                                        )}
+                                    />
+                                    <FieldDescription>
+                                        2–16 karakter: huruf, angka, atau tanda
+                                        hubung.
+                                    </FieldDescription>
+                                    <FieldError>
+                                        {form.errors.company_code}
+                                    </FieldError>
+                                </Field>
+                                <Field
+                                    data-invalid={Boolean(
+                                        form.errors.country_code,
+                                    )}
+                                >
+                                    <Input
+                                        label="Kode negara"
+                                        value={form.data.country_code}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'country_code',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.country_code,
+                                        )}
+                                        maxLength={2}
+                                    />
+                                    <FieldError>
+                                        {form.errors.country_code}
+                                    </FieldError>
+                                </Field>
+                            </>
+                        ) : (
+                            <Field
+                                data-invalid={Boolean(
+                                    form.errors.operating_unit_type,
+                                )}
+                            >
+                                <NativeSelect
+                                    label="Tipe operating unit"
+                                    value={form.data.operating_unit_type}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'operating_unit_type',
+                                            event.target.value,
+                                        )
+                                    }
+                                    aria-invalid={Boolean(
+                                        form.errors.operating_unit_type,
+                                    )}
+                                >
+                                    {Object.entries(operatingUnitTypes).map(
+                                        ([value, label]) => (
+                                            <option key={value} value={value}>
+                                                {label}
+                                            </option>
+                                        ),
+                                    )}
+                                </NativeSelect>
+                                <FieldError>
+                                    {form.errors.operating_unit_type}
+                                </FieldError>
+                            </Field>
+                        )}
+                        <Button type="submit" disabled={form.processing}>
+                            Simpan organisasi
+                        </Button>
+                    </FieldGroup>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function EditOrganizationSheet({
+    organization,
+    operatingUnitTypes,
+    onClose,
+}: {
+    organization: Organization;
+    operatingUnitTypes: Props['operatingUnitTypes'];
+    onClose: () => void;
+}) {
+    const legalEntity = organization.classification === 'legal_entity';
+    const form = useForm({
+        name: organization.name,
+        company_code: organization.legal_entity?.company_code ?? '',
+        country_code: organization.legal_entity?.country_code ?? 'ID',
+        operating_unit_type: organization.operating_unit?.type ?? 'department',
+    });
+
+    return (
+        <Sheet open onOpenChange={(open) => !open && onClose()}>
+            <SheetContent
+                side="right"
+                className="flex w-full flex-col sm:max-w-lg"
+            >
+                <SheetHeader>
+                    <SheetTitle>Ubah organisasi</SheetTitle>
+                    <SheetDescription>
+                        Klasifikasi organisasi tidak dapat diubah agar data dan
+                        riwayat hierarchy tetap konsisten.
+                    </SheetDescription>
+                </SheetHeader>
+                <form
+                    className="flex min-h-0 flex-1 flex-col"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        form.patch(
+                            `/settings/organization/organizations/${organization.id}`,
+                            {
+                                onSuccess: onClose,
+                            },
+                        );
+                    }}
+                >
+                    <FieldGroup className="flex-1 overflow-y-auto px-4 py-6">
                         <Field data-invalid={Boolean(form.errors.name)}>
                             <Input
                                 label="Nama organisasi"
@@ -251,13 +404,23 @@ function CreateOrganizationDialog({
                                 </FieldError>
                             </Field>
                         )}
-                        <Button type="submit" disabled={form.processing}>
-                            Simpan organisasi
-                        </Button>
                     </FieldGroup>
+                    <SheetFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                            disabled={form.processing}
+                        >
+                            Batal
+                        </Button>
+                        <Button type="submit" disabled={form.processing}>
+                            Simpan perubahan
+                        </Button>
+                    </SheetFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </SheetContent>
+        </Sheet>
     );
 }
 
@@ -419,9 +582,21 @@ function DraftActions({
     });
 
     return (
-        <div className="flex flex-col gap-3 rounded-lg border p-4">
+        <form
+            className="flex flex-col gap-3 rounded-lg border p-4"
+            onSubmit={(event) => {
+                event.preventDefault();
+                form.post(
+                    `/settings/organization/hierarchy-versions/${version.id}/placements`,
+                    {
+                        preserveScroll: true,
+                        onSuccess: () => form.setData('organization_id', ''),
+                    },
+                );
+            }}
+        >
             <div className="grid gap-3 md:grid-cols-2">
-                <Field>
+                <Field data-invalid={Boolean(form.errors.organization_id)}>
                     <NativeSelect
                         label="Organisasi yang ditambahkan"
                         value={form.data.organization_id}
@@ -430,6 +605,7 @@ function DraftActions({
                         }
                         disabled={!unplaced.length}
                     >
+                        <option value="">Pilih organisasi</option>
                         {unplaced.map((organization) => (
                             <option
                                 key={organization.id}
@@ -439,8 +615,11 @@ function DraftActions({
                             </option>
                         ))}
                     </NativeSelect>
+                    <FieldError>{form.errors.organization_id}</FieldError>
                 </Field>
-                <Field>
+                <Field
+                    data-invalid={Boolean(form.errors.parent_organization_id)}
+                >
                     <NativeSelect
                         label="Berada di bawah"
                         value={form.data.parent_organization_id}
@@ -460,6 +639,9 @@ function DraftActions({
                             </option>
                         ))}
                     </NativeSelect>
+                    <FieldError>
+                        {form.errors.parent_organization_id}
+                    </FieldError>
                 </Field>
             </div>
             <FieldDescription>
@@ -469,17 +651,14 @@ function DraftActions({
             <div className="flex justify-end gap-2">
                 <Button
                     variant="outline"
+                    type="submit"
                     disabled={!unplaced.length || form.processing}
-                    onClick={() =>
-                        form.post(
-                            `/settings/organization/hierarchy-versions/${version.id}/placements`,
-                            { preserveScroll: true },
-                        )
-                    }
                 >
                     Tambah penempatan
                 </Button>
                 <Button
+                    type="button"
+                    disabled={form.processing}
                     onClick={() =>
                         form.post(
                             `/settings/organization/hierarchy-versions/${version.id}/publish`,
@@ -490,7 +669,119 @@ function DraftActions({
                     Publikasikan
                 </Button>
             </div>
-        </div>
+        </form>
+    );
+}
+
+function RemovePlacementAction({
+    version,
+    node,
+}: {
+    version: Version;
+    node: Node;
+}) {
+    const [open, setOpen] = useState(false);
+    const form = useForm({});
+
+    return (
+        <AlertDialog open={open} onOpenChange={setOpen}>
+            <AlertDialogTrigger asChild>
+                <Button type="button" variant="outline" size="sm">
+                    <Trash2 />
+                    Batalkan
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Batalkan penempatan?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        {node.organization.name} akan dilepas dari draft ini dan
+                        dapat ditempatkan kembali di bawah organisasi yang
+                        benar.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={form.processing}>
+                        Kembali
+                    </AlertDialogCancel>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={form.processing}
+                        onClick={() =>
+                            form.delete(
+                                `/settings/organization/hierarchy-versions/${version.id}/placements/${node.id}`,
+                                {
+                                    preserveScroll: true,
+                                    onSuccess: () => setOpen(false),
+                                },
+                            )
+                        }
+                    >
+                        Batalkan penempatan
+                    </Button>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
+function CreateVersionDraftAction({ version }: { version: Version }) {
+    const form = useForm({
+        effective_from: new Date().toISOString().slice(0, 10),
+    });
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline">Buat versi baru</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Buat draft versi baru</DialogTitle>
+                    <DialogDescription>
+                        Versi yang sudah dipublikasikan tetap menjadi riwayat.
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        form.post(
+                            `/settings/organization/hierarchy-versions/${version.id}/drafts`,
+                            { onSuccess: () => setOpen(false) },
+                        );
+                    }}
+                >
+                    <FieldGroup>
+                        <Field
+                            data-invalid={Boolean(form.errors.effective_from)}
+                        >
+                            <Input
+                                label="Berlaku mulai"
+                                type="date"
+                                value={form.data.effective_from}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'effective_from',
+                                        event.target.value,
+                                    )
+                                }
+                                aria-invalid={Boolean(
+                                    form.errors.effective_from,
+                                )}
+                            />
+                            <FieldError>
+                                {form.errors.effective_from}
+                            </FieldError>
+                        </Field>
+                        <Button type="submit" disabled={form.processing}>
+                            Buat draft
+                        </Button>
+                    </FieldGroup>
+                </form>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -502,6 +793,8 @@ export default function OrganizationPage({
     purposes,
     operatingUnitTypes,
 }: Props) {
+    const [editingOrganization, setEditingOrganization] =
+        useState<Organization | null>(null);
     const organizationColumns: DataTableColumn<Organization>[] = [
         {
             id: 'name',
@@ -510,12 +803,6 @@ export default function OrganizationPage({
                 <span className="font-medium">{organization.name}</span>
             ),
             sortValue: (organization) => organization.name,
-        },
-        {
-            id: 'code',
-            header: 'Kode',
-            cell: (organization) => <code>{organization.code}</code>,
-            sortValue: (organization) => organization.code,
         },
         {
             id: 'classification',
@@ -542,6 +829,23 @@ export default function OrganizationPage({
                 organization.operating_unit?.type ??
                 organization.legal_entity?.company_code ??
                 '',
+        },
+        {
+            id: 'actions',
+            header: 'Aksi',
+            align: 'right',
+            cell: (organization) =>
+                canManage ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingOrganization(organization)}
+                    >
+                        <Pencil />
+                        Ubah
+                    </Button>
+                ) : null,
         },
     ];
 
@@ -593,6 +897,14 @@ export default function OrganizationPage({
                         )}
                     </CardContent>
                 </Card>
+                {editingOrganization && (
+                    <EditOrganizationSheet
+                        key={editingOrganization.id}
+                        organization={editingOrganization}
+                        operatingUnitTypes={operatingUnitTypes}
+                        onClose={() => setEditingOrganization(null)}
+                    />
+                )}
 
                 <Card>
                     <CardHeader>
@@ -644,16 +956,33 @@ export default function OrganizationPage({
                                             {version.nodes.map((node) => (
                                                 <div
                                                     key={node.id}
-                                                    className="rounded-md bg-muted p-3 text-sm"
+                                                    className="flex items-start justify-between gap-2 rounded-md bg-muted p-3 text-sm"
                                                 >
-                                                    <span className="font-medium">
-                                                        {node.organization.name}
-                                                    </span>
-                                                    <span className="block text-muted-foreground">
-                                                        {node.parent_node
-                                                            ? `Di bawah ${node.parent_node.organization.name}`
-                                                            : 'Paling atas'}
-                                                    </span>
+                                                    <div>
+                                                        <span className="font-medium">
+                                                            {
+                                                                node
+                                                                    .organization
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                        <span className="block text-muted-foreground">
+                                                            {node.parent_node
+                                                                ? `Di bawah ${node.parent_node.organization.name}`
+                                                                : 'Paling atas'}
+                                                        </span>
+                                                    </div>
+                                                    {canManage &&
+                                                        version.status ===
+                                                            'draft' &&
+                                                        node.parent_node && (
+                                                            <RemovePlacementAction
+                                                                version={
+                                                                    version
+                                                                }
+                                                                node={node}
+                                                            />
+                                                        )}
                                                 </div>
                                             ))}
                                         </div>
@@ -665,6 +994,14 @@ export default function OrganizationPage({
                                                         organizations
                                                     }
                                                 />
+                                            )}
+                                        {canManage &&
+                                            version.status === 'published' && (
+                                                <div className="flex justify-end">
+                                                    <CreateVersionDraftAction
+                                                        version={version}
+                                                    />
+                                                </div>
                                             )}
                                     </div>
                                 );

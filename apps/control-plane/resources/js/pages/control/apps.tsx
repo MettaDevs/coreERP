@@ -2,15 +2,15 @@ import { Head } from '@inertiajs/react';
 import { Box, Database, PackageCheck } from 'lucide-react';
 
 import Heading from '@/components/heading';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
+import { Badge } from '@apperp/ui/badge';
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
+} from '@apperp/ui/card';
 
 type App = {
     id: string;

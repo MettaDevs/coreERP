@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Provider;
 
+use App\Actions\Provider\RegisterAppCatalog;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Provider\AppCatalogRequest;
 use App\Models\CoreApp;
@@ -19,14 +20,20 @@ class AppCatalogController extends Controller
         ]);
     }
 
-    public function store(AppCatalogRequest $request): JsonResponse
+    public function store(AppCatalogRequest $request, RegisterAppCatalog $registrar): JsonResponse
     {
-        $app = CoreApp::query()->create($request->payload());
+        $app = $registrar->handle(
+            $request->appPayload(),
+            $request->securityPayload(),
+            $request->numberSequenceReferencesPayload(),
+            $request->workflowTypesPayload(),
+            $request->dataPoliciesPayload(),
+        );
 
-        return response()->json(['data' => $this->present($app)], 201);
+        return response()->json(['data' => $this->present($app)], $app->wasRecentlyCreated ? 201 : 200);
     }
 
-    /** @return array{id:string,name:string,description:?string,version:string,status:string,database_name:string,ui_entry:?string,repository_url:?string,contract_url:?string} */
+    /** @return array{id:string,name:string,description:?string,version:string,status:string,database_name:string,ui_entry:?string,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string} */
     private function present(CoreApp $app): array
     {
         return [
@@ -37,6 +44,7 @@ class AppCatalogController extends Controller
             'status' => $app->status,
             'database_name' => $app->database_name,
             'ui_entry' => $app->ui_entry,
+            'navigation' => $app->navigation,
             'repository_url' => $app->repository_url,
             'contract_url' => $app->contract_url,
         ];

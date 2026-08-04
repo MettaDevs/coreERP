@@ -4,15 +4,15 @@ import { useEffect, useState } from 'react';
 
 import { AppCommandPalette } from '@/components/app-command-palette';
 import { ProductLauncher } from '@/components/product-launcher';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@apperp/ui/avatar';
+import { Button } from '@apperp/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Kbd } from '@/components/ui/kbd';
-import { SidebarTrigger } from '@/components/ui/sidebar';
+} from '@apperp/ui/dropdown-menu';
+import { Kbd } from '@apperp/ui/kbd';
+import { SidebarTrigger } from '@apperp/ui/sidebar';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { WorkspaceSwitcher } from '@/components/workspace-switcher';
 import { cn } from '@/lib/utils';

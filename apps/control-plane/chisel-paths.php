@@ -15,7 +15,7 @@ return [
         'resources/js/components/manage-two-factor.tsx',
         'resources/js/components/two-factor-setup-modal.tsx',
         'resources/js/components/two-factor-recovery-codes.tsx',
-        'resources/js/components/ui/input-otp.tsx',
+        '../../packages/ui/src/components/input-otp.tsx',
         'resources/js/hooks/use-two-factor-auth.ts',
     ],
 

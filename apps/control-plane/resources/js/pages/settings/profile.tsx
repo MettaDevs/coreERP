@@ -6,8 +6,8 @@ import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileCo
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@apperp/ui/button';
+import { Input } from '@apperp/ui/input';
 import { edit } from '@/routes/profile';
 import type { Auth } from '@/types';
 /* @chisel-email-verification */

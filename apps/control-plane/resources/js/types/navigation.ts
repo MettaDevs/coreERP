@@ -12,3 +12,21 @@ export type NavItem = {
     icon?: LucideIcon | null;
     isActive?: boolean;
 };
+
+export type HostedNavigationItem = {
+    id: string;
+    label: string;
+    href: string;
+};
+
+export type HostedNavigationRail = {
+    id: string;
+    label: string;
+    href: string;
+    items: HostedNavigationItem[];
+};
+
+export type HostedNavigation = {
+    rails: HostedNavigationRail[];
+    activeItemId: string | null;
+};

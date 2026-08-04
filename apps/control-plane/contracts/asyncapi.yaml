@@ -1,0 +1,20 @@
+asyncapi: 3.0.0
+info:
+  title: CoreERP access integration events
+  version: 1.0.0
+  description: Contract semantik perubahan penugasan posisi dari Human Resources ke Core.
+channels:
+  human-resources.worker-position-assignment.changed:
+    address: human-resources.worker-position-assignment.changed
+    messages:
+      changed:
+        payload:
+          type: object
+          required: [tenant_id, membership_id, assignment_id, position_id, operating_unit_id, active]
+          properties:
+            tenant_id: { type: string }
+            membership_id: { type: string }
+            assignment_id: { type: string }
+            position_id: { type: string }
+            operating_unit_id: { type: string }
+            active: { type: boolean }

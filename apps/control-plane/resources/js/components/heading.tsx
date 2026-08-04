@@ -1,10 +1,6 @@
 import { CircleAlert } from 'lucide-react';
 
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 
 export default function Heading({
     title,

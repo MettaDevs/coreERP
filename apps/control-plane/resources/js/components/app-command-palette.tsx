@@ -13,7 +13,7 @@ import {
     CommandInput,
     CommandItem,
     CommandList,
-} from '@/components/ui/command';
+} from '@apperp/ui/command';
 
 type AppCommandPaletteProps = {
     open: boolean;
@@ -21,8 +21,8 @@ type AppCommandPaletteProps = {
 };
 
 const commands = [
-    { label: 'Asset dashboard', icon: LayoutDashboard },
-    { label: 'Asset register', icon: Package },
+    { label: 'Dashboard aset', icon: LayoutDashboard },
+    { label: 'Daftar aset', icon: Package },
     { label: 'Finance dashboard', icon: BarChart3 },
     { label: 'Locations', icon: Building2 },
     { label: 'Settings', icon: Settings },

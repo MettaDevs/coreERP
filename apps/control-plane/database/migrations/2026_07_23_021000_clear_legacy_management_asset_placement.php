@@ -7,7 +7,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::table('app_placements')->where('app_id', 'management-asset')->delete();
+        DB::table('app_placements')->where('app_id', 'management-aset')->delete();
     }
 
     public function down(): void

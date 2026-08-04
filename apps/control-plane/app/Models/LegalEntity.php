@@ -13,11 +13,17 @@ class LegalEntity extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['organization_id', 'company_code', 'country_code'];
+    protected $fillable = ['organization_id', 'tenant_id', 'company_code', 'country_code', 'fiscal_calendar_id'];
 
     /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /** @return BelongsTo<FiscalCalendar, $this> */
+    public function fiscalCalendar(): BelongsTo
+    {
+        return $this->belongsTo(FiscalCalendar::class, 'fiscal_calendar_id');
     }
 }

@@ -5,16 +5,21 @@ namespace App\Actions\Access;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\TenantMembership;
-use App\Support\OrganizationScopeResolver;
+use App\Support\DataPolicyScopeResolver;
+use App\Support\SodConflictEvaluator;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class UpdateMembership
 {
-    public function __construct(private readonly OrganizationScopeResolver $scopeResolver) {}
+    public function __construct(
+        private readonly DataPolicyScopeResolver $scopeResolver,
+        private readonly SodConflictEvaluator $sod,
+    ) {}
 
-    /** @param array{system_role:string,role_ids:list<string>,organization_id:?string,hierarchy_id:?string,include_descendants:bool} $data */
+    /** @param array{system_role:string,assignments:list<array{role_id:string,policy_scopes:list<array<string,mixed>>}>} $data */
     public function handle(TenantMembership $actor, TenantMembership $target, array $data): TenantMembership
     {
         $targetIsOwner = $target->system_role === 'owner';
@@ -29,28 +34,56 @@ class UpdateMembership
             ]);
         }
 
-        $roles = Role::query()->where('tenant_id', $actor->tenant_id)->where('is_active', true)->whereIn('id', $data['role_ids'])->get();
-        if ($roles->count() !== count(array_unique($data['role_ids']))) {
+        $roleIds = collect($data['assignments'])->pluck('role_id')->unique()->values()->all();
+        $roles = Role::query()->where('tenant_id', $actor->tenant_id)->where('is_active', true)->whereIn('id', $roleIds)->get()->keyBy('id');
+        if ($roles->count() !== count($roleIds)) {
             throw ValidationException::withMessages(['role_ids' => 'Pilih tanggung jawab bisnis yang tersedia untuk bisnis ini.']);
         }
-        $scope = $this->scopeResolver->resolve($actor->tenant_id, $data);
+        $this->sod->assertManualAssignmentAllowed($target, $roleIds);
+        foreach ($data['assignments'] as $assignment) {
+            $scopeKeys = collect($assignment['policy_scopes'])->map(fn (array $scope): string => implode('|', [
+                $scope['policy_code'], $scope['legal_entity_id'] ?? '', $scope['organization_id'] ?? '',
+                $scope['hierarchy_id'] ?? '', $scope['include_descendants'] ? '1' : '0',
+            ]));
+            if ($scopeKeys->unique()->count() !== $scopeKeys->count()) {
+                throw ValidationException::withMessages(['assignments' => 'Satu batas data yang sama tidak boleh ditambahkan dua kali pada role yang sama.']);
+            }
+        }
 
-        return DB::transaction(function () use ($target, $targetIsOwner, $data, $roles, $scope): TenantMembership {
+        return DB::transaction(function () use ($actor, $target, $targetIsOwner, $data, $roles): TenantMembership {
             if (! $targetIsOwner) {
                 $target->update(['system_role' => $data['system_role']]);
             }
-            $target->roleAssignments()->delete();
-            foreach ($roles as $role) {
-                RoleAssignment::create([
+            $target->roleAssignments()->where('source', 'manual')->delete();
+            foreach ($data['assignments'] as $input) {
+                $assignment = RoleAssignment::create([
                     'membership_id' => $target->id,
-                    'role_id' => $role->id,
+                    'role_id' => $input['role_id'],
                     'source' => 'manual',
                     'status' => 'active',
                     'valid_from' => now(),
-                ])->organizationScope()->create($scope);
+                ]);
+
+                foreach ($input['policy_scopes'] as $scope) {
+                    $assignment->dataPolicyScopes()->create([
+                        ...$this->scopeResolver->resolve($actor->tenant_id, $roles->get($input['role_id']), $scope),
+                        'tenant_id' => $actor->tenant_id,
+                        'valid_from' => now(),
+                    ]);
+                }
             }
 
-            return $target->load('roleAssignments.role');
+            DB::table('access_audit_events')->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $actor->tenant_id,
+                'membership_id' => $target->id,
+                'action' => 'access.manual-assignment.updated',
+                'payload' => json_encode(['actor_membership_id' => $actor->id, 'assignments' => $data['assignments']], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $target->load('roleAssignments.role', 'roleAssignments.dataPolicyScopes');
         });
     }
 }

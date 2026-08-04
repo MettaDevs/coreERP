@@ -1,0 +1,4 @@
+interface:
+  display_name: "CoreERP Architecture"
+  short_description: "Guardrails for organization and module lifecycle"
+  default_prompt: "Use $coreerp-architecture to verify CoreERP tenant, organization, authorization, and module lifecycle boundaries before implementation."

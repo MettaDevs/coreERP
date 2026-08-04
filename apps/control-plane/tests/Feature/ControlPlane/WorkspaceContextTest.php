@@ -4,9 +4,12 @@ namespace Tests\Feature\ControlPlane;
 
 use App\Models\Client;
 use App\Models\Organization;
+use App\Models\Role;
+use App\Models\RoleAssignment;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
+use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -15,11 +18,36 @@ class WorkspaceContextTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_owner_can_select_legal_entity_and_operating_unit_separately(): void
+    public function test_member_can_select_legal_entity_and_operating_unit_with_an_effective_policy_scope(): void
     {
+        $this->seed(AppCatalogSeeder::class);
+        \Illuminate\Support\Facades\DB::table('app_data_policies')->insert([
+            'code' => 'management-aset.asset-responsibility',
+            'app_id' => 'management-aset',
+            'name' => 'Akses aset menurut unit penanggung jawab',
+            'protected_permissions' => json_encode(['management-aset.entitas-aset.read'], JSON_THROW_ON_ERROR),
+            'requires_legal_entity' => true,
+            'requires_operating_unit' => true,
+            'allows_descendants' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         $user = User::factory()->create();
         [$membership, $legalEntity, $unit] = $this->createWorkspace($user, 'alpha', 'Alpha Outlet');
         $this->createWorkspace($user, 'beta', 'Beta Outlet');
+        $assignment = RoleAssignment::create([
+            'membership_id' => $membership->id,
+            'role_id' => Role::create(['tenant_id' => $membership->tenant_id, 'name' => 'Workspace viewer'])->id,
+            'source' => 'manual',
+            'status' => 'active',
+            'valid_from' => now(),
+        ]);
+        $assignment->dataPolicyScopes()->create([
+            'tenant_id' => $membership->tenant_id,
+            'policy_code' => 'management-aset.asset-responsibility',
+            'include_descendants' => false,
+            'valid_from' => now(),
+        ]);
 
         $this->actingAs($user)->putJson('/api/v1/workspace-context', [
             'membership_id' => $membership->id,
@@ -73,15 +101,17 @@ class WorkspaceContextTest extends TestCase
         ]);
         $legalEntity = Organization::create([
             'tenant_id' => $tenant->id,
-            'code' => strtoupper($slug).'-LE',
             'name' => ucfirst($slug).' Legal Entity',
             'classification' => 'legal_entity',
             'status' => 'active',
         ]);
-        $legalEntity->legalEntity()->create(['company_code' => strtoupper($slug), 'country_code' => 'ID']);
+        $legalEntity->legalEntity()->create([
+            'tenant_id' => $tenant->id,
+            'company_code' => strtoupper($slug),
+            'country_code' => 'ID',
+        ]);
         $unit = Organization::create([
             'tenant_id' => $tenant->id,
-            'code' => strtoupper($slug).'-OU',
             'name' => $unitName,
             'classification' => 'operating_unit',
             'status' => 'active',

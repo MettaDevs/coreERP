@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string $id
@@ -17,7 +17,7 @@ class RoleAssignment extends Model
 {
     use HasUlids;
 
-    protected $fillable = ['membership_id', 'role_id', 'source', 'status', 'valid_from', 'valid_until'];
+    protected $fillable = ['membership_id', 'role_id', 'source', 'source_reference', 'status', 'valid_from', 'valid_until'];
 
     protected function casts(): array
     {
@@ -30,9 +30,9 @@ class RoleAssignment extends Model
         return $this->belongsTo(Role::class);
     }
 
-    /** @return HasOne<RoleAssignmentOrgScope, $this> */
-    public function organizationScope(): HasOne
+    /** @return HasMany<RoleAssignmentDataPolicyScope, $this> */
+    public function dataPolicyScopes(): HasMany
     {
-        return $this->hasOne(RoleAssignmentOrgScope::class, 'assignment_id');
+        return $this->hasMany(RoleAssignmentDataPolicyScope::class, 'role_assignment_id');
     }
 }

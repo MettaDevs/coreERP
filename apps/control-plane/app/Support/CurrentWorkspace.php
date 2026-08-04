@@ -6,7 +6,6 @@ use App\Models\Organization;
 use App\Models\TenantMembership;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 final class CurrentWorkspace
 {
@@ -44,33 +43,20 @@ final class CurrentWorkspace
     public function organizations(TenantMembership $membership): Collection
     {
         $query = Organization::query()->where('tenant_id', $membership->tenant_id)->where('status', 'active')->orderBy('name');
-        if ($membership->canManageAccess()) {
+        $policies = app(DataPolicyAccessResolver::class)->resolve($membership);
+        if (collect($policies)->contains(fn (array $scope): bool => $scope['all'])) {
             return $query->get();
         }
+        $organizationIds = collect($policies)
+            ->flatMap(fn (array $scope): array => $scope['scope_grants'])
+            ->flatMap(fn (array $grant): array => array_filter([
+                $grant['legal_entity_id'],
+                ...$grant['operating_unit_ids'],
+            ]))
+            ->unique()
+            ->values();
 
-        $scopes = DB::table('role_assignment_org_scopes as scopes')
-            ->join('role_assignments as assignments', 'assignments.id', '=', 'scopes.assignment_id')
-            ->where('assignments.membership_id', $membership->id)
-            ->where('assignments.status', 'active')
-            ->where('assignments.valid_from', '<=', now())
-            ->where(fn ($builder) => $builder->whereNull('assignments.valid_until')->orWhere('assignments.valid_until', '>', now()))
-            ->get(['scopes.organization_id', 'scopes.hierarchy_version_id', 'scopes.include_descendants']);
-
-        if ($scopes->contains(fn (object $scope): bool => $scope->organization_id === null)) {
-            return $query->get();
-        }
-
-        $organizationIds = $scopes->pluck('organization_id')->filter();
-        foreach ($scopes->where('include_descendants', true) as $scope) {
-            $organizationIds = $organizationIds->merge(
-                DB::table('organization_hierarchy_closures')
-                    ->where('version_id', $scope->hierarchy_version_id)
-                    ->where('ancestor_organization_id', $scope->organization_id)
-                    ->pluck('descendant_organization_id'),
-            );
-        }
-
-        return $query->whereIn('id', $organizationIds->unique())->get();
+        return $organizationIds->isEmpty() ? new Collection : $query->whereIn('id', $organizationIds)->get();
     }
 
     public function legalEntity(Request $request, TenantMembership $membership): ?Organization

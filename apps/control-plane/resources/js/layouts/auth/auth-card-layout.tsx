@@ -7,7 +7,7 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
+} from '@apperp/ui/card';
 import { home } from '@/routes';
 
 export default function AuthCardLayout({

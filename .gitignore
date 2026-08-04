@@ -12,3 +12,7 @@ storage/pail/
 .phpunit.cache/
 .phpunit.result.cache
 /graphify-out
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/

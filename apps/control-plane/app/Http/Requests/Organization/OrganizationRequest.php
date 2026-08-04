@@ -17,9 +17,13 @@ class OrganizationRequest extends FormRequest
     {
         return [
             'classification' => ['required', Rule::in(['legal_entity', 'operating_unit'])],
-            'code' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9_-]+$/'],
             'name' => ['required', 'string', 'max:150'],
-            'company_code' => [Rule::requiredIf($this->input('classification') === 'legal_entity'), 'nullable', 'string', 'max:50'],
+            'company_code' => [
+                Rule::requiredIf($this->input('classification') === 'legal_entity'),
+                'nullable',
+                'string',
+                'regex:/^[A-Za-z0-9][A-Za-z0-9-]{1,15}$/',
+            ],
             'country_code' => [Rule::requiredIf($this->input('classification') === 'legal_entity'), 'nullable', 'string', 'size:2'],
             'operating_unit_type' => [
                 Rule::requiredIf($this->input('classification') === 'operating_unit'),
@@ -29,14 +33,13 @@ class OrganizationRequest extends FormRequest
         ];
     }
 
-    /** @return array{classification:string,code:string,name:string,company_code:?string,country_code:?string,operating_unit_type:?string} */
+    /** @return array{classification:string,name:string,company_code:?string,country_code:?string,operating_unit_type:?string} */
     public function payload(): array
     {
         return [
             'classification' => $this->string('classification')->toString(),
-            'code' => strtoupper($this->string('code')->toString()),
             'name' => $this->string('name')->toString(),
-            'company_code' => $this->string('company_code')->toString() ?: null,
+            'company_code' => strtoupper($this->string('company_code')->toString()) ?: null,
             'country_code' => $this->string('country_code')->toString() ?: null,
             'operating_unit_type' => $this->string('operating_unit_type')->toString() ?: null,
         ];

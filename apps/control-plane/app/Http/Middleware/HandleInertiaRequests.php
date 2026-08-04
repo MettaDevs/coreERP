@@ -7,7 +7,6 @@ use App\Models\TenantMembership;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -92,6 +91,10 @@ class HandleInertiaRequests extends Middleware
             'entitledProducts' => fn (): array => $this->entitledProducts($membership),
             'launchableProducts' => fn (): array => $this->launchableProducts($membership),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'flash' => [
+                'status' => fn (): ?string => $request->session()->get('status'),
+                'error' => fn (): ?string => $request->session()->get('error'),
+            ],
         ];
     }
 

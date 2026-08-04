@@ -2,14 +2,14 @@ import { Head } from '@inertiajs/react';
 import { DotLottie } from '@lottiefiles/dotlottie-web';
 import { useEffect, useRef, useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@apperp/ui/badge';
 import {
     Card,
     CardContent,
     CardDescription,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
+} from '@apperp/ui/card';
 
 const lottieFiles = import.meta.glob('../assets/lottie/*.lottie', {
     eager: true,

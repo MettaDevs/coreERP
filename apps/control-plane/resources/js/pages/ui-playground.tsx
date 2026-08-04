@@ -22,8 +22,8 @@ import {
     AccordionContent,
     AccordionItem,
     AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+} from '@apperp/ui/accordion';
+import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -34,10 +34,10 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
     AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
+} from '@apperp/ui/alert-dialog';
+import { AspectRatio } from '@apperp/ui/aspect-ratio';
+import { Avatar, AvatarFallback } from '@apperp/ui/avatar';
+import { Badge } from '@apperp/ui/badge';
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -45,10 +45,10 @@ import {
     BreadcrumbList,
     BreadcrumbPage,
     BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
-import { Calendar } from '@/components/ui/calendar';
+} from '@apperp/ui/breadcrumb';
+import { Button } from '@apperp/ui/button';
+import { ButtonGroup } from '@apperp/ui/button-group';
+import { Calendar } from '@apperp/ui/calendar';
 import {
     Card,
     CardContent,
@@ -56,20 +56,20 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-} from '@/components/ui/card';
+} from '@apperp/ui/card';
 import {
     Carousel,
     CarouselContent,
     CarouselItem,
     CarouselNext,
     CarouselPrevious,
-} from '@/components/ui/carousel';
-import { Checkbox } from '@/components/ui/checkbox';
+} from '@apperp/ui/carousel';
+import { Checkbox } from '@apperp/ui/checkbox';
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+} from '@apperp/ui/collapsible';
 import {
     Command,
     CommandEmpty,
@@ -77,7 +77,7 @@ import {
     CommandInput,
     CommandItem,
     CommandList,
-} from '@/components/ui/command';
+} from '@apperp/ui/command';
 import {
     Dialog,
     DialogContent,
@@ -85,12 +85,12 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
-import { DataTable } from '@/components/ui/data-table';
+} from '@apperp/ui/dialog';
+import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
     DataTableRowAction,
-} from '@/components/ui/data-table';
+} from '@apperp/ui/data-table';
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -99,7 +99,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@apperp/ui/dropdown-menu';
 import {
     Empty,
     EmptyContent,
@@ -107,26 +107,26 @@ import {
     EmptyHeader,
     EmptyMedia,
     EmptyTitle,
-} from '@/components/ui/empty';
-import { Field, FieldDescription, FieldGroup } from '@/components/ui/field';
+} from '@apperp/ui/empty';
+import { Field, FieldDescription, FieldGroup } from '@apperp/ui/field';
 import {
     HoverCard,
     HoverCardContent,
     HoverCardTrigger,
-} from '@/components/ui/hover-card';
-import { Input } from '@/components/ui/input';
+} from '@apperp/ui/hover-card';
+import { Input } from '@apperp/ui/input';
 import {
     InputGroup,
     InputGroupAddon,
     InputGroupInput,
     InputGroupText,
-} from '@/components/ui/input-group';
+} from '@apperp/ui/input-group';
 import {
     InputOTP,
     InputOTPGroup,
     InputOTPSeparator,
     InputOTPSlot,
-} from '@/components/ui/input-otp';
+} from '@apperp/ui/input-otp';
 import {
     Item,
     ItemActions,
@@ -134,9 +134,9 @@ import {
     ItemDescription,
     ItemMedia,
     ItemTitle,
-} from '@/components/ui/item';
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
-import { Label } from '@/components/ui/label';
+} from '@apperp/ui/item';
+import { Kbd, KbdGroup } from '@apperp/ui/kbd';
+import { Label } from '@apperp/ui/label';
 import {
     Menubar,
     MenubarContent,
@@ -144,8 +144,8 @@ import {
     MenubarMenu,
     MenubarSeparator,
     MenubarTrigger,
-} from '@/components/ui/menubar';
-import { MultiSelect } from '@/components/ui/multi-select';
+} from '@apperp/ui/menubar';
+import { MultiSelect } from '@apperp/ui/multi-select';
 import {
     Pagination,
     PaginationContent,
@@ -154,22 +154,18 @@ import {
     PaginationLink,
     PaginationNext,
     PaginationPrevious,
-} from '@/components/ui/pagination';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
-import { Progress } from '@/components/ui/progress';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+} from '@apperp/ui/pagination';
+import { Popover, PopoverContent, PopoverTrigger } from '@apperp/ui/popover';
+import { Progress } from '@apperp/ui/progress';
+import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import {
     ResizableHandle,
     ResizablePanel,
     ResizablePanelGroup,
-} from '@/components/ui/resizable';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+} from '@apperp/ui/resizable';
+import { ScrollArea } from '@apperp/ui/scroll-area';
+import { Select } from '@apperp/ui/select';
+import { Separator } from '@apperp/ui/separator';
 import {
     Sheet,
     SheetContent,
@@ -177,20 +173,16 @@ import {
     SheetHeader,
     SheetTitle,
     SheetTrigger,
-} from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Slider } from '@/components/ui/slider';
-import { Spinner } from '@/components/ui/spinner';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { Toggle } from '@/components/ui/toggle';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@apperp/ui/sheet';
+import { Skeleton } from '@apperp/ui/skeleton';
+import { Slider } from '@apperp/ui/slider';
+import { Spinner } from '@apperp/ui/spinner';
+import { Switch } from '@apperp/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
+import { Textarea } from '@apperp/ui/textarea';
+import { Toggle } from '@apperp/ui/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 
 const availableComponents = [
     'Accordion',

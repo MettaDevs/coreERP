@@ -1,0 +1,4 @@
+interface:
+  display_name: "Desain Nomor Otomatis"
+  short_description: "Audit referensi dan default nomor CoreERP"
+  default_prompt: "Use $number-sequence-design to audit a new CoreERP app/module, declare every required master and transaction reference, align automatic generation with Dynamics 365, and ask before guessing unresolved policies."

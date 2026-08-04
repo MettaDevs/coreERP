@@ -1,4 +1,5 @@
 import type { Auth, EntitledProduct } from '@/types/auth';
+import type { HostedNavigation } from '@/types/navigation';
 
 declare module 'react' {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -14,6 +15,11 @@ declare module '@inertiajs/core' {
             auth: Auth;
             entitledProducts: EntitledProduct[];
             launchableProducts: EntitledProduct[];
+            app?: {
+                id: string;
+                name: string;
+                navigation: HostedNavigation;
+            };
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

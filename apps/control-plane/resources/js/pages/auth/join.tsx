@@ -2,17 +2,17 @@ import { Form, Head } from '@inertiajs/react';
 
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
-import { Button } from '@/components/ui/button';
-import { Field, FieldError, FieldGroup } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@apperp/ui/button';
+import { Field, FieldError, FieldGroup } from '@apperp/ui/field';
+import { Input } from '@apperp/ui/input';
+import { Spinner } from '@apperp/ui/spinner';
 
 type Props = { passwordRules: string };
 
 export default function Join({ passwordRules }: Props) {
     return (
         <>
-            <Head title="Join business" />
+            <Head title="Daftar dengan kode akses" />
             <Form
                 action="/join"
                 method="post"
@@ -24,7 +24,7 @@ export default function Join({ passwordRules }: Props) {
                         <Field data-invalid={Boolean(errors.code)}>
                             <Input
                                 id="code"
-                                label="Invite code"
+                                label="Kode akses"
                                 name="code"
                                 required
                                 autoFocus
@@ -81,11 +81,11 @@ export default function Join({ passwordRules }: Props) {
                         </Field>
                         <Button type="submit" disabled={processing}>
                             {processing && <Spinner />}
-                            Join business
+                            Masuk ke bisnis
                         </Button>
                         <p className="text-center text-sm text-muted-foreground">
                             Sudah punya akun?{' '}
-                            <TextLink href="/login">Log in</TextLink>
+                            <TextLink href="/login">Masuk</TextLink>
                         </p>
                     </FieldGroup>
                 )}
@@ -95,7 +95,7 @@ export default function Join({ passwordRules }: Props) {
 }
 
 Join.layout = {
-    title: 'Join dengan invite code',
+    title: 'Daftar dengan kode akses',
     description:
-        'Email wajib sebagai identity login. Pengiriman email akan hadir kemudian.',
+        'Masukkan kode dari admin. Role dan akses organisasi akan diterapkan otomatis, lalu Anda langsung masuk.',
 };

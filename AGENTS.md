@@ -1,16 +1,38 @@
 # CoreERP
 
-- Desain kanonik ada di `docs/dev/README.md`. Buka hanya dokumen yang relevan dengan tugas; dokumen konsep lama bersifat historis.
-- Jaga perubahan dan dependency tetap minimal. Jangan membuat abstraksi atau compatibility layer spekulatif.
+- Desain kanonik ada di `docs/dev/README.md` dan di Dynamic 365 https://learn.microsoft.com/en-us/dynamics365/. Buka hanya dokumen yang relevan dengan tugas; dokumen konsep lama bersifat historis.
+- Jaga perubahan dan dependency tetap minimal. Jangan membuat abstraksi atau compatibility layer spekulatif kalau ada yang bingung langsung tanyakan saya, stop berfikir sampainkonteks jelas. /
 - Teks UI untuk end user—termasuk hint, label, dialog, empty state, error, dan status—wajib memakai bahasa sehari-hari yang menjelaskan tindakan atau dampaknya bagi pengguna. Jangan tampilkan istilah internal seperti entitlement, artifact, deployment/installation registry, `TenantContext`, `tenant_id`, atau istilah arsitektur lain kecuali layar memang ditujukan untuk developer/operator teknis.
 - Setiap module memiliki API, UI, database, migration, contract, dan container sendiri. Dilarang query database lintas module; gunakan REST/OpenAPI atau event/AsyncAPI.
 - Jangan samakan katalog, entitlement, installation, dan runtime health module. Katalog berarti produk dikenal; entitlement berarti tenant berhak memakai; `installed/ready` hanya sah setelah artifact ditempatkan dan migration berhasil menurut installation/deployment registry. UI berlabel "terpasang" wajib membaca registry tersebut, tidak boleh menyimpulkannya dari entitlement. Jika registry belum ada, nyatakan gap dan jangan memalsukan state.
 - Data tenant wajib memakai `TenantContext` tepercaya dan `tenant_id`; data operasional memakai `org_unit_id` bila relevan.
+- Saat menambah app atau fitur yang menyimpan/menampilkan data operasional, wajib membuka dan mengikuti **Data policy decision gate** pada `.agents/skills/coreerp-architecture/SKILL.md`. Deklarasikan policy data beserta kontraknya pada manifest hanya bila resource memang perlu dibatasi organisasi.
+- Sebelum membuat app, master, transaksi, workflow, atau integrasi baru, wajib gunakan `.agents/skills/module-discovery/SKILL.md`: cari referensi resmi Dynamics 365, buat proposal keputusan, dan tunggu persetujuan untuk pilihan material. Jika tidak ada padanan Dynamics, nyatakan dengan jelas.
 - SaaS dikelola control plane; on-prem perpetual berdiri sendiri, memakai update bertanda tangan, dan tanpa telemetry wajib.
 - Pertahankan perubahan user yang tidak terkait. Verifikasi hanya scope yang berubah dengan script Composer/NPM yang tersedia.
+- Sebuah modul belum selesai hanya karena test feature lulus. Modul baru wajib melewati load test: 1000+ VU serentak, 100+ tenant, 2+ instance API di belakang load balancer, database asli (bukan SQLite), 90 detik pada beban penuh. Gate kebenaran—0 pelanggaran lintas tenant, 0 nomor ganda, 0 eskalasi hak, 0 error 5xx aplikasi—berlaku di perangkat keras apa pun dan diverifikasi lewat SQL langsung ke database, bukan lewat API yang sedang diuji. Gate latensi diukur pada concurrency yang masih tertahan, bukan pada titik jenuh. Rinciannya ada pada skill `coreerp-architecture`; contoh implementasi ada di `app-erp-management-aset/loadtest/`.
 
 Rules:
 - Do not ever hardcode a name, like name of a company, name of a person, name  of a BIG MODULE, everything should config on database, ask me if you still didnt clear about this later on the conv
+
+## UI overlay dropdowns
+
+- Any `Select` or combobox rendered inside an SDK `Sheet`, dialog, popover, or other overlay must receive that overlay content ref through `portalContainer`. Otherwise its menu may visually open beneath the overlay but cannot be selected. Follow the full UI guidance in [`.agents/skills/coreerp-ui/SKILL.md`](.agents/skills/coreerp-ui/SKILL.md).
+
+## UI runtime verification
+
+- Setelah mengubah UI, `npm run build` saja tidak cukup: rebuild dan recreate container runtime melalui `D:\Kerja\erp-dev\start.ps1 -Build`, lalu buka layar yang diubah pada `http://localhost:8000` untuk memastikan artifact baru benar-benar tampil.
+- Jangan melaporkan perubahan UI selesai hanya karena type-check atau build lokal lulus. Pastikan container yang aktif dibuat ulang setelah perubahan dan health check stack selesai.
+
+## Runtime database verification
+
+- Perintah `php artisan migrate`, `db:seed`, atau `tinker` dari host dapat memakai database yang berbeda dari UI lokal. Untuk data yang harus terlihat di `http://localhost:8000`, jalankan migrasi/seed melalui container `core-app` dari `D:\Kerja\erp-dev` atau gunakan `D:\Kerja\erp-dev\start.ps1 -Build`.
+- Setelah migration atau seed, verifikasi dengan query dari container runtime dan reload layar terkait. Jangan menyatakan data tersedia di UI hanya berdasarkan hasil `php artisan` di host.
+
+## App manifest runtime verification
+
+- Setelah mengubah navigasi atau security di `app.yaml`, rebuild UI saja tidak cukup. Jalankan `app:register-manifest /workspace/app.yaml` melalui container `core-app` di `D:\Kerja\erp-dev`, lalu verifikasi kolom `apps.navigation` pada database runtime dan reload shell Core.
+- Saat menghapus duty yang sudah dipakai role, buat migration kecil untuk melepas relasi role-duty terlebih dahulu; baru daftarkan ulang manifest. Ini mencegah menu lama tetap tampil dari katalog Core.
 
 ## graphify
 

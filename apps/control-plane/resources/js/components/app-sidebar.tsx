@@ -1,8 +1,12 @@
 import { Link, usePage } from '@inertiajs/react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import {
     Building2,
+    Database,
     KeyRound,
     LayoutDashboard,
+    Hash,
+    Ruler,
     Package,
     Palette,
     ShieldCheck,
@@ -10,22 +14,55 @@ import {
     Users,
 } from 'lucide-react';
 
-import { Sidebar } from '@/components/ui/sidebar';
+import { Sidebar } from '@apperp/ui/sidebar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 type NavigationItem = {
     label: string;
-    icon: typeof LayoutDashboard;
+    icon?: typeof LayoutDashboard;
     href: string;
 };
 type PrimaryNavigationItem = NavigationItem & {
+    icon: typeof LayoutDashboard;
     children: NavigationItem[];
 };
+
+function TruncatedLabel({ children }: { children: string }) {
+    const label = useRef<HTMLSpanElement>(null);
+    const [truncated, setTruncated] = useState(false);
+
+    useLayoutEffect(() => {
+        const update = () =>
+            setTruncated(
+                (label.current?.scrollWidth ?? 0) >
+                    (label.current?.clientWidth ?? 0),
+            );
+        update();
+        const observer = new ResizeObserver(update);
+        if (label.current) observer.observe(label.current);
+        return () => observer.disconnect();
+    }, [children]);
+
+    const content = (
+        <span ref={label} className="truncate">
+            {children}
+        </span>
+    );
+    if (!truncated) return content;
+
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>{content}</TooltipTrigger>
+            <TooltipContent side="right">{children}</TooltipContent>
+        </Tooltip>
+    );
+}
 
 export function AppSidebar() {
     const { url, props } = usePage();
     const path = url.split('?')[0];
-    const primaryItems: PrimaryNavigationItem[] = [
+    const coreItems: PrimaryNavigationItem[] = [
         {
             label: 'Dashboard',
             icon: LayoutDashboard,
@@ -72,8 +109,52 @@ export function AppSidebar() {
                               icon: Users,
                               href: '/settings/access?section=invitations',
                           },
+                          {
+                              label: 'Konfigurasi keamanan',
+                              icon: ShieldCheck,
+                              href: '/settings/security-configuration',
+                          },
+                          {
+                              label: 'Workflow',
+                              icon: ShieldCheck,
+                              href: '/settings/workflows',
+                          },
                       ],
                   },
+                  ...(props.auth.membership &&
+                  ['owner', 'admin'].includes(props.auth.membership.system_role)
+                      ? [
+                            {
+                                label: 'Data referensi',
+                                icon: Ruler,
+                                href: '/settings/units-of-measure',
+                                children: [
+                                    {
+                                        label: 'Satuan',
+                                        icon: Ruler,
+                                        href: '/settings/units-of-measure',
+                                    },
+                                ],
+                            },
+                        ]
+                      : []),
+                  ...(props.auth.membership &&
+                  ['owner', 'admin'].includes(props.auth.membership.system_role)
+                      ? [
+                            {
+                                label: 'Nomor dokumen',
+                                icon: Hash,
+                                href: '/settings/number-sequences',
+                                children: [
+                                    {
+                                        label: 'Atur nomor',
+                                        icon: Hash,
+                                        href: '/settings/number-sequences',
+                                    },
+                                ],
+                            },
+                        ]
+                      : []),
               ]
             : []),
         {
@@ -134,9 +215,25 @@ export function AppSidebar() {
               ]
             : []),
     ];
+    const hostedItems: PrimaryNavigationItem[] =
+        props.app?.navigation.rails.map((rail) => ({
+            label: rail.label,
+            icon: Database,
+            href: rail.href,
+            children: rail.items.map((item) => ({
+                label: item.label,
+                href: item.href,
+            })),
+        })) ?? [];
+    const isHostedApp = props.app !== undefined;
+    const primaryItems = isHostedApp ? hostedItems : coreItems;
     const selectedItem =
         primaryItems.find((item) =>
-            item.children.some((child) => path === child.href.split('?')[0]),
+            item.children.some((child) =>
+                isHostedApp
+                    ? url === child.href
+                    : path === child.href.split('?')[0],
+            ),
         ) ?? primaryItems[0];
     const isChildActive = (item: NavigationItem) =>
         url === item.href ||
@@ -148,28 +245,21 @@ export function AppSidebar() {
         <Sidebar
             collapsible="offcanvas"
             className="border-r border-sidebar-border bg-sidebar"
-            style={{ '--sidebar-width': '20rem' } as React.CSSProperties}
+            style={{ '--sidebar-width': '16rem' } as React.CSSProperties}
         >
             <div className="flex h-full w-full">
-                <aside className="flex w-24 shrink-0 flex-col items-center gap-3 border-r border-sidebar-border py-3">
-                    <Link
-                        href="/dashboard"
-                        className="flex size-8 items-center justify-center rounded-md bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground"
-                        aria-label="Beranda"
-                    >
-                        CE
-                    </Link>
+                <aside className="flex w-14 shrink-0 flex-col items-center border-r border-sidebar-border px-1 py-1">
                     <nav
                         aria-label="Menu utama"
-                        className="flex flex-col gap-1"
+                        className="flex w-full flex-col gap-1"
                     >
                         {primaryItems.map((item) => (
                             <Link
                                 key={item.label}
                                 href={item.href}
                                 className={cn(
-                                    'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1 text-center text-[10px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&_svg]:size-4',
-                                    selectedItem.label === item.label &&
+                                    'flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1 text-center text-[10px] text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&_svg]:size-4',
+                                    selectedItem?.label === item.label &&
                                         'bg-sidebar-accent font-semibold text-sidebar-accent-foreground',
                                 )}
                             >
@@ -182,35 +272,39 @@ export function AppSidebar() {
                     </nav>
                 </aside>
 
-                <nav
-                    className="min-w-0 flex-1"
-                    aria-label={`${selectedItem.label} navigation`}
-                >
-                    <div className="border-b border-sidebar-border px-3 py-3">
-                        <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                            Menu
-                        </p>
-                        <h2 className="text-base font-semibold">
-                            {selectedItem.label}
-                        </h2>
-                    </div>
-                    <div className="flex flex-col gap-1 px-3 py-3">
-                        {selectedItem.children.map((item) => (
-                            <Link
-                                key={item.label}
-                                href={item.href}
-                                className={cn(
-                                    'flex h-9 items-center gap-3 rounded-md px-3 text-xs text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:h-10 lg:text-sm [&_svg]:size-4 lg:[&_svg]:size-5',
-                                    isChildActive(item) &&
-                                        'bg-sidebar-accent font-semibold text-sidebar-accent-foreground',
-                                )}
-                            >
-                                <item.icon />
-                                <span className="truncate">{item.label}</span>
-                            </Link>
-                        ))}
-                    </div>
-                </nav>
+                {selectedItem && (
+                    <nav
+                        className="min-w-0 flex-1"
+                        aria-label={`${selectedItem.label} navigation`}
+                    >
+                        <div className="border-b border-sidebar-border px-1 py-1">
+                            <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                                Menu
+                            </p>
+                            <h2 className="text-sm font-semibold">
+                                {selectedItem.label}
+                            </h2>
+                        </div>
+                        <div className="flex flex-col gap-1 px-1 py-1">
+                            {selectedItem.children.map((item) => (
+                                <Link
+                                    key={item.label}
+                                    href={item.href}
+                                    className={cn(
+                                        'flex h-7 items-center gap-1 rounded-md px-1 text-[10px] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&_svg]:size-3.5',
+                                        isChildActive(item) &&
+                                            'bg-sidebar-accent font-semibold text-sidebar-accent-foreground',
+                                    )}
+                                >
+                                    {item.icon && <item.icon />}
+                                    <TruncatedLabel>
+                                        {item.label}
+                                    </TruncatedLabel>
+                                </Link>
+                            ))}
+                        </div>
+                    </nav>
+                )}
             </div>
         </Sidebar>
     );

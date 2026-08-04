@@ -4,14 +4,19 @@ namespace App\Http\Controllers\Organization;
 
 use App\Actions\Organization\CreateOrganization;
 use App\Actions\Organization\CreateOrganizationHierarchy;
+use App\Actions\Organization\CreateOrganizationHierarchyDraft;
 use App\Actions\Organization\PlaceOrganizationInHierarchy;
 use App\Actions\Organization\PublishOrganizationHierarchy;
+use App\Actions\Organization\UnplaceOrganizationFromHierarchy;
+use App\Actions\Organization\UpdateOrganization;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Organization\HierarchyRequest;
 use App\Http\Requests\Organization\OrganizationRequest;
+use App\Http\Requests\Organization\UpdateOrganizationRequest;
 use App\Models\HierarchyPurpose;
 use App\Models\Organization;
 use App\Models\OrganizationHierarchy;
+use App\Models\OrganizationHierarchyNode;
 use App\Models\OrganizationHierarchyVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -64,6 +69,15 @@ class OrganizationController extends Controller
             : back()->with('status', 'Organisasi dibuat.');
     }
 
+    public function update(UpdateOrganizationRequest $request, Organization $organization, UpdateOrganization $action): JsonResponse|RedirectResponse
+    {
+        $organization = $action->handle($this->currentMembership($request), $organization, $request->payload());
+
+        return $request->is('api/*')
+            ? response()->json(['data' => $organization])
+            : back()->with('status', 'Organisasi diperbarui.');
+    }
+
     public function storeHierarchy(HierarchyRequest $request, CreateOrganizationHierarchy $action): RedirectResponse
     {
         $action->handle($this->currentMembership($request), $request->payload());
@@ -85,6 +99,21 @@ class OrganizationController extends Controller
         );
 
         return back()->with('status', 'Organisasi ditempatkan pada draft hierarchy.');
+    }
+
+    public function unplace(Request $request, OrganizationHierarchyVersion $version, OrganizationHierarchyNode $node, UnplaceOrganizationFromHierarchy $action): RedirectResponse
+    {
+        $action->handle($this->currentMembership($request), $version, $node);
+
+        return back()->with('status', 'Penempatan organisasi dibatalkan.');
+    }
+
+    public function createDraft(Request $request, OrganizationHierarchyVersion $version, CreateOrganizationHierarchyDraft $action): RedirectResponse
+    {
+        $data = $request->validate(['effective_from' => ['required', 'date']]);
+        $action->handle($this->currentMembership($request), $version, $data['effective_from']);
+
+        return back()->with('status', 'Draft versi baru dibuat. Susun perubahan lalu publikasikan.');
     }
 
     public function publish(Request $request, OrganizationHierarchyVersion $version, PublishOrganizationHierarchy $action): RedirectResponse

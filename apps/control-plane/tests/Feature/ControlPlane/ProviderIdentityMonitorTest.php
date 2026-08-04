@@ -27,7 +27,7 @@ class ProviderIdentityMonitorTest extends TestCase
         app(RegisterBusiness::class)->handle([
             'name' => 'Owner',
             'business_name' => 'PT Metta',
-            'app_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['management-aset'],
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);
@@ -44,7 +44,7 @@ class ProviderIdentityMonitorTest extends TestCase
         $owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner',
             'business_name' => 'PT Metta',
-            'app_ids' => ['procurement', 'management-asset'],
+            'app_ids' => ['management-aset'],
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);

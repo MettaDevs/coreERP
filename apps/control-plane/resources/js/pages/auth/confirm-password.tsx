@@ -1,8 +1,8 @@
 import { Form, Head } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+import { Button } from '@apperp/ui/button';
+import { Spinner } from '@apperp/ui/spinner';
 import { store } from '@/routes/password/confirm';
 /* @chisel-passkeys */
 import {

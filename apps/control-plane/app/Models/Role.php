@@ -35,4 +35,23 @@ class Role extends Model
     {
         return $this->belongsToMany(SecurityDuty::class, 'security_role_duties', 'role_id', 'duty_code');
     }
+
+    /**
+     * Role yang berada di bawah role ini. Hak seluruh child ikut berlaku bagi
+     * pemegang role ini.
+     *
+     * @return BelongsToMany<Role, $this>
+     */
+    public function children(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'security_role_children', 'parent_role_id', 'child_role_id')
+            ->withTimestamps();
+    }
+
+    /** @return BelongsToMany<Role, $this> */
+    public function parents(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'security_role_children', 'child_role_id', 'parent_role_id')
+            ->withTimestamps();
+    }
 }

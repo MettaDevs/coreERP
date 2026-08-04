@@ -11,6 +11,24 @@ deploy/        manifest deployment dan release tooling
 docs/          desain kanonik
 ```
 
+## Baru bergabung?
+
+Mulai dari [panduan onboarding](docs/onboarding/index.md): jalur baca, setup lingkungan lokal, glosarium, dan cara berkontribusi.
+
+## Situs dokumentasi
+
+Seluruh dokumen di `docs/` dirender sebagai situs dengan pencarian dan navigasi.
+
+**Membaca** — ikut nyala bersama stack lokal `erp-dev` di `http://localhost:18090`.
+
+**Menulis** — jalankan dev server dengan hot reload:
+
+```bash
+cd docs && npm install && npm run docs:dev
+```
+
+`npm run docs:build` memvalidasi seluruh tautan antar dokumen; build gagal bila ada tautan yang putus.
+
 ## Dokumentasi desain
 
 Mulai dari [desain kanonik](docs/dev/README.md), lalu gunakan dokumen sesuai pekerjaan:

@@ -99,6 +99,41 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
+        /*
+         * The test connections are real PostgreSQL. Number sequences depend on row locks and SKIP LOCKED, and every
+         * lock clause compiles to an empty string on SQLite, so a SQLite suite silently proves nothing about them.
+         *
+         * `pgsql_test_secondary` is the same database over a second connection. It stands in for a second Core API
+         * instance so concurrency tests can interleave two transactions deterministically.
+         */
+        'pgsql_test' => [
+            'driver' => 'pgsql',
+            'host' => env('DB_TEST_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('DB_TEST_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_TEST_DATABASE', env('DB_DATABASE', 'core_erp')),
+            'username' => env('DB_TEST_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('DB_TEST_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => env('DB_TEST_SCHEMA', 'coreerp_test'),
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        'pgsql_test_secondary' => [
+            'driver' => 'pgsql',
+            'host' => env('DB_TEST_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('DB_TEST_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_TEST_DATABASE', env('DB_DATABASE', 'core_erp')),
+            'username' => env('DB_TEST_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('DB_TEST_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => env('DB_TEST_SCHEMA', 'coreerp_test'),
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
         'sqlsrv' => [
             'driver' => 'sqlsrv',
             'url' => env('DB_URL'),
