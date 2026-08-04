@@ -1,0 +1,29 @@
+openapi: 3.1.0
+info:
+  title: Human Resources API
+  version: 0.1.0
+  description: |
+    Seluruh endpoint selain health memverifikasi signed Core context. Policy
+    `human-resources.workforce-responsibility` membatasi position dan penugasan
+    menurut operating unit; pekerja tanpa position hanya terlihat bagi akses
+    seluruh organisasi. Tautan akun memakai `core_membership_id` dari lookup
+    Core, bukan alamat email.
+paths:
+  /api/v1/health:
+    get:
+      summary: Memeriksa kesiapan API
+      responses: { '200': { description: API siap menerima request } }
+  /api/v1/core-members:
+    get: { summary: Mencari anggota Core untuk ditautkan ke pekerja, responses: { '200': { description: Daftar anggota Core aktif } } }
+  /api/v1/workers:
+    get: { summary: Menampilkan pekerja yang dapat diakses, responses: { '200': { description: Daftar pekerja } } }
+    post: { summary: Menambah pekerja, responses: { '201': { description: Pekerja dibuat } } }
+  /api/v1/jobs:
+    get: { summary: Menampilkan jabatan, responses: { '200': { description: Daftar jabatan } } }
+    post: { summary: Menambah jabatan, responses: { '201': { description: Jabatan dibuat } } }
+  /api/v1/positions:
+    get: { summary: Menampilkan posisi, responses: { '200': { description: Daftar posisi } } }
+    post: { summary: Menambah posisi, responses: { '201': { description: Posisi dibuat } } }
+  /api/v1/worker-position-assignments:
+    get: { summary: Menampilkan penugasan posisi, responses: { '200': { description: Daftar penugasan } } }
+    post: { summary: Menugaskan pekerja ke posisi, responses: { '201': { description: Penugasan dibuat } } }
