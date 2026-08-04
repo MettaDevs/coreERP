@@ -9,7 +9,7 @@ Repository saat ini adalah monorepo transisi. Laravel 13 React starter berada di
 | `apps/control-plane/` | Laravel 13, Inertia, Fortify; organization, access, entitlement, placement, dan worker sudah ada. | Tetap di repository CoreERP ini sebagai Control Plane. Ia tidak memiliki domain bisnis app. |
 | `apps/provider-console/` | Belum dipisahkan sebagai aplikasi mandiri. | Dibuat di repository CoreERP ini; hanya memakai Control Plane API untuk operasi provider. |
 | `apps/web-shell/` | Belum dipisahkan sebagai aplikasi mandiri. | Dibuat di repository CoreERP ini; menjadi host UI dan launcher app tenant. |
-| App bisnis | Tidak lagi disimpan di repository CoreERP. | Management Asset berjalan dari repository `app-erp-management-asset`; app berikutnya dibuat sebagai repository `apperp-<app-key>` sendiri. |
+| App bisnis | Tidak lagi disimpan di repository CoreERP. | Management Aset berjalan dari repository `app-erp-management-aset`; app berikutnya dibuat sebagai repository `app-erp-<app-key>` sendiri. |
 | `packages/` | Belum merupakan package registry berversi. | Tidak dipisahkan dulu. Package hanya dipublish bila dipakai minimal dua repository. |
 
 Control Plane sekarang memiliki organization directory (`organizations`, `legal_entities`, `operating_units`), purpose-scoped versioned hierarchy, membership, entitlement, tenant deployment binding, placement registry, installation-attempt history, queued placement worker, role → duty → privilege → permission, organization-scoped assignment, invitation, dan provider access. Launcher memisahkan hak produk dari produk yang benar-benar siap dibuka. Workforce/position, automatic dan temporary assignment, SoD, audit access, dan integrasi deployment production masih menjadi fase berikutnya.
@@ -25,12 +25,12 @@ CoreERP/                            # repository platform yang sekarang ini
 ├── deploy/                         # deployment platform
 └── README.md
 
-apperp-<app-key>/                   # satu repository untuk satu app bisnis
+app-erp-<app-key>/                  # satu repository untuk satu app bisnis
 ├── api/ ui/ database/ contracts/ deploy/
 ├── app.yaml
 └── README.md
 
-apperp-<bridge-key>/                # repository bridge bila use case nyata muncul
+app-erp-<bridge-key>/               # repository bridge bila use case nyata muncul
 └── api/ database/ contracts/ deploy/ app.yaml
 ```
 
@@ -67,3 +67,10 @@ Control Plane mengoordinasi katalog, entitlement, placement, dan status runtime.
 - Contract change memicu compatibility check pada app consumer yang terdaftar.
 - Reporting gabungan dibaca dari `reporting_db` projection, bukan join lintas database/replica app.
 - Package bersama tidak dibuat sebelum dipakai minimal dua repository dan memiliki versi serta owner.
+
+## Lihat juga
+
+- [Standar module](02-module-standard.md) — isi wajib satu repository app
+- [Release dan on-prem](03-release-and-on-prem.md) — apa yang dirilis dari repository terpisah
+- [Development stack lokal](11-local-docker-development.md) — menjalankan repository terpisah sebagai satu stack
+- [Menerbitkan release app](13-publishing-an-app-release.md) — CI per repository app

@@ -46,3 +46,9 @@ Setiap extension memiliki dependency graph, permission, lifecycle install/uninst
 ## Productization rule
 
 Jika custom feature diminta beberapa tenant dan domainnya umum, pindahkan ke core module/configuration product. Jika hanya masuk akal untuk satu customer, pertahankan sebagai private addon. Keputusan ini dicatat sebagai ADR bersama owner product dan engineering.
+
+## Lihat juga
+
+- [Standar module](02-module-standard.md) — batas app, addon app, dan extension
+- [API dan integration bridge](04-api-and-integration.md) — kontrak yang boleh dipakai addon
+- [Menerbitkan release app](13-publishing-an-app-release.md) — pendaftaran addon ke katalog

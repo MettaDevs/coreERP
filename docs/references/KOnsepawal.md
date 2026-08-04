@@ -1,6 +1,6 @@
 # PRODUCT REQUIREMENTS DOCUMENT (PRD)
 
-> **Status: konsep historis — jangan diimplementasikan sebagai desain target.** Desain kanonik telah dipindahkan ke [docs/dev/README.md](dev/README.md). Khususnya, asumsi "satu Laravel runtime dengan Composer package", feature flag frontend sebagai mekanisme distribusi, dan update on-prem melalui Composer/webhook telah digantikan oleh service module API + UI artifact + database + Docker release unit serta bundle update bertanda tangan. SaaS dimonitor melalui control plane; on-prem perpetual independen dan konektor support bersifat opt-in. Dokumen ini dipertahankan hanya sebagai catatan kebutuhan awal.
+> **Status: konsep historis — jangan diimplementasikan sebagai desain target.** Desain kanonik telah dipindahkan ke [docs/dev/README.md](../dev/README.md). Khususnya, asumsi "satu Laravel runtime dengan Composer package", feature flag frontend sebagai mekanisme distribusi, dan update on-prem melalui Composer/webhook telah digantikan oleh service module API + UI artifact + database + Docker release unit serta bundle update bertanda tangan. SaaS dimonitor melalui control plane; on-prem perpetual independen dan konektor support bersifat opt-in. Dokumen ini dipertahankan hanya sebagai catatan kebutuhan awal.
 
 **Proyek:** Arsitektur Sistem LeakStudio (SaaS Multi-Tenant Modular)
 **Fokus:** Skalabilitas Database, Proteksi Kode Sumber (IP), dan CI/CD Deployment

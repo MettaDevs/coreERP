@@ -46,11 +46,11 @@ tenants
 └── id, client_id, name, edition, deployment_profile, status
 
 organizations
-├── id, tenant_id, code, name, status
+├── id, tenant_id, name, status
 └── identitas stabil; tidak menyimpan parent atau depth
 
 legal_entities
-└── organization_id, company_code, country_code, registration/tax data
+└── organization_id, tenant_id, company_code, country_code, registration/tax data
 
 operating_units
 └── organization_id, type
@@ -79,6 +79,19 @@ organization_hierarchy_closures
 Closure adalah projection untuk query subtree pada satu hierarchy version. Kolom `distance` adalah jarak relasi, bukan batas kedalaman organisasi dan bukan pilihan tenant.
 
 Setiap organization mempunyai tepat satu klasifikasi: legal entity atau operating unit. Establishment tidak ditambahkan sebagai nilai `operating_units.type`; status tersebut berlaku ketika operating unit ditempatkan pada hierarchy efektif dengan purpose `Enterprise establishment structure`. Dalam version tersebut, establishment harus berada di bawah tepat satu legal entity yang tetap menjadi badan hukum dan accounting entity.
+
+## Kode legal entity
+
+`organizations.id` adalah identitas sistem yang dipakai oleh relasi, API, event, dan transaksi. Ia tidak digantikan oleh kode yang dibaca pengguna.
+
+Setiap legal entity wajib mempunyai `company_code` dengan aturan berikut:
+
+- unik dalam satu tenant (`UNIQUE (tenant_id, company_code)`);
+- dinormalisasi ke huruf besar;
+- 2 sampai 16 karakter, hanya huruf A-Z, angka, dan tanda hubung; karakter pertama harus huruf atau angka;
+- dibuat saat legal entity dibuat dan dikunci setelah data finansial pertama tercatat.
+
+Operating unit tidak memiliki kode organisasi umum. Jika proses regulator atau integrasi membutuhkan nomor cabang/unit, simpan sebagai identifier domain yang eksplisit; jangan menjadikannya pengganti `organizations.id` atau memaksa semua operating unit memiliki kode. `company_code` bukan nomor registrasi, NPWP, atau nomor pajak.
 
 ## Registrasi dan setup awal
 
@@ -166,3 +179,11 @@ Endpoint first-party untuk mengganti konteks session tetap `PUT /api/v1/workspac
 | Susunan reporting dan procurement berbeda | Dua purpose-scoped hierarchy atas directory yang sama |
 | Anak perusahaan mempunyai kontrak, admin, billing, dan isolation sendiri | Tenant terpisah + optional `tenant_relationships` |
 | Reseller mengelola customer berbeda | Tenant reseller dan customer tetap tenant terpisah |
+
+## Lihat juga
+
+- [Query scope dan schema](08-query-scopes-and-schema.md) — bentuk tabel dan query scope-nya
+- [Identity dan access](09-identity-and-access.md) — scope organisasi pada role assignment
+- [Grand design dan boundary platform](01-grand-design.md) — posisi model ini di arsitektur keseluruhan
+- [Model organisasi Dynamics 365](../references/dynamics-365-organization-model.md) — asal model legal entity dan operating unit
+- [Glosarium](../onboarding/glosarium.md) — beda tenant, organization, legal entity, dan operating unit

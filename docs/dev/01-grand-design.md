@@ -107,3 +107,11 @@ Detail customisasi ada pada [05-customization-and-addons.md](05-customization-an
 ## Konektor support bukan bagian default on-prem
 
 Customer dapat memilih paket **managed support** secara terpisah. Hanya pada mode ini `support-connector` opsional dipasang dan membuat koneksi **outbound mTLS** ke vendor. Payload dibatasi pada installation ID yang disetujui, versi/image digest, health service, kapasitas disk/CPU, dan error fingerprint. Ia tidak mengirim transaksi, master data, database dump, user/role, atau secret; tidak ada remote shell, port inbound, atau perintah update otomatis dari vendor. Menonaktifkan connector tidak mengubah kemampuan aplikasi on-prem untuk melayani pengguna.
+
+## Lihat juga
+
+- [Tenant dan hierarki organisasi](01a-tenant-and-org-hierarchy.md) — model organisasi di dalam tenant
+- [Standar module](02-module-standard.md) — app sebagai release unit mandiri
+- [Release dan on-prem](03-release-and-on-prem.md) — profile deployment dalam praktik
+- [Reporting dan read replica](07-reporting-and-replicas.md) — konsekuensi boundary data lintas app
+- [Gate fondasi Core](10-core-foundation-gates.md) — fondasi mana yang belum boleh dibangun

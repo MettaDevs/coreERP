@@ -64,3 +64,9 @@ Jika sebuah keputusan bisnis membutuhkan data terbaru dan kuat konsistensinya, p
 | On-prem perpetual | Mulai dari primary untuk report ringan; aktifkan replica/projection lokal ketika resource dan beban membenarkan. Tidak ada usage/health yang wajib dikirim ke control plane vendor. |
 
 Pada semua profile, business module tetap tidak mengetahui apakah consumer adalah reporting service, accounting, addon customer, atau module lain. Ia hanya menerbitkan contract event yang stabil.
+
+## Lihat juga
+
+- [API dan integration bridge](04-api-and-integration.md) — event contract sumber projection
+- [Query scope dan schema](08-query-scopes-and-schema.md) — konvensi tabel projection
+- [Grand design dan boundary platform](01-grand-design.md) — kenapa join lintas app tidak tersedia

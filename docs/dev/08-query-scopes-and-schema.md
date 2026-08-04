@@ -19,10 +19,10 @@ Hierarchy     = susunan organization untuk purpose dan version tertentu
 control_plane_db
 ├── clients
 ├── tenants
-├── tenant_module_entitlements
+├── tenant_app_entitlements
 ├── tenant_deployments
-├── module_placements
-└── module_installations
+├── app_placements
+└── app_installations
 
 organization_db
 ├── organizations
@@ -62,19 +62,21 @@ Contoh ini menunjukkan invariant utama, bukan migration yang sudah tersedia di w
 CREATE TABLE organizations (
     id uuid PRIMARY KEY,
     tenant_id uuid NOT NULL,
-    code text NOT NULL,
     name text NOT NULL,
     classification text NOT NULL
         CHECK (classification IN ('legal_entity', 'operating_unit')),
     status text NOT NULL,
-    UNIQUE (tenant_id, id),
-    UNIQUE (tenant_id, code)
+    UNIQUE (tenant_id, id)
 );
 
 CREATE TABLE legal_entities (
     organization_id uuid PRIMARY KEY REFERENCES organizations(id),
-    company_code text NOT NULL,
-    country_code text NOT NULL
+    tenant_id uuid NOT NULL,
+    company_code varchar(16) NOT NULL,
+    country_code text NOT NULL,
+    UNIQUE (tenant_id, company_code),
+    FOREIGN KEY (tenant_id, organization_id)
+        REFERENCES organizations(tenant_id, id)
 );
 
 CREATE TABLE operating_units (
@@ -137,6 +139,8 @@ CREATE TABLE organization_hierarchy_closures (
 ```
 
 Writer organization membuat tepat satu row subtype yang sesuai dengan `organizations.classification`; satu organization tidak boleh sekaligus menjadi legal entity dan operating unit. Application/service validation juga memastikan organization, hierarchy, version, dan node berada dalam tenant yang sama; graph tidak bersiklus; dan satu organization hanya muncul sekali dalam satu version. `distance` hanya mempercepat query relasi, bukan batas depth. Establishment ditentukan oleh placement operating unit dalam effective hierarchy purpose `Enterprise establishment structure`, bukan oleh nilai subtype baru.
+
+`company_code` hanya milik legal entity dan wajib unik per tenant. Ia dinormalisasi ke huruf besar, terdiri dari 2--16 karakter `A-Z`, `0-9`, atau `-`, dan tidak dipakai sebagai foreign key atau ID transaksi. Operating unit tidak mempunyai `code` generik.
 
 ## Schema transaksi module
 
@@ -246,9 +250,9 @@ Ini adalah query reporting eventually consistent, bukan query operasional lintas
 1. Bangun `TenantContext` dari token/session tepercaya.
 2. Validasi entitlement dan installation readiness secara terpisah.
 3. Resolve permission melalui role → duty → privilege → permission.
-4. Resolve organization scope assignment dan effective hierarchy version.
-5. Terapkan `tenant_id` lalu `legal_entity_id`/`org_unit_id` pada query module.
-6. Gunakan local hierarchy projection bila descendants diperlukan.
+4. Resolve claim data policy yang relevan dengan resource/proses, termasuk hierarchy version yang sudah efektif.
+5. Terapkan `tenant_id` lalu predicate `legal_entity_id`/`org_unit_id` milik policy itu pada setiap query dan command module.
+6. Gunakan local hierarchy projection atau daftar unit hasil claim bila descendants diperlukan. Workspace hanya boleh memberi filter awal; ia bukan claim otorisasi.
 
 ## Keadaan worktree saat ini
 
@@ -263,3 +267,10 @@ Control Plane sudah memakai `organizations`, subtype legal entity/operating unit
 5. Historical version tidak ditulis ulang saat restrukturisasi.
 6. `org_unit_id` tidak menggantikan `legal_entity_id` untuk kebutuhan hukum/akuntansi.
 7. Endpoint production mendefinisikan response fields, pagination, limit, dan ordering dalam OpenAPI; `SELECT *` di atas hanya contoh scope.
+
+## Lihat juga
+
+- [Tenant dan hierarki organisasi](01a-tenant-and-org-hierarchy.md) — konsep di balik schema ini
+- [Identity dan access](09-identity-and-access.md) — scope efektif per role assignment
+- [Reporting dan read replica](07-reporting-and-replicas.md) — projection dan konsistensinya
+- [Number sequence](14-number-sequences.md) — scope key yang memecah counter

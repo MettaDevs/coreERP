@@ -198,3 +198,11 @@ Uninstall harus ditolak jika app lain masih declared dependency atau memiliki in
 - Source app yang tidak dibeli harus absent dari on-prem bundle, Compose manifest, build context, dan image cache.
 - Lisensi perpetual dan app entitlement diverifikasi secara lokal dari signature vendor. Tidak ada call-home atau online grace period sebagai dependency runtime. Perpanjangan support atau pembelian app baru menghasilkan bundle/lisensi bertanda tangan yang dipasang operator.
 - Kode yang dieksekusi di server customer tidak dapat dibuat 100% rahasia secara teknis. Signed artifact, registry access, container, kontrak lisensi, dan audit menaikkan proteksi; bukan pengganti SaaS/hybrid bila kerahasiaan absolut diperlukan.
+
+## Lihat juga
+
+- [Standar module](02-module-standard.md) — definisi release unit yang dirilis di sini
+- [Menerbitkan release app](13-publishing-an-app-release.md) — kontrak CI untuk katalog dan release
+- [Development stack lokal](11-local-docker-development.md) — versi lokal dari mekanisme yang sama
+- [Gate fondasi Core](10-core-foundation-gates.md) — syarat sebelum deployment production aktif
+- [Empat kebenaran lifecycle](../onboarding/empat-kebenaran.md) — kenapa "terpasang" bukan satu status

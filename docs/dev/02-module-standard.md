@@ -7,7 +7,7 @@ Dokumen ini memakai istilah **app**. App adalah produk atau kemampuan bisnis yan
 Satu app bisnis memiliki satu repository. API dan UI bukan repository terpisah karena keduanya perlu diuji, diberi versi, dan dirilis sebagai satu kemampuan bisnis.
 
 ```text
-apperp-accounting/                  # satu repository app
+app-erp-accounting/                 # satu repository app
 ├── app.yaml
 ├── api/                            # Laravel service milik Accounting
 │   ├── Dockerfile
@@ -39,53 +39,124 @@ Jangan memakai Git submodule untuk menghubungkan repository. Contract yang dipak
 
 ```yaml
 id: accounting
-publisher: coreerp
+publisher: apperp
 version: 1.0.0
 kind: business-app
 requires:
   core: ^1.0
-dependsOn: []
+depends_on: []
 api:
-  image: registry.coreerp.local/apps/accounting-api:1.0.0
+  image: registry.apperp.local/apps/accounting-api:1.0.0
   openapi: contracts/openapi.yaml
 ui:
-  image: registry.coreerp.local/apps/accounting-ui:1.0.0
-  entry: /apps/accounting/entry.js
+  image: registry.apperp.local/apps/accounting-ui:1.0.0
+  entry: /apps/accounting/
+  navigation:
+    rail:
+      - id: jurnal
+        label: Jurnal
+    sidebar:
+      jurnal:
+        - id: jurnal-umum
+          label: Jurnal umum
+          permission: accounting.jurnal.read
 database:
-  logicalName: accounting
+  logical_name: app_erp_accounting
   migrations: database/migrations
 events:
   asyncapi: contracts/asyncapi.yaml
-capabilities:
-  - accounting.journal.create
-  - accounting.journal.read
+workflow_types:
+  - code: accounting.jurnal-verification
+    name: Verifikasi jurnal
+    decision_context_schema:
+      required: [document_id]
 security:
-  entryPoints:
-    - code: accounting.journals.form
+  data_policies:
+    - code: accounting.jurnal-responsibility
+      name: Akses jurnal menurut entitas legal
+      protected_permissions:
+        - accounting.jurnal.read
+        - accounting.jurnal.create
+  entry_points:
+    - code: accounting.jurnal.form
+      name: Layar jurnal
       type: form
-    - code: accounting.journals.api
+    - code: accounting.jurnal.api
+      name: API jurnal
       type: api
   permissions:
-    - code: accounting.journal.read
-      entryPoint: accounting.journals.form
+    - code: accounting.jurnal.read
+      name: Lihat jurnal
+      entry_point: accounting.jurnal.form
       access: read
-    - code: accounting.journal.create
-      entryPoint: accounting.journals.api
+    - code: accounting.jurnal.create
+      name: Buat jurnal
+      entry_point: accounting.jurnal.api
       access: create
   privileges:
-    - code: accounting.journals.maintain
-      permissions: [accounting.journal.read, accounting.journal.create]
+    - code: accounting.jurnal.maintain
+      name: Pelihara jurnal
+      permissions:
+        - accounting.jurnal.read
+        - accounting.jurnal.create
   duties:
-    - code: accounting.journals.process
-      privileges: [accounting.journals.maintain]
-dataRetention: archive
+    - code: accounting.jurnal.manage
+      name: Kelola jurnal
+      privileges:
+        - accounting.jurnal.maintain
+number_sequences:
+  references:
+    - code: accounting.jurnal
+      name: Nomor jurnal
+      default_prefix: JRNL
+      allowed_scopes:
+        - legal_entity
+data_retention: archive
 ```
 
 Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user assignment, dan organization scope dibuat pada tenant; ketiganya bukan bagian dari manifest app dan tidak dibatasi ke satu app.
 
+### Blok manifest dan apa yang dipicunya
+
+| Blok | Wajib? | Yang terjadi di Core setelah registrasi |
+| --- | --- | --- |
+| `api`, `ui`, `database`, `events` | Ya | Katalog mengenal artifact, database logis, dan kontrak app |
+| `ui.navigation` | Ya | Menu app muncul di shell Core. Item menu hanya boleh memakai permission `read` milik app yang sama |
+| `security.entry_points` / `permissions` / `privileges` / `duties` | Ya, keempatnya | Duty tersedia untuk disusun admin tenant menjadi security role |
+| `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat admin memberi role ke anggota |
+| `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
+| `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
+
+App tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, app meminta nomor lewat API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`, dengan `idempotency_key` wajib. Detailnya di [Number sequence](14-number-sequences.md).
+
+Contoh manifest utuh yang sudah berjalan ada di `app-erp-management-aset/app.yaml` — 787 baris, dengan blok `security` sepanjang 600 baris. Contoh di atas sengaja dipersingkat.
+
+#::: tip Mencari langkah mengerjakannya?
+Halaman ini menetapkan **aturannya**. Urutan mengerjakan beserta persiapan teknis, konvensi penamaan dan alokasi port, artefak wajib, dan gate per tahap ada di [jalur membangun app baru](../apps/membangun-app-baru.md).
+:::
+
+## Empat lapis keamanan tidak boleh diringkas
+
+Manifest wajib mendeklarasikan keempat lapis secara terpisah, mengikuti [role-based security Dynamics 365](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/sysadmin/role-based-security):
+
+| Lapis | Arti | Aturan kode |
+| --- | --- | --- |
+| Entry point | Yang dilindungi: form, menu item, API/service operation, report, atau action. | `<app>.<resource>.<form\|api>` |
+| Permission | Pasangan entry point + access level. | `<app>.<resource>.<aksi>` |
+| Privilege | Satu tugas; kumpulan permission. | `<app>.<resource>.<tugas>` |
+| Duty | Bagian proses bisnis; kumpulan privilege. | `<app>.<resource>.<proses>` |
+
+`type` entry point: `form`, `menu_item`, `api`, `report`, `action`.
+
+`access` permission memakai access level Dynamics 365: `read`, `update`, `create`, `correct`, `delete`, `invoke`. Aksi lifecycle penghapusan CoreERP (`archive`, `void`, `retire`) memakai `delete`; service operation tanpa CRUD memakai `invoke`.
+
+Kode privilege tidak boleh sama dengan kode permission. Tanpa aturan ini, manifest dapat memakai satu kode untuk dua lapis dan rantai `duty → privilege → permission` berubah menjadi satu lapis bersalin tiga. Core menolak manifest semacam itu.
+
+Nama key manifest sama persis dengan payload API katalog Core, sehingga `app.yaml` dapat dikirim apa adanya tanpa lapisan transformasi.
+
 ## Ownership dan database
 
-Setiap app memiliki owner yang bertanggung jawab atas code review, contract, database, release, rollback, dan incident app tersebut. Core Platform memiliki `core_erp`. Setiap app resmi memiliki database dengan pola `core_app_<app>`, misalnya `core_app_procurement` dan `core_app_management_asset`; addon memakai `addon_<publisher>_<app>`. Setiap database mempunyai database user/secret sendiri. Tidak ada foreign key, Eloquent relation, atau query langsung lintas database.
+Setiap app memiliki owner yang bertanggung jawab atas code review, contract, database, release, rollback, dan incident app tersebut. Core Platform memiliki `core_erp`. Setiap app resmi memiliki database dengan pola `app_erp_<app>`, misalnya `app_erp_procurement` dan `app_erp_management_aset`; addon memakai `addon_<publisher>_<app>`. Setiap database mempunyai database user/secret sendiri. Tidak ada foreign key, Eloquent relation, atau query langsung lintas database.
 
 Di dalam database sendiri, app boleh memakai transaksi, foreign key, dan table desain normal. Semua tabel tenant-scoped membawa `tenant_id`; data dengan konsekuensi hukum/akuntansi membawa `legal_entity_id`; data operasional membawa `org_unit_id` bila ownership terjadi pada operating unit. ID organisasi adalah reference opaque ke Organization service, bukan foreign key lintas database. Lihat [model tenant dan organisasi](01a-tenant-and-org-hierarchy.md).
 
@@ -95,7 +166,7 @@ Di dalam database sendiri, app boleh memakai transaksi, foreign key, dan table d
 | --- | --- |
 | API sync | REST/JSON di bawah `/api/v1`, lengkap dalam OpenAPI. |
 | Event | Event dibuat melalui outbox setelah commit; payload dan channel ditulis dalam AsyncAPI. |
-| UI | UI entry mendaftarkan route/menu melalui host SDK; host memuat artifact hanya bila entitlement aktif, installation registry `ready`, dan user mempunyai permission entry point. |
+| UI | UI entry mendaftarkan route/menu melalui host SDK; host memuat artifact hanya bila entitlement aktif, installation registry `ready`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`; CSS app hanya mengatur layout dan domain. |
 | Auth | Semua endpoint memvalidasi token, `TenantContext`, entitlement, installation readiness, permission, dan organization scope. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
 | Data | Tidak ada database access lintas app. ID app lain hanya reference opaque. |
 | Jobs | Idempotent, membawa `tenant_id`, memiliki retry/dead-letter policy. |
@@ -118,9 +189,11 @@ Web Shell memiliki layout bersama agar pengguna tidak berpindah-pindah pola saat
 | Sidebar di kanan rail | App aktif | Navigasi turunan dari pilihan pada rail, yang didaftarkan UI artifact melalui host SDK. |
 | Konten utama | App aktif | Halaman dan alur bisnis app aktif. |
 
-Contoh: saat user memilih `Akses` pada rail, sidebar dapat berisi `Anggota`, `Role`, dan `Undangan`. Pada Management Asset, rail dapat memuat `Master`; sidebar kemudian berisi `Asset`, `Kategori`, dan `Grup`. Saat user berpindah aplikasi melalui header, kedua navigasi tersebut diganti seluruhnya oleh navigasi aplikasi aktif.
+Contoh: saat user memilih `Akses` pada rail, sidebar dapat berisi `Anggota`, `Role`, dan `Undangan`. Pada Management Aset, rail memuat `Master data`; sidebar kemudian berisi kedelapan master pada `app.yaml`-nya, mulai `Entitas aset` sampai `Analisa maintenance`. Setiap entry sidebar membawa `entryPoint` berupa permission `read` master tersebut, sehingga menu yang tidak boleh dibuka user tidak ikut tampil. Saat user berpindah aplikasi melalui header, kedua navigasi tersebut diganti seluruhnya oleh navigasi aplikasi aktif.
 
 App tidak membuat ulang header atau kerangka navigasi. App hanya mendaftarkan identitas, route, menu utama pada rail, menu turunan pada sidebar, dan permission entry point-nya. Nama, ikon, urutan, dan label menu berasal dari metadata app/host SDK, bukan daftar app yang di-hardcode di Web Shell.
+
+Kontrak host navigasi versi awal bersifat deklaratif melalui `ui.navigation` pada manifest. Control Plane memvalidasi bahwa setiap item sidebar menunjuk permission `read` milik app yang sama, menyimpannya di katalog, lalu Web Shell memfilter dan merendernya dengan komponen Core. Pemilihan item memakai query `view` pada route host dan hash pada UI artifact. App tidak mengimpor komponen internal Control Plane dan tidak menggambar ulang rail/sidebar.
 
 ## Lifecycle app
 
@@ -145,3 +218,12 @@ Disable mencabut akses dan menghentikan jobs tanpa memalsukan installation state
 | Customer extension app | Customer melalui SDK dan approval | Connector mesin produksi |
 
 Customer extension pada managed cloud tidak boleh mengunggah arbitrary container. Ia harus memakai publisher namespace, signed image, manifest tervalidasi, least-privilege permission, dan security review. Pada on-prem perpetual, customer dapat menjalankan sidecar sendiri tetapi hanya melalui API/event contract publik; tidak ada query langsung DB atau perubahan source Core. Support vendor berlaku sesuai batas kontrak, bukan melalui enrollment runtime wajib.
+
+## Lihat juga
+
+- [Gate penemuan dan keputusan](18-module-discovery-and-decision-gate.md) — dilewati **sebelum** app dibuat
+- [Rantai keamanan modul transaksi](19-transaction-security-chain.md) — empat lapis di atas diteruskan sampai ke user
+- [Menerbitkan release app](13-publishing-an-app-release.md) — cara manifest app masuk katalog Core
+- [API dan integration bridge](04-api-and-integration.md) — satu-satunya jalan komunikasi antar app
+- [Kustomisasi dan addon](05-customization-and-addons.md) — kebutuhan khusus customer tanpa fork
+- [Release dan on-prem](03-release-and-on-prem.md) — lifecycle install, upgrade, uninstall

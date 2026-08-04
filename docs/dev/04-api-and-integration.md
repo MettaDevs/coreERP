@@ -79,3 +79,10 @@ Module hanya boleh membuka extension point yang eksplisit:
 - Webhook outbound dengan signature dan retry.
 
 Addon tidak boleh mendapat database credential module lain, meng-import model internal, atau menambahkan route ke service module lain.
+
+## Lihat juga
+
+- [Standar module](02-module-standard.md) — kepemilikan database yang membuat kontrak ini perlu
+- [Integrasi sistem eksternal](12-external-module-integration.md) — penerapan kontrak untuk pihak luar
+- [Reporting dan read replica](07-reporting-and-replicas.md) — konsumsi event untuk laporan gabungan
+- [Query scope dan schema](08-query-scopes-and-schema.md) — field scope yang dibawa envelope event

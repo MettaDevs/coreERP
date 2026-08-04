@@ -1,4 +1,4 @@
-> **Status: konsep historis.** Struktur target yang kanonik terdapat pada [docs/dev/06-worktree-target.md](dev/06-worktree-target.md). Dokumen ini dipertahankan sebagai catatan struktur awal.
+> **Status: konsep historis.** Struktur target yang kanonik terdapat pada [docs/dev/06-worktree-target.md](../dev/06-worktree-target.md). Dokumen ini dipertahankan sebagai catatan struktur awal.
 
 /ERP METTA
 │

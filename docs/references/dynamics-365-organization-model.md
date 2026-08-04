@@ -121,7 +121,7 @@ Microsoft memisahkan empat fakta yang sering tercampur dalam desain ERP:
 - **position** adalah kursi kerja tertentu di dalam organization, misalnya `Finance Manager Makassar`;
 - **worker-position assignment** menyatakan siapa yang menduduki kursi itu dan selama periode apa.
 
-Satu worker dapat mempunyai beberapa position. Pada waktu yang sama, satu position hanya diduduki satu worker. Hubungan `reports to` berada pada position hierarchy; Microsoft juga mengizinkan beberapa hierarchy type sehingga reporting line manajerial dan matrix dapat berbeda tanpa menggandakan worker atau department.
+Satu worker dapat mempunyai beberapa position. Pada waktu yang sama, satu position hanya diduduki satu worker. Hubungan `reports to` berada pada position hierarchy; Microsoft juga mengizinkan beberapa hierarchy type sehingga reporting line manajerial dan matrix dapat berbeda tanpa menggandakan worker atau department. Maka seorang pekerja yang bekerja di business unit Negarow dan Denpasar memiliki dua position assignment aktif berbatas waktu, bukan dua identity atau satu kolom business unit bernilai ganda.
 
 Karena itu, rangkap jabatan tidak dimodelkan dengan memindahkan user ke department lain atau menamai ulang department. Contoh perusahaan Z:
 
@@ -154,12 +154,13 @@ Dengan demikian, label `FINANCE` pada diagram hanyalah kelompok pembaca, bukan c
 
 ### Assignment otomatis, manual, dan organization scope
 
-Microsoft mendukung assignment manual serta automatic role assignment berdasarkan business data, termasuk position. Role assignment juga dapat diberi organization scope: akses hanya untuk organization tertentu atau node beserta turunannya pada hierarchy yang dipilih.
+Microsoft mendukung assignment manual serta automatic role assignment berdasarkan business data, termasuk position. Role assignment juga dapat diberi beberapa organization scope: akses dapat diberikan atau dikecualikan untuk organization tertentu, masing-masing dengan atau tanpa turunan pada hierarchy yang dipilih.
 
 Konsekuensinya:
 
 - rule position menentukan **tanggung jawab apa** yang otomatis diterima;
 - organization scope menentukan **data organisasi mana** yang dapat dijangkau;
+- scope Negarow dan Denpasar yang sejajar adalah dua scope dalam assignment yang relevan, bukan role baru atau membership baru;
 - hierarchy menentukan arti `with children`, bukan menentukan permission;
 - perubahan position atau berakhirnya assignment harus menghitung ulang akses otomatis;
 - assignment manual tetap tersedia untuk pengecualian yang sah dan harus diaudit.
@@ -262,7 +263,7 @@ Nama tabel berikut bersifat rancangan CoreERP, tetapi relasi dan pemisahan tangg
 | Hierarchy | `organization_hierarchies`, `hierarchy_purposes`, `organization_hierarchy_purposes`, `organization_hierarchy_versions`, `organization_hierarchy_nodes` | Parent-child berada pada node versi, bukan pada organization identity. |
 | Workforce | `workers`, `jobs`, `positions`, `worker_position_assignments`, `position_hierarchy_types`, `position_relationships` | Satu worker dapat mempunyai banyak assignment; satu position maksimal satu worker aktif pada waktu yang sama. |
 | Security metadata | `security_roles`, `security_duties`, `security_privileges`, `security_permissions`, `module_entry_points` | Join tables menghubungkan role→duty→privilege→permission; permission menunjuk entry point modul. |
-| Assignment | `user_role_assignments`, `role_assignment_org_scopes`, `automatic_role_assignment_rules` | Assignment menyimpan sumber, periode berlaku, dan organization scope. |
+| Assignment dan policy CoreERP | `role_assignments`, `role_assignment_data_policy_scopes`, `automatic_role_assignment_rules` | Adaptasi boundary antar-app: assignment menyimpan sumber/periode; grant disimpan per data policy agar tiap resource dapat menegakkan aturan record-nya tanpa query database Core. |
 | Governance | `temporary_role_sessions`, `sod_rules`, `sod_conflicts`, `access_audit_events` | Akses sementara dan konflik SoD selalu dapat ditelusuri. |
 
 Semua tabel tenant-owned membawa `tenant_id`. Transaction table tetap membawa `legal_entity_id` dan `org_unit_id` saat relevan. Module entry point berasal dari contract/manifest modul, sedangkan role composition adalah konfigurasi tenant.
@@ -272,8 +273,8 @@ Semua tabel tenant-owned membawa `tenant_id`. Transaction table tetap membawa `l
 1. **Organization lifecycle:** buat identity, klasifikasikan sebagai legal entity/operating unit, susun draft hierarchy, lakukan validasi, publish dengan effective date, dan simpan versi lama.
 2. **Workforce lifecycle:** buat job dan position, hubungkan position ke department, tetapkan reporting relationship, lalu buat assignment worker dengan tanggal mulai/akhir. Rangkap jabatan berarti menambah position assignment kedua.
 3. **Security design:** modul mendaftarkan entry point dan permission; duty dan privilege membentuk proses; administrator menyusun security role lintas modul sesuai tanggung jawab.
-4. **Role provisioning:** berikan role secara manual atau melalui automatic rule berdasarkan position/business data, lalu tentukan organization scope dan apakah children ikut tercakup.
-5. **Runtime authorization:** identifikasi user dan tenant, ambil assignment aktif, perluas role→duty→privilege→permission, terapkan organization scope, periksa entitlement tenant dan installation registry, lalu izinkan entry point.
+4. **Role provisioning:** berikan role secara manual atau melalui automatic rule berdasarkan position/business data, lalu tetapkan grant data policy dan apakah children ikut tercakup.
+5. **Runtime authorization:** identifikasi user dan tenant, ambil assignment aktif, perluas role→duty→privilege→permission, resolusikan grant policy per resource, periksa entitlement tenant dan installation registry, lalu izinkan entry point.
 6. **Temporary cover:** buat permintaan berbatas waktu, pilih mode merge/replace dan organization scope, approve, aktifkan otomatis, audit pemakaian, lalu cabut otomatis saat berakhir.
 7. **SoD review:** hitung duty efektif lintas role, temukan pasangan konflik, lalu reject atau rekam approval dan mitigasi sebelum assignment berlaku.
 
@@ -297,7 +298,7 @@ Keempatnya diperiksa berurutan dan tidak boleh disimpulkan satu dari yang lain. 
 - organization-scoped assignment, automatic rules, temporary role, dan SoD ditambahkan sebagai operasi di atas model yang sama, bukan sebagai compatibility layer;
 - purpose hierarchy ditambahkan saat konsumen bisnisnya tersedia, tetapi schema version/placement sudah benar sejak fondasi.
 
-Blueprint visual relasi, database minimum, dan operasi tersedia pada page **6 - Build Blueprint Microsoft Model** di [`coreerp-saas-organization-hierarchy.drawio`](./coreerp-saas-organization-hierarchy.drawio).
+Blueprint visual relasi, database minimum, dan operasi tersedia pada page **6 - Build Blueprint Microsoft Model** di [`coreerp-saas-organization-hierarchy.drawio`](../diagrams/drawio/coreerp-saas-organization-hierarchy.drawio).
 
 ## Tingkat keyakinan setelah riset
 
