@@ -1,0 +1,365 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\MasterData;
+use App\Services\NumberSequenceClient;
+use App\Support\MasterChild;
+use App\Support\MasterParent;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Exists;
+use RuntimeException;
+
+/**
+ * Perilaku bersama seluruh master Management Aset: hak akses per resource, batas
+ * tenant, idempotency, kode dari Number Sequence Core, induk rantai klasifikasi,
+ * dan arsip yang tidak memutus referensi aktif.
+ */
+abstract class MasterDataController extends Controller
+{
+    /**
+     * ID app pada kode permission dan reference nomor. Nilai statis yang harus sama
+     * dengan `app.yaml`; sengaja bukan konfigurasi runtime agar env tidak dapat
+     * menggeser hak akses.
+     */
+    protected const APP_ID = 'management-aset';
+
+    /** Slug resource pada route, kode permission, dan reference nomor. */
+    abstract protected function resource(): string;
+
+    /** @return class-string<MasterData> */
+    abstract protected function model(): string;
+
+    /** Induk pada rantai klasifikasi; null bila master ini berdiri sendiri. */
+    protected function parentMaster(): ?MasterParent
+    {
+        return null;
+    }
+
+    /** @return list<MasterChild> */
+    protected function childMasters(): array
+    {
+        return [];
+    }
+
+    public function index(Request $request): JsonResponse
+    {
+        $this->requirePermission($request, 'read');
+        $parent = $this->parentMaster();
+        $validated = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'aktif' => ['nullable', Rule::in(['true', 'false', '1', '0'])],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            ...$parent ? [$parent->column => ['nullable', 'string', 'size:26']] : [],
+        ]);
+
+        $query = $this->tenantQuery($request);
+        // Perbandingan eksplisit terhadap string kosong, bukan truthiness: pencarian "0"
+        // adalah kata kunci yang sah dan tidak boleh diperlakukan sebagai tanpa filter.
+        $search = trim((string) ($validated['q'] ?? ''));
+        if ($search !== '') {
+            $query->where(fn (Builder $builder) => $builder
+                ->whereRaw('LOWER(kode) LIKE ?', ['%'.mb_strtolower($search).'%'])
+                ->orWhereRaw('LOWER(nama) LIKE ?', ['%'.mb_strtolower($search).'%']));
+        }
+        // `?aktif=` kosong berarti tanpa filter. Tanpa pemeriksaan null, ia akan
+        // berubah menjadi `aktif = false` dan hanya menampilkan data tidak aktif.
+        if (($validated['aktif'] ?? null) !== null) {
+            $query->where('aktif', filter_var($validated['aktif'], FILTER_VALIDATE_BOOL));
+        }
+        if ($parent && ($parentId = $validated[$parent->column] ?? null)) {
+            $query->where($parent->column, $parentId);
+        }
+
+        $page = $query->orderBy('kode')->paginate((int) ($validated['per_page'] ?? 20));
+
+        return response()->json([
+            'data' => collect($page->items())->map($this->present(...))->values(),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'last_page' => $page->lastPage(),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+            ],
+        ]);
+    }
+
+    public function store(Request $request, NumberSequenceClient $numbers): JsonResponse
+    {
+        $this->requirePermission($request, 'create');
+        $creationKey = (string) $request->header('Idempotency-Key');
+        // Core membatasi idempotency_key pada 160 karakter dan kunci yang dikirim ke sana
+        // diawali slug resource. Slug terpanjang `item-checklist-maintenance` (26) plus ':'
+        // menyisakan 133, jadi batas app harus 133 agar tidak pernah ditolak Core sebagai 503.
+        validator(['key' => $creationKey], ['key' => ['required', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
+        $tenantId = $this->tenantId($request);
+        $data = $request->validate($this->writeRules($tenantId, creating: true));
+        $payload = $this->payload($data);
+
+        if ($existing = $this->creationKeyQuery($tenantId, $creationKey)->first()) {
+            return $this->replay($existing, $payload);
+        }
+
+        try {
+            $kode = $numbers->issue(
+                static::APP_ID.'.'.$this->resource(),
+                $tenantId,
+                $this->resource().':'.$creationKey,
+            );
+        } catch (RuntimeException $exception) {
+            return response()->json(['error' => ['code' => 'number_sequence_unavailable', 'message' => $exception->getMessage()]], 503);
+        }
+
+        try {
+            $record = DB::transaction(fn () => $this->newQuery()->create([
+                'tenant_id' => $tenantId,
+                'creation_key' => $creationKey,
+                'kode' => $kode,
+                ...$payload,
+            ]));
+        } catch (QueryException $exception) {
+            $existing = $this->creationKeyQuery($tenantId, $creationKey)->first();
+            if (! $existing) {
+                throw $exception;
+            }
+
+            return $this->replay($existing, $payload);
+        }
+
+        return response()->json(['data' => $this->present($record)], 201, [
+            'Location' => url('/api/v1/'.$this->resource().'/'.$record->getKey()),
+        ]);
+    }
+
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $this->requirePermission($request, 'read');
+
+        return response()->json(['data' => $this->present($this->find($request, $id))]);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        $this->requirePermission($request, 'update');
+        $data = $request->validate($this->writeRules($this->tenantId($request), creating: false));
+        $record = $this->find($request, $id);
+        $this->rejectParentCycle($record, $data);
+        $record->update($this->changes($data));
+        // Induk boleh berpindah, jadi relasi lama dibuang agar dimuat ulang saat disajikan.
+        if ($parent = $this->parentMaster()) {
+            $record->unsetRelation($parent->relation);
+        }
+
+        return response()->json(['data' => $this->present($record)]);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $this->requirePermission($request, 'archive');
+        $record = $this->find($request, $id);
+        if ($child = $this->unarchivedChild($record)) {
+            return response()->json(['error' => [
+                'code' => 'referenced_by_children',
+                'message' => 'Data ini masih dipakai '.$child->label.' yang belum diarsipkan. Arsipkan data turunannya lebih dahulu.',
+            ]], 409);
+        }
+        $record->delete();
+
+        return response()->json(status: 204);
+    }
+
+    /** @return Builder<MasterData> */
+    private function newQuery(): Builder
+    {
+        $model = $this->model();
+
+        return $model::query();
+    }
+
+    /** @return Builder<MasterData> */
+    private function tenantQuery(Request $request): Builder
+    {
+        $query = $this->newQuery()->where('tenant_id', $this->tenantId($request));
+
+        return ($parent = $this->parentMaster()) ? $query->with($parent->eagerLoad()) : $query;
+    }
+
+    /**
+     * Unique (tenant_id, creation_key) juga mencakup record yang sudah diarsipkan, jadi
+     * pencarian replay wajib menembus soft delete. Tanpa `withTrashed()`, retry dengan
+     * kunci milik record yang sudah diarsipkan tidak menemukan apa pun, menerbitkan nomor
+     * kedua, lalu menabrak unique index dan berakhir sebagai 500.
+     *
+     * @return Builder<MasterData>
+     */
+    private function creationKeyQuery(string $tenantId, string $creationKey): Builder
+    {
+        return $this->newQuery()->withTrashed()->where('tenant_id', $tenantId)->where('creation_key', $creationKey);
+    }
+
+    private function find(Request $request, string $id): MasterData
+    {
+        return $this->tenantQuery($request)->findOrFail($id);
+    }
+
+    /** Master yang menunjuk dirinya sendiri (contohnya lokasi) tidak boleh membentuk siklus. */
+    private function rejectParentCycle(MasterData $record, array $data): void
+    {
+        $parent = $this->parentMaster();
+        if (! $parent || ! array_key_exists($parent->column, $data) || $parent->table !== $record->getTable()) return;
+        $parentId = $data[$parent->column];
+        abort_if($parentId === $record->getKey(), 422, 'Data tidak dapat menjadi induk dirinya sendiri.');
+        while ($parentId) {
+            abort_if($parentId === $record->getKey(), 422, 'Lokasi induk tidak boleh membentuk siklus.');
+            $parentId = DB::table($parent->table)->where('tenant_id', $record->tenant_id)->where('id', $parentId)->value($parent->column);
+        }
+    }
+
+    private function tenantId(Request $request): string
+    {
+        return (string) $request->attributes->get('coreerp.tenant_id');
+    }
+
+    private function requirePermission(Request $request, string $action): void
+    {
+        $permission = static::APP_ID.'.'.$this->resource().'.'.$action;
+        if (in_array($permission, $request->attributes->get('coreerp.permissions', []), true)) {
+            return;
+        }
+
+        // Kode permission memang disebutkan: ia sudah publik pada manifest app dan
+        // menolong admin tenant menemukan duty yang belum ditugaskan.
+        abort(response()->json(['error' => [
+            'code' => 'forbidden',
+            'message' => 'Hak '.$permission.' belum dimiliki pengguna pada tenant aktif.',
+        ]], 403));
+    }
+
+    /** @return array<string, list<mixed>> */
+    private function writeRules(string $tenantId, bool $creating): array
+    {
+        $required = $creating ? ['required'] : ['sometimes', 'required'];
+        $optional = $creating ? ['nullable'] : ['sometimes', 'nullable'];
+        $rules = [
+            'nama' => [...$required, 'string', 'max:150'],
+            'keterangan' => [...$optional, 'string', 'max:2000'],
+            'aktif' => ['sometimes', 'boolean'],
+        ];
+
+        if ($parent = $this->parentMaster()) {
+            $parentRequired = $parent->required ? $required : $optional;
+            $rules[$parent->column] = [...$parentRequired, 'string', 'size:26', $this->parentExists($parent, $tenantId)];
+        }
+
+        return $rules;
+    }
+
+    /** Induk wajib berada pada tenant yang sama dan belum diarsipkan. */
+    private function parentExists(MasterParent $parent, string $tenantId): Exists
+    {
+        return Rule::exists($parent->table, 'id')
+            ->where('tenant_id', $tenantId)
+            ->whereNull('deleted_at');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function payload(array $data): array
+    {
+        $parent = $this->parentMaster();
+
+        return [
+            ...$parent ? [$parent->column => $data[$parent->column] ?? null] : [],
+            'nama' => trim($data['nama']),
+            'keterangan' => array_key_exists('keterangan', $data) ? $this->trimmedOrNull($data['keterangan']) : null,
+            // Dinormalkan ke boolean asli supaya replay() membandingkan nilai yang setipe
+            // dengan atribut model. Rule `boolean` menerima 1/0/"1"/"0" tanpa mengubahnya.
+            'aktif' => filter_var($data['aktif'] ?? true, FILTER_VALIDATE_BOOL),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function changes(array $data): array
+    {
+        return [
+            ...$data,
+            ...array_key_exists('nama', $data) ? ['nama' => trim($data['nama'])] : [],
+            ...array_key_exists('keterangan', $data) ? ['keterangan' => $this->trimmedOrNull($data['keterangan'])] : [],
+        ];
+    }
+
+    /** Teks "0" adalah keterangan yang sah, jadi yang diperiksa kosong-atau-tidak, bukan truthiness. */
+    private function trimmedOrNull(mixed $value): ?string
+    {
+        $trimmed = trim((string) $value);
+
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    /** Yang menahan arsip adalah anak yang belum diarsipkan, terlepas dari penanda `aktif`. */
+    private function unarchivedChild(MasterData $record): ?MasterChild
+    {
+        foreach ($this->childMasters() as $child) {
+            $referenced = DB::table($child->table)
+                ->where('tenant_id', $record->tenant_id)
+                ->where($child->column, $record->getKey())
+                ->whereNull('deleted_at')
+                ->exists();
+
+            if ($referenced) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function replay(MasterData $record, array $payload): JsonResponse
+    {
+        if ($record->only(array_keys($payload)) !== $payload) {
+            return response()->json(['error' => [
+                'code' => 'idempotency_conflict',
+                'message' => 'Kunci permintaan sudah dipakai untuk data yang berbeda.',
+            ]], 409);
+        }
+
+        return response()->json(['data' => $this->present($record)], 200, ['Idempotent-Replayed' => 'true']);
+    }
+
+    /** @return array<string, mixed> */
+    private function present(MasterData $record): array
+    {
+        $data = [
+            'id' => $record->getKey(),
+            'kode' => $record->kode,
+            'nama' => $record->nama,
+            'keterangan' => $record->keterangan,
+            'aktif' => $record->aktif,
+        ];
+
+        if ($parent = $this->parentMaster()) {
+            $related = $record->loadMissing($parent->eagerLoad())->getRelation($parent->relation);
+            $data[$parent->column] = $record->{$parent->column};
+            $data[$parent->payloadKey()] = $related instanceof MasterData
+                ? ['id' => $related->getKey(), 'kode' => $related->kode, 'nama' => $related->nama]
+                : null;
+        }
+
+        return [
+            ...$data,
+            'created_at' => $record->created_at?->toISOString(),
+            'updated_at' => $record->updated_at?->toISOString(),
+        ];
+    }
+}

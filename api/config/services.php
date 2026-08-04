@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    'coreerp' => [
+        'url' => env('COREERP_URL'),
+        'app_id' => env('COREERP_APP_ID', 'management-aset'),
+        'service_token' => env('COREERP_SERVICE_TOKEN'),
+        'context_signing_key' => env('COREERP_APP_CONTEXT_SIGNING_KEY'),
+    ],
+
 ];

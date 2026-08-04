@@ -97,6 +97,11 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Tanpa koneksi persisten, setiap request HTTP membuka lalu menutup satu koneksi
+            // PostgreSQL, dan PostgreSQL fork satu proses untuk tiap koneksi. Pada beban tinggi
+            // biaya itu melampaui biaya query modul ini. Nyalakan hanya pada deployment dengan
+            // worker proses tetap (Apache prefork/FPM); matikan bila memakai transaction pooling.
+            'options' => env('DB_PERSISTENT', false) ? [PDO::ATTR_PERSISTENT => true] : [],
         ],
 
         'sqlsrv' => [

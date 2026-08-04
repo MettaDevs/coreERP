@@ -1,43 +1,787 @@
-id: management-asset
+id: management-aset
+name: Management Aset
+description: Kelola entitas, kategori, dan maintenance aset perusahaan.
 publisher: apperp
 version: 0.1.0
 kind: business-app
 requires:
   core: ^0.1
-dependsOn: []
+depends_on: []
 api:
-  image: registry.apperp.local/apps/management-asset-api:0.1.0
+  image: registry.apperp.local/apps/management-aset-api:0.1.0
   openapi: contracts/openapi.yaml
 ui:
-  image: registry.apperp.local/apps/management-asset-ui:0.1.0
-  entry: /apps/management-asset/
+  image: registry.apperp.local/apps/management-aset-ui:0.1.0
+  entry: /apps-content/management-aset/
   navigation:
     rail:
-      - id: dashboard
-        label: Dashboard
       - id: master
-        label: Master
+        label: Master data
+      - id: transaksi
+        label: Transaksi
     sidebar:
       master:
-        - id: assets
-          label: Aset
-          entryPoint: management-asset.assets.read
-        - id: categories
-          label: Kategori
-          entryPoint: management-asset.categories.read
-        - id: groups
-          label: Grup
-          entryPoint: management-asset.groups.read
+        - id: entitas-aset
+          label: Entitas aset
+          permission: management-aset.entitas-aset.read
+        - id: group-aset
+          label: Group aset
+          permission: management-aset.group-aset.read
+        - id: kategori-aset
+          label: Kategori aset
+          permission: management-aset.kategori-aset.read
+        - id: jenis-aset
+          label: Jenis aset
+          permission: management-aset.jenis-aset.read
+        - id: kondisi-aset
+          label: Kondisi aset
+          permission: management-aset.kondisi-aset.read
+        - id: pabrikan-aset
+          label: Pabrikan aset
+          permission: management-aset.pabrikan-aset.read
+        - id: item-checklist-maintenance
+          label: Item checklist maintenance
+          permission: management-aset.item-checklist-maintenance.read
+        - id: analisa-maintenance
+          label: Analisa maintenance
+          permission: management-aset.analisa-maintenance.read
+        - id: lokasi-aset
+          label: Lokasi aset
+          permission: management-aset.lokasi-aset.read
+        - id: profil-penyusutan
+          label: Profil penyusutan
+          permission: management-aset.profil-penyusutan.read
+      transaksi:
+        - id: perencanaan-aset
+          label: Perencanaan aset
+          permission: management-aset.perencanaan-aset.read
+        - id: permintaan-pembelian-aset
+          label: Permintaan pembelian
+          permission: management-aset.permintaan-pembelian-aset.read
+        - id: aset
+          label: Register aset
+          permission: management-aset.aset.read
+        - id: mutasi-aset
+          label: Mutasi aset
+          permission: management-aset.mutasi-aset.read
+        - id: pemeliharaan-aset
+          label: Pemeliharaan aset
+          permission: management-aset.pemeliharaan-aset.read
+        - id: dekomisioning-aset
+          label: Dekomisioning aset
+          permission: management-aset.dekomisioning-aset.read
+        - id: penjualan-aset
+          label: Penjualan aset
+          permission: management-aset.penjualan-aset.read
+        - id: pemusnahan-aset
+          label: Pemusnahan aset
+          permission: management-aset.pemusnahan-aset.read
+        - id: monitoring-aset
+          label: Monitoring aset
+          permission: management-aset.monitoring-aset.read
+        - id: penyusutan
+          label: Penyusutan aset
+          permission: management-aset.penyusutan.read
 database:
-  logicalName: app_erp_management_asset
+  logical_name: app_erp_management_aset
   migrations: database/migrations
 events:
   asyncapi: contracts/asyncapi.yaml
-permissions:
-  - management-asset.assets.read
-  - management-asset.assets.create
-  - management-asset.assets.update
-  - management-asset.categories.read
-  - management-asset.categories.manage
-  - management-asset.groups.read
-  - management-asset.groups.manage
+workflow_types:
+  - code: management-aset.dekomisioning-aset-verification
+    name: Verifikasi usulan dekomisioning aset
+    decision_context_schema:
+      required: [document_id, asset_id]
+  - code: management-aset.pemusnahan-aset-verification
+    name: Verifikasi usulan pemusnahan aset
+    decision_context_schema:
+      required: [document_id, asset_id]
+security:
+  data_policies:
+    - code: management-aset.asset-responsibility
+      name: Akses aset menurut unit penanggung jawab
+      protected_permissions:
+        - management-aset.aset.read
+        - management-aset.aset.create
+        - management-aset.aset.mutate
+        - management-aset.perencanaan-aset.read
+        - management-aset.perencanaan-aset.create
+        - management-aset.perencanaan-aset.update
+        - management-aset.perencanaan-aset.archive
+        - management-aset.permintaan-pembelian-aset.read
+        - management-aset.permintaan-pembelian-aset.create
+        - management-aset.pemeliharaan-aset.read
+        - management-aset.pemeliharaan-aset.create
+        - management-aset.dekomisioning-aset.read
+        - management-aset.dekomisioning-aset.create
+        - management-aset.dekomisioning-aset.verify
+        - management-aset.penjualan-aset.read
+        - management-aset.penjualan-aset.create
+        - management-aset.pemusnahan-aset.read
+        - management-aset.pemusnahan-aset.create
+        - management-aset.penyusutan.read
+        - management-aset.penyusutan.create
+        - management-aset.penyusutan.finalize
+        - management-aset.penyusutan.correct
+      requires_legal_entity: true
+      requires_operating_unit: true
+      allows_descendants: true
+  # Empat lapis Dynamics 365. Entry point adalah yang dilindungi, permission
+  # memasangkan entry point dengan access level, privilege adalah satu tugas,
+  # duty adalah bagian proses bisnis yang disusun tenant menjadi security role.
+  entry_points:
+    - code: management-aset.entitas-aset.form
+      name: Layar entitas aset
+      type: form
+    - code: management-aset.entitas-aset.api
+      name: API entitas aset
+      type: api
+    - code: management-aset.group-aset.form
+      name: Layar group aset
+      type: form
+    - code: management-aset.group-aset.api
+      name: API group aset
+      type: api
+    - code: management-aset.kategori-aset.form
+      name: Layar kategori aset
+      type: form
+    - code: management-aset.kategori-aset.api
+      name: API kategori aset
+      type: api
+    - code: management-aset.jenis-aset.form
+      name: Layar jenis aset
+      type: form
+    - code: management-aset.jenis-aset.api
+      name: API jenis aset
+      type: api
+    - code: management-aset.kondisi-aset.form
+      name: Layar kondisi aset
+      type: form
+    - code: management-aset.kondisi-aset.api
+      name: API kondisi aset
+      type: api
+    - code: management-aset.pabrikan-aset.form
+      name: Layar pabrikan aset
+      type: form
+    - code: management-aset.pabrikan-aset.api
+      name: API pabrikan aset
+      type: api
+    - code: management-aset.item-checklist-maintenance.form
+      name: Layar item checklist maintenance
+      type: form
+    - code: management-aset.item-checklist-maintenance.api
+      name: API item checklist maintenance
+      type: api
+    - code: management-aset.analisa-maintenance.form
+      name: Layar analisa maintenance
+      type: form
+    - code: management-aset.analisa-maintenance.api
+      name: API analisa maintenance
+      type: api
+    - code: management-aset.aset.form
+      name: Layar register aset
+      type: form
+    - code: management-aset.aset.api
+      name: API register aset
+      type: api
+    - code: management-aset.mutasi-aset.form
+      name: Layar mutasi aset
+      type: form
+    - code: management-aset.perencanaan-aset.form
+      name: Layar perencanaan aset
+      type: form
+    - code: management-aset.perencanaan-aset.api
+      name: API perencanaan aset
+      type: api
+    - code: management-aset.permintaan-pembelian-aset.form
+      name: Layar permintaan pembelian aset
+      type: form
+    - code: management-aset.permintaan-pembelian-aset.api
+      name: API permintaan pembelian aset
+      type: api
+    - code: management-aset.pemeliharaan-aset.form
+      name: Layar pemeliharaan aset
+      type: form
+    - code: management-aset.pemeliharaan-aset.api
+      name: API pemeliharaan aset
+      type: api
+    - code: management-aset.dekomisioning-aset.form
+      name: Layar dekomisioning aset
+      type: form
+    - code: management-aset.dekomisioning-aset.api
+      name: API dekomisioning aset
+      type: api
+    - code: management-aset.penjualan-aset.form
+      name: Layar penjualan aset
+      type: form
+    - code: management-aset.penjualan-aset.api
+      name: API penjualan aset
+      type: api
+    - code: management-aset.pemusnahan-aset.form
+      name: Layar pemusnahan aset
+      type: form
+    - code: management-aset.pemusnahan-aset.api
+      name: API pemusnahan aset
+      type: api
+    - code: management-aset.monitoring-aset.form
+      name: Layar monitoring aset
+      type: form
+    - code: management-aset.penyusutan.api
+      name: API penyusutan aset
+      type: api
+    - code: management-aset.penyusutan.form
+      name: Layar penyusutan aset
+      type: form
+    - code: management-aset.lokasi-aset.api
+      name: API lokasi aset
+      type: api
+    - code: management-aset.profil-penyusutan.api
+      name: API profil penyusutan
+      type: api
+  permissions:
+    - code: management-aset.entitas-aset.read
+      name: Lihat entitas aset
+      entry_point: management-aset.entitas-aset.form
+      access: read
+    - code: management-aset.entitas-aset.create
+      name: Tambah entitas aset
+      entry_point: management-aset.entitas-aset.api
+      access: create
+    - code: management-aset.entitas-aset.update
+      name: Ubah entitas aset
+      entry_point: management-aset.entitas-aset.api
+      access: update
+    - code: management-aset.entitas-aset.archive
+      name: Arsipkan entitas aset
+      entry_point: management-aset.entitas-aset.api
+      access: delete
+    - code: management-aset.group-aset.read
+      name: Lihat group aset
+      entry_point: management-aset.group-aset.form
+      access: read
+    - code: management-aset.group-aset.create
+      name: Tambah group aset
+      entry_point: management-aset.group-aset.api
+      access: create
+    - code: management-aset.group-aset.update
+      name: Ubah group aset
+      entry_point: management-aset.group-aset.api
+      access: update
+    - code: management-aset.group-aset.archive
+      name: Arsipkan group aset
+      entry_point: management-aset.group-aset.api
+      access: delete
+    - code: management-aset.kategori-aset.read
+      name: Lihat kategori aset
+      entry_point: management-aset.kategori-aset.form
+      access: read
+    - code: management-aset.kategori-aset.create
+      name: Tambah kategori aset
+      entry_point: management-aset.kategori-aset.api
+      access: create
+    - code: management-aset.kategori-aset.update
+      name: Ubah kategori aset
+      entry_point: management-aset.kategori-aset.api
+      access: update
+    - code: management-aset.kategori-aset.archive
+      name: Arsipkan kategori aset
+      entry_point: management-aset.kategori-aset.api
+      access: delete
+    - code: management-aset.jenis-aset.read
+      name: Lihat jenis aset
+      entry_point: management-aset.jenis-aset.form
+      access: read
+    - code: management-aset.jenis-aset.create
+      name: Tambah jenis aset
+      entry_point: management-aset.jenis-aset.api
+      access: create
+    - code: management-aset.jenis-aset.update
+      name: Ubah jenis aset
+      entry_point: management-aset.jenis-aset.api
+      access: update
+    - code: management-aset.jenis-aset.archive
+      name: Arsipkan jenis aset
+      entry_point: management-aset.jenis-aset.api
+      access: delete
+    - code: management-aset.kondisi-aset.read
+      name: Lihat kondisi aset
+      entry_point: management-aset.kondisi-aset.form
+      access: read
+    - code: management-aset.kondisi-aset.create
+      name: Tambah kondisi aset
+      entry_point: management-aset.kondisi-aset.api
+      access: create
+    - code: management-aset.kondisi-aset.update
+      name: Ubah kondisi aset
+      entry_point: management-aset.kondisi-aset.api
+      access: update
+    - code: management-aset.kondisi-aset.archive
+      name: Arsipkan kondisi aset
+      entry_point: management-aset.kondisi-aset.api
+      access: delete
+    - code: management-aset.pabrikan-aset.read
+      name: Lihat pabrikan aset
+      entry_point: management-aset.pabrikan-aset.form
+      access: read
+    - code: management-aset.pabrikan-aset.create
+      name: Tambah pabrikan aset
+      entry_point: management-aset.pabrikan-aset.api
+      access: create
+    - code: management-aset.pabrikan-aset.update
+      name: Ubah pabrikan aset
+      entry_point: management-aset.pabrikan-aset.api
+      access: update
+    - code: management-aset.pabrikan-aset.archive
+      name: Arsipkan pabrikan aset
+      entry_point: management-aset.pabrikan-aset.api
+      access: delete
+    - code: management-aset.item-checklist-maintenance.read
+      name: Lihat item checklist maintenance
+      entry_point: management-aset.item-checklist-maintenance.form
+      access: read
+    - code: management-aset.item-checklist-maintenance.create
+      name: Tambah item checklist maintenance
+      entry_point: management-aset.item-checklist-maintenance.api
+      access: create
+    - code: management-aset.item-checklist-maintenance.update
+      name: Ubah item checklist maintenance
+      entry_point: management-aset.item-checklist-maintenance.api
+      access: update
+    - code: management-aset.item-checklist-maintenance.archive
+      name: Arsipkan item checklist maintenance
+      entry_point: management-aset.item-checklist-maintenance.api
+      access: delete
+    - code: management-aset.analisa-maintenance.read
+      name: Lihat analisa maintenance
+      entry_point: management-aset.analisa-maintenance.form
+      access: read
+    - code: management-aset.analisa-maintenance.create
+      name: Tambah analisa maintenance
+      entry_point: management-aset.analisa-maintenance.api
+      access: create
+    - code: management-aset.analisa-maintenance.update
+      name: Ubah analisa maintenance
+      entry_point: management-aset.analisa-maintenance.api
+      access: update
+    - code: management-aset.analisa-maintenance.archive
+      name: Arsipkan analisa maintenance
+      entry_point: management-aset.analisa-maintenance.api
+      access: delete
+    - code: management-aset.aset.read
+      name: Lihat register aset
+      entry_point: management-aset.aset.form
+      access: read
+    - code: management-aset.aset.create
+      name: Terima aset
+      entry_point: management-aset.aset.api
+      access: create
+    - code: management-aset.aset.mutate
+      name: Mutasi aset
+      entry_point: management-aset.aset.api
+      access: invoke
+    - code: management-aset.mutasi-aset.read
+      name: Lihat mutasi aset
+      entry_point: management-aset.mutasi-aset.form
+      access: read
+    - code: management-aset.perencanaan-aset.read
+      name: Lihat perencanaan aset
+      entry_point: management-aset.perencanaan-aset.form
+      access: read
+    - code: management-aset.perencanaan-aset.create
+      name: Buat perencanaan aset
+      entry_point: management-aset.perencanaan-aset.api
+      access: create
+    - code: management-aset.perencanaan-aset.update
+      name: Ubah perencanaan aset
+      entry_point: management-aset.perencanaan-aset.api
+      access: update
+    - code: management-aset.perencanaan-aset.archive
+      name: Arsipkan perencanaan aset
+      entry_point: management-aset.perencanaan-aset.api
+      access: delete
+    - code: management-aset.permintaan-pembelian-aset.read
+      name: Lihat permintaan pembelian aset
+      entry_point: management-aset.permintaan-pembelian-aset.form
+      access: read
+    - code: management-aset.permintaan-pembelian-aset.create
+      name: Buat permintaan pembelian aset
+      entry_point: management-aset.permintaan-pembelian-aset.api
+      access: create
+    - code: management-aset.pemeliharaan-aset.read
+      name: Lihat pemeliharaan aset
+      entry_point: management-aset.pemeliharaan-aset.form
+      access: read
+    - code: management-aset.pemeliharaan-aset.create
+      name: Catat pemeliharaan aset
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: create
+    - code: management-aset.dekomisioning-aset.read
+      name: Lihat dekomisioning aset
+      entry_point: management-aset.dekomisioning-aset.form
+      access: read
+    - code: management-aset.dekomisioning-aset.create
+      name: Buat usulan dekomisioning aset
+      entry_point: management-aset.dekomisioning-aset.api
+      access: create
+    - code: management-aset.dekomisioning-aset.verify
+      name: Verifikasi dekomisioning aset
+      entry_point: management-aset.dekomisioning-aset.api
+      access: invoke
+    - code: management-aset.penjualan-aset.read
+      name: Lihat penjualan aset
+      entry_point: management-aset.penjualan-aset.form
+      access: read
+    - code: management-aset.penjualan-aset.create
+      name: Buat usulan penjualan aset
+      entry_point: management-aset.penjualan-aset.api
+      access: create
+    - code: management-aset.pemusnahan-aset.read
+      name: Lihat pemusnahan aset
+      entry_point: management-aset.pemusnahan-aset.form
+      access: read
+    - code: management-aset.pemusnahan-aset.create
+      name: Buat usulan pemusnahan aset
+      entry_point: management-aset.pemusnahan-aset.api
+      access: create
+    - code: management-aset.monitoring-aset.read
+      name: Lihat monitoring aset
+      entry_point: management-aset.monitoring-aset.form
+      access: read
+    - code: management-aset.penyusutan.create
+      name: Buat proposal penyusutan
+      entry_point: management-aset.penyusutan.api
+      access: create
+    - code: management-aset.penyusutan.read
+      name: Lihat penyusutan aset
+      entry_point: management-aset.penyusutan.api
+      access: read
+    - code: management-aset.penyusutan.finalize
+      name: Finalisasi penyusutan
+      entry_point: management-aset.penyusutan.api
+      access: invoke
+    - code: management-aset.penyusutan.correct
+      name: Koreksi penyusutan
+      entry_point: management-aset.penyusutan.api
+      access: correct
+    - code: management-aset.lokasi-aset.read
+      name: Lihat lokasi aset
+      entry_point: management-aset.lokasi-aset.api
+      access: read
+    - code: management-aset.lokasi-aset.create
+      name: Tambah lokasi aset
+      entry_point: management-aset.lokasi-aset.api
+      access: create
+    - code: management-aset.lokasi-aset.update
+      name: Ubah lokasi aset
+      entry_point: management-aset.lokasi-aset.api
+      access: update
+    - code: management-aset.lokasi-aset.archive
+      name: Arsipkan lokasi aset
+      entry_point: management-aset.lokasi-aset.api
+      access: delete
+    - code: management-aset.profil-penyusutan.read
+      name: Lihat profil penyusutan
+      entry_point: management-aset.profil-penyusutan.api
+      access: read
+    - code: management-aset.profil-penyusutan.create
+      name: Tambah profil penyusutan
+      entry_point: management-aset.profil-penyusutan.api
+      access: create
+  privileges:
+    - code: management-aset.entitas-aset.maintain
+      name: Pelihara entitas aset
+      permissions:
+        - management-aset.entitas-aset.read
+        - management-aset.entitas-aset.create
+        - management-aset.entitas-aset.update
+    - code: management-aset.entitas-aset.retire
+      name: Arsipkan entitas aset
+      permissions:
+        - management-aset.entitas-aset.archive
+    - code: management-aset.group-aset.maintain
+      name: Pelihara group aset
+      permissions:
+        - management-aset.group-aset.read
+        - management-aset.group-aset.create
+        - management-aset.group-aset.update
+    - code: management-aset.group-aset.retire
+      name: Arsipkan group aset
+      permissions:
+        - management-aset.group-aset.archive
+    - code: management-aset.kategori-aset.maintain
+      name: Pelihara kategori aset
+      permissions:
+        - management-aset.kategori-aset.read
+        - management-aset.kategori-aset.create
+        - management-aset.kategori-aset.update
+    - code: management-aset.kategori-aset.retire
+      name: Arsipkan kategori aset
+      permissions:
+        - management-aset.kategori-aset.archive
+    - code: management-aset.jenis-aset.maintain
+      name: Pelihara jenis aset
+      permissions:
+        - management-aset.jenis-aset.read
+        - management-aset.jenis-aset.create
+        - management-aset.jenis-aset.update
+    - code: management-aset.jenis-aset.retire
+      name: Arsipkan jenis aset
+      permissions:
+        - management-aset.jenis-aset.archive
+    - code: management-aset.kondisi-aset.maintain
+      name: Pelihara kondisi aset
+      permissions:
+        - management-aset.kondisi-aset.read
+        - management-aset.kondisi-aset.create
+        - management-aset.kondisi-aset.update
+    - code: management-aset.kondisi-aset.retire
+      name: Arsipkan kondisi aset
+      permissions:
+        - management-aset.kondisi-aset.archive
+    - code: management-aset.pabrikan-aset.maintain
+      name: Pelihara pabrikan aset
+      permissions:
+        - management-aset.pabrikan-aset.read
+        - management-aset.pabrikan-aset.create
+        - management-aset.pabrikan-aset.update
+    - code: management-aset.pabrikan-aset.retire
+      name: Arsipkan pabrikan aset
+      permissions:
+        - management-aset.pabrikan-aset.archive
+    - code: management-aset.item-checklist-maintenance.maintain
+      name: Pelihara item checklist maintenance
+      permissions:
+        - management-aset.item-checklist-maintenance.read
+        - management-aset.item-checklist-maintenance.create
+        - management-aset.item-checklist-maintenance.update
+    - code: management-aset.item-checklist-maintenance.retire
+      name: Arsipkan item checklist maintenance
+      permissions:
+        - management-aset.item-checklist-maintenance.archive
+    - code: management-aset.analisa-maintenance.maintain
+      name: Pelihara analisa maintenance
+      permissions:
+        - management-aset.analisa-maintenance.read
+        - management-aset.analisa-maintenance.create
+        - management-aset.analisa-maintenance.update
+    - code: management-aset.analisa-maintenance.retire
+      name: Arsipkan analisa maintenance
+      permissions:
+        - management-aset.analisa-maintenance.archive
+    - code: management-aset.aset.receive
+      name: Terima aset
+      permissions:
+        - management-aset.aset.read
+        - management-aset.aset.create
+    - code: management-aset.aset.transfer
+      name: Mutasi aset
+      permissions:
+        - management-aset.aset.mutate
+        - management-aset.mutasi-aset.read
+    - code: management-aset.perencanaan-aset.maintain
+      name: Kelola perencanaan aset
+      permissions: [management-aset.perencanaan-aset.read, management-aset.perencanaan-aset.create, management-aset.perencanaan-aset.update]
+    - code: management-aset.perencanaan-aset.retire
+      name: Arsipkan perencanaan aset
+      permissions: [management-aset.perencanaan-aset.archive]
+    - code: management-aset.permintaan-pembelian-aset.maintain
+      name: Kelola permintaan pembelian aset
+      permissions: [management-aset.permintaan-pembelian-aset.read, management-aset.permintaan-pembelian-aset.create]
+    - code: management-aset.pemeliharaan-aset.maintain
+      name: Kelola pemeliharaan aset
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.create]
+    - code: management-aset.dekomisioning-aset.maintain
+      name: Kelola usulan dekomisioning aset
+      permissions: [management-aset.dekomisioning-aset.read, management-aset.dekomisioning-aset.create]
+    - code: management-aset.dekomisioning-aset.verify-request
+      name: Verifikasi usulan dekomisioning aset
+      permissions: [management-aset.dekomisioning-aset.verify]
+    - code: management-aset.penjualan-aset.maintain
+      name: Kelola penjualan aset
+      permissions: [management-aset.penjualan-aset.read, management-aset.penjualan-aset.create]
+    - code: management-aset.pemusnahan-aset.maintain
+      name: Kelola pemusnahan aset
+      permissions: [management-aset.pemusnahan-aset.read, management-aset.pemusnahan-aset.create]
+    - code: management-aset.monitoring-aset.view
+      name: Pantau aset
+      permissions: [management-aset.monitoring-aset.read]
+    - code: management-aset.penyusutan.maintain
+      name: Kelola penyusutan aset
+      permissions: [management-aset.penyusutan.read, management-aset.penyusutan.create, management-aset.penyusutan.finalize]
+    - code: management-aset.penyusutan.correct-period
+      name: Koreksi penyusutan aset
+      permissions: [management-aset.penyusutan.correct]
+    - code: management-aset.lokasi-aset.maintain
+      name: Kelola lokasi aset
+      permissions:
+        - management-aset.lokasi-aset.read
+        - management-aset.lokasi-aset.create
+        - management-aset.lokasi-aset.update
+        - management-aset.lokasi-aset.archive
+    - code: management-aset.profil-penyusutan.maintain
+      name: Kelola profil penyusutan
+      permissions:
+        - management-aset.profil-penyusutan.read
+        - management-aset.profil-penyusutan.create
+  duties:
+    - code: management-aset.entitas-aset.manage
+      name: Kelola entitas aset
+      privileges:
+        - management-aset.entitas-aset.maintain
+        - management-aset.entitas-aset.retire
+    - code: management-aset.group-aset.manage
+      name: Kelola group aset
+      privileges:
+        - management-aset.group-aset.maintain
+        - management-aset.group-aset.retire
+    - code: management-aset.kategori-aset.manage
+      name: Kelola kategori aset
+      privileges:
+        - management-aset.kategori-aset.maintain
+        - management-aset.kategori-aset.retire
+    - code: management-aset.jenis-aset.manage
+      name: Kelola jenis aset
+      privileges:
+        - management-aset.jenis-aset.maintain
+        - management-aset.jenis-aset.retire
+    - code: management-aset.kondisi-aset.manage
+      name: Kelola kondisi aset
+      privileges:
+        - management-aset.kondisi-aset.maintain
+        - management-aset.kondisi-aset.retire
+    - code: management-aset.pabrikan-aset.manage
+      name: Kelola pabrikan aset
+      privileges:
+        - management-aset.pabrikan-aset.maintain
+        - management-aset.pabrikan-aset.retire
+    - code: management-aset.item-checklist-maintenance.manage
+      name: Kelola item checklist maintenance
+      privileges:
+        - management-aset.item-checklist-maintenance.maintain
+        - management-aset.item-checklist-maintenance.retire
+    - code: management-aset.analisa-maintenance.manage
+      name: Kelola analisa maintenance
+      privileges:
+        - management-aset.analisa-maintenance.maintain
+        - management-aset.analisa-maintenance.retire
+    - code: management-aset.aset.manage
+      name: Kelola register aset
+      privileges:
+        - management-aset.aset.receive
+        - management-aset.aset.transfer
+    - code: management-aset.perencanaan-aset.manage
+      name: Kelola perencanaan aset
+      privileges: [management-aset.perencanaan-aset.maintain, management-aset.perencanaan-aset.retire]
+    - code: management-aset.permintaan-pembelian-aset.manage
+      name: Kelola permintaan pembelian aset
+      privileges: [management-aset.permintaan-pembelian-aset.maintain]
+    - code: management-aset.pemeliharaan-aset.manage
+      name: Kelola pemeliharaan aset
+      privileges: [management-aset.pemeliharaan-aset.maintain]
+    - code: management-aset.dekomisioning-aset.manage
+      name: Kelola dekomisioning aset
+      privileges: [management-aset.dekomisioning-aset.maintain]
+    - code: management-aset.dekomisioning-aset.verify
+      name: Verifikasi dekomisioning aset
+      privileges: [management-aset.dekomisioning-aset.verify-request]
+    - code: management-aset.penjualan-aset.manage
+      name: Kelola penjualan aset
+      privileges: [management-aset.penjualan-aset.maintain]
+    - code: management-aset.pemusnahan-aset.manage
+      name: Kelola pemusnahan aset
+      privileges: [management-aset.pemusnahan-aset.maintain]
+    - code: management-aset.monitoring-aset.manage
+      name: Pantau aset
+      privileges: [management-aset.monitoring-aset.view]
+    - code: management-aset.penyusutan.manage
+      name: Kelola penyusutan aset
+      privileges: [management-aset.penyusutan.maintain, management-aset.penyusutan.correct-period]
+    - code: management-aset.lokasi-aset.manage
+      name: Kelola lokasi aset
+      privileges:
+        - management-aset.lokasi-aset.maintain
+    - code: management-aset.profil-penyusutan.manage
+      name: Kelola profil penyusutan
+      privileges:
+        - management-aset.profil-penyusutan.maintain
+number_sequences:
+  references:
+    - code: management-aset.entitas-aset
+      name: Kode entitas aset
+      default_prefix: ENTA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.group-aset
+      name: Kode group aset
+      default_prefix: GRPA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.kategori-aset
+      name: Kode kategori aset
+      default_prefix: KTGA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.jenis-aset
+      name: Kode jenis aset
+      default_prefix: JNSA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.kondisi-aset
+      name: Kode kondisi aset
+      default_prefix: KNDA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.pabrikan-aset
+      name: Kode pabrikan aset
+      default_prefix: PBRA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.item-checklist-maintenance
+      name: Kode item checklist maintenance
+      default_prefix: ICMA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.analisa-maintenance
+      name: Kode analisa maintenance
+      default_prefix: ANMA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.aset
+      name: Nomor aset
+      default_prefix: ASTA
+      allowed_scopes:
+        - legal_entity
+    - code: management-aset.lokasi-aset
+      name: Kode lokasi aset
+      default_prefix: LOCA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.profil-penyusutan
+      name: Kode profil penyusutan
+      default_prefix: DPRE
+      allowed_scopes:
+        - tenant
+    - code: management-aset.perencanaan-aset
+      name: Nomor perencanaan aset
+      default_prefix: PLNA
+      allowed_scopes: [legal_entity]
+    - code: management-aset.permintaan-pembelian-aset
+      name: Nomor permintaan pembelian aset
+      default_prefix: RPPA
+      allowed_scopes: [legal_entity]
+    - code: management-aset.pemeliharaan-aset
+      name: Nomor pemeliharaan aset
+      default_prefix: PMHA
+      allowed_scopes: [legal_entity]
+    - code: management-aset.dekomisioning-aset
+      name: Nomor dekomisioning aset
+      default_prefix: DKMA
+      allowed_scopes: [legal_entity]
+    - code: management-aset.penjualan-aset
+      name: Nomor penjualan aset
+      default_prefix: PJLA
+      allowed_scopes: [legal_entity]
+    - code: management-aset.pemusnahan-aset
+      name: Nomor pemusnahan aset
+      default_prefix: PMSA
+      allowed_scopes: [legal_entity]

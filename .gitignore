@@ -4,4 +4,7 @@
 node_modules/
 dist/
 vendor/
+!ui/vendor/
+ui/vendor/*
+!ui/vendor/.gitignore
 public/build/

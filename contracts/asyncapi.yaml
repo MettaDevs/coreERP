@@ -1,5 +1,32 @@
 asyncapi: 3.0.0
 info:
-  title: Management Asset events
+  title: Management Aset events
   version: 0.1.0
-channels: {}
+channels:
+  core.workflow.decision.v1:
+    address: core.workflow.decision.v1
+    messages:
+      workflowDecision:
+        payload:
+          type: object
+          required: [id, type, occurred_at, tenant_id, data]
+          properties:
+            id: { type: string }
+            type: { const: core.workflow.decision.v1 }
+            occurred_at: { type: string, format: date-time }
+            tenant_id: { type: string }
+            data:
+              type: object
+              required: [workflow_instance_id, workflow_type, decision, source_document_type, source_document_id, decision_context]
+              properties:
+                workflow_instance_id: { type: string }
+                workflow_type: { const: management-aset.dekomisioning-aset-verification }
+                decision: { enum: [approved, rejected] }
+                source_document_type: { const: dekomisioning-aset }
+                source_document_id: { type: string }
+                decision_context: { type: object }
+operations:
+  receiveWorkflowDecision:
+    action: receive
+    channel:
+      $ref: '#/channels/core.workflow.decision.v1'

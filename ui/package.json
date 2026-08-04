@@ -1,5 +1,5 @@
 {
-  "name": "@apperp/management-asset-ui",
+  "name": "@apperp/management-aset-ui",
   "private": true,
   "type": "module",
   "scripts": {
@@ -7,14 +7,18 @@
     "build": "tsc --noEmit && vite build"
   },
   "dependencies": {
+    "@apperp/ui": "file:vendor/apperp-ui.tgz",
     "@vitejs/plugin-react": "^5.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "vite": "^8.0.0"
+    "vite": "^8.0.0",
+    "sonner": "^2.0.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2"
   }
 }

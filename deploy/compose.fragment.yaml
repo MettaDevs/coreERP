@@ -1,7 +1,13 @@
 services:
-  management-asset-api:
-    image: registry.apperp.local/apps/management-asset-api:0.1.0
+  management-aset-api:
+    image: registry.apperp.local/apps/management-aset-api:0.1.0
     environment:
       APP_ENV: production
-  management-asset-ui:
-    image: registry.apperp.local/apps/management-asset-ui:0.1.0
+      COREERP_URL: http://core-app
+      COREERP_APP_ID: management-aset
+      COREERP_SERVICE_TOKEN: ${COREERP_MANAGEMENT_ASET_SERVICE_TOKEN}
+      COREERP_APP_CONTEXT_SIGNING_KEY: ${COREERP_APP_CONTEXT_SIGNING_KEY}
+  management-aset-ui:
+    image: registry.apperp.local/apps/management-aset-ui:0.1.0
+    environment:
+      API_UPSTREAM: management-aset-api

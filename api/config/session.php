@@ -9,16 +9,16 @@ return [
     | Default Session Driver
     |--------------------------------------------------------------------------
     |
-    | This option determines the default session driver that is utilized for
-    | incoming requests. Laravel supports a variety of storage options to
-    | persist session data. Database storage is a great default choice.
+    | API app ini stateless: identity dan session milik Core, dan setiap request
+    | membawa app-context token yang diverifikasi RequireCoreErpContext. Karena
+    | itu tidak ada tabel `sessions` di database app dan driver default `array`.
     |
     | Supported: "file", "cookie", "database", "memcached",
     |            "redis", "dynamodb", "array"
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'database'),
+    'driver' => env('SESSION_DRIVER', 'array'),
 
     /*
     |--------------------------------------------------------------------------
