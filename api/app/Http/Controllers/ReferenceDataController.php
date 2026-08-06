@@ -15,7 +15,8 @@ final class ReferenceDataController extends Controller
         try {
             return response()->json(['data' => collect($units->active((string) $request->attributes->get('coreerp.tenant_id')))
                 ->map(fn (array $unit): array => ['id' => $unit['id'], 'kode' => $unit['code'], 'nama' => $unit['name']])->values()]);
+        } catch (RuntimeException $exception) {
+            return response()->json(['error' => ['code' => 'units_of_measure_unavailable', 'message' => $exception->getMessage()]], 503);
         }
-        catch (RuntimeException $exception) { return response()->json(['error' => ['code' => 'units_of_measure_unavailable', 'message' => $exception->getMessage()]], 503); }
     }
 }

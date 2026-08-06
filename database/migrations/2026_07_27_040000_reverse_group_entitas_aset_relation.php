@@ -11,7 +11,7 @@ return new class extends Migration
     {
         if (Schema::hasColumn('m_group_aset', 'entitas_aset_id')) {
             if (DB::table('m_entitas_aset')->exists() || DB::table('m_group_aset')->exists()) {
-                throw new \RuntimeException('Relasi group dan entitas aset tidak dapat dibalik otomatis karena sudah ada data. Pindahkan setiap entitas ke group yang benar sebelum menjalankan migration ini.');
+                throw new RuntimeException('Relasi group dan entitas aset tidak dapat dibalik otomatis karena sudah ada data. Pindahkan setiap entitas ke group yang benar sebelum menjalankan migration ini.');
             }
 
             Schema::table('m_group_aset', function (Blueprint $table): void {

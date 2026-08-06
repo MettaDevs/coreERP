@@ -10,6 +10,7 @@ use App\Support\OrganizationScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use RuntimeException;
 
@@ -71,7 +72,7 @@ class AssetController extends Controller
                 'keterangan' => $data['keterangan'] ?? null,
             ]);
             DB::table('tr_penempatan_aset')->insert([
-                'id' => (string) \Illuminate\Support\Str::ulid(),
+                'id' => (string) Str::ulid(),
                 'tenant_id' => $tenantId,
                 'asset_id' => $asset->id,
                 'receiving_org_unit_id' => $data['receiving_org_unit_id'] ?? null,
@@ -84,7 +85,7 @@ class AssetController extends Controller
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            if (!empty($profileId)) {
+            if (! empty($profileId)) {
                 AssetBook::query()->create([
                     'tenant_id' => $tenantId,
                     'asset_id' => $asset->id,
@@ -120,7 +121,7 @@ class AssetController extends Controller
         app(OrganizationScope::class)->require($request, $asset->legal_entity_id, $data['usage_org_unit_id']);
         DB::transaction(function () use ($asset, $tenantId, $data): void {
             DB::table('tr_penempatan_aset')->insert([
-                'id' => (string) \Illuminate\Support\Str::ulid(), 'tenant_id' => $tenantId, 'asset_id' => $asset->id,
+                'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'asset_id' => $asset->id,
                 'usage_org_unit_id' => $data['usage_org_unit_id'],
                 'custodian_user_id' => $data['custodian_user_id'] ?? null,
                 'asset_location_id' => $data['asset_location_id'] ?? null,
@@ -147,6 +148,7 @@ class AssetController extends Controller
     private function rules(string $tenantId): array
     {
         $sameTenant = fn (string $table) => Rule::exists($table, 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at');
+
         return [
             'legal_entity_id' => ['required', 'ulid'],
             'jenis_aset_id' => ['required', 'ulid', $sameTenant('m_jenis_aset')],
@@ -170,13 +172,20 @@ class AssetController extends Controller
         abort_unless(in_array('management-aset.'.self::RESOURCE.'.'.$action, $request->attributes->get('coreerp.permissions', []), true), 403);
     }
 
-    private function tenantId(Request $request): string { return (string) $request->attributes->get('coreerp.tenant_id'); }
+    private function tenantId(Request $request): string
+    {
+        return (string) $request->attributes->get('coreerp.tenant_id');
+    }
 
     private function groupDefaults(string $tenantId, string $jenisAsetId): ?object
     {
         return DB::table('m_jenis_aset as jenis')
-            ->join('m_kategori_aset as kategori', function ($join): void { $join->on('kategori.id', '=', 'jenis.kategori_aset_id')->on('kategori.tenant_id', '=', 'jenis.tenant_id'); })
-            ->join('m_group_aset as grup', function ($join): void { $join->on('grup.id', '=', 'kategori.group_aset_id')->on('grup.tenant_id', '=', 'kategori.tenant_id'); })
+            ->join('m_kategori_aset as kategori', function ($join): void {
+                $join->on('kategori.id', '=', 'jenis.kategori_aset_id')->on('kategori.tenant_id', '=', 'jenis.tenant_id');
+            })
+            ->join('m_group_aset as grup', function ($join): void {
+                $join->on('grup.id', '=', 'kategori.group_aset_id')->on('grup.tenant_id', '=', 'kategori.tenant_id');
+            })
             ->where(['jenis.tenant_id' => $tenantId, 'jenis.id' => $jenisAsetId])
             ->select('grup.default_depreciation_profile_id', 'grup.default_book_code')->first();
     }

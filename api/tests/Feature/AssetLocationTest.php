@@ -20,7 +20,9 @@ class AssetLocationTest extends TestCase
         $this->tenantId = (string) Str::ulid();
         $this->configureCoreErpContext();
         $number = 0;
-        Http::fake(function () use (&$number) { return Http::response(['data' => ['number' => 'LOCA-'.str_pad((string) ++$number, 6, '0', STR_PAD_LEFT)]], 200); });
+        Http::fake(function () use (&$number) {
+            return Http::response(['data' => ['number' => 'LOCA-'.str_pad((string) ++$number, 6, '0', STR_PAD_LEFT)]], 200);
+        });
     }
 
     public function test_location_keeps_hierarchy_and_rejects_cycles_or_archiving_a_parent(): void

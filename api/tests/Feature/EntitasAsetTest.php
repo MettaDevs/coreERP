@@ -99,10 +99,14 @@ class EntitasAsetTest extends TestCase
 
     private function jenis(): string
     {
-        $now = now(); $group = (string) Str::ulid(); $category = (string) Str::ulid(); $type = (string) Str::ulid();
+        $now = now();
+        $group = (string) Str::ulid();
+        $category = (string) Str::ulid();
+        $type = (string) Str::ulid();
         DB::table('m_group_aset')->insert(['id' => $group, 'tenant_id' => $this->tenantId, 'creation_key' => 'group-'.Str::ulid(), 'kode' => 'G'.Str::random(6), 'nama' => 'Group', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
         DB::table('m_kategori_aset')->insert(['id' => $category, 'tenant_id' => $this->tenantId, 'creation_key' => 'category-'.Str::ulid(), 'group_aset_id' => $group, 'kode' => 'K'.Str::random(6), 'nama' => 'Kategori', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
         DB::table('m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.Str::ulid(), 'kategori_aset_id' => $category, 'kode' => 'J'.Str::random(6), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+
         return $type;
     }
 }

@@ -75,20 +75,28 @@ class DepreciationTest extends TestCase
 
     private function book(): array
     {
-        $now = now(); $profile = (string) Str::ulid(); $asset = (string) Str::ulid(); $book = (string) Str::ulid(); $usage = (string) Str::ulid();
+        $now = now();
+        $profile = (string) Str::ulid();
+        $asset = (string) Str::ulid();
+        $book = (string) Str::ulid();
+        $usage = (string) Str::ulid();
         DB::table('m_profil_penyusutan')->insert(['id' => $profile, 'tenant_id' => $this->tenantId, 'creation_key' => 'profile-'.Str::ulid(), 'kode' => 'PRF'.Str::random(5), 'nama' => 'Garis lurus', 'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar', 'useful_life_periods' => 12, 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
         DB::table('tr_penerimaan_aset')->insert(['id' => $asset, 'tenant_id' => $this->tenantId, 'creation_key' => 'asset-'.Str::ulid(), 'kode' => 'AST'.Str::random(5), 'legal_entity_id' => (string) Str::ulid(), 'jenis_aset_id' => $this->jenis($now), 'acquired_on' => '2026-07-01', 'acquisition_value' => 1200, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now]);
         DB::table('tr_penempatan_aset')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'asset_id' => $asset, 'usage_org_unit_id' => $usage, 'effective_on' => '2026-07-15', 'created_at' => $now, 'updated_at' => $now]);
         DB::table('tr_buku_aset')->insert(['id' => $book, 'tenant_id' => $this->tenantId, 'asset_id' => $asset, 'depreciation_profile_id' => $profile, 'book_code' => 'BOOK', 'acquisition_value' => 1200, 'net_book_value' => 1200, 'created_at' => $now, 'updated_at' => $now]);
+
         return [$book, $usage];
     }
 
     private function jenis($now): string
     {
-        $group = (string) Str::ulid(); $category = (string) Str::ulid(); $type = (string) Str::ulid();
+        $group = (string) Str::ulid();
+        $category = (string) Str::ulid();
+        $type = (string) Str::ulid();
         DB::table('m_group_aset')->insert(['id' => $group, 'tenant_id' => $this->tenantId, 'creation_key' => 'group-'.Str::ulid(), 'kode' => 'G'.Str::random(5), 'nama' => 'Group', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
         DB::table('m_kategori_aset')->insert(['id' => $category, 'tenant_id' => $this->tenantId, 'creation_key' => 'category-'.Str::ulid(), 'group_aset_id' => $group, 'kode' => 'K'.Str::random(5), 'nama' => 'Kategori', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
         DB::table('m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.Str::ulid(), 'kategori_aset_id' => $category, 'kode' => 'J'.Str::random(5), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+
         return $type;
     }
 }

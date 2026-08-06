@@ -211,7 +211,9 @@ abstract class MasterDataController extends Controller
     private function rejectParentCycle(MasterData $record, array $data): void
     {
         $parent = $this->parentMaster();
-        if (! $parent || ! array_key_exists($parent->column, $data) || $parent->table !== $record->getTable()) return;
+        if (! $parent || ! array_key_exists($parent->column, $data) || $parent->table !== $record->getTable()) {
+            return;
+        }
         $parentId = $data[$parent->column];
         abort_if($parentId === $record->getKey(), 422, 'Data tidak dapat menjadi induk dirinya sendiri.');
         while ($parentId) {

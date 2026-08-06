@@ -30,7 +30,10 @@ class AssetPlanningTest extends TestCase
         $this->configureCoreErpContext();
         $this->unitId = (string) Str::ulid();
         Http::fake(function ($request) {
-            if (str_ends_with($request->url(), '/units-of-measure/resolve')) return Http::response(['data' => [['id' => $this->unitId, 'code' => 'EA', 'name' => 'Unit', 'symbol' => null, 'decimal_places' => 0]]], 200);
+            if (str_ends_with($request->url(), '/units-of-measure/resolve')) {
+                return Http::response(['data' => [['id' => $this->unitId, 'code' => 'EA', 'name' => 'Unit', 'symbol' => null, 'decimal_places' => 0]]], 200);
+            }
+
             return Http::response(['data' => ['number' => 'PLNA-000001']], 200);
         });
     }

@@ -27,6 +27,7 @@ class PerencanaanAsetController extends Controller
         $query = DB::table('tr_perencanaan_aset')
             ->where('tenant_id', $this->tenant($request))->whereNull('deleted_at');
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
+
         return response()->json(['data' => $query
             ->latest('planned_on')->latest('created_at')
             ->get()]);
@@ -173,8 +174,11 @@ class PerencanaanAsetController extends Controller
         if ($count !== count($ids)) {
             throw ValidationException::withMessages(['details' => 'Jenis aset tidak ditemukan atau sudah tidak aktif.']);
         }
-        try { return $units->resolve($tenant, array_values(array_unique(array_column($details, 'satuan_id')))); }
-        catch (\RuntimeException) { throw ValidationException::withMessages(['details' => 'Satuan tidak ditemukan, tidak aktif, atau belum dapat diperiksa.']); }
+        try {
+            return $units->resolve($tenant, array_values(array_unique(array_column($details, 'satuan_id'))));
+        } catch (RuntimeException) {
+            throw ValidationException::withMessages(['details' => 'Satuan tidak ditemukan, tidak aktif, atau belum dapat diperiksa.']);
+        }
     }
 
     /** @return array<string, mixed> */
@@ -219,6 +223,7 @@ class PerencanaanAsetController extends Controller
     {
         $query = DB::table('tr_perencanaan_aset')->where(['id' => $id, 'tenant_id' => $this->tenant($request)])->whereNull('deleted_at');
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
+
         return $query->firstOrFail();
     }
 
