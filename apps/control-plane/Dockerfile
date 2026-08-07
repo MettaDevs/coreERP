@@ -2,14 +2,20 @@ FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+COPY . .
+RUN php artisan wayfinder:generate --with-form --no-interaction
 
 FROM node:22-bookworm-slim AS assets
 WORKDIR /app
+# Wayfinder is generated in the Composer stage because this stage has no PHP.
 ENV WAYFINDER_COMMAND=true
 COPY package.json package-lock.json ./
 COPY .packages ./.packages
 RUN npm ci
 COPY resources ./resources
+COPY --from=vendor /app/resources/js/actions ./resources/js/actions
+COPY --from=vendor /app/resources/js/routes ./resources/js/routes
+COPY --from=vendor /app/resources/js/wayfinder ./resources/js/wayfinder
 COPY public ./public
 COPY vite.config.ts tsconfig.json ./
 RUN npm run build

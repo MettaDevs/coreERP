@@ -28,7 +28,7 @@ Urutannya:
 
 **Hari pertama** — [Hari pertama](/onboarding/hari-pertama) → [Setup lingkungan lokal](/onboarding/setup) → [Glosarium](/onboarding/glosarium)
 
-**Minggu pertama** — [Empat kebenaran lifecycle](/onboarding/empat-kebenaran) → [Alur end-to-end](/onboarding/alur-end-to-end) → [Peta kode ke dokumen](/onboarding/peta-kode) → [Cara berkontribusi](/onboarding/kontribusi)
+**Minggu pertama** — [Grand design](/dev/01-grand-design) → [Empat kebenaran lifecycle](/onboarding/empat-kebenaran) → [Alur end-to-end](/onboarding/alur-end-to-end) → [Peta kode ke dokumen](/onboarding/peta-kode) → [Cara berkontribusi](/onboarding/kontribusi)
 
 **Saat dibutuhkan** — sisanya di [Desain kanonik](/dev/), dibuka sesuai tugas
 

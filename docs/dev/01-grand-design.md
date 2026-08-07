@@ -4,40 +4,165 @@
 
 CoreERP dibangun sebagai **app platform API-first**. Setiap app adalah release unit deployable dengan repository sendiri, bukan folder fitur di dalam aplikasi utama. Satu versi image app dapat dipakai pada cloud pooled, cloud isolated, maupun on-prem perpetual; yang berubah adalah placement, manifest instalasi, dan kanal update, bukan source business logic.
 
+## Cara membaca grand design
+
+Untuk orang yang baru masuk ke CoreERP, gunakan tiga kalimat ini sebagai peta:
+
+1. **Control Plane mengatur lingkungan**: tenant, identity, entitlement, katalog app, placement, installation, operasi, dan metering.
+2. **Application Plane menjalankan pekerjaan bisnis**: UI, API, database, migration, dan kontrak milik setiap app.
+3. **Tenant adalah batas isolasi**: organisasi berada di dalam tenant, sedangkan `TenantContext` tepercaya ikut menentukan data apa yang boleh disentuh oleh request.
+
+Control Plane dan Application Plane bukan dua nama untuk satu aplikasi besar. Keduanya adalah batas tanggung jawab. Control Plane mengetahui release dan placement, tetapi tidak boleh mengambil alih database bisnis app. Application Plane menjalankan fitur bisnis, tetapi tidak boleh membuat keputusan komersial atau deployment global sendiri.
+
 ```mermaid
 flowchart LR
-    subgraph CP[Control plane - global]
-        ADM[Provider Admin]
-        ONB[Onboarding]
-        ID[Identity]
-        TEN[Tenant and entitlement]
-        PLC[Deployment placement]
-        MTR[Metering, billing, operations]
+    subgraph CP["Control Plane - global vendor"]
+        ADM["Provider admin"]
+        ADMA["Administration app"]
+        ID["Identity + TenantContext"]
+        TEN["Tenant + entitlement"]
+        CAT["App catalog + releases"]
+        PLC["Placement + installation"]
+        MTR["Usage records + billing + operations"]
     end
 
-    subgraph AP[Application plane]
-        GW[API Gateway and UI Shell]
-        POS[POS API + UI + pos_db]
-        BKG[Booking API + UI + booking_db]
-        BRG[POS-Booking Bridge + bridge_db]
+    subgraph AP["Application Plane - per placement"]
+        GW["Tenant UI shell / gateway"]
+        APPA["App A API + UI"]
+        APPB["App B API + UI"]
+        DBA[("App A database")]
+        DBB[("App B database")]
+        PROV["Tenant provisioning adapter"]
     end
 
-    ADM --> ONB
-    ONB --> TEN
+    ADM --> ADMA
+    ADMA --> TEN
+    ADMA --> CAT
     TEN --> PLC
+    CAT --> PLC
+    PLC --> PROV
     ID --> GW
-    PLC --> GW
-    GW --> POS
-    GW --> BKG
-    POS <--> BRG
-    BKG <--> BRG
-    POS --> MTR
-    BKG --> MTR
+    GW --> APPA
+    GW --> APPB
+    PROV --> APPA
+    PROV --> APPB
+    APPA --> DBA
+    APPB --> DBB
+    APPA -. "usage / health in SaaS" .-> MTR
+    APPB -. "usage / health in SaaS" .-> MTR
 ```
 
 Pemisahan ini mengikuti AWS untuk **SaaS yang dikelola vendor**: control plane mengelola onboarding, identity, tenant, billing, metering, dan operasi secara terpadu; application plane menyajikan fitur multi-tenant dan melakukan provisioning resource tenant. AWS juga memperbolehkan kombinasi pool dan silo pada service yang berbeda, selama pengalaman operasionalnya tetap terpadu. Lihat whitepaper lokal, bagian "Control plane vs application plane" dan "Pool and silo".
 
 Diagram di atas berlaku untuk profile SaaS (`pooled` dan `isolated`). On-prem perpetual menjalankan application plane dan core runtime lokal; ia tidak bergantung pada control plane vendor agar aplikasi customer berfungsi.
+
+### Batas tanggung jawab
+
+| Bagian | Memiliki | Tidak boleh mengambil alih |
+| --- | --- | --- |
+| Control Plane | Tenant, identity, catalog, entitlement, release, placement, installation registry, usage records | Database transaksi app, aturan bisnis app, atau query lintas database app |
+| Application Plane | UI, API, database, migration, business rule, dan kontrak app | Keputusan entitlement, penerbitan release, atau status `ready` tanpa registry |
+| Deployment/runtime | Container, endpoint, secret reference, health, dan routing pada placement | Mengubah source app hanya karena tenant ditempatkan pada silo |
+
+## Dari tenant baru sampai aplikasi siap dipakai
+
+Status lifecycle harus dibaca berurutan. `catalogued`, `entitled`, `installed`, dan `ready` adalah fakta berbeda; satu status tidak boleh ditebak dari status sebelumnya.
+
+```mermaid
+flowchart TB
+    A["1. Onboarding tenant"] --> B["2. Identity + tenant context"]
+    B --> C["3. Entitlement aktif"]
+    C --> D["4. Pilih placement pooled / isolated"]
+    D --> E["5. Install release + jalankan migration"]
+    E --> F{"Readiness checks lulus?"}
+    F -- "Tidak" --> G["Tetap installed / not ready<br/>dan laporkan gap"]
+    F -- "Ya" --> H["Ready + launch manifest"]
+    H --> I["Request app memakai TenantContext tepercaya"]
+```
+
+Urutan ini menjelaskan kenapa launcher tidak boleh menampilkan app sebagai "terpasang" hanya karena tenant memiliki entitlement. Sumber kebenaran install adalah installation/deployment registry; sumber kebenaran readiness adalah runtime/placement status. Jika registry belum ada, dokumentasi dan UI harus menyebut gap, bukan membuat state optimistis.
+
+## Pooled, isolated, dan on-prem
+
+Pooled dan silo bukan pilihan antara "SaaS" dan "bukan SaaS". Keduanya adalah cara menempatkan resource di dalam pengalaman SaaS yang tetap dikelola secara terpadu. Satu service boleh pooled, sementara service lain silo, bila kebutuhan isolasi, noisy neighbor, regulasi, data residency, atau SLA membutuhkannya.
+
+```mermaid
+flowchart TB
+    subgraph OPS["Shared management surface"]
+        ONB["Onboarding"]
+        IAM["Identity"]
+        DEP["DevOps + deployment"]
+        MON["Management + monitoring"]
+        BILL["Billing + metering"]
+        ANALYTICS["Metrics + analytics"]
+    end
+
+    subgraph ENV["SaaS environment"]
+        subgraph POOL["Pooled placement"]
+            PT1["Tenant A<br/>shared compute + partitioned data"]
+            PT2["Tenant B<br/>shared compute + partitioned data"]
+        end
+        subgraph SILOS["Isolated placements"]
+            ST1["Tenant C<br/>dedicated app resources"]
+            ST2["Tenant D<br/>dedicated app resources"]
+        end
+    end
+
+    ONB --> POOL
+    ONB --> SILOS
+    IAM --> ENV
+    DEP --> ENV
+    MON --> ENV
+    BILL --> ENV
+    ANALYTICS --> ENV
+```
+
+Pada `onprem-perpetual`, deployment dan installation state berada di infrastruktur customer. Aplikasi tetap bisa melayani pengguna tanpa telemetry, heartbeat, atau validasi lisensi online yang wajib. Support connector adalah pilihan terpisah dan hanya outbound mTLS dengan payload minimum.
+
+## Silo dan pool pada level service
+
+Keputusan pool/silo dapat dibuat per service, bukan hanya untuk seluruh stack. Diagram berikut hanya contoh pola; nama service bukan daftar module yang wajib ada di CoreERP.
+
+```mermaid
+flowchart LR
+    ORDER["Order service<br/>siloed compute"] --> PRODUCT["Product service<br/>pooled compute + storage"]
+    PRODUCT --> INVOICE["Invoice service<br/>pooled compute + siloed storage"]
+    INVOICE --> QA["Tenant queues<br/>siloed messages"]
+    QA --> SHIPPING["Shipping service<br/>pooled compute + storage"]
+
+    ORDER_DB[("Tenant data<br/>partitioned storage")]
+    PRODUCT_DB[("Pooled storage")]
+    INV_A[("Tenant A silo")]
+    INV_B[("Tenant B silo")]
+
+    ORDER --> ORDER_DB
+    PRODUCT --> PRODUCT_DB
+    INVOICE --> INV_A
+    INVOICE --> INV_B
+
+    classDef service fill:#dae8fc,stroke:#6c8ebf,color:#1f2937;
+    classDef silo fill:#ffe6cc,stroke:#d79b00,color:#1f2937;
+    classDef queue fill:#fff2cc,stroke:#d6b656,color:#1f2937;
+    class ORDER,PRODUCT,INVOICE,SHIPPING service;
+    class INV_A,INV_B silo;
+    class QA queue;
+```
+
+**Partisi data bukan isolasi.** Partisi menjawab di mana data tenant disimpan, misalnya row dengan `tenant_id`, schema, tabel, atau database yang berbeda. Isolasi menjawab apakah request tenant A benar-benar dibatasi agar tidak dapat membaca atau menulis resource tenant B. Keduanya harus dirancang dan diuji secara terpisah.
+
+## Aturan praktis untuk implementasi
+
+- Mulai dari `TenantContext` yang tepercaya; `tenant_id` dari body atau query string bukan bukti akses.
+- Organization berada di dalam tenant. Legal entity dan operating unit bukan pengganti tenant dan tidak boleh dijadikan satu pohon universal.
+- Setiap app memiliki database owner sendiri. Integrasi lintas app memakai REST/OpenAPI untuk query atau perintah, dan event/AsyncAPI untuk fakta yang sudah terjadi.
+- App tidak boleh menebak state global. Catalog, entitlement, installation, dan readiness punya sumber kebenaran masing-masing.
+- Silo bukan fork source. Semua placement menjalankan release yang kompatibel; yang berubah adalah resource dan placement, bukan business logic secara diam-diam.
+
+## Sumber dan diagram editable
+
+Konsep control plane/application plane, pooled/silo, identitas SaaS, isolasi tenant, partisi data, serta perbedaan metering dan metrics diringkas dari [Dasar-dasar Arsitektur SaaS](../saas-architecture-fundamentals.pdf), terutama bagian halaman 12-14, 21-22, 30-32, dan 34-35 pada PDF. Keputusan boundary dan lifecycle di halaman ini tetap mengikuti aturan kanonik CoreERP.
+
+Versi diagram yang dapat diedit di draw.io: [coreerp-saas-grand-design.drawio](../diagrams/drawio/coreerp-saas-grand-design.drawio).
 
 ## Invarian yang tidak boleh dilanggar
 
