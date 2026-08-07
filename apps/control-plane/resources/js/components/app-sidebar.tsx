@@ -40,7 +40,11 @@ function TruncatedLabel({ children }: { children: string }) {
             );
         update();
         const observer = new ResizeObserver(update);
-        if (label.current) observer.observe(label.current);
+
+        if (label.current) {
+observer.observe(label.current);
+}
+
         return () => observer.disconnect();
     }, [children]);
 
@@ -49,7 +53,10 @@ function TruncatedLabel({ children }: { children: string }) {
             {children}
         </span>
     );
-    if (!truncated) return content;
+
+    if (!truncated) {
+return content;
+}
 
     return (
         <Tooltip>
@@ -98,11 +105,6 @@ export function AppSidebar() {
                               label: 'Anggota',
                               icon: Users,
                               href: '/settings/access?section=members',
-                          },
-                          {
-                              label: 'Role',
-                              icon: KeyRound,
-                              href: '/settings/access?section=roles',
                           },
                           {
                               label: 'Undangan',

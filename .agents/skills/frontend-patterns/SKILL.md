@@ -20,12 +20,12 @@ Modern frontend patterns for React, Next.js, and performant user interfaces.
 
 ## Component Patterns
 
-### Hint Placement
+### Contextual help
 
-- Render a field or card title and its hint trigger in the same inline flex group with a small gap.
-- Do not place a contextual hint in `CardAction` or another corner of the card; reserve those areas for actions such as create, edit, or close.
-- Apply the same rule to `Heading` and `DialogHeader`: do not use `justify-between`, a trailing grid column, or `margin-left: auto` for a hint trigger.
-- Use a tooltip for optional short clarification. Use supporting text below the label when users need the information before they can continue.
+- Page/card/dialog heading help is optional. Do not add a hint trigger to every heading; reserve it for context that applies to the whole surface.
+- Every field can receive optional help text. Attach it to the field and use it for complex or non-obvious meaning, expected values, constraints, dependencies, or impact.
+- Prefer field help over repeating the same explanation in a page/card header. Obvious fields need no help text.
+- Hover field help opens after roughly one second and closes when the pointer leaves. Clicking the field label/title toggles a persistent open state; clicking it again closes it. The same toggle must be reachable by keyboard. Required, validation, and error text stays visible instead of being hidden only in a tooltip.
 
 ### Composition Over Inheritance
 

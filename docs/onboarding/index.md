@@ -22,7 +22,7 @@ Konsekuensinya ada dua, dan keduanya sering bikin kaget orang baru:
 
 ## Jalur baca
 
-Jangan baca 19 dokumen sekaligus. Urutannya:
+Urutannya:
 
 <div class="tip custom-block" style="padding-top: 8px">
 

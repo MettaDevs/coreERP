@@ -1,46 +1,1739 @@
-import { Head, useForm } from '@inertiajs/react';
-import { Check, ChevronRight, FileKey2, Plus, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import {
+    Check,
+    ChevronRight,
+    CopyPlus,
+    FileKey2,
+    KeyRound,
+    Pencil,
+    Plus,
+    Search,
+    ShieldCheck,
+    Trash2,
+    UserCog,
+} from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
-import Heading from '@/components/heading';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@apperp/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@apperp/ui/card';
 import { Checkbox } from '@apperp/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@apperp/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLegend, FieldSet } from '@apperp/ui/field';
+import {
+    Dialog,
+    DialogAction,
+    DialogBody,
+    DialogCancel,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@apperp/ui/dialog';
+import { Empty, EmptyDescription, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Field,
+    FieldError,
+    FieldGroup,
+    FieldLegend,
+    FieldSet,
+} from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { NativeSelect } from '@apperp/ui/native-select';
+import { Separator } from '@apperp/ui/separator';
+import { Tabs, TabsList, TabsTrigger } from '@apperp/ui/tabs';
+import Heading from '@/components/heading';
 
-type Permission = { code: string; name: string; app_id: string; entry_point_code: string; access_level: string; entry_point: { code: string; name: string; type: string } | null };
-type Privilege = { code: string; name: string; app_id: string | null; source: 'manifest' | 'custom'; status: 'draft' | 'active'; permissions: Pick<Permission, 'code' | 'name' | 'entry_point_code' | 'access_level'>[] };
-type Duty = { code: string; name: string; app_id: string | null; source: 'manifest' | 'custom'; status: 'draft' | 'active'; privileges: Pick<Privilege, 'code' | 'name' | 'source' | 'status'>[] };
+type Source = 'manifest' | 'custom';
+type Status = 'draft' | 'active';
 
-const toggle = (values: string[], value: string, checked: boolean) => checked ? [...new Set([...values, value])] : values.filter((item) => item !== value);
-const State = ({ value }: { value: 'draft' | 'active' }) => <Badge variant={value === 'active' ? 'secondary' : 'outline'}>{value === 'active' ? 'Diterbitkan' : 'Draf'}</Badge>;
-function PublishButton({ path }: { path: string }) { const form = useForm({}); return <Button size="sm" variant="outline" disabled={form.processing} onClick={() => form.post(path)}><Check />Terbitkan</Button>; }
+type App = { id: string; name: string };
+type RoleRef = { id: string; name: string };
+type Role = {
+    id: string;
+    name: string;
+    duty_codes: string[];
+    child_roles: RoleRef[];
+    parent_roles: RoleRef[];
+};
+type Duty = {
+    code: string;
+    name: string;
+    description: string | null;
+    app_id: string | null;
+    source: Source;
+    status: Status;
+    privilege_codes: string[];
+};
+type Privilege = {
+    code: string;
+    name: string;
+    description: string | null;
+    app_id: string | null;
+    source: Source;
+    status: Status;
+    permission_codes: string[];
+};
+type Permission = {
+    code: string;
+    name: string;
+    description: string | null;
+    app_id: string;
+    access_level: string;
+    entry_point: { code: string; name: string; type: string } | null;
+};
 
-function PrivilegeDialog({ permissions }: { permissions: Permission[] }) {
+type Props = {
+    canManage: boolean;
+    apps: App[];
+    roles: Role[];
+    duties: Duty[];
+    privileges: Privilege[];
+    permissions: Permission[];
+};
+
+type Level = 'role' | 'duty' | 'privilege' | 'permission';
+
+/**
+ * Rantai kalian selalu satu tipe anak per tingkat, jadi kolom kategori
+ * referensi milik F&O tidak diperlukan — cascade langsung turun ke anaknya.
+ * Referensi arah balik ditampilkan pada panel detail.
+ */
+const CHAIN: Level[] = ['role', 'duty', 'privilege', 'permission'];
+
+const LABEL: Record<Level, string> = {
+    role: 'Role',
+    duty: 'Tanggung jawab',
+    privilege: 'Tugas akses',
+    permission: 'Izin',
+};
+
+const ICON: Record<Level, typeof ShieldCheck> = {
+    role: UserCog,
+    duty: ShieldCheck,
+    privilege: KeyRound,
+    permission: FileKey2,
+};
+
+const toggle = (values: string[], value: string, checked: boolean) =>
+    checked
+        ? [...new Set([...values, value])]
+        : values.filter((item) => item !== value);
+
+const matches = (haystack: string, needle: string) =>
+    haystack.toLowerCase().includes(needle.trim().toLowerCase());
+
+function StatusBadge({ value }: { value: Status }) {
+    return (
+        <Badge variant={value === 'active' ? 'secondary' : 'outline'}>
+            {value === 'active' ? 'Diterbitkan' : 'Draf'}
+        </Badge>
+    );
+}
+
+function SourceBadge({ value }: { value: Source }) {
+    return (
+        <span className="text-xs text-muted-foreground">
+            {value === 'custom' ? 'Dibuat khusus' : 'Dari aplikasi'}
+        </span>
+    );
+}
+
+type Row = {
+    id: string;
+    name: string;
+    hint?: string;
+    childCount: number;
+    status?: Status;
+};
+
+function Column({
+    level,
+    rows,
+    selected,
+    onSelect,
+    filter,
+}: {
+    level: Level;
+    rows: Row[];
+    selected: string | null;
+    onSelect: (id: string) => void;
+    filter?: React.ReactNode;
+}) {
+    const Glyph = ICON[level];
+
+    return (
+        <div className="flex w-64 shrink-0 flex-col border-r last:border-r-0">
+            <div className="flex items-center gap-2 border-b px-3 py-2">
+                <Glyph className="size-4 text-muted-foreground" />
+                <span className="flex-1 text-sm font-medium">
+                    {LABEL[level]}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                    {rows.length}
+                </span>
+            </div>
+            {filter ? <div className="border-b p-2">{filter}</div> : null}
+            <div className="min-h-0 flex-1 overflow-y-auto">
+                {rows.length === 0 ? (
+                    <p className="p-3 text-xs text-muted-foreground">
+                        Tidak ada {LABEL[level].toLowerCase()}.
+                    </p>
+                ) : (
+                    rows.map((row) => (
+                        <button
+                            key={row.id}
+                            type="button"
+                            onClick={() => onSelect(row.id)}
+                            className={`flex w-full items-center gap-2 border-l-2 px-3 py-2 text-left text-sm hover:bg-accent/50 ${
+                                selected === row.id
+                                    ? 'border-l-primary bg-accent'
+                                    : 'border-l-transparent'
+                            }`}
+                        >
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate">
+                                    {row.name}
+                                </span>
+                                {row.hint ? (
+                                    <span className="block truncate text-xs text-muted-foreground">
+                                        {row.hint}
+                                    </span>
+                                ) : null}
+                            </span>
+                            {row.status === 'draft' ? (
+                                <Badge variant="outline">Draf</Badge>
+                            ) : null}
+                            {/* Penanda "+" ala F&O: hanya yang ada isinya layak diklik. */}
+                            {row.childCount > 0 ? (
+                                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                            ) : null}
+                        </button>
+                    ))
+                )}
+            </div>
+        </div>
+    );
+}
+
+function DetailRow({
+    label,
+    value,
+}: {
+    label: string;
+    value: React.ReactNode;
+}) {
+    return (
+        <div className="grid grid-cols-[7rem_1fr] gap-2 py-1 text-sm">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="min-w-0 break-words">{value}</span>
+        </div>
+    );
+}
+
+function UsedBy({ groups }: { groups: { label: string; names: string[] }[] }) {
+    const populated = groups.filter((group) => group.names.length > 0);
+
+    return (
+        <div className="space-y-3">
+            <p className="text-sm font-medium">Dipakai oleh</p>
+            {populated.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                    Belum dipakai di mana pun. Aman diubah.
+                </p>
+            ) : (
+                populated.map((group) => (
+                    <div key={group.label}>
+                        <p className="text-xs text-muted-foreground">
+                            {group.label} ({group.names.length})
+                        </p>
+                        <ul className="mt-1 space-y-0.5">
+                            {group.names.map((name) => (
+                                <li key={name} className="text-sm">
+                                    {name}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ))
+            )}
+        </div>
+    );
+}
+
+// Urutan kolom mengikuti grid F&O.
+const ACCESS_LEVELS = [
+    'read',
+    'update',
+    'create',
+    'delete',
+    'correct',
+    'invoke',
+] as const;
+
+type MatrixRow = {
+    key: string;
+    label: string;
+    type: string;
+    appId: string;
+    byAccess: Map<string, string>;
+};
+
+/**
+ * Matriks entry point x access level. Sel hanya bisa dicentang bila aplikasi
+ * memang mendeklarasikan izin untuk pasangan itu — sel mati berarti tidak ada
+ * kode yang mengeceknya, jadi mencentangnya tidak akan pernah berefek.
+ */
+function PermissionMatrix({
+    apps,
+    permissions,
+    selected,
+    onChange,
+}: {
+    apps: App[];
+    permissions: Permission[];
+    selected: string[];
+    onChange: (codes: string[]) => void;
+}) {
+    const [query, setQuery] = useState('');
+    const [appFilter, setAppFilter] = useState('');
+    const appName = new Map(apps.map((app) => [app.id, app.name]));
+
+    const rows = useMemo(() => {
+        const byEntryPoint = new Map<string, MatrixRow>();
+
+        permissions.forEach((permission) => {
+            const key = permission.entry_point?.code ?? permission.code;
+            const row = byEntryPoint.get(key) ?? {
+                key,
+                label: permission.entry_point?.name ?? permission.name,
+                type: permission.entry_point?.type ?? '—',
+                appId: permission.app_id,
+                byAccess: new Map<string, string>(),
+            };
+
+            row.byAccess.set(permission.access_level, permission.code);
+            byEntryPoint.set(key, row);
+        });
+
+        return [...byEntryPoint.values()];
+    }, [permissions]);
+
+    const visible = rows.filter(
+        (row) =>
+            (!appFilter || row.appId === appFilter) &&
+            (!query || matches(row.label, query) || matches(row.key, query)),
+    );
+    const grouped = [...Map.groupBy(visible, (row) => row.appId)];
+    const codesIn = (candidates: MatrixRow[], access: string) =>
+        candidates
+            .map((row) => row.byAccess.get(access))
+            .filter((code): code is string => Boolean(code));
+
+    const toggleColumn = (access: string) => {
+        const codes = codesIn(visible, access);
+        const allOn = codes.every((code) => selected.includes(code));
+
+        onChange(
+            allOn
+                ? selected.filter((code) => !codes.includes(code))
+                : [...new Set([...selected, ...codes])],
+        );
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+                <Input
+                    label="Cari entry point"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                />
+                <NativeSelect
+                    value={appFilter}
+                    onChange={(event) => setAppFilter(event.target.value)}
+                >
+                    <option value="">Semua aplikasi</option>
+                    {apps.map((app) => (
+                        <option key={app.id} value={app.id}>
+                            {app.name}
+                        </option>
+                    ))}
+                </NativeSelect>
+            </div>
+            <div className="max-h-80 overflow-auto rounded-md border">
+                <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-background">
+                        <tr className="border-b">
+                            <th className="px-3 py-2 text-left font-medium">
+                                Entry point
+                            </th>
+                            {ACCESS_LEVELS.map((access) => (
+                                <th key={access} className="px-2 py-2">
+                                    {/* Klik judul kolom = pilih seluruh kolom yang tersaring. */}
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleColumn(access)}
+                                        className="w-full rounded px-1 py-0.5 text-xs font-medium hover:bg-accent"
+                                        title={`Pilih semua ${access} yang tampil`}
+                                    >
+                                        {access}
+                                    </button>
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {grouped.length === 0 ? (
+                            <tr>
+                                <td
+                                    colSpan={ACCESS_LEVELS.length + 1}
+                                    className="p-3 text-muted-foreground"
+                                >
+                                    Tidak ada entry point yang cocok.
+                                </td>
+                            </tr>
+                        ) : (
+                            grouped.map(([appId, items]) => (
+                                <Fragment key={appId}>
+                                    <tr className="bg-muted/50">
+                                        <td
+                                            colSpan={ACCESS_LEVELS.length + 1}
+                                            className="px-3 py-1 text-xs font-medium text-muted-foreground"
+                                        >
+                                            {appName.get(appId) ?? appId}
+                                        </td>
+                                    </tr>
+                                    {items.map((row) => (
+                                        <tr key={row.key} className="border-t">
+                                            <td className="px-3 py-1.5">
+                                                <span className="block">
+                                                    {row.label}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {row.type}
+                                                </span>
+                                            </td>
+                                            {ACCESS_LEVELS.map((access) => {
+                                                const code =
+                                                    row.byAccess.get(access);
+
+                                                return (
+                                                    <td
+                                                        key={access}
+                                                        className="px-2 py-1.5 text-center"
+                                                    >
+                                                        {code ? (
+                                                            <Checkbox
+                                                                checked={selected.includes(
+                                                                    code,
+                                                                )}
+                                                                onCheckedChange={(
+                                                                    checked,
+                                                                ) =>
+                                                                    onChange(
+                                                                        toggle(
+                                                                            selected,
+                                                                            code,
+                                                                            checked ===
+                                                                                true,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <span
+                                                                className="text-muted-foreground/40"
+                                                                title="Aplikasi tidak mendeklarasikan izin ini"
+                                                            >
+                                                                ·
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </Fragment>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-xs text-muted-foreground">
+                {selected.length} izin dipilih. Titik berarti aplikasi tidak
+                mendeklarasikan izin untuk pasangan itu.
+            </p>
+        </div>
+    );
+}
+
+function PrivilegeDialog({
+    apps,
+    permissions,
+    privilege,
+}: {
+    apps: App[];
+    permissions: Permission[];
+    privilege?: Privilege;
+}) {
     const [open, setOpen] = useState(false);
-    const form = useForm({ name: '', permission_codes: [] as string[] });
-    return <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button variant="outline"><Plus />Tugas akses</Button></DialogTrigger><DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto"><DialogHeader><DialogTitle>Tugas akses baru</DialogTitle></DialogHeader><form onSubmit={(event) => { event.preventDefault(); form.post('/settings/security-configuration/privileges', { onSuccess: () => setOpen(false) }); }}><FieldGroup><Field><Input label="Nama tugas akses" value={form.data.name} onChange={(event) => form.setData('name', event.target.value)} /><FieldError>{form.errors.name}</FieldError></Field><FieldSet><FieldLegend>Pilih izin yang diperlukan</FieldLegend><div className="max-h-72 space-y-3 overflow-y-auto rounded-md border p-3">{permissions.map((permission) => <label key={permission.code} className="flex items-start gap-3 text-sm"><Checkbox checked={form.data.permission_codes.includes(permission.code)} onCheckedChange={(checked) => form.setData('permission_codes', toggle(form.data.permission_codes, permission.code, checked === true))} /><span><span className="block font-medium">{permission.name}</span><span className="text-xs text-muted-foreground">{permission.entry_point?.name ?? 'Layar atau layanan'} · {permission.access_level}</span></span></label>)}</div><FieldError>{form.errors.permission_codes}</FieldError></FieldSet><Button type="submit" disabled={form.processing}>Simpan sebagai draf</Button></FieldGroup></form></DialogContent></Dialog>;
+    const form = useForm({
+        name: privilege?.name ?? '',
+        permission_codes: privilege?.permission_codes ?? [],
+    });
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                    {privilege ? <Pencil /> : <Plus />}
+                    {privilege ? 'Edit draf' : 'Tugas akses'}
+                </Button>
+            </DialogTrigger>
+            <DialogContent size="full">
+                <DialogHeader>
+                    <DialogTitle>
+                        {privilege
+                            ? `Edit ${privilege.name}`
+                            : 'Tugas akses baru'}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Centang pasangan entry point dan access level yang
+                        diperlukan. Klik judul kolom untuk memilih seluruh kolom
+                        sekaligus.
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    className="contents"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const done = {
+                            onSuccess: () => {
+                                form.reset();
+                                setOpen(false);
+                            },
+                        };
+
+                        if (privilege) {
+                            form.put(
+                                `/settings/security-configuration/privileges/${privilege.code}`,
+                                done,
+                            );
+
+                            return;
+                        }
+
+                        form.post(
+                            '/settings/security-configuration/privileges',
+                            done,
+                        );
+                    }}
+                >
+                    <DialogBody>
+                        <FieldGroup>
+                            <Field>
+                                <Input
+                                    label="Nama tugas akses"
+                                    value={form.data.name}
+                                    onChange={(event) =>
+                                        form.setData('name', event.target.value)
+                                    }
+                                />
+                                <FieldError>{form.errors.name}</FieldError>
+                            </Field>
+                            <FieldSet>
+                                <FieldLegend>
+                                    Pilih izin yang diperlukan
+                                </FieldLegend>
+                                <PermissionMatrix
+                                    apps={apps}
+                                    permissions={permissions}
+                                    selected={form.data.permission_codes}
+                                    onChange={(codes) =>
+                                        form.setData('permission_codes', codes)
+                                    }
+                                />
+                                <FieldError>
+                                    {form.errors.permission_codes}
+                                </FieldError>
+                            </FieldSet>
+                        </FieldGroup>
+                    </DialogBody>
+                    <DialogFooter>
+                        <DialogAction type="submit" disabled={form.processing}>
+                            Simpan sebagai draf
+                        </DialogAction>
+                        <DialogCancel />
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
-function DutyDialog({ privileges }: { privileges: Privilege[] }) {
+function DuplicateButton({ path }: { path: string }) {
+    const form = useForm({});
+
+    return (
+        <Button
+            variant="outline"
+            size="sm"
+            disabled={form.processing}
+            onClick={() => form.post(path)}
+        >
+            <CopyPlus />
+            Duplikat
+        </Button>
+    );
+}
+
+function DutyDialog({
+    apps,
+    privileges,
+    duty,
+}: {
+    apps: App[];
+    privileges: Privilege[];
+    duty?: Duty;
+}) {
     const [open, setOpen] = useState(false);
-    const form = useForm({ name: '', privilege_codes: [] as string[] });
-    return <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button><Plus />Tanggung jawab</Button></DialogTrigger><DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto"><DialogHeader><DialogTitle>Tanggung jawab baru</DialogTitle></DialogHeader><form onSubmit={(event) => { event.preventDefault(); form.post('/settings/security-configuration/duties', { onSuccess: () => setOpen(false) }); }}><FieldGroup><Field><Input label="Nama tanggung jawab" value={form.data.name} onChange={(event) => form.setData('name', event.target.value)} /><FieldError>{form.errors.name}</FieldError></Field><FieldSet><FieldLegend>Pilih tugas akses</FieldLegend><div className="max-h-72 space-y-3 overflow-y-auto rounded-md border p-3">{privileges.map((privilege) => <label key={privilege.code} className="flex items-start gap-3 text-sm"><Checkbox checked={form.data.privilege_codes.includes(privilege.code)} onCheckedChange={(checked) => form.setData('privilege_codes', toggle(form.data.privilege_codes, privilege.code, checked === true))} /><span><span className="block font-medium">{privilege.name}</span><span className="text-xs text-muted-foreground">{privilege.source === 'custom' ? 'Dibuat khusus' : 'Dari aplikasi'} · {privilege.permissions.length} izin</span></span></label>)}</div><FieldError>{form.errors.privilege_codes}</FieldError></FieldSet><Button type="submit" disabled={form.processing}>Simpan sebagai draf</Button></FieldGroup></form></DialogContent></Dialog>;
+    const [query, setQuery] = useState('');
+    const form = useForm({
+        name: duty?.name ?? '',
+        privilege_codes: duty?.privilege_codes ?? [],
+    });
+    const appName = new Map(apps.map((app) => [app.id, app.name]));
+    const visible = privileges.filter(
+        (privilege) => !query || matches(privilege.name, query),
+    );
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button size="sm" variant={duty ? 'outline' : 'default'}>
+                    {duty ? <Pencil /> : <Plus />}
+                    {duty ? 'Edit draf' : 'Tanggung jawab'}
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>
+                        {duty ? `Edit ${duty.name}` : 'Tanggung jawab baru'}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Tanggung jawab menggabungkan beberapa tugas akses
+                        menjadi satu bagian proses bisnis yang dapat dipasang
+                        pada role.
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    className="contents"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const done = {
+                            onSuccess: () => {
+                                form.reset();
+                                setOpen(false);
+                            },
+                        };
+
+                        if (duty) {
+                            form.put(
+                                `/settings/security-configuration/duties/${duty.code}`,
+                                done,
+                            );
+
+                            return;
+                        }
+
+                        form.post(
+                            '/settings/security-configuration/duties',
+                            done,
+                        );
+                    }}
+                >
+                    <DialogBody>
+                        <FieldGroup>
+                            <Field>
+                                <Input
+                                    label="Nama tanggung jawab"
+                                    value={form.data.name}
+                                    onChange={(event) =>
+                                        form.setData('name', event.target.value)
+                                    }
+                                />
+                                <FieldError>{form.errors.name}</FieldError>
+                            </Field>
+                            <FieldSet>
+                                <FieldLegend>Pilih tugas akses</FieldLegend>
+                                <Input
+                                    label="Cari tugas akses"
+                                    value={query}
+                                    onChange={(event) =>
+                                        setQuery(event.target.value)
+                                    }
+                                />
+                                <div className="max-h-72 space-y-3 overflow-y-auto rounded-md border p-3">
+                                    {visible.map((privilege) => (
+                                        <label
+                                            key={privilege.code}
+                                            className="flex items-start gap-3 text-sm"
+                                        >
+                                            <Checkbox
+                                                checked={form.data.privilege_codes.includes(
+                                                    privilege.code,
+                                                )}
+                                                onCheckedChange={(checked) =>
+                                                    form.setData(
+                                                        'privilege_codes',
+                                                        toggle(
+                                                            form.data
+                                                                .privilege_codes,
+                                                            privilege.code,
+                                                            checked === true,
+                                                        ),
+                                                    )
+                                                }
+                                            />
+                                            <span>
+                                                <span className="block font-medium">
+                                                    {privilege.name}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {privilege.app_id
+                                                        ? (appName.get(
+                                                              privilege.app_id,
+                                                          ) ?? privilege.app_id)
+                                                        : 'Dibuat khusus'}{' '}
+                                                    ·{' '}
+                                                    {
+                                                        privilege
+                                                            .permission_codes
+                                                            .length
+                                                    }{' '}
+                                                    izin
+                                                </span>
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <FieldError>
+                                    {form.errors.privilege_codes}
+                                </FieldError>
+                            </FieldSet>
+                        </FieldGroup>
+                    </DialogBody>
+                    <DialogFooter>
+                        <DialogAction type="submit" disabled={form.processing}>
+                            Simpan sebagai draf
+                        </DialogAction>
+                        <DialogCancel />
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
-function Tree({ duties, privileges, permissions }: { duties: Duty[]; privileges: Privilege[]; permissions: Permission[] }) {
-    const privilegeByCode = new Map(privileges.map((item) => [item.code, item]));
-    const permissionByCode = new Map(permissions.map((item) => [item.code, item]));
-    return <div className="space-y-3">{duties.map((duty) => <details key={duty.code} className="rounded-md border" open={duty.source === 'custom'}><summary className="flex cursor-pointer list-none items-center gap-3 p-3"><ChevronRight className="size-4 transition-transform group-open:rotate-90" /><ShieldCheck className="size-4 text-primary" /><span className="min-w-0 flex-1 font-medium">{duty.name}</span><State value={duty.status} /><span className="text-xs text-muted-foreground">{duty.source === 'custom' ? 'Dibuat khusus' : 'Dari aplikasi'}</span></summary><div className="space-y-3 border-t p-3 pl-10">{duty.privileges.map((item) => { const privilege = privilegeByCode.get(item.code); return <div key={item.code} className="border-l pl-4"><p className="font-medium text-sm">{item.name}</p><p className="mb-2 text-xs text-muted-foreground">Tugas akses</p>{privilege?.permissions.map((permission) => { const detail = permissionByCode.get(permission.code); return <div className="mb-2 flex items-start gap-2 text-sm" key={permission.code}><FileKey2 className="mt-0.5 size-3.5 text-muted-foreground" /><span><span>{permission.name}</span><span className="block text-xs text-muted-foreground">{detail?.entry_point?.name ?? permission.entry_point_code} · {permission.access_level}</span></span></div>; })}</div>; })}</div></details>)}</div>;
+function RoleDialog({
+    apps,
+    duties,
+    role,
+}: {
+    apps: App[];
+    duties: Duty[];
+    role?: Role;
+}) {
+    const [open, setOpen] = useState(false);
+    const form = useForm({
+        name: role?.name ?? '',
+        duty_codes: role?.duty_codes ?? [],
+        // Sub role dipertahankan apa adanya; form ini hanya mengurus duty.
+        child_role_ids: role?.child_roles.map((item) => item.id) ?? [],
+    });
+    // Draf tidak boleh menjadi sumber hak role — API menolaknya dengan 422.
+    const selectable = duties.filter((duty) => duty.status === 'active');
+    const groups = [
+        ...apps.map((app) => ({
+            id: app.id,
+            name: app.name,
+            items: selectable.filter((duty) => duty.app_id === app.id),
+        })),
+        {
+            id: 'custom',
+            name: 'Dibuat khusus',
+            items: selectable.filter((duty) => duty.source === 'custom'),
+        },
+    ].filter((group) => group.items.length > 0);
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant={role ? 'outline' : 'default'} size="sm">
+                    {role ? <Pencil /> : <Plus />}
+                    {role ? 'Edit role' : 'Role'}
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>
+                        {role ? 'Edit security role' : 'Security role baru'}
+                    </DialogTitle>
+                    <DialogDescription>
+                        Role menentukan tindakan yang boleh dilakukan. Batas
+                        data diatur saat role diberikan ke anggota.
+                    </DialogDescription>
+                </DialogHeader>
+                <form
+                    className="contents"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        const done = { onSuccess: () => setOpen(false) };
+
+                        if (role) {
+                            form.put(`/settings/access/roles/${role.id}`, done);
+
+                            return;
+                        }
+
+                        form.post('/settings/access/roles', done);
+                    }}
+                >
+                    <DialogBody>
+                        <FieldGroup>
+                            <Field>
+                                <Input
+                                    label="Nama role"
+                                    value={form.data.name}
+                                    onChange={(event) =>
+                                        form.setData('name', event.target.value)
+                                    }
+                                />
+                                <FieldError>{form.errors.name}</FieldError>
+                            </Field>
+                            <FieldSet>
+                                <FieldLegend>Tanggung jawab bisnis</FieldLegend>
+                                <div className="max-h-72 space-y-4 overflow-y-auto rounded-md border p-3">
+                                    {groups.map((group) => (
+                                        <div
+                                            key={group.id}
+                                            className="space-y-2"
+                                        >
+                                            <p className="text-xs font-medium text-muted-foreground">
+                                                {group.name}
+                                            </p>
+                                            {group.items.map((duty) => (
+                                                <label
+                                                    key={duty.code}
+                                                    className="flex items-start gap-3 text-sm"
+                                                >
+                                                    <Checkbox
+                                                        checked={form.data.duty_codes.includes(
+                                                            duty.code,
+                                                        )}
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            form.setData(
+                                                                'duty_codes',
+                                                                toggle(
+                                                                    form.data
+                                                                        .duty_codes,
+                                                                    duty.code,
+                                                                    checked ===
+                                                                        true,
+                                                                ),
+                                                            )
+                                                        }
+                                                    />
+                                                    <span>
+                                                        <span className="block font-medium">
+                                                            {duty.name}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {
+                                                                duty
+                                                                    .privilege_codes
+                                                                    .length
+                                                            }{' '}
+                                                            tugas akses
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                                <FieldError>
+                                    {form.errors.duty_codes}
+                                </FieldError>
+                            </FieldSet>
+                        </FieldGroup>
+                    </DialogBody>
+                    <DialogFooter>
+                        <DialogAction type="submit" disabled={form.processing}>
+                            Simpan role
+                        </DialogAction>
+                        <DialogCancel />
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
-export default function SecurityConfiguration({ duties, privileges, permissions }: { duties: Duty[]; privileges: Privilege[]; permissions: Permission[] }) {
-    const customPrivileges = privileges.filter((item) => item.source === 'custom');
-    const customDuties = duties.filter((item) => item.source === 'custom');
-    return <><Head title="Konfigurasi keamanan" /><main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6"><Heading title="Konfigurasi keamanan" description="Susun akses aplikasi menjadi tugas akses dan tanggung jawab, lalu gunakan tanggung jawab yang diterbitkan pada role." /><Card><CardHeader><CardTitle>Struktur akses</CardTitle><CardDescription>Bagian dari aplikasi hanya dapat dilihat. Konfigurasi yang dibuat khusus dimulai sebagai draf dan harus diterbitkan sebelum dapat dipilih pada role.</CardDescription><CardAction><div className="flex gap-2"><PrivilegeDialog permissions={permissions} /><DutyDialog privileges={privileges} /></div></CardAction></CardHeader><CardContent><Tree duties={duties} privileges={privileges} permissions={permissions} /></CardContent></Card><div className="grid gap-6 lg:grid-cols-2"><Card><CardHeader><CardTitle>Tugas akses khusus</CardTitle><CardDescription>{customPrivileges.length} tugas dibuat khusus untuk tenant ini.</CardDescription></CardHeader><CardContent>{customPrivileges.length ? <div className="space-y-2">{customPrivileges.map((item) => <div key={item.code} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"><span>{item.name}</span><div className="flex items-center gap-2"><State value={item.status} />{item.status === 'draft' && <PublishButton path={`/settings/security-configuration/privileges/${item.code}/publish`} />}</div></div>)}</div> : <p className="text-sm text-muted-foreground">Belum ada tugas akses khusus.</p>}</CardContent></Card><Card><CardHeader><CardTitle>Tanggung jawab khusus</CardTitle><CardDescription>{customDuties.length} tanggung jawab dibuat khusus untuk tenant ini.</CardDescription></CardHeader><CardContent>{customDuties.length ? <div className="space-y-2">{customDuties.map((item) => <div key={item.code} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm"><span>{item.name}</span><div className="flex items-center gap-2"><State value={item.status} />{item.status === 'draft' && <PublishButton path={`/settings/security-configuration/duties/${item.code}/publish`} />}</div></div>)}</div> : <p className="text-sm text-muted-foreground">Belum ada tanggung jawab khusus.</p>}</CardContent></Card></div></main></>;
+function DeleteRoleButton({
+    role,
+    onDeleted,
+}: {
+    role: Role;
+    onDeleted: () => void;
+}) {
+    const form = useForm({});
+
+    return (
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                    <Trash2 />
+                    Hapus role
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Hapus role {role.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Anggota yang memegang role ini kehilangan seluruh hak
+                        yang berasal darinya. Tanggung jawab dan tugas akses di
+                        dalamnya tidak ikut terhapus.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogAction
+                        disabled={form.processing}
+                        onClick={() =>
+                            form.delete(`/settings/access/roles/${role.id}`, {
+                                onSuccess: onDeleted,
+                            })
+                        }
+                    >
+                        Hapus
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
 }
 
-SecurityConfiguration.layout = { breadcrumbs: [{ title: 'Settings', href: '/settings/access' }, { title: 'Identity & access', href: '/settings/access' }, { title: 'Konfigurasi keamanan', href: '/settings/security-configuration' }] };
+function PublishButton({ path }: { path: string }) {
+    const form = useForm({});
+
+    return (
+        <Button
+            size="sm"
+            variant="outline"
+            disabled={form.processing}
+            onClick={() => form.post(path)}
+        >
+            <Check />
+            Terbitkan
+        </Button>
+    );
+}
+
+function DeleteDraftButton({ path, name }: { path: string; name: string }) {
+    const form = useForm({});
+
+    return (
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                    <Trash2 />
+                    Hapus
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Hapus draf {name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Draf belum dipakai role mana pun, jadi menghapusnya
+                        tidak mengubah hak siapa pun. Objek bawaan aplikasi yang
+                        disalin tidak ikut terhapus.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogAction
+                        disabled={form.processing}
+                        onClick={() => form.delete(path)}
+                    >
+                        Hapus
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
+/**
+ * Setara tab "Unpublished objects" di F&O: seluruh perubahan tenant yang belum
+ * diterbitkan, lengkap dengan isinya dan aksinya, supaya draf tidak perlu
+ * dicari lagi lewat cascade.
+ */
+function DraftPanel({
+    apps,
+    duties,
+    privileges,
+    permissions,
+    allPrivileges,
+}: {
+    apps: App[];
+    duties: Duty[];
+    privileges: Privilege[];
+    permissions: Permission[];
+    allPrivileges: Privilege[];
+}) {
+    const permissionByCode = new Map(
+        permissions.map((item) => [item.code, item]),
+    );
+    const privilegeByCode = new Map(
+        allPrivileges.map((item) => [item.code, item]),
+    );
+
+    if (duties.length + privileges.length === 0) {
+        return (
+            <Empty className="py-12">
+                <EmptyTitle>Tidak ada draf</EmptyTitle>
+                <EmptyDescription>
+                    Duplikat atau buat tugas akses dan tanggung jawab, lalu
+                    hasilnya menunggu di sini sampai diterbitkan.
+                </EmptyDescription>
+            </Empty>
+        );
+    }
+
+    return (
+        <div className="space-y-3 p-3">
+            {privileges.map((item) => (
+                <div key={item.code} className="rounded-md border p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="flex-1">
+                            <span className="block font-medium">
+                                {item.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                Tugas akses · {item.permission_codes.length}{' '}
+                                izin
+                            </span>
+                        </span>
+                        <PrivilegeDialog
+                            apps={apps}
+                            permissions={permissions}
+                            privilege={item}
+                        />
+                        <DeleteDraftButton
+                            name={item.name}
+                            path={`/settings/security-configuration/privileges/${item.code}`}
+                        />
+                        <PublishButton
+                            path={`/settings/security-configuration/privileges/${item.code}/publish`}
+                        />
+                    </div>
+                    <ul className="mt-2 flex flex-wrap gap-1">
+                        {item.permission_codes.map((code) => (
+                            <li key={code}>
+                                <Badge variant="outline">
+                                    {permissionByCode.get(code)?.name ?? code}
+                                    {' · '}
+                                    {permissionByCode.get(code)?.access_level}
+                                </Badge>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ))}
+            {duties.map((item) => (
+                <div key={item.code} className="rounded-md border p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="flex-1">
+                            <span className="block font-medium">
+                                {item.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                Tanggung jawab · {item.privilege_codes.length}{' '}
+                                tugas akses
+                            </span>
+                        </span>
+                        <DutyDialog
+                            apps={apps}
+                            privileges={allPrivileges}
+                            duty={item}
+                        />
+                        <DeleteDraftButton
+                            name={item.name}
+                            path={`/settings/security-configuration/duties/${item.code}`}
+                        />
+                        <PublishButton
+                            path={`/settings/security-configuration/duties/${item.code}/publish`}
+                        />
+                    </div>
+                    <ul className="mt-2 flex flex-wrap gap-1">
+                        {item.privilege_codes.map((code) => (
+                            <li key={code}>
+                                <Badge variant="outline">
+                                    {privilegeByCode.get(code)?.name ?? code}
+                                </Badge>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ))}
+            <p className="text-xs text-muted-foreground">
+                Terbitkan tugas akses lebih dulu — tanggung jawab menolak terbit
+                selama masih memuat tugas akses berstatus draf.
+            </p>
+        </div>
+    );
+}
+
+export default function SecurityConfiguration({
+    canManage,
+    apps,
+    roles,
+    duties,
+    privileges,
+    permissions,
+}: Props) {
+    const [tab, setTab] = useState<Level | 'draft'>('role');
+    const [appFilter, setAppFilter] = useState('');
+    const [query, setQuery] = useState('');
+    const [path, setPath] = useState<string[]>([]);
+    const scroller = useRef<HTMLDivElement>(null);
+
+    const draftCount = [...duties, ...privileges].filter(
+        (item) => item.status === 'draft',
+    ).length;
+
+    const dutyByCode = useMemo(
+        () => new Map(duties.map((item) => [item.code, item])),
+        [duties],
+    );
+    const privilegeByCode = useMemo(
+        () => new Map(privileges.map((item) => [item.code, item])),
+        [privileges],
+    );
+    const permissionByCode = useMemo(
+        () => new Map(permissions.map((item) => [item.code, item])),
+        [permissions],
+    );
+    const appName = useMemo(
+        () => new Map(apps.map((app) => [app.id, app.name])),
+        [apps],
+    );
+
+    /**
+     * Referensi arah balik. Inilah yang menjawab "kalau saya ubah ini, siapa
+     * yang kena?" — pertanyaan pertama admin sebelum menyentuh apa pun.
+     */
+    const usedBy = useMemo(() => {
+        const add = (map: Map<string, string[]>, key: string, value: string) =>
+            map.set(key, [...(map.get(key) ?? []), value]);
+        const dutyToRoles = new Map<string, string[]>();
+        const privilegeToDuties = new Map<string, string[]>();
+        const permissionToPrivileges = new Map<string, string[]>();
+
+        roles.forEach((role) =>
+            role.duty_codes.forEach((code) => add(dutyToRoles, code, role.id)),
+        );
+        duties.forEach((duty) =>
+            duty.privilege_codes.forEach((code) =>
+                add(privilegeToDuties, code, duty.code),
+            ),
+        );
+        privileges.forEach((privilege) =>
+            privilege.permission_codes.forEach((code) =>
+                add(permissionToPrivileges, code, privilege.code),
+            ),
+        );
+
+        return { dutyToRoles, privilegeToDuties, permissionToPrivileges };
+    }, [roles, duties, privileges]);
+
+    const roleNames = (ids: string[]) =>
+        ids
+            .map((id) => roles.find((role) => role.id === id)?.name)
+            .filter((name): name is string => Boolean(name));
+    const dutyNames = (codes: string[]) =>
+        codes
+            .map((code) => dutyByCode.get(code)?.name)
+            .filter((name): name is string => Boolean(name));
+    const privilegeNames = (codes: string[]) =>
+        codes
+            .map((code) => privilegeByCode.get(code)?.name)
+            .filter((name): name is string => Boolean(name));
+
+    const levels = tab === 'draft' ? [] : CHAIN.slice(CHAIN.indexOf(tab));
+    const select = (index: number, id: string) =>
+        setPath((current) =>
+            current[index] === id
+                ? current.slice(0, index)
+                : [...current.slice(0, index), id],
+        );
+
+    // Kolom terbaru selalu ditarik ke dalam pandangan, seperti F&O.
+    useEffect(() => {
+        scroller.current?.scrollTo({
+            left: scroller.current.scrollWidth,
+            behavior: 'smooth',
+        });
+    }, [path]);
+
+    const changeTab = (value: string) => {
+        setTab(value as Level | 'draft');
+        setPath([]);
+    };
+    const changeAppFilter = (value: string) => {
+        setAppFilter(value);
+        setPath([]);
+    };
+
+    const rowsFor = (level: Level, index: number): Row[] => {
+        const parent = index === 0 ? null : path[index - 1];
+
+        if (index > 0 && !parent) {
+            return [];
+        }
+
+        if (level === 'role') {
+            return roles
+                .filter(
+                    (role) =>
+                        (!appFilter ||
+                            role.duty_codes.some(
+                                (code) =>
+                                    dutyByCode.get(code)?.app_id === appFilter,
+                            )) &&
+                        (!query || matches(role.name, query)),
+                )
+                .map((role) => ({
+                    id: role.id,
+                    name: role.name,
+                    hint: `${role.duty_codes.length} tanggung jawab`,
+                    childCount: role.duty_codes.length,
+                }));
+        }
+
+        if (level === 'duty') {
+            const codes =
+                index === 0
+                    ? duties.map((duty) => duty.code)
+                    : (roles.find((role) => role.id === parent)?.duty_codes ??
+                      []);
+
+            return codes
+                .map((code) => dutyByCode.get(code))
+                .filter((duty): duty is Duty => Boolean(duty))
+                .filter(
+                    (duty) =>
+                        (index > 0 ||
+                            !appFilter ||
+                            duty.app_id === appFilter) &&
+                        (index > 0 || !query || matches(duty.name, query)),
+                )
+                .map((duty) => ({
+                    id: duty.code,
+                    name: duty.name,
+                    hint: duty.app_id
+                        ? (appName.get(duty.app_id) ?? duty.app_id)
+                        : 'Dibuat khusus',
+                    childCount: duty.privilege_codes.length,
+                    status: duty.status,
+                }));
+        }
+
+        if (level === 'privilege') {
+            const codes =
+                index === 0
+                    ? privileges.map((item) => item.code)
+                    : (dutyByCode.get(parent!)?.privilege_codes ?? []);
+
+            return codes
+                .map((code) => privilegeByCode.get(code))
+                .filter((item): item is Privilege => Boolean(item))
+                .filter(
+                    (item) =>
+                        (index > 0 ||
+                            !appFilter ||
+                            item.app_id === appFilter) &&
+                        (index > 0 || !query || matches(item.name, query)),
+                )
+                .map((item) => ({
+                    id: item.code,
+                    name: item.name,
+                    hint: `${item.permission_codes.length} izin`,
+                    childCount: item.permission_codes.length,
+                    status: item.status,
+                }));
+        }
+
+        return (privilegeByCode.get(parent!)?.permission_codes ?? [])
+            .map((code) => permissionByCode.get(code))
+            .filter((item): item is Permission => Boolean(item))
+            .map((item) => ({
+                id: item.code,
+                name: item.name,
+                hint: `${item.entry_point?.name ?? '—'} · ${item.access_level}`,
+                childCount: 0,
+            }));
+    };
+
+    const deepest = path.length - 1;
+    const detailLevel = deepest >= 0 ? levels[deepest] : null;
+    const detailId = deepest >= 0 ? path[deepest] : null;
+
+    // Action pane bekerja pada objek terdalam yang dipilih. Role dikecualikan:
+    // aksinya tetap tersedia selama role ada di jalur, supaya menambah
+    // tanggung jawab tidak menuntut pengguna naik dulu ke kolom pertama.
+    const selectedRole =
+        tab === 'role' && path[0]
+            ? roles.find((item) => item.id === path[0])
+            : undefined;
+    const selectedDuty =
+        detailLevel === 'duty' && detailId
+            ? dutyByCode.get(detailId)
+            : undefined;
+    const selectedPrivilege =
+        detailLevel === 'privilege' && detailId
+            ? privilegeByCode.get(detailId)
+            : undefined;
+    const editable = (item: { source: Source; status: Status }) =>
+        item.source === 'custom' && item.status === 'draft';
+
+    const renderDetail = () => {
+        if (!detailLevel || !detailId) {
+            return (
+                <p className="p-4 text-sm text-muted-foreground">
+                    Pilih salah satu untuk melihat rinciannya.
+                </p>
+            );
+        }
+
+        if (detailLevel === 'role') {
+            const role = roles.find((item) => item.id === detailId);
+
+            if (!role) {
+                return null;
+            }
+
+            return (
+                <div className="space-y-4 p-4">
+                    <p className="font-medium">{role.name}</p>
+                    <DetailRow
+                        label="Tanggung jawab"
+                        value={role.duty_codes.length}
+                    />
+                    <DetailRow
+                        label="Sub role"
+                        value={
+                            role.child_roles
+                                .map((item) => item.name)
+                                .join(', ') || '—'
+                        }
+                    />
+                    <DetailRow
+                        label="Role induk"
+                        value={
+                            role.parent_roles
+                                .map((item) => item.name)
+                                .join(', ') || '—'
+                        }
+                    />
+                    <Separator />
+                    <p className="text-xs text-muted-foreground">
+                        Penugasan role ke pengguna beserta scope organisasinya
+                        diatur terpisah.
+                    </p>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/settings/access?section=roles">
+                            Buka penugasan role
+                        </Link>
+                    </Button>
+                </div>
+            );
+        }
+
+        if (detailLevel === 'duty') {
+            const duty = dutyByCode.get(detailId);
+
+            if (!duty) {
+                return null;
+            }
+
+            return (
+                <div className="space-y-4 p-4">
+                    <div className="flex items-center gap-2">
+                        <p className="flex-1 font-medium">{duty.name}</p>
+                        <StatusBadge value={duty.status} />
+                    </div>
+                    <SourceBadge value={duty.source} />
+                    {duty.description ? (
+                        <p className="text-sm text-muted-foreground">
+                            {duty.description}
+                        </p>
+                    ) : null}
+                    <DetailRow label="Kode" value={duty.code} />
+                    <DetailRow
+                        label="Aplikasi"
+                        value={
+                            duty.app_id
+                                ? (appName.get(duty.app_id) ?? duty.app_id)
+                                : '—'
+                        }
+                    />
+                    <Separator />
+                    <UsedBy
+                        groups={[
+                            {
+                                label: 'Role',
+                                names: roleNames(
+                                    usedBy.dutyToRoles.get(duty.code) ?? [],
+                                ),
+                            },
+                        ]}
+                    />
+                </div>
+            );
+        }
+
+        if (detailLevel === 'privilege') {
+            const privilege = privilegeByCode.get(detailId);
+
+            if (!privilege) {
+                return null;
+            }
+
+            const dutyCodes =
+                usedBy.privilegeToDuties.get(privilege.code) ?? [];
+            const roleIds = [
+                ...new Set(
+                    dutyCodes.flatMap(
+                        (code) => usedBy.dutyToRoles.get(code) ?? [],
+                    ),
+                ),
+            ];
+
+            return (
+                <div className="space-y-4 p-4">
+                    <div className="flex items-center gap-2">
+                        <p className="flex-1 font-medium">{privilege.name}</p>
+                        <StatusBadge value={privilege.status} />
+                    </div>
+                    <SourceBadge value={privilege.source} />
+                    {privilege.description ? (
+                        <p className="text-sm text-muted-foreground">
+                            {privilege.description}
+                        </p>
+                    ) : null}
+                    <DetailRow label="Kode" value={privilege.code} />
+                    <DetailRow
+                        label="Aplikasi"
+                        value={
+                            privilege.app_id
+                                ? (appName.get(privilege.app_id) ??
+                                  privilege.app_id)
+                                : '—'
+                        }
+                    />
+                    <Separator />
+                    <UsedBy
+                        groups={[
+                            {
+                                label: 'Tanggung jawab',
+                                names: dutyNames(dutyCodes),
+                            },
+                            { label: 'Role', names: roleNames(roleIds) },
+                        ]}
+                    />
+                </div>
+            );
+        }
+
+        const permission = permissionByCode.get(detailId);
+
+        if (!permission) {
+            return null;
+        }
+
+        const privilegeCodes =
+            usedBy.permissionToPrivileges.get(permission.code) ?? [];
+
+        return (
+            <div className="space-y-4 p-4">
+                <p className="font-medium">{permission.name}</p>
+                {permission.description ? (
+                    <p className="text-sm text-muted-foreground">
+                        {permission.description}
+                    </p>
+                ) : null}
+                <DetailRow label="Kode" value={permission.code} />
+                <DetailRow
+                    label="Entry point"
+                    value={
+                        permission.entry_point
+                            ? `${permission.entry_point.name} (${permission.entry_point.type})`
+                            : '—'
+                    }
+                />
+                <DetailRow
+                    label="Access level"
+                    value={
+                        <Badge variant="secondary">
+                            {permission.access_level}
+                        </Badge>
+                    }
+                />
+                <DetailRow
+                    label="Aplikasi"
+                    value={appName.get(permission.app_id) ?? permission.app_id}
+                />
+                <p className="text-xs text-muted-foreground">
+                    Entry point dan access level ditetapkan aplikasi pada
+                    manifest, jadi tidak dapat diubah dari sini.
+                </p>
+                <Separator />
+                <UsedBy
+                    groups={[
+                        {
+                            label: 'Tugas akses',
+                            names: privilegeNames(privilegeCodes),
+                        },
+                    ]}
+                />
+            </div>
+        );
+    };
+
+    return (
+        <>
+            <Head title="Konfigurasi keamanan" />
+            <main className="mx-auto flex w-full min-w-0 flex-col gap-6 p-6">
+                <Heading
+                    title="Konfigurasi keamanan"
+                    description="Telusuri struktur akses dari role sampai izin. Bagian yang berasal dari aplikasi hanya dapat dilihat; konfigurasi khusus tenant dimulai sebagai draf."
+                />
+                <Card className="overflow-hidden">
+                    <CardHeader>
+                        <CardTitle>Struktur akses</CardTitle>
+                        <CardDescription>
+                            Tab menentukan kolom pertama. Aplikasi dipakai
+                            sebagai penyaring, bukan tingkatan tersendiri.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3 px-0">
+                        <div className="px-6">
+                            <Tabs value={tab} onValueChange={changeTab}>
+                                <TabsList>
+                                    <TabsTrigger value="role">Role</TabsTrigger>
+                                    <TabsTrigger value="duty">
+                                        Tanggung jawab
+                                    </TabsTrigger>
+                                    <TabsTrigger value="privilege">
+                                        Tugas akses
+                                    </TabsTrigger>
+                                    <TabsTrigger value="draft">
+                                        Draf ({draftCount})
+                                    </TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                        </div>
+                        {/* Action pane menyesuaikan tab dan objek terpilih, seperti F&O. */}
+                        {canManage ? (
+                            <div className="flex flex-wrap items-center gap-2 border-y bg-muted/40 px-6 py-2">
+                                {tab === 'role' ? (
+                                    <>
+                                        <RoleDialog
+                                            apps={apps}
+                                            duties={duties}
+                                        />
+                                        {selectedRole ? (
+                                            <>
+                                                <RoleDialog
+                                                    apps={apps}
+                                                    duties={duties}
+                                                    role={selectedRole}
+                                                />
+                                                <DeleteRoleButton
+                                                    role={selectedRole}
+                                                    onDeleted={() =>
+                                                        setPath([])
+                                                    }
+                                                />
+                                            </>
+                                        ) : null}
+                                    </>
+                                ) : null}
+                                {tab === 'duty' ? (
+                                    <DutyDialog
+                                        apps={apps}
+                                        privileges={privileges}
+                                    />
+                                ) : null}
+                                {tab === 'privilege' ? (
+                                    <PrivilegeDialog
+                                        apps={apps}
+                                        permissions={permissions}
+                                    />
+                                ) : null}
+                                {selectedDuty ? (
+                                    <>
+                                        <DuplicateButton
+                                            path={`/settings/security-configuration/duties/${selectedDuty.code}/duplicate`}
+                                        />
+                                        {editable(selectedDuty) ? (
+                                            <DutyDialog
+                                                apps={apps}
+                                                privileges={privileges}
+                                                duty={selectedDuty}
+                                            />
+                                        ) : null}
+                                    </>
+                                ) : null}
+                                {selectedPrivilege ? (
+                                    <>
+                                        <DuplicateButton
+                                            path={`/settings/security-configuration/privileges/${selectedPrivilege.code}/duplicate`}
+                                        />
+                                        {editable(selectedPrivilege) ? (
+                                            <PrivilegeDialog
+                                                apps={apps}
+                                                permissions={permissions}
+                                                privilege={selectedPrivilege}
+                                            />
+                                        ) : null}
+                                    </>
+                                ) : null}
+                                <div className="flex-1" />
+                                <span className="text-xs text-muted-foreground">
+                                    {selectedRole
+                                        ? `Edit role untuk menambah atau melepas tanggung jawab ${selectedRole.name}.`
+                                        : selectedDuty || selectedPrivilege
+                                          ? 'Duplikat objek aplikasi untuk menyempitkan haknya.'
+                                          : 'Objek dari aplikasi hanya dapat dilihat.'}
+                                </span>
+                            </div>
+                        ) : null}
+                        {tab === 'draft' ? (
+                            <DraftPanel
+                                apps={apps}
+                                permissions={permissions}
+                                allPrivileges={privileges}
+                                duties={duties.filter(
+                                    (item) => item.status === 'draft',
+                                )}
+                                privileges={privileges.filter(
+                                    (item) => item.status === 'draft',
+                                )}
+                            />
+                        ) : (
+                            <div
+                                ref={scroller}
+                                className="flex h-[32rem] overflow-x-auto border-y"
+                            >
+                                {levels.map((level, index) =>
+                                    index === 0 || path[index - 1] ? (
+                                        <Column
+                                            key={level}
+                                            level={level}
+                                            rows={rowsFor(level, index)}
+                                            selected={path[index] ?? null}
+                                            onSelect={(id) => select(index, id)}
+                                            filter={
+                                                index === 0 ? (
+                                                    <div className="space-y-2">
+                                                        <div className="relative">
+                                                            <Search className="absolute top-2.5 left-2 size-3.5 text-muted-foreground" />
+                                                            <input
+                                                                value={query}
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    setQuery(
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder="Cari"
+                                                                className="h-8 w-full rounded-md border pl-7 text-sm"
+                                                            />
+                                                        </div>
+                                                        <NativeSelect
+                                                            value={appFilter}
+                                                            onChange={(event) =>
+                                                                changeAppFilter(
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        >
+                                                            <option value="">
+                                                                Semua aplikasi
+                                                            </option>
+                                                            {apps.map((app) => (
+                                                                <option
+                                                                    key={app.id}
+                                                                    value={
+                                                                        app.id
+                                                                    }
+                                                                >
+                                                                    {app.name}
+                                                                </option>
+                                                            ))}
+                                                        </NativeSelect>
+                                                    </div>
+                                                ) : undefined
+                                            }
+                                        />
+                                    ) : null,
+                                )}
+                                <div className="w-80 shrink-0 overflow-y-auto">
+                                    {renderDetail()}
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </main>
+        </>
+    );
+}
+
+SecurityConfiguration.layout = {
+    breadcrumbs: [
+        { title: 'Settings', href: '/settings/access' },
+        { title: 'Identity & access', href: '/settings/access' },
+        {
+            title: 'Konfigurasi keamanan',
+            href: '/settings/security-configuration',
+        },
+    ],
+};

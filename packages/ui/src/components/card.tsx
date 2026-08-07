@@ -50,7 +50,7 @@ function CardDescription({
   ...props
 }: React.ComponentProps<"button">) {
   return (
-    <Tooltip>
+    <Tooltip clickToPin>
       <TooltipTrigger asChild>
         <button
           type="button"

@@ -21,7 +21,7 @@ Target yang dikunci:
 | --- | --- |
 | [01-grand-design.md](01-grand-design.md) | AWS control plane/application plane, deployment profile, dan keputusan inti |
 | [01a-tenant-and-org-hierarchy.md](01a-tenant-and-org-hierarchy.md) | Tenant, organization directory, legal entity, operating unit, dan versioned hierarchy |
-| [02-module-standard.md](02-module-standard.md) | Standar app: repository, release unit, manifest, database ownership, dan lifecycle |
+| [02-module-standard.md](02-module-standard.md) | Standar app: repository, release unit, manifest, database ownership, lifecycle, dan bantuan kontekstual per field |
 | [03-release-and-on-prem.md](03-release-and-on-prem.md) | Provisioning, Docker Compose edition, update, dan uninstall |
 | [04-api-and-integration.md](04-api-and-integration.md) | REST/OpenAPI, event/AsyncAPI, bridge POS-Booking, dan API governance |
 | [05-customization-and-addons.md](05-customization-and-addons.md) | Konfigurasi, addon private, extension customer, dan anti-fork policy |

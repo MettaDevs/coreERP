@@ -20,6 +20,7 @@ class WorkflowRuntime
                 'tenant_id' => $tenantId,
                 'workflow_type_id' => $type->id,
                 'initiator_membership_id' => $data['initiator_membership_id'] ?? null,
+                'correlation_id' => $data['correlation_id'] ?? $id,
                 'configuration_version_id' => $version->id,
                 'source_document_type' => $data['source_document_type'],
                 'source_document_id' => $data['source_document_id'],
@@ -218,8 +219,17 @@ class WorkflowRuntime
             return;
         }
         $workflowType = DB::table('workflow_types')->where('id', $instance->workflow_type_id)->first(['code']);
+        // The legal entity lives on the configuration, not the instance, so the envelope
+        // reads it back through the version the instance was started against. A decision
+        // is an accounting-relevant fact, so 04-api-and-integration.md requires it.
+        $legalEntityId = DB::table('workflow_configuration_versions as versions')
+            ->join('workflow_configurations as configurations', 'configurations.id', '=', 'versions.configuration_id')
+            ->where('versions.id', $instance->configuration_version_id)
+            ->value('configurations.legal_entity_id');
         DB::table('outbox_events')->insert([
-            'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'type' => 'core.workflow.decision.v1',
+            'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'type' => 'core.workflow.decision.v2',
+            'correlation_id' => $instance->correlation_id ?? $instance->id,
+            'legal_entity_id' => $legalEntityId,
             'payload' => json_encode(['workflow_instance_id' => $instance->id, 'workflow_type' => $workflowType?->code, 'decision' => $status, 'source_document_type' => $instance->source_document_type, 'source_document_id' => $instance->source_document_id, 'decision_context' => json_decode($instance->decision_context, true, 512, JSON_THROW_ON_ERROR)], JSON_THROW_ON_ERROR),
             'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);

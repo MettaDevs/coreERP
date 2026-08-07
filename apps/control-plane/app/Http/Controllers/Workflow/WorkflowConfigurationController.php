@@ -36,14 +36,14 @@ class WorkflowConfigurationController extends Controller
                 $latestVersion = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->orderByDesc('version')->first(['status']);
 
                 return [
-                'id' => $workflow->id,
-                'name' => $workflow->name,
-                'enabled' => (bool) $workflow->enabled,
-                'status' => $workflow->enabled ? 'active' : ($latestVersion?->status === 'published' ? 'inactive' : 'draft'),
-                'type_name' => $workflow->type_name,
-                'app_name' => $workflow->app_name,
-                'scope' => $workflow->scope,
-                'legal_entity_id' => $workflow->legal_entity_id,
+                    'id' => $workflow->id,
+                    'name' => $workflow->name,
+                    'enabled' => (bool) $workflow->enabled,
+                    'status' => $workflow->enabled ? 'active' : ($latestVersion?->status === 'published' ? 'inactive' : 'draft'),
+                    'type_name' => $workflow->type_name,
+                    'app_name' => $workflow->app_name,
+                    'scope' => $workflow->scope,
+                    'legal_entity_id' => $workflow->legal_entity_id,
                 ];
             });
 
@@ -230,6 +230,7 @@ class WorkflowConfigurationController extends Controller
                     if ($memberIds->isEmpty() || TenantMembership::query()->where('tenant_id', $membership->tenant_id)->where('status', 'active')->whereIn('id', $memberIds)->count() !== $memberIds->count()) {
                         throw ValidationException::withMessages(["node.{$element->key}" => "Pilih minimal satu anggota aktif sebagai penerima pada {$element->label}."]);
                     }
+
                     continue;
                 }
                 $assignee = $config['assignee'] ?? null;

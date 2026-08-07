@@ -32,11 +32,17 @@ final class UnitOfMeasureService
         if ($units->count() !== 2 || $units[$from]->uom_class_id !== $units[$to]->uom_class_id) {
             throw ValidationException::withMessages(['to_unit_id' => 'Satuan harus aktif dan berada dalam kelas yang sama.']);
         }
-        if ($from === $to) return ['value' => $value, 'unit_id' => $to];
+        if ($from === $to) {
+            return ['value' => $value, 'unit_id' => $to];
+        }
         $rule = DB::table('uom_conversions')->where(['tenant_id' => $tenantId, 'from_unit_id' => $from, 'to_unit_id' => $to])->first();
-        if (! $rule) throw ValidationException::withMessages(['to_unit_id' => 'Aturan konversi satuan belum tersedia.']);
+        if (! $rule) {
+            throw ValidationException::withMessages(['to_unit_id' => 'Aturan konversi satuan belum tersedia.']);
+        }
         $result = ((float) $value * (float) $rule->factor) + (float) $rule->offset;
-        if ($rule->rounding_scale !== null) $result = round($result, (int) $rule->rounding_scale);
+        if ($rule->rounding_scale !== null) {
+            $result = round($result, (int) $rule->rounding_scale);
+        }
 
         return ['value' => (string) $result, 'unit_id' => $to];
     }

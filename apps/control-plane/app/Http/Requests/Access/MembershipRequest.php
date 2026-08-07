@@ -25,6 +25,7 @@ class MembershipRequest extends FormRequest
             'assignments.*.policy_scopes.*.organization_id' => ['nullable', 'string'],
             'assignments.*.policy_scopes.*.hierarchy_id' => ['nullable', 'string'],
             'assignments.*.policy_scopes.*.include_descendants' => ['required', 'boolean'],
+            'assignments.*.policy_scopes.*.unrestricted' => ['nullable', 'boolean'],
         ];
     }
 
@@ -41,6 +42,7 @@ class MembershipRequest extends FormRequest
                     'organization_id' => (string) data_get($scope, 'organization_id') ?: null,
                     'hierarchy_id' => (string) data_get($scope, 'hierarchy_id') ?: null,
                     'include_descendants' => (bool) data_get($scope, 'include_descendants'),
+                    'unrestricted' => (bool) data_get($scope, 'unrestricted'),
                 ])->all(),
             ])->all(),
         ];

@@ -1,6 +1,6 @@
 ---
 name: coreerp-architecture
-description: Guard CoreERP architecture boundaries, organization model, authorization, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, installation, placement, deployment, product launcher, upgrades, SaaS/on-prem packaging, or module availability UI/API.
+description: Guard CoreERP architecture boundaries, organization model, authorization, contracts, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, installation, placement, deployment, product launcher, upgrades, SaaS/on-prem packaging, or module availability UI/API. Also use when touching any cross-module surface — OpenAPI/AsyncAPI contract files, `internal/v1` endpoints, published events, webhooks, event envelopes or versions — or when adding a route another app calls.
 ---
 
 # CoreERP Architecture
@@ -122,6 +122,92 @@ Use the implementation backlog in
 is promoted into the canonical design. The Dynamics references behind this gate
 are the organization, Budget planning security, and XDS documentation linked
 there.
+
+### Contract decision gate
+
+A contract is the promise a module makes to code it does not control. It is not
+documentation of the code, and it is not optional once an endpoint or event
+crosses a module boundary.
+
+Before adding or changing anything reachable from outside the module — any
+`internal/v1` endpoint, any published event, any webhook, any signed payload:
+
+1. **Decide the transport from the semantics, not from convenience.** REST is a
+   command or a query: "do this", "give me that". An event is a fact that already
+   happened. A synchronous call documented as a channel, or a fact modelled as a
+   command, is a wrong contract even when the code works.
+2. **The contract is written, not generated, for every cross-module surface.**
+   Generated specs are acceptable only for surfaces whose sole consumer is this
+   module's own UI. A generated file cannot be the source of truth for a promise,
+   because changing the code silently changes the promise.
+3. **An undocumented cross-module surface is an incomplete change.** If a route
+   exists that another app calls and it is absent from the contract, the change is
+   not finished. Absence is the most common failure here and it is invisible in
+   tests — nothing fails when a contract omits an endpoint. For Control Plane, the
+   app-facing surface lives in `contracts/openapi-internal.yaml` and is enforced by
+   `python contracts/check-contract-coverage.py`, which also runs in CI. Run it after
+   any change to `routes/api.php`.
+4. **Events carry the full envelope and an explicit version.** Channel names are
+   `module.aggregate.action.vN` per `docs/dev/04-api-and-integration.md`; the
+   envelope carries `id`, `type`, `occurred_at`, `tenant_id`, `correlation_id`,
+   and `data`, plus `legal_entity_id` when the fact has legal or accounting
+   consequence and `org_unit_id` when an operating unit owns it. A channel without
+   `.vN` has no way to change without breaking every consumer.
+5. **Document what is true, then name the gap.** When the code does not yet satisfy
+   the canonical rule, the contract describes the code and states the gap in
+   `info.description`. Never write the aspirational shape — a consumer would build
+   against a field that never arrives.
+6. **A published version is immutable.** Adding a required field, removing one, or
+   narrowing a type is `vN+1`, not an edit to `vN`. Widening an enum a consumer
+   switches on is also breaking.
+7. **Both sides move together.** Publisher and consumer contracts live in separate
+   repos; a change to one is incomplete until the other matches in the same piece of
+   work. State explicitly which files in which repos were changed.
+8. **Transport security is part of the contract.** Signature headers, the exact
+   string that is signed, and the failure status belong in the spec. A consumer
+   cannot verify a signature it has to reverse-engineer from the publisher's source.
+9. **Split before the file becomes unreviewable.** Past roughly 1500 lines, break the
+   spec into `paths/` and `components/` joined by `$ref`, and commit a bundled
+   artifact next to the split source for tooling that cannot resolve cross-file
+   refs. One 10k-line spec guarantees merge conflicts between unrelated features.
+
+#### Envelope fields cannot be added retroactively
+
+`core.workflow.decision` reached `v2` because `v1` shipped without `correlation_id`.
+The lesson is about *when* a field must exist, not about that one field:
+
+- **A field that records what happened at request time must be persisted at request
+  time.** A workflow decision is emitted days after the request that started it, so
+  reading the correlation from the current request is impossible — it has to live on
+  the aggregate (`workflow_instances.correlation_id`) before it can reach the event.
+  Any envelope field describing the *origin* of a fact has this shape.
+- **History cannot be backfilled.** Events already delivered without a correlation are
+  permanently uncorrelated. This is why the cost of omitting such a field grows with
+  time while the cost of adding it stays flat — add it when the table is created.
+- **Batch envelope changes into one version.** `correlation_id` and `legal_entity_id`
+  went out together in `v2` because making every consumer migrate twice for one
+  envelope is a cost with no benefit. Before bumping a version, check whether any
+  other known envelope gap should ride along.
+- **A publisher must refuse to emit a payload that violates its own contract.** When a
+  required envelope field is missing, hold the row back and report it. Sending a
+  half-formed event moves the failure to the consumer, where it looks like a bug in
+  code that did nothing wrong.
+- **Deriving a field is part of the design, not an afterthought.** `legal_entity_id`
+  is not on the workflow instance; it is reached through the configuration version the
+  instance ran against. If a required envelope field has no obvious source, resolve
+  where it comes from before promising it in the contract.
+- **The consumer's transport client sends what the publisher needs.** A correlation
+  only exists if the caller supplies it — `WorkflowClient` sends `X-Correlation-Id`.
+  An envelope field nobody populates is a contract that is true and useless.
+
+Security objects follow the same rule and have a specific trap. Entry points,
+permissions, privileges, and duties are **declared in the app manifest** and travel
+with the release. Tenants compose roles and duties from those declarations; they
+never mint new codes. Dynamics 365 F&O allows security objects to be created through
+the UI, which stores them only in that environment's database under generated GUID
+names — unreviewable, unversioned, and lost on refresh. CoreERP deliberately rejects
+that model (`docs/dev/09-identity-and-access.md`). Never add a path that lets a
+tenant create a permission code or entry point at runtime.
 
 Before implementing module-availability UI or API:
 

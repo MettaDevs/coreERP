@@ -47,6 +47,13 @@ jobs:
       - name: Lint Frontend
         run: npm run lint:check
 
+      # A route under internal/v1 is called by another application. No test fails when
+      # one is missing from the contract, so this is the only step that notices.
+      - name: Check internal API contract coverage
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 contracts/check-contract-coverage.py
+
       # - name: Commit Changes
       #   uses: stefanzweifel/git-auto-commit-action@v7
       #   with:

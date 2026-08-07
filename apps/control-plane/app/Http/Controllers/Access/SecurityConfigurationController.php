@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Access;
 
 use App\Http\Controllers\Controller;
+use App\Models\CoreApp;
 use App\Models\Permission;
+use App\Models\Role;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
 use App\Models\TenantMembership;
@@ -23,34 +25,78 @@ class SecurityConfigurationController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($membership->canManageAccess(), 403);
         $appIds = $this->entitledAppIds($membership);
+        $tenantId = $membership->tenant_id;
 
+        // Graf dikirim ternormalisasi: setiap tingkat hanya membawa kode anaknya.
+        // Referensi arah balik ("dipakai oleh") dihitung di klien dari susunan
+        // yang sama, sehingga tidak ada query tambahan dan tidak ada state
+        // seleksi yang disimpan di server.
         return Inertia::render('settings/security-configuration', [
+            'canManage' => $membership->canManageAccess(),
+            'apps' => CoreApp::query()->whereIn('id', $appIds)
+                ->orderBy('name')->get(['id', 'name']),
+            'roles' => Role::query()
+                ->where('tenant_id', $tenantId)
+                ->where('is_active', true)
+                ->with(['duties:code', 'children:id,name', 'parents:id,name'])
+                ->orderBy('name')->get()
+                ->map(fn (Role $role) => [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'duty_codes' => $role->duties->pluck('code')->values(),
+                    'child_roles' => $role->children->map(fn (Role $child) => $child->only(['id', 'name']))->values(),
+                    'parent_roles' => $role->parents->map(fn (Role $parent) => $parent->only(['id', 'name']))->values(),
+                ])->values(),
+            'duties' => SecurityDuty::query()
+                ->where(fn ($query) => $this->visibleTo($query, $appIds, $tenantId))
+                ->with('privileges:code')
+                ->orderBy('name')->get()
+                ->map(fn (SecurityDuty $duty) => [
+                    'code' => $duty->code,
+                    'name' => $duty->name,
+                    'description' => $duty->description,
+                    'app_id' => $duty->app_id,
+                    'source' => $duty->source,
+                    'status' => $duty->status,
+                    'privilege_codes' => $duty->privileges->pluck('code')->values(),
+                ])->values(),
+            'privileges' => SecurityPrivilege::query()
+                ->where(fn ($query) => $this->visibleTo($query, $appIds, $tenantId))
+                ->with('permissions:code')
+                ->orderBy('name')->get()
+                ->map(fn (SecurityPrivilege $privilege) => [
+                    'code' => $privilege->code,
+                    'name' => $privilege->name,
+                    'description' => $privilege->description,
+                    'app_id' => $privilege->app_id,
+                    'source' => $privilege->source,
+                    'status' => $privilege->status,
+                    'permission_codes' => $privilege->permissions->pluck('code')->values(),
+                ])->values(),
             'permissions' => Permission::query()
                 ->whereIn('app_id', $appIds)
                 ->with('entryPoint:code,name,type')
-                ->orderBy('app_id')->orderBy('name')->get()
+                ->orderBy('name')->get()
                 ->map(fn (Permission $permission) => [
                     'code' => $permission->code,
                     'name' => $permission->name,
+                    'description' => $permission->description,
                     'app_id' => $permission->app_id,
                     'access_level' => $permission->access_level,
                     'entry_point' => $permission->entryPoint?->only(['code', 'name', 'type']),
                 ])->values(),
-            'privileges' => SecurityPrivilege::query()
-                ->where(function ($query) use ($membership, $appIds): void {
-                    $query->whereIn('app_id', $appIds)->orWhere('tenant_id', $membership->tenant_id);
-                })
-                ->with('permissions:code,name,entry_point_code,access_level')
-                ->orderBy('source')->orderBy('name')->get()
-                ->map(fn (SecurityPrivilege $privilege) => $this->privilegeData($privilege))->values(),
-            'duties' => SecurityDuty::query()
-                ->where(function ($query) use ($membership, $appIds): void {
-                    $query->whereIn('app_id', $appIds)->orWhere('tenant_id', $membership->tenant_id);
-                })
-                ->with('privileges:code,name,app_id,tenant_id,source,status')
-                ->orderBy('source')->orderBy('name')->get()
-                ->map(fn (SecurityDuty $duty) => $this->dutyData($duty))->values(),
         ]);
+    }
+
+    /**
+     * Objek yang boleh dilihat tenant: bawaan aplikasi yang dientitle, atau
+     * konfigurasi milik tenant itu sendiri.
+     *
+     * @param  list<string>  $appIds
+     */
+    private function visibleTo(mixed $query, array $appIds, string $tenantId): void
+    {
+        $query->whereIn('app_id', $appIds)->orWhere('tenant_id', $tenantId);
     }
 
     public function storePrivilege(Request $request): RedirectResponse
@@ -89,6 +135,26 @@ class SecurityConfigurationController extends Controller
         return back()->with('status', 'Tugas akses diterbitkan.');
     }
 
+    /**
+     * Menyalin tugas akses bawaan aplikasi menjadi draf milik tenant. Ini cara
+     * tenant menyempitkan hak tanpa mengubah objek yang diterbitkan aplikasi.
+     */
+    public function duplicatePrivilege(Request $request, string $privilege): RedirectResponse
+    {
+        $membership = $this->manager($request);
+        $source = $this->visiblePrivilege($privilege, $membership);
+        $copy = SecurityPrivilege::create([
+            'code' => $this->customCode($membership->tenant_id),
+            'tenant_id' => $membership->tenant_id,
+            'name' => $this->copyName($source->name),
+            'description' => $source->description,
+            'source' => 'custom', 'status' => 'draft',
+        ]);
+        $copy->permissions()->sync($source->permissions->pluck('code')->all());
+
+        return back()->with('status', 'Salinan tugas akses dibuat sebagai draf.');
+    }
+
     public function storeDuty(Request $request): RedirectResponse
     {
         $membership = $this->manager($request);
@@ -125,6 +191,43 @@ class SecurityConfigurationController extends Controller
         $item->update(['status' => 'active', 'published_at' => now()]);
 
         return back()->with('status', 'Tanggung jawab diterbitkan dan siap dipakai pada role.');
+    }
+
+    /** Draf boleh dibuang. Yang sudah diterbitkan tidak, karena role memakainya. */
+    public function destroyPrivilege(Request $request, string $privilege): RedirectResponse
+    {
+        $item = $this->customPrivilege($privilege, $this->manager($request));
+        $this->draftOnly($item->status);
+        $item->permissions()->detach();
+        $item->delete();
+
+        return back()->with('status', 'Draf tugas akses dihapus.');
+    }
+
+    public function destroyDuty(Request $request, string $duty): RedirectResponse
+    {
+        $item = $this->customDuty($duty, $this->manager($request));
+        $this->draftOnly($item->status);
+        $item->privileges()->detach();
+        $item->delete();
+
+        return back()->with('status', 'Draf tanggung jawab dihapus.');
+    }
+
+    public function duplicateDuty(Request $request, string $duty): RedirectResponse
+    {
+        $membership = $this->manager($request);
+        $source = $this->visibleDuty($duty, $membership);
+        $copy = SecurityDuty::create([
+            'code' => $this->customCode($membership->tenant_id),
+            'tenant_id' => $membership->tenant_id,
+            'name' => $this->copyName($source->name),
+            'description' => $source->description,
+            'source' => 'custom', 'status' => 'draft',
+        ]);
+        $copy->privileges()->sync($source->privileges->pluck('code')->all());
+
+        return back()->with('status', 'Salinan tanggung jawab dibuat sebagai draf.');
     }
 
     private function manager(Request $request): TenantMembership
@@ -201,17 +304,27 @@ class SecurityConfigurationController extends Controller
         return 'custom.'.$tenantId.'.'.Str::ulid();
     }
 
-    /** @return array<string, mixed> */
-    private function privilegeData(SecurityPrivilege $item): array
+    /** Sumber salinan boleh bawaan aplikasi maupun milik tenant sendiri. */
+    private function visiblePrivilege(string $code, TenantMembership $membership): SecurityPrivilege
     {
-        return ['code' => $item->code, 'name' => $item->name, 'app_id' => $item->app_id, 'source' => $item->source, 'status' => $item->status,
-            'permissions' => $item->permissions->map(fn (Permission $permission) => $permission->only(['code', 'name', 'entry_point_code', 'access_level']))->values()];
+        return SecurityPrivilege::query()
+            ->where('code', $code)
+            ->where(fn ($query) => $this->visibleTo($query, $this->entitledAppIds($membership), $membership->tenant_id))
+            ->with('permissions:code')
+            ->firstOrFail();
     }
 
-    /** @return array<string, mixed> */
-    private function dutyData(SecurityDuty $item): array
+    private function visibleDuty(string $code, TenantMembership $membership): SecurityDuty
     {
-        return ['code' => $item->code, 'name' => $item->name, 'app_id' => $item->app_id, 'source' => $item->source, 'status' => $item->status,
-            'privileges' => $item->privileges->map(fn (SecurityPrivilege $privilege) => $privilege->only(['code', 'name', 'app_id', 'tenant_id', 'source', 'status']))->values()];
+        return SecurityDuty::query()
+            ->where('code', $code)
+            ->where(fn ($query) => $this->visibleTo($query, $this->entitledAppIds($membership), $membership->tenant_id))
+            ->with('privileges:code')
+            ->firstOrFail();
+    }
+
+    private function copyName(string $name): string
+    {
+        return Str::limit($name.' (salinan)', 120, '');
     }
 }

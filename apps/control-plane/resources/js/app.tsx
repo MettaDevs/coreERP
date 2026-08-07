@@ -22,7 +22,7 @@ createInertiaApp({
     strictMode: true,
     withApp(app) {
         return (
-            <TooltipProvider delayDuration={0}>
+            <TooltipProvider delayDuration={1000}>
                 {app}
                 <Toaster />
             </TooltipProvider>

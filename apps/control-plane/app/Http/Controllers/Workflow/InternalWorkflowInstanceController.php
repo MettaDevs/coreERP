@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Workflow;
 
 use App\Http\Controllers\Controller;
+use App\Support\WorkflowRuntime;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Support\WorkflowRuntime;
-use Illuminate\Database\QueryException;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class InternalWorkflowInstanceController extends Controller
@@ -26,6 +27,16 @@ class InternalWorkflowInstanceController extends Controller
         ]);
         $key = (string) $request->header('Idempotency-Key');
         validator(['key' => $key], ['key' => ['required', 'string', 'max:160', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
+
+        // The decision event is published days later, so the correlation has to be
+        // persisted on the instance now. An app that does not send one starts its own
+        // chain here rather than losing the trace entirely.
+        $correlationId = (string) $request->header('X-Correlation-Id');
+        if ($correlationId === '') {
+            $correlationId = (string) Str::ulid();
+        }
+        validator(['correlation_id' => $correlationId], ['correlation_id' => ['required', 'ulid']])->validate();
+        $data['correlation_id'] = $correlationId;
 
         $type = DB::table('workflow_types')->where('code', $data['workflow_type'])->where('app_id', $appId)->first();
         abort_unless($type, 404, 'Jenis workflow tidak terdaftar untuk aplikasi ini.');

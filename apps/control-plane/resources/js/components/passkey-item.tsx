@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Dialog,
-    DialogClose,
+    DialogAction,
+    DialogCancel,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -68,7 +69,7 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                         <span className="sr-only">Remove</span>
                     </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent size="compact">
                     <DialogHeader>
                         <DialogTitle>Remove passkey</DialogTitle>
                         <DialogDescription>
@@ -77,17 +78,15 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                             sign in.
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="gap-2">
-                        <DialogClose asChild>
-                            <Button variant="secondary">Cancel</Button>
-                        </DialogClose>
-                        <Button
+                    <DialogFooter>
+                        <DialogAction
                             variant="destructive"
                             onClick={handleDelete}
                             disabled={isDeleting}
                         >
                             {isDeleting ? 'Removing...' : 'Remove passkey'}
-                        </Button>
+                        </DialogAction>
+                        <DialogCancel>Cancel</DialogCancel>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

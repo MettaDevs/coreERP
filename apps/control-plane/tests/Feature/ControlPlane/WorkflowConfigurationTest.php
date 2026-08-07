@@ -89,7 +89,7 @@ class WorkflowConfigurationTest extends TestCase
 
         $this->assertDatabaseHas('workflow_instances', ['id' => $instance->id, 'status' => 'approved']);
         $this->assertDatabaseHas('workflow_history', ['instance_id' => $instance->id, 'event_type' => 'approved', 'actor_membership_id' => $membership->id]);
-        $this->assertDatabaseHas('outbox_events', ['tenant_id' => $membership->tenant_id, 'type' => 'core.workflow.decision.v1']);
+        $this->assertDatabaseHas('outbox_events', ['tenant_id' => $membership->tenant_id, 'type' => 'core.workflow.decision.v2']);
     }
 
     public function test_multiple_approval_nodes_run_in_order(): void
@@ -214,19 +214,42 @@ class WorkflowConfigurationTest extends TestCase
     public function test_publisher_signs_and_marks_a_workflow_decision_event_after_delivery(): void
     {
         $eventId = (string) Str::ulid();
+        $correlationId = (string) Str::ulid();
         DB::table('outbox_events')->insert([
             'id' => $eventId, 'tenant_id' => $this->owner->activeMembership()->tenant_id,
-            'type' => 'core.workflow.decision.v1', 'payload' => json_encode(['decision' => 'approved'], JSON_THROW_ON_ERROR),
+            'correlation_id' => $correlationId,
+            'type' => 'core.workflow.decision.v2', 'payload' => json_encode(['decision' => 'approved'], JSON_THROW_ON_ERROR),
             'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         config()->set('coreerp.app_context_signing_key', 'workflow-test-key');
-        config()->set('coreerp.event_endpoints', [['type' => 'core.workflow.decision.v1', 'url' => 'https://aset.test/events']]);
+        config()->set('coreerp.event_endpoints', [['type' => 'core.workflow.decision.v2', 'url' => 'https://aset.test/events']]);
         Http::fake(['https://aset.test/events' => Http::response(['data' => ['accepted' => true]])]);
 
         Artisan::call('workflow-events:publish');
 
         Http::assertSent(fn ($request) => $request->url() === 'https://aset.test/events'
-            && $request->hasHeader('X-CoreERP-Event-Signature') && $request['id'] === $eventId);
+            && $request->hasHeader('X-CoreERP-Event-Signature') && $request['id'] === $eventId
+            && $request['correlation_id'] === $correlationId);
         $this->assertNotNull(DB::table('outbox_events')->where('id', $eventId)->value('published_at'));
+    }
+
+    public function test_publisher_holds_back_an_event_without_a_correlation_id(): void
+    {
+        $eventId = (string) Str::ulid();
+        DB::table('outbox_events')->insert([
+            'id' => $eventId, 'tenant_id' => $this->owner->activeMembership()->tenant_id,
+            'type' => 'core.workflow.decision.v2', 'payload' => json_encode(['decision' => 'approved'], JSON_THROW_ON_ERROR),
+            'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        config()->set('coreerp.app_context_signing_key', 'workflow-test-key');
+        config()->set('coreerp.event_endpoints', [['type' => 'core.workflow.decision.v2', 'url' => 'https://aset.test/events']]);
+        Http::fake(['https://aset.test/events' => Http::response(['data' => ['accepted' => true]])]);
+
+        Artisan::call('workflow-events:publish');
+
+        // Sending it would put a payload on the wire that violates the v2 envelope, so the
+        // row stays unpublished and visible rather than leaving the consumer to reject it.
+        Http::assertNothingSent();
+        $this->assertNull(DB::table('outbox_events')->where('id', $eventId)->value('published_at'));
     }
 }

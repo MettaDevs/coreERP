@@ -41,13 +41,7 @@ class UpdateMembership
         }
         $this->sod->assertManualAssignmentAllowed($target, $roleIds);
         foreach ($data['assignments'] as $assignment) {
-            $scopeKeys = collect($assignment['policy_scopes'])->map(fn (array $scope): string => implode('|', [
-                $scope['policy_code'], $scope['legal_entity_id'] ?? '', $scope['organization_id'] ?? '',
-                $scope['hierarchy_id'] ?? '', $scope['include_descendants'] ? '1' : '0',
-            ]));
-            if ($scopeKeys->unique()->count() !== $scopeKeys->count()) {
-                throw ValidationException::withMessages(['assignments' => 'Satu batas data yang sama tidak boleh ditambahkan dua kali pada role yang sama.']);
-            }
+            $this->scopeResolver->assertNoRedundantGrants($assignment['policy_scopes']);
         }
 
         return DB::transaction(function () use ($actor, $target, $targetIsOwner, $data, $roles): TenantMembership {

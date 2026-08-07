@@ -1,5 +1,12 @@
 import * as React from "react"
-import { ArrowDown, ArrowUp, ArrowUpDown, Ellipsis } from "lucide-react"
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpDown,
+  Ellipsis,
+  Plus,
+} from "lucide-react"
 
 import {
   DropdownMenu,
@@ -56,6 +63,18 @@ type DataTableProps<T> = {
   emptyMessage?: string
   showRowNumbers?: boolean
   className?: string
+  /**
+   * Letak menu tiga titik. `inline` menaruhnya tepat setelah kolom pertama
+   * seperti Business Central, sehingga tetap terjangkau pada tabel lebar tanpa
+   * perlu menggulir ke kanan. `trailing` menaruhnya di kolom terakhir.
+   */
+  actionsPlacement?: "inline" | "trailing"
+  /** Baris aktif ditandai panah pada kolom nomor, seperti penunjuk baris BC. */
+  activeRowKey?: React.Key
+  onRowClick?: (row: T) => void
+  /** Baris kosong di bawah untuk menambah data, seperti Edit List BC. */
+  onAddRow?: () => void
+  addRowLabel?: string
 }
 
 function DataTable<T>({
@@ -69,6 +88,11 @@ function DataTable<T>({
   emptyMessage = "No results.",
   showRowNumbers = true,
   className,
+  actionsPlacement = "inline",
+  activeRowKey,
+  onRowClick,
+  onAddRow,
+  addRowLabel = "Tambah baris",
 }: DataTableProps<T>) {
   const [sort, setSort] = React.useState<{
     columnId: string
@@ -178,16 +202,55 @@ function DataTable<T>({
     selection.onSelectedKeysChange([...next])
   }
 
+  const hasInlineActions = actions.length > 0 && actionsPlacement === "inline"
+  const hasTrailingActions =
+    actions.length > 0 && actionsPlacement === "trailing"
+  const totalColumns =
+    columns.length +
+    (selection ? 1 : 0) +
+    (showRowNumbers ? 1 : 0) +
+    (actions.length > 0 ? 1 : 0)
+  const actionsMenu = (row: T) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-6"
+          aria-label={`Tindakan untuk ${getRowLabel?.(row) ?? "baris"}`}
+        >
+          <Ellipsis />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        {actions.map((action) => (
+          <React.Fragment key={action.id}>
+            {action.separatorBefore && <DropdownMenuSeparator />}
+            <DropdownMenuItem
+              variant={action.destructive ? "destructive" : "default"}
+              onSelect={() => onRowAction?.(action.id, row)}
+            >
+              {action.label}
+            </DropdownMenuItem>
+          </React.Fragment>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
   const renderRow = (row: T, index: number) => (
     <TableRow
       key={getRowKey(row)}
+      data-active={activeRowKey === getRowKey(row) ? "" : undefined}
+      onClick={onRowClick ? () => onRowClick(row) : undefined}
       className={cn(
-        "border-0 hover:bg-accent/40",
+        "border-0 hover:bg-accent/40 data-active:bg-accent/60",
+        onRowClick && "cursor-pointer",
         selection && selectedKeys.has(getRowKey(row)) && "bg-accent/40"
       )}
     >
       {selection && (
-        <TableCell className="h-9 px-2 text-center">
+        <TableCell className="h-9 border-r border-b px-2 text-center">
           <Checkbox
             checked={selectedKeys.has(getRowKey(row))}
             onCheckedChange={(checked) => {
@@ -202,44 +265,35 @@ function DataTable<T>({
         </TableCell>
       )}
       {showRowNumbers && (
-        <TableCell className="h-9 px-2 text-center text-xs tabular-nums text-muted-foreground">
-          {index + 1}
+        <TableCell className="h-9 border-r border-b px-2 text-center text-xs tabular-nums text-muted-foreground">
+          {activeRowKey === getRowKey(row) ? (
+            <ArrowRight className="mx-auto size-3.5 text-primary" />
+          ) : (
+            index + 1
+          )}
         </TableCell>
       )}
-      {columns.map((column) => (
-        <TableCell
-          key={column.id}
-          className={cn(
-            "h-9 overflow-hidden px-3 text-ellipsis whitespace-nowrap",
-            column.align === "center" && "text-center",
-            column.align === "right" && "text-right"
+      {columns.map((column, columnIndex) => (
+        <React.Fragment key={column.id}>
+          <TableCell
+            className={cn(
+              "h-9 overflow-hidden border-r border-b px-3 text-ellipsis whitespace-nowrap",
+              column.align === "center" && "text-center",
+              column.align === "right" && "text-right"
+            )}
+          >
+            {column.cell(row)}
+          </TableCell>
+          {hasInlineActions && columnIndex === 0 && (
+            <TableCell className="h-9 border-r border-b px-1 text-center">
+              {actionsMenu(row)}
+            </TableCell>
           )}
-        >
-          {column.cell(row)}
-        </TableCell>
+        </React.Fragment>
       ))}
-      {actions.length > 0 && (
-        <TableCell className="h-9 px-2 text-right">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={`Tindakan untuk ${getRowLabel?.(row) ?? "baris"}`}>
-                <Ellipsis />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {actions.map((action) => (
-                <React.Fragment key={action.id}>
-                  {action.separatorBefore && <DropdownMenuSeparator />}
-                  <DropdownMenuItem
-                    variant={action.destructive ? "destructive" : "default"}
-                    onSelect={() => onRowAction?.(action.id, row)}
-                  >
-                    {action.label}
-                  </DropdownMenuItem>
-                </React.Fragment>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+      {hasTrailingActions && (
+        <TableCell className="h-9 border-b px-1 text-center">
+          {actionsMenu(row)}
         </TableCell>
       )}
     </TableRow>
@@ -261,13 +315,17 @@ function DataTable<T>({
         <colgroup>
           {selection && <col style={{ width: 44 }} />}
           {showRowNumbers && <col style={{ width: 44 }} />}
-          {columns.map((column) => (
-            <col
-              key={column.id}
-              style={{ width: widths[column.id] ?? column.width ?? 160 }}
-            />
+          {columns.map((column, columnIndex) => (
+            <React.Fragment key={column.id}>
+              <col
+                style={{ width: widths[column.id] ?? column.width ?? 160 }}
+              />
+              {hasInlineActions && columnIndex === 0 && (
+                <col style={{ width: 36 }} />
+              )}
+            </React.Fragment>
           ))}
-          {actions.length > 0 && <col style={{ width: 44 }} />}
+          {hasTrailingActions && <col style={{ width: 44 }} />}
         </colgroup>
         <TableHeader className="[&_tr]:border-0">
           <TableRow className="border-0 hover:bg-transparent">
@@ -295,8 +353,8 @@ function DataTable<T>({
                   : ArrowDown
 
               return (
+                <React.Fragment key={column.id}>
                 <TableHead
-                  key={column.id}
                   aria-sort={
                     isSorted
                       ? sort.direction === "asc"
@@ -393,9 +451,19 @@ function DataTable<T>({
                     />
                   )}
                 </TableHead>
+                {hasInlineActions && columnIndex === 0 && (
+                  <TableHead className="h-9 border-r border-b bg-muted/70 px-1">
+                    <span className="sr-only">Tindakan</span>
+                  </TableHead>
+                )}
+                </React.Fragment>
               )
             })}
-            {actions.length > 0 && <TableHead className="h-9 border-b bg-muted/70 px-2 text-right"><span className="sr-only">Tindakan</span></TableHead>}
+            {hasTrailingActions && (
+              <TableHead className="h-9 border-b bg-muted/70 px-2 text-right">
+                <span className="sr-only">Tindakan</span>
+              </TableHead>
+            )}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -404,10 +472,25 @@ function DataTable<T>({
           ) : (
             <TableRow>
               <TableCell
-                colSpan={columns.length + (selection ? 1 : 0) + (showRowNumbers ? 1 : 0) + (actions.length ? 1 : 0)}
+                colSpan={totalColumns}
                 className="h-24 text-center text-muted-foreground"
               >
                 {emptyMessage}
+              </TableCell>
+            </TableRow>
+          )}
+          {onAddRow && (
+            // Baris kosong di bawah, seperti Edit List Business Central.
+            <TableRow className="hover:bg-accent/40">
+              <TableCell colSpan={totalColumns} className="h-9 border-b p-0">
+                <button
+                  type="button"
+                  onClick={onAddRow}
+                  className="flex h-9 w-full items-center gap-2 px-3 text-left text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                >
+                  <Plus className="size-3.5" />
+                  {addRowLabel}
+                </button>
               </TableCell>
             </TableRow>
           )}

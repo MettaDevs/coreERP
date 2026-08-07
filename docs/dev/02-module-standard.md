@@ -175,7 +175,38 @@ Di dalam database sendiri, app boleh memakai transaksi, foreign key, dan table d
 
 Contract adalah batas integrasi, bukan shared domain model. Contract tetap dimiliki repository app penerbit. App consumer memakai versi contract yang dipublish dan menjalankan compatibility check di CI.
 
+## Bantuan kontekstual pada halaman dan field
+
+UI app mengikuti pola **field description** Dynamics 365: setiap field dapat memiliki help text opsional, tetapi bantuan hanya ditulis untuk field yang rumit atau pemakaiannya tidak langsung jelas. Dynamics 365 juga menampilkan deskripsi saat pengguna mengarahkan pointer ke field dan tidak mengisi deskripsi pada semua halaman. Lihat [View and export field descriptions](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/get-started/view-export-field-descriptions).
+
+- Judul page, card, dan dialog cukup menyatakan konteksnya. Deskripsi atau ikon bantuan pada header bukan default; pakai hanya bila ada aturan atau konteks yang berlaku untuk seluruh permukaan.
+- Detail yang hanya berlaku untuk satu field harus melekat pada field tersebut. Jelaskan arti bisnis, nilai yang diharapkan, batasan, ketergantungan, atau dampak pengisiannya dalam bahasa sehari-hari.
+- Field yang sudah jelas tidak perlu help text. Jangan menyalin kalimat yang sama ke header dan setiap field.
+- Hover sekitar satu detik menampilkan bantuan sementara dan bantuan otomatis hilang saat cursor berpindah. Klik label/judul field menampilkan bantuan yang tetap terbuka walau cursor meninggalkan field; klik label/judul itu lagi menutupnya. Padanan keyboard harus dapat melakukan toggle yang sama. Syarat, validasi, dan error yang perlu diketahui pengguna tidak boleh disembunyikan hanya di bantuan hover.
+- Standar ini menetapkan keputusan konten dan perilaku, bukan nama prop, bentuk ikon, atau penyimpanan metadata. Perubahan komponen UI dapat dilakukan bertahap tanpa mengubah aturan di atas.
+
 `packages/` tidak dibuat sebagai tempat menaruh kode bersama tanpa kebutuhan nyata. Package baru hanya dibuat ketika minimal dua repository membutuhkan interface yang sama dan interface tersebut siap diberi versi/publish. Kandidat awal yang wajar hanya SDK kecil untuk autentikasi/konteks tenant atau host UI; bukan model bisnis bersama.
+
+## Membuat banyak baris sekaligus
+
+Sebelum membuat layar pembuatan data, jawab dulu satu pertanyaan: dalam satu kali kunjungan, berapa banyak yang biasanya dibuat pengguna, dan seberapa banyak detail yang harus diisi per satuannya?
+
+| Yang biasa dibuat | Detail per satuan | Bentuk |
+| --- | --- | --- |
+| Banyak | Ringkas dan seragam | **Tabel**: satu baris satu data, sel dapat diisi langsung |
+| Satu | Ringkas | Card |
+| Banyak | Bercabang, banyak detail kecil | Card |
+| Satu | Bercabang | Card |
+
+Tabel hanya dipakai bila kedua syarat terpenuhi bersamaan. Banyak tetapi detailnya bercabang tetap memakai card, karena tabel memaksa setiap field muat dalam satu sel dan yang tidak muat akan diam-diam dihilangkan. Sedikit tetapi ringkas juga tetap memakai card, karena tabel menambah beban belajar tanpa imbalan. Acuannya pola *Edit List* Business Central, bukan konsep baru.
+
+Tiga aturan mengikat bentuk tabel:
+
+- Detail yang tidak muat dalam sel dipindah ke dialog lapis kedua, bukan dibuang. Selnya menjadi tombol yang menampilkan ringkasan keadaan, misalnya `Belum diatur`, `2 batas`, atau `Tidak dibatasi`. Ini yang menjaga fitur tetap utuh tanpa melebarkan tabel.
+- Bila yang dibuat berupa identitas yang dihasilkan sistem — kode, token, nomor urut — setiap baris wajib memiliki kolom keterangan bebas. Tanpa itu pengguna tidak dapat mengingat baris mana dibuat untuk siapa atau untuk keperluan apa.
+- Endpoint menerima bentuk jamak dalam satu request dan satu transaksi, serta tetap menerima bentuk tunggal agar contract yang sudah dipublish tidak pecah.
+
+Contoh yang sudah berjalan: kode undangan pada Control Plane. Satu baris berisi keterangan, user platform, security role, tanggung jawab hasil hitungan, batas data, dan sumber; batas data membuka dialog lapis kedua karena isinya bercabang. Admin membuat sepuluh kode dalam satu kali kirim, bukan mengulang dialog sepuluh kali.
 
 ## Navigasi Web Shell
 

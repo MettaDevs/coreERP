@@ -21,6 +21,12 @@ type MultiSelectProps = {
   searchPlaceholder?: string
   emptyMessage?: string
   className?: string
+  /**
+   * Wajib diisi saat komponen berada di dalam dialog. Tanpa ini popup ikut
+   * portal ke `document.body`, berada di luar dialog, dan klik pada item
+   * ditelan oleh focus trap dialog.
+   */
+  portalContainer?: HTMLElement | ShadowRoot | null | React.RefObject<HTMLElement | ShadowRoot | null>
 }
 
 function MultiSelect({
@@ -32,6 +38,7 @@ function MultiSelect({
   searchPlaceholder = "Search...",
   emptyMessage = "No items found.",
   className,
+  portalContainer,
 }: MultiSelectProps) {
   const [internalValue, setInternalValue] = React.useState(defaultValue)
   const selected = value ?? internalValue
@@ -58,7 +65,7 @@ function MultiSelect({
           {(values) => values?.join(", ") || placeholder}
         </ComboboxValue>
       </ComboboxTrigger>
-      <ComboboxContent>
+      <ComboboxContent container={portalContainer}>
         <ComboboxInput
           placeholder={searchPlaceholder}
           showSearchIcon

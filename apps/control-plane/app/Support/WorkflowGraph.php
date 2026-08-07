@@ -55,6 +55,7 @@ final class WorkflowGraph
         foreach ($nodes as $node) {
             if (! in_array($node->kind, self::KINDS, true)) {
                 $errors["node.{$node->key}"] = "Elemen {$node->label} tidak didukung.";
+
                 continue;
             }
             if ($node->kind !== 'start' && ! $incoming->has($node->id)) {
@@ -87,7 +88,7 @@ final class WorkflowGraph
             }
         }
 
-            if ($starts->count() === 1) {
+        if ($starts->count() === 1) {
             $reachable = self::walk($starts->first()->id, $outgoing);
             foreach ($nodes as $node) {
                 if (! isset($reachable[$node->id])) {

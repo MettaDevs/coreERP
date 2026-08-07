@@ -9,6 +9,7 @@ use App\Support\DataPolicyScopeResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class CreateInvitation
@@ -41,9 +42,13 @@ class CreateInvitation
         $roles = Role::query()->whereIn('id', $roleIds)->get()->keyBy('id');
         $scopes = collect($data['assignments'])->flatMap(function (array $assignment) use ($roles, $actor): array {
             $role = $roles->get($assignment['role_id']);
-            return collect($assignment['policy_scopes'])->map(fn (array $scope): array => [
+            $this->scopeResolver->assertNoRedundantGrants($assignment['policy_scopes']);
+            $resolved = collect($assignment['policy_scopes'])
+                ->map(fn (array $scope): array => $this->scopeResolver->resolve($actor->tenant_id, $role, $scope));
+
+            return $resolved->map(fn (array $scope): array => [
                 'role_id' => $role->id,
-                ...$this->scopeResolver->resolve($actor->tenant_id, $role, $scope),
+                ...$scope,
             ])->all();
         });
 
@@ -55,17 +60,20 @@ class CreateInvitation
                 'code_hash' => self::hash($plain),
                 'code_ciphertext' => Crypt::encryptString($plain),
                 'system_role' => $data['system_role'],
+                'label' => $data['label'] ?? null,
                 'created_by' => $actor->user_id,
                 'expires_at' => null,
             ]);
             $invitation->roles()->sync($roleIds);
             $rows = $scopes->map(fn (array $scope): array => [
-                'id' => (string) \Illuminate\Support\Str::ulid(),
+                'id' => (string) Str::ulid(),
                 'invitation_id' => $invitation->id,
                 ...$scope,
                 'created_at' => now(), 'updated_at' => now(),
             ])->all();
-            if ($rows !== []) DB::table('invitation_data_policy_scopes')->insert($rows);
+            if ($rows !== []) {
+                DB::table('invitation_data_policy_scopes')->insert($rows);
+            }
 
             return ['invitation' => $invitation, 'code' => $plain];
         });

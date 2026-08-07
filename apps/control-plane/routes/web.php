@@ -22,8 +22,8 @@ use App\Http\Controllers\Workflow\WorkflowInboxController;
 use App\Models\CoreApp;
 use App\Support\AppContextToken;
 use App\Support\CurrentWorkspace;
-use App\Support\LaunchableAppCatalog;
 use App\Support\DataPolicyAccessResolver;
+use App\Support\LaunchableAppCatalog;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -129,6 +129,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('settings/security-configuration/duties', [SecurityConfigurationController::class, 'storeDuty'])->name('security-configuration.duties.store');
     Route::put('settings/security-configuration/duties/{duty}', [SecurityConfigurationController::class, 'updateDuty'])->name('security-configuration.duties.update');
     Route::post('settings/security-configuration/duties/{duty}/publish', [SecurityConfigurationController::class, 'publishDuty'])->name('security-configuration.duties.publish');
+    Route::post('settings/security-configuration/privileges/{privilege}/duplicate', [SecurityConfigurationController::class, 'duplicatePrivilege'])->name('security-configuration.privileges.duplicate');
+    Route::post('settings/security-configuration/duties/{duty}/duplicate', [SecurityConfigurationController::class, 'duplicateDuty'])->name('security-configuration.duties.duplicate');
+    Route::delete('settings/security-configuration/privileges/{privilege}', [SecurityConfigurationController::class, 'destroyPrivilege'])->name('security-configuration.privileges.destroy');
+    Route::delete('settings/security-configuration/duties/{duty}', [SecurityConfigurationController::class, 'destroyDuty'])->name('security-configuration.duties.destroy');
     Route::get('settings/organization', [OrganizationController::class, 'index'])->name('organization.index');
     Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index');
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
@@ -176,6 +180,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('settings/access/invitations', [InvitationCodeController::class, 'store'])
         ->middleware('throttle:20,1')
         ->name('access.invitations.store');
+    Route::patch('settings/access/invitations/{invitationCode}', [InvitationCodeController::class, 'update'])
+        ->name('access.invitations.update');
     Route::delete('settings/access/invitations/{invitationCode}', [InvitationCodeController::class, 'destroy'])
         ->name('access.invitations.destroy');
 
@@ -218,6 +224,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('invitation-codes', [InvitationCodeController::class, 'store'])
             ->middleware('throttle:20,1')
             ->name('invitation-codes.store');
+        Route::patch('invitation-codes/{invitationCode}', [InvitationCodeController::class, 'update'])
+            ->name('invitation-codes.update');
         Route::delete('invitation-codes/{invitationCode}', [InvitationCodeController::class, 'destroy'])
             ->name('invitation-codes.destroy');
         Route::get('control/identities', [IdentityMonitorController::class, 'apiIndex'])

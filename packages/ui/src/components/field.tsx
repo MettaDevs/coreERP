@@ -51,7 +51,7 @@ function FieldLegend({
       <span className="inline-flex items-center gap-1">
         {children}
         {hint && (
-          <Tooltip>
+          <Tooltip clickToPin>
             <TooltipTrigger asChild>
               <button
                 type="button"

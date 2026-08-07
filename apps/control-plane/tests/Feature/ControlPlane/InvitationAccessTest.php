@@ -5,9 +5,11 @@ namespace Tests\Feature\ControlPlane;
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\InvitationCode;
 use App\Models\Organization;
+use App\Models\OrganizationHierarchyVersion;
 use App\Models\Role;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\DataPolicyAccessResolver;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -113,6 +115,50 @@ class InvitationAccessTest extends TestCase
         }
     }
 
+    public function test_invitation_rejects_direct_and_descendant_grants_for_the_same_unit(): void
+    {
+        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
+        $policyCode = $this->createPolicy(
+            'management-aset.operating-unit-responsibility',
+            'management-aset.entitas-aset.read',
+            requiresOperatingUnit: true,
+            allowsDescendants: true,
+        );
+        $legalEntity = $this->createOrganization([
+            'classification' => 'legal_entity', 'name' => 'PT Scope', 'company_code' => 'SCOPE', 'country_code' => 'ID',
+        ]);
+        $unit = $this->createOrganization([
+            'classification' => 'operating_unit', 'name' => 'Unit Scope', 'operating_unit_type' => 'department',
+        ]);
+
+        $this->actingAs($this->owner)->post('/settings/organization/hierarchies', [
+            'name' => 'Scope structure', 'purpose_codes' => ['policy'],
+            'root_organization_id' => $legalEntity->id, 'effective_from' => now()->toDateString(),
+        ])->assertRedirect();
+        $version = OrganizationHierarchyVersion::query()->firstOrFail();
+        $this->post("/settings/organization/hierarchy-versions/{$version->id}/placements", [
+            'organization_id' => $unit->id, 'parent_organization_id' => $legalEntity->id,
+        ])->assertRedirect();
+        $this->post("/settings/organization/hierarchy-versions/{$version->id}/publish")->assertRedirect();
+
+        $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'user',
+            'assignments' => [[
+                'role_id' => $role->id,
+                'policy_scopes' => [
+                    [
+                        'policy_code' => $policyCode, 'legal_entity_id' => null, 'organization_id' => $unit->id,
+                        'hierarchy_id' => null, 'include_descendants' => false,
+                    ],
+                    [
+                        'policy_code' => $policyCode, 'legal_entity_id' => null, 'organization_id' => $unit->id,
+                        'hierarchy_id' => $version->hierarchy_id, 'include_descendants' => true,
+                    ],
+                ],
+            ]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('assignments');
+    }
+
     public function test_role_can_receive_the_entitas_aset_duty(): void
     {
         $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
@@ -185,6 +231,164 @@ class InvitationAccessTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('organization_id');
     }
 
+    public function test_issued_invitation_can_be_edited_without_changing_the_code_or_existing_members(): void
+    {
+        $first = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
+        $second = $this->createRole('Asset auditor', ['management-aset.entitas-aset.manage']);
+        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $scope = [
+            'policy_code' => $policyCode,
+            'legal_entity_id' => null,
+            'organization_id' => null,
+            'hierarchy_id' => null,
+            'include_descendants' => false,
+        ];
+
+        $created = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'user',
+            'label' => 'Batch Agustus',
+            'assignments' => [['role_id' => $first->id, 'policy_scopes' => [$scope]]],
+        ])->assertCreated();
+        $invitationId = $created->json('data.id');
+        $code = $created->json('data.code');
+
+        // Satu orang menukarkan kode sebelum undangan diubah.
+        auth()->logout();
+        $this->postJson('/api/v1/invitation-redemptions', [
+            'code' => $code,
+            'name' => 'Joined Early',
+            'email' => 'early@metta.test',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
+        $joined = User::query()->where('email', 'early@metta.test')->firstOrFail()->activeMembership();
+        $this->assertSame([$first->id], $joined->roleAssignments()->pluck('role_id')->all());
+
+        $this->actingAs($this->owner)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'system_role' => 'admin',
+            'label' => 'Batch Agustus (revisi)',
+            'assignments' => [['role_id' => $second->id, 'policy_scopes' => [$scope]]],
+        ])->assertOk();
+
+        $invitation = InvitationCode::findOrFail($invitationId);
+        $this->assertSame($code, $invitation->accessibleCode());
+        $this->assertSame('admin', $invitation->system_role);
+        $this->assertSame([$second->id], $invitation->roles()->pluck('roles.id')->all());
+        $this->assertSame(1, DB::table('invitation_data_policy_scopes')
+            ->where('invitation_id', $invitationId)->where('role_id', $second->id)->count());
+        $this->assertDatabaseHas('access_audit_events', [
+            'tenant_id' => $invitation->tenant_id,
+            'action' => 'access.invitation.updated',
+        ]);
+
+        // Anggota yang sudah bergabung tidak ikut berubah.
+        $this->assertSame([$first->id], $joined->roleAssignments()->pluck('role_id')->all());
+
+        // Penukar berikutnya menerima role yang baru.
+        auth()->logout();
+        $this->postJson('/api/v1/invitation-redemptions', [
+            'code' => $code,
+            'name' => 'Joined Later',
+            'email' => 'later@metta.test',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
+        $later = User::query()->where('email', 'later@metta.test')->firstOrFail()->activeMembership();
+        $this->assertSame([$second->id], $later->roleAssignments()->pluck('role_id')->all());
+        $this->assertSame('admin', $later->system_role);
+    }
+
+    public function test_revoked_invitation_cannot_be_edited(): void
+    {
+        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
+        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $scope = [
+            'policy_code' => $policyCode,
+            'legal_entity_id' => null,
+            'organization_id' => null,
+            'hierarchy_id' => null,
+            'include_descendants' => false,
+        ];
+        $invitationId = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'user',
+            'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
+        ])->assertCreated()->json('data.id');
+        InvitationCode::findOrFail($invitationId)->update(['revoked_at' => now()]);
+
+        $this->actingAs($this->owner)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'system_role' => 'admin',
+            'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
+        ])->assertUnprocessable();
+    }
+
+    public function test_member_without_access_management_cannot_edit_an_invitation(): void
+    {
+        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
+        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $scope = [
+            'policy_code' => $policyCode,
+            'legal_entity_id' => null,
+            'organization_id' => null,
+            'hierarchy_id' => null,
+            'include_descendants' => false,
+        ];
+        $invitationId = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
+            'system_role' => 'user',
+            'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
+        ])->assertCreated()->json('data.id');
+
+        $plain = User::factory()->create();
+        TenantMembership::create([
+            'tenant_id' => $this->owner->activeMembership()->tenant_id,
+            'user_id' => $plain->id,
+            'system_role' => 'user',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($plain)->patchJson("/api/v1/invitation-codes/{$invitationId}", [
+            'system_role' => 'admin',
+            'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
+        ])->assertForbidden();
+    }
+
+    public function test_grant_without_dimensions_is_rejected_unless_it_is_declared_unrestricted(): void
+    {
+        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
+        $policyCode = $this->createPolicy(
+            'management-aset.operating-unit-responsibility',
+            'management-aset.entitas-aset.read',
+            requiresOperatingUnit: true,
+        );
+        $membership = $this->owner->activeMembership();
+        $scope = [
+            'policy_code' => $policyCode,
+            'legal_entity_id' => null,
+            'organization_id' => null,
+            'hierarchy_id' => null,
+            'include_descendants' => false,
+        ];
+
+        $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'system_role' => 'owner',
+            'assignments' => [['role_id' => $role->id, 'policy_scopes' => [$scope]]],
+        ])->assertUnprocessable()->assertJsonValidationErrors('organization_id');
+
+        $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
+            'system_role' => 'owner',
+            'assignments' => [['role_id' => $role->id, 'policy_scopes' => [[...$scope, 'unrestricted' => true]]]],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('role_assignment_data_policy_scopes', [
+            'policy_code' => $policyCode,
+            'legal_entity_id' => null,
+            'organization_id' => null,
+            'hierarchy_id' => null,
+        ]);
+        $this->assertTrue(
+            app(DataPolicyAccessResolver::class)->resolve($membership->fresh())[$policyCode]['all'],
+        );
+    }
+
     public function test_admin_cannot_change_the_owner_access(): void
     {
         $ownerMembership = $this->owner->activeMembership();
@@ -224,13 +428,24 @@ class InvitationAccessTest extends TestCase
         return Organization::findOrFail($id);
     }
 
-    private function createPolicy(string $code, string $permission, bool $requiresOperatingUnit = false): string
+    private function createOrganization(array $data): Organization
     {
+        $id = $this->actingAs($this->owner)->postJson('/api/v1/organizations', $data)->assertCreated()->json('data.id');
+
+        return Organization::query()->findOrFail($id);
+    }
+
+    private function createPolicy(
+        string $code,
+        string $permission,
+        bool $requiresOperatingUnit = false,
+        bool $allowsDescendants = false,
+    ): string {
         DB::table('app_data_policies')->insert([
             'code' => $code, 'app_id' => 'management-aset', 'name' => 'Policy test',
             'protected_permissions' => json_encode([$permission], JSON_THROW_ON_ERROR),
             'requires_legal_entity' => false, 'requires_operating_unit' => $requiresOperatingUnit,
-            'allows_descendants' => false, 'created_at' => now(), 'updated_at' => now(),
+            'allows_descendants' => $allowsDescendants, 'created_at' => now(), 'updated_at' => now(),
         ]);
 
         return $code;

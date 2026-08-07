@@ -29,7 +29,7 @@ export default function Heading({
                 {title}
             </h2>
             {description && (
-                <Tooltip>
+                <Tooltip clickToPin>
                     <TooltipTrigger asChild>
                         <button
                             type="button"

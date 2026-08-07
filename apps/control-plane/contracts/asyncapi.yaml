@@ -1,20 +1,136 @@
 asyncapi: 3.0.0
 info:
-  title: CoreERP access integration events
-  version: 1.0.0
-  description: Contract semantik perubahan penugasan posisi dari Human Resources ke Core.
+  title: CoreERP Control Plane events
+  version: 2.0.0
+  description: |
+    Event yang **diterbitkan** Control Plane ke aplikasi bisnis.
+
+    Envelope wajib mengikuti `docs/dev/04-api-and-integration.md`. Pengiriman
+    memakai outbox (`outbox_events`) lalu webhook bertanda tangan; implementasinya
+    ada di `app/Console/Commands/PublishWorkflowEvents.php`.
+
+    Bukan event, jangan dicari di sini: sinkronisasi penugasan posisi dari
+    Human Resources adalah REST `POST /api/internal/v1/human-resources/position-assignments`.
+    Ia perintah, bukan fakta masa lalu, dan dikontrakkan pada OpenAPI.
+
+    **Riwayat versi.** `v1` tidak membawa `correlation_id` maupun `legal_entity_id`,
+    sehingga sebuah keputusan tidak dapat ditelusuri kembali ke request yang
+    melahirkannya. `v2` mewajibkan `correlation_id` dan menyertakan `legal_entity_id`
+    untuk fakta ber-scope legal entity. Keduanya dinaikkan sekaligus agar consumer
+    tidak bermigrasi dua kali untuk satu perubahan envelope.
+
+    `v1` tidak lagi diterbitkan dan tidak punya jalur kompatibilitas. Baris
+    `outbox_events` bertipe `v1` yang belum terkirim sebelum migration tidak akan
+    dikirim; database development di-reset, sesuai `docs/dev/09-identity-and-access.md`.
+
+servers:
+  webhook:
+    host: 'tenant-configured'
+    protocol: https
+    description: |
+      URL tujuan per app diambil dari `config('coreerp.event_endpoints')`, dicocokkan
+      berdasarkan `type` event. Tidak ada broker; pengiriman point-to-point.
+
 channels:
-  human-resources.worker-position-assignment.changed:
-    address: human-resources.worker-position-assignment.changed
+  core.workflow.decision.v2:
+    address: core.workflow.decision.v2
+    description: Keputusan akhir sebuah workflow instance yang dijalankan Core atas nama app.
     messages:
-      changed:
-        payload:
+      workflowDecision:
+        $ref: '#/components/messages/workflowDecision'
+
+operations:
+  sendWorkflowDecision:
+    action: send
+    channel:
+      $ref: '#/channels/core.workflow.decision.v2'
+    description: |
+      Dikirim satu kali per workflow instance. `workflow_history` menahan penerbitan
+      kedua (`decision_event_emitted`), tetapi consumer tetap wajib dedup memakai `id`
+      karena webhook di-retry saat endpoint gagal.
+
+components:
+  messages:
+    workflowDecision:
+      name: workflowDecision
+      title: Keputusan workflow
+      contentType: application/json
+      headers:
+        type: object
+        required: [X-CoreERP-Event-Timestamp, X-CoreERP-Event-Signature]
+        properties:
+          X-CoreERP-Event-Timestamp:
+            type: string
+            description: Unix timestamp saat request dikirim.
+          X-CoreERP-Event-Signature:
+            type: string
+            description: |
+              `hash_hmac('sha256', "<timestamp>.<raw body>", COREERP_APP_CONTEXT_SIGNING_KEY)`.
+              Consumer wajib memverifikasi ini sebelum membaca body.
+      payload:
+        $ref: '#/components/schemas/workflowDecisionEvent'
+
+  schemas:
+    workflowDecisionEvent:
+      type: object
+      additionalProperties: false
+      required: [id, type, occurred_at, tenant_id, correlation_id, data]
+      properties:
+        id:
+          type: string
+          description: ULID. Kunci dedup pada inbox consumer.
+        type:
+          const: core.workflow.decision.v2
+        occurred_at:
+          type: string
+          format: date-time
+        tenant_id:
+          type: string
+          description: ULID tenant pemilik fakta.
+        correlation_id:
+          type: string
+          description: |
+            ULID yang menandai rantai kerja yang melahirkan keputusan ini, diambil dari
+            header `X-Correlation-Id` pada `POST /api/internal/v1/workflow-instances`.
+            Bila app tidak mengirimnya, Core membangkitkan satu dan rantai itu berakar
+            di Core. Berbeda dari `id`: `id` menandai event ini, `correlation_id`
+            menandai ceritanya.
+        legal_entity_id:
+          type: [string, 'null']
+          description: |
+            Legal entity yang memiliki fakta ini, dibaca dari konfigurasi workflow yang
+            dipakai instance. Bernilai null hanya untuk jenis workflow ber-scope tenant.
+        data:
+          $ref: '#/components/schemas/workflowDecisionData'
+
+    workflowDecisionData:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          workflow_instance_id,
+          workflow_type,
+          decision,
+          source_document_type,
+          source_document_id,
+          decision_context,
+        ]
+      properties:
+        workflow_instance_id:
+          type: string
+        workflow_type:
+          type: string
+          description: |
+            Kode `workflow_types`, dimiliki app yang meminta workflow, misalnya
+            `management-aset.dekomisioning-aset-verification`. Core tidak menutup
+            daftar nilainya; consumer mengabaikan kode yang bukan miliknya.
+        decision:
+          enum: [approved, rejected]
+        source_document_type:
+          type: string
+          description: Jenis dokumen milik app peminta, mis. `dekomisioning-aset`.
+        source_document_id:
+          type: string
+        decision_context:
           type: object
-          required: [tenant_id, membership_id, assignment_id, position_id, operating_unit_id, active]
-          properties:
-            tenant_id: { type: string }
-            membership_id: { type: string }
-            assignment_id: { type: string }
-            position_id: { type: string }
-            operating_unit_id: { type: string }
-            active: { type: boolean }
+          description: Konteks keputusan yang dikirim app saat membuat workflow instance.

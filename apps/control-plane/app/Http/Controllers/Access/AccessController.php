@@ -10,12 +10,11 @@ use App\Models\Organization;
 use App\Models\OrganizationHierarchy;
 use App\Models\Role;
 use App\Models\RoleAssignment;
-use App\Models\SecurityDuty;
 use App\Models\TenantMembership;
 use App\Support\RoleHierarchy;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,6 +28,7 @@ class AccessController extends Controller
             ->where('status', 'active')
             ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', now()))
             ->pluck('app_id');
+
         return Inertia::render('settings/access', [
             'canManage' => $membership->canManageAccess(),
             'tenant' => $membership->tenant->only(['id', 'name']),
@@ -60,6 +60,7 @@ class AccessController extends Controller
                                 'organization_id' => $scope->organization_id,
                                 'hierarchy_id' => $scope->hierarchy_id,
                                 'include_descendants' => $scope->include_descendants,
+                                'unrestricted' => $scope->legal_entity_id === null && $scope->organization_id === null,
                                 'valid_from' => $scope->valid_from?->toDateTimeString(),
                                 'valid_until' => $scope->valid_until?->toDateTimeString(),
                             ])->values(),
@@ -72,12 +73,6 @@ class AccessController extends Controller
                 ->whereHas('duties')
                 ->with(['duties.privileges.permissions'])
                 ->get(['id', 'name']),
-            'customDuties' => SecurityDuty::query()
-                ->where('tenant_id', $tenantId)
-                ->where('source', 'custom')
-                ->where('status', 'active')
-                ->with(['privileges.permissions'])
-                ->orderBy('name')->get(['code', 'app_id', 'name']),
             'roles' => $this->roles($tenantId),
             'dataPolicies' => AppDataPolicy::query()
                 ->whereIn('app_id', $entitledAppIds)
@@ -92,30 +87,124 @@ class AccessController extends Controller
                 ])
                 ->values(),
             'organizations' => Organization::query()
-                ->where('tenant_id', $tenantId)
-                ->where('status', 'active')
-                ->orderBy('name')
-                ->get(['id', 'name', 'classification']),
-            'hierarchies' => OrganizationHierarchy::query()
-                ->where('tenant_id', $tenantId)
-                ->where('status', 'active')
-                ->orderBy('name')
-                ->get(['id', 'name']),
-            'invitations' => InvitationCode::query()
-                ->where('tenant_id', $tenantId)
-                ->with(['roles:id,name'])
-                ->latest()
-                ->get()
-                ->map(fn (InvitationCode $invitation) => [
+                ->where('organizations.tenant_id', $tenantId)
+                ->where('organizations.status', 'active')
+                ->leftJoin('operating_units', 'operating_units.organization_id', '=', 'organizations.id')
+                ->orderBy('organizations.name')
+                ->get(['organizations.id', 'organizations.name', 'organizations.classification', 'operating_units.type as unit_type']),
+            'hierarchies' => $this->hierarchies($tenantId),
+            'invitations' => $this->invitations($tenantId, $membership->canManageAccess()),
+            'newInvitationCodes' => $request->session()->pull('new_invitation_codes', []),
+        ]);
+    }
+
+    /**
+     * Assignment ikut dikirim supaya grid kode undangan dapat menampilkan
+     * undangan yang sudah ada dengan kolom yang sama seperti baris baru —
+     * tanggung jawab dan batas datanya terbaca, bukan sekadar nama role.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function invitations(string $tenantId, bool $canManage): Collection
+    {
+        $scopes = DB::table('invitation_data_policy_scopes as scope')
+            ->join('invitation_codes as invitation', 'invitation.id', '=', 'scope.invitation_id')
+            ->where('invitation.tenant_id', $tenantId)
+            ->get([
+                'scope.invitation_id', 'scope.role_id', 'scope.policy_code',
+                'scope.legal_entity_id', 'scope.organization_id',
+                'scope.hierarchy_id', 'scope.include_descendants',
+            ])
+            ->groupBy('invitation_id');
+        // Redemption menandai assignment dengan `invitation:<id>`, jadi jumlah
+        // pemakai terbaca tanpa tabel tambahan. Angka ini dipakai UI untuk
+        // memperingatkan bahwa kode sudah beredar sebelum diubah.
+        $redeemed = DB::table('role_assignments')
+            ->join('tenant_memberships as membership', 'membership.id', '=', 'role_assignments.membership_id')
+            ->where('membership.tenant_id', $tenantId)
+            ->whereNotNull('role_assignments.source_reference')
+            ->select('role_assignments.source_reference', 'role_assignments.membership_id')
+            ->distinct()
+            ->get()
+            ->groupBy('source_reference')
+            ->map(fn (Collection $rows): int => $rows->pluck('membership_id')->unique()->count());
+
+        return InvitationCode::query()
+            ->where('tenant_id', $tenantId)
+            ->with(['roles:id,name'])
+            ->latest()
+            ->get()
+            ->map(function (InvitationCode $invitation) use ($scopes, $redeemed, $canManage): array {
+                $byRole = $scopes->get($invitation->id, collect())->groupBy('role_id');
+
+                return [
                     'id' => $invitation->id,
+                    'redeemed_count' => $redeemed->get('invitation:'.$invitation->id, 0),
                     'system_role' => $invitation->system_role,
-                    'roles' => $invitation->roles->pluck('name'),
-                    'code' => $membership->canManageAccess() ? $invitation->accessibleCode() : null,
+                    'label' => $invitation->label,
+                    'roles' => $invitation->roles->pluck('name')->values(),
+                    'assignments' => $invitation->roles->map(fn (Role $role): array => [
+                        'role_id' => $role->id,
+                        'role_name' => $role->name,
+                        'policy_scopes' => $byRole->get($role->id, collect())
+                            ->map(fn (object $scope): array => [
+                                'policy_code' => $scope->policy_code,
+                                'legal_entity_id' => $scope->legal_entity_id,
+                                'organization_id' => $scope->organization_id,
+                                'hierarchy_id' => $scope->hierarchy_id,
+                                'include_descendants' => (bool) $scope->include_descendants,
+                                'unrestricted' => $scope->legal_entity_id === null && $scope->organization_id === null,
+                            ])
+                            ->values(),
+                    ])->values(),
+                    'code' => $canManage ? $invitation->accessibleCode() : null,
                     'expires_at' => $invitation->expires_at,
                     'revoked_at' => $invitation->revoked_at,
-                ]),
-            'newInvitationCode' => $request->session()->pull('new_invitation_code'),
-        ]);
+                ];
+            });
+    }
+
+    /**
+     * Node susunan organisasi ikut dikirim agar layar batas data dapat
+     * menampilkan pohon sesuai susunan yang dipilih, bukan daftar unit datar.
+     * Yang dipakai hanya versi published yang sedang berlaku — versi itu juga
+     * yang nanti dicatat pada grant.
+     *
+     * @return Collection<int, array{id:string,name:string,version_id:?string,nodes:array<int, array{organization_id:string,parent_organization_id:?string}>}>
+     */
+    private function hierarchies(string $tenantId): Collection
+    {
+        return OrganizationHierarchy::query()
+            ->where('tenant_id', $tenantId)
+            ->where('status', 'active')
+            ->with(['versions' => fn ($query) => $query
+                ->where('status', 'published')
+                ->where('effective_from', '<=', now())
+                ->orderByDesc('effective_from')
+                ->orderByDesc('version_number')])
+            ->orderBy('name')
+            ->get()
+            ->map(function (OrganizationHierarchy $hierarchy): array {
+                $version = $hierarchy->versions->first();
+
+                return [
+                    'id' => $hierarchy->id,
+                    'name' => $hierarchy->name,
+                    'version_id' => $version?->id,
+                    'nodes' => $version === null ? [] : DB::table('organization_hierarchy_nodes as node')
+                        ->leftJoin('organization_hierarchy_nodes as parent', 'parent.id', '=', 'node.parent_node_id')
+                        ->where('node.version_id', $version->id)
+                        ->get(['node.organization_id', 'parent.organization_id as parent_organization_id'])
+                        ->map(fn (object $node): array => [
+                            'organization_id' => (string) $node->organization_id,
+                            'parent_organization_id' => $node->parent_organization_id === null
+                                ? null
+                                : (string) $node->parent_organization_id,
+                        ])
+                        ->values()
+                        ->all(),
+                ];
+            });
     }
 
     /** @return Collection<int, array{id:string,name:string,duties:Collection<int, mixed>,data_policy_codes:list<string>}> */

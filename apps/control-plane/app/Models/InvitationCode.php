@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Crypt;
  * @property string $id
  * @property string $tenant_id
  * @property string $system_role
+ * @property string|null $label
  * @property int $created_by
  * @property string|null $code_ciphertext
  * @property Carbon|null $expires_at
@@ -30,6 +31,7 @@ class InvitationCode extends Model
         'code_hash',
         'code_ciphertext',
         'system_role',
+        'label',
         'created_by',
         'expires_at',
         'revoked_at',

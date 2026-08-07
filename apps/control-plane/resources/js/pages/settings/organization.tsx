@@ -1,4 +1,14 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import {
+    Background,
+    Controls,
+    Handle,
+    MiniMap,
+    Position,
+    ReactFlow,
+} from '@xyflow/react';
+import type { Edge, Node as FlowNode, NodeProps, NodeTypes } from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
 import { Building2, Network, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -23,8 +33,12 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
-import { DataTable } from '@apperp/ui/data-table';
-import type { DataTableColumn } from '@apperp/ui/data-table';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from '@apperp/ui/accordion';
 import {
     Dialog,
     DialogContent,
@@ -50,14 +64,6 @@ import {
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 
 type Organization = {
@@ -68,18 +74,25 @@ type Organization = {
     legal_entity: { company_code: string; country_code: string } | null;
     operating_unit: { type: string } | null;
 };
-type Purpose = { code: string; name: string; description: string };
-type Node = {
+type Purpose = {
+    code: string;
+    name: string;
+    description: string;
+    allowed_organization_types?: { organization_type: string }[];
+};
+type HierarchyNode = {
     id: string;
-    organization: Pick<Organization, 'id' | 'name' | 'classification'>;
-    parent_node: { organization: Pick<Organization, 'id' | 'name'> } | null;
+    organization: Pick<Organization, 'id' | 'name' | 'classification'> & {
+        operating_unit?: { type: string } | null;
+    };
+    parent_node: { id: string; organization: Pick<Organization, 'id' | 'name'> } | null;
 };
 type Version = {
     id: string;
     version_number: number;
     status: 'draft' | 'published';
     effective_from: string;
-    nodes: Node[];
+    nodes: HierarchyNode[];
 };
 type Hierarchy = {
     id: string;
@@ -90,6 +103,7 @@ type Hierarchy = {
 };
 type Props = {
     canManage: boolean;
+    section: 'legal-entities' | 'operating-units' | 'hierarchies';
     tenant: { id: string; name: string };
     organizations: Organization[];
     hierarchies: Hierarchy[];
@@ -98,32 +112,43 @@ type Props = {
 };
 
 function CreateOrganizationDialog({
+    classification,
     operatingUnitTypes,
-}: Pick<Props, 'operatingUnitTypes'>) {
+    triggerLabel,
+}: {
+    classification: Organization['classification'];
+    operatingUnitTypes: Props['operatingUnitTypes'];
+    triggerLabel: string;
+}) {
     const [open, setOpen] = useState(false);
     const form = useForm({
-        classification: 'legal_entity',
+        classification,
         name: '',
         company_code: '',
         country_code: 'ID',
         operating_unit_type: 'department',
     });
-    const legalEntity = form.data.classification === 'legal_entity';
+    const legalEntity = classification === 'legal_entity';
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button>
                     <Plus />
-                    Tambah organisasi
+                    {triggerLabel}
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Organisasi baru</DialogTitle>
+                    <DialogTitle>
+                        {legalEntity
+                            ? 'Legal entity baru'
+                            : 'Operating unit baru'}
+                    </DialogTitle>
                     <DialogDescription>
-                        Buat legal entity untuk badan hukum, atau operating unit
-                        untuk bagian operasional.
+                        {legalEntity
+                            ? 'Simpan identitas badan hukum yang dipakai untuk transaksi resmi.'
+                            : 'Simpan unit operasional yang akan ditempatkan pada hierarchy bila diperlukan.'}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -138,33 +163,6 @@ function CreateOrganizationDialog({
                     }}
                 >
                     <FieldGroup>
-                        <Field
-                            data-invalid={Boolean(form.errors.classification)}
-                        >
-                            <NativeSelect
-                                label="Jenis organisasi"
-                                value={form.data.classification}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'classification',
-                                        event.target.value,
-                                    )
-                                }
-                                aria-invalid={Boolean(
-                                    form.errors.classification,
-                                )}
-                            >
-                                <option value="legal_entity">
-                                    Legal entity
-                                </option>
-                                <option value="operating_unit">
-                                    Operating unit
-                                </option>
-                            </NativeSelect>
-                            <FieldError>
-                                {form.errors.classification}
-                            </FieldError>
-                        </Field>
                         <Field data-invalid={Boolean(form.errors.name)}>
                             <Input
                                 label="Nama organisasi"
@@ -270,53 +268,241 @@ function CreateOrganizationDialog({
     );
 }
 
-function EditOrganizationSheet({
+type OrganizationExtraSection = {
+    value: string;
+    title: string;
+    description: string;
+    action?: string;
+};
+
+function OrganizationExtraSectionContent({
+    section,
+}: {
+    section: OrganizationExtraSection;
+}) {
+    if (section.value === 'report-company-logo') {
+        return (
+            <div className="space-y-3 rounded-md border border-dashed bg-slate-50 p-4 dark:bg-white">
+                <Field>
+                    <Input
+                        label="Logo perusahaan untuk laporan"
+                        type="file"
+                        disabled
+                    />
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                    Wadah sudah tersedia. Upload logo belum aktif karena integrasi file belum tersedia.
+                </p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="rounded-md border border-dashed bg-slate-50 p-4 dark:bg-white">
+            <p className="text-sm text-muted-foreground">{section.description}</p>
+            {section.action && (
+                <Button type="button" variant="outline" className="mt-3" disabled>
+                    {section.action}
+                </Button>
+            )}
+            <p className="mt-2 text-xs text-muted-foreground">
+                Wadah tersedia; fungsi ini akan dihubungkan oleh modul pemiliknya.
+            </p>
+        </div>
+    );
+}
+
+function OrganizationDetailPage({
     organization,
+    canManage,
     operatingUnitTypes,
-    onClose,
 }: {
     organization: Organization;
+    canManage: boolean;
     operatingUnitTypes: Props['operatingUnitTypes'];
-    onClose: () => void;
 }) {
     const legalEntity = organization.classification === 'legal_entity';
+    const [editing, setEditing] = useState(false);
     const form = useForm({
         name: organization.name,
         company_code: organization.legal_entity?.company_code ?? '',
         country_code: organization.legal_entity?.country_code ?? 'ID',
         operating_unit_type: organization.operating_unit?.type ?? 'department',
     });
+    const unitType = operatingUnitTypes[organization.operating_unit?.type ?? ''] ?? organization.operating_unit?.type;
+    const extraSections: OrganizationExtraSection[] = legalEntity
+        ? [
+              {
+                  value: 'addresses',
+                  title: 'Alamat',
+                  description: 'Simpan alamat utama dan alamat tambahan legal entity.',
+                  action: 'Tambah alamat',
+              },
+              {
+                  value: 'contact-information',
+                  title: 'Informasi kontak',
+                  description: 'Simpan email, nomor telepon, dan kontak organisasi.',
+                  action: 'Tambah kontak',
+              },
+              {
+                  value: 'statutory-reporting',
+                  title: 'Pelaporan wajib',
+                  description: 'Tempat untuk konfigurasi pelaporan resmi dan periode pelaporan.',
+                  action: 'Tambah pengaturan pelaporan',
+              },
+              {
+                  value: 'registration-numbers',
+                  title: 'Nomor registrasi',
+                  description: 'Tempat untuk nomor registrasi badan hukum.',
+                  action: 'Tambah nomor registrasi',
+              },
+              {
+                  value: 'bank-account-information',
+                  title: 'Informasi rekening bank',
+                  description: 'Tempat untuk rekening bank yang terkait dengan legal entity.',
+                  action: 'Tambah rekening bank',
+              },
+              {
+                  value: 'foreign-trade-and-logistics',
+                  title: 'Perdagangan luar negeri dan logistik',
+                  description: 'Tempat untuk pengaturan perdagangan lintas negara dan logistik.',
+                  action: 'Tambah pengaturan',
+              },
+              {
+                  value: 'number-sequences',
+                  title: 'Nomor urut',
+                  description: 'Tempat untuk nomor otomatis yang dipakai dokumen organisasi.',
+                  action: 'Buka nomor urut',
+              },
+              {
+                  value: 'additional-registration',
+                  title: 'Registrasi tambahan',
+                  description: 'Tempat untuk data registrasi tambahan yang diperlukan organisasi.',
+                  action: 'Tambah registrasi',
+              },
+              {
+                  value: 'dashboard-image',
+                  title: 'Gambar dashboard',
+                  description: 'Tempat untuk gambar yang ditampilkan pada dashboard organisasi.',
+                  action: 'Pilih gambar',
+              },
+              {
+                  value: 'report-company-logo',
+                  title: 'Logo perusahaan untuk laporan',
+                  description: 'Logo untuk laporan yang menggunakan legal entity ini.',
+              },
+              {
+                  value: 'print-destination-default',
+                  title: 'Default tujuan cetak',
+                  description: 'Tempat untuk tujuan cetak default organisasi.',
+                  action: 'Atur tujuan cetak',
+              },
+              {
+                  value: 'regulatory-establishments',
+                  title: 'Instansi regulator',
+                  description: 'Tempat untuk instansi regulator yang terkait organisasi.',
+                  action: 'Tambah instansi',
+              },
+              {
+                  value: 'tax-registration',
+                  title: 'Registrasi pajak',
+                  description: 'Tempat untuk data registrasi pajak legal entity.',
+                  action: 'Tambah registrasi pajak',
+              },
+          ]
+        : [
+              {
+                  value: 'addresses',
+                  title: 'Alamat',
+                  description: 'Simpan alamat unit operasional.',
+                  action: 'Tambah alamat',
+              },
+              {
+                  value: 'contact-information',
+                  title: 'Informasi kontak',
+                  description: 'Simpan email, nomor telepon, dan kontak unit operasional.',
+                  action: 'Tambah kontak',
+              },
+              {
+                  value: 'operating-unit-details',
+                  title: 'Detail operating unit',
+                  description: `Tempat untuk detail khusus tipe ${unitType ?? 'operating unit'}.`,
+                  action: 'Buka detail tipe unit',
+              },
+          ];
 
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent
-                side="right"
-                className="flex w-full flex-col sm:max-w-lg"
-            >
-                <SheetHeader>
-                    <SheetTitle>Ubah organisasi</SheetTitle>
-                    <SheetDescription>
-                        Klasifikasi organisasi tidak dapat diubah agar data dan
-                        riwayat hierarchy tetap konsisten.
-                    </SheetDescription>
-                </SheetHeader>
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-white text-slate-900 dark:bg-white dark:text-slate-900">
+            <div className="sticky top-0 z-10 flex min-w-0 shrink-0 flex-wrap items-start justify-between gap-3 border-b bg-white px-4 py-4 dark:bg-white">
+                <div className="min-w-0">
+                    <CardTitle>{organization.name}</CardTitle>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                        <Badge variant="outline">
+                            {legalEntity ? 'Legal entity' : 'Operating unit'}
+                        </Badge>
+                        <span>
+                            {legalEntity
+                                ? `${organization.legal_entity?.company_code ?? 'Belum ada kode'} · ${organization.legal_entity?.country_code ?? 'Belum ada negara'}`
+                                : unitType}
+                        </span>
+                    </div>
+                </div>
+                {canManage && (
+                    <div className="shrink-0">
+                        {!editing ? (
+                            <Button type="button" onClick={() => setEditing(true)}>
+                                <Pencil />
+                                Edit
+                            </Button>
+                        ) : (
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => {
+                                        form.reset();
+                                        form.clearErrors();
+                                        setEditing(false);
+                                    }}
+                                    disabled={form.processing}
+                                >
+                                    Batal
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    form={`organization-form-${organization.id}`}
+                                    disabled={form.processing}
+                                >
+                                    Simpan
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 <form
-                    className="flex min-h-0 flex-1 flex-col"
+                    id={`organization-form-${organization.id}`}
                     onSubmit={(event) => {
                         event.preventDefault();
                         form.patch(
                             `/settings/organization/organizations/${organization.id}`,
-                            {
-                                onSuccess: onClose,
-                            },
+                            { onSuccess: () => setEditing(false) },
                         );
                     }}
                 >
-                    <FieldGroup className="flex-1 overflow-y-auto px-4 py-6">
+                    <Accordion type="multiple" defaultValue={['general']}>
+                        <AccordionItem value="general">
+                            <AccordionTrigger className="py-3 hover:no-underline">
+                                Umum
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2">
+                                <FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <Field data-invalid={Boolean(form.errors.name)}>
                             <Input
                                 label="Nama organisasi"
                                 value={form.data.name}
+                                disabled={!editing}
                                 onChange={(event) =>
                                     form.setData('name', event.target.value)
                                 }
@@ -334,6 +520,7 @@ function EditOrganizationSheet({
                                     <Input
                                         label="Kode perusahaan"
                                         value={form.data.company_code}
+                                        disabled={!editing}
                                         onChange={(event) =>
                                             form.setData(
                                                 'company_code',
@@ -356,6 +543,7 @@ function EditOrganizationSheet({
                                     <Input
                                         label="Kode negara"
                                         value={form.data.country_code}
+                                        disabled={!editing}
                                         onChange={(event) =>
                                             form.setData(
                                                 'country_code',
@@ -381,6 +569,7 @@ function EditOrganizationSheet({
                                 <NativeSelect
                                     label="Tipe operating unit"
                                     value={form.data.operating_unit_type}
+                                    disabled={!editing}
                                     onChange={(event) =>
                                         form.setData(
                                             'operating_unit_type',
@@ -404,23 +593,26 @@ function EditOrganizationSheet({
                                 </FieldError>
                             </Field>
                         )}
-                    </FieldGroup>
-                    <SheetFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onClose}
-                            disabled={form.processing}
-                        >
-                            Batal
-                        </Button>
-                        <Button type="submit" disabled={form.processing}>
-                            Simpan perubahan
-                        </Button>
-                    </SheetFooter>
+                                </FieldGroup>
+                            </AccordionContent>
+                        </AccordionItem>
+                        {extraSections.map((section) => (
+                            <AccordionItem
+                                key={section.value}
+                                value={section.value}
+                            >
+                                <AccordionTrigger className="py-3 hover:no-underline">
+                                    {section.title}
+                                </AccordionTrigger>
+                                <AccordionContent className="pt-2">
+                                    <OrganizationExtraSectionContent section={section} />
+                                </AccordionContent>
+                            </AccordionItem>
+                        ))}
+                    </Accordion>
                 </form>
-            </SheetContent>
-        </Sheet>
+            </div>
+        </div>
     );
 }
 
@@ -673,12 +865,182 @@ function DraftActions({
     );
 }
 
+type OrganizationHierarchyFlowData = {
+    label: string;
+    classification: Organization['classification'];
+    operatingUnitType: string | null;
+};
+type OrganizationHierarchyFlowNode = FlowNode<
+    OrganizationHierarchyFlowData,
+    'organization'
+>;
+
+function OrganizationHierarchyFlowNode({
+    data,
+}: NodeProps<OrganizationHierarchyFlowNode>) {
+    return (
+        <div className="min-w-52 rounded-lg border bg-white px-4 py-3 text-slate-900 shadow-sm dark:bg-white dark:text-slate-900">
+            <Handle type="target" position={Position.Top} />
+            <p className="text-sm font-semibold">{data.label}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+                {data.classification === 'legal_entity'
+                    ? 'Legal entity'
+                    : data.operatingUnitType ?? 'Operating unit'}
+            </p>
+            <Handle type="source" position={Position.Bottom} />
+        </div>
+    );
+}
+
+const organizationHierarchyNodeTypes: NodeTypes = {
+    organization: OrganizationHierarchyFlowNode,
+};
+
+function buildHierarchyGraph(version: Version): {
+    nodes: OrganizationHierarchyFlowNode[];
+    edges: Edge[];
+} {
+    const nodeById = new Map(version.nodes.map((node) => [node.id, node]));
+    const childrenByParent = new Map<string, HierarchyNode[]>();
+    const roots: HierarchyNode[] = [];
+
+    for (const node of version.nodes) {
+        const parentId = node.parent_node?.id;
+
+        if (!parentId || !nodeById.has(parentId)) {
+            roots.push(node);
+            continue;
+        }
+
+        const children = childrenByParent.get(parentId) ?? [];
+        children.push(node);
+        childrenByParent.set(parentId, children);
+    }
+
+    // ponytail: deterministic tree layout; use a graph layout engine only if hierarchies become DAGs.
+    const nodeWidth = 208;
+    const horizontalGap = 56;
+    const verticalGap = 170;
+    const subtreeWidths = new Map<string, number>();
+    const measure = (node: HierarchyNode, path = new Set<string>()): number => {
+        if (path.has(node.id)) {
+            return nodeWidth;
+        }
+
+        const known = subtreeWidths.get(node.id);
+        if (known !== undefined) {
+            return known;
+        }
+
+        const children = childrenByParent.get(node.id) ?? [];
+        const nextPath = new Set(path).add(node.id);
+        const childrenWidth = children.reduce(
+            (total, child, index) =>
+                total + measure(child, nextPath) + (index > 0 ? horizontalGap : 0),
+            0,
+        );
+        const width = Math.max(nodeWidth, childrenWidth);
+        subtreeWidths.set(node.id, width);
+        return width;
+    };
+    const positions = new Map<string, { x: number; y: number }>();
+    const place = (
+        node: HierarchyNode,
+        left: number,
+        depth: number,
+        path = new Set<string>(),
+    ): void => {
+        if (path.has(node.id)) {
+            return;
+        }
+
+        const width = subtreeWidths.get(node.id) ?? measure(node);
+        positions.set(node.id, {
+            x: left + (width - nodeWidth) / 2,
+            y: depth * verticalGap,
+        });
+
+        const children = childrenByParent.get(node.id) ?? [];
+        const childWidths = children.map((child) => subtreeWidths.get(child.id) ?? measure(child));
+        const childrenWidth = childWidths.reduce(
+            (total, childWidth, index) =>
+                total + childWidth + (index > 0 ? horizontalGap : 0),
+            0,
+        );
+        let childLeft = left + (width - childrenWidth) / 2;
+        const nextPath = new Set(path).add(node.id);
+
+        children.forEach((child, index) => {
+            place(child, childLeft, depth + 1, nextPath);
+            childLeft += childWidths[index] + horizontalGap;
+        });
+    };
+
+    const layoutRoots = roots.length ? roots : version.nodes.slice(0, 1);
+    let rootLeft = 0;
+    for (const root of layoutRoots) {
+        const width = measure(root);
+        place(root, rootLeft, 0);
+        rootLeft += width + horizontalGap;
+    }
+
+    const nodes = version.nodes.map((node) => ({
+        id: node.id,
+        type: 'organization' as const,
+        position: positions.get(node.id) ?? { x: 0, y: 0 },
+        data: {
+            label: node.organization.name,
+            classification: node.organization.classification,
+            operatingUnitType: node.organization.operating_unit?.type ?? null,
+        },
+    }));
+    const edges = version.nodes.flatMap((node) =>
+        node.parent_node
+            ? [{
+                  id: `${node.parent_node.id}-${node.id}`,
+                  source: node.parent_node.id,
+                  target: node.id,
+                  type: 'smoothstep',
+              }]
+            : [],
+    );
+
+    return { nodes, edges };
+}
+
+function HierarchyCanvas({ version }: { version: Version }) {
+    const graph = buildHierarchyGraph(version);
+
+    return (
+        <div className="overflow-hidden rounded-lg border bg-white dark:bg-white">
+            <p className="border-b px-4 py-2 text-xs text-slate-600">
+                Tampilan susunan organisasi
+            </p>
+            <div className="h-[520px]">
+                <ReactFlow
+                    nodes={graph.nodes}
+                    edges={graph.edges}
+                    nodeTypes={organizationHierarchyNodeTypes}
+                    nodesConnectable={false}
+                    nodesDraggable={false}
+                    fitView
+                    proOptions={{ hideAttribution: true }}
+                >
+                    <Background gap={18} size={1} />
+                    <Controls />
+                    <MiniMap pannable zoomable />
+                </ReactFlow>
+            </div>
+        </div>
+    );
+}
+
 function RemovePlacementAction({
     version,
     node,
 }: {
     version: Version;
-    node: Node;
+    node: HierarchyNode;
 }) {
     const [open, setOpen] = useState(false);
     const form = useForm({});
@@ -787,98 +1149,160 @@ function CreateVersionDraftAction({ version }: { version: Version }) {
 
 export default function OrganizationPage({
     canManage,
+    section,
     tenant,
     organizations,
     hierarchies,
     purposes,
     operatingUnitTypes,
 }: Props) {
-    const [editingOrganization, setEditingOrganization] =
-        useState<Organization | null>(null);
-    const organizationColumns: DataTableColumn<Organization>[] = [
-        {
-            id: 'name',
-            header: 'Organisasi',
-            cell: (organization) => (
-                <span className="font-medium">{organization.name}</span>
-            ),
-            sortValue: (organization) => organization.name,
-        },
-        {
-            id: 'classification',
-            header: 'Klasifikasi',
-            cell: (organization) => (
-                <Badge variant="outline">
-                    {organization.classification === 'legal_entity'
-                        ? 'Legal entity'
-                        : 'Operating unit'}
-                </Badge>
-            ),
-            sortValue: (organization) => organization.classification,
-        },
-        {
-            id: 'detail',
-            header: 'Detail',
-            cell: (organization) =>
-                organization.legal_entity
-                    ? `${organization.legal_entity.company_code} · ${organization.legal_entity.country_code}`
-                    : (operatingUnitTypes[
-                          organization.operating_unit?.type ?? ''
-                      ] ?? organization.operating_unit?.type),
-            sortValue: (organization) =>
-                organization.operating_unit?.type ??
-                organization.legal_entity?.company_code ??
-                '',
-        },
-        {
-            id: 'actions',
-            header: 'Aksi',
-            align: 'right',
-            cell: (organization) =>
-                canManage ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingOrganization(organization)}
-                    >
-                        <Pencil />
-                        Ubah
-                    </Button>
-                ) : null,
-        },
-    ];
+    const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
+    const [organizationSearch, setOrganizationSearch] = useState('');
+    const isHierarchySection = section === 'hierarchies';
+    const classification = section === 'operating-units' ? 'operating_unit' : 'legal_entity';
+    const visibleOrganizations = organizations.filter(
+        (organization) => organization.classification === classification,
+    );
+    const organizationSearchTerm = organizationSearch.trim().toLocaleLowerCase();
+    const filteredOrganizations = visibleOrganizations.filter((organization) => {
+        if (!organizationSearchTerm) {
+            return true;
+        }
 
+        return [
+            organization.name,
+            organization.legal_entity?.company_code,
+            organization.legal_entity?.country_code,
+            organization.operating_unit?.type,
+            organization.operating_unit?.type
+                ? operatingUnitTypes[organization.operating_unit.type]
+                : undefined,
+        ].some((value) =>
+            value?.toLocaleLowerCase().includes(organizationSearchTerm),
+        );
+    });
+    const selectedOrganization =
+        visibleOrganizations.find(
+            (organization) => organization.id === selectedOrganizationId,
+        ) ?? filteredOrganizations[0] ?? null;
     return (
         <>
             <Head title="Organisasi" />
-            <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
+            <main className="mx-auto flex min-h-screen w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
                 <Heading
                     title="Organisasi"
                     description={`Kelola identitas organisasi dan hierarchy ${tenant.name}.`}
                 />
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Direktori organisasi</CardTitle>
+                <nav
+                    aria-label="Bagian organisasi"
+                    className="flex flex-wrap gap-2 rounded-lg border bg-white p-2 dark:bg-white"
+                >
+                    {[
+                        ['legal-entities', 'Legal entities'],
+                        ['operating-units', 'Operating units'],
+                        ['hierarchies', 'Hierarchy'],
+                    ].map(([value, label]) => (
+                        <Link
+                            key={value}
+                            href={`/settings/organization?section=${value}`}
+                            aria-current={section === value ? 'page' : undefined}
+                            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                                section === value
+                                    ? 'bg-primary text-primary-foreground'
+                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                            }`}
+                        >
+                            {label}
+                        </Link>
+                    ))}
+                </nav>
+                {!isHierarchySection && <Card className="w-full min-w-0 bg-white text-slate-900 dark:bg-white dark:text-slate-900">
+                    <CardHeader className="min-w-0">
+                        <CardTitle>
+                            {classification === 'legal_entity'
+                                ? 'Legal entities'
+                                : 'Operating units'}
+                        </CardTitle>
                         <CardDescription>
-                            Legal entity dan operating unit dibuat sekali lalu
-                            dapat dipakai pada beberapa hierarchy.
+                            {classification === 'legal_entity'
+                                ? 'Badan hukum untuk transaksi resmi, pajak, dan laporan.'
+                                : 'Unit operasional untuk proses, akses, dan hierarchy organisasi.'}
                         </CardDescription>
                         {canManage && (
                             <CardAction>
                                 <CreateOrganizationDialog
+                                    classification={classification}
                                     operatingUnitTypes={operatingUnitTypes}
+                                    triggerLabel="New"
                                 />
                             </CardAction>
                         )}
                     </CardHeader>
-                    <CardContent>
-                        {organizations.length ? (
-                            <DataTable
-                                columns={organizationColumns}
-                                data={organizations}
-                                getRowKey={(organization) => organization.id}
-                            />
+                    <CardContent className="w-full min-w-0">
+                        {visibleOrganizations.length ? (
+                            <div className="grid min-w-0 gap-4 lg:h-[calc(100vh-18rem)] lg:min-h-[32rem] lg:max-h-[42.5rem] lg:grid-cols-[18rem_minmax(0,1fr)]">
+                                <aside className="flex min-h-[20rem] min-w-0 flex-col overflow-hidden rounded-lg border bg-white dark:bg-white lg:min-h-0">
+                                    <div className="shrink-0 space-y-3 border-b px-4 py-3">
+                                        <p className="font-medium">Daftar organisasi</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Pilih satu organisasi untuk melihat detailnya.
+                                        </p>
+                                        <Input
+                                            label="Cari"
+                                            placeholder="Cari organisasi..."
+                                            value={organizationSearch}
+                                            onChange={(event) =>
+                                                setOrganizationSearch(event.target.value)
+                                            }
+                                        />
+                                    </div>
+                                    <div className="min-h-0 flex-1 overflow-y-auto">
+                                        {filteredOrganizations.length ? filteredOrganizations.map((organization) => {
+                                            const selected = organization.id === selectedOrganization?.id;
+                                            const subtitle = organization.legal_entity
+                                                ? `${organization.legal_entity.company_code} · ${organization.legal_entity.country_code}`
+                                                : (operatingUnitTypes[
+                                                      organization.operating_unit?.type ?? ''
+                                                  ] ?? organization.operating_unit?.type);
+
+                                            return (
+                                                <button
+                                                    key={organization.id}
+                                                    type="button"
+                                                    aria-pressed={selected}
+                                                    onClick={() => setSelectedOrganizationId(organization.id)}
+                                                    className={`w-full border-b px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset dark:hover:bg-slate-100 ${
+                                                        selected
+                                                            ? 'border-l-2 border-l-primary bg-primary/10'
+                                                            : 'border-l-2 border-l-transparent'
+                                                    }`}
+                                                >
+                                                    <span className="block truncate font-medium">
+                                                        {organization.name}
+                                                    </span>
+                                                    <span className="mt-1 block truncate text-xs text-muted-foreground">
+                                                        {subtitle}
+                                                    </span>
+                                                </button>
+                                            );
+                                        }) : (
+                                            <p className="p-4 text-sm text-muted-foreground">
+                                                Tidak ada organisasi yang cocok.
+                                            </p>
+                                        )}
+                                    </div>
+                                </aside>
+                                {selectedOrganization && (
+                                    <div className="flex min-h-[32rem] min-w-0 overflow-hidden rounded-lg border bg-white dark:bg-white lg:min-h-0">
+                                        <OrganizationDetailPage
+                                            key={selectedOrganization.id}
+                                            organization={selectedOrganization}
+                                            canManage={canManage}
+                                            operatingUnitTypes={operatingUnitTypes}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         ) : (
                             <Empty>
                                 <EmptyHeader>
@@ -886,32 +1310,23 @@ export default function OrganizationPage({
                                         <Building2 />
                                     </EmptyMedia>
                                     <EmptyTitle>
-                                        Belum ada organisasi
+                                        Belum ada {classification === 'legal_entity' ? 'legal entity' : 'operating unit'}
                                     </EmptyTitle>
                                     <EmptyDescription>
-                                        Buat legal entity pertama agar bisnis
-                                        dapat mencatat transaksi resmi.
+                                        {classification === 'legal_entity'
+                                            ? 'Buat legal entity pertama agar transaksi resmi memiliki badan hukum.'
+                                            : 'Buat operating unit bila proses bisnis membutuhkan unit operasional.'}
                                     </EmptyDescription>
                                 </EmptyHeader>
                             </Empty>
                         )}
                     </CardContent>
-                </Card>
-                {editingOrganization && (
-                    <EditOrganizationSheet
-                        key={editingOrganization.id}
-                        organization={editingOrganization}
-                        operatingUnitTypes={operatingUnitTypes}
-                        onClose={() => setEditingOrganization(null)}
-                    />
-                )}
-
-                <Card>
+                </Card>}
+                {isHierarchySection && <Card className="bg-white text-slate-900 dark:bg-white dark:text-slate-900">
                     <CardHeader>
                         <CardTitle>Hierarchy organisasi</CardTitle>
                         <CardDescription>
-                            Buat hierarchy hanya ketika proses bisnis
-                            membutuhkan susunan parent-child.
+                            Susun hubungan parent-child hanya untuk proses bisnis yang membutuhkannya.
                         </CardDescription>
                         {canManage && (
                             <CardAction>
@@ -927,10 +1342,14 @@ export default function OrganizationPage({
                             hierarchies.map((hierarchy) => {
                                 const version = hierarchy.versions[0];
 
+                                if (!version) {
+                                    return null;
+                                }
+
                                 return (
                                     <div
                                         key={hierarchy.id}
-                                        className="space-y-4 rounded-lg border p-4"
+                                            className="space-y-4 rounded-lg border bg-white p-4 dark:bg-white"
                                     >
                                         <div className="flex flex-wrap items-start justify-between gap-3">
                                             <div>
@@ -952,6 +1371,10 @@ export default function OrganizationPage({
                                                     : `Published v${version.version_number}`}
                                             </Badge>
                                         </div>
+                                        <HierarchyCanvas version={version} />
+                                        <p className="text-xs text-muted-foreground">
+                                            Tipe organisasi yang diizinkan akan diatur per tujuan hierarchy. Saat ini belum ada batasan tipe yang diaktifkan.
+                                        </p>
                                         <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
                                             {version.nodes.map((node) => (
                                                 <div
@@ -1021,7 +1444,7 @@ export default function OrganizationPage({
                             </Empty>
                         )}
                     </CardContent>
-                </Card>
+                </Card>}
             </main>
         </>
     );

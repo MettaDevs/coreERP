@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 final class DataPolicyScopeResolver
 {
     /**
-     * @param  array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool}  $data
+     * @param  array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted?:bool}  $data
      * @return array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,hierarchy_version_id:?string,include_descendants:bool}
      */
     public function resolve(string $tenantId, Role $role, array $data): array
@@ -20,6 +20,20 @@ final class DataPolicyScopeResolver
         $policy = AppDataPolicy::query()->find($data['policy_code']);
         if (! $policy || ! $this->roleUsesPolicy($tenantId, $role, $policy)) {
             throw ValidationException::withMessages(['policy_code' => 'Policy data tidak tersedia untuk tanggung jawab bisnis yang dipilih.']);
+        }
+
+        // Grant tanpa dimensi berarti seluruh organisasi. Ia harus dinyatakan
+        // eksplisit agar tidak tertukar dengan form yang belum diisi; dimensi
+        // wajib policy sengaja dilewati karena tidak ada batas yang dipasang.
+        if ($data['unrestricted'] ?? false) {
+            return [
+                'policy_code' => $policy->code,
+                'legal_entity_id' => null,
+                'organization_id' => null,
+                'hierarchy_id' => null,
+                'hierarchy_version_id' => null,
+                'include_descendants' => false,
+            ];
         }
 
         $legalEntityId = $this->legalEntityId($tenantId, $data['legal_entity_id'], $policy->requires_legal_entity);
@@ -75,6 +89,42 @@ final class DataPolicyScopeResolver
             'hierarchy_version_id' => $version->id,
             'include_descendants' => true,
         ];
+    }
+
+    /**
+     * @param  list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted?:bool}>  $scopes
+     */
+    public function assertNoRedundantGrants(array $scopes): void
+    {
+        foreach ($scopes as $index => $scope) {
+            foreach (array_slice($scopes, $index + 1) as $other) {
+                if ($scope['policy_code'] !== $other['policy_code']) {
+                    continue;
+                }
+
+                if (($scope['unrestricted'] ?? false) || ($other['unrestricted'] ?? false)) {
+                    throw ValidationException::withMessages([
+                        'assignments' => 'Batas data seluruh organisasi tidak boleh digabung dengan batas data lain pada role yang sama.',
+                    ]);
+                }
+
+                if ($scope['legal_entity_id'] !== $other['legal_entity_id']
+                    || $scope['organization_id'] !== $other['organization_id']) {
+                    continue;
+                }
+
+                $sameGrant = (! $scope['include_descendants'] && ! $other['include_descendants'])
+                    || ($scope['include_descendants'] && $other['include_descendants']
+                        && $scope['hierarchy_id'] === $other['hierarchy_id']);
+                $directGrantCovered = $scope['include_descendants'] !== $other['include_descendants'];
+
+                if ($sameGrant || $directGrantCovered) {
+                    throw ValidationException::withMessages([
+                        'assignments' => 'Batas data yang sama atau sudah tercakup tidak boleh ditambahkan dua kali pada role yang sama.',
+                    ]);
+                }
+            }
+        }
     }
 
     private function legalEntityId(string $tenantId, ?string $legalEntityId, bool $required): ?string

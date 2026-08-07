@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
-use App\Http\Requests\ReferenceData\ResolveUnitsRequest;
 use App\Http\Requests\ReferenceData\ConvertUnitsRequest;
+use App\Http\Requests\ReferenceData\ResolveUnitsRequest;
 use App\Models\UnitOfMeasure;
 use App\Services\UnitOfMeasureService;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +16,7 @@ final class UnitOfMeasureDirectoryController extends Controller
     {
         $data = UnitOfMeasure::query()->where('tenant_id', $request->attributes->get('coreerp.tenant_id'))->where('active', true)
             ->orderBy('name')->get(['id', 'code', 'name', 'symbol', 'decimal_places']);
+
         return response()->json(['data' => $data]);
     }
 

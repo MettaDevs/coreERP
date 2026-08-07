@@ -55,7 +55,9 @@ class RedeemInvitation
             $scopes = DB::table('invitation_data_policy_scopes')->where('invitation_id', $invitation->id)->get();
             foreach ($scopes as $scope) {
                 $assignment = $assignments->get($scope->role_id);
-                if (! $assignment) continue;
+                if (! $assignment) {
+                    continue;
+                }
                 $assignment->dataPolicyScopes()->create([
                     'tenant_id' => $membership->tenant_id,
                     'policy_code' => $scope->policy_code,

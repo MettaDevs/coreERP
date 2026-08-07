@@ -375,7 +375,7 @@ export default function UnitsOfMeasure({
                                                 </TableHead>
                                                 <TableHead>Ke satuan</TableHead>
                                                 <TableHead>
-                                                    <Tooltip>
+                                                    <Tooltip clickToPin>
                                                         <TooltipTrigger asChild>
                                                             <button
                                                                 type="button"

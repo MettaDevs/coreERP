@@ -28,11 +28,16 @@ final class ProvisionDefaultUnitsOfMeasure
                 if (! $unit) {
                     $id = (string) Str::ulid();
                     DB::table('units_of_measure')->insert(['id' => $id, 'tenant_id' => $tenantId, 'uom_class_id' => $classes[$class], 'uom_system_id' => $system ? $systems[$system] : null, 'code' => $code, 'name' => $name, 'symbol' => $symbol, 'decimal_places' => $decimals, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
-                } else { $id = $unit->id; }
+                } else {
+                    $id = $unit->id;
+                }
                 $units[$code] = $id;
                 $external = DB::table('uom_external_codes')->where(['tenant_id' => $tenantId, 'scheme' => 'UN/ECE-REC20', 'code' => $externalCode]);
-                if ($external->exists()) $external->update(['unit_id' => $id, 'updated_at' => now()]);
-                else $external->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'scheme' => 'UN/ECE-REC20', 'code' => $externalCode, 'unit_id' => $id, 'created_at' => now(), 'updated_at' => now()]);
+                if ($external->exists()) {
+                    $external->update(['unit_id' => $id, 'updated_at' => now()]);
+                } else {
+                    $external->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'scheme' => 'UN/ECE-REC20', 'code' => $externalCode, 'unit_id' => $id, 'created_at' => now(), 'updated_at' => now()]);
+                }
             }
             foreach ([['LUSIN', 'PCS', 12], ['KG', 'G', 1000], ['KG', 'TON', 0.001], ['M', 'CM', 100], ['KM', 'M', 1000], ['M2', 'HA', 0.0001], ['L', 'ML', 1000], ['M3', 'L', 1000], ['HOUR', 'MIN', 60], ['DAY', 'HOUR', 24]] as [$from, $to, $factor]) {
                 $this->conversion($tenantId, $units[$from], $units[$to], $factor);
@@ -47,17 +52,25 @@ final class ProvisionDefaultUnitsOfMeasure
         $result = [];
         foreach ($items as [$code, $name]) {
             $record = DB::table($table)->where(['tenant_id' => $tenantId, 'code' => $code])->first();
-            if (! $record) { $id = (string) Str::ulid(); DB::table($table)->insert(['id' => $id, 'tenant_id' => $tenantId, 'code' => $code, 'name' => $name, 'active' => true, 'created_at' => now(), 'updated_at' => now()]); }
-            else { $id = $record->id; }
+            if (! $record) {
+                $id = (string) Str::ulid();
+                DB::table($table)->insert(['id' => $id, 'tenant_id' => $tenantId, 'code' => $code, 'name' => $name, 'active' => true, 'created_at' => now(), 'updated_at' => now()]);
+            } else {
+                $id = $record->id;
+            }
             $result[$code] = $id;
         }
+
         return $result;
     }
 
     private function conversion(string $tenantId, string $from, string $to, float $factor): void
     {
         $conversion = DB::table('uom_conversions')->where(['tenant_id' => $tenantId, 'from_unit_id' => $from, 'to_unit_id' => $to]);
-        if ($conversion->exists()) $conversion->update(['factor' => $factor, 'offset' => 0, 'rounding_scale' => null, 'updated_at' => now()]);
-        else $conversion->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'from_unit_id' => $from, 'to_unit_id' => $to, 'factor' => $factor, 'offset' => 0, 'rounding_scale' => null, 'created_at' => now(), 'updated_at' => now()]);
+        if ($conversion->exists()) {
+            $conversion->update(['factor' => $factor, 'offset' => 0, 'rounding_scale' => null, 'updated_at' => now()]);
+        } else {
+            $conversion->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'from_unit_id' => $from, 'to_unit_id' => $to, 'factor' => $factor, 'offset' => 0, 'rounding_scale' => null, 'created_at' => now(), 'updated_at' => now()]);
+        }
     }
 }

@@ -21,13 +21,13 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 
 - Use one content title. Do not add uppercase category eyebrows such as "MASTER DATA" unless the reference page has one for a real user need.
 - Match Core typography: ordinary page/card titles use `text-xl` or SDK `CardTitle`; never start a CRUD page at `text-3xl` or `text-4xl`.
-- Put explanatory copy in `CardDescription`, `FieldDescription`, or the reference page's tooltip/hint pattern.
+- Keep page/card descriptions optional and page-wide. Do not add a hover/info hint to every heading. Give complex or non-obvious fields optional help text attached to that field; use `FieldDescription` when the guidance must be visible before entry, and keep field-specific meaning out of the page/card header.
 - Keep the page container consistent with its host. An iframe app must not recreate Shell chrome.
 
 ## Cards and actions
 
 - A directory/list page uses one primary `Card`.
-- Put its title and hint in `CardHeader`.
+- Put its title in `CardHeader`. Add a hint there only when it explains the whole list, not an individual field.
 - Put the primary action in `CardAction`, not in a detached page header.
 - Put filters and data in `CardContent`; pagination belongs in `CardFooter`.
 - Use the SDK `Empty` composition when the comparable Core page does.
@@ -51,4 +51,4 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 
 - Write everyday Indonesian that explains the action or consequence.
 - Never expose internal architecture terms on business screens.
-- Verify: one clear title; hint attached to its subject; action inside the card; desktop filters horizontal; no decorative navigation bullets; SDK font/theme inherited; context handshake completes; empty and error states readable.
+- Verify: one clear title; page-level hint is optional; field help is attached to its field; hover opens it after roughly one second and closes it when the pointer leaves; label/title click toggles a persistent open state; keyboard can perform the same toggle; action inside the card; desktop filters horizontal; no decorative navigation bullets; SDK font/theme inherited; context handshake completes; empty and error states readable.

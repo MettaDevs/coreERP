@@ -29,6 +29,10 @@ class OrganizationController extends Controller
     public function index(Request $request): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
+        $section = $request->string('section')->toString();
+        $section = in_array($section, ['legal-entities', 'operating-units', 'hierarchies'], true)
+            ? $section
+            : 'legal-entities';
         $organizations = Organization::query()
             ->where('tenant_id', $membership->tenant_id)
             ->with(['legalEntity', 'operatingUnit'])
@@ -43,8 +47,11 @@ class OrganizationController extends Controller
             ->where('tenant_id', $membership->tenant_id)
             ->with([
                 'purposes:id,code,name',
+                'purposes.allowedOrganizationTypes',
                 'versions' => fn ($query) => $query->orderByDesc('version_number'),
                 'versions.nodes.organization:id,name,classification',
+                'versions.nodes.organization.operatingUnit:organization_id,type',
+                'versions.nodes.parentNode:id,organization_id',
                 'versions.nodes.parentNode.organization:id,name',
             ])
             ->orderBy('name')
@@ -52,6 +59,7 @@ class OrganizationController extends Controller
 
         return Inertia::render('settings/organization', [
             'canManage' => $membership->canManageAccess(),
+            'section' => $section,
             'tenant' => $membership->tenant->only(['id', 'name']),
             'organizations' => $organizations,
             'hierarchies' => $hierarchies,
