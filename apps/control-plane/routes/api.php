@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Internal\FiscalCalendarDirectoryController;
 use App\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Http\Controllers\Internal\MemberDirectoryController;
 use App\Http\Controllers\Internal\OrganizationDirectoryController;
@@ -12,6 +13,7 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
     Route::get('members', [MemberDirectoryController::class, 'index']);
     Route::get('members/{membership}', [MemberDirectoryController::class, 'show']);
     Route::get('operating-units', [OrganizationDirectoryController::class, 'operatingUnits']);
+    Route::get('fiscal-periods', [FiscalCalendarDirectoryController::class, 'resolve']);
     Route::get('units-of-measure', [UnitOfMeasureDirectoryController::class, 'index']);
     Route::post('units-of-measure/resolve', [UnitOfMeasureDirectoryController::class, 'resolve']);
     Route::post('units-of-measure/convert', [UnitOfMeasureDirectoryController::class, 'convert']);

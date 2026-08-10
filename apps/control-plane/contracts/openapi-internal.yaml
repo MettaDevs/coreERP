@@ -133,6 +133,73 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /fiscal-periods:
+    get:
+      tags: [Directory]
+      operationId: internal.fiscal-periods.resolve
+      summary: Tahun buku dan periode yang memuat satu tanggal
+      description: |
+        Untuk app yang perhitungannya bergantung pada batas tahun buku, misalnya
+        penyusutan aset dengan dasar tahun fiskal. Kalender melekat pada legal entity,
+        jadi app cukup menyebut legal entity dan tanggal yang ditanyakan.
+
+        Fakta kalender tetap dimiliki Core. App tidak boleh menyalin bulan awal tahun
+        buku ke databasenya sendiri, karena salinan itu akan menyimpang saat tenant
+        mengubah kalendernya.
+      parameters:
+        - name: legal_entity_id
+          in: query
+          required: true
+          schema: { type: string, format: ulid }
+        - name: date
+          in: query
+          required: true
+          description: Tanggal yang dicari periodenya, format `YYYY-MM-DD`.
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Kalender, tahun buku, dan periode yang memuat tanggal tersebut.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [calendar, year, period]
+                    properties:
+                      calendar:
+                        type: object
+                        required: [id, code, name]
+                        properties:
+                          id: { type: string, format: ulid }
+                          code: { type: string }
+                          name: { type: string }
+                      year:
+                        type: object
+                        required: [id, name, starts_on, ends_on]
+                        properties:
+                          id: { type: string, format: ulid }
+                          name: { type: string }
+                          starts_on: { type: string, format: date }
+                          ends_on: { type: string, format: date }
+                      period:
+                        type: object
+                        required: [id, ordinal, name, starts_on, ends_on]
+                        properties:
+                          id: { type: string, format: ulid }
+                          ordinal: { type: integer }
+                          name: { type: string }
+                          starts_on: { type: string, format: date }
+                          ends_on: { type: string, format: date }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: Legal entity belum punya kalender tahun buku, atau tanggal belum tercakup periodenya.
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /units-of-measure:
     get:
       tags: [Directory]
