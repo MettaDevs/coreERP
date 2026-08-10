@@ -8,12 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        foreach (['m_kondisi_aset', 'm_pabrikan_aset'] as $masterTable) {
-            Schema::table($masterTable, function (Blueprint $table): void {
-                $table->unique(['tenant_id', 'id']);
-            });
-        }
-
         Schema::create('m_lokasi_aset', function (Blueprint $table): void {
             $table->ulid('id')->primary();
             $table->ulid('tenant_id')->index();
@@ -36,6 +30,9 @@ return new class extends Migration
             $table->string('creation_key', 160);
             $table->string('kode', 50);
             $table->string('nama', 150);
+            // Profil penyusutan adalah master penuh seperti master lainnya, jadi ia
+            // memakai bentuk dasar yang sama termasuk keterangan.
+            $table->text('keterangan')->nullable();
             $table->string('method', 40);
             $table->string('frequency', 20);
             $table->string('year_basis', 20);
@@ -57,9 +54,19 @@ return new class extends Migration
             $table->string('creation_key', 160);
             $table->string('kode', 50);
             $table->ulid('legal_entity_id')->index();
+            // Dua sumbu klasifikasi yang saling lepas dan sama-sama wajib: group membawa
+            // perlakuan finansial (penyusutan, GL, penomoran), jenis membawa perlakuan
+            // teknis (maintenance, atribut). Keduanya ditunjuk langsung, tanpa perantara.
+            $table->ulid('group_aset_id');
             $table->ulid('jenis_aset_id');
             $table->ulid('kondisi_aset_id')->nullable();
             $table->ulid('pabrikan_aset_id')->nullable();
+            // Katalog model opsional; mengisinya tidak menggantikan pabrikan pada aset,
+            // karena aset bekas rakitan bisa saja tidak ada di katalog mana pun.
+            $table->ulid('model_aset_id')->nullable();
+            // Hierarki aset hidup di data, bukan skema: satu mesin dapat memiliki
+            // komponen yang juga merupakan aset tercatat, sedalam apa pun.
+            $table->ulid('parent_asset_id')->nullable();
             $table->ulid('asset_location_id')->nullable();
             $table->string('serial_number', 150)->nullable();
             $table->string('model_number', 150)->nullable();
@@ -74,9 +81,15 @@ return new class extends Migration
             $table->unique(['tenant_id', 'id']);
             $table->unique(['tenant_id', 'kode']);
             $table->unique(['tenant_id', 'creation_key']);
+            $table->index(['tenant_id', 'group_aset_id']);
+            $table->index(['tenant_id', 'jenis_aset_id']);
+            $table->index(['tenant_id', 'parent_asset_id']);
+            $table->foreign(['tenant_id', 'group_aset_id'])->references(['tenant_id', 'id'])->on('m_group_aset')->restrictOnDelete();
             $table->foreign(['tenant_id', 'jenis_aset_id'])->references(['tenant_id', 'id'])->on('m_jenis_aset')->restrictOnDelete();
             $table->foreign(['tenant_id', 'kondisi_aset_id'])->references(['tenant_id', 'id'])->on('m_kondisi_aset')->restrictOnDelete();
             $table->foreign(['tenant_id', 'pabrikan_aset_id'])->references(['tenant_id', 'id'])->on('m_pabrikan_aset')->restrictOnDelete();
+            $table->foreign(['tenant_id', 'model_aset_id'])->references(['tenant_id', 'id'])->on('m_model_aset')->restrictOnDelete();
+            $table->foreign(['tenant_id', 'parent_asset_id'])->references(['tenant_id', 'id'])->on('t_aset')->restrictOnDelete();
             $table->foreign(['tenant_id', 'asset_location_id'])->references(['tenant_id', 'id'])->on('m_lokasi_aset')->restrictOnDelete();
         });
 

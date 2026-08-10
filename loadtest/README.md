@@ -37,8 +37,19 @@ DB_TARGET_HOST=db DB_TARGET_PORT=5432 DB_PERSISTENT=true docker compose up -d ap
 node mint-tenants.mjs
 ```
 
+Token dari command ini sudah memuat permission `penyusutan.read`,
+`penyusutan.create`, `penyusutan.finalize`, dan `penyusutan.correct` untuk
+skenario berikut. Fixture default berisi 128 tenant.
+
 ```bash
 docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=saturation -e VUS=1000 -e DURATION=120s -e RUN_ID=run1 grafana/k6:0.55.0 run /scripts/master-data.js
+```
+
+Skenario penyusutan menyiapkan tiga periode per tenant dan menguji retry
+proposal/finalisasi pada 1000 VU:
+
+```bash
+docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=saturation -e VUS=1000 -e DURATION=90s -e RUN_ID=dep-run1 grafana/k6:0.55.0 run /scripts/depreciation.js
 ```
 
 ```bash
@@ -66,7 +77,11 @@ Tiga sumber terpisah, tidak ada yang memakai kode yang sedang diuji sebagai haki
 
 1. **`verify.sql`** — langsung ke database: kode ganda per tenant, `creation_key` ganda, anak yang menunjuk induk tenant lain, anak yatim, prefix kode yang tertukar antar reference, `tenant_id` bukan ULID.
 2. **`core-stub /__stats`** — jumlah nomor terbit vs jumlah nomor unik. Selisih apa pun berarti satu nomor diterbitkan dua kali.
-3. **Probe di dalam k6** — token tenant A membaca record tenant B (harus 404), menulis anak di bawah induk tenant B (harus 422), dan tenant yang hanya punya `group-aset.read` membuka `kategori-aset` (harus 403). Semuanya berjalan **selama** beban penuh, bukan sesudahnya.
+3. **Probe di dalam k6** — token tenant A membaca record tenant B (harus 404), menulis anak di bawah induk tenant B (harus 422), dan tenant yang hanya punya `group-aset.read` membuka `model-aset` (harus 403). Semuanya berjalan **selama** beban penuh, bukan sesudahnya.
+
+Untuk depresiasi, oracle juga memeriksa nilai penyusutan negatif, NBV di bawah
+residual atau nol, finalisasi periode ganda, dan saldo round-off yang tidak
+mendarat di residual.
 
 ## Hasil terukur
 
@@ -128,3 +143,6 @@ Temuan lain: route `context` dulunya closure, yang diam-diam mematikan `php arti
 - `core-stub` bukan Control Plane. Ia menegakkan kontrak issue + idempotency dan mencatat nomor, tetapi tidak menguji continuous sequence, reservation, atau failover Core.
 - Token konteks di-mint dengan TTL panjang supaya tidak kedaluwarsa di tengah run. Masa hidup token diuji di test feature, bukan di sini.
 - UI tidak disentuh load test ini.
+- `depreciation.js` menguji proposal/finalisasi yang sama secara idempotent setelah
+  setup deterministik; urutan perhitungan dan saldo awal divalidasi saat setup,
+  sedangkan race saat beban penuh memvalidasi saldo tidak berubah.

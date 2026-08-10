@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Tests\Concerns\InteractsWithCoreErpContext;
 use Tests\TestCase;
 
@@ -14,24 +16,150 @@ class AssetLocationTest extends TestCase
 
     private string $tenantId;
 
+    private int $issued = 0;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->tenantId = (string) Str::ulid();
         $this->configureCoreErpContext();
-        $number = 0;
-        Http::fake(function () use (&$number) {
-            return Http::response(['data' => ['number' => 'LOCA-'.str_pad((string) ++$number, 6, '0', STR_PAD_LEFT)]], 200);
-        });
+        Http::fake(fn () => Http::response(['data' => ['number' => 'LOCA-'.str_pad((string) ++$this->issued, 6, '0', STR_PAD_LEFT)]], 200));
     }
 
     public function test_location_keeps_hierarchy_and_rejects_cycles_or_archiving_a_parent(): void
     {
-        $permissions = ['management-aset.lokasi-aset.read', 'management-aset.lokasi-aset.create', 'management-aset.lokasi-aset.update', 'management-aset.lokasi-aset.archive'];
-        $root = $this->withHeaders($this->contextHeaders($this->tenantId, $permissions))->withHeader('Idempotency-Key', 'location-root')->postJson('/api/v1/lokasi-aset', ['nama' => 'Kantor pusat'])->assertCreated()->json('data');
-        $child = $this->withHeaders($this->contextHeaders($this->tenantId, $permissions))->withHeader('Idempotency-Key', 'location-child')->postJson('/api/v1/lokasi-aset', ['nama' => 'Lantai satu', 'parent_id' => $root['id']])->assertCreated()->assertJsonPath('data.parent.id', $root['id'])->json('data');
+        $root = $this->create('lokasi-aset', ['nama' => 'Kantor pusat'])->assertCreated()->json('data');
+        $child = $this->create('lokasi-aset', ['nama' => 'Lantai satu', 'parent_id' => $root['id']])
+            ->assertCreated()
+            ->assertJsonPath('data.parent.id', $root['id'])
+            ->json('data');
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions))->patchJson('/api/v1/lokasi-aset/'.$root['id'], ['parent_id' => $child['id']])->assertStatus(422);
-        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions))->deleteJson('/api/v1/lokasi-aset/'.$root['id'])->assertConflict();
+        $this->request('lokasi-aset', 'patch', '/api/v1/lokasi-aset/'.$root['id'], ['parent_id' => $child['id']])->assertStatus(422);
+        $this->request('lokasi-aset', 'delete', '/api/v1/lokasi-aset/'.$root['id'])->assertConflict();
+    }
+
+    public function test_tipe_lokasi_adalah_induk_kedua_yang_lepas_dari_induk_lokasi(): void
+    {
+        $tipe = $this->create('tipe-lokasi-aset', ['nama' => 'Ruangan'])->assertCreated()->json('data.id');
+        $root = $this->create('lokasi-aset', ['nama' => 'Kantor pusat'])->assertCreated()->json('data.id');
+
+        // Induk lokasi dan tipe lokasi diisi bersamaan tanpa saling menyaring.
+        $lokasi = $this->create('lokasi-aset', ['nama' => 'Ruang server', 'parent_id' => $root, 'tipe_lokasi_id' => $tipe])
+            ->assertCreated()
+            ->assertJsonPath('data.parent.id', $root)
+            ->assertJsonPath('data.tipe_lokasi.id', $tipe)
+            ->json('data.id');
+
+        // Tipe yang masih dipakai tidak boleh diarsipkan.
+        $this->request('tipe-lokasi-aset', 'delete', '/api/v1/tipe-lokasi-aset/'.$tipe)
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'referenced_by_children');
+
+        // Menghapus tipe dari lokasi tidak menggeser induk lokasinya.
+        $this->request('lokasi-aset', 'patch', '/api/v1/lokasi-aset/'.$lokasi, ['tipe_lokasi_id' => null])
+            ->assertOk()
+            ->assertJsonPath('data.tipe_lokasi', null)
+            ->assertJsonPath('data.parent.id', $root);
+
+        $this->request('tipe-lokasi-aset', 'delete', '/api/v1/tipe-lokasi-aset/'.$tipe)->assertNoContent();
+    }
+
+    public function test_daftar_lokasi_dapat_disaring_menurut_tipe(): void
+    {
+        $ruangan = $this->create('tipe-lokasi-aset', ['nama' => 'Ruangan'])->assertCreated()->json('data.id');
+        $gedung = $this->create('tipe-lokasi-aset', ['nama' => 'Gedung'])->assertCreated()->json('data.id');
+        $this->create('lokasi-aset', ['nama' => 'Ruang server', 'tipe_lokasi_id' => $ruangan])->assertCreated();
+        $this->create('lokasi-aset', ['nama' => 'Gedung A', 'tipe_lokasi_id' => $gedung])->assertCreated();
+
+        $this->request('lokasi-aset', 'get', '/api/v1/lokasi-aset?tipe_lokasi_id='.$ruangan)
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.nama', 'Ruang server');
+    }
+
+    /**
+     * Padanan toggle "Update asset dimension" di F&O: lokasi memetakan unit organisasi,
+     * dan aset yang ditempatkan di situ mewarisinya sebagai dimensi keuangan.
+     */
+    public function test_aset_mewarisi_dimensi_keuangan_dari_lokasi_saat_diterima_dan_dimutasi(): void
+    {
+        $unitGudang = (string) Str::ulid();
+        $unitProduksi = (string) Str::ulid();
+        $unitPengguna = (string) Str::ulid();
+        $legalEntity = (string) Str::ulid();
+
+        $gudang = $this->create('lokasi-aset', ['nama' => 'Gudang', 'org_unit_id' => $unitGudang])
+            ->assertCreated()
+            ->assertJsonPath('data.org_unit_id', $unitGudang)
+            ->json('data.id');
+        $produksi = $this->create('lokasi-aset', ['nama' => 'Lantai produksi', 'org_unit_id' => $unitProduksi])->assertCreated()->json('data.id');
+        $tanpaUnit = $this->create('lokasi-aset', ['nama' => 'Koridor'])->assertCreated()->json('data.id');
+
+        $classification = $this->classification();
+        $assetPermissions = ['management-aset.aset.read', 'management-aset.aset.create', 'management-aset.aset.mutate'];
+
+        $asset = $this->withHeaders($this->contextHeaders($this->tenantId, $assetPermissions))
+            ->withHeader('Idempotency-Key', 'terima-1')
+            ->postJson('/api/v1/aset', [
+                'legal_entity_id' => $legalEntity, ...$classification,
+                'asset_location_id' => $gudang, 'acquired_on' => '2026-08-01',
+                'acquisition_value' => 1000, 'currency_code' => 'IDR',
+                'usage_org_unit_id' => $unitPengguna,
+            ])->assertCreated()
+            // Dimensi diambil dari lokasi, bukan dari unit pengguna.
+            ->assertJsonPath('data.financial_dimension_org_unit_id', $unitGudang)
+            ->json('data.id');
+
+        // Pindah ke lokasi yang dipetakan ke unit lain: pembebanannya ikut pindah.
+        $this->withHeaders($this->contextHeaders($this->tenantId, $assetPermissions))
+            ->postJson('/api/v1/aset/'.$asset.'/penempatan', [
+                'effective_on' => '2026-09-01', 'reason' => 'Mulai dipakai produksi',
+                'usage_org_unit_id' => $unitPengguna, 'asset_location_id' => $produksi,
+            ])->assertOk()
+            ->assertJsonPath('data.financial_dimension_org_unit_id', $unitProduksi);
+
+        // Lokasi tanpa pemetaan: aset jatuh kembali ke unit penggunanya sendiri.
+        $this->withHeaders($this->contextHeaders($this->tenantId, $assetPermissions))
+            ->postJson('/api/v1/aset/'.$asset.'/penempatan', [
+                'effective_on' => '2026-10-01', 'reason' => 'Dipindah ke koridor',
+                'usage_org_unit_id' => $unitPengguna, 'asset_location_id' => $tanpaUnit,
+            ])->assertOk()
+            ->assertJsonPath('data.financial_dimension_org_unit_id', $unitPengguna);
+    }
+
+    /** @return array{group_aset_id: string, jenis_aset_id: string} */
+    private function classification(): array
+    {
+        $now = now();
+        $group = (string) Str::ulid();
+        $jenis = (string) Str::ulid();
+        DB::table('m_group_aset')->insert(['id' => $group, 'tenant_id' => $this->tenantId, 'creation_key' => 'g-'.Str::ulid(), 'kode' => 'G'.Str::random(6), 'nama' => 'Group', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('m_jenis_aset')->insert(['id' => $jenis, 'tenant_id' => $this->tenantId, 'creation_key' => 'j-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+
+        return ['group_aset_id' => $group, 'jenis_aset_id' => $jenis];
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function create(string $resource, array $payload): TestResponse
+    {
+        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor($resource)))
+            ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
+            ->postJson('/api/v1/'.$resource, $payload);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function request(string $resource, string $method, string $uri, array $payload = []): TestResponse
+    {
+        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor($resource)))
+            ->json(strtoupper($method), $uri, $payload);
+    }
+
+    /** @return list<string> */
+    private function permissionsFor(string $resource): array
+    {
+        return array_map(
+            fn (string $action): string => 'management-aset.'.$resource.'.'.$action,
+            ['read', 'create', 'update', 'archive'],
+        );
     }
 }

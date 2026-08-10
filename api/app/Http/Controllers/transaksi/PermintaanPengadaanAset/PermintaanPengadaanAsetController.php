@@ -70,7 +70,7 @@ class PermintaanPengadaanAsetController extends Controller
                 $this->replaceDetails($id, $this->tenant($request), $data['details']);
             }
 
-return $changed;
+            return $changed;
         });
         abort_unless($changed, 409, 'Permintaan telah berubah.');
 

@@ -35,10 +35,16 @@ abstract class MasterDataController extends Controller
     /** @return class-string<MasterData> */
     abstract protected function model(): string;
 
-    /** Induk pada rantai klasifikasi; null bila master ini berdiri sendiri. */
-    protected function parentMaster(): ?MasterParent
+    /**
+     * Induk master ini; kosong bila berdiri sendiri. Beberapa master memiliki lebih dari
+     * satu induk yang saling lepas (misalnya model aset yang menunjuk pabrikan dan jenis),
+     * jadi daftar ini tidak menyiratkan urutan atau penyaringan bertingkat.
+     *
+     * @return list<MasterParent>
+     */
+    protected function parentMasters(): array
     {
-        return null;
+        return [];
     }
 
     /** @return list<MasterChild> */
@@ -50,12 +56,16 @@ abstract class MasterDataController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->requirePermission($request, 'read');
-        $parent = $this->parentMaster();
+        $parents = $this->parentMasters();
+        $parentFilterRules = [];
+        foreach ($parents as $parent) {
+            $parentFilterRules[$parent->column] = ['nullable', 'string', 'size:26'];
+        }
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:100'],
             'aktif' => ['nullable', Rule::in(['true', 'false', '1', '0'])],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-            ...$parent ? [$parent->column => ['nullable', 'string', 'size:26']] : [],
+            ...$parentFilterRules,
         ]);
 
         $query = $this->tenantQuery($request);
@@ -72,8 +82,12 @@ abstract class MasterDataController extends Controller
         if (($validated['aktif'] ?? null) !== null) {
             $query->where('aktif', filter_var($validated['aktif'], FILTER_VALIDATE_BOOL));
         }
-        if ($parent && ($parentId = $validated[$parent->column] ?? null)) {
-            $query->where($parent->column, $parentId);
+        // Filter induk bersifat aditif: master dengan dua induk dapat disaring pada
+        // keduanya sekaligus karena tidak ada hubungan bertingkat di antara mereka.
+        foreach ($parents as $parent) {
+            if ($parentId = $validated[$parent->column] ?? null) {
+                $query->where($parent->column, $parentId);
+            }
         }
 
         $page = $query->orderBy('kode')->paginate((int) ($validated['per_page'] ?? 20));
@@ -151,7 +165,7 @@ abstract class MasterDataController extends Controller
         $this->rejectParentCycle($record, $data);
         $record->update($this->changes($data));
         // Induk boleh berpindah, jadi relasi lama dibuang agar dimuat ulang saat disajikan.
-        if ($parent = $this->parentMaster()) {
+        foreach ($this->parentMasters() as $parent) {
             $record->unsetRelation($parent->relation);
         }
 
@@ -185,8 +199,11 @@ abstract class MasterDataController extends Controller
     private function tenantQuery(Request $request): Builder
     {
         $query = $this->newQuery()->where('tenant_id', $this->tenantId($request));
+        foreach ($this->parentMasters() as $parent) {
+            $query->with($parent->eagerLoad());
+        }
 
-        return ($parent = $this->parentMaster()) ? $query->with($parent->eagerLoad()) : $query;
+        return $query;
     }
 
     /**
@@ -210,15 +227,19 @@ abstract class MasterDataController extends Controller
     /** Master yang menunjuk dirinya sendiri (contohnya lokasi) tidak boleh membentuk siklus. */
     private function rejectParentCycle(MasterData $record, array $data): void
     {
-        $parent = $this->parentMaster();
-        if (! $parent || ! array_key_exists($parent->column, $data) || $parent->table !== $record->getTable()) {
-            return;
-        }
-        $parentId = $data[$parent->column];
-        abort_if($parentId === $record->getKey(), 422, 'Data tidak dapat menjadi induk dirinya sendiri.');
-        while ($parentId) {
-            abort_if($parentId === $record->getKey(), 422, 'Lokasi induk tidak boleh membentuk siklus.');
-            $parentId = DB::table($parent->table)->where('tenant_id', $record->tenant_id)->where('id', $parentId)->value($parent->column);
+        foreach ($this->parentMasters() as $parent) {
+            // Hanya induk yang menunjuk tabel master ini sendiri yang dapat membentuk siklus.
+            // Wajib `continue` dan bukan `return`: induk lain pada master yang sama masih
+            // harus diperiksa, dan urutan induk tidak dijamin.
+            if (! array_key_exists($parent->column, $data) || $parent->table !== $record->getTable()) {
+                continue;
+            }
+            $parentId = $data[$parent->column];
+            abort_if($parentId === $record->getKey(), 422, 'Data tidak dapat menjadi induk dirinya sendiri.');
+            while ($parentId) {
+                abort_if($parentId === $record->getKey(), 422, 'Lokasi induk tidak boleh membentuk siklus.');
+                $parentId = DB::table($parent->table)->where('tenant_id', $record->tenant_id)->where('id', $parentId)->value($parent->column);
+            }
         }
     }
 
@@ -253,12 +274,12 @@ abstract class MasterDataController extends Controller
             'aktif' => ['sometimes', 'boolean'],
         ];
 
-        if ($parent = $this->parentMaster()) {
+        foreach ($this->parentMasters() as $parent) {
             $parentRequired = $parent->required ? $required : $optional;
             $rules[$parent->column] = [...$parentRequired, 'string', 'size:26', $this->parentExists($parent, $tenantId)];
         }
 
-        return $rules;
+        return [...$rules, ...$this->extraRules($tenantId, $creating)];
     }
 
     /** Induk wajib berada pada tenant yang sama dan belum diarsipkan. */
@@ -275,15 +296,19 @@ abstract class MasterDataController extends Controller
      */
     private function payload(array $data): array
     {
-        $parent = $this->parentMaster();
+        $parentColumns = [];
+        foreach ($this->parentMasters() as $parent) {
+            $parentColumns[$parent->column] = $data[$parent->column] ?? null;
+        }
 
         return [
-            ...$parent ? [$parent->column => $data[$parent->column] ?? null] : [],
+            ...$parentColumns,
             'nama' => trim($data['nama']),
             'keterangan' => array_key_exists('keterangan', $data) ? $this->trimmedOrNull($data['keterangan']) : null,
             // Dinormalkan ke boolean asli supaya replay() membandingkan nilai yang setipe
             // dengan atribut model. Rule `boolean` menerima 1/0/"1"/"0" tanpa mengubahnya.
             'aktif' => filter_var($data['aktif'] ?? true, FILTER_VALIDATE_BOOL),
+            ...$this->extraPayload($data),
         ];
     }
 
@@ -297,6 +322,9 @@ abstract class MasterDataController extends Controller
             ...$data,
             ...array_key_exists('nama', $data) ? ['nama' => trim($data['nama'])] : [],
             ...array_key_exists('keterangan', $data) ? ['keterangan' => $this->trimmedOrNull($data['keterangan'])] : [],
+            // Kolom tambahan dinormalkan lewat jalur yang sama seperti saat pembuatan,
+            // supaya bentuk yang tersimpan tidak berbeda antara POST dan PATCH.
+            ...$this->extraPayload($data),
         ];
     }
 
@@ -326,10 +354,20 @@ abstract class MasterDataController extends Controller
         return null;
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * Payload dinormalkan lewat cast model sebelum dibandingkan. Tanpa ini, retry yang
+     * sah dituduh konflik hanya karena beda tipe: kolom `decimal:2` mengembalikan
+     * "1000.00" dari database sementara payload membawa float 1000.0, dan perbandingan
+     * strict di bawah menganggapnya berbeda.
+     *
+     * @param  array<string, mixed>  $payload
+     */
     private function replay(MasterData $record, array $payload): JsonResponse
     {
-        if ($record->only(array_keys($payload)) !== $payload) {
+        $model = $this->model();
+        $normalized = (new $model)->forceFill($payload)->only(array_keys($payload));
+
+        if ($record->only(array_keys($payload)) !== $normalized) {
             return response()->json(['error' => [
                 'code' => 'idempotency_conflict',
                 'message' => 'Kunci permintaan sudah dipakai untuk data yang berbeda.',
@@ -350,7 +388,7 @@ abstract class MasterDataController extends Controller
             'aktif' => $record->aktif,
         ];
 
-        if ($parent = $this->parentMaster()) {
+        foreach ($this->parentMasters() as $parent) {
             $related = $record->loadMissing($parent->eagerLoad())->getRelation($parent->relation);
             $data[$parent->column] = $record->{$parent->column};
             $data[$parent->payloadKey()] = $related instanceof MasterData
@@ -360,8 +398,43 @@ abstract class MasterDataController extends Controller
 
         return [
             ...$data,
+            ...$this->extraPresent($record),
             'created_at' => $record->created_at?->toISOString(),
             'updated_at' => $record->updated_at?->toISOString(),
         ];
+    }
+
+    /**
+     * Aturan validasi kolom tambahan milik satu master, di luar bentuk dasar
+     * nama/keterangan/aktif/induk. Dipakai master yang membawa field sendiri seperti
+     * group aset dan profil penyusutan, supaya subclass tidak perlu menimpa
+     * writeRules() secara penuh dan kehilangan aturan induk.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    protected function extraRules(string $tenantId, bool $creating): array
+    {
+        return [];
+    }
+
+    /**
+     * Nilai kolom tambahan yang disimpan saat pembuatan.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function extraPayload(array $data): array
+    {
+        return [];
+    }
+
+    /**
+     * Kolom tambahan yang disajikan pada respons.
+     *
+     * @return array<string, mixed>
+     */
+    protected function extraPresent(MasterData $record): array
+    {
+        return [];
     }
 }

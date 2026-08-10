@@ -30,21 +30,21 @@ const fixture = JSON.parse(open('./tenants.json'));
 const TENANTS = fixture.tenants;
 const NARROW = fixture.narrow;
 
+// Hanya model-aset yang masih berinduk setelah rantai klasifikasi diratakan.
 const CHAINED = {
-    'kategori-aset': { parentField: 'group_aset_id', seed: 'groupAsetId' },
-    'jenis-aset': { parentField: 'kategori_aset_id', seed: 'kategoriAsetId' },
-    'entitas-aset': { parentField: 'jenis_aset_id', seed: 'jenisAsetId' },
+    'model-aset': { parentField: 'pabrikan_aset_id', seed: 'pabrikanAsetId' },
 };
-const STANDALONE = ['group-aset', 'kondisi-aset', 'pabrikan-aset', 'item-checklist-maintenance', 'analisa-maintenance'];
+const STANDALONE = ['group-aset', 'jenis-aset', 'kondisi-aset', 'pabrikan-aset', 'item-checklist-maintenance', 'analisa-maintenance', 'tipe-lokasi-aset'];
+// Prefix mengikuti default_prefix pada app.yaml, bukan singkatan bebas.
 const KODE_PREFIX = {
-    'entitas-aset': 'EA-',
-    'group-aset': 'GA-',
-    'kategori-aset': 'KA-',
-    'jenis-aset': 'JA-',
-    'kondisi-aset': 'KD-',
-    'pabrikan-aset': 'PB-',
-    'item-checklist-maintenance': 'IC-',
-    'analisa-maintenance': 'AM-',
+    'model-aset': 'MDLA',
+    'group-aset': 'GRPA',
+    'jenis-aset': 'JNSA',
+    'kondisi-aset': 'KNDA',
+    'pabrikan-aset': 'PBRA',
+    'item-checklist-maintenance': 'ICMA',
+    'analisa-maintenance': 'ANMA',
+    'tipe-lokasi-aset': 'TLKA',
 };
 
 const readLatency = new Trend('op_read', true);
@@ -147,7 +147,7 @@ export function setup() {
     };
 
     const groupIds = stage(
-        'entitas-aset',
+        'group-aset',
         TENANTS.map((tenant, index) => [
             'POST',
             `${BASE}/api/v1/group-aset`,
@@ -156,33 +156,43 @@ export function setup() {
         ]),
     );
 
-    const kategoriIds = stage(
-        'kategori-aset',
-        TENANTS.map((tenant, index) => [
-            'POST',
-            `${BASE}/api/v1/kategori-aset`,
-            JSON.stringify({ nama: `Kategori seed ${index}`, group_aset_id: groupIds[index] }),
-            auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-kategori-${index}` }),
-        ]),
-    );
-
     const jenisIds = stage(
         'jenis-aset',
         TENANTS.map((tenant, index) => [
             'POST',
             `${BASE}/api/v1/jenis-aset`,
-            JSON.stringify({ nama: `Jenis seed ${index}`, kategori_aset_id: kategoriIds[index] }),
+            JSON.stringify({ nama: `Jenis seed ${index}` }),
             auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-jenis-${index}` }),
         ]),
     );
 
-    const entitasIds = stage(
-        'entitas-aset',
+    const pabrikanIds = stage(
+        'pabrikan-aset',
         TENANTS.map((tenant, index) => [
             'POST',
-            `${BASE}/api/v1/entitas-aset`,
-            JSON.stringify({ nama: `Entitas seed ${index}`, jenis_aset_id: jenisIds[index] }),
-            auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-entitas-${index}` }),
+            `${BASE}/api/v1/pabrikan-aset`,
+            JSON.stringify({ nama: `Pabrikan seed ${index}` }),
+            auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-pabrikan-${index}` }),
+        ]),
+    );
+
+    const modelIds = stage(
+        'model-aset',
+        TENANTS.map((tenant, index) => [
+            'POST',
+            `${BASE}/api/v1/model-aset`,
+            JSON.stringify({ nama: `Model seed ${index}`, pabrikan_aset_id: pabrikanIds[index], jenis_aset_id: jenisIds[index] }),
+            auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-model-${index}` }),
+        ]),
+    );
+
+    const bukuIds = stage(
+        'buku-penyusutan',
+        TENANTS.map((tenant, index) => [
+            'POST',
+            `${BASE}/api/v1/buku-penyusutan`,
+            JSON.stringify({ nama: `Buku seed ${index}`, posting_layer: 'current' }),
+            auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-buku-${index}` }),
         ]),
     );
 
@@ -191,7 +201,7 @@ export function setup() {
         TENANTS.map((tenant, index) => [
             'POST',
             `${BASE}/api/v1/aset`,
-            JSON.stringify({ legal_entity_id: tenant.legalEntityId, usage_org_unit_id: tenant.orgUnitId, jenis_aset_id: jenisIds[index], acquired_on: '2026-01-01', acquisition_value: 1000000, currency_code: 'IDR' }),
+            JSON.stringify({ legal_entity_id: tenant.legalEntityId, usage_org_unit_id: tenant.orgUnitId, group_aset_id: groupIds[index], jenis_aset_id: jenisIds[index], acquired_on: '2026-01-01', acquisition_value: 1000000, currency_code: 'IDR' }),
             auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-aset-${index}` }),
         ]),
     );
@@ -200,9 +210,10 @@ export function setup() {
         created.push({
             id: tenant.id,
             token: tenant.token,
-            entitasAsetId: entitasIds[index],
+            modelAsetId: modelIds[index],
             groupAsetId: groupIds[index],
-            kategoriAsetId: kategoriIds[index],
+            bukuPenyusutanId: bukuIds[index],
+            pabrikanAsetId: pabrikanIds[index],
             jenisAsetId: jenisIds[index],
             legalEntityId: tenant.legalEntityId,
             orgUnitId: tenant.orgUnitId,
@@ -211,7 +222,7 @@ export function setup() {
         });
     });
 
-    console.log(`setup: ${created.length} tenant siap, masing-masing dengan rantai group/kategori/jenis/entitas`);
+    console.log(`setup: ${created.length} tenant siap, masing-masing dengan group, jenis, pabrikan, model, dan buku penyusutan`);
 
     return { tenants: created, narrow: NARROW };
 }
@@ -236,7 +247,7 @@ function violation(kind, tags = {}) {
 }
 
 function listMaster(tenant) {
-    const resources = Object.keys(CHAINED).concat(STANDALONE, ['entitas-aset']);
+    const resources = Object.keys(CHAINED).concat(STANDALONE);
     const resource = resources[Math.floor(Math.random() * resources.length)];
     const chained = CHAINED[resource];
     const query = chained ? `?per_page=20&${chained.parentField}=${tenant[chained.seed]}` : '?per_page=20';
@@ -263,13 +274,15 @@ function listMaster(tenant) {
 }
 
 function showMaster(tenant) {
-    const response = http.get(`${BASE}/api/v1/kategori-aset/${tenant.kategoriAsetId}`, {
+    const response = http.get(`${BASE}/api/v1/model-aset/${tenant.modelAsetId}`, {
         ...auth(tenant.token),
-        tags: { op: 'show', resource: 'kategori-aset' },
+        tags: { op: 'show', resource: 'model-aset' },
     });
     record(response, readLatency, 200, 'show 200');
 
-    if (response.status === 200 && response.json('data.group_aset.id') !== tenant.groupAsetId) {
+    // Model membawa dua induk sekaligus; keduanya harus tersaji utuh dan tidak tertukar.
+    if (response.status === 200 && (response.json('data.pabrikan_aset.id') !== tenant.pabrikanAsetId
+        || response.json('data.jenis_aset.id') !== tenant.jenisAsetId)) {
         violation('wrong_parent_summary');
     }
 }
@@ -292,11 +305,35 @@ function createMaster(tenant) {
     }
 }
 
+/**
+ * Mengganti seluruh matriks group x buku. Dijalankan berbarengan pada pemilik yang
+ * sama untuk membuktikan jalur ganti-seluruh-himpunan tidak menabrak unique index
+ * saat dua penyuntingan beradu.
+ */
+function replaceMatrix(tenant) {
+    const response = http.put(
+        `${BASE}/api/v1/group-aset/${tenant.groupAsetId}/buku-penyusutan`,
+        JSON.stringify({
+            rows: [{
+                buku_id: tenant.bukuPenyusutanId,
+                useful_life_periods: 12 + (exec.vu.idInTest % 48),
+                convention: 'full_month',
+                depreciate: true,
+            }],
+        }),
+        { ...auth(tenant.token), tags: { op: 'replace_link', resource: 'group-buku-penyusutan' } },
+    );
+    record(response, writeLatency, 200, 'replace matrix 200');
+    if (response.status >= 500) {
+        violation('link_replace_conflict', { status: response.status });
+    }
+}
+
 function updateMaster(tenant) {
     const response = http.patch(
-        `${BASE}/api/v1/kategori-aset/${tenant.kategoriAsetId}`,
+        `${BASE}/api/v1/model-aset/${tenant.modelAsetId}`,
         JSON.stringify({ keterangan: `disentuh vu${exec.vu.idInTest}` }),
-        { ...auth(tenant.token), tags: { op: 'update', resource: 'kategori-aset' } },
+        { ...auth(tenant.token), tags: { op: 'update', resource: 'model-aset' } },
     );
     record(response, writeLatency, 200, 'update 200');
 }
@@ -339,9 +376,9 @@ function idempotencyRace(tenant) {
 function crossTenantProbe(tenant, victim) {
     crossTenantProbes.add(1);
 
-    const read = http.get(`${BASE}/api/v1/kategori-aset/${victim.kategoriAsetId}`, {
+    const read = http.get(`${BASE}/api/v1/model-aset/${victim.modelAsetId}`, {
         ...auth(tenant.token),
-        tags: { op: 'probe_read', resource: 'kategori-aset' },
+        tags: { op: 'probe_read', resource: 'model-aset' },
         responseCallback: http.expectedStatuses(404),
     });
     check(read, { 'baca lintas tenant 404': (r) => r.status === 404 });
@@ -351,10 +388,10 @@ function crossTenantProbe(tenant, victim) {
 
     const write = post(
         tenant,
-        'entitas-aset',
-        { nama: 'entitas curian', jenis_aset_id: victim.jenisAsetId },
+        'model-aset',
+        { nama: 'model curian', pabrikan_aset_id: victim.pabrikanAsetId },
         `steal-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}`,
-        { tags: { op: 'probe_write', resource: 'entitas-aset' }, responseCallback: http.expectedStatuses(422) },
+        { tags: { op: 'probe_write', resource: 'model-aset' }, responseCallback: http.expectedStatuses(422) },
     );
     check(write, { 'tulis induk lintas tenant 422': (r) => r.status === 422 });
     if (write.status === 201) {
@@ -376,12 +413,12 @@ function permissionScopeProbe(narrow) {
     });
     check(allowed, { 'scope: group-aset read 200': (r) => r.status === 200 });
 
-    const denied = http.get(`${BASE}/api/v1/kategori-aset?per_page=1`, {
+    const denied = http.get(`${BASE}/api/v1/model-aset?per_page=1`, {
         ...auth(narrow.token),
-        tags: { op: 'probe_scope_denied', resource: 'kategori-aset' },
+        tags: { op: 'probe_scope_denied', resource: 'model-aset' },
         responseCallback: http.expectedStatuses(403),
     });
-    check(denied, { 'scope: kategori-aset read 403': (r) => r.status === 403 });
+    check(denied, { 'scope: model-aset read 403': (r) => r.status === 403 });
     if (denied.status === 200) {
         violation('permission_scope_escalation');
     }
@@ -427,8 +464,10 @@ export default function (data) {
         showMaster(tenant);
     } else if (roll < 0.68) {
         createMaster(tenant);
-    } else if (roll < 0.77) {
+    } else if (roll < 0.74) {
         updateMaster(tenant);
+    } else if (roll < 0.77) {
+        replaceMatrix(tenant);
     } else if (roll < 0.84) {
         lifecycleTransaction(tenant);
     } else if (roll < 0.89) {

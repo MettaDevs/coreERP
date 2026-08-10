@@ -7,6 +7,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/emp
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { api, errorMessage } from '../api';
+import GroupBookMatrix from './GroupBookMatrix';
 import MasterForm from './MasterForm';
 import {
     MasterAction,
@@ -21,31 +22,37 @@ import {
 type ListMeta = { current_page: number; last_page: number; total: number };
 const emptyMeta: ListMeta = { current_page: 1, last_page: 1, total: 0 };
 
+const optionLabel = (option: ParentSummary) => `${option.kode} — ${option.nama}`;
+const allLabel = (label: string) => `Semua ${label.toLowerCase()}`;
+
 export default function MasterPage({ config, permissions }: { config: MasterConfig; permissions: Permission[] }) {
-    const parent = config.parent;
+    const parents = useMemo(() => config.parents ?? [], [config.parents]);
     const can = (action: MasterAction) => permissions.includes(permission(config.resource, action));
     const [items, setItems] = useState<MasterRecord[]>([]);
     const [meta, setMeta] = useState<ListMeta>(emptyMeta);
     const [search, setSearch] = useState('');
     const [activeFilter, setActiveFilter] = useState('semua');
-    const [parentFilter, setParentFilter] = useState('semua');
+    /** Filter induk per kolom foreign key; beberapa induk dapat disaring sekaligus. */
+    const [parentFilter, setParentFilter] = useState<Record<string, string>>({});
     const [page, setPage] = useState(1);
     const [editing, setEditing] = useState<MasterRecord | null | undefined>();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [parentOptions, setParentOptions] = useState<ParentSummary[]>([]);
-    const [parentOptionsError, setParentOptionsError] = useState('');
+    const [parentOptions, setParentOptions] = useState<Record<string, ParentSummary[]>>({});
+    const [parentOptionsError, setParentOptionsError] = useState<Record<string, string>>({});
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const parentItems = parentOptions.map((option) => `${option.kode} — ${option.nama}`);
-    const selectedParent = parentOptions.find((option) => option.id === parentFilter);
 
     const query = useMemo(() => {
         const params = new URLSearchParams({ per_page: '20', page: String(page) });
         if (search.trim()) params.set('q', search.trim());
         if (activeFilter !== 'semua') params.set('aktif', activeFilter);
-        if (parent && parentFilter !== 'semua') params.set(parent.field, parentFilter);
+        // Filter induk bersifat aditif: server menerapkan seluruhnya sekaligus.
+        for (const parent of parents) {
+            const selected = parentFilter[parent.field];
+            if (selected && selected !== 'semua') params.set(parent.field, selected);
+        }
         return params.toString();
-    }, [search, activeFilter, parentFilter, page, parent]);
+    }, [search, activeFilter, parentFilter, page, parents]);
 
     async function load() {
         setLoading(true);
@@ -62,24 +69,30 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
     }
 
     useEffect(() => {
-        if (!parent) {
-            setParentOptions([]);
-            setParentOptionsError('');
-            return;
-        }
+        setParentOptions({});
+        setParentOptionsError({});
+        if (!parents.length) return;
         let cancelled = false;
-        setParentOptionsError('');
-        api<{ data: MasterRecord[] }>(`/${parent.resource}?per_page=100&aktif=true`)
-            .then((result) => {
-                if (!cancelled) setParentOptions(result.data.map(({ id, kode, nama }) => ({ id, kode, nama })));
-            })
-            .catch(() => {
-                if (cancelled) return;
-                setParentOptions([]);
-                setParentOptionsError(`Pilihan ${parent.label.toLowerCase()} belum dapat dimuat. Anda memerlukan akses lihat untuk memilih induk.`);
-            });
+        // Induk saling lepas, jadi seluruh pilihan dimuat berbarengan; gagalnya satu
+        // induk tidak menghalangi induk lain tampil.
+        for (const parent of parents) {
+            api<{ data: MasterRecord[] }>(`/${parent.resource}?per_page=100&aktif=true`)
+                .then((result) => {
+                    if (cancelled) return;
+                    const options = result.data.map(({ id, kode, nama }) => ({ id, kode, nama }));
+                    setParentOptions((current) => ({ ...current, [parent.field]: options }));
+                })
+                .catch(() => {
+                    if (cancelled) return;
+                    setParentOptions((current) => ({ ...current, [parent.field]: [] }));
+                    setParentOptionsError((current) => ({
+                        ...current,
+                        [parent.field]: `Pilihan ${parent.label.toLowerCase()} belum dapat dimuat. Anda memerlukan akses lihat untuk memilih induk.`,
+                    }));
+                });
+        }
         return () => { cancelled = true; };
-    }, [parent]);
+    }, [parents]);
 
     useEffect(() => { setPage(1); }, [search, activeFilter, parentFilter]);
     useEffect(() => { setSelectedIds([]); }, [config.resource, query]);
@@ -138,10 +151,15 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
     const columns: DataTableColumn<MasterRecord>[] = [
         { id: 'kode', header: config.kodeLabel, cell: (item) => <span className="code">{item.kode}</span>, sortValue: (item) => item.kode, width: 170 },
         { id: 'nama', header: config.namaLabel, cell: (item) => <span className="name">{item.nama}</span>, sortValue: (item) => item.nama, width: 260 },
-        ...(parent ? [{ id: 'parent', header: parent.label, cell: (item: MasterRecord) => {
-            const summary = parentSummaryOf(item, parent);
-            return <span className="muted">{summary ? `${summary.kode} — ${summary.nama}` : '—'}</span>;
-        }, width: 220 }] : []),
+        ...parents.map((parent) => ({
+            id: `parent-${parent.field}`,
+            header: parent.label,
+            cell: (item: MasterRecord) => {
+                const summary = parentSummaryOf(item, parent);
+                return <span className="muted">{summary ? optionLabel(summary) : '—'}</span>;
+            },
+            width: 220,
+        })),
         { id: 'keterangan', header: 'Keterangan', cell: (item) => <span className="muted">{item.keterangan || '—'}</span>, width: 260 },
         { id: 'status', header: 'Status', cell: (item) => <Badge variant={item.aktif ? 'default' : 'secondary'}>{item.aktif ? 'Aktif' : 'Tidak aktif'}</Badge>, width: 120 },
     ];
@@ -165,18 +183,27 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                             <Input className="w-full sm:w-70" type="search" placeholder="Cari kode atau nama" aria-label={`Cari ${config.singular}`} value={search} onChange={(event) => setSearch(event.target.value)} />
-                            {parent && (
-                                <div className="w-full sm:w-52">
-                                    <Select
-                                        items={[`Semua ${parent.label.toLowerCase()}`, ...parentItems]}
-                                        value={selectedParent ? `${selectedParent.kode} — ${selectedParent.nama}` : `Semua ${parent.label.toLowerCase()}`}
-                                        searchPlaceholder={`Cari ${parent.label.toLowerCase()}`}
-                                        emptyMessage={`${parent.label} tidak ditemukan.`}
-                                        ariaLabel={`Saring berdasarkan ${parent.label.toLowerCase()}`}
-                                        onValueChange={(item) => setParentFilter(item === `Semua ${parent.label.toLowerCase()}` ? 'semua' : parentOptions.find((option) => `${option.kode} — ${option.nama}` === item)?.id ?? 'semua')}
-                                    />
-                                </div>
-                            )}
+                            {parents.map((parent) => {
+                                const options = parentOptions[parent.field] ?? [];
+                                const selected = options.find((option) => option.id === parentFilter[parent.field]);
+                                return (
+                                    <div key={parent.field} className="w-full sm:w-52">
+                                        <Select
+                                            items={[allLabel(parent.label), ...options.map(optionLabel)]}
+                                            value={selected ? optionLabel(selected) : allLabel(parent.label)}
+                                            searchPlaceholder={`Cari ${parent.label.toLowerCase()}`}
+                                            emptyMessage={`${parent.label} tidak ditemukan.`}
+                                            ariaLabel={`Saring berdasarkan ${parent.label.toLowerCase()}`}
+                                            onValueChange={(item) => setParentFilter((current) => ({
+                                                ...current,
+                                                [parent.field]: item === allLabel(parent.label)
+                                                    ? 'semua'
+                                                    : options.find((option) => optionLabel(option) === item)?.id ?? 'semua',
+                                            }))}
+                                        />
+                                    </div>
+                                );
+                            })}
                             <div className="w-full sm:w-44">
                                 <Select
                                     items={['Semua status', 'Aktif', 'Tidak aktif']}
@@ -229,7 +256,18 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
             </Card>
 
             {editing !== undefined && (
-                <MasterForm config={config} value={editing} parentOptions={parentOptions} parentOptionsError={parentOptionsError} onClose={() => setEditing(undefined)} onSaved={() => { setEditing(undefined); load(); }} />
+                <MasterForm
+                    config={config}
+                    value={editing}
+                    parentOptions={parentOptions}
+                    parentOptionsError={parentOptionsError}
+                    onClose={() => setEditing(undefined)}
+                    onSaved={() => { setEditing(undefined); load(); }}
+                    // Matriks butuh id group, jadi ia baru muncul setelah group tersimpan.
+                    extraSection={config.resource === 'group-aset' && editing
+                        ? <GroupBookMatrix groupId={editing.id} canEdit={can('update')} />
+                        : undefined}
+                />
             )}
         </div>
     );

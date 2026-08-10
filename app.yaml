@@ -1,6 +1,6 @@
 id: management-aset
 name: Management Aset
-description: Kelola entitas, kategori, dan maintenance aset perusahaan.
+description: Kelola klasifikasi, penyusutan, dan maintenance aset perusahaan.
 publisher: apperp
 version: 0.1.0
 kind: business-app
@@ -21,36 +21,50 @@ ui:
         label: Transaksi
     sidebar:
       master:
-        - id: entitas-aset
-          label: Entitas aset
-          permission: management-aset.entitas-aset.read
+        # Dua sumbu klasifikasi yang ditunjuk aset secara langsung didahulukan,
+        # baru katalog dan master pendukungnya.
         - id: group-aset
           label: Group aset
           permission: management-aset.group-aset.read
-        - id: kategori-aset
-          label: Kategori aset
-          permission: management-aset.kategori-aset.read
         - id: jenis-aset
           label: Jenis aset
           permission: management-aset.jenis-aset.read
-        - id: kondisi-aset
-          label: Kondisi aset
-          permission: management-aset.kondisi-aset.read
         - id: pabrikan-aset
           label: Pabrikan aset
           permission: management-aset.pabrikan-aset.read
+        - id: model-aset
+          label: Model aset
+          permission: management-aset.model-aset.read
+        - id: kondisi-aset
+          label: Kondisi aset
+          permission: management-aset.kondisi-aset.read
         - id: item-checklist-maintenance
           label: Item checklist maintenance
           permission: management-aset.item-checklist-maintenance.read
         - id: analisa-maintenance
           label: Analisa maintenance
           permission: management-aset.analisa-maintenance.read
+        - id: tipe-lokasi-aset
+          label: Tipe lokasi aset
+          permission: management-aset.tipe-lokasi-aset.read
         - id: lokasi-aset
           label: Lokasi aset
           permission: management-aset.lokasi-aset.read
+        - id: tipe-atribut
+          label: Tipe atribut
+          permission: management-aset.tipe-atribut.read
+        - id: buku-penyusutan
+          label: Buku penyusutan
+          permission: management-aset.buku-penyusutan.read
         - id: profil-penyusutan
           label: Profil penyusutan
           permission: management-aset.profil-penyusutan.read
+        - id: fixed-asset-parameters
+          label: Parameter aset tetap
+          permission: management-aset.fixed-asset-parameters.read
+        - id: fixed-asset-posting-profiles
+          label: Profil posting aset
+          permission: management-aset.fixed-asset-posting-profiles.read
       transaksi:
         - id: perencanaan-aset
           label: Perencanaan aset
@@ -130,23 +144,17 @@ security:
   # memasangkan entry point dengan access level, privilege adalah satu tugas,
   # duty adalah bagian proses bisnis yang disusun tenant menjadi security role.
   entry_points:
-    - code: management-aset.entitas-aset.form
-      name: Layar entitas aset
+    - code: management-aset.model-aset.form
+      name: Layar model aset
       type: form
-    - code: management-aset.entitas-aset.api
-      name: API entitas aset
+    - code: management-aset.model-aset.api
+      name: API model aset
       type: api
     - code: management-aset.group-aset.form
       name: Layar group aset
       type: form
     - code: management-aset.group-aset.api
       name: API group aset
-      type: api
-    - code: management-aset.kategori-aset.form
-      name: Layar kategori aset
-      type: form
-    - code: management-aset.kategori-aset.api
-      name: API kategori aset
       type: api
     - code: management-aset.jenis-aset.form
       name: Layar jenis aset
@@ -232,28 +240,58 @@ security:
     - code: management-aset.penyusutan.form
       name: Layar penyusutan aset
       type: form
+    - code: management-aset.lokasi-aset.form
+      name: Layar lokasi aset
+      type: form
     - code: management-aset.lokasi-aset.api
       name: API lokasi aset
       type: api
+    - code: management-aset.tipe-lokasi-aset.form
+      name: Layar tipe lokasi aset
+      type: form
+    - code: management-aset.tipe-lokasi-aset.api
+      name: API tipe lokasi aset
+      type: api
+    - code: management-aset.tipe-atribut.form
+      name: Layar tipe atribut
+      type: form
+    - code: management-aset.tipe-atribut.api
+      name: API tipe atribut
+      type: api
+    - code: management-aset.buku-penyusutan.form
+      name: Layar buku penyusutan
+      type: form
+    - code: management-aset.buku-penyusutan.api
+      name: API buku penyusutan
+      type: api
+    - code: management-aset.profil-penyusutan.form
+      name: Layar profil penyusutan
+      type: form
     - code: management-aset.profil-penyusutan.api
       name: API profil penyusutan
       type: api
+    - code: management-aset.fixed-asset-parameters.form
+      name: Layar parameter aset tetap
+      type: form
+    - code: management-aset.fixed-asset-posting-profiles.form
+      name: Layar profil posting aset
+      type: form
   permissions:
-    - code: management-aset.entitas-aset.read
-      name: Lihat entitas aset
-      entry_point: management-aset.entitas-aset.form
+    - code: management-aset.model-aset.read
+      name: Lihat model aset
+      entry_point: management-aset.model-aset.form
       access: read
-    - code: management-aset.entitas-aset.create
-      name: Tambah entitas aset
-      entry_point: management-aset.entitas-aset.api
+    - code: management-aset.model-aset.create
+      name: Tambah model aset
+      entry_point: management-aset.model-aset.api
       access: create
-    - code: management-aset.entitas-aset.update
-      name: Ubah entitas aset
-      entry_point: management-aset.entitas-aset.api
+    - code: management-aset.model-aset.update
+      name: Ubah model aset
+      entry_point: management-aset.model-aset.api
       access: update
-    - code: management-aset.entitas-aset.archive
-      name: Arsipkan entitas aset
-      entry_point: management-aset.entitas-aset.api
+    - code: management-aset.model-aset.archive
+      name: Arsipkan model aset
+      entry_point: management-aset.model-aset.api
       access: delete
     - code: management-aset.group-aset.read
       name: Lihat group aset
@@ -270,22 +308,6 @@ security:
     - code: management-aset.group-aset.archive
       name: Arsipkan group aset
       entry_point: management-aset.group-aset.api
-      access: delete
-    - code: management-aset.kategori-aset.read
-      name: Lihat kategori aset
-      entry_point: management-aset.kategori-aset.form
-      access: read
-    - code: management-aset.kategori-aset.create
-      name: Tambah kategori aset
-      entry_point: management-aset.kategori-aset.api
-      access: create
-    - code: management-aset.kategori-aset.update
-      name: Ubah kategori aset
-      entry_point: management-aset.kategori-aset.api
-      access: update
-    - code: management-aset.kategori-aset.archive
-      name: Arsipkan kategori aset
-      entry_point: management-aset.kategori-aset.api
       access: delete
     - code: management-aset.jenis-aset.read
       name: Lihat jenis aset
@@ -463,9 +485,25 @@ security:
       name: Koreksi penyusutan
       entry_point: management-aset.penyusutan.api
       access: correct
+    - code: management-aset.tipe-lokasi-aset.read
+      name: Lihat tipe lokasi aset
+      entry_point: management-aset.tipe-lokasi-aset.form
+      access: read
+    - code: management-aset.tipe-lokasi-aset.create
+      name: Tambah tipe lokasi aset
+      entry_point: management-aset.tipe-lokasi-aset.api
+      access: create
+    - code: management-aset.tipe-lokasi-aset.update
+      name: Ubah tipe lokasi aset
+      entry_point: management-aset.tipe-lokasi-aset.api
+      access: update
+    - code: management-aset.tipe-lokasi-aset.archive
+      name: Arsipkan tipe lokasi aset
+      entry_point: management-aset.tipe-lokasi-aset.api
+      access: delete
     - code: management-aset.lokasi-aset.read
       name: Lihat lokasi aset
-      entry_point: management-aset.lokasi-aset.api
+      entry_point: management-aset.lokasi-aset.form
       access: read
     - code: management-aset.lokasi-aset.create
       name: Tambah lokasi aset
@@ -479,25 +517,73 @@ security:
       name: Arsipkan lokasi aset
       entry_point: management-aset.lokasi-aset.api
       access: delete
+    - code: management-aset.tipe-atribut.read
+      name: Lihat tipe atribut
+      entry_point: management-aset.tipe-atribut.form
+      access: read
+    - code: management-aset.tipe-atribut.create
+      name: Tambah tipe atribut
+      entry_point: management-aset.tipe-atribut.api
+      access: create
+    - code: management-aset.tipe-atribut.update
+      name: Ubah tipe atribut
+      entry_point: management-aset.tipe-atribut.api
+      access: update
+    - code: management-aset.tipe-atribut.archive
+      name: Arsipkan tipe atribut
+      entry_point: management-aset.tipe-atribut.api
+      access: delete
+    - code: management-aset.buku-penyusutan.read
+      name: Lihat buku penyusutan
+      entry_point: management-aset.buku-penyusutan.form
+      access: read
+    - code: management-aset.buku-penyusutan.create
+      name: Tambah buku penyusutan
+      entry_point: management-aset.buku-penyusutan.api
+      access: create
+    - code: management-aset.buku-penyusutan.update
+      name: Ubah buku penyusutan
+      entry_point: management-aset.buku-penyusutan.api
+      access: update
+    - code: management-aset.buku-penyusutan.archive
+      name: Arsipkan buku penyusutan
+      entry_point: management-aset.buku-penyusutan.api
+      access: delete
     - code: management-aset.profil-penyusutan.read
       name: Lihat profil penyusutan
-      entry_point: management-aset.profil-penyusutan.api
+      entry_point: management-aset.profil-penyusutan.form
       access: read
     - code: management-aset.profil-penyusutan.create
       name: Tambah profil penyusutan
       entry_point: management-aset.profil-penyusutan.api
       access: create
+    - code: management-aset.profil-penyusutan.update
+      name: Ubah profil penyusutan
+      entry_point: management-aset.profil-penyusutan.api
+      access: update
+    - code: management-aset.profil-penyusutan.archive
+      name: Arsipkan profil penyusutan
+      entry_point: management-aset.profil-penyusutan.api
+      access: delete
+    - code: management-aset.fixed-asset-parameters.read
+      name: Lihat parameter aset tetap
+      entry_point: management-aset.fixed-asset-parameters.form
+      access: read
+    - code: management-aset.fixed-asset-posting-profiles.read
+      name: Lihat profil posting aset
+      entry_point: management-aset.fixed-asset-posting-profiles.form
+      access: read
   privileges:
-    - code: management-aset.entitas-aset.maintain
-      name: Pelihara entitas aset
+    - code: management-aset.model-aset.maintain
+      name: Pelihara model aset
       permissions:
-        - management-aset.entitas-aset.read
-        - management-aset.entitas-aset.create
-        - management-aset.entitas-aset.update
-    - code: management-aset.entitas-aset.retire
-      name: Arsipkan entitas aset
+        - management-aset.model-aset.read
+        - management-aset.model-aset.create
+        - management-aset.model-aset.update
+    - code: management-aset.model-aset.retire
+      name: Arsipkan model aset
       permissions:
-        - management-aset.entitas-aset.archive
+        - management-aset.model-aset.archive
     - code: management-aset.group-aset.maintain
       name: Pelihara group aset
       permissions:
@@ -508,16 +594,6 @@ security:
       name: Arsipkan group aset
       permissions:
         - management-aset.group-aset.archive
-    - code: management-aset.kategori-aset.maintain
-      name: Pelihara kategori aset
-      permissions:
-        - management-aset.kategori-aset.read
-        - management-aset.kategori-aset.create
-        - management-aset.kategori-aset.update
-    - code: management-aset.kategori-aset.retire
-      name: Arsipkan kategori aset
-      permissions:
-        - management-aset.kategori-aset.archive
     - code: management-aset.jenis-aset.maintain
       name: Pelihara jenis aset
       permissions:
@@ -611,34 +687,75 @@ security:
     - code: management-aset.penyusutan.correct-period
       name: Koreksi penyusutan aset
       permissions: [management-aset.penyusutan.correct]
+    - code: management-aset.tipe-lokasi-aset.maintain
+      name: Pelihara tipe lokasi aset
+      permissions:
+        - management-aset.tipe-lokasi-aset.read
+        - management-aset.tipe-lokasi-aset.create
+        - management-aset.tipe-lokasi-aset.update
+    - code: management-aset.tipe-lokasi-aset.retire
+      name: Arsipkan tipe lokasi aset
+      permissions:
+        - management-aset.tipe-lokasi-aset.archive
     - code: management-aset.lokasi-aset.maintain
-      name: Kelola lokasi aset
+      name: Pelihara lokasi aset
       permissions:
         - management-aset.lokasi-aset.read
         - management-aset.lokasi-aset.create
         - management-aset.lokasi-aset.update
+    - code: management-aset.lokasi-aset.retire
+      name: Arsipkan lokasi aset
+      permissions:
         - management-aset.lokasi-aset.archive
+    - code: management-aset.tipe-atribut.maintain
+      name: Pelihara tipe atribut
+      permissions:
+        - management-aset.tipe-atribut.read
+        - management-aset.tipe-atribut.create
+        - management-aset.tipe-atribut.update
+    - code: management-aset.tipe-atribut.retire
+      name: Arsipkan tipe atribut
+      permissions:
+        - management-aset.tipe-atribut.archive
+    - code: management-aset.buku-penyusutan.maintain
+      name: Pelihara buku penyusutan
+      permissions:
+        - management-aset.buku-penyusutan.read
+        - management-aset.buku-penyusutan.create
+        - management-aset.buku-penyusutan.update
+    - code: management-aset.buku-penyusutan.retire
+      name: Arsipkan buku penyusutan
+      permissions:
+        - management-aset.buku-penyusutan.archive
     - code: management-aset.profil-penyusutan.maintain
-      name: Kelola profil penyusutan
+      name: Pelihara profil penyusutan
       permissions:
         - management-aset.profil-penyusutan.read
         - management-aset.profil-penyusutan.create
+        - management-aset.profil-penyusutan.update
+    - code: management-aset.profil-penyusutan.retire
+      name: Arsipkan profil penyusutan
+      permissions:
+        - management-aset.profil-penyusutan.archive
+    - code: management-aset.fixed-asset-parameters.view
+      name: Lihat parameter aset tetap
+      permissions:
+        - management-aset.fixed-asset-parameters.read
+    - code: management-aset.fixed-asset-posting-profiles.view
+      name: Lihat profil posting aset
+      permissions:
+        - management-aset.fixed-asset-posting-profiles.read
   duties:
-    - code: management-aset.entitas-aset.manage
-      name: Kelola entitas aset
+    - code: management-aset.model-aset.manage
+      name: Kelola model aset
       privileges:
-        - management-aset.entitas-aset.maintain
-        - management-aset.entitas-aset.retire
+        - management-aset.model-aset.maintain
+        - management-aset.model-aset.retire
     - code: management-aset.group-aset.manage
       name: Kelola group aset
       privileges:
         - management-aset.group-aset.maintain
         - management-aset.group-aset.retire
-    - code: management-aset.kategori-aset.manage
-      name: Kelola kategori aset
-      privileges:
-        - management-aset.kategori-aset.maintain
-        - management-aset.kategori-aset.retire
     - code: management-aset.jenis-aset.manage
       name: Kelola jenis aset
       privileges:
@@ -696,29 +813,46 @@ security:
     - code: management-aset.penyusutan.manage
       name: Kelola penyusutan aset
       privileges: [management-aset.penyusutan.maintain, management-aset.penyusutan.correct-period]
+    - code: management-aset.tipe-lokasi-aset.manage
+      name: Kelola tipe lokasi aset
+      privileges:
+        - management-aset.tipe-lokasi-aset.maintain
+        - management-aset.tipe-lokasi-aset.retire
     - code: management-aset.lokasi-aset.manage
       name: Kelola lokasi aset
       privileges:
         - management-aset.lokasi-aset.maintain
+        - management-aset.lokasi-aset.retire
+    - code: management-aset.tipe-atribut.manage
+      name: Kelola tipe atribut
+      privileges:
+        - management-aset.tipe-atribut.maintain
+        - management-aset.tipe-atribut.retire
+    - code: management-aset.buku-penyusutan.manage
+      name: Kelola buku penyusutan
+      privileges:
+        - management-aset.buku-penyusutan.maintain
+        - management-aset.buku-penyusutan.retire
     - code: management-aset.profil-penyusutan.manage
       name: Kelola profil penyusutan
       privileges:
         - management-aset.profil-penyusutan.maintain
+        - management-aset.profil-penyusutan.retire
+    - code: management-aset.fixed-assets-setup.view
+      name: Lihat pengaturan aset tetap
+      privileges:
+        - management-aset.fixed-asset-parameters.view
+        - management-aset.fixed-asset-posting-profiles.view
 number_sequences:
   references:
-    - code: management-aset.entitas-aset
-      name: Kode entitas aset
-      default_prefix: ENTA
+    - code: management-aset.model-aset
+      name: Kode model aset
+      default_prefix: MDLA
       allowed_scopes:
         - tenant
     - code: management-aset.group-aset
       name: Kode group aset
       default_prefix: GRPA
-      allowed_scopes:
-        - tenant
-    - code: management-aset.kategori-aset
-      name: Kode kategori aset
-      default_prefix: KTGA
       allowed_scopes:
         - tenant
     - code: management-aset.jenis-aset
@@ -751,9 +885,24 @@ number_sequences:
       default_prefix: ASTA
       allowed_scopes:
         - legal_entity
+    - code: management-aset.tipe-lokasi-aset
+      name: Kode tipe lokasi aset
+      default_prefix: TLKA
+      allowed_scopes:
+        - tenant
     - code: management-aset.lokasi-aset
       name: Kode lokasi aset
       default_prefix: LOCA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.tipe-atribut
+      name: Kode tipe atribut
+      default_prefix: TATR
+      allowed_scopes:
+        - tenant
+    - code: management-aset.buku-penyusutan
+      name: Kode buku penyusutan
+      default_prefix: BKPY
       allowed_scopes:
         - tenant
     - code: management-aset.profil-penyusutan

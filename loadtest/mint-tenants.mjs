@@ -18,14 +18,16 @@ const TTL_SECONDS = Number(process.env.TTL_SECONDS ?? 7200);
 const OUTPUT = process.env.OUTPUT ?? 'k6/tenants.json';
 
 const MASTERS = [
-    'entitas-aset',
     'group-aset',
-    'kategori-aset',
     'jenis-aset',
+    'model-aset',
     'kondisi-aset',
     'pabrikan-aset',
     'item-checklist-maintenance',
     'analisa-maintenance',
+    'tipe-lokasi-aset',
+    'buku-penyusutan',
+    'profil-penyusutan',
 ];
 const ACTIONS = ['read', 'create', 'update', 'archive'];
 
@@ -89,6 +91,7 @@ function contextToken(tenantId, permissions, legalEntityId, orgUnitId) {
 const allPermissions = MASTERS.flatMap((master) => ACTIONS.map((action) => `${APP_ID}.${master}.${action}`));
 const transactionPermissions = [
     `${APP_ID}.aset.read`, `${APP_ID}.aset.create`, `${APP_ID}.aset.mutate`, `${APP_ID}.mutasi-aset.read`,
+    `${APP_ID}.penyusutan.read`, `${APP_ID}.penyusutan.create`, `${APP_ID}.penyusutan.finalize`, `${APP_ID}.penyusutan.correct`,
     ...['perencanaan-aset', 'permintaan-pembelian-aset', 'pemeliharaan-aset', 'penjualan-aset', 'pemusnahan-aset'].flatMap((resource) => [`${APP_ID}.${resource}.read`, `${APP_ID}.${resource}.create`]),
     `${APP_ID}.perencanaan-aset.update`, `${APP_ID}.perencanaan-aset.archive`,
 ];

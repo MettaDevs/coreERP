@@ -19,11 +19,16 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 ## Batas yang tidak boleh dilanggar
 
 - App ini **tidak pernah** menyentuh database Core, dan Core tidak menyentuh database ini. Pertukaran hanya lewat REST/OpenAPI, event/AsyncAPI, dan token konteks bertanda tangan.
+- Setiap endpoint dan event yang menyeberang batas app wajib ada di `contracts/`. Tidak ada test yang gagal karena contract kurang lengkap, jadi periksa manual sebelum menyatakan selesai.
+- Contract ditulis tangan dan merupakan sumber kebenaran, bukan hasil generate dari kode. Ambang ~1500 baris sudah terlampaui, jadi sumbernya kini dipecah di `contracts/src/` (`paths/` dan `components/`) dan `contracts/openapi.yaml` adalah **bundle hasil generate** — jangan pernah menyuntingnya langsung, isinya ditimpa tiap build. Sunting `contracts/src/`, lalu jalankan `python contracts/bundle.py`. `python contracts/bundle.py --check` memastikan bundle sinkron dengan sumbernya. Bundle sengaja tetap bernama `contracts/openapi.yaml` supaya `api.openapi` di `app.yaml` dan Control Plane membaca path yang sama seperti sebelum dipecah.
+- Mengubah contract event berarti mengubah kedua sisi. Pasangan `contracts/asyncapi.yaml` di sini adalah `CoreERP/apps/control-plane/contracts/asyncapi.yaml`; keduanya berubah dalam pekerjaan yang sama.
+- Event yang diterima wajib mengontrakkan header signature dan status kegagalannya, bukan hanya payload. Consumer tidak boleh menebak string yang ditandatangani dari source publisher.
 - `tenant_id` hanya berasal dari token konteks yang diverifikasi `RequireCoreErpContext`. Tidak pernah dari body, query, atau header bebas.
 - `kode` selalu diterbitkan Number Sequence Core. App tidak menyimpan counter dan mengabaikan `kode` yang dikirim klien.
 - Format, status, dan counter nomor adalah keputusan owner/admin tenant di Control Plane. Manifest hanya mendeklarasikan reference dan allowed scope.
 - Arsip adalah soft delete. Jangan mengganti dengan hard delete: record lama masih direferensikan data turunan.
-- Rantai `entitas → group → kategori → jenis` adalah struktur domain app ini, bukan organization hierarchy CoreERP. Foreign key permanen di sini sah; di identitas organization Core tidak.
+- Master klasifikasi **datar dan saling lepas**, mengikuti model Dynamics 365 F&O: aset menunjuk `group_aset_id` (sumbu finansial) dan `jenis_aset_id` (sumbu teknis) secara langsung dan sejajar. Jangan menambah tingkat klasifikasi baru sebagai tabel; pembedaan yang lebih rinci diselesaikan lewat atribut.
+- Yang hierarkis hanya data, bukan skema: `m_lokasi_aset.parent_id` dan `tr_penerimaan_aset.parent_asset_id` menunjuk dirinya sendiri. Keduanya struktur domain app ini, bukan organization hierarchy CoreERP; foreign key permanen di sini sah, di identitas organization Core tidak.
 
 ## Menambah atau mengubah master
 
@@ -31,7 +36,7 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 2. Foreign key ke master lain wajib **gabungan dengan `tenant_id`** — `(tenant_id, parent_id)` → `(tenant_id, id)` — sehingga induk lintas tenant ditolak database, bukan hanya validasi aplikasi. Tabel induk perlu `unique(tenant_id, id)`.
 3. Controller cukup mewarisi `MasterDataController` dan menyatakan slug resource, model, induk, serta anaknya. Jangan menyalin ulang logika hak akses, idempotency, atau penomoran.
 4. `app.yaml` wajib menambah empat lapis Dynamics 365 secara terpisah — entry point, permission, privilege, duty — plus satu reference nomor. Kode privilege tidak boleh sama dengan kode permission.
-5. Perbarui `contracts/openapi.yaml`, `README.md`, dan `database/README.md` pada perubahan yang sama.
+5. Perbarui `contracts/src/` (lalu `python contracts/bundle.py`), `README.md`, dan `database/README.md` pada perubahan yang sama.
 
 ## Verifikasi sebelum menyatakan selesai
 

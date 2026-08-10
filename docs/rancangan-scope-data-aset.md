@@ -48,8 +48,8 @@ Jika seorang pengguna memiliki lebih dari satu assignment aktif, scope efektifny
 
 | Data / datatable | Kunci pembatas | Aturan baca dan ubah |
 | --- | --- | --- |
-| Master klasifikasi (`entitas`, `group`, `kategori`, `jenis`, `kondisi`, `pabrikan`, profil penyusutan) | `tenant_id` | Ini konfigurasi tenant bersama. Tetap perlu permission resource; tidak disaring per kantor kecuali suatu master kelak benar-benar dimiliki unit tertentu. |
-| Lokasi aset | `tenant_id` + unit pemilik/pengguna lokasi **yang perlu ditambahkan** | Nama lokasi dapat mengungkap kantor lain. Jika lokasi dipakai sebagai lokasi kantor, filter dengan scope organisasi yang sama; jangan menyamakan pohon lokasi dengan hierarchy organisasi. |
+| Master klasifikasi (`group`, `jenis`, `model`, `kondisi`, `pabrikan`, profil penyusutan) | `tenant_id` | Ini konfigurasi tenant bersama. Tetap perlu permission resource; tidak disaring per kantor kecuali suatu master kelak benar-benar dimiliki unit tertentu. |
+| Lokasi aset | `tenant_id` + `org_unit_id` pada lokasi | Nama lokasi dapat mengungkap kantor lain. `org_unit_id` sudah tersedia sebagai jembatan ke unit organisasi; pakai kolom itu untuk menyaring, dan tetap jangan menyamakan pohon lokasi dengan hierarchy organisasi. |
 | Register aset | `tenant_id`, `legal_entity_id`, unit pemakaian aktif | Baris hanya terlihat bila `usage_org_unit_id` penempatan efektif termasuk scope assignment. Aset yang belum ditempatkan memakai unit penerima sebagai fallback; bila keduanya kosong, hanya role yang memang diberi scope legal entity/tenant administratif yang boleh melihatnya. |
 | Riwayat penempatan | scope dari aset induknya | Jangan expose sebagai list bebas. Setelah aset lolos scope, riwayatnya boleh dibaca sesuai permission aset. |
 | Perencanaan aset | `tenant_id`, `legal_entity_id`, `planning_org_unit_id` | Filter dan validasi tulis terhadap scope unit perencana. Implementasi saat ini hanya memaksa unit aktif saat create/update; list dan show belum membatasi semua assignment yang diizinkan. |

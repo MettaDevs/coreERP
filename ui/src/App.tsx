@@ -5,7 +5,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/emp
 import { api, errorMessage, setContextToken } from './api';
 import MasterPage from './master/MasterPage';
 import AssetPage from './transactions/inventarisasi-aset/AssetPage';
-import DepreciationProfilePage from './transactions/inventarisasi-aset/DepreciationProfilePage';
 import DepreciationPage from './transactions/inventarisasi-aset/DepreciationPage';
 import LifecycleDocumentPage from './transactions/_shared/LifecycleDocumentPage';
 import MutationPage from './transactions/mutasi-aset/MutationPage';
@@ -17,6 +16,7 @@ import { config as dekomisioningAset } from './transactions/dekomisioning-aset/c
 import { config as penjualanAset } from './transactions/penjualan-aset/config';
 import { config as pemusnahanAset } from './transactions/pemusnahan-aset/config';
 import { MASTERS, MasterResource, Permission, permission } from './master/masters';
+import FixedAssetSetupPlaceholderPage from './fixed-assets-setup/FixedAssetSetupPlaceholderPage';
 
 function useHashResource(): string {
     const read = () => window.location.hash.replace(/^#\/?/, '');
@@ -92,8 +92,9 @@ export default function App() {
     if (hashResource === 'aset' && permissions.includes('management-aset.aset.read')) {
         return <main><AssetPage context={assetContext} /></main>;
     }
-    if (hashResource === 'profil-penyusutan' && permissions.includes('management-aset.profil-penyusutan.read')) return <main><DepreciationProfilePage canCreate={permissions.includes('management-aset.profil-penyusutan.create')} /></main>;
     if (hashResource === 'penyusutan' && permissions.includes('management-aset.penyusutan.read')) return <main><DepreciationPage canCreate={permissions.includes('management-aset.penyusutan.create')} canFinalize={permissions.includes('management-aset.penyusutan.finalize')} canCorrect={permissions.includes('management-aset.penyusutan.correct')} /></main>;
+    if (hashResource === 'fixed-asset-parameters' && permissions.includes('management-aset.fixed-asset-parameters.read')) return <main><FixedAssetSetupPlaceholderPage kind="parameters" /></main>;
+    if (hashResource === 'fixed-asset-posting-profiles' && permissions.includes('management-aset.fixed-asset-posting-profiles.read')) return <main><FixedAssetSetupPlaceholderPage kind="posting-profiles" /></main>;
 
     if (hashResource === 'mutasi-aset' && permissions.includes('management-aset.mutasi-aset.read')) return <main><MutationPage /></main>;
     if (hashResource === 'monitoring-aset' && permissions.includes('management-aset.monitoring-aset.read')) return <main><MonitoringPage /></main>;
