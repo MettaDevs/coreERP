@@ -12,7 +12,8 @@ class AssetBook extends Model
     protected $table = 'tr_buku_aset';
 
     protected $fillable = [
-        'tenant_id', 'asset_id', 'depreciation_profile_id', 'book_code',
+        'tenant_id', 'asset_id', 'buku_id', 'depreciation_profile_id', 'alternative_profile_id', 'book_code',
+        'useful_life_periods', 'convention', 'depreciation_start_on', 'depreciate', 'round_off_depreciation',
         'acquisition_value', 'residual_value', 'accumulated_depreciation',
         'net_book_value', 'status',
     ];
@@ -24,6 +25,10 @@ class AssetBook extends Model
             'residual_value' => 'decimal:2',
             'accumulated_depreciation' => 'decimal:2',
             'net_book_value' => 'decimal:2',
+            'useful_life_periods' => 'integer',
+            'depreciation_start_on' => 'date',
+            'depreciate' => 'boolean',
+            'round_off_depreciation' => 'decimal:2',
         ];
     }
 }

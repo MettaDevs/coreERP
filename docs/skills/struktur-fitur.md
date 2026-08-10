@@ -4,17 +4,17 @@ Sebelum membuat halaman atau fitur baru, buat folder fiturnya pada API dan UI. C
 
 Pertahankan kode shared tetap kecil. Pindahkan ke shared hanya setelah benar-benar dipakai minimal dua fitur.
 
-## Dropdown bertingkat
+## Beberapa induk: sejajar dulu, bertingkat hanya bila memang bergantung
 
-Saat nilai induk berubah, kosongkan semua nilai turunannya pada handler yang sama dan saring pilihan anak berdasarkan induk aktif. Jangan kirim nilai anak lama ke API.
+Pertanyaan pertama bukan "bagaimana membuat cascade", melainkan **apakah induknya benar-benar saling bergantung**.
 
-Pastikan komponen pilihan benar-benar controlled ketika dikosongkan. Pada `@apperp/ui/Select`, `undefined` berarti memakai state internal; gunakan `null` untuk menampilkan pilihan kosong secara eksplisit. Perubahan group harus mereset kategori dan jenis; perubahan kategori harus mereset jenis.
+Sebagian besar tidak. Master klasifikasi aset datar dan saling lepas: `model-aset` punya dua induk (pabrikan dan jenis), tetapi memilih pabrikan tidak menyaring pilihan jenis. Untuk kasus seperti ini render **N dropdown sejajar** — tanpa reset, tanpa urutan, tanpa `key` remount. Menambahkan cascade di sini justru memaksa pengguna mengisi urutan yang tidak ada aturannya, dan itulah bentuk kesalahan yang paling sering terjadi.
 
-## Dropdown bertingkat
+`MasterForm` dan `MasterPage` sudah menangani ini lewat `parents: MasterParentConfig[]` di `ui/src/master/masters.ts`; tambahkan induk di konfigurasi, jangan menulis dropdown khusus.
 
-Untuk pilihan yang bergantung pada induk, misalnya group → kategori → jenis:
+Cascade hanya dipakai ketika pilihan anak **memang** merupakan himpunan bagian dari induknya. Bila demikian:
 
 - Saat nilai induk berubah, kosongkan seluruh nilai turunannya pada event handler yang sama.
 - Saring pilihan anak berdasarkan induk aktif; jangan kirim nilai anak lama ke API.
-- Pastikan komponen pilihan benar-benar menampilkan keadaan kosong. Bila komponen menyimpan nilai internal saat prop `value` menjadi `undefined`, remount komponen anak dengan `key` yang berasal dari ID induknya, atau gunakan nilai kosong yang tetap controlled.
-- Terapkan urutan yang sama sampai tingkat paling bawah: perubahan group mereset kategori dan jenis; perubahan kategori mereset jenis.
+- Pastikan komponen pilihan benar-benar menampilkan keadaan kosong. Pada `@apperp/ui/Select`, `undefined` berarti memakai state internal; gunakan `null` untuk pilihan kosong yang eksplisit, atau remount komponen anak dengan `key` yang berasal dari ID induknya.
+- Saring di sisi server lewat `?<induk>_id=`, bukan dengan memuat seluruh daftar lalu menyaring di browser — daftar yang dimuat selalu terbatas `per_page` dan pilihan yang tersisa akan hilang diam-diam.

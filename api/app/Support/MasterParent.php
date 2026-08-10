@@ -18,7 +18,7 @@ final readonly class MasterParent
         public bool $required = true,
     ) {}
 
-    /** Kunci induk pada payload API, misalnya `entitas_aset`. */
+    /** Kunci induk pada payload API, misalnya `pabrikan_aset`. */
     public function payloadKey(): string
     {
         return Str::beforeLast($this->column, '_id');

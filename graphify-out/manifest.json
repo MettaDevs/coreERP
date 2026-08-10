@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/MasterDataController.php": {
-    "mtime": 1785245603.165044,
-    "ast_hash": "b5d53d464082f3c151d30fd67b505a01",
+    "mtime": 1786065414.2796786,
+    "ast_hash": "c26389d398943b9efbe063016249b2ec",
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/master/AnalisaMaintenanceController.php": {
@@ -24,14 +24,9 @@
     "ast_hash": "7f618f282000628d1e2bd6c49106366c",
     "semantic_hash": ""
   },
-  "api/app/Http/Controllers/master/EntitasAsetController.php": {
-    "mtime": 1785204945.472852,
-    "ast_hash": "a6bbd5a73112dc832eac45dd190a471c",
-    "semantic_hash": ""
-  },
   "api/app/Http/Controllers/master/GroupAsetController.php": {
-    "mtime": 1785204949.6961493,
-    "ast_hash": "d954d048c13513ce0cb7ee843f545241",
+    "mtime": 1786065423.413301,
+    "ast_hash": "454ffd1192689c633150f68d51f47fbb",
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/master/ItemChecklistMaintenanceController.php": {
@@ -40,13 +35,8 @@
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/master/JenisAsetController.php": {
-    "mtime": 1785204957.909545,
-    "ast_hash": "7d1e007929ec59f04cef916e8e594d84",
-    "semantic_hash": ""
-  },
-  "api/app/Http/Controllers/master/KategoriAsetController.php": {
-    "mtime": 1785204962.1541698,
-    "ast_hash": "a5947a749696d3fbbaa93229e5169161",
+    "mtime": 1786003352.1239736,
+    "ast_hash": "eddd5250fc04d4d92bf127e99a88601f",
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/master/KondisiAsetController.php": {
@@ -55,13 +45,13 @@
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/master/PabrikanAsetController.php": {
-    "mtime": 1785204971.0428271,
-    "ast_hash": "67037382347e175f78f21d1190db8297",
+    "mtime": 1786003385.4161685,
+    "ast_hash": "b8756b1a5ae3ab0a303b2ce9430d36a0",
     "semantic_hash": ""
   },
   "api/app/Http/Middleware/RequireCoreErpContext.php": {
-    "mtime": 1785377063.4359732,
-    "ast_hash": "cc1974800b91bb0cfc5c6fb9b4b6d25a",
+    "mtime": 1785462765.601747,
+    "ast_hash": "4527a0c8e06ab28047a733fd842d9ed7",
     "semantic_hash": ""
   },
   "api/app/Models/MasterData.php": {
@@ -70,43 +60,33 @@
     "semantic_hash": ""
   },
   "api/app/Models/master/AnalisaMaintenance.php": {
-    "mtime": 1785204997.7256784,
-    "ast_hash": "ae86088a49fac4159c2e65fd1adfa178",
-    "semantic_hash": ""
-  },
-  "api/app/Models/master/EntitasAset.php": {
-    "mtime": 1785205002.1597824,
-    "ast_hash": "4cd48b282c14ff1667888c4f835a12b7",
+    "mtime": 1786001725.605669,
+    "ast_hash": "d399c3f7e903459f37fea6be2baf445e",
     "semantic_hash": ""
   },
   "api/app/Models/master/GroupAset.php": {
-    "mtime": 1785205006.352781,
-    "ast_hash": "5b5aaf46577ff08e66a7a8c417818086",
+    "mtime": 1786065379.348503,
+    "ast_hash": "2f08343bfce11c5679b3da34c406a4ba",
     "semantic_hash": ""
   },
   "api/app/Models/master/ItemChecklistMaintenance.php": {
-    "mtime": 1785205010.5734215,
-    "ast_hash": "792c85d538646afc4bf924d37e5c4bc9",
+    "mtime": 1786001725.6286545,
+    "ast_hash": "50c20cd8221302552933c6312d383e51",
     "semantic_hash": ""
   },
   "api/app/Models/master/JenisAset.php": {
-    "mtime": 1785205014.5629249,
-    "ast_hash": "8687d3e101cb13966a8706048de9d109",
-    "semantic_hash": ""
-  },
-  "api/app/Models/master/KategoriAset.php": {
-    "mtime": 1785205018.760795,
-    "ast_hash": "1bc6e366c4e9f9c37ff4dae6b4034c6b",
+    "mtime": 1786003297.3969107,
+    "ast_hash": "a92f75457c33a41f3a8885069518edee",
     "semantic_hash": ""
   },
   "api/app/Models/master/KondisiAset.php": {
-    "mtime": 1785205022.913213,
-    "ast_hash": "ca6bf427aed7a467c60b9e8d34677481",
+    "mtime": 1786001725.640683,
+    "ast_hash": "ec92c505d8ef8b8d010661b019edcdd4",
     "semantic_hash": ""
   },
   "api/app/Models/master/PabrikanAset.php": {
-    "mtime": 1785205027.0152512,
-    "ast_hash": "c09b1d76e5c99748954b138d0c6aa078",
+    "mtime": 1786001725.6507401,
+    "ast_hash": "e692f1c8443e01cafeaeebfa20df0cbf",
     "semantic_hash": ""
   },
   "api/app/Providers/AppServiceProvider.php": {
@@ -125,8 +105,8 @@
     "semantic_hash": ""
   },
   "api/app/Support/MasterParent.php": {
-    "mtime": 1785245598.2871566,
-    "ast_hash": "f74a7035367eabe8d47b617423243b60",
+    "mtime": 1786062843.3873458,
+    "ast_hash": "6440080a3e46170a99766aaf27fff27a",
     "semantic_hash": ""
   },
   "api/artisan": {
@@ -135,8 +115,8 @@
     "semantic_hash": ""
   },
   "api/bootstrap/app.php": {
-    "mtime": 1785081325.9259615,
-    "ast_hash": "eb15063bac295d550ee107797a91efd3",
+    "mtime": 1785719435.7802832,
+    "ast_hash": "537194b13b3fcf99f5ca611c001b242f",
     "semantic_hash": ""
   },
   "api/bootstrap/providers.php": {
@@ -215,8 +195,8 @@
     "semantic_hash": ""
   },
   "api/routes/api.php": {
-    "mtime": 1785393589.5313601,
-    "ast_hash": "78a79ccdd93c4cd2cd5f9a5d59f438f1",
+    "mtime": 1786085925.1622655,
+    "ast_hash": "d9de52c4b49f669ae9c9a96c0f0a226c",
     "semantic_hash": ""
   },
   "api/routes/console.php": {
@@ -225,18 +205,13 @@
     "semantic_hash": ""
   },
   "api/tests/Concerns/InteractsWithCoreErpContext.php": {
-    "mtime": 1785377544.8336368,
-    "ast_hash": "4027bc5e2efba57811e86a31fbcfe2cb",
-    "semantic_hash": ""
-  },
-  "api/tests/Feature/EntitasAsetTest.php": {
-    "mtime": 1785244939.3557153,
-    "ast_hash": "ddea58c79255f2c0b2265b60e5f42894",
+    "mtime": 1785465811.4705606,
+    "ast_hash": "4c0403558afce9c45fd55e1e7df9ff20",
     "semantic_hash": ""
   },
   "api/tests/Feature/MasterDataAsetTest.php": {
-    "mtime": 1785136048.8476434,
-    "ast_hash": "26dbdd2290013456c74893ba55930442",
+    "mtime": 1786088150.5338452,
+    "ast_hash": "213c008f23965ccb8273318bd07a0d16",
     "semantic_hash": ""
   },
   "api/tests/TestCase.php": {
@@ -249,24 +224,9 @@
     "ast_hash": "3f679e9508c834f0ad95943455fcd836",
     "semantic_hash": ""
   },
-  "database/migrations/2026_07_23_000000_create_management_aset_tables.php": {
-    "mtime": 1784884534.03553,
-    "ast_hash": "62be35a26a61c91d7a8c89c5c055669b",
-    "semantic_hash": ""
-  },
-  "database/migrations/2026_07_24_000000_add_lifecycle_to_m_entitas_aset.php": {
-    "mtime": 1784884536.4943457,
-    "ast_hash": "6ab749f99138f661fc3cf1ce19218355",
-    "semantic_hash": ""
-  },
   "database/migrations/2026_07_26_000000_create_master_data_aset_tables.php": {
-    "mtime": 1785136000.3936324,
-    "ast_hash": "26bc7f3ceb9ee6c9e781c6a4c2dd8e99",
-    "semantic_hash": ""
-  },
-  "database/migrations/2026_07_27_040000_reverse_group_entitas_aset_relation.php": {
-    "mtime": 1785136002.2293534,
-    "ast_hash": "a886c1c0c850228a61a99e499abd9f57",
+    "mtime": 1786003043.6020787,
+    "ast_hash": "7d4d81908a3fcc8adcf50b0eed1821c8",
     "semantic_hash": ""
   },
   "deploy/migrate.sh": {
@@ -280,33 +240,33 @@
     "semantic_hash": ""
   },
   "loadtest/k6/master-data.js": {
-    "mtime": 1785375276.4275627,
-    "ast_hash": "8f7e35ebbf8c731357f20a2dd2c0d963",
+    "mtime": 1786087408.3758943,
+    "ast_hash": "c2ddd9340a112077695421969e350e7a",
     "semantic_hash": ""
   },
   "loadtest/mint-tenants.mjs": {
-    "mtime": 1785373307.8306708,
-    "ast_hash": "eba213cdd11ea26e5b39e7d48849f6c5",
+    "mtime": 1786094233.6941829,
+    "ast_hash": "ca4f92b0d30e662378adfd1720d83ecf",
     "semantic_hash": ""
   },
   "loadtest/stub-core/server.mjs": {
-    "mtime": 1785374178.4510188,
-    "ast_hash": "7d0428bb4df051ba5eaab83e8907b157",
+    "mtime": 1786085352.3558404,
+    "ast_hash": "91f74c9e1d3814243b4385ba1518d0e1",
     "semantic_hash": ""
   },
   "loadtest/verify.sql": {
-    "mtime": 1785373358.7502205,
-    "ast_hash": "eacbc5481101ea213b4c1a483b3d9990",
+    "mtime": 1786094263.7763789,
+    "ast_hash": "0f4c1b9bbf629d310bd17c62fe0fa8e8",
     "semantic_hash": ""
   },
   "ui/package.json": {
-    "mtime": 1785122625.631997,
-    "ast_hash": "833089e02f9b8aab76a3d484fa639eee",
+    "mtime": 1785729799.3481812,
+    "ast_hash": "3dc267a676d18db291b4b7f887820987",
     "semantic_hash": ""
   },
   "ui/src/App.tsx": {
-    "mtime": 1785373130.0744934,
-    "ast_hash": "57909bbe92314e18b42c9ac8b3afe1a4",
+    "mtime": 1786093087.512416,
+    "ast_hash": "fa970e629eb680fd533ce6083d97f601",
     "semantic_hash": ""
   },
   "ui/src/api.ts": {
@@ -315,23 +275,23 @@
     "semantic_hash": ""
   },
   "ui/src/main.tsx": {
-    "mtime": 1785130194.8443134,
-    "ast_hash": "6502ceb020d670c397d2966716a1b917",
+    "mtime": 1785729793.4423532,
+    "ast_hash": "7ea8b164deb06ed45de5da717b3603b4",
     "semantic_hash": ""
   },
   "ui/src/master/MasterForm.tsx": {
-    "mtime": 1785379816.6878548,
-    "ast_hash": "d79693a2eba8d554a81898ff08c157d3",
+    "mtime": 1786085321.3994787,
+    "ast_hash": "871b0be0752c86e6a3e87a5bb0575068",
     "semantic_hash": ""
   },
   "ui/src/master/MasterPage.tsx": {
-    "mtime": 1785220446.7857168,
-    "ast_hash": "9dec42bc42283a1187c700c184d09200",
+    "mtime": 1786085321.400479,
+    "ast_hash": "cf4d98338374cb10c577dc9dba60694b",
     "semantic_hash": ""
   },
   "ui/src/master/masters.ts": {
-    "mtime": 1785393610.799344,
-    "ast_hash": "2fbd1cb9d07eaec8f9837d6527b6c224",
+    "mtime": 1786093087.5134156,
+    "ast_hash": "c3249c3440132586f7fe51f58d8f8ccd",
     "semantic_hash": ""
   },
   "ui/tsconfig.json": {
@@ -345,13 +305,13 @@
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1785205800.9808853,
-    "ast_hash": "11d74bc41538614374f5b6ec482b5166",
+    "mtime": 1786062859.8729963,
+    "ast_hash": "6c986d44c6e2cf8c1055724156c8e10a",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1785373758.3173368,
-    "ast_hash": "8a56b71c8ad2fbb8b5c1856afad0d3ac",
+    "mtime": 1786067557.83085,
+    "ast_hash": "614c16c18ad18f5b5da4035350a7b6c1",
     "semantic_hash": ""
   },
   "api/README.md": {
@@ -365,23 +325,23 @@
     "semantic_hash": ""
   },
   "app.yaml": {
-    "mtime": 1785393622.2072706,
-    "ast_hash": "5bfbdef3f580dbc4cf696d81ce73dca1",
+    "mtime": 1786093125.3380928,
+    "ast_hash": "8b286a722f611559ea431aa1a7d864a4",
     "semantic_hash": ""
   },
   "contracts/asyncapi.yaml": {
-    "mtime": 1784880429.286368,
-    "ast_hash": "837094bdb5b6bb85372fb0ccfecf4b1a",
+    "mtime": 1785900414.2745035,
+    "ast_hash": "28d12a786a1f3ab27af24e10f3e92a67",
     "semantic_hash": ""
   },
   "contracts/openapi.yaml": {
-    "mtime": 1785393644.1287508,
-    "ast_hash": "efe5a3c0e8155753f6f8785bbf8d1867",
+    "mtime": 1786095317.4437191,
+    "ast_hash": "c9a9aa7db7efe8331ea3b06443b78880",
     "semantic_hash": ""
   },
   "database/README.md": {
-    "mtime": 1785373211.9916117,
-    "ast_hash": "c95e42ae27221b67763ee31d11d3b196",
+    "mtime": 1786092940.6152232,
+    "ast_hash": "f3087091d341d0ebb82b2b52689e294a",
     "semantic_hash": ""
   },
   "deploy/compose.fragment.yaml": {
@@ -390,13 +350,13 @@
     "semantic_hash": ""
   },
   "docs/skills/struktur-fitur.md": {
-    "mtime": 1785205799.1965523,
-    "ast_hash": "cdc90a95bef351eae94b40df4a04f5c1",
+    "mtime": 1786062897.1722174,
+    "ast_hash": "d8e2efec6cf4685f9d798370f4bdaec3",
     "semantic_hash": ""
   },
   "loadtest/README.md": {
-    "mtime": 1785082609.8241637,
-    "ast_hash": "f478fb29c548684bc8896c070086ddcd",
+    "mtime": 1786094319.3864515,
+    "ast_hash": "f7fdf48d114a944da3a5c2610a6bb3e7",
     "semantic_hash": ""
   },
   "loadtest/docker-compose.yml": {
@@ -410,33 +370,33 @@
     "semantic_hash": ""
   },
   "api/tests/Feature/AssetRegisterTest.php": {
-    "mtime": 1785377639.1756606,
-    "ast_hash": "431e6e3155a3e7f6f52c0d5b1213c744",
+    "mtime": 1786062398.290888,
+    "ast_hash": "4bf252fb61549e58643c0d771864062d",
     "semantic_hash": ""
   },
   "api/tests/Feature/DepreciationTest.php": {
-    "mtime": 1785371769.9679449,
-    "ast_hash": "42b73df1a8bc34c6d188786de52e0b10",
+    "mtime": 1786093018.461204,
+    "ast_hash": "84400e61b1577567829f0b6738f38a77",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_28_090000_create_asset_register_and_depreciation_tables.php": {
-    "mtime": 1785234579.300922,
-    "ast_hash": "37f4df202ebbbecfaf54e1ea7e45e0aa",
+    "mtime": 1786065989.6023488,
+    "ast_hash": "f67135211e3c06a34886135665c9b151",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_28_091000_add_composite_keys_for_asset_references.php": {
-    "mtime": 1785234260.5484686,
-    "ast_hash": "b88caf360cba02e8becc46a67f19f116",
+    "mtime": 1786001728.9315107,
+    "ast_hash": "e7f68af0c45f4d955d251022fe6f9ad2",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_28_092000_widen_asset_user_reference_columns.php": {
-    "mtime": 1785243790.5041592,
-    "ast_hash": "c5d0bb1c45735b19e5c1967f63816d2a",
+    "mtime": 1786001728.9472005,
+    "ast_hash": "a2aa0881273a0c33d9912237d0f4011d",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_28_093000_create_asset_lifecycle_documents.php": {
-    "mtime": 1785238578.561825,
-    "ast_hash": "8133ec86e8c9644a8602fea634dd4605",
+    "mtime": 1786001728.9790096,
+    "ast_hash": "a2215665e54cd80ac8b61c321be54355",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_28_094000_add_asset_group_depreciation_defaults.php": {
@@ -454,14 +414,9 @@
     "ast_hash": "6d43df6d71b3097212605ef91a44984d",
     "semantic_hash": ""
   },
-  "loadtest/tenants.json": {
-    "mtime": 1785241809.162882,
-    "ast_hash": "bcf8589119b474af887dfff70a74c68f",
-    "semantic_hash": ""
-  },
   "api/tests/Feature/AssetLocationTest.php": {
-    "mtime": 1785245539.5457146,
-    "ast_hash": "221893650f14483401344986097f9929",
+    "mtime": 1786067485.2494588,
+    "ast_hash": "d31fdd41186ed5e3eb439bf8a34bcb8b",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_28_097000_add_description_to_asset_locations.php": {
@@ -470,68 +425,43 @@
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/transaksi/DokumenSiklusAset/DokumenSiklusAsetController.php": {
-    "mtime": 1785372954.484324,
-    "ast_hash": "9239e8a1cc6c1a8b52dcbfbf6177e06d",
+    "mtime": 1786001724.0231411,
+    "ast_hash": "dbc713a6ac369a3d1a5b4fcef59669de",
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/transaksi/InventarisasiAset/AssetController.php": {
-    "mtime": 1785377063.440811,
-    "ast_hash": "5e72233594e00d13694b2713a6a2bd1b",
-    "semantic_hash": ""
-  },
-  "api/app/Http/Controllers/transaksi/InventarisasiAset/AssetLocationController.php": {
-    "mtime": 1785308479.7996614,
-    "ast_hash": "8a4be4404bb2905970f0d9d1dcd11892",
+    "mtime": 1786092877.7884865,
+    "ast_hash": "e546084d89eea268bc95393ffd5492a1",
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/transaksi/InventarisasiAset/DepreciationController.php": {
-    "mtime": 1785371769.9747093,
-    "ast_hash": "bed1292063763f21af999b13900e698f",
-    "semantic_hash": ""
-  },
-  "api/app/Http/Controllers/transaksi/InventarisasiAset/DepreciationProfileController.php": {
-    "mtime": 1785308479.8016596,
-    "ast_hash": "a2da66628acd6c4157e5be5a785c8d5d",
+    "mtime": 1786095210.330804,
+    "ast_hash": "6b41f56e588419ca87e1364440415e38",
     "semantic_hash": ""
   },
   "api/app/Models/transaksi/InventarisasiAset/Asset.php": {
-    "mtime": 1785377063.438702,
-    "ast_hash": "471e8fcb24aa7aaf36b796bbbd7db0e4",
+    "mtime": 1786067258.7490318,
+    "ast_hash": "05d637bff003bf7a4461b1b5dc0a5684",
     "semantic_hash": ""
   },
   "api/app/Models/transaksi/InventarisasiAset/AssetBook.php": {
-    "mtime": 1785371769.966944,
-    "ast_hash": "9309e27566fc76720510c3decce54645",
-    "semantic_hash": ""
-  },
-  "api/app/Models/transaksi/InventarisasiAset/AssetLocation.php": {
-    "mtime": 1785308479.8051748,
-    "ast_hash": "1b0e5e133dffe643e103bb8af6988ed9",
-    "semantic_hash": ""
-  },
-  "api/app/Models/transaksi/InventarisasiAset/DepreciationProfile.php": {
-    "mtime": 1785308479.8061788,
-    "ast_hash": "c86609618f17dbab54f3b0a168e33f5a",
+    "mtime": 1786092858.611799,
+    "ast_hash": "eb7d32262dd1287ab02e9cd8d1aa39e2",
     "semantic_hash": ""
   },
   "ui/src/transactions/_shared/LifecycleDocumentPage.tsx": {
-    "mtime": 1785308412.340359,
-    "ast_hash": "0745d2ace6348141d5f8a7eea64fbf2c",
+    "mtime": 1785462701.5007825,
+    "ast_hash": "6430132bf928cb6f2e60caa6e3f5f4cc",
     "semantic_hash": ""
   },
   "ui/src/transactions/inventarisasi-aset/AssetPage.tsx": {
-    "mtime": 1785308384.2186615,
-    "ast_hash": "2d1d2209e0000c61b99047de8e8d5905",
+    "mtime": 1786086104.6374555,
+    "ast_hash": "0477bfaceae5df27eb187fecac0db68d",
     "semantic_hash": ""
   },
   "ui/src/transactions/inventarisasi-aset/DepreciationPage.tsx": {
     "mtime": 1785308412.3353553,
     "ast_hash": "ee3b1ff509f3f9592904ea694e80fd57",
-    "semantic_hash": ""
-  },
-  "ui/src/transactions/inventarisasi-aset/DepreciationProfilePage.tsx": {
-    "mtime": 1785308412.338356,
-    "ast_hash": "072521a2735fe03c6bdd0be67b22a7d4",
     "semantic_hash": ""
   },
   "ui/src/transactions/monitoring-aset/MonitoringPage.tsx": {
@@ -575,13 +505,13 @@
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/transaksi/PerencanaanAset/PerencanaanAsetController.php": {
-    "mtime": 1785393589.5333674,
-    "ast_hash": "380586ce68d66cfb771b33e2a4fdaf8b",
+    "mtime": 1786001725.3127112,
+    "ast_hash": "863f72b6a797eab9910278893e26bc0b",
     "semantic_hash": ""
   },
   "api/tests/Feature/AssetPlanningTest.php": {
-    "mtime": 1785394047.6577466,
-    "ast_hash": "bb4f1fa23a95f0e213b65a248a9e3743",
+    "mtime": 1786062415.8960376,
+    "ast_hash": "f11fcf66d2aa88d2b02361859a6d6b52",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_30_121000_create_asset_planning_tables.php": {
@@ -590,43 +520,323 @@
     "semantic_hash": ""
   },
   "ui/src/transactions/perencanaan-aset/PlanningPage.tsx": {
-    "mtime": 1785400313.1444309,
-    "ast_hash": "e1c5f3343c5d99ccad9d9bcbeaacdffc",
+    "mtime": 1785729796.6340077,
+    "ast_hash": "94ff4aeb2da6af508068f10edfd6c56c",
     "semantic_hash": ""
   },
   "docs/rancangan-scope-data-aset.md": {
-    "mtime": 1785377483.0469878,
-    "ast_hash": "711d101137205d2933f094a295e5080f",
+    "mtime": 1786067575.7731378,
+    "ast_hash": "4f889d7431d637f6041e5fa4b302778e",
     "semantic_hash": ""
   },
   "api/app/Support/OrganizationScope.php": {
-    "mtime": 1785377081.1164706,
-    "ast_hash": "cb1a763831d5506fbfc90b382136f299",
+    "mtime": 1786001725.982923,
+    "ast_hash": "fb54a168a94886bc946ae05aeacbfb76",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_30_122000_add_asset_responsibility_scope.php": {
-    "mtime": 1785379177.371864,
-    "ast_hash": "ef5f2b143fe232b4aa0006959a5474be",
+    "mtime": 1786001729.005852,
+    "ast_hash": "e1e6f53504022893e3141d12438aefc6",
     "semantic_hash": ""
   },
   "api/app/Http/Controllers/ReferenceDataController.php": {
-    "mtime": 1785393644.126751,
-    "ast_hash": "f24a58882afc0de5e75e02443d69f4fd",
+    "mtime": 1786001723.6822586,
+    "ast_hash": "9262fe9f5556df970308fb961f92383c",
     "semantic_hash": ""
   },
   "api/app/Services/UnitOfMeasureClient.php": {
-    "mtime": 1785393644.1257496,
-    "ast_hash": "ded535a945712ab7d253cf635eab39b5",
+    "mtime": 1786001725.7768526,
+    "ast_hash": "1199c34fd233e810dcf1d19239b17c89",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_30_123000_create_satuan_master.php": {
-    "mtime": 1785393610.7946506,
-    "ast_hash": "7809e1e6635ccedd0a21265e799ec4ed",
+    "mtime": 1786001729.025376,
+    "ast_hash": "f154ae6098f51836338e64a5f12200d3",
     "semantic_hash": ""
   },
   "database/migrations/2026_07_30_123500_remove_asset_satuan_master.php": {
-    "mtime": 1785393610.7946506,
-    "ast_hash": "4a319f26ccc8744adf71756c2a4a5ed8",
+    "mtime": 1786001729.0489542,
+    "ast_hash": "e5d429eb9c9ff66e5cb8c0c2e65b0541",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/MasterLinkController.php": {
+    "mtime": 1786087343.0071337,
+    "ast_hash": "be60723a49d4e4c864461b3e052976c4",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/BukuPenyusutanController.php": {
+    "mtime": 1786092852.0892787,
+    "ast_hash": "b97c0f85268db927ca6929337ae7b764",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/GroupBukuPenyusutanController.php": {
+    "mtime": 1786095130.88873,
+    "ast_hash": "bcb9ecdbd43dbaedbc8db284401051d5",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/JenisAsetAtributController.php": {
+    "mtime": 1786085846.7207906,
+    "ast_hash": "6188b1941eaf646ade5b031e190b4d96",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/JenisAsetAtributDefinisiController.php": {
+    "mtime": 1786085920.2075188,
+    "ast_hash": "3622a031de828de5e3866d8bf209c144",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/LokasiAsetController.php": {
+    "mtime": 1786067196.8899615,
+    "ast_hash": "ebc24f890e0bfe40fee29f4308f1cb55",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/ModelAsetController.php": {
+    "mtime": 1786003327.70632,
+    "ast_hash": "150c1252220194f2938fb626d7d10bb5",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/ProfilPenyusutanController.php": {
+    "mtime": 1786088036.5590384,
+    "ast_hash": "77355a71d9da6bf543c7b2198dfeed1f",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/TipeAtributController.php": {
+    "mtime": 1786085828.6533184,
+    "ast_hash": "0508d12890cc0b1ba664cf4651c4aece",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/TipeAtributNilaiController.php": {
+    "mtime": 1786085841.5948858,
+    "ast_hash": "782df2b794ce30dd0bdc09234c3db08b",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/master/TipeLokasiAsetController.php": {
+    "mtime": 1786067189.6357267,
+    "ast_hash": "34c9f8f361c242e3bd160cc1e8b5da99",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/transaksi/DekomisioningAset/WorkflowDecisionController.php": {
+    "mtime": 1786001723.778992,
+    "ast_hash": "db03674f52ee7665bed8a7a9e7d5ffcf",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php": {
+    "mtime": 1786083063.5577173,
+    "ast_hash": "f78b509c1ea1a36487a0edfa91eb47f1",
+    "semantic_hash": ""
+  },
+  "api/app/Http/Middleware/VerifyCoreErpEvent.php": {
+    "mtime": 1785719388.0654635,
+    "ast_hash": "78e7d66e7a2f76470671dda7399b0580",
+    "semantic_hash": ""
+  },
+  "api/app/Models/master/BukuPenyusutan.php": {
+    "mtime": 1786092848.2206397,
+    "ast_hash": "77a681cc9fb28314e650fa5e4069df2b",
+    "semantic_hash": ""
+  },
+  "api/app/Models/master/LokasiAset.php": {
+    "mtime": 1786067179.3134904,
+    "ast_hash": "399702177bde950bac514b74f73ec54a",
+    "semantic_hash": ""
+  },
+  "api/app/Models/master/ModelAset.php": {
+    "mtime": 1786003250.2720964,
+    "ast_hash": "f3e6580ac43409adce8b2c29bfcb0025",
+    "semantic_hash": ""
+  },
+  "api/app/Models/master/ProfilPenyusutan.php": {
+    "mtime": 1786088037.2215226,
+    "ast_hash": "312360b15bbb202149c262fc59992c51",
+    "semantic_hash": ""
+  },
+  "api/app/Models/master/TipeAtribut.php": {
+    "mtime": 1786085822.488345,
+    "ast_hash": "a8d7096c09620bdc4588afb6d5421099",
+    "semantic_hash": ""
+  },
+  "api/app/Models/master/TipeLokasiAset.php": {
+    "mtime": 1786067174.2799468,
+    "ast_hash": "7f0bfbcb77abc59c7eebd01c2c3f7226",
+    "semantic_hash": ""
+  },
+  "api/app/Services/DepreciationCalculator.php": {
+    "mtime": 1786092701.7977579,
+    "ast_hash": "affe24d0439b5c285e72c203f60d987e",
+    "semantic_hash": ""
+  },
+  "api/app/Services/FiscalCalendarClient.php": {
+    "mtime": 1786083063.959683,
+    "ast_hash": "9782217f2e7e19931512a36330afa344",
+    "semantic_hash": ""
+  },
+  "api/app/Services/WorkflowClient.php": {
+    "mtime": 1786001725.8495264,
+    "ast_hash": "dd06612f464ed6ad698abe737f4093bb",
+    "semantic_hash": ""
+  },
+  "api/app/Support/AssetAttributeValidator.php": {
+    "mtime": 1786085924.978397,
+    "ast_hash": "31f370a1e5f2ff5170c815b540362630",
+    "semantic_hash": ""
+  },
+  "api/tests/Feature/AssetAttributeTest.php": {
+    "mtime": 1786086042.5720668,
+    "ast_hash": "08678eaab9e4ba815bae43717cb28dd2",
+    "semantic_hash": ""
+  },
+  "api/tests/Feature/DepreciationBookTest.php": {
+    "mtime": 1786095182.8661647,
+    "ast_hash": "6d167ebbeb66df9b8a510e3e65eff79b",
+    "semantic_hash": ""
+  },
+  "api/tests/Feature/DepreciationEndToEndTest.php": {
+    "mtime": 1786095228.4242482,
+    "ast_hash": "cfb765e10b36093312550ad8d7edd860",
+    "semantic_hash": ""
+  },
+  "api/tests/Feature/DepreciationScaleTest.php": {
+    "mtime": 1786089167.9461992,
+    "ast_hash": "c6c471c7c5a9d375cd46b6836e0f363a",
+    "semantic_hash": ""
+  },
+  "api/tests/Feature/ModelAsetTest.php": {
+    "mtime": 1786062339.994475,
+    "ast_hash": "d35f3c3983fc44b084924e938053ad69",
+    "semantic_hash": ""
+  },
+  "api/tests/Feature/ProfilPenyusutanTest.php": {
+    "mtime": 1786065945.2228482,
+    "ast_hash": "69928394ff7e66e8391186a6172e77c7",
+    "semantic_hash": ""
+  },
+  "api/tests/Unit/DepreciationCalculatorTest.php": {
+    "mtime": 1786092719.0005078,
+    "ast_hash": "88a8631238df1fd8283dc4b0a00c13ce",
+    "semantic_hash": ""
+  },
+  "contracts/bundle.py": {
+    "mtime": 1786000880.1257582,
+    "ast_hash": "f71def76ae72fd7734ac1e9b2530daa1",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026_07_31_124000_add_lifecycle_document_responsibility_scope.php": {
+    "mtime": 1785462640.162085,
+    "ast_hash": "902921e5f730081ff3e6ed56368057d0",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026_08_03_100000_add_decommissioning_workflow_tracking.php": {
+    "mtime": 1785719388.0674767,
+    "ast_hash": "22a4861e9b8beb45e3f15c8cc50c90b4",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026_08_03_110000_create_asset_acquisition_request_tables.php": {
+    "mtime": 1786001729.1165497,
+    "ast_hash": "d862d787d7e9fddc96350a866b5b29fe",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026_08_07_100000_add_group_aset_financial_columns.php": {
+    "mtime": 1786065366.450387,
+    "ast_hash": "80afdf3d09b8c5edfea0aa24aa9bda78",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026_08_07_110000_create_asset_location_type_and_dimension_bridge.php": {
+    "mtime": 1786095430.0939672,
+    "ast_hash": "a6216e39e85d95fc215687cb90e9fcf5",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026_08_07_120000_create_depreciation_book_tables.php": {
+    "mtime": 1786095170.0173025,
+    "ast_hash": "abd632f9435d28ff34f39979cbbec153",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026_08_07_130000_create_asset_attribute_tables.php": {
+    "mtime": 1786085806.9143732,
+    "ast_hash": "a0b5ef80ba70effbe2d2502e1851c8e1",
+    "semantic_hash": ""
+  },
+  "database/migrations/2026_08_07_140000_add_round_off_to_depreciation_books.php": {
+    "mtime": 1786092843.95145,
+    "ast_hash": "9702381fa1f8da413ababe26df94c39a",
+    "semantic_hash": ""
+  },
+  "loadtest/k6/depreciation.js": {
+    "mtime": 1786094473.123975,
+    "ast_hash": "a5a36b105d9af77e421cb15ca2384bda",
+    "semantic_hash": ""
+  },
+  "ui/src/fixed-assets-setup/FixedAssetSetupPlaceholderPage.tsx": {
+    "mtime": 1786093087.5104177,
+    "ast_hash": "2a8bf40e9aff0379692464186588fb54",
+    "semantic_hash": ""
+  },
+  "ui/src/master/DynamicField.tsx": {
+    "mtime": 1786065668.2401288,
+    "ast_hash": "5401208900b44a07b6c2e5dcb41a0942",
+    "semantic_hash": ""
+  },
+  "ui/src/master/GroupBookMatrix.tsx": {
+    "mtime": 1786095249.7864668,
+    "ast_hash": "b4fb08071460345a22dff2137f8b956a",
+    "semantic_hash": ""
+  },
+  "ui/src/master/fields.ts": {
+    "mtime": 1786065648.4649282,
+    "ast_hash": "1d12011f2a87f1de0f60ca0123fea5f6",
+    "semantic_hash": ""
+  },
+  "ui/src/transactions/dekomisioning-aset/config.ts": {
+    "mtime": 1785719590.4857657,
+    "ast_hash": "ef72b1805d360445f8eb08219460489a",
+    "semantic_hash": ""
+  },
+  "ui/src/transactions/inventarisasi-aset/attributes.ts": {
+    "mtime": 1786086082.262199,
+    "ast_hash": "bfffd1760f63eee8c64cbc6665baa6fb",
+    "semantic_hash": ""
+  },
+  "contracts/src/components/parameters.yaml": {
+    "mtime": 1786067438.2897613,
+    "ast_hash": "8ecca7e27710f4c74e9fb27d20991168",
+    "semantic_hash": ""
+  },
+  "contracts/src/components/responses.yaml": {
+    "mtime": 1786000853.4942477,
+    "ast_hash": "26962956f50424edab66d41aa7ed7e89",
+    "semantic_hash": ""
+  },
+  "contracts/src/components/schemas.yaml": {
+    "mtime": 1786095158.9459898,
+    "ast_hash": "05dad4e8893f4fccebc3c8482818c420",
+    "semantic_hash": ""
+  },
+  "contracts/src/components/security.yaml": {
+    "mtime": 1786000853.463763,
+    "ast_hash": "b560e989ab7a9c766e2ded69fe5c819c",
+    "semantic_hash": ""
+  },
+  "contracts/src/openapi.yaml": {
+    "mtime": 1786004089.8664832,
+    "ast_hash": "61d27d39cb09fa4788fffd455d510eb5",
+    "semantic_hash": ""
+  },
+  "contracts/src/paths/aset.yaml": {
+    "mtime": 1786000994.8610733,
+    "ast_hash": "a44ed812253fb279825f9211c2f4e73f",
+    "semantic_hash": ""
+  },
+  "contracts/src/paths/master-data.yaml": {
+    "mtime": 1786092937.642241,
+    "ast_hash": "b337a169156c106e1fdb0ee5617707fa",
+    "semantic_hash": ""
+  },
+  "contracts/src/paths/penyusutan.yaml": {
+    "mtime": 1786093021.411448,
+    "ast_hash": "efdda9fff463dc228af7973d42b7c27a",
+    "semantic_hash": ""
+  },
+  "contracts/src/paths/platform.yaml": {
+    "mtime": 1786000853.3983653,
+    "ast_hash": "e65a912c9f5ffaf20bf479634f220ee0",
     "semantic_hash": ""
   }
 }

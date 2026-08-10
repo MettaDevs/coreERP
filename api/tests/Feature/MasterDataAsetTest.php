@@ -37,11 +37,17 @@ class MasterDataAsetTest extends TestCase
         });
     }
 
-    /** @return array<string, array{0:string,1:string}> */
+    /**
+     * Seluruh master klasifikasi kini datar. `jenis-aset` ikut di sini karena setelah
+     * rantai diratakan ia tidak lagi punya induk.
+     *
+     * @return array<string, array{0:string,1:string}>
+     */
     public static function standaloneMasters(): array
     {
         return [
             'group aset' => ['group-aset', 'm_group_aset'],
+            'jenis aset' => ['jenis-aset', 'm_jenis_aset'],
             'kondisi aset' => ['kondisi-aset', 'm_kondisi_aset'],
             'pabrikan aset' => ['pabrikan-aset', 'm_pabrikan_aset'],
             'item checklist maintenance' => ['item-checklist-maintenance', 'm_item_checklist_maintenance'],
@@ -49,13 +55,15 @@ class MasterDataAsetTest extends TestCase
         ];
     }
 
-    /** @return array<string, array{0:string,1:string}> */
+    /**
+     * Satu-satunya master berinduk yang tersisa, dan induk wajibnya hanya pabrikan.
+     *
+     * @return array<string, array{0:string,1:string}>
+     */
     public static function chainedMasters(): array
     {
         return [
-            'entitas aset' => ['entitas-aset', 'jenis_aset_id'],
-            'kategori aset' => ['kategori-aset', 'group_aset_id'],
-            'jenis aset' => ['jenis-aset', 'kategori_aset_id'],
+            'model aset' => ['model-aset', 'pabrikan_aset_id'],
         ];
     }
 
@@ -70,7 +78,7 @@ class MasterDataAsetTest extends TestCase
         $id = $created->json('data.id');
 
         // Master mandiri tidak boleh membawa kolom induk apa pun.
-        foreach (['entitas_aset_id', 'group_aset_id', 'kategori_aset_id'] as $parentColumn) {
+        foreach (['group_aset_id', 'jenis_aset_id', 'pabrikan_aset_id', 'parent_id'] as $parentColumn) {
             $this->assertArrayNotHasKey($parentColumn, $created->json('data'));
         }
 
@@ -102,141 +110,246 @@ class MasterDataAsetTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_rantai_klasifikasi_menyimpan_dan_menyajikan_induknya(): void
+    public function test_model_aset_menyajikan_kedua_induknya_sekaligus(): void
     {
-        $chain = $this->buildChain();
+        $classification = $this->buildClassification();
 
-        $entitas = $this->request('entitas-aset', 'get', '/api/v1/entitas-aset/'.$chain['entitas-aset'])->assertOk();
-        $entitas->assertJsonPath('data.jenis_aset_id', $chain['jenis-aset']);
-        $entitas->assertJsonPath('data.jenis_aset.id', $chain['jenis-aset']);
-        $entitas->assertJsonPath('data.jenis_aset.nama', 'Excavator 20 Ton');
-
-        $this->request('kategori-aset', 'get', '/api/v1/kategori-aset/'.$chain['kategori-aset'])
-            ->assertOk()
-            ->assertJsonPath('data.group_aset.id', $chain['group-aset']);
-
-        $this->request('jenis-aset', 'get', '/api/v1/jenis-aset/'.$chain['jenis-aset'])
-            ->assertOk()
-            ->assertJsonPath('data.kategori_aset.id', $chain['kategori-aset']);
+        $model = $this->request('model-aset', 'get', '/api/v1/model-aset/'.$classification['model-aset'])->assertOk();
+        $model->assertJsonPath('data.pabrikan_aset_id', $classification['pabrikan-aset']);
+        $model->assertJsonPath('data.pabrikan_aset.nama', 'Komatsu');
+        $model->assertJsonPath('data.jenis_aset_id', $classification['jenis-aset']);
+        $model->assertJsonPath('data.jenis_aset.nama', 'Excavator 20 Ton');
     }
 
-    public function test_daftar_anak_dapat_disaring_menurut_induk(): void
+    public function test_model_aset_dapat_dibuat_tanpa_jenis_karena_jenis_bersifat_opsional(): void
     {
-        $chain = $this->buildChain();
-        $lain = $this->createRecord('jenis-aset', ['nama' => 'Jenis Lain', 'kategori_aset_id' => $chain['kategori-aset']])->assertCreated()->json('data.id');
-        $this->createRecord('entitas-aset', ['nama' => 'Entitas Lain', 'jenis_aset_id' => $lain])->assertCreated();
+        $pabrikan = $this->createRecord('pabrikan-aset', ['nama' => 'Komatsu'])->assertCreated()->json('data.id');
 
-        $this->request('entitas-aset', 'get', '/api/v1/entitas-aset')->assertOk()->assertJsonPath('meta.total', 2);
-        $this->request('entitas-aset', 'get', '/api/v1/entitas-aset?jenis_aset_id='.$chain['jenis-aset'])
+        $this->createRecord('model-aset', ['nama' => 'PC200-8', 'pabrikan_aset_id' => $pabrikan])
+            ->assertCreated()
+            ->assertJsonPath('data.jenis_aset_id', null)
+            ->assertJsonPath('data.jenis_aset', null);
+    }
+
+    public function test_daftar_model_dapat_disaring_menurut_tiap_induk_dan_gabungannya(): void
+    {
+        $classification = $this->buildClassification();
+        $pabrikanLain = $this->createRecord('pabrikan-aset', ['nama' => 'Hitachi'])->assertCreated()->json('data.id');
+        $jenisLain = $this->createRecord('jenis-aset', ['nama' => 'Excavator 30 Ton'])->assertCreated()->json('data.id');
+
+        // Pabrikan sama, jenis berbeda: membuktikan kedua filter benar-benar independen.
+        $modelJenisLain = $this->createRecord('model-aset', [
+            'nama' => 'PC300-8',
+            'pabrikan_aset_id' => $classification['pabrikan-aset'],
+            'jenis_aset_id' => $jenisLain,
+        ])->assertCreated()->json('data.id');
+        $this->createRecord('model-aset', [
+            'nama' => 'ZX200',
+            'pabrikan_aset_id' => $pabrikanLain,
+            'jenis_aset_id' => $classification['jenis-aset'],
+        ])->assertCreated();
+
+        $this->request('model-aset', 'get', '/api/v1/model-aset')->assertOk()->assertJsonPath('meta.total', 3);
+
+        $this->request('model-aset', 'get', '/api/v1/model-aset?pabrikan_aset_id='.$classification['pabrikan-aset'])
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2);
+
+        $this->request('model-aset', 'get', '/api/v1/model-aset?jenis_aset_id='.$classification['jenis-aset'])
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2);
+
+        // Kedua filter dikirim bersamaan; server menerapkan keduanya, bukan salah satu.
+        $this->request('model-aset', 'get', '/api/v1/model-aset?pabrikan_aset_id='.$classification['pabrikan-aset'].'&jenis_aset_id='.$jenisLain)
             ->assertOk()
             ->assertJsonPath('meta.total', 1)
-            ->assertJsonPath('data.0.id', $chain['entitas-aset']);
+            ->assertJsonPath('data.0.id', $modelJenisLain);
     }
 
     public function test_induk_dari_tenant_lain_ditolak_dan_tidak_menerbitkan_nomor(): void
     {
         $foreignTenant = (string) Str::ulid();
-        $foreignGroup = $this->createRecord('group-aset', ['nama' => 'Group Tenant Lain'], tenantId: $foreignTenant)
+        $foreignPabrikan = $this->createRecord('pabrikan-aset', ['nama' => 'Pabrikan Tenant Lain'], tenantId: $foreignTenant)
             ->assertCreated()
             ->json('data.id');
-        $foreignCategory = $this->createRecord('kategori-aset', ['nama' => 'Kategori Tenant Lain', 'group_aset_id' => $foreignGroup], tenantId: $foreignTenant)->assertCreated()->json('data.id');
-        $foreignJenis = $this->createRecord('jenis-aset', ['nama' => 'Jenis Tenant Lain', 'kategori_aset_id' => $foreignCategory], tenantId: $foreignTenant)->assertCreated()->json('data.id');
-        Http::assertSentCount(3);
+        Http::assertSentCount(1);
 
-        $this->createRecord('entitas-aset', ['nama' => 'Entitas Curian', 'jenis_aset_id' => $foreignJenis])
+        $this->createRecord('model-aset', ['nama' => 'Model Curian', 'pabrikan_aset_id' => $foreignPabrikan])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('jenis_aset_id');
+            ->assertJsonValidationErrors('pabrikan_aset_id');
 
-        $this->assertDatabaseCount('m_entitas_aset', 0);
-        Http::assertSentCount(3);
+        $this->assertDatabaseCount('m_model_aset', 0);
+        Http::assertSentCount(1);
+    }
+
+    public function test_hanya_induk_yang_salah_tenant_yang_ditolak_bukan_seluruh_payload(): void
+    {
+        $classification = $this->buildClassification();
+        $foreignTenant = (string) Str::ulid();
+        $foreignJenis = $this->createRecord('jenis-aset', ['nama' => 'Jenis Tenant Lain'], tenantId: $foreignTenant)
+            ->assertCreated()
+            ->json('data.id');
+
+        // Pabrikan sah, jenis milik tenant lain: hanya kolom jenis yang boleh disalahkan.
+        $response = $this->createRecord('model-aset', [
+            'nama' => 'Model Campuran',
+            'pabrikan_aset_id' => $classification['pabrikan-aset'],
+            'jenis_aset_id' => $foreignJenis,
+        ])->assertStatus(422);
+        $response->assertJsonValidationErrors('jenis_aset_id');
+        $response->assertJsonMissingValidationErrors('pabrikan_aset_id');
     }
 
     public function test_induk_dari_tenant_lain_juga_ditolak_saat_mengubah_anak(): void
     {
-        $chain = $this->buildChain();
+        $classification = $this->buildClassification();
         $foreignTenant = (string) Str::ulid();
-        $foreignGroup = $this->createRecord('group-aset', ['nama' => 'Group Tenant Lain'], tenantId: $foreignTenant)
+        $foreignPabrikan = $this->createRecord('pabrikan-aset', ['nama' => 'Pabrikan Tenant Lain'], tenantId: $foreignTenant)
             ->assertCreated()
             ->json('data.id');
-        $foreignCategory = $this->createRecord('kategori-aset', ['nama' => 'Kategori Tenant Lain', 'group_aset_id' => $foreignGroup], tenantId: $foreignTenant)->assertCreated()->json('data.id');
-        $foreignJenis = $this->createRecord('jenis-aset', ['nama' => 'Jenis Tenant Lain', 'kategori_aset_id' => $foreignCategory], tenantId: $foreignTenant)->assertCreated()->json('data.id');
 
-        $this->request('entitas-aset', 'patch', '/api/v1/entitas-aset/'.$chain['entitas-aset'], ['jenis_aset_id' => $foreignJenis])
+        $this->request('model-aset', 'patch', '/api/v1/model-aset/'.$classification['model-aset'], ['pabrikan_aset_id' => $foreignPabrikan])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('jenis_aset_id');
+            ->assertJsonValidationErrors('pabrikan_aset_id');
 
-        $this->assertDatabaseHas('m_entitas_aset', [
-            'id' => $chain['entitas-aset'],
-            'jenis_aset_id' => $chain['jenis-aset'],
+        $this->assertDatabaseHas('m_model_aset', [
+            'id' => $classification['model-aset'],
+            'pabrikan_aset_id' => $classification['pabrikan-aset'],
         ]);
     }
 
     public function test_induk_yang_sudah_diarsipkan_tidak_dapat_dipilih(): void
     {
-        $jenis = $this->createRecord('jenis-aset', ['nama' => 'Jenis Arsip', 'kategori_aset_id' => $this->buildChain()['kategori-aset']])->assertCreated()->json('data.id');
-        $this->request('jenis-aset', 'delete', '/api/v1/jenis-aset/'.$jenis)->assertNoContent();
+        $pabrikan = $this->createRecord('pabrikan-aset', ['nama' => 'Pabrikan Arsip'])->assertCreated()->json('data.id');
+        $this->request('pabrikan-aset', 'delete', '/api/v1/pabrikan-aset/'.$pabrikan)->assertNoContent();
 
-        $this->createRecord('entitas-aset', ['nama' => 'Entitas Baru', 'jenis_aset_id' => $jenis])
+        $this->createRecord('model-aset', ['nama' => 'Model Baru', 'pabrikan_aset_id' => $pabrikan])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('jenis_aset_id');
+            ->assertJsonValidationErrors('pabrikan_aset_id');
     }
 
     public function test_anak_dapat_dipindahkan_ke_induk_lain_pada_tenant_yang_sama(): void
     {
-        $chain = $this->buildChain();
-        $tujuan = $this->createRecord('jenis-aset', ['nama' => 'Jenis Tujuan', 'kategori_aset_id' => $chain['kategori-aset']])->assertCreated()->json('data.id');
+        $classification = $this->buildClassification();
+        $pabrikanTujuan = $this->createRecord('pabrikan-aset', ['nama' => 'Pabrikan Tujuan'])->assertCreated()->json('data.id');
+        $jenisTujuan = $this->createRecord('jenis-aset', ['nama' => 'Jenis Tujuan'])->assertCreated()->json('data.id');
 
-        $this->request('entitas-aset', 'patch', '/api/v1/entitas-aset/'.$chain['entitas-aset'], ['jenis_aset_id' => $tujuan])
+        $this->request('model-aset', 'patch', '/api/v1/model-aset/'.$classification['model-aset'], ['pabrikan_aset_id' => $pabrikanTujuan])
             ->assertOk()
-            ->assertJsonPath('data.jenis_aset_id', $tujuan)
-            ->assertJsonPath('data.jenis_aset.nama', 'Jenis Tujuan');
+            ->assertJsonPath('data.pabrikan_aset.nama', 'Pabrikan Tujuan')
+            // Memindahkan satu induk tidak boleh menggeser induk lainnya.
+            ->assertJsonPath('data.jenis_aset_id', $classification['jenis-aset']);
+
+        $this->request('model-aset', 'patch', '/api/v1/model-aset/'.$classification['model-aset'], ['jenis_aset_id' => $jenisTujuan])
+            ->assertOk()
+            ->assertJsonPath('data.jenis_aset.nama', 'Jenis Tujuan')
+            ->assertJsonPath('data.pabrikan_aset_id', $pabrikanTujuan);
     }
 
     public function test_induk_tidak_dapat_diarsipkan_selama_anaknya_masih_aktif(): void
     {
-        $chain = $this->buildChain();
+        $classification = $this->buildClassification();
 
-        $this->request('group-aset', 'delete', '/api/v1/group-aset/'.$chain['group-aset'])
+        // Model menggantung pada dua induk sekaligus, jadi keduanya terkunci.
+        $this->request('pabrikan-aset', 'delete', '/api/v1/pabrikan-aset/'.$classification['pabrikan-aset'])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
-        $this->request('kategori-aset', 'delete', '/api/v1/kategori-aset/'.$chain['kategori-aset'])
+        $this->request('jenis-aset', 'delete', '/api/v1/jenis-aset/'.$classification['jenis-aset'])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
 
-        $this->request('entitas-aset', 'delete', '/api/v1/entitas-aset/'.$chain['entitas-aset'])->assertNoContent();
-        $this->request('jenis-aset', 'delete', '/api/v1/jenis-aset/'.$chain['jenis-aset'])->assertNoContent();
-        $this->request('kategori-aset', 'delete', '/api/v1/kategori-aset/'.$chain['kategori-aset'])->assertNoContent();
-        $this->request('group-aset', 'delete', '/api/v1/group-aset/'.$chain['group-aset'])->assertNoContent();
+        $this->request('model-aset', 'delete', '/api/v1/model-aset/'.$classification['model-aset'])->assertNoContent();
+        $this->request('pabrikan-aset', 'delete', '/api/v1/pabrikan-aset/'.$classification['pabrikan-aset'])->assertNoContent();
+        $this->request('jenis-aset', 'delete', '/api/v1/jenis-aset/'.$classification['jenis-aset'])->assertNoContent();
+        // Group tidak lagi menjadi induk master mana pun, hanya aset, jadi bebas diarsipkan.
+        $this->request('group-aset', 'delete', '/api/v1/group-aset/'.$classification['group-aset'])->assertNoContent();
     }
 
     public function test_hak_pada_satu_master_tidak_memberi_hak_pada_master_lain(): void
     {
-        $chain = $this->buildChain();
+        $classification = $this->buildClassification();
         $onlyGroupRead = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.group-aset.read']));
 
         $onlyGroupRead->getJson('/api/v1/group-aset')->assertOk();
-        $onlyGroupRead->getJson('/api/v1/kategori-aset')
+        $onlyGroupRead->getJson('/api/v1/model-aset')
             ->assertForbidden()
             ->assertJsonPath('error.code', 'forbidden');
         $onlyGroupRead->getJson('/api/v1/jenis-aset')->assertForbidden();
         $onlyGroupRead->getJson('/api/v1/kondisi-aset')->assertForbidden();
         $onlyGroupRead->withHeader('Idempotency-Key', 'tanpa-hak-create')
-            ->postJson('/api/v1/entitas-aset', ['nama' => 'Entitas', 'jenis_aset_id' => $chain['jenis-aset']])
+            ->postJson('/api/v1/model-aset', ['nama' => 'Model', 'pabrikan_aset_id' => $classification['pabrikan-aset']])
             ->assertForbidden();
-        $onlyGroupRead->patchJson('/api/v1/group-aset/'.$chain['group-aset'], ['nama' => 'Group Diubah'])->assertForbidden();
-        $onlyGroupRead->deleteJson('/api/v1/group-aset/'.$chain['group-aset'])->assertForbidden();
+        $onlyGroupRead->patchJson('/api/v1/group-aset/'.$classification['group-aset'], ['nama' => 'Group Diubah'])->assertForbidden();
+        $onlyGroupRead->deleteJson('/api/v1/group-aset/'.$classification['group-aset'])->assertForbidden();
     }
 
     public function test_setiap_master_memakai_reference_nomornya_sendiri(): void
     {
-        $this->buildChain();
+        $this->buildClassification();
 
-        foreach (['entitas-aset', 'group-aset', 'kategori-aset', 'jenis-aset'] as $resource) {
+        foreach (['group-aset', 'jenis-aset', 'pabrikan-aset', 'model-aset'] as $resource) {
             Http::assertSent(fn ($request) => $request->url() === 'http://core.test/api/internal/v1/number-sequences/management-aset.'.$resource.'/issue'
                 && str_starts_with((string) $request['idempotency_key'], $resource.':')
                 && $request->hasHeader('X-CoreERP-Tenant-Id', $this->tenantId));
         }
         Http::assertSentCount(4);
+    }
+
+    public function test_group_aset_menyimpan_dan_menyajikan_field_finansialnya(): void
+    {
+        $created = $this->createRecord('group-aset', [
+            'nama' => 'Bangunan',
+            'tipe_harta' => 'bangunan_permanen',
+            'major_type' => 'tangible',
+            'capitalization_threshold' => 1000,
+            'posting_layers' => ['current', 'tax'],
+        ])->assertCreated();
+
+        $created->assertJsonPath('data.tipe_harta', 'bangunan_permanen');
+        $created->assertJsonPath('data.major_type', 'tangible');
+        $created->assertJsonPath('data.capitalization_threshold', '1000.00');
+        $created->assertJsonPath('data.posting_layers', ['current', 'tax']);
+
+        $this->request('group-aset', 'patch', '/api/v1/group-aset/'.$created->json('data.id'), ['posting_layers' => ['tax']])
+            ->assertOk()
+            ->assertJsonPath('data.posting_layers', ['tax'])
+            // Field lain tidak ikut tergeser saat satu field diubah.
+            ->assertJsonPath('data.tipe_harta', 'bangunan_permanen');
+    }
+
+    public function test_nilai_di_luar_daftar_pada_field_finansial_ditolak(): void
+    {
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'tipe_harta' => 'kelompok_9'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('tipe_harta');
+
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'posting_layers' => ['gudang']])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('posting_layers.0');
+    }
+
+    /**
+     * Kolom bercast `decimal:2` dibaca kembali sebagai "1000.00" sementara payload retry
+     * membawa angka 1000. Tanpa normalisasi lewat cast model, perbandingan strict di
+     * replay() menuduh retry yang sah sebagai idempotency_conflict.
+     */
+    public function test_retry_kolom_desimal_tetap_direplay_bukan_dianggap_konflik(): void
+    {
+        $key = 'ambang-kapitalisasi';
+        $payload = ['nama' => 'Mesin', 'capitalization_threshold' => 1000];
+        $first = $this->postWithKey('group-aset', $payload, $key)->assertCreated();
+
+        $this->postWithKey('group-aset', $payload, $key)
+            ->assertOk()
+            ->assertHeader('Idempotent-Replayed', 'true')
+            ->assertJsonPath('data.id', $first->json('data.id'));
+
+        // Nilai yang benar-benar berbeda tetap harus ditolak sebagai konflik.
+        $this->postWithKey('group-aset', ['nama' => 'Mesin', 'capitalization_threshold' => 2000], $key)
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'idempotency_conflict');
+
+        Http::assertSentCount(1);
     }
 
     public function test_kode_dari_klien_diabaikan_dan_selalu_berasal_dari_core(): void
@@ -325,42 +438,51 @@ class MasterDataAsetTest extends TestCase
         Http::assertSent(fn ($request) => strlen((string) $request['idempotency_key']) <= 160);
     }
 
-    public function test_database_menegakkan_batas_tenant_pada_foreign_key_rantai(): void
+    public function test_database_menegakkan_batas_tenant_pada_foreign_key_master(): void
     {
-        $chain = $this->buildChain();
-        $jenis = $chain['jenis-aset'];
+        $classification = $this->buildClassification();
+        $pabrikan = $classification['pabrikan-aset'];
 
         // Menulis langsung ke tabel, melewati validasi aplikasi, agar yang diuji adalah
-        // foreign key gabungan (tenant_id, jenis_aset_id) -> (tenant_id, id).
-        $this->assertTrue($this->insertEntitasDirectly($this->tenantId, $jenis));
-        $this->assertDatabaseCount('m_entitas_aset', 2);
+        // foreign key gabungan (tenant_id, pabrikan_aset_id) -> (tenant_id, id).
+        $this->assertTrue($this->insertModelDirectly($this->tenantId, $pabrikan));
+        $this->assertDatabaseCount('m_model_aset', 2);
 
-        $this->assertFalse($this->insertEntitasDirectly((string) Str::ulid(), $jenis), 'induk milik tenant lain harus ditolak database');
-        $this->assertFalse($this->insertEntitasDirectly($this->tenantId, (string) Str::ulid()), 'induk yang tidak ada harus ditolak database');
-        $this->assertDatabaseCount('m_entitas_aset', 2);
+        $this->assertFalse($this->insertModelDirectly((string) Str::ulid(), $pabrikan), 'induk milik tenant lain harus ditolak database');
+        $this->assertFalse($this->insertModelDirectly($this->tenantId, (string) Str::ulid()), 'induk yang tidak ada harus ditolak database');
+        $this->assertDatabaseCount('m_model_aset', 2);
 
         // Arsip adalah soft delete sehingga referensi tidak pernah terputus; hard delete tetap ditahan.
-        $this->assertFalse($this->hardDelete('m_jenis_aset', $jenis), 'hard delete induk yang masih direferensikan harus ditahan');
-        $this->assertDatabaseHas('m_jenis_aset', ['id' => $jenis, 'deleted_at' => null]);
+        $this->assertFalse($this->hardDelete('m_pabrikan_aset', $pabrikan), 'hard delete induk yang masih direferensikan harus ditahan');
+        $this->assertDatabaseHas('m_pabrikan_aset', ['id' => $pabrikan, 'deleted_at' => null]);
     }
 
-    /** Kode dan creation_key selalu unik per pemanggilan agar kegagalan hanya dapat berasal dari foreign key. */
-    private function insertEntitasDirectly(string $tenantId, string $parentId): bool
+    /**
+     * Kode dan creation_key selalu unik per pemanggilan agar kegagalan hanya dapat
+     * berasal dari foreign key.
+     *
+     * Percobaan dibungkus transaksi bersarang supaya Laravel memasang SAVEPOINT.
+     * PostgreSQL membatalkan seluruh transaksi begitu satu statement gagal, sehingga
+     * tanpa savepoint percobaan berikutnya kena "current transaction is aborted" dan
+     * bukan pelanggaran foreign key yang sedang diuji. SQLite tidak berperilaku begitu,
+     * jadi kekurangan ini hanya terlihat pada mesin yang sebenarnya dipakai produksi.
+     */
+    private function insertModelDirectly(string $tenantId, string $parentId): bool
     {
         $suffix = ++$this->requestCounter;
 
         try {
-            return DB::table('m_entitas_aset')->insert([
+            return DB::transaction(fn (): bool => DB::table('m_model_aset')->insert([
                 'id' => (string) Str::ulid(),
                 'tenant_id' => $tenantId,
                 'creation_key' => 'langsung-'.$suffix,
-                'jenis_aset_id' => $parentId,
-                'kode' => sprintf('EA-L%05d', $suffix),
-                'nama' => 'Entitas langsung',
+                'pabrikan_aset_id' => $parentId,
+                'kode' => sprintf('MDLA-L%05d', $suffix),
+                'nama' => 'Model langsung',
                 'aktif' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ]));
         } catch (QueryException) {
             return false;
         }
@@ -369,7 +491,7 @@ class MasterDataAsetTest extends TestCase
     private function hardDelete(string $table, string $id): bool
     {
         try {
-            DB::table($table)->where('id', $id)->delete();
+            DB::transaction(fn () => DB::table($table)->where('id', $id)->delete());
 
             return true;
         } catch (QueryException) {
@@ -378,26 +500,30 @@ class MasterDataAsetTest extends TestCase
     }
 
     /**
-     * Rantai lengkap group -> kategori -> jenis -> entitas pada tenant aktif.
+     * Klasifikasi lengkap pada tenant aktif. Group, jenis, dan pabrikan dibuat tanpa
+     * urutan yang mengikat; hanya model yang menunggu kedua induknya ada.
      *
      * @return array<string, string>
      */
-    private function buildChain(): array
+    private function buildClassification(): array
     {
         $group = $this->createRecord('group-aset', ['nama' => 'Alat Berat'])
             ->assertCreated()->json('data.id');
-        $kategori = $this->createRecord('kategori-aset', ['nama' => 'Excavator', 'group_aset_id' => $group])
+        $jenis = $this->createRecord('jenis-aset', ['nama' => 'Excavator 20 Ton'])
             ->assertCreated()->json('data.id');
-        $jenis = $this->createRecord('jenis-aset', ['nama' => 'Excavator 20 Ton', 'kategori_aset_id' => $kategori])
+        $pabrikan = $this->createRecord('pabrikan-aset', ['nama' => 'Komatsu'])
             ->assertCreated()->json('data.id');
-        $entitas = $this->createRecord('entitas-aset', ['nama' => 'Entitas Induk', 'jenis_aset_id' => $jenis])
-            ->assertCreated()->json('data.id');
+        $model = $this->createRecord('model-aset', [
+            'nama' => 'PC200-8',
+            'pabrikan_aset_id' => $pabrikan,
+            'jenis_aset_id' => $jenis,
+        ])->assertCreated()->json('data.id');
 
         return [
-            'entitas-aset' => $entitas,
             'group-aset' => $group,
-            'kategori-aset' => $kategori,
             'jenis-aset' => $jenis,
+            'pabrikan-aset' => $pabrikan,
+            'model-aset' => $model,
         ];
     }
 

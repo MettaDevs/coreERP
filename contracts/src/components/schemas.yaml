@@ -1,0 +1,1006 @@
+# Skema request dan response.
+Ulid:
+  type: string
+  pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
+AssetPlanningDetailWrite:
+  type: object
+  required:
+  - jenis_aset_id
+  - satuan_id
+  - quantity
+  - requested_specification
+  properties:
+    jenis_aset_id:
+      $ref: '#/components/schemas/Ulid'
+    satuan_id:
+      allOf:
+      - $ref: '#/components/schemas/Ulid'
+      description: Referensi opaque ke satuan aktif milik Core. Konversi khusus produk akan dimiliki PIM/Inventory.
+    quantity:
+      type: number
+      exclusiveMinimum: 0
+    requested_specification:
+      type: string
+      maxLength: 2000
+      example: RAM 16 GB, SSD 512 GB
+    estimated_unit_price:
+      type: number
+      minimum: 0
+AssetPlanningWrite:
+  type: object
+  required:
+  - legal_entity_id
+  - planning_org_unit_id
+  - planned_on
+  - planning_year
+  - planning_type
+  - details
+  properties:
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    planning_org_unit_id:
+      $ref: '#/components/schemas/Ulid'
+    planned_on:
+      type: string
+      format: date
+    planning_year:
+      type: integer
+      minimum: 2000
+      maximum: 2100
+    planning_type:
+      type: string
+      enum:
+      - regular
+      - additional
+    funding_source:
+      type: string
+      maxLength: 250
+      nullable: true
+    description:
+      type: string
+      maxLength: 2000
+      nullable: true
+    details:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/components/schemas/AssetPlanningDetailWrite'
+HealthResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          const: ready
+PaginationMeta:
+  type: object
+  required:
+  - current_page
+  - last_page
+  - per_page
+  - total
+  properties:
+    current_page:
+      type: integer
+    last_page:
+      type: integer
+    per_page:
+      type: integer
+    total:
+      type: integer
+ErrorResponse:
+  type: object
+  required:
+  - error
+  properties:
+    error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+MasterSummary:
+  description: Ringkasan induk untuk ditampilkan tanpa permintaan tambahan. Induk yang sudah diarsipkan tetap disertakan.
+  type: object
+  required:
+  - id
+  - kode
+  - nama
+  properties:
+    id:
+      $ref: '#/components/schemas/Ulid'
+    kode:
+      type: string
+    nama:
+      type: string
+MasterRecord:
+  description: Bentuk dasar seluruh master. `kode` selalu diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
+  type: object
+  required:
+  - id
+  - kode
+  - nama
+  - keterangan
+  - aktif
+  - created_at
+  - updated_at
+  properties:
+    id:
+      $ref: '#/components/schemas/Ulid'
+    kode:
+      type: string
+      maxLength: 50
+    nama:
+      type: string
+      maxLength: 150
+    keterangan:
+      type:
+      - string
+      - 'null'
+      maxLength: 2000
+    aktif:
+      type: boolean
+    created_at:
+      type:
+      - string
+      - 'null'
+      format: date-time
+    updated_at:
+      type:
+      - string
+      - 'null'
+      format: date-time
+MasterCreate:
+  type: object
+  required:
+  - nama
+  properties:
+    nama:
+      type: string
+      minLength: 1
+      maxLength: 150
+    keterangan:
+      type:
+      - string
+      - 'null'
+      maxLength: 2000
+    aktif:
+      type: boolean
+      default: true
+MasterPatch:
+  type: object
+  properties:
+    nama:
+      type: string
+      minLength: 1
+      maxLength: 150
+    keterangan:
+      type:
+      - string
+      - 'null'
+      maxLength: 2000
+    aktif:
+      type: boolean
+ModelAset:
+  description: |
+    Katalog model barang milik satu pabrikan; padanan "Manufacturers and models" di
+    Dynamics 365 F&O. Pabrikan dan jenis adalah induk yang saling lepas: memilih salah
+    satu tidak menyaring pilihan yang lain, dan keduanya dapat disaring bersamaan pada
+    endpoint daftar.
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    required:
+    - pabrikan_aset_id
+    - pabrikan_aset
+    - jenis_aset_id
+    - jenis_aset
+    - model_number
+    properties:
+      pabrikan_aset_id:
+        $ref: '#/components/schemas/Ulid'
+      pabrikan_aset:
+        oneOf:
+        - $ref: '#/components/schemas/MasterSummary'
+        - type: 'null'
+      jenis_aset_id:
+        oneOf:
+        - $ref: '#/components/schemas/Ulid'
+        - type: 'null'
+      jenis_aset:
+        oneOf:
+        - $ref: '#/components/schemas/MasterSummary'
+        - type: 'null'
+      model_number:
+        type:
+        - string
+        - 'null'
+        maxLength: 150
+  examples:
+  - id: 01JZ0000000000000000000000
+    kode: MDLA-000001
+    nama: Kompresor Angin PK-100
+    keterangan: Kompresor 100 liter untuk lini produksi.
+    model_number: PK-100
+    aktif: true
+    created_at: '2026-07-26T02:00:00.000000Z'
+    updated_at: '2026-07-26T02:00:00.000000Z'
+ModelAsetCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - type: object
+    required:
+    - pabrikan_aset_id
+    properties:
+      pabrikan_aset_id:
+        allOf:
+        - $ref: '#/components/schemas/Ulid'
+        description: Pabrikan pada tenant yang sama dan belum diarsipkan. Wajib, karena sebuah model selalu milik satu pabrikan.
+      jenis_aset_id:
+        oneOf:
+        - $ref: '#/components/schemas/Ulid'
+        - type: 'null'
+        description: Opsional, supaya katalog dapat mulai diisi sebelum klasifikasi teknis ditetapkan.
+      model_number:
+        type:
+        - string
+        - 'null'
+        maxLength: 150
+ModelAsetPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - type: object
+    properties:
+      pabrikan_aset_id:
+        $ref: '#/components/schemas/Ulid'
+      jenis_aset_id:
+        oneOf:
+        - $ref: '#/components/schemas/Ulid'
+        - type: 'null'
+      model_number:
+        type:
+        - string
+        - 'null'
+        maxLength: 150
+ModelAsetResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/ModelAset'
+ModelAsetList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/ModelAset'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+GroupAsetFields:
+  description: |
+    Perlakuan finansial yang melekat pada group; padanan field pada "Fixed asset group"
+    di Dynamics 365 F&O. Seluruhnya opsional supaya tenant yang belum memetakan
+    perlakuan pajaknya tetap dapat membuat group.
+  type: object
+  properties:
+    tipe_harta:
+      description: Kelompok harta berwujud menurut PMK; menentukan masa manfaat dan tarif fiskal.
+      type:
+      - string
+      - 'null'
+      enum:
+      - kelompok_1
+      - kelompok_2
+      - kelompok_3
+      - kelompok_4
+      - bangunan_permanen
+      - bangunan_non_permanen
+      - bukan_objek_penyusutan
+      - null
+    major_type:
+      type:
+      - string
+      - 'null'
+      enum:
+      - tangible
+      - intangible
+      - right_of_use
+      - low_value
+      - null
+    capitalization_threshold:
+      description: Perolehan di bawah nilai ini dibebankan, tidak dikapitalisasi sebagai aset.
+      type:
+      - string
+      - 'null'
+      format: decimal
+    posting_layers:
+      description: Lapisan pembukuan yang boleh dipakai group ini.
+      type: array
+      items:
+        type: string
+        enum:
+        - current
+        - operations
+        - tax
+        - none
+GroupAset:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - $ref: '#/components/schemas/GroupAsetFields'
+GroupAsetCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - $ref: '#/components/schemas/GroupAsetFields'
+GroupAsetPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - $ref: '#/components/schemas/GroupAsetFields'
+GroupAsetResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/GroupAset'
+GroupAsetList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/GroupAset'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+JenisAset:
+  description: |
+    Sumbu klasifikasi teknis aset; padanan "Asset type" pada modul Asset management
+    Dynamics 365 F&O. Datar dan tanpa induk, sehingga tenant yang hanya mengenal satu
+    tingkat klasifikasi tetap terlayani tanpa mengisi tingkat yang tidak mereka punya.
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+JenisAsetCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+JenisAsetPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+JenisAsetResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/JenisAset'
+JenisAsetList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/JenisAset'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+KondisiAset:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+KondisiAsetCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+KondisiAsetPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+KondisiAsetResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/KondisiAset'
+KondisiAsetList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/KondisiAset'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+PabrikanAset:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+PabrikanAsetCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+PabrikanAsetPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+PabrikanAsetResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/PabrikanAset'
+PabrikanAsetList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/PabrikanAset'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+ItemChecklistMaintenance:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+ItemChecklistMaintenanceCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+ItemChecklistMaintenancePatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+ItemChecklistMaintenanceResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/ItemChecklistMaintenance'
+ItemChecklistMaintenanceList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/ItemChecklistMaintenance'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+AnalisaMaintenance:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+AnalisaMaintenanceCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+AnalisaMaintenancePatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+AnalisaMaintenanceResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/AnalisaMaintenance'
+AnalisaMaintenanceList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/AnalisaMaintenance'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+TipeLokasiAset:
+  description: |
+    Tingkatan lokasi yang dipakai tenant; padanan "Functional location type" di
+    Dynamics 365 F&O. Datar: kedalaman pohon lokasi ditentukan data, bukan tipe.
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+TipeLokasiAsetCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+TipeLokasiAsetPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+TipeLokasiAsetResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/TipeLokasiAset'
+TipeLokasiAsetList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/TipeLokasiAset'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+LokasiAsetFields:
+  type: object
+  properties:
+    parent_id:
+      description: Lokasi induk pada tenant yang sama dan belum diarsipkan. Kosong berarti lokasi akar; perpindahan yang membentuk siklus ditolak.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    tipe_lokasi_id:
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    org_unit_id:
+      description: |
+        Unit organisasi Core yang menjadi dimensi keuangan aset di lokasi ini; padanan
+        toggle "Update asset dimension" di F&O. Disimpan sebagai ID opaque tanpa foreign
+        key, karena unit organisasi dimiliki Core.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+LokasiAset:
+  description: |
+    Pohon lokasi fisik aset; padanan "Functional location" di Dynamics 365 F&O. Ia
+    mereferensikan dirinya sendiri lewat `parent_id`, jadi kedalamannya ditentukan data
+    tenant dan bukan skema. Sengaja terpisah dari struktur organisasi Core: "di mana
+    benda ini" dan "siapa yang bertanggung jawab" berubah karena sebab yang berbeda.
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - $ref: '#/components/schemas/LokasiAsetFields'
+  - type: object
+    required:
+    - parent
+    - tipe_lokasi
+    properties:
+      parent:
+        oneOf:
+        - $ref: '#/components/schemas/MasterSummary'
+        - type: 'null'
+      tipe_lokasi:
+        oneOf:
+        - $ref: '#/components/schemas/MasterSummary'
+        - type: 'null'
+LokasiAsetCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - $ref: '#/components/schemas/LokasiAsetFields'
+LokasiAsetPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - $ref: '#/components/schemas/LokasiAsetFields'
+LokasiAsetResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/LokasiAset'
+LokasiAsetList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/LokasiAset'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+ProfilPenyusutanFields:
+  description: |
+    Aturan penyusutan yang dapat dipakai ulang lintas aset; padanan "Depreciation profile"
+    di Dynamics 365 F&O. Field mana yang wajib bergantung pada `method`:
+    `useful_life_periods` untuk garis lurus dan saldo menurun, `rate_percent` untuk
+    saldo menurun, `manual_schedule` untuk metode manual.
+  type: object
+  properties:
+    method:
+      type: string
+      enum:
+      - straight_line
+      - reducing_balance
+      - manual
+      - consumption
+    frequency:
+      type: string
+      enum:
+      - monthly
+      - quarterly
+      - half_yearly
+      - yearly
+    year_basis:
+      type: string
+      enum:
+      - calendar
+      - fiscal
+    convention:
+      description: Belum dibaca mesin penyusutan; diaktifkan bersama buku penyusutan.
+      type:
+      - string
+      - 'null'
+      maxLength: 40
+    useful_life_periods:
+      type:
+      - integer
+      - 'null'
+      minimum: 1
+    rate_percent:
+      type:
+      - string
+      - 'null'
+      format: decimal
+    manual_schedule:
+      oneOf:
+      - type: array
+        items:
+          type: object
+          required:
+          - amount
+          properties:
+            amount:
+              type: number
+              minimum: 0
+      - type: 'null'
+ProfilPenyusutan:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - $ref: '#/components/schemas/ProfilPenyusutanFields'
+  - type: object
+    required:
+    - method
+    - frequency
+    - year_basis
+ProfilPenyusutanCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - $ref: '#/components/schemas/ProfilPenyusutanFields'
+  - type: object
+    required:
+    - method
+    - frequency
+    - year_basis
+ProfilPenyusutanPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - $ref: '#/components/schemas/ProfilPenyusutanFields'
+ProfilPenyusutanResponse:
+  type: object
+  required:
+  - data
+  properties:
+    data:
+      $ref: '#/components/schemas/ProfilPenyusutan'
+ProfilPenyusutanList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/ProfilPenyusutan'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+BukuPenyusutanFields:
+  type: object
+  properties:
+    posting_layer:
+      description: Lapisan pembukuan buku ini. `tax` lazim dipakai buku fiskal.
+      type: string
+      enum: [current, operations, tax, none]
+      default: current
+    export_to_backoffice:
+      description: |
+        App ini tidak menjurnal; ia mengekspor periode final ke backoffice. Buku fiskal
+        umumnya dimatikan agar backoffice tidak menjurnal dua kali untuk aset yang sama.
+      type: boolean
+      default: true
+    round_off_depreciation:
+      description: Kelipatan nominal pembulatan penyusutan. Nol berarti tanpa pembulatan.
+      type:
+      - number
+      - 'null'
+      minimum: 0
+      format: decimal
+    depreciation_profile_id:
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    alternative_profile_id:
+      description: Profil pengganti saat saldo menurun sudah kalah dari garis lurus sisa umur.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+BukuPenyusutan:
+  description: |
+    Buku penyusutan; padanan "Book" di Dynamics 365 F&O. Satu aset dapat memiliki
+    beberapa buku sekaligus, lazimnya satu komersial dan satu fiskal, dan tiap buku
+    melacak nilai aset secara mandiri dengan aturannya sendiri.
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - $ref: '#/components/schemas/BukuPenyusutanFields'
+BukuPenyusutanCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - $ref: '#/components/schemas/BukuPenyusutanFields'
+BukuPenyusutanPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - $ref: '#/components/schemas/BukuPenyusutanFields'
+BukuPenyusutanResponse:
+  type: object
+  required: [data]
+  properties:
+    data:
+      $ref: '#/components/schemas/BukuPenyusutan'
+BukuPenyusutanList:
+  type: object
+  required: [data, meta]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/BukuPenyusutan'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+GroupBukuPenyusutanRow:
+  description: |
+    Satu baris matriks group x buku; padanan "Fixed asset group/book" di F&O. Nilainya
+    menjadi default yang disalin ke buku aset saat aset diterima, bukan acuan hidup:
+    mengubah matriks tidak menulis ulang aset yang sudah berjalan.
+  type: object
+  required: [buku_id]
+  properties:
+    buku_id:
+      $ref: '#/components/schemas/Ulid'
+    depreciation_profile_id:
+      description: Mengalahkan profil bawaan buku untuk group ini. Kosong berarti memakai profil buku.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    alternative_profile_id:
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    useful_life_periods:
+      type:
+      - integer
+      - 'null'
+      minimum: 1
+    convention:
+      description: Perlakuan periode pertama, dihitung dari tanggal aset mulai digunakan.
+      type:
+      - string
+      - 'null'
+      enum:
+      - none
+      - full_month
+      - half_year
+      - mid_quarter
+      - mid_month_1st
+      - mid_month_15th
+      - half_year_start_of_year
+      - half_year_next_year
+      - null
+    depreciate:
+      description: Aset dari group ini mendapat buku tersebut tetapi tidak disusutkan bila `false`.
+      type: boolean
+      default: true
+    round_off_depreciation:
+      description: |
+        Kelipatan nominal pembulatan untuk group dan book ini. Null berarti mengikuti
+        nilai pada Book; periode terakhir tetap memakai sisa nilai tanpa pembulatan.
+      type:
+      - number
+      - 'null'
+      minimum: 0
+      format: decimal
+GroupBukuPenyusutanReplace:
+  description: Daftar penuh baris matriks; baris yang tidak disertakan diarsipkan.
+  type: object
+  required: [rows]
+  properties:
+    rows:
+      type: array
+      items:
+        $ref: '#/components/schemas/GroupBukuPenyusutanRow'
+GroupBukuPenyusutanList:
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: array
+      items:
+        allOf:
+        - type: object
+          required: [id]
+          properties:
+            id:
+              $ref: '#/components/schemas/Ulid'
+        - $ref: '#/components/schemas/GroupBukuPenyusutanRow'
+TipeAtributFields:
+  type: object
+  properties:
+    data_type:
+      description: |
+        Menentukan kolom mana yang dipakai menyimpan nilainya pada aset dan bagaimana
+        field-nya dirender. `fixed_list` mengambil pilihan dari daftar nilai atribut,
+        `value_range` dibatasi `min_value` dan `max_value`.
+      type: string
+      enum: [text, number, boolean, date, fixed_list, value_range]
+    satuan:
+      type: [string, 'null']
+      maxLength: 50
+    min_value:
+      type: [string, 'null']
+      format: decimal
+    max_value:
+      type: [string, 'null']
+      format: decimal
+TipeAtribut:
+  description: |
+    Padanan "Attribute type" di Dynamics 365 F&O. Inilah cara menambah pembeda aset
+    tanpa menambah tingkat klasifikasi baru: tenant membuat atributnya sendiri,
+    menempelkannya ke jenis aset, dan aset mewarisinya.
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - $ref: '#/components/schemas/TipeAtributFields'
+TipeAtributCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - $ref: '#/components/schemas/TipeAtributFields'
+TipeAtributPatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - $ref: '#/components/schemas/TipeAtributFields'
+TipeAtributResponse:
+  type: object
+  required: [data]
+  properties:
+    data:
+      $ref: '#/components/schemas/TipeAtribut'
+TipeAtributList:
+  type: object
+  required: [data, meta]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/TipeAtribut'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
+TipeAtributNilaiReplace:
+  description: Daftar penuh pilihan nilai; pilihan yang tidak disertakan diarsipkan.
+  type: object
+  required: [rows]
+  properties:
+    rows:
+      type: array
+      items:
+        type: object
+        required: [nilai]
+        properties:
+          nilai:
+            type: string
+            maxLength: 150
+          urutan:
+            type: integer
+            minimum: 0
+            default: 0
+TipeAtributNilaiList:
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: array
+      items:
+        type: object
+        required: [id, nilai, urutan]
+        properties:
+          id:
+            $ref: '#/components/schemas/Ulid'
+          nilai:
+            type: string
+          urutan:
+            type: integer
+JenisAsetAtributReplace:
+  description: Daftar penuh atribut yang menempel pada jenis aset ini.
+  type: object
+  required: [rows]
+  properties:
+    rows:
+      type: array
+      items:
+        type: object
+        required: [tipe_atribut_id]
+        properties:
+          tipe_atribut_id:
+            $ref: '#/components/schemas/Ulid'
+          wajib:
+            type: boolean
+            default: false
+          urutan:
+            type: integer
+            minimum: 0
+            default: 0
+JenisAsetAtributList:
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: array
+      items:
+        type: object
+        required: [id, tipe_atribut_id, wajib, urutan]
+        properties:
+          id:
+            $ref: '#/components/schemas/Ulid'
+          tipe_atribut_id:
+            $ref: '#/components/schemas/Ulid'
+          wajib:
+            type: boolean
+          urutan:
+            type: integer
+JenisAsetAtributDefinisi:
+  description: |
+    Definisi atribut satu jenis aset, siap dipakai form penerimaan aset untuk merender
+    field dinamisnya tanpa perlu menggabungkan sendiri dari beberapa endpoint.
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: array
+      items:
+        allOf:
+        - $ref: '#/components/schemas/TipeAtributFields'
+        - type: object
+          required: [tipe_atribut_id, kode, nama, wajib, urutan, nilai_pilihan]
+          properties:
+            tipe_atribut_id:
+              $ref: '#/components/schemas/Ulid'
+            kode:
+              type: string
+            nama:
+              type: string
+            wajib:
+              type: boolean
+            urutan:
+              type: integer
+            nilai_pilihan:
+              type: array
+              items:
+                type: object
+                required: [id, nilai]
+                properties:
+                  id:
+                    $ref: '#/components/schemas/Ulid'
+                  nilai:
+                    type: string

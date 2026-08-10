@@ -28,5 +28,8 @@ return new class extends Migration
         });
     }
 
-    public function down(): void { Schema::dropIfExists('t_dokumen_siklus_aset'); }
+    public function down(): void
+    {
+        Schema::dropIfExists('t_dokumen_siklus_aset');
+    }
 };

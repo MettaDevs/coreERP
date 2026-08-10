@@ -12,10 +12,11 @@
 
 with duplikat_kode as (
     select count(*) as n from (
-        select tenant_id, kode from m_entitas_aset group by 1, 2 having count(*) > 1
-        union all select tenant_id, kode from m_group_aset group by 1, 2 having count(*) > 1
-        union all select tenant_id, kode from m_kategori_aset group by 1, 2 having count(*) > 1
+        select tenant_id, kode from m_group_aset group by 1, 2 having count(*) > 1
         union all select tenant_id, kode from m_jenis_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, kode from m_model_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, kode from m_tipe_lokasi_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, kode from m_buku_penyusutan group by 1, 2 having count(*) > 1
         union all select tenant_id, kode from m_kondisi_aset group by 1, 2 having count(*) > 1
         union all select tenant_id, kode from m_pabrikan_aset group by 1, 2 having count(*) > 1
         union all select tenant_id, kode from m_item_checklist_maintenance group by 1, 2 having count(*) > 1
@@ -24,10 +25,11 @@ with duplikat_kode as (
 ),
 duplikat_kunci as (
     select count(*) as n from (
-        select tenant_id, creation_key from m_entitas_aset group by 1, 2 having count(*) > 1
-        union all select tenant_id, creation_key from m_group_aset group by 1, 2 having count(*) > 1
-        union all select tenant_id, creation_key from m_kategori_aset group by 1, 2 having count(*) > 1
+        select tenant_id, creation_key from m_group_aset group by 1, 2 having count(*) > 1
         union all select tenant_id, creation_key from m_jenis_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, creation_key from m_model_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, creation_key from m_tipe_lokasi_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, creation_key from m_buku_penyusutan group by 1, 2 having count(*) > 1
         union all select tenant_id, creation_key from m_kondisi_aset group by 1, 2 having count(*) > 1
         union all select tenant_id, creation_key from m_pabrikan_aset group by 1, 2 having count(*) > 1
         union all select tenant_id, creation_key from m_item_checklist_maintenance group by 1, 2 having count(*) > 1
@@ -36,34 +38,41 @@ duplikat_kunci as (
 ),
 induk_lintas_tenant as (
     select
-        (select count(*) from m_entitas_aset c join m_jenis_aset p on p.id = c.jenis_aset_id where p.tenant_id <> c.tenant_id)
-      + (select count(*) from m_kategori_aset c join m_group_aset p on p.id = c.group_aset_id where p.tenant_id <> c.tenant_id)
-      + (select count(*) from m_jenis_aset c join m_kategori_aset p on p.id = c.kategori_aset_id where p.tenant_id <> c.tenant_id) as n
+        (select count(*) from m_model_aset c join m_pabrikan_aset p on p.id = c.pabrikan_aset_id where p.tenant_id <> c.tenant_id)
+      + (select count(*) from m_model_aset c join m_jenis_aset p on p.id = c.jenis_aset_id where p.tenant_id <> c.tenant_id)
+      + (select count(*) from m_lokasi_aset c join m_lokasi_aset p on p.id = c.parent_id where p.tenant_id <> c.tenant_id)
+      + (select count(*) from m_lokasi_aset c join m_tipe_lokasi_aset p on p.id = c.tipe_lokasi_id where p.tenant_id <> c.tenant_id)
+      + (select count(*) from m_group_buku_penyusutan m join m_group_aset g on g.id = m.group_aset_id where g.tenant_id <> m.tenant_id)
+      + (select count(*) from m_group_buku_penyusutan m join m_buku_penyusutan b on b.id = m.buku_id where b.tenant_id <> m.tenant_id)
+      + (select count(*) from tr_buku_aset k join m_buku_penyusutan b on b.id = k.buku_id where b.tenant_id <> k.tenant_id)
+      + (select count(*) from tr_penerimaan_aset a join m_group_aset p on p.id = a.group_aset_id where p.tenant_id <> a.tenant_id)
+      + (select count(*) from tr_penerimaan_aset a join m_jenis_aset p on p.id = a.jenis_aset_id where p.tenant_id <> a.tenant_id) as n
 ),
 induk_hilang as (
     select
-        (select count(*) from m_entitas_aset c left join m_jenis_aset p on p.id = c.jenis_aset_id where p.id is null)
-      + (select count(*) from m_kategori_aset c left join m_group_aset p on p.id = c.group_aset_id where p.id is null)
-      + (select count(*) from m_jenis_aset c left join m_kategori_aset p on p.id = c.kategori_aset_id where p.id is null) as n
+        (select count(*) from m_model_aset c left join m_pabrikan_aset p on p.id = c.pabrikan_aset_id where p.id is null)
+      + (select count(*) from m_model_aset c left join m_jenis_aset p on p.id = c.jenis_aset_id where c.jenis_aset_id is not null and p.id is null)
+      + (select count(*) from tr_penerimaan_aset a left join m_group_aset p on p.id = a.group_aset_id where p.id is null) as n
 ),
 prefix_salah as (
     -- Prefix kode berasal dari reference Number Sequence yang berbeda per master.
     -- Prefix yang tertukar berarti satu master memakai reference milik master lain.
     select
-        (select count(*) from m_entitas_aset where kode not like 'EA-%')
-      + (select count(*) from m_group_aset where kode not like 'GA-%')
-      + (select count(*) from m_kategori_aset where kode not like 'KA-%')
-      + (select count(*) from m_jenis_aset where kode not like 'JA-%')
-      + (select count(*) from m_kondisi_aset where kode not like 'KD-%')
-      + (select count(*) from m_pabrikan_aset where kode not like 'PB-%')
-      + (select count(*) from m_item_checklist_maintenance where kode not like 'IC-%')
-      + (select count(*) from m_analisa_maintenance where kode not like 'AM-%') as n
+        (select count(*) from m_group_aset where kode not like 'GRPA%')
+      + (select count(*) from m_jenis_aset where kode not like 'JNSA%')
+      + (select count(*) from m_model_aset where kode not like 'MDLA%')
+      + (select count(*) from m_tipe_lokasi_aset where kode not like 'TLKA%')
+      + (select count(*) from m_buku_penyusutan where kode not like 'BKPY%')
+      + (select count(*) from m_kondisi_aset where kode not like 'KNDA%')
+      + (select count(*) from m_pabrikan_aset where kode not like 'PBRA%')
+      + (select count(*) from m_item_checklist_maintenance where kode not like 'ICMA%')
+      + (select count(*) from m_analisa_maintenance where kode not like 'ANMA%') as n
 ),
 tenant_kosong as (
     select
-        (select count(*) from m_entitas_aset where tenant_id is null or length(tenant_id) <> 26)
-      + (select count(*) from m_group_aset where tenant_id is null or length(tenant_id) <> 26)
-      + (select count(*) from m_kategori_aset where tenant_id is null or length(tenant_id) <> 26) as n
+        (select count(*) from m_group_aset where tenant_id is null or length(tenant_id) <> 26)
+      + (select count(*) from m_jenis_aset where tenant_id is null or length(tenant_id) <> 26)
+      + (select count(*) from m_model_aset where tenant_id is null or length(tenant_id) <> 26) as n
 ),
 aset_duplikat as (
     select count(*) as n from (
@@ -97,6 +106,38 @@ export_ganda as (
         select tenant_id, posting_id from tr_export_penyusutan group by 1, 2 having count(*) > 1
         union all select tenant_id, depreciation_period_id from tr_export_penyusutan group by 1, 2 having count(*) > 1
     ) d
+),
+depreciation_negative as (
+    select count(*) as n from tr_penyusutan_aset
+    where reverses_period_id is null and amount < 0
+),
+depreciation_nbv_below_residual as (
+    select count(*) as n from tr_buku_aset
+    where net_book_value < greatest(coalesce(residual_value, 0), 0)
+),
+depreciation_final_ganda as (
+    select count(*) as n from (
+        select tenant_id, asset_book_id, period_ends_on
+        from tr_penyusutan_aset
+        where reverses_period_id is null and status = 'final'
+        group by 1, 2, 3 having count(*) > 1
+    ) d
+),
+depreciation_rounding_not_finished as (
+    select count(*) as n from (
+        select b.id
+        from tr_buku_aset b
+        left join tr_penyusutan_aset p
+          on p.tenant_id = b.tenant_id
+         and p.asset_book_id = b.id
+         and p.reverses_period_id is null
+         and p.status = 'final'
+        where b.round_off_depreciation > 0
+          and b.useful_life_periods is not null
+        group by b.id, b.residual_value, b.net_book_value, b.useful_life_periods
+        having count(p.id) >= b.useful_life_periods
+           and b.net_book_value <> coalesce(b.residual_value, 0)
+    ) d
 )
 select 'kode ganda dalam satu tenant' as pemeriksaan, n as pelanggaran from duplikat_kode
 union all select 'creation_key ganda dalam satu tenant', n from duplikat_kunci
@@ -110,14 +151,21 @@ union all select 'dokumen lifecycle menunjuk aset tenant lain', n from dokumen_l
 union all select 'kode atau kunci perencanaan ganda', n from perencanaan_duplikat
 union all select 'detail perencanaan lintas tenant atau yatim', n from perencanaan_detail_tidak_sah
 union all select 'prefix nomor perencanaan salah', n from perencanaan_prefix_salah
-union all select 'posting export penyusutan ganda', n from export_ganda;
+union all select 'posting export penyusutan ganda', n from export_ganda
+union all select 'nilai penyusutan negatif', n from depreciation_negative
+union all select 'NBV melewati nilai residual atau nol', n from depreciation_nbv_below_residual
+union all select 'finalisasi periode ganda', n from depreciation_final_ganda
+union all select 'round-off tidak mendarat di residual atau nol', n from depreciation_rounding_not_finished;
 
 \echo
 \echo '=== VOLUME DATA ==='
-select 'm_entitas_aset' as tabel, count(*) as baris, count(distinct tenant_id) as tenant from m_entitas_aset
-union all select 'm_group_aset', count(*), count(distinct tenant_id) from m_group_aset
-union all select 'm_kategori_aset', count(*), count(distinct tenant_id) from m_kategori_aset
+select 'm_group_aset' as tabel, count(*) as baris, count(distinct tenant_id) as tenant from m_group_aset
 union all select 'm_jenis_aset', count(*), count(distinct tenant_id) from m_jenis_aset
+union all select 'm_model_aset', count(*), count(distinct tenant_id) from m_model_aset
+union all select 'm_tipe_lokasi_aset', count(*), count(distinct tenant_id) from m_tipe_lokasi_aset
+union all select 'm_buku_penyusutan', count(*), count(distinct tenant_id) from m_buku_penyusutan
+union all select 'm_group_buku_penyusutan', count(*), count(distinct tenant_id) from m_group_buku_penyusutan
+union all select 'm_lokasi_aset', count(*), count(distinct tenant_id) from m_lokasi_aset
 union all select 'm_kondisi_aset', count(*), count(distinct tenant_id) from m_kondisi_aset
 union all select 'm_pabrikan_aset', count(*), count(distinct tenant_id) from m_pabrikan_aset
 union all select 'm_item_checklist_maintenance', count(*), count(distinct tenant_id) from m_item_checklist_maintenance
@@ -127,4 +175,6 @@ union all select 'tr_penempatan_aset', count(*), count(distinct tenant_id) from 
 union all select 'tr_dokumen_siklus_aset', count(*), count(distinct tenant_id) from tr_dokumen_siklus_aset
 union all select 'tr_perencanaan_aset', count(*), count(distinct tenant_id) from tr_perencanaan_aset
 union all select 'tr_perencanaan_aset_details', count(*), count(distinct tenant_id) from tr_perencanaan_aset_details
+union all select 'tr_penyusutan_aset', count(*), count(distinct tenant_id) from tr_penyusutan_aset
+union all select 'tr_export_penyusutan', count(*), count(distinct tenant_id) from tr_export_penyusutan
 order by 1;

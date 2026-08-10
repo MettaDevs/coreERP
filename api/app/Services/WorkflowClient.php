@@ -9,12 +9,17 @@ use RuntimeException;
 
 class WorkflowClient
 {
+    // Korelasi memakai id dokumen: satu dokumen dekomisioning adalah satu rantai kerja,
+    // dan Core mengembalikannya pada event keputusan berhari-hari kemudian. Tanpa ini
+    // Core membangkitkan korelasinya sendiri dan sisi app kehilangan jejaknya.
     /** @param array<string, mixed> $context */
     public function submit(string $tenantId, string $key, string $documentId, string $assetId, array $context): string
     {
         $url = rtrim((string) config('services.coreerp.url'), '/');
         $token = (string) config('services.coreerp.service_token');
-        if ($url === '' || $token === '') throw new RuntimeException('Layanan persetujuan belum dikonfigurasi.');
+        if ($url === '' || $token === '') {
+            throw new RuntimeException('Layanan persetujuan belum dikonfigurasi.');
+        }
 
         try {
             $response = Http::baseUrl($url)->acceptJson()->connectTimeout(2)->timeout(5)
@@ -22,7 +27,7 @@ class WorkflowClient
                 ->withHeaders([
                     'X-CoreERP-App-Id' => (string) config('services.coreerp.app_id'),
                     'X-CoreERP-Service-Token' => $token, 'X-CoreERP-Tenant-Id' => $tenantId,
-                    'Idempotency-Key' => $key,
+                    'Idempotency-Key' => $key, 'X-Correlation-Id' => $documentId,
                 ])->post('/api/internal/v1/workflow-instances', [
                     'workflow_type' => 'management-aset.dekomisioning-aset-verification',
                     'source_document_type' => 'dekomisioning-aset', 'source_document_id' => $documentId,
@@ -34,7 +39,9 @@ class WorkflowClient
         }
 
         $id = $response->json('data.id');
-        if (! is_string($id) || $id === '') throw new RuntimeException('Layanan persetujuan mengembalikan data yang tidak valid.');
+        if (! is_string($id) || $id === '') {
+            throw new RuntimeException('Layanan persetujuan mengembalikan data yang tidak valid.');
+        }
 
         return $id;
     }

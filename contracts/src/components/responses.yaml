@@ -1,0 +1,35 @@
+# Response error yang dipakai ulang lintas endpoint.
+Unauthenticated:
+  description: Sesi aplikasi tidak valid
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+Forbidden:
+  description: Pengguna tidak memiliki hak untuk tindakan ini pada resource ini
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+NotFound:
+  description: Data tidak ditemukan pada tenant aktif
+ValidationError:
+  description: Data tidak valid, termasuk induk yang tidak ada, sudah diarsipkan, atau milik tenant lain
+IdempotencyConflict:
+  description: Idempotency-Key sudah dipakai untuk data yang berbeda
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+ReferencedByChildren:
+  description: Data masih dipakai master turunan yang aktif
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+NumberSequenceUnavailable:
+  description: Number Sequence belum aktif atau tidak tersedia
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'

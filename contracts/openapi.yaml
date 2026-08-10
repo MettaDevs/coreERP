@@ -1,3 +1,5 @@
+# DIBANGKITKAN OLEH contracts/bundle.py - JANGAN DISUNTING LANGSUNG.
+# Sunting contracts/src/ lalu jalankan: python contracts/bundle.py
 openapi: 3.1.0
 info:
   title: Management Aset API
@@ -12,19 +14,27 @@ info:
     Kode setiap master diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
     Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
 
-    Rantai klasifikasi `entitas aset -> group aset -> kategori aset -> jenis aset`
-    adalah struktur domain milik app ini, bukan organization hierarchy CoreERP.
+    Klasifikasi aset mengikuti model Dynamics 365 F&O: seluruh master klasifikasi datar
+    dan saling lepas, dan aset menunjuk masing-masing secara langsung. `group aset`
+    membawa perlakuan finansial (penyusutan, GL, penomoran), `jenis aset` membawa
+    perlakuan teknis (maintenance, atribut), dan `model aset` adalah katalog barang per
+    pabrikan. Tidak ada rantai berjenjang yang wajib diisi, sehingga tenant dengan
+    kedalaman klasifikasi berbeda tidak dipaksa mengisi tingkat yang tidak mereka punya.
+
+    Yang hierarkis hanya data, bukan skema: lokasi aset dan komposisi aset (`parent_asset_id`)
+    menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya struktur domain milik
+    app ini, bukan organization hierarchy CoreERP.
 servers:
-  - url: /
+- url: /
 security:
-  - CoreERPContext: []
+- CoreERPContext: []
 tags:
-  - name: Master data
-    description: Master aset dan master maintenance.
-  - name: Lifecycle aset
-    description: Dokumen lifecycle aset, register, mutasi, dan pelepasan tanpa jurnal GL.
-  - name: Penyusutan
-    description: Proposal dan finalisasi penyusutan beserta export bridge backoffice.
+- name: Master data
+  description: Master aset dan master maintenance.
+- name: Lifecycle aset
+  description: Dokumen lifecycle aset, register, mutasi, dan pelepasan tanpa jurnal GL.
+- name: Penyusutan
+  description: Proposal dan finalisasi penyusutan beserta export bridge backoffice.
 paths:
   /api/v1/health:
     get:
@@ -49,200 +59,24 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: object
-                    required: [permissions]
+                    required:
+                    - permissions
                     properties:
                       permissions:
                         type: array
-                        items: { type: string }
+                        items:
+                          type: string
         '401':
           $ref: '#/components/responses/Unauthenticated'
-
-  /api/v1/aset:
-    get:
-      tags: [Lifecycle aset]
-      operationId: listAset
-      summary: Menampilkan register aset tenant aktif
-      responses: { '200': { description: Register aset } }
-    post:
-      tags: [Lifecycle aset]
-      operationId: receiveAset
-      summary: Mencatat penerimaan aset dan penempatan awal; plan atau permintaan bersifat opsional
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      responses: { '201': { description: Aset diterima }, '403': { $ref: '#/components/responses/Forbidden' }, '503': { $ref: '#/components/responses/NumberSequenceUnavailable' } }
-
-  /api/v1/aset/{id}/history:
-    get:
-      tags: [Lifecycle aset]
-      operationId: assetHistory
-      summary: Membaca histori penempatan efektif aset tanpa mengubah histori lama
-      parameters: [{ $ref: '#/components/parameters/RecordId' }]
-      responses: { '200': { description: Aset dan histori penempatan }, '404': { $ref: '#/components/responses/NotFound' } }
-
-  /api/v1/aset/{id}/penempatan:
-    post:
-      tags: [Lifecycle aset]
-      operationId: placeAsset
-      summary: Menambah mutasi penggunaan, PIC, atau lokasi aset
-      parameters: [{ $ref: '#/components/parameters/RecordId' }]
-      responses: { '200': { description: Mutasi dicatat }, '409': { description: Aset yang dilepas tidak dapat dimutasi } }
-
-  /api/v1/perencanaan-aset:
-    get:
-      tags: [Perencanaan aset]
-      operationId: listAssetPlans
-      summary: Menampilkan rencana aset tenant aktif
-      responses: { '200': { description: Daftar rencana aset }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' } }
-    post:
-      tags: [Perencanaan aset]
-      operationId: createAssetPlan
-      summary: Membuat header dan rincian perencanaan aset; spesifikasi adalah snapshot pada rincian transaksi
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/AssetPlanningWrite' } } } }
-      responses: { '200': { description: Permintaan yang sama diulang }, '201': { description: Rencana dibuat }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '422': { $ref: '#/components/responses/ValidationError' }, '503': { description: Number Sequence Core belum tersedia } }
-
-  /api/v1/perencanaan-aset/{id}:
-    get:
-      tags: [Perencanaan aset]
-      operationId: showAssetPlan
-      summary: Menampilkan satu rencana aset beserta rinciannya
-      parameters: [{ $ref: '#/components/parameters/RecordId' }]
-      responses: { '200': { description: Rencana aset }, '401': { $ref: '#/components/responses/Unauthenticated' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { description: Rencana tidak ditemukan } }
-    patch:
-      tags: [Perencanaan aset]
-      operationId: updateAssetPlan
-      summary: Mengubah rencana draf dengan version saat ini
-      parameters: [{ $ref: '#/components/parameters/RecordId' }]
-      requestBody: { required: true, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/AssetPlanningWrite' }, { type: object, required: [version], properties: { version: { type: integer, minimum: 1 } } }] } } } }
-      responses: { '200': { description: Rencana diperbarui }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { description: Version sudah berubah }, '422': { $ref: '#/components/responses/ValidationError' } }
-    delete:
-      tags: [Perencanaan aset]
-      operationId: archiveAssetPlan
-      summary: Mengarsipkan rencana draf tanpa menghapus data fisik
-      parameters: [{ $ref: '#/components/parameters/RecordId' }]
-      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [version], properties: { version: { type: integer, minimum: 1 } } } } } }
-      responses: { '204': { description: Rencana diarsipkan }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { description: Version sudah berubah }, '422': { $ref: '#/components/responses/ValidationError' } }
-
-  /api/v1/{lifecycleDocument}:
-    get:
-      tags: [Lifecycle aset]
-      operationId: listLifecycleDocument
-      summary: Menampilkan permintaan pembelian, pemeliharaan, dekomisioning, penjualan, atau pemusnahan
-      parameters: [{ name: lifecycleDocument, in: path, required: true, schema: { type: string, enum: [permintaan-pembelian-aset, pemeliharaan-aset, dekomisioning-aset, penjualan-aset, pemusnahan-aset] } }]
-      responses: { '200': { description: Daftar dokumen lifecycle } }
-    post:
-      tags: [Lifecycle aset]
-      operationId: createLifecycleDocument
-      summary: Membuat dokumen lifecycle; dekomisioning yang disetujui menghentikan pemakaian aset sebelum penjualan atau pemusnahan
-      parameters: [{ name: lifecycleDocument, in: path, required: true, schema: { type: string, enum: [permintaan-pembelian-aset, pemeliharaan-aset, dekomisioning-aset, penjualan-aset, pemusnahan-aset] } }, { $ref: '#/components/parameters/IdempotencyKey' }]
-      responses: { '201': { description: Dokumen dibuat } }
-
-  /api/v1/penyusutan/proposal:
-    post:
-      tags: [Penyusutan]
-      operationId: proposeDepreciation
-      summary: Membuat proposal penyusutan satu Asset Book tanpa jurnal GL
-      responses: { '201': { description: Proposal dibuat } }
-
-  /api/v1/penyusutan:
-    get:
-      tags: [Penyusutan]
-      operationId: listDepreciationPeriods
-      summary: Menampilkan periode penyusutan tenant aktif
-      responses: { '200': { description: Daftar periode } }
-
-  /api/v1/penyusutan/buku:
-    get:
-      tags: [Penyusutan]
-      operationId: listAssetBooksForDepreciation
-      summary: Menampilkan Asset Book aktif yang dapat dihitung penyusutannya
-      responses: { '200': { description: Daftar Asset Book } }
-
-  /api/v1/penyusutan/{id}/finalisasi:
-    post:
-      tags: [Penyusutan]
-      operationId: finalizeDepreciation
-      summary: Mengunci periode dan membuat export bridge dengan posting_id stabil
-      parameters: [{ $ref: '#/components/parameters/RecordId' }]
-      responses: { '200': { description: Periode final dan export dibuat }, '409': { description: Periode sudah final } }
-
-  /api/v1/penyusutan/{id}/reversal:
-    post:
-      tags: [Penyusutan]
-      operationId: reverseDepreciation
-      summary: Membuat pembalikan baru untuk periode final tanpa mengubah periode asal
-      parameters: [{ $ref: '#/components/parameters/RecordId' }]
-      responses: { '201': { description: Pembalikan dan export bridge dibuat }, '409': { description: Periode tidak dapat dibalik } }
-
-  /api/v1/entitas-aset:
-    get:
-      tags: [Master data]
-      operationId: listEntitasAset
-      summary: Menampilkan entitas aset
-      parameters:
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/ActiveFilter'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
-        - $ref: '#/components/parameters/JenisAsetFilter'
-      responses:
-        '200':
-          description: Daftar entitas aset
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EntitasAsetList'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    post:
-      tags: [Master data]
-      operationId: createEntitasAset
-      summary: Membuat entitas aset dengan kode dari Number Sequence Core
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EntitasAsetCreate'
-      responses:
-        '200':
-          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
-          headers:
-            Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EntitasAsetResponse'
-        '201':
-          description: Entitas aset dibuat
-          headers:
-            Location:
-              schema: { type: string, format: uri }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EntitasAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
   /api/v1/reference-data/units-of-measure:
     get:
-      tags: [Reference data]
+      tags:
+      - Reference data
       operationId: listCoreUnitsOfMeasure
       summary: Menampilkan satuan aktif dari Core untuk dipilih dalam transaksi aset
       responses:
@@ -250,809 +84,17 @@ paths:
           description: Daftar satuan aktif
         '503':
           description: Layanan satuan Core belum dapat dihubungi
-  /api/v1/entitas-aset/{id}:
-    parameters:
-      - $ref: '#/components/parameters/RecordId'
-    get:
-      tags: [Master data]
-      operationId: getEntitasAset
-      summary: Membaca satu entitas aset
-      responses:
-        '200':
-          description: Entitas aset ditemukan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EntitasAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    patch:
-      tags: [Master data]
-      operationId: updateEntitasAset
-      summary: Mengubah nama, keterangan, atau status entitas aset
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/EntitasAsetPatch'
-      responses:
-        '200':
-          description: Entitas aset diperbarui
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EntitasAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Master data]
-      operationId: archiveEntitasAset
-      summary: Mengarsipkan entitas aset
-      responses:
-        '204':
-          description: Entitas aset diarsipkan
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/ReferencedByChildren'
-
-  /api/v1/group-aset:
-    get:
-      tags: [Master data]
-      operationId: listGroupAset
-      summary: Menampilkan group aset
-      parameters:
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/ActiveFilter'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
-      responses:
-        '200':
-          description: Daftar group aset
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupAsetList'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    post:
-      tags: [Master data]
-      operationId: createGroupAset
-      summary: Membuat group aset
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GroupAsetCreate'
-      responses:
-        '200':
-          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
-          headers:
-            Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupAsetResponse'
-        '201':
-          description: Group aset dibuat
-          headers:
-            Location:
-              schema: { type: string, format: uri }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
-  /api/v1/group-aset/{id}:
-    parameters:
-      - $ref: '#/components/parameters/RecordId'
-    get:
-      tags: [Master data]
-      operationId: getGroupAset
-      summary: Membaca satu group aset
-      responses:
-        '200':
-          description: Group aset ditemukan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    patch:
-      tags: [Master data]
-      operationId: updateGroupAset
-      summary: Mengubah group aset, termasuk memindahkannya ke entitas aset lain
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GroupAsetPatch'
-      responses:
-        '200':
-          description: Group aset diperbarui
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GroupAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Master data]
-      operationId: archiveGroupAset
-      summary: Mengarsipkan group aset
-      responses:
-        '204':
-          description: Group aset diarsipkan
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/ReferencedByChildren'
-
-  /api/v1/kategori-aset:
-    get:
-      tags: [Master data]
-      operationId: listKategoriAset
-      summary: Menampilkan kategori aset
-      parameters:
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/ActiveFilter'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
-        - $ref: '#/components/parameters/GroupAsetFilter'
-      responses:
-        '200':
-          description: Daftar kategori aset
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KategoriAsetList'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    post:
-      tags: [Master data]
-      operationId: createKategoriAset
-      summary: Membuat kategori aset di bawah satu group aset
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/KategoriAsetCreate'
-      responses:
-        '200':
-          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
-          headers:
-            Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KategoriAsetResponse'
-        '201':
-          description: Kategori aset dibuat
-          headers:
-            Location:
-              schema: { type: string, format: uri }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KategoriAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
-  /api/v1/kategori-aset/{id}:
-    parameters:
-      - $ref: '#/components/parameters/RecordId'
-    get:
-      tags: [Master data]
-      operationId: getKategoriAset
-      summary: Membaca satu kategori aset
-      responses:
-        '200':
-          description: Kategori aset ditemukan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KategoriAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    patch:
-      tags: [Master data]
-      operationId: updateKategoriAset
-      summary: Mengubah kategori aset, termasuk memindahkannya ke group aset lain
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/KategoriAsetPatch'
-      responses:
-        '200':
-          description: Kategori aset diperbarui
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KategoriAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Master data]
-      operationId: archiveKategoriAset
-      summary: Mengarsipkan kategori aset
-      responses:
-        '204':
-          description: Kategori aset diarsipkan
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/ReferencedByChildren'
-
-  /api/v1/jenis-aset:
-    get:
-      tags: [Master data]
-      operationId: listJenisAset
-      summary: Menampilkan jenis aset
-      parameters:
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/ActiveFilter'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
-        - $ref: '#/components/parameters/KategoriAsetFilter'
-      responses:
-        '200':
-          description: Daftar jenis aset
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JenisAsetList'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    post:
-      tags: [Master data]
-      operationId: createJenisAset
-      summary: Membuat jenis aset di bawah satu kategori aset
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/JenisAsetCreate'
-      responses:
-        '200':
-          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
-          headers:
-            Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JenisAsetResponse'
-        '201':
-          description: Jenis aset dibuat
-          headers:
-            Location:
-              schema: { type: string, format: uri }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JenisAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
-  /api/v1/jenis-aset/{id}:
-    parameters:
-      - $ref: '#/components/parameters/RecordId'
-    get:
-      tags: [Master data]
-      operationId: getJenisAset
-      summary: Membaca satu jenis aset
-      responses:
-        '200':
-          description: Jenis aset ditemukan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JenisAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    patch:
-      tags: [Master data]
-      operationId: updateJenisAset
-      summary: Mengubah jenis aset, termasuk memindahkannya ke kategori aset lain
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/JenisAsetPatch'
-      responses:
-        '200':
-          description: Jenis aset diperbarui
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JenisAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Master data]
-      operationId: archiveJenisAset
-      summary: Mengarsipkan jenis aset
-      responses:
-        '204':
-          description: Jenis aset diarsipkan
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /api/v1/kondisi-aset:
-    get:
-      tags: [Master data]
-      operationId: listKondisiAset
-      summary: Menampilkan kondisi aset
-      parameters:
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/ActiveFilter'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
-      responses:
-        '200':
-          description: Daftar kondisi aset
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KondisiAsetList'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    post:
-      tags: [Master data]
-      operationId: createKondisiAset
-      summary: Membuat kondisi aset dengan kode dari Number Sequence Core
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/KondisiAsetCreate'
-      responses:
-        '200':
-          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
-          headers:
-            Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KondisiAsetResponse'
-        '201':
-          description: Kondisi aset dibuat
-          headers:
-            Location:
-              schema: { type: string, format: uri }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KondisiAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
-  /api/v1/kondisi-aset/{id}:
-    parameters:
-      - $ref: '#/components/parameters/RecordId'
-    get:
-      tags: [Master data]
-      operationId: getKondisiAset
-      summary: Membaca satu kondisi aset
-      responses:
-        '200':
-          description: Kondisi aset ditemukan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KondisiAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    patch:
-      tags: [Master data]
-      operationId: updateKondisiAset
-      summary: Mengubah nama, keterangan, atau status kondisi aset
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/KondisiAsetPatch'
-      responses:
-        '200':
-          description: Kondisi aset diperbarui
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/KondisiAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Master data]
-      operationId: archiveKondisiAset
-      summary: Mengarsipkan kondisi aset
-      responses:
-        '204':
-          description: Kondisi aset diarsipkan
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /api/v1/pabrikan-aset:
-    get:
-      tags: [Master data]
-      operationId: listPabrikanAset
-      summary: Menampilkan pabrikan aset
-      parameters:
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/ActiveFilter'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
-      responses:
-        '200':
-          description: Daftar pabrikan aset
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PabrikanAsetList'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    post:
-      tags: [Master data]
-      operationId: createPabrikanAset
-      summary: Membuat pabrikan aset dengan kode dari Number Sequence Core
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PabrikanAsetCreate'
-      responses:
-        '200':
-          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
-          headers:
-            Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PabrikanAsetResponse'
-        '201':
-          description: Pabrikan aset dibuat
-          headers:
-            Location:
-              schema: { type: string, format: uri }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PabrikanAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
-  /api/v1/pabrikan-aset/{id}:
-    parameters:
-      - $ref: '#/components/parameters/RecordId'
-    get:
-      tags: [Master data]
-      operationId: getPabrikanAset
-      summary: Membaca satu pabrikan aset
-      responses:
-        '200':
-          description: Pabrikan aset ditemukan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PabrikanAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    patch:
-      tags: [Master data]
-      operationId: updatePabrikanAset
-      summary: Mengubah nama, keterangan, atau status pabrikan aset
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PabrikanAsetPatch'
-      responses:
-        '200':
-          description: Pabrikan aset diperbarui
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PabrikanAsetResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Master data]
-      operationId: archivePabrikanAset
-      summary: Mengarsipkan pabrikan aset
-      responses:
-        '204':
-          description: Pabrikan aset diarsipkan
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /api/v1/item-checklist-maintenance:
-    get:
-      tags: [Master data]
-      operationId: listItemChecklistMaintenance
-      summary: Menampilkan item checklist maintenance
-      parameters:
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/ActiveFilter'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
-      responses:
-        '200':
-          description: Daftar item checklist maintenance
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ItemChecklistMaintenanceList'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-    post:
-      tags: [Master data]
-      operationId: createItemChecklistMaintenance
-      summary: Membuat item checklist maintenance dengan kode dari Number Sequence Core
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ItemChecklistMaintenanceCreate'
-      responses:
-        '200':
-          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
-          headers:
-            Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ItemChecklistMaintenanceResponse'
-        '201':
-          description: Item checklist maintenance dibuat
-          headers:
-            Location:
-              schema: { type: string, format: uri }
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ItemChecklistMaintenanceResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '409':
-          $ref: '#/components/responses/IdempotencyConflict'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
-  /api/v1/item-checklist-maintenance/{id}:
-    parameters:
-      - $ref: '#/components/parameters/RecordId'
-    get:
-      tags: [Master data]
-      operationId: getItemChecklistMaintenance
-      summary: Membaca satu item checklist maintenance
-      responses:
-        '200':
-          description: Item checklist maintenance ditemukan
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ItemChecklistMaintenanceResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-    patch:
-      tags: [Master data]
-      operationId: updateItemChecklistMaintenance
-      summary: Mengubah nama, keterangan, atau status item checklist maintenance
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ItemChecklistMaintenancePatch'
-      responses:
-        '200':
-          description: Item checklist maintenance diperbarui
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ItemChecklistMaintenanceResponse'
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/ValidationError'
-    delete:
-      tags: [Master data]
-      operationId: archiveItemChecklistMaintenance
-      summary: Mengarsipkan item checklist maintenance
-      responses:
-        '204':
-          description: Item checklist maintenance diarsipkan
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
   /api/v1/analisa-maintenance:
     get:
-      tags: [Master data]
+      tags:
+      - Master data
       operationId: listAnalisaMaintenance
       summary: Menampilkan analisa maintenance
       parameters:
-        - $ref: '#/components/parameters/Search'
-        - $ref: '#/components/parameters/ActiveFilter'
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PerPage'
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: Daftar analisa maintenance
@@ -1065,11 +107,12 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
     post:
-      tags: [Master data]
+      tags:
+      - Master data
       operationId: createAnalisaMaintenance
       summary: Membuat analisa maintenance dengan kode dari Number Sequence Core
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1081,7 +124,9 @@ paths:
           description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
           headers:
             Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
+              schema:
+                type: string
+                const: 'true'
           content:
             application/json:
               schema:
@@ -1090,7 +135,9 @@ paths:
           description: Analisa maintenance dibuat
           headers:
             Location:
-              schema: { type: string, format: uri }
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
@@ -1107,9 +154,10 @@ paths:
           $ref: '#/components/responses/NumberSequenceUnavailable'
   /api/v1/analisa-maintenance/{id}:
     parameters:
-      - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/RecordId'
     get:
-      tags: [Master data]
+      tags:
+      - Master data
       operationId: getAnalisaMaintenance
       summary: Membaca satu analisa maintenance
       responses:
@@ -1126,7 +174,8 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
-      tags: [Master data]
+      tags:
+      - Master data
       operationId: updateAnalisaMaintenance
       summary: Mengubah nama, keterangan, atau status analisa maintenance
       requestBody:
@@ -1151,7 +200,8 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationError'
     delete:
-      tags: [Master data]
+      tags:
+      - Master data
       operationId: archiveAnalisaMaintenance
       summary: Mengarsipkan analisa maintenance
       responses:
@@ -1163,7 +213,1881 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/group-aset:
+    get:
+      tags:
+      - Master data
+      operationId: listGroupAset
+      summary: Menampilkan group aset
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar group aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupAsetList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createGroupAset
+      summary: Membuat group aset
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupAsetCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupAsetResponse'
+        '201':
+          description: Group aset dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/group-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getGroupAset
+      summary: Membaca satu group aset
+      responses:
+        '200':
+          description: Group aset ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateGroupAset
+      summary: Mengubah nama, keterangan, atau status group aset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupAsetPatch'
+      responses:
+        '200':
+          description: Group aset diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveGroupAset
+      summary: Mengarsipkan group aset
+      responses:
+        '204':
+          description: Group aset diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ReferencedByChildren'
+  /api/v1/group-aset/{id}/buku-penyusutan:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: listGroupBukuPenyusutan
+      summary: Menampilkan matriks buku penyusutan satu group aset
+      responses:
+        '200':
+          description: Baris matriks group aset tersebut
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupBukuPenyusutanList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Master data
+      operationId: replaceGroupBukuPenyusutan
+      summary: Mengganti seluruh baris matriks buku penyusutan satu group aset
+      description: |
+        Baris disunting di dalam form group, jadi endpoint ini memakai permission
+        `management-aset.group-aset.update` dan bukan permission tersendiri.
 
+        Semantiknya ganti-seluruh-himpunan: kiriman memuat daftar penuh, dan baris yang
+        tidak disertakan diarsipkan. Karena itu permintaan yang sama dapat diulang tanpa
+        efek tambahan dan tidak memerlukan `Idempotency-Key`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupBukuPenyusutanReplace'
+      responses:
+        '200':
+          description: Matriks setelah diganti
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupBukuPenyusutanList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/jenis-aset/{id}/atribut:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: listJenisAsetAtribut
+      summary: Menampilkan atribut yang menempel pada satu jenis aset
+      responses:
+        '200':
+          description: Daftar atribut yang menempel pada satu jenis aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JenisAsetAtributList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Master data
+      operationId: replaceJenisAsetAtribut
+      summary: Mengganti seluruh atribut yang menempel pada satu jenis aset
+      description: |
+        Disunting di dalam form pemiliknya, jadi memakai permission pemilik dan bukan
+        permission tersendiri. Semantiknya ganti-seluruh-himpunan: kiriman memuat daftar
+        penuh, baris yang tidak disertakan diarsipkan, dan permintaan yang sama dapat
+        diulang tanpa efek tambahan sehingga tidak memerlukan header idempotency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JenisAsetAtributReplace'
+      responses:
+        '200':
+          description: Daftar setelah diganti
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JenisAsetAtributList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/jenis-aset/{id}/atribut-definisi:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getJenisAsetAtributDefinisi
+      summary: Menampilkan definisi atribut jenis aset beserta pilihan nilainya
+      description: |
+        Bentuk siap render untuk form penerimaan aset: tiap atribut sudah membawa tipe
+        data, satuan, batas nilai, penanda wajib, dan daftar pilihannya.
+      responses:
+        '200':
+          description: Definisi atribut jenis aset tersebut
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JenisAsetAtributDefinisi'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/v1/tipe-atribut/{id}/nilai:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: listTipeAtributNilai
+      summary: Menampilkan pilihan nilai satu tipe atribut
+      responses:
+        '200':
+          description: Daftar pilihan nilai satu tipe atribut
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeAtributNilaiList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Master data
+      operationId: replaceTipeAtributNilai
+      summary: Mengganti seluruh pilihan nilai satu tipe atribut
+      description: |
+        Disunting di dalam form pemiliknya, jadi memakai permission pemilik dan bukan
+        permission tersendiri. Semantiknya ganti-seluruh-himpunan: kiriman memuat daftar
+        penuh, baris yang tidak disertakan diarsipkan, dan permintaan yang sama dapat
+        diulang tanpa efek tambahan sehingga tidak memerlukan header idempotency.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TipeAtributNilaiReplace'
+      responses:
+        '200':
+          description: Daftar setelah diganti
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeAtributNilaiList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/item-checklist-maintenance:
+    get:
+      tags:
+      - Master data
+      operationId: listItemChecklistMaintenance
+      summary: Menampilkan item checklist maintenance
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar item checklist maintenance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemChecklistMaintenanceList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createItemChecklistMaintenance
+      summary: Membuat item checklist maintenance dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemChecklistMaintenanceCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemChecklistMaintenanceResponse'
+        '201':
+          description: Item checklist maintenance dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemChecklistMaintenanceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/item-checklist-maintenance/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getItemChecklistMaintenance
+      summary: Membaca satu item checklist maintenance
+      responses:
+        '200':
+          description: Item checklist maintenance ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemChecklistMaintenanceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateItemChecklistMaintenance
+      summary: Mengubah nama, keterangan, atau status item checklist maintenance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemChecklistMaintenancePatch'
+      responses:
+        '200':
+          description: Item checklist maintenance diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemChecklistMaintenanceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveItemChecklistMaintenance
+      summary: Mengarsipkan item checklist maintenance
+      responses:
+        '204':
+          description: Item checklist maintenance diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/jenis-aset:
+    get:
+      tags:
+      - Master data
+      operationId: listJenisAset
+      summary: Menampilkan jenis aset
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar jenis aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JenisAsetList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createJenisAset
+      summary: Membuat jenis aset dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JenisAsetCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JenisAsetResponse'
+        '201':
+          description: Jenis aset dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JenisAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/jenis-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getJenisAset
+      summary: Membaca satu jenis aset
+      responses:
+        '200':
+          description: Jenis aset ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JenisAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateJenisAset
+      summary: Mengubah nama, keterangan, atau status jenis aset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JenisAsetPatch'
+      responses:
+        '200':
+          description: Jenis aset diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JenisAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveJenisAset
+      summary: Mengarsipkan jenis aset
+      responses:
+        '204':
+          description: Jenis aset diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/kondisi-aset:
+    get:
+      tags:
+      - Master data
+      operationId: listKondisiAset
+      summary: Menampilkan kondisi aset
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar kondisi aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KondisiAsetList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createKondisiAset
+      summary: Membuat kondisi aset dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KondisiAsetCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KondisiAsetResponse'
+        '201':
+          description: Kondisi aset dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KondisiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/kondisi-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getKondisiAset
+      summary: Membaca satu kondisi aset
+      responses:
+        '200':
+          description: Kondisi aset ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KondisiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateKondisiAset
+      summary: Mengubah nama, keterangan, atau status kondisi aset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KondisiAsetPatch'
+      responses:
+        '200':
+          description: Kondisi aset diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KondisiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveKondisiAset
+      summary: Mengarsipkan kondisi aset
+      responses:
+        '204':
+          description: Kondisi aset diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/lokasi-aset:
+    get:
+      tags:
+      - Master data
+      operationId: listLokasiAset
+      summary: Menampilkan lokasi aset
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      - $ref: '#/components/parameters/ParentLokasiAsetFilter'
+      - $ref: '#/components/parameters/TipeLokasiAsetFilter'
+      responses:
+        '200':
+          description: Daftar lokasi aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LokasiAsetList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createLokasiAset
+      summary: Membuat lokasi aset dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LokasiAsetCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LokasiAsetResponse'
+        '201':
+          description: Lokasi aset dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LokasiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/lokasi-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getLokasiAset
+      summary: Membaca satu lokasi aset
+      responses:
+        '200':
+          description: Lokasi aset ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LokasiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateLokasiAset
+      summary: Mengubah lokasi aset, termasuk induk, tipe, dan pemetaan unit organisasinya
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LokasiAsetPatch'
+      responses:
+        '200':
+          description: Lokasi aset diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LokasiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveLokasiAset
+      summary: Mengarsipkan lokasi aset
+      responses:
+        '204':
+          description: Lokasi aset diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ReferencedByChildren'
+  /api/v1/model-aset:
+    get:
+      tags:
+      - Master data
+      operationId: listModelAset
+      summary: Menampilkan model aset
+      description: |
+        Kedua filter induk bersifat aditif dan dapat dikirim bersamaan, karena pabrikan
+        dan jenis tidak saling menyaring.
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      - $ref: '#/components/parameters/PabrikanAsetFilter'
+      - $ref: '#/components/parameters/JenisAsetFilter'
+      responses:
+        '200':
+          description: Daftar model aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAsetList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createModelAset
+      summary: Membuat model aset dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelAsetCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAsetResponse'
+        '201':
+          description: Model aset dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/model-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getModelAset
+      summary: Membaca satu model aset
+      responses:
+        '200':
+          description: Model aset ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateModelAset
+      summary: Mengubah model aset, termasuk memindahkannya ke pabrikan atau jenis lain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelAsetPatch'
+      responses:
+        '200':
+          description: Model aset diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveModelAset
+      summary: Mengarsipkan model aset
+      responses:
+        '204':
+          description: Model aset diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ReferencedByChildren'
+  /api/v1/profil-penyusutan:
+    get:
+      tags:
+      - Master data
+      operationId: listProfilPenyusutan
+      summary: Menampilkan profil penyusutan
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar profil penyusutan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilPenyusutanList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createProfilPenyusutan
+      summary: Membuat profil penyusutan dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilPenyusutanCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilPenyusutanResponse'
+        '201':
+          description: Profil penyusutan dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilPenyusutanResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/profil-penyusutan/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getProfilPenyusutan
+      summary: Membaca satu profil penyusutan
+      responses:
+        '200':
+          description: Profil penyusutan ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilPenyusutanResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateProfilPenyusutan
+      summary: Mengubah aturan, nama, keterangan, atau status profil penyusutan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilPenyusutanPatch'
+      responses:
+        '200':
+          description: Profil penyusutan diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfilPenyusutanResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveProfilPenyusutan
+      summary: Mengarsipkan profil penyusutan
+      responses:
+        '204':
+          description: Profil penyusutan diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/tipe-lokasi-aset:
+    get:
+      tags:
+      - Master data
+      operationId: listTipeLokasiAset
+      summary: Menampilkan tipe lokasi aset
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar tipe lokasi aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeLokasiAsetList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createTipeLokasiAset
+      summary: Membuat tipe lokasi aset dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TipeLokasiAsetCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeLokasiAsetResponse'
+        '201':
+          description: Tipe lokasi aset dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeLokasiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/tipe-lokasi-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getTipeLokasiAset
+      summary: Membaca satu tipe lokasi aset
+      responses:
+        '200':
+          description: Tipe lokasi aset ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeLokasiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateTipeLokasiAset
+      summary: Mengubah nama, keterangan, atau status tipe lokasi aset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TipeLokasiAsetPatch'
+      responses:
+        '200':
+          description: Tipe lokasi aset diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeLokasiAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveTipeLokasiAset
+      summary: Mengarsipkan tipe lokasi aset
+      responses:
+        '204':
+          description: Tipe lokasi aset diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ReferencedByChildren'
+  /api/v1/buku-penyusutan:
+    get:
+      tags:
+      - Master data
+      operationId: listBukuPenyusutan
+      summary: Menampilkan buku penyusutan
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar buku penyusutan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BukuPenyusutanList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createBukuPenyusutan
+      summary: Membuat buku penyusutan dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BukuPenyusutanCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BukuPenyusutanResponse'
+        '201':
+          description: Buku penyusutan dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BukuPenyusutanResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/buku-penyusutan/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getBukuPenyusutan
+      summary: Membaca satu buku penyusutan
+      responses:
+        '200':
+          description: Buku penyusutan ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BukuPenyusutanResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateBukuPenyusutan
+      summary: Mengubah buku penyusutan, termasuk profil, lapisan, dan pembulatan nominalnya
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BukuPenyusutanPatch'
+      responses:
+        '200':
+          description: Buku penyusutan diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BukuPenyusutanResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveBukuPenyusutan
+      summary: Mengarsipkan buku penyusutan
+      responses:
+        '204':
+          description: Buku penyusutan diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ReferencedByChildren'
+  /api/v1/tipe-atribut:
+    get:
+      tags:
+      - Master data
+      operationId: listTipeAtribut
+      summary: Menampilkan tipe atribut
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar tipe atribut
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeAtributList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createTipeAtribut
+      summary: Membuat tipe atribut dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TipeAtributCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeAtributResponse'
+        '201':
+          description: Tipe atribut dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeAtributResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/tipe-atribut/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getTipeAtribut
+      summary: Membaca satu tipe atribut
+      responses:
+        '200':
+          description: Tipe atribut ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeAtributResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updateTipeAtribut
+      summary: Mengubah tipe atribut, termasuk tipe data dan batas nilainya
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TipeAtributPatch'
+      responses:
+        '200':
+          description: Tipe atribut diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipeAtributResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archiveTipeAtribut
+      summary: Mengarsipkan tipe atribut
+      responses:
+        '204':
+          description: Tipe atribut diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/ReferencedByChildren'
+  /api/v1/pabrikan-aset:
+    get:
+      tags:
+      - Master data
+      operationId: listPabrikanAset
+      summary: Menampilkan pabrikan aset
+      parameters:
+      - $ref: '#/components/parameters/Search'
+      - $ref: '#/components/parameters/ActiveFilter'
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Daftar pabrikan aset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PabrikanAsetList'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Master data
+      operationId: createPabrikanAset
+      summary: Membuat pabrikan aset dengan kode dari Number Sequence Core
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PabrikanAsetCreate'
+      responses:
+        '200':
+          description: Permintaan sebelumnya diulang; data yang sama dikembalikan tanpa menerbitkan nomor baru
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PabrikanAsetResponse'
+        '201':
+          description: Pabrikan aset dibuat
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PabrikanAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/pabrikan-aset/{id}:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Master data
+      operationId: getPabrikanAset
+      summary: Membaca satu pabrikan aset
+      responses:
+        '200':
+          description: Pabrikan aset ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PabrikanAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Master data
+      operationId: updatePabrikanAset
+      summary: Mengubah nama, keterangan, atau status pabrikan aset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PabrikanAsetPatch'
+      responses:
+        '200':
+          description: Pabrikan aset diperbarui
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PabrikanAsetResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Master data
+      operationId: archivePabrikanAset
+      summary: Mengarsipkan pabrikan aset
+      responses:
+        '204':
+          description: Pabrikan aset diarsipkan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/aset:
+    get:
+      tags:
+      - Lifecycle aset
+      operationId: listAset
+      summary: Menampilkan register aset tenant aktif
+      responses:
+        '200':
+          description: Register aset
+    post:
+      tags:
+      - Lifecycle aset
+      operationId: receiveAset
+      summary: Mencatat penerimaan aset dan penempatan awal; plan atau permintaan bersifat opsional
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      responses:
+        '201':
+          description: Aset diterima
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/aset/{id}/history:
+    get:
+      tags:
+      - Lifecycle aset
+      operationId: assetHistory
+      summary: Membaca histori penempatan efektif aset tanpa mengubah histori lama
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Aset dan histori penempatan
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/aset/{id}/penempatan:
+    post:
+      tags:
+      - Lifecycle aset
+      operationId: placeAsset
+      summary: Menambah mutasi penggunaan, PIC, atau lokasi aset
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Mutasi dicatat
+        '409':
+          description: Aset yang dilepas tidak dapat dimutasi
+  /api/v1/perencanaan-aset:
+    get:
+      tags:
+      - Perencanaan aset
+      operationId: listAssetPlans
+      summary: Menampilkan rencana aset tenant aktif
+      responses:
+        '200':
+          description: Daftar rencana aset
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Perencanaan aset
+      operationId: createAssetPlan
+      summary: Membuat header dan rincian perencanaan aset; spesifikasi adalah snapshot pada rincian transaksi
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetPlanningWrite'
+      responses:
+        '200':
+          description: Permintaan yang sama diulang
+        '201':
+          description: Rencana dibuat
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          description: Number Sequence Core belum tersedia
+  /api/v1/perencanaan-aset/{id}:
+    get:
+      tags:
+      - Perencanaan aset
+      operationId: showAssetPlan
+      summary: Menampilkan satu rencana aset beserta rinciannya
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Rencana aset
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Rencana tidak ditemukan
+    patch:
+      tags:
+      - Perencanaan aset
+      operationId: updateAssetPlan
+      summary: Mengubah rencana draf dengan version saat ini
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/AssetPlanningWrite'
+              - type: object
+                required:
+                - version
+                properties:
+                  version:
+                    type: integer
+                    minimum: 1
+      responses:
+        '200':
+          description: Rencana diperbarui
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Version sudah berubah
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags:
+      - Perencanaan aset
+      operationId: archiveAssetPlan
+      summary: Mengarsipkan rencana draf tanpa menghapus data fisik
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - version
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '204':
+          description: Rencana diarsipkan
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Version sudah berubah
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/v1/{lifecycleDocument}:
+    get:
+      tags:
+      - Lifecycle aset
+      operationId: listLifecycleDocument
+      summary: Menampilkan permintaan pembelian, pemeliharaan, dekomisioning, penjualan, atau pemusnahan
+      parameters:
+      - name: lifecycleDocument
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - permintaan-pembelian-aset
+          - pemeliharaan-aset
+          - dekomisioning-aset
+          - penjualan-aset
+          - pemusnahan-aset
+      responses:
+        '200':
+          description: Daftar dokumen lifecycle
+    post:
+      tags:
+      - Lifecycle aset
+      operationId: createLifecycleDocument
+      summary: Membuat dokumen lifecycle; dekomisioning yang disetujui menghentikan pemakaian aset sebelum penjualan atau
+        pemusnahan
+      parameters:
+      - name: lifecycleDocument
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - permintaan-pembelian-aset
+          - pemeliharaan-aset
+          - dekomisioning-aset
+          - penjualan-aset
+          - pemusnahan-aset
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      responses:
+        '201':
+          description: Dokumen dibuat
+  /api/v1/penyusutan/proposal:
+    post:
+      tags:
+      - Penyusutan
+      operationId: proposeDepreciation
+      summary: Membuat proposal penyusutan satu Asset Book tanpa jurnal GL
+      responses:
+        '201':
+          description: Proposal dibuat
+  /api/v1/penyusutan:
+    get:
+      tags:
+      - Penyusutan
+      operationId: listDepreciationPeriods
+      summary: Menampilkan periode penyusutan tenant aktif
+      responses:
+        '200':
+          description: Daftar periode
+  /api/v1/penyusutan/buku:
+    get:
+      tags:
+      - Penyusutan
+      operationId: listAssetBooksForDepreciation
+      summary: Menampilkan Asset Book aktif yang dapat dihitung penyusutannya
+      responses:
+        '200':
+          description: Daftar Asset Book
+  /api/v1/penyusutan/{id}/finalisasi:
+    post:
+      tags:
+      - Penyusutan
+      operationId: finalizeDepreciation
+      summary: Mengunci subledger periode dan mengembalikan export bridge tanpa posting GL
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Periode final; retry mengembalikan data yang sama tanpa export kedua
+  /api/v1/penyusutan/{id}/reversal:
+    post:
+      tags:
+      - Penyusutan
+      operationId: reverseDepreciation
+      summary: Membuat pembalikan baru untuk periode final tanpa mengubah periode asal
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '201':
+          description: Pembalikan dan export bridge dibuat
+        '409':
+          description: Periode tidak dapat dibalik
 components:
   securitySchemes:
     CoreERPContext:
@@ -1171,223 +2095,452 @@ components:
       scheme: bearer
       bearerFormat: CoreERP context token
       description: Token singkat bertanda tangan yang diterbitkan Web Shell untuk aplikasi ini.
-
   parameters:
     RecordId:
       name: id
       in: path
       required: true
-      schema: { $ref: '#/components/schemas/Ulid' }
+      schema:
+        $ref: '#/components/schemas/Ulid'
     IdempotencyKey:
       name: Idempotency-Key
       in: header
       required: true
-      description: Kunci stabil per percobaan pembuatan; retry dengan kunci sama tidak menerbitkan nomor baru.
+      description: |
+        Kunci stabil per percobaan pembuatan; retry dengan kunci sama tidak menerbitkan nomor baru.
+        Batas 133 karakter: Core membatasi idempotency_key pada 160 dan kunci yang diteruskan ke sana
+        diawali slug resource, sehingga slug master terpanjang (`item-checklist-maintenance`, 26) plus
+        `:` menyisakan 133.
       schema:
         type: string
-        maxLength: 140
-        pattern: '^[A-Za-z0-9._:-]+$'
+        maxLength: 133
+        pattern: ^[A-Za-z0-9._:-]+$
+    IdempotencyKeyTransaksi:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Sama seperti `IdempotencyKey`, tetapi untuk endpoint transaksi yang slug resource-nya lebih
+        pendek sehingga menyisakan 154 karakter.
+      schema:
+        type: string
+        maxLength: 154
+        pattern: ^[A-Za-z0-9._:-]+$
     Search:
       name: q
       in: query
       description: Mencari pada kode atau nama.
-      schema: { type: string, maxLength: 100 }
+      schema:
+        type: string
+        maxLength: 100
     ActiveFilter:
       name: aktif
       in: query
-      schema: { type: boolean }
+      schema:
+        type: boolean
     Page:
       name: page
       in: query
-      schema: { type: integer, minimum: 1 }
+      schema:
+        type: integer
+        minimum: 1
     PerPage:
       name: per_page
       in: query
-      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
-    EntitasAsetFilter:
-      name: entitas_aset_id
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    PabrikanAsetFilter:
+      name: pabrikan_aset_id
       in: query
-      description: Membatasi daftar pada satu entitas aset.
-      schema: { $ref: '#/components/schemas/Ulid' }
-    GroupAsetFilter:
-      name: group_aset_id
-      in: query
-      description: Membatasi daftar pada satu group aset.
-      schema: { $ref: '#/components/schemas/Ulid' }
-    KategoriAsetFilter:
-      name: kategori_aset_id
-      in: query
-      description: Membatasi daftar pada satu kategori aset.
-      schema: { $ref: '#/components/schemas/Ulid' }
+      description: Membatasi daftar pada satu pabrikan aset.
+      schema:
+        $ref: '#/components/schemas/Ulid'
     JenisAsetFilter:
       name: jenis_aset_id
       in: query
       description: Membatasi daftar pada satu jenis aset.
-      schema: { $ref: '#/components/schemas/Ulid' }
-
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    ParentLokasiAsetFilter:
+      name: parent_id
+      in: query
+      description: Membatasi daftar pada anak langsung satu lokasi aset.
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    TipeLokasiAsetFilter:
+      name: tipe_lokasi_id
+      in: query
+      description: Membatasi daftar pada satu tipe lokasi aset.
+      schema:
+        $ref: '#/components/schemas/Ulid'
   schemas:
     Ulid:
       type: string
-      pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+      pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
     AssetPlanningDetailWrite:
       type: object
-      required: [jenis_aset_id, satuan_id, quantity, requested_specification]
+      required:
+      - jenis_aset_id
+      - satuan_id
+      - quantity
+      - requested_specification
       properties:
-        jenis_aset_id: { $ref: '#/components/schemas/Ulid' }
+        jenis_aset_id:
+          $ref: '#/components/schemas/Ulid'
         satuan_id:
           allOf:
-            - $ref: '#/components/schemas/Ulid'
+          - $ref: '#/components/schemas/Ulid'
           description: Referensi opaque ke satuan aktif milik Core. Konversi khusus produk akan dimiliki PIM/Inventory.
-        quantity: { type: number, exclusiveMinimum: 0 }
-        requested_specification: { type: string, maxLength: 2000, example: 'RAM 16 GB, SSD 512 GB' }
-        estimated_unit_price: { type: number, minimum: 0 }
+        quantity:
+          type: number
+          exclusiveMinimum: 0
+        requested_specification:
+          type: string
+          maxLength: 2000
+          example: RAM 16 GB, SSD 512 GB
+        estimated_unit_price:
+          type: number
+          minimum: 0
     AssetPlanningWrite:
       type: object
-      required: [legal_entity_id, planning_org_unit_id, planned_on, planning_year, planning_type, details]
+      required:
+      - legal_entity_id
+      - planning_org_unit_id
+      - planned_on
+      - planning_year
+      - planning_type
+      - details
       properties:
-        legal_entity_id: { $ref: '#/components/schemas/Ulid' }
-        planning_org_unit_id: { $ref: '#/components/schemas/Ulid' }
-        planned_on: { type: string, format: date }
-        planning_year: { type: integer, minimum: 2000, maximum: 2100 }
-        planning_type: { type: string, enum: [regular, additional] }
-        funding_source: { type: string, maxLength: 250, nullable: true }
-        description: { type: string, maxLength: 2000, nullable: true }
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        planning_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        planned_on:
+          type: string
+          format: date
+        planning_year:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+        planning_type:
+          type: string
+          enum:
+          - regular
+          - additional
+        funding_source:
+          type: string
+          maxLength: 250
+          nullable: true
+        description:
+          type: string
+          maxLength: 2000
+          nullable: true
         details:
           type: array
           minItems: 1
-          items: { $ref: '#/components/schemas/AssetPlanningDetailWrite' }
+          items:
+            $ref: '#/components/schemas/AssetPlanningDetailWrite'
     HealthResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           type: object
-          required: [status]
+          required:
+          - status
           properties:
-            status: { type: string, const: ready }
+            status:
+              type: string
+              const: ready
     PaginationMeta:
       type: object
-      required: [current_page, last_page, per_page, total]
+      required:
+      - current_page
+      - last_page
+      - per_page
+      - total
       properties:
-        current_page: { type: integer }
-        last_page: { type: integer }
-        per_page: { type: integer }
-        total: { type: integer }
+        current_page:
+          type: integer
+        last_page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
     ErrorResponse:
       type: object
-      required: [error]
+      required:
+      - error
       properties:
         error:
           type: object
-          required: [code, message]
+          required:
+          - code
+          - message
           properties:
-            code: { type: string }
-            message: { type: string }
-
+            code:
+              type: string
+            message:
+              type: string
     MasterSummary:
       description: Ringkasan induk untuk ditampilkan tanpa permintaan tambahan. Induk yang sudah diarsipkan tetap disertakan.
       type: object
-      required: [id, kode, nama]
+      required:
+      - id
+      - kode
+      - nama
       properties:
-        id: { $ref: '#/components/schemas/Ulid' }
-        kode: { type: string }
-        nama: { type: string }
+        id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+        nama:
+          type: string
     MasterRecord:
       description: Bentuk dasar seluruh master. `kode` selalu diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
       type: object
-      required: [id, kode, nama, keterangan, aktif, created_at, updated_at]
+      required:
+      - id
+      - kode
+      - nama
+      - keterangan
+      - aktif
+      - created_at
+      - updated_at
       properties:
-        id: { $ref: '#/components/schemas/Ulid' }
-        kode: { type: string, maxLength: 50 }
-        nama: { type: string, maxLength: 150 }
-        keterangan: { type: [string, 'null'], maxLength: 2000 }
-        aktif: { type: boolean }
-        created_at: { type: [string, 'null'], format: date-time }
-        updated_at: { type: [string, 'null'], format: date-time }
+        id:
+          $ref: '#/components/schemas/Ulid'
+        kode:
+          type: string
+          maxLength: 50
+        nama:
+          type: string
+          maxLength: 150
+        keterangan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        aktif:
+          type: boolean
+        created_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        updated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
     MasterCreate:
       type: object
-      required: [nama]
+      required:
+      - nama
       properties:
-        nama: { type: string, minLength: 1, maxLength: 150 }
-        keterangan: { type: [string, 'null'], maxLength: 2000 }
-        aktif: { type: boolean, default: true }
+        nama:
+          type: string
+          minLength: 1
+          maxLength: 150
+        keterangan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        aktif:
+          type: boolean
+          default: true
     MasterPatch:
       type: object
       properties:
-        nama: { type: string, minLength: 1, maxLength: 150 }
-        keterangan: { type: [string, 'null'], maxLength: 2000 }
-        aktif: { type: boolean }
-
-    EntitasAset:
+        nama:
+          type: string
+          minLength: 1
+          maxLength: 150
+        keterangan:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        aktif:
+          type: boolean
+    ModelAset:
+      description: |
+        Katalog model barang milik satu pabrikan; padanan "Manufacturers and models" di
+        Dynamics 365 F&O. Pabrikan dan jenis adalah induk yang saling lepas: memilih salah
+        satu tidak menyaring pilihan yang lain, dan keduanya dapat disaring bersamaan pada
+        endpoint daftar.
       allOf:
-        - $ref: '#/components/schemas/MasterRecord'
-        - type: object
-          required: [jenis_aset_id, jenis_aset]
-          properties:
-            jenis_aset_id: { $ref: '#/components/schemas/Ulid' }
-            jenis_aset:
-              oneOf:
-                - $ref: '#/components/schemas/MasterSummary'
-                - type: 'null'
+      - $ref: '#/components/schemas/MasterRecord'
+      - type: object
+        required:
+        - pabrikan_aset_id
+        - pabrikan_aset
+        - jenis_aset_id
+        - jenis_aset
+        - model_number
+        properties:
+          pabrikan_aset_id:
+            $ref: '#/components/schemas/Ulid'
+          pabrikan_aset:
+            oneOf:
+            - $ref: '#/components/schemas/MasterSummary'
+            - type: 'null'
+          jenis_aset_id:
+            oneOf:
+            - $ref: '#/components/schemas/Ulid'
+            - type: 'null'
+          jenis_aset:
+            oneOf:
+            - $ref: '#/components/schemas/MasterSummary'
+            - type: 'null'
+          model_number:
+            type:
+            - string
+            - 'null'
+            maxLength: 150
       examples:
-        - id: 01JZ0000000000000000000000
-          kode: EA-000001
-          nama: Laptop MSI
-          keterangan: Aset yang dapat direncanakan atau diminta pembeliannya.
-          aktif: true
-          created_at: '2026-07-26T02:00:00.000000Z'
-          updated_at: '2026-07-26T02:00:00.000000Z'
-    EntitasAsetCreate:
+      - id: 01JZ0000000000000000000000
+        kode: MDLA-000001
+        nama: Kompresor Angin PK-100
+        keterangan: Kompresor 100 liter untuk lini produksi.
+        model_number: PK-100
+        aktif: true
+        created_at: '2026-07-26T02:00:00.000000Z'
+        updated_at: '2026-07-26T02:00:00.000000Z'
+    ModelAsetCreate:
       allOf:
-        - $ref: '#/components/schemas/MasterCreate'
-        - type: object
-          required: [jenis_aset_id]
-          properties:
-            jenis_aset_id:
-              allOf:
-                - $ref: '#/components/schemas/Ulid'
-              description: Jenis aset pada tenant yang sama dan belum diarsipkan.
-    EntitasAsetPatch:
+      - $ref: '#/components/schemas/MasterCreate'
+      - type: object
+        required:
+        - pabrikan_aset_id
+        properties:
+          pabrikan_aset_id:
+            allOf:
+            - $ref: '#/components/schemas/Ulid'
+            description: Pabrikan pada tenant yang sama dan belum diarsipkan. Wajib, karena sebuah model selalu milik satu
+              pabrikan.
+          jenis_aset_id:
+            oneOf:
+            - $ref: '#/components/schemas/Ulid'
+            - type: 'null'
+            description: Opsional, supaya katalog dapat mulai diisi sebelum klasifikasi teknis ditetapkan.
+          model_number:
+            type:
+            - string
+            - 'null'
+            maxLength: 150
+    ModelAsetPatch:
       allOf:
-        - $ref: '#/components/schemas/MasterPatch'
-        - type: object
-          properties:
-            jenis_aset_id: { $ref: '#/components/schemas/Ulid' }
-    EntitasAsetResponse:
+      - $ref: '#/components/schemas/MasterPatch'
+      - type: object
+        properties:
+          pabrikan_aset_id:
+            $ref: '#/components/schemas/Ulid'
+          jenis_aset_id:
+            oneOf:
+            - $ref: '#/components/schemas/Ulid'
+            - type: 'null'
+          model_number:
+            type:
+            - string
+            - 'null'
+            maxLength: 150
+    ModelAsetResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
-          $ref: '#/components/schemas/EntitasAset'
-    EntitasAsetList:
+          $ref: '#/components/schemas/ModelAset'
+    ModelAsetList:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/EntitasAset'
+            $ref: '#/components/schemas/ModelAset'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
+    GroupAsetFields:
+      description: |
+        Perlakuan finansial yang melekat pada group; padanan field pada "Fixed asset group"
+        di Dynamics 365 F&O. Seluruhnya opsional supaya tenant yang belum memetakan
+        perlakuan pajaknya tetap dapat membuat group.
+      type: object
+      properties:
+        tipe_harta:
+          description: Kelompok harta berwujud menurut PMK; menentukan masa manfaat dan tarif fiskal.
+          type:
+          - string
+          - 'null'
+          enum:
+          - kelompok_1
+          - kelompok_2
+          - kelompok_3
+          - kelompok_4
+          - bangunan_permanen
+          - bangunan_non_permanen
+          - bukan_objek_penyusutan
+          - null
+        major_type:
+          type:
+          - string
+          - 'null'
+          enum:
+          - tangible
+          - intangible
+          - right_of_use
+          - low_value
+          - null
+        capitalization_threshold:
+          description: Perolehan di bawah nilai ini dibebankan, tidak dikapitalisasi sebagai aset.
+          type:
+          - string
+          - 'null'
+          format: decimal
+        posting_layers:
+          description: Lapisan pembukuan yang boleh dipakai group ini.
+          type: array
+          items:
+            type: string
+            enum:
+            - current
+            - operations
+            - tax
+            - none
     GroupAset:
       allOf:
-        - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/GroupAsetFields'
     GroupAsetCreate:
       allOf:
-        - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/GroupAsetFields'
     GroupAsetPatch:
       allOf:
-        - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/GroupAsetFields'
     GroupAsetResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           $ref: '#/components/schemas/GroupAset'
     GroupAsetList:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -1395,87 +2548,31 @@ components:
             $ref: '#/components/schemas/GroupAset'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
-    KategoriAset:
-      allOf:
-        - $ref: '#/components/schemas/MasterRecord'
-        - type: object
-          required: [group_aset_id, group_aset]
-          properties:
-            group_aset_id: { $ref: '#/components/schemas/Ulid' }
-            group_aset:
-              oneOf:
-                - $ref: '#/components/schemas/MasterSummary'
-                - type: 'null'
-    KategoriAsetCreate:
-      allOf:
-        - $ref: '#/components/schemas/MasterCreate'
-        - type: object
-          required: [group_aset_id]
-          properties:
-            group_aset_id:
-              allOf:
-                - $ref: '#/components/schemas/Ulid'
-              description: Group aset pada tenant yang sama dan belum diarsipkan.
-    KategoriAsetPatch:
-      allOf:
-        - $ref: '#/components/schemas/MasterPatch'
-        - type: object
-          properties:
-            group_aset_id: { $ref: '#/components/schemas/Ulid' }
-    KategoriAsetResponse:
-      type: object
-      required: [data]
-      properties:
-        data:
-          $ref: '#/components/schemas/KategoriAset'
-    KategoriAsetList:
-      type: object
-      required: [data, meta]
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/KategoriAset'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
-
     JenisAset:
+      description: |
+        Sumbu klasifikasi teknis aset; padanan "Asset type" pada modul Asset management
+        Dynamics 365 F&O. Datar dan tanpa induk, sehingga tenant yang hanya mengenal satu
+        tingkat klasifikasi tetap terlayani tanpa mengisi tingkat yang tidak mereka punya.
       allOf:
-        - $ref: '#/components/schemas/MasterRecord'
-        - type: object
-          required: [kategori_aset_id, kategori_aset]
-          properties:
-            kategori_aset_id: { $ref: '#/components/schemas/Ulid' }
-            kategori_aset:
-              oneOf:
-                - $ref: '#/components/schemas/MasterSummary'
-                - type: 'null'
+      - $ref: '#/components/schemas/MasterRecord'
     JenisAsetCreate:
       allOf:
-        - $ref: '#/components/schemas/MasterCreate'
-        - type: object
-          required: [kategori_aset_id]
-          properties:
-            kategori_aset_id:
-              allOf:
-                - $ref: '#/components/schemas/Ulid'
-              description: Kategori aset pada tenant yang sama dan belum diarsipkan.
+      - $ref: '#/components/schemas/MasterCreate'
     JenisAsetPatch:
       allOf:
-        - $ref: '#/components/schemas/MasterPatch'
-        - type: object
-          properties:
-            kategori_aset_id: { $ref: '#/components/schemas/Ulid' }
+      - $ref: '#/components/schemas/MasterPatch'
     JenisAsetResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           $ref: '#/components/schemas/JenisAset'
     JenisAsetList:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -1483,25 +2580,27 @@ components:
             $ref: '#/components/schemas/JenisAset'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
     KondisiAset:
       allOf:
-        - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/MasterRecord'
     KondisiAsetCreate:
       allOf:
-        - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/MasterCreate'
     KondisiAsetPatch:
       allOf:
-        - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/MasterPatch'
     KondisiAsetResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           $ref: '#/components/schemas/KondisiAset'
     KondisiAsetList:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -1509,25 +2608,27 @@ components:
             $ref: '#/components/schemas/KondisiAset'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
     PabrikanAset:
       allOf:
-        - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/MasterRecord'
     PabrikanAsetCreate:
       allOf:
-        - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/MasterCreate'
     PabrikanAsetPatch:
       allOf:
-        - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/MasterPatch'
     PabrikanAsetResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           $ref: '#/components/schemas/PabrikanAset'
     PabrikanAsetList:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -1535,25 +2636,27 @@ components:
             $ref: '#/components/schemas/PabrikanAset'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
     ItemChecklistMaintenance:
       allOf:
-        - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/MasterRecord'
     ItemChecklistMaintenanceCreate:
       allOf:
-        - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/MasterCreate'
     ItemChecklistMaintenancePatch:
       allOf:
-        - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/MasterPatch'
     ItemChecklistMaintenanceResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           $ref: '#/components/schemas/ItemChecklistMaintenance'
     ItemChecklistMaintenanceList:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -1561,25 +2664,27 @@ components:
             $ref: '#/components/schemas/ItemChecklistMaintenance'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
     AnalisaMaintenance:
       allOf:
-        - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/MasterRecord'
     AnalisaMaintenanceCreate:
       allOf:
-        - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/MasterCreate'
     AnalisaMaintenancePatch:
       allOf:
-        - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/MasterPatch'
     AnalisaMaintenanceResponse:
       type: object
-      required: [data]
+      required:
+      - data
       properties:
         data:
           $ref: '#/components/schemas/AnalisaMaintenance'
     AnalisaMaintenanceList:
       type: object
-      required: [data, meta]
+      required:
+      - data
+      - meta
       properties:
         data:
           type: array
@@ -1587,7 +2692,546 @@ components:
             $ref: '#/components/schemas/AnalisaMaintenance'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
-
+    TipeLokasiAset:
+      description: |
+        Tingkatan lokasi yang dipakai tenant; padanan "Functional location type" di
+        Dynamics 365 F&O. Datar: kedalaman pohon lokasi ditentukan data, bukan tipe.
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+    TipeLokasiAsetCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+    TipeLokasiAsetPatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+    TipeLokasiAsetResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/TipeLokasiAset'
+    TipeLokasiAsetList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TipeLokasiAset'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    LokasiAsetFields:
+      type: object
+      properties:
+        parent_id:
+          description: Lokasi induk pada tenant yang sama dan belum diarsipkan. Kosong berarti lokasi akar; perpindahan yang
+            membentuk siklus ditolak.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        tipe_lokasi_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        org_unit_id:
+          description: |
+            Unit organisasi Core yang menjadi dimensi keuangan aset di lokasi ini; padanan
+            toggle "Update asset dimension" di F&O. Disimpan sebagai ID opaque tanpa foreign
+            key, karena unit organisasi dimiliki Core.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+    LokasiAset:
+      description: |
+        Pohon lokasi fisik aset; padanan "Functional location" di Dynamics 365 F&O. Ia
+        mereferensikan dirinya sendiri lewat `parent_id`, jadi kedalamannya ditentukan data
+        tenant dan bukan skema. Sengaja terpisah dari struktur organisasi Core: "di mana
+        benda ini" dan "siapa yang bertanggung jawab" berubah karena sebab yang berbeda.
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/LokasiAsetFields'
+      - type: object
+        required:
+        - parent
+        - tipe_lokasi
+        properties:
+          parent:
+            oneOf:
+            - $ref: '#/components/schemas/MasterSummary'
+            - type: 'null'
+          tipe_lokasi:
+            oneOf:
+            - $ref: '#/components/schemas/MasterSummary'
+            - type: 'null'
+    LokasiAsetCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/LokasiAsetFields'
+    LokasiAsetPatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/LokasiAsetFields'
+    LokasiAsetResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/LokasiAset'
+    LokasiAsetList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/LokasiAset'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    ProfilPenyusutanFields:
+      description: |
+        Aturan penyusutan yang dapat dipakai ulang lintas aset; padanan "Depreciation profile"
+        di Dynamics 365 F&O. Field mana yang wajib bergantung pada `method`:
+        `useful_life_periods` untuk garis lurus dan saldo menurun, `rate_percent` untuk
+        saldo menurun, `manual_schedule` untuk metode manual.
+      type: object
+      properties:
+        method:
+          type: string
+          enum:
+          - straight_line
+          - reducing_balance
+          - manual
+          - consumption
+        frequency:
+          type: string
+          enum:
+          - monthly
+          - quarterly
+          - half_yearly
+          - yearly
+        year_basis:
+          type: string
+          enum:
+          - calendar
+          - fiscal
+        convention:
+          description: Belum dibaca mesin penyusutan; diaktifkan bersama buku penyusutan.
+          type:
+          - string
+          - 'null'
+          maxLength: 40
+        useful_life_periods:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+        rate_percent:
+          type:
+          - string
+          - 'null'
+          format: decimal
+        manual_schedule:
+          oneOf:
+          - type: array
+            items:
+              type: object
+              required:
+              - amount
+              properties:
+                amount:
+                  type: number
+                  minimum: 0
+          - type: 'null'
+    ProfilPenyusutan:
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/ProfilPenyusutanFields'
+      - type: object
+        required:
+        - method
+        - frequency
+        - year_basis
+    ProfilPenyusutanCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/ProfilPenyusutanFields'
+      - type: object
+        required:
+        - method
+        - frequency
+        - year_basis
+    ProfilPenyusutanPatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/ProfilPenyusutanFields'
+    ProfilPenyusutanResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/ProfilPenyusutan'
+    ProfilPenyusutanList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfilPenyusutan'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    BukuPenyusutanFields:
+      type: object
+      properties:
+        posting_layer:
+          description: Lapisan pembukuan buku ini. `tax` lazim dipakai buku fiskal.
+          type: string
+          enum:
+          - current
+          - operations
+          - tax
+          - none
+          default: current
+        export_to_backoffice:
+          description: |
+            App ini tidak menjurnal; ia mengekspor periode final ke backoffice. Buku fiskal
+            umumnya dimatikan agar backoffice tidak menjurnal dua kali untuk aset yang sama.
+          type: boolean
+          default: true
+        round_off_depreciation:
+          description: Kelipatan nominal pembulatan penyusutan. Nol berarti tanpa pembulatan.
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          format: decimal
+        depreciation_profile_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        alternative_profile_id:
+          description: Profil pengganti saat saldo menurun sudah kalah dari garis lurus sisa umur.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+    BukuPenyusutan:
+      description: |
+        Buku penyusutan; padanan "Book" di Dynamics 365 F&O. Satu aset dapat memiliki
+        beberapa buku sekaligus, lazimnya satu komersial dan satu fiskal, dan tiap buku
+        melacak nilai aset secara mandiri dengan aturannya sendiri.
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/BukuPenyusutanFields'
+    BukuPenyusutanCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/BukuPenyusutanFields'
+    BukuPenyusutanPatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/BukuPenyusutanFields'
+    BukuPenyusutanResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/BukuPenyusutan'
+    BukuPenyusutanList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BukuPenyusutan'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    GroupBukuPenyusutanRow:
+      description: |
+        Satu baris matriks group x buku; padanan "Fixed asset group/book" di F&O. Nilainya
+        menjadi default yang disalin ke buku aset saat aset diterima, bukan acuan hidup:
+        mengubah matriks tidak menulis ulang aset yang sudah berjalan.
+      type: object
+      required:
+      - buku_id
+      properties:
+        buku_id:
+          $ref: '#/components/schemas/Ulid'
+        depreciation_profile_id:
+          description: Mengalahkan profil bawaan buku untuk group ini. Kosong berarti memakai profil buku.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        alternative_profile_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        useful_life_periods:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+        convention:
+          description: Perlakuan periode pertama, dihitung dari tanggal aset mulai digunakan.
+          type:
+          - string
+          - 'null'
+          enum:
+          - none
+          - full_month
+          - half_year
+          - mid_quarter
+          - mid_month_1st
+          - mid_month_15th
+          - half_year_start_of_year
+          - half_year_next_year
+          - null
+        depreciate:
+          description: Aset dari group ini mendapat buku tersebut tetapi tidak disusutkan bila `false`.
+          type: boolean
+          default: true
+        round_off_depreciation:
+          description: |
+            Kelipatan nominal pembulatan untuk group dan book ini. Null berarti mengikuti
+            nilai pada Book; periode terakhir tetap memakai sisa nilai tanpa pembulatan.
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          format: decimal
+    GroupBukuPenyusutanReplace:
+      description: Daftar penuh baris matriks; baris yang tidak disertakan diarsipkan.
+      type: object
+      required:
+      - rows
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/GroupBukuPenyusutanRow'
+    GroupBukuPenyusutanList:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: array
+          items:
+            allOf:
+            - type: object
+              required:
+              - id
+              properties:
+                id:
+                  $ref: '#/components/schemas/Ulid'
+            - $ref: '#/components/schemas/GroupBukuPenyusutanRow'
+    TipeAtributFields:
+      type: object
+      properties:
+        data_type:
+          description: |
+            Menentukan kolom mana yang dipakai menyimpan nilainya pada aset dan bagaimana
+            field-nya dirender. `fixed_list` mengambil pilihan dari daftar nilai atribut,
+            `value_range` dibatasi `min_value` dan `max_value`.
+          type: string
+          enum:
+          - text
+          - number
+          - boolean
+          - date
+          - fixed_list
+          - value_range
+        satuan:
+          type:
+          - string
+          - 'null'
+          maxLength: 50
+        min_value:
+          type:
+          - string
+          - 'null'
+          format: decimal
+        max_value:
+          type:
+          - string
+          - 'null'
+          format: decimal
+    TipeAtribut:
+      description: |
+        Padanan "Attribute type" di Dynamics 365 F&O. Inilah cara menambah pembeda aset
+        tanpa menambah tingkat klasifikasi baru: tenant membuat atributnya sendiri,
+        menempelkannya ke jenis aset, dan aset mewarisinya.
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - $ref: '#/components/schemas/TipeAtributFields'
+    TipeAtributCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+      - $ref: '#/components/schemas/TipeAtributFields'
+    TipeAtributPatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+      - $ref: '#/components/schemas/TipeAtributFields'
+    TipeAtributResponse:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          $ref: '#/components/schemas/TipeAtribut'
+    TipeAtributList:
+      type: object
+      required:
+      - data
+      - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TipeAtribut'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+    TipeAtributNilaiReplace:
+      description: Daftar penuh pilihan nilai; pilihan yang tidak disertakan diarsipkan.
+      type: object
+      required:
+      - rows
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required:
+            - nilai
+            properties:
+              nilai:
+                type: string
+                maxLength: 150
+              urutan:
+                type: integer
+                minimum: 0
+                default: 0
+    TipeAtributNilaiList:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+            - id
+            - nilai
+            - urutan
+            properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              nilai:
+                type: string
+              urutan:
+                type: integer
+    JenisAsetAtributReplace:
+      description: Daftar penuh atribut yang menempel pada jenis aset ini.
+      type: object
+      required:
+      - rows
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required:
+            - tipe_atribut_id
+            properties:
+              tipe_atribut_id:
+                $ref: '#/components/schemas/Ulid'
+              wajib:
+                type: boolean
+                default: false
+              urutan:
+                type: integer
+                minimum: 0
+                default: 0
+    JenisAsetAtributList:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            required:
+            - id
+            - tipe_atribut_id
+            - wajib
+            - urutan
+            properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              tipe_atribut_id:
+                $ref: '#/components/schemas/Ulid'
+              wajib:
+                type: boolean
+              urutan:
+                type: integer
+    JenisAsetAtributDefinisi:
+      description: |
+        Definisi atribut satu jenis aset, siap dipakai form penerimaan aset untuk merender
+        field dinamisnya tanpa perlu menggabungkan sendiri dari beberapa endpoint.
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/TipeAtributFields'
+            - type: object
+              required:
+              - tipe_atribut_id
+              - kode
+              - nama
+              - wajib
+              - urutan
+              - nilai_pilihan
+              properties:
+                tipe_atribut_id:
+                  $ref: '#/components/schemas/Ulid'
+                kode:
+                  type: string
+                nama:
+                  type: string
+                wajib:
+                  type: boolean
+                urutan:
+                  type: integer
+                nilai_pilihan:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - id
+                    - nilai
+                    properties:
+                      id:
+                        $ref: '#/components/schemas/Ulid'
+                      nilai:
+                        type: string
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

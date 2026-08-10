@@ -30,7 +30,10 @@ class AssetPlanningTest extends TestCase
         $this->configureCoreErpContext();
         $this->unitId = (string) Str::ulid();
         Http::fake(function ($request) {
-            if (str_ends_with($request->url(), '/units-of-measure/resolve')) return Http::response(['data' => [['id' => $this->unitId, 'code' => 'EA', 'name' => 'Unit', 'symbol' => null, 'decimal_places' => 0]]], 200);
+            if (str_ends_with($request->url(), '/units-of-measure/resolve')) {
+                return Http::response(['data' => [['id' => $this->unitId, 'code' => 'EA', 'name' => 'Unit', 'symbol' => null, 'decimal_places' => 0]]], 200);
+            }
+
             return Http::response(['data' => ['number' => 'PLNA-000001']], 200);
         });
     }
@@ -112,15 +115,12 @@ class AssetPlanningTest extends TestCase
         ];
     }
 
+    /** Jenis aset kini datar, jadi cukup satu insert tanpa group dan kategori di atasnya. */
     private function jenis(string $tenant): string
     {
-        $group = (string) Str::ulid();
-        $category = (string) Str::ulid();
         $type = (string) Str::ulid();
         $now = now();
-        DB::table('m_group_aset')->insert(['id' => $group, 'tenant_id' => $tenant, 'creation_key' => 'group-'.Str::ulid(), 'kode' => 'G'.Str::random(6), 'nama' => 'Group', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
-        DB::table('m_kategori_aset')->insert(['id' => $category, 'tenant_id' => $tenant, 'creation_key' => 'category-'.Str::ulid(), 'group_aset_id' => $group, 'kode' => 'K'.Str::random(6), 'nama' => 'Kategori', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
-        DB::table('m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $tenant, 'creation_key' => 'type-'.Str::ulid(), 'kategori_aset_id' => $category, 'kode' => 'J'.Str::random(6), 'nama' => 'Laptop kerja', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $tenant, 'creation_key' => 'type-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Laptop kerja', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
 
         return $type;
     }

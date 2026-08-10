@@ -1,0 +1,49 @@
+# Health, context, dan reference data Core.
+/api/v1/health:
+  get:
+    security: []
+    operationId: health
+    summary: Memeriksa kesiapan API
+    responses:
+      '200':
+        description: API siap
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HealthResponse'
+/api/v1/context:
+  get:
+    operationId: currentContext
+    summary: Membaca hak akses pengguna pada aplikasi
+    responses:
+      '200':
+        description: Konteks sudah diverifikasi gateway
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - data
+              properties:
+                data:
+                  type: object
+                  required:
+                  - permissions
+                  properties:
+                    permissions:
+                      type: array
+                      items:
+                        type: string
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+/api/v1/reference-data/units-of-measure:
+  get:
+    tags:
+    - Reference data
+    operationId: listCoreUnitsOfMeasure
+    summary: Menampilkan satuan aktif dari Core untuk dipilih dalam transaksi aset
+    responses:
+      '200':
+        description: Daftar satuan aktif
+      '503':
+        description: Layanan satuan Core belum dapat dihubungi

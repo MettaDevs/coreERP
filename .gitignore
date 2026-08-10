@@ -8,3 +8,4 @@ vendor/
 ui/vendor/*
 !ui/vendor/.gitignore
 public/build/
+graphify-out/cache

@@ -16,6 +16,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'legal_entity_id', 'responsible_org_unit_id'], 'asset_scope_index');
         });
     }
+
     public function down(): void
     {
         Schema::table('tr_penerimaan_aset', function (Blueprint $table): void {

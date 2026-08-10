@@ -6,6 +6,9 @@ import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
 import { api, errorMessage } from '../../api';
+import DynamicField from '../../master/DynamicField';
+import { FieldValue, emptyValue, payloadValue } from '../../master/fields';
+import { AttributeDefinition, toFieldConfig } from './attributes';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null; user_id: string | number | null };
 type Asset = { id: string; kode: string; serial_number: string | null; acquisition_value: string; currency_code: string; lifecycle_state: string };
@@ -15,17 +18,42 @@ type Placement = { id: string; effective_on: string; reason: string | null; rece
 export default function AssetPage({ context }: { context: Context }) {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [types, setTypes] = useState<AssetType[]>([]);
+    const [groups, setGroups] = useState<AssetType[]>([]);
     const [open, setOpen] = useState(false);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [history, setHistory] = useState<{ asset: Asset; placements: Placement[] } | null>(null);
+    // Atribut diwarisi dari jenis aset, jadi definisinya dibaca ulang tiap jenis berubah.
+    const [typeId, setTypeId] = useState('');
+    const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
+    const [attributeValues, setAttributeValues] = useState<Record<string, FieldValue>>({});
 
     const load = () => Promise.all([
         api<{ data: Asset[] }>('/aset').then((result) => setAssets(result.data)),
         api<{ data: AssetType[] }>('/jenis-aset?per_page=100&aktif=true').then((result) => setTypes(result.data)),
+        api<{ data: AssetType[] }>('/group-aset?per_page=100&aktif=true').then((result) => setGroups(result.data)),
     ]).catch((caught) => setError(errorMessage(caught, 'Register aset belum dapat dimuat.')));
 
     useEffect(() => { void load(); }, []);
+
+    useEffect(() => {
+        if (!typeId) {
+            setAttributes([]);
+            setAttributeValues({});
+            return;
+        }
+        let cancelled = false;
+        api<{ data: AttributeDefinition[] }>(`/jenis-aset/${typeId}/atribut-definisi`)
+            .then((result) => {
+                if (cancelled) return;
+                setAttributes(result.data);
+                setAttributeValues(Object.fromEntries(
+                    result.data.map((definition) => [definition.tipe_atribut_id, emptyValue(toFieldConfig(definition))]),
+                ));
+            })
+            .catch(() => { if (!cancelled) setAttributes([]); });
+        return () => { cancelled = true; };
+    }, [typeId]);
 
     async function showHistory(asset: Asset) {
         try { setHistory((await api<{ data: { asset: Asset; placements: Placement[] } }>(`/aset/${asset.id}/history`)).data); }
@@ -44,6 +72,7 @@ export default function AssetPage({ context }: { context: Context }) {
                 method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() },
                 body: JSON.stringify({
                     legal_entity_id: context.legal_entity_id,
+                    group_aset_id: values.get('group_aset_id'),
                     jenis_aset_id: values.get('jenis_aset_id'),
                     acquired_on: values.get('acquired_on'),
                     acquisition_value: values.get('acquisition_value'),
@@ -58,6 +87,10 @@ export default function AssetPage({ context }: { context: Context }) {
                     depreciation_profile_id: values.get('depreciation_profile_id') || null,
                     book_code: values.get('book_code') || null,
                     residual_value: values.get('residual_value') || null,
+                    atribut: attributes.map((definition) => ({
+                        tipe_atribut_id: definition.tipe_atribut_id,
+                        nilai: payloadValue(toFieldConfig(definition), attributeValues[definition.tipe_atribut_id]),
+                    })),
                 }),
             });
             setOpen(false); form.reset(); await load();
@@ -73,7 +106,17 @@ export default function AssetPage({ context }: { context: Context }) {
                 <div className="divide-y">{assets.map((asset) => <div key={asset.id} className="flex items-center justify-between px-5 py-3"><div><p className="font-medium">{asset.kode}</p><p className="text-sm text-muted-foreground">{asset.serial_number || 'Tanpa nomor seri'}</p></div><div className="flex items-center gap-3"><span className="text-sm">{asset.currency_code} {asset.acquisition_value}</span><Button variant="outline" size="sm" onClick={() => void showHistory(asset)}>Riwayat</Button></div></div>)}</div>}
         </CardContent>
         <Sheet open={open} onOpenChange={setOpen}><SheetContent side="right"><SheetHeader><SheetTitle>Terima aset</SheetTitle></SheetHeader><form className="space-y-4 p-4" onSubmit={(event) => { event.preventDefault(); void receive(event.currentTarget); }}>
-            <Field><Input name="jenis_aset_id" label="Jenis aset" required list="asset-types" /><datalist id="asset-types">{types.map((type) => <option key={type.id} value={type.id}>{type.kode} — {type.nama}</option>)}</datalist><FieldError>Gunakan ID jenis aset yang tersedia.</FieldError></Field>
+            <Field><Input name="group_aset_id" label="Group aset" required list="asset-groups" /><datalist id="asset-groups">{groups.map((group) => <option key={group.id} value={group.id}>{group.kode} — {group.nama}</option>)}</datalist><FieldError>Group menentukan dasar penyusutan aset.</FieldError></Field>
+            <Field><Input name="jenis_aset_id" label="Jenis aset" required list="asset-types" value={typeId} onChange={(event) => setTypeId(event.target.value)} /><datalist id="asset-types">{types.map((type) => <option key={type.id} value={type.id}>{type.kode} — {type.nama}</option>)}</datalist><FieldError>Gunakan ID jenis aset yang tersedia.</FieldError></Field>
+            {attributes.length > 0 && <p className="pt-2 text-sm font-medium">Atribut {types.find((type) => type.id === typeId)?.nama ?? 'jenis aset'}</p>}
+            {attributes.map((definition) => (
+                <DynamicField
+                    key={definition.tipe_atribut_id}
+                    config={toFieldConfig(definition)}
+                    value={attributeValues[definition.tipe_atribut_id]}
+                    onChange={(next) => setAttributeValues((current) => ({ ...current, [definition.tipe_atribut_id]: next }))}
+                />
+            ))}
             <Field><Input name="acquired_on" label="Tanggal penerimaan" type="date" required /></Field>
             <Field><Input name="acquisition_value" label="Nilai perolehan" type="number" min="0" step="0.01" required /></Field>
             <Field><Input name="currency_code" label="Mata uang" defaultValue="IDR" maxLength={3} required /></Field>

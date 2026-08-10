@@ -11,6 +11,7 @@ final class OrganizationScope
     public function allows(Request $request, ?string $legalEntityId, ?string $operatingUnitId): bool
     {
         $scope = $this->scope($request);
+
         return $scope['all'] || collect($scope['scope_grants'])->contains(
             fn (array $grant): bool => ($legalEntityId === null || $grant['legal_entity_id'] === $legalEntityId)
                 && ($operatingUnitId === null || in_array($operatingUnitId, $grant['operating_unit_ids'], true)),
@@ -30,8 +31,12 @@ final class OrganizationScope
     public function query(mixed $query, Request $request, string $legalEntityColumn, string $operatingUnitColumn): mixed
     {
         $scope = $this->scope($request);
-        if ($scope['all']) return $query;
-        if ($scope['scope_grants'] === []) return $query->whereRaw('1 = 0');
+        if ($scope['all']) {
+            return $query;
+        }
+        if ($scope['scope_grants'] === []) {
+            return $query->whereRaw('1 = 0');
+        }
 
         return $query->where(function ($query) use ($scope, $legalEntityColumn, $operatingUnitColumn): void {
             foreach ($scope['scope_grants'] as $grant) {
@@ -52,7 +57,9 @@ final class OrganizationScope
     {
         $policies = $request->attributes->get('coreerp.data_policies', []);
         $scope = is_array($policies) ? ($policies[self::POLICY_CODE] ?? []) : [];
-        if (! is_array($scope)) return ['all' => false, 'scope_grants' => []];
+        if (! is_array($scope)) {
+            return ['all' => false, 'scope_grants' => []];
+        }
 
         return [
             'all' => $scope['all'] === true,
