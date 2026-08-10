@@ -1,4 +1,4 @@
-import AuthLayoutTemplate from '@/layouts/auth/auth-simple-layout';
+import AuthLayoutTemplate from '@/layouts/auth/auth-modern-layout';
 import FlashToasts from '@/components/flash-toasts';
 
 export default function AuthLayout({
