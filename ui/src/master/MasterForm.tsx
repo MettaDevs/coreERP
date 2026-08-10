@@ -1,9 +1,17 @@
 import { FormEvent, ReactNode, useMemo, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@apperp/ui/field';
+import {
+    Dialog,
+    DialogBody,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@apperp/ui/dialog';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage } from '../api';
@@ -54,7 +62,7 @@ export default function MasterForm({
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const creationKey = useRef(crypto.randomUUID());
-    const sheetContentRef = useRef<HTMLDivElement>(null);
+    const dialogRef = useRef<HTMLDivElement>(null);
 
     /**
      * Induk yang sedang dipakai record ini tetap dapat dipilih meski sudah diarsipkan,
@@ -121,7 +129,7 @@ export default function MasterForm({
                     searchPlaceholder={`Cari ${parent.label.toLowerCase()}`}
                     emptyMessage={`${parent.label} tidak ditemukan.`}
                     ariaLabel={`Pilih ${parent.label.toLowerCase()}`}
-                    portalContainer={sheetContentRef}
+                    portalContainer={dialogRef}
                     onValueChange={(item) => setParentIds({
                         ...parentIds,
                         [parent.field]: options.find((option) => optionLabel(option) === item)?.id ?? '',
@@ -133,49 +141,212 @@ export default function MasterForm({
     }
 
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent ref={sheetContentRef} side="right" className="w-full gap-0 p-0 sm:max-w-xl">
-                <SheetHeader className="border-b px-6 py-5 pr-12">
-                    <SheetTitle>{value ? 'Ubah' : 'Tambah'} {config.singular}</SheetTitle>
-                </SheetHeader>
-                <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
-                    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-                    <FieldGroup>
-                        <Field data-disabled="true">
-                            <Input id="code" label={config.kodeLabel} value={value?.kode ?? 'Dibuat otomatis saat disimpan'} disabled />
-                        </Field>
-                        <Field>
-                            <Input id="name" label={`${config.namaLabel} *`} autoFocus required maxLength={150} value={form.nama} onChange={(event) => setForm({ ...form, nama: event.target.value })} />
-                        </Field>
-                        {/* Induk dirender sejajar: tidak ada yang menyaring pilihan yang lain. */}
-                        {parents.map(parentField)}
-                        {extraFields.filter((field) => isVisible(field, extra)).map((field) => (
-                            <DynamicField
-                                key={field.name}
-                                config={field}
-                                value={extra[field.name]}
-                                onChange={(next) => setExtra((current) => ({ ...current, [field.name]: next }))}
-                                portalContainer={sheetContentRef}
-                            />
-                        ))}
-                        <Field>
-                            <FieldLabel htmlFor="description">Keterangan</FieldLabel>
-                            <Textarea id="description" rows={4} maxLength={2000} value={form.keterangan} onChange={(event) => setForm({ ...form, keterangan: event.target.value })} />
-                        </Field>
-                        <Field orientation="horizontal">
-                            <Switch id="active" checked={form.aktif} onCheckedChange={(checked) => setForm({ ...form, aktif: checked })} />
-                            <FieldLabel htmlFor="active">Data aktif dan dapat dipilih</FieldLabel>
-                        </Field>
-                        {error && <FieldError>{error}</FieldError>}
-                    </FieldGroup>
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent 
+                size="compact" 
+                showCloseButton 
+                className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-2xl max-h-[85vh] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-2xl overflow-hidden flex flex-col p-0"
+            >
+                {/* Header Modal Terpusat */}
+                <DialogHeader className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-5">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
+                            {value ? (
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            ) : (
+                                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                </svg>
+                            )}
+                        </div>
+                        <div>
+                            <DialogTitle className="text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+                                {value ? 'Ubah' : 'Tambah'} {config.singular}
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                {value ? `Perbarui informasi ${config.singular}` : `Isi formulir untuk menambahkan ${config.singular} baru`}
+                            </DialogDescription>
+                        </div>
                     </div>
+                </DialogHeader>
+
+                <form className="flex min-h-0 flex-1 flex-col justify-between overflow-hidden" onSubmit={submit}>
+                    <DialogBody ref={dialogRef} className="min-h-0 flex-1 overflow-y-auto px-6 py-6 space-y-5 bg-slate-50/50 dark:bg-slate-950/20">
+                        {/* Kartu Section 1: Informasi Utama */}
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-5">
+                            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                                <svg className="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Informasi Utama
+                                </h3>
+                            </div>
+
+                            <FieldGroup className="space-y-4">
+                                {/* Kode Master (Auto-generated / Disabled) */}
+                                <Field data-disabled="true">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <FieldLabel className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                            {config.kodeLabel}
+                                        </FieldLabel>
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                            <svg className="h-3 w-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                            </svg>
+                                            Otomatis oleh Sistem
+                                        </span>
+                                    </div>
+                                    <Input 
+                                        id="code" 
+                                        value={value?.kode ?? 'Dibuat otomatis saat disimpan'} 
+                                        disabled 
+                                        className="bg-slate-50 dark:bg-slate-950 font-mono text-xs text-slate-500 border-slate-200 dark:border-slate-800" 
+                                    />
+                                </Field>
+
+                                {/* Nama Master */}
+                                <Field>
+                                    <Input 
+                                        id="name" 
+                                        label={`${config.namaLabel} *`} 
+                                        autoFocus 
+                                        required 
+                                        maxLength={150} 
+                                        placeholder={`Masukkan ${config.namaLabel.toLowerCase()}`}
+                                        value={form.nama} 
+                                        onChange={(event) => setForm({ ...form, nama: event.target.value })} 
+                                    />
+                                </Field>
+
+                                {/* Dropdown Induk */}
+                                {parents.map(parentField)}
+
+                                {/* Field Dinamis Tambahan */}
+                                {extraFields.filter((field) => isVisible(field, extra)).map((field) => (
+                                    <DynamicField
+                                        key={field.name}
+                                        config={field}
+                                        value={extra[field.name]}
+                                        onChange={(next) => setExtra((current) => ({ ...current, [field.name]: next }))}
+                                        portalContainer={dialogRef}
+                                    />
+                                ))}
+                            </FieldGroup>
+                        </div>
+
+                        {/* Kartu Section 2: Keterangan & Deskripsi */}
+                        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs dark:border-slate-800 dark:bg-slate-900 space-y-4">
+                            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                                <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+                                </svg>
+                                <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                    Catatan Tambahan
+                                </h3>
+                            </div>
+                            <Field>
+                                <FieldLabel htmlFor="description" className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                    Keterangan
+                                </FieldLabel>
+                                <Textarea 
+                                    id="description" 
+                                    rows={3} 
+                                    maxLength={2000} 
+                                    placeholder="Tambahkan keterangan atau rincian opsional…"
+                                    className="resize-none text-sm"
+                                    value={form.keterangan} 
+                                    onChange={(event) => setForm({ ...form, keterangan: event.target.value })} 
+                                />
+                            </Field>
+                        </div>
+
+                        {/* Kartu Section 3: Status Aktif Card */}
+                        <div className={`rounded-xl border p-4 transition-all duration-200 ${
+                            form.aktif 
+                                ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/20' 
+                                : 'border-slate-200 bg-slate-100/50 dark:border-slate-800 dark:bg-slate-900/50'
+                        }`}>
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                        form.aktif 
+                                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' 
+                                            : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                    }`}>
+                                        {form.aktif ? (
+                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                                            Status Aktif Data
+                                        </p>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                            {form.aktif ? 'Data ini aktif dan dapat dipilih dalam transaksi.' : 'Data dalam status diarsipkan / non-aktif.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Switch 
+                                    id="active" 
+                                    checked={form.aktif} 
+                                    onCheckedChange={(checked) => setForm({ ...form, aktif: checked })} 
+                                />
+                            </div>
+                        </div>
+
+                        {/* Pesan Error Validasi */}
+                        {error && (
+                            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-600 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400 flex items-center gap-2">
+                                <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{error}</span>
+                            </div>
+                        )}
+                    </DialogBody>
+
                     {extraSection}
-                    <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                        <Button variant="outline" type="button" onClick={onClose}>Batal</Button>
-                        <Button disabled={saving}>{saving ? 'Menyimpan…' : 'Simpan'}</Button>
-                    </SheetFooter>
+
+                    {/* Footer Form Modal */}
+                    <DialogFooter className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-4 flex flex-row items-center justify-end gap-3">
+                        <Button 
+                            variant="outline" 
+                            type="button" 
+                            onClick={onClose}
+                            className="text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                        >
+                            Batal
+                        </Button>
+                        <Button 
+                            disabled={saving}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium shadow-xs px-5 flex items-center gap-1.5 transition-all"
+                        >
+                            {saving ? (
+                                <>
+                                    <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    <span>Menyimpan…</span>
+                                </>
+                            ) : (
+                                <span>Simpan</span>
+                            )}
+                        </Button>
+                    </DialogFooter>
                 </form>
-            </SheetContent>
-        </Sheet>
+            </DialogContent>
+        </Dialog>
     );
 }
+
+
