@@ -144,6 +144,7 @@ export default withMermaid({
           items: [
             { text: 'Release dan on-prem', link: '/dev/03-release-and-on-prem' },
             { text: 'Menerbitkan release app', link: '/dev/13-publishing-an-app-release' },
+            { text: 'Deploy source build di Dokploy', link: '/dev/20-dokploy-source-build' },
             { text: 'Development stack lokal', link: '/dev/11-local-docker-development' },
             { text: 'Reporting dan read replica', link: '/dev/07-reporting-and-replicas' },
             { text: 'Target worktree', link: '/dev/06-worktree-target' },

@@ -40,6 +40,7 @@ Target yang dikunci:
 | [17-healthcare-finance-subledger.md](17-healthcare-finance-subledger.md) | Healthcare sebagai subledger, proses verifikasi, dan posting Finance yang dapat dikonfigurasi per faskes |
 | [18-module-discovery-and-decision-gate.md](18-module-discovery-and-decision-gate.md) | Gate keputusan sebelum membuat app, master, transaksi, workflow, nomor, atau integrasi |
 | [19-transaction-security-chain.md](19-transaction-security-chain.md) | Rantai keamanan satu modul transaksi: empat lapis manifest, lalu security role sampai user |
+| [20-dokploy-source-build.md](20-dokploy-source-build.md) | Deploy CoreERP di Dokploy dengan build source langsung di server tanpa registry image aplikasi |
 
 ## Referensi utama
 
