@@ -39,11 +39,21 @@ class RegisterBusiness
                 throw new RuntimeException('One or more selected apps are not available.');
             }
             $slug = $this->uniqueSlug($data['business_name']);
-            $user = User::create([
-                'name' => $data['name'],
-                'email' => Str::lower($data['email']),
-                'password' => $hashedPassword,
-            ]);
+            $email = Str::lower(trim($data['email']));
+            $user = User::where('email', $email)->first();
+
+            if ($user) {
+                $count = TenantMembership::where('user_id', $user->id)->count();
+                if ($count >= 3) {
+                    throw new RuntimeException('Email ini telah terdaftar untuk 3 bisnis (batas maksimal). Silakan gunakan email lain atau login.');
+                }
+            } else {
+                $user = User::create([
+                    'name' => $data['name'],
+                    'email' => $email,
+                    'password' => $hashedPassword,
+                ]);
+            }
             $client = Client::create([
                 'legal_name' => $data['business_name'],
                 'slug' => $slug,

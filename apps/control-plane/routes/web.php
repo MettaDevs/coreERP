@@ -17,6 +17,7 @@ use App\Http\Controllers\Provider\AppReleaseController;
 use App\Http\Controllers\Provider\AppServiceCredentialController;
 use App\Http\Controllers\Provider\IdentityMonitorController;
 use App\Http\Controllers\ReferenceData\UnitOfMeasureController;
+use App\Http\Controllers\MasterData\AssetEntityController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
 use App\Models\CoreApp;
@@ -30,7 +31,70 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
-Route::inertia('/', 'welcome')->name('home');
+use Laravel\Fortify\Http\Controllers\AuthenticatedSessionController;
+use Laravel\Fortify\Http\Controllers\NewPasswordController;
+use Laravel\Fortify\Http\Controllers\PasswordResetLinkController;
+use Laravel\Fortify\Http\Controllers\RegisteredUserController;
+
+Route::get('/', function () {
+    return Inertia::render('welcome');
+})->name('home');
+
+Route::get('login', function (Request $request) {
+    return Inertia::render('auth/login', [
+        'canResetPassword' => true,
+        'status' => $request->session()->get('status'),
+    ]);
+})->name('login');
+Route::post('login', [AuthenticatedSessionController::class, 'store']);
+
+Route::get('register', function () {
+    return Inertia::render('auth/register', [
+        'passwordRules' => Password::defaults()->toPasswordRulesString(),
+        'apps' => CoreApp::query()
+            ->where('status', 'available')
+            ->orderBy('name')
+            ->get(['id', 'name', 'description'])
+            ->map(fn (CoreApp $app): array => [
+                'id' => $app->id,
+                'name' => $app->name,
+                'description' => $app->description ?? '',
+            ])->values(),
+    ]);
+})->name('register');
+Route::post('check-email', function (Request $request) {
+    $email = \Illuminate\Support\Str::lower(trim((string) $request->input('email')));
+    $user = \App\Models\User::where('email', $email)->first();
+    $count = 0;
+    if ($user) {
+        $count = \App\Models\TenantMembership::where('user_id', $user->id)->count();
+    }
+    $maxReached = $count >= 3;
+    return response()->json([
+        'exists' => $user !== null,
+        'maxReached' => $maxReached,
+        'count' => $count,
+        'message' => $maxReached ? 'Email ini telah terdaftar untuk 3 bisnis (batas maksimal). Silakan gunakan email lain atau login.' : null,
+    ]);
+});
+Route::post('register', [RegisteredUserController::class, 'store']);
+
+Route::get('forgot-password', function (Request $request) {
+    return Inertia::render('auth/forgot-password', [
+        'status' => $request->session()->get('status'),
+        'email' => $request->query('email', ''),
+    ]);
+})->name('password.request');
+Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
+
+Route::get('reset-password/{token}', function (Request $request, string $token) {
+    return Inertia::render('auth/reset-password', [
+        'email' => $request->email,
+        'token' => $token,
+        'passwordRules' => Password::defaults()->toPasswordRulesString(),
+    ]);
+})->name('password.reset');
+Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.update');
 Route::inertia('ui-playground', 'ui-playground')->name('ui-playground');
 Route::inertia('lottie', 'lottie-gallery')->name('lottie-gallery');
 
@@ -70,12 +134,6 @@ Route::get('api/v1/control/apps', fn () => response()->json([
 ]))->name('api.control.apps.index');
 
 Route::middleware('guest')->group(function () {
-    Route::get('join', fn () => Inertia::render('auth/join', [
-        'passwordRules' => Password::defaults()->toPasswordRulesString(),
-    ]))->name('join');
-    Route::post('join', [InvitationRedemptionController::class, 'store'])
-        ->middleware('throttle:5,1')
-        ->name('join.store');
     Route::post('api/v1/business-registrations', [BusinessRegistrationController::class, 'store'])
         ->middleware('throttle:'.config('coreerp.registration_rate_limit', 5).',1')
         ->name('api.business-registrations.store');
@@ -138,6 +196,12 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
     Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
     Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index');
+
+    Route::get('master-data/entitas-aset', [AssetEntityController::class, 'index'])->name('master-data.entitas-aset.index');
+    Route::post('master-data/entitas-aset', [AssetEntityController::class, 'store'])->name('master-data.entitas-aset.store');
+    Route::patch('master-data/entitas-aset/{assetEntity}', [AssetEntityController::class, 'update'])->name('master-data.entitas-aset.update');
+    Route::delete('master-data/entitas-aset/{assetEntity}', [AssetEntityController::class, 'destroy'])->name('master-data.entitas-aset.destroy');
+    Route::post('master-data/entitas-aset/{assetEntity}/toggle-status', [AssetEntityController::class, 'toggleStatus'])->name('master-data.entitas-aset.toggle-status');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
     Route::get('settings/workflows/{workflow}/edit', [WorkflowConfigurationController::class, 'edit'])->name('workflows.edit');
