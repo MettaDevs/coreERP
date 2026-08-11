@@ -32,15 +32,15 @@ export default function AuthModernLayout({
                         href={home()}
                         className="inline-flex items-center gap-3 group transition-transform active:scale-95"
                     >
-                        <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-500 p-2.5 shadow-lg shadow-indigo-500/25 ring-1 ring-white/20 group-hover:shadow-indigo-500/40 transition-all">
-                            <AppLogoIcon className="size-full fill-white" />
+                        <div className="flex size-11 items-center justify-center rounded-xl bg-white p-2 shadow-lg shadow-blue-500/20 ring-1 ring-white/30 group-hover:shadow-blue-500/40 transition-all overflow-hidden">
+                            <AppLogoIcon className="size-full" />
                         </div>
                         <div>
-                            <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
-                                {appName}
+                            <span className="text-xl font-extrabold tracking-tight text-white block">
+                                PT SANATA SYSTEM
                             </span>
-                            <span className="block text-xs font-medium text-indigo-300/80 tracking-wider uppercase">
-                                Enterprise System
+                            <span className="block text-xs font-medium text-blue-300/90 tracking-wider uppercase">
+                                IT Solutions & Enterprise System
                             </span>
                         </div>
                     </Link>
@@ -48,8 +48,8 @@ export default function AuthModernLayout({
 
                 {/* Content Feature Highlights */}
                 <div className="relative z-10 my-auto py-8 space-y-8">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 backdrop-blur-md text-xs font-medium text-indigo-300">
-                        <Sparkles className="size-3.5 text-indigo-400 animate-pulse" />
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-400/20 backdrop-blur-md text-xs font-medium text-blue-300">
+                        <Sparkles className="size-3.5 text-blue-400 animate-pulse" />
                         <span>Sistem ERP & Asset Management Modern</span>
                     </div>
 
@@ -64,7 +64,7 @@ export default function AuthModernLayout({
 
                     <div className="space-y-3.5 pt-2">
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all hover:bg-white/10">
-                            <div className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 shrink-0">
+                            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400 shrink-0">
                                 <Boxes className="size-4" />
                             </div>
                             <div>
@@ -84,7 +84,7 @@ export default function AuthModernLayout({
                         </div>
 
                         <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all hover:bg-white/10">
-                            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
+                            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400 shrink-0">
                                 <ShieldCheck className="size-4" />
                             </div>
                             <div>
@@ -106,33 +106,33 @@ export default function AuthModernLayout({
             </div>
 
             {/* Right Form Panel */}
-            <div className="lg:col-span-7 flex min-h-screen flex-col items-center justify-center p-6 sm:p-10 md:p-12 relative bg-slate-50 dark:bg-slate-950">
-                <div className="w-full max-w-md space-y-6 my-auto">
+            <div className="lg:col-span-7 flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-slate-50 dark:bg-slate-950">
+                <div className="w-full max-w-md space-y-4 my-auto">
                     {/* Mobile Header Logo */}
-                    <div className="flex lg:hidden flex-col items-center gap-3 text-center mb-6">
+                    <div className="flex lg:hidden flex-col items-center gap-2 text-center mb-4">
                         <Link
                             href={home()}
                             className="inline-flex items-center gap-3 group"
                         >
-                            <div className="flex size-11 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-500 p-2.5 shadow-md">
-                                <AppLogoIcon className="size-full fill-white" />
+                            <div className="flex size-11 items-center justify-center rounded-xl bg-white p-2 shadow-md border border-slate-200 overflow-hidden">
+                                <AppLogoIcon className="size-full" />
                             </div>
-                            <span className="text-xl font-bold text-slate-900 dark:text-white">
-                                {appName}
+                            <span className="text-xl font-extrabold text-slate-900 dark:text-white">
+                                PT SANATA SYSTEM
                             </span>
                         </Link>
                     </div>
 
                     {/* Main Auth Form Container Card */}
-                    <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-7 sm:p-9 shadow-xl shadow-slate-200/50 dark:shadow-none backdrop-blur-xl space-y-6">
-                        <div className="space-y-2">
+                    <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-7 shadow-xl shadow-slate-200/50 dark:shadow-none backdrop-blur-xl space-y-4">
+                        <div className="space-y-1">
                             {title && (
-                                <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                                     {title}
                                 </h1>
                             )}
                             {description && (
-                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                                     {description}
                                 </p>
                             )}
