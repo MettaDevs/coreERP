@@ -218,8 +218,9 @@ export default function Security(props: Props) {
 
                         <Button
                             type="button"
+                            variant="default"
                             onClick={() => setShowPasswordModal(true)}
-                            className="btn-gradient-primary text-white px-5 py-2.5 rounded-full cursor-pointer shrink-0 self-start sm:self-center font-bold text-xs"
+                            className="cursor-pointer shrink-0 self-start sm:self-center font-bold text-xs"
                         >
                             <Lock className="size-4 mr-2" />
                             <span>Ubah Kata Sandi</span>
@@ -310,16 +311,18 @@ export default function Security(props: Props) {
                                                 <div className="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
                                                     <Button
                                                         type="button"
+                                                        variant="outline"
+                                                        size="sm"
                                                         onClick={() => setShowPasswordModal(false)}
-                                                        className="btn-outline-turquoise rounded-full px-4 py-2 text-xs font-bold"
                                                     >
                                                         Batalkan
                                                     </Button>
 
                                                     <Button
                                                         type="submit"
+                                                        variant="default"
+                                                        size="sm"
                                                         disabled={isPending}
-                                                        className="btn-gradient-primary rounded-full px-5 py-2 text-xs font-bold"
                                                     >
                                                         {isPending ? (
                                                             <>

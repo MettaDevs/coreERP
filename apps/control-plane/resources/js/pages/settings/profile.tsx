@@ -469,15 +469,18 @@ export default function Profile(
                                         <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
                                             <Button
                                                 type="button"
+                                                variant="outline"
+                                                size="sm"
                                                 onClick={() => setShowNameModal(false)}
-                                                className="btn-outline-turquoise rounded-full px-4 py-2 text-xs font-bold"
                                             >
                                                 Batalkan
                                             </Button>
                                             <Button
                                                 type="submit"
+                                                variant="default"
+                                                size="sm"
                                                 disabled={processing}
-                                                className="btn-gradient-primary rounded-full px-5 py-2 text-xs font-bold cursor-pointer"
+                                                className="cursor-pointer"
                                             >
                                                 {processing ? (
                                                     <>
@@ -565,15 +568,18 @@ export default function Profile(
                                         <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
                                             <Button
                                                 type="button"
+                                                variant="outline"
+                                                size="sm"
                                                 onClick={() => setShowEmailModal(false)}
-                                                className="btn-outline-turquoise rounded-full px-4 py-2 text-xs font-bold"
                                             >
                                                 Batalkan
                                             </Button>
                                             <Button
                                                 type="submit"
+                                                variant="default"
+                                                size="sm"
                                                 disabled={processing}
-                                                className="btn-gradient-primary rounded-full px-5 py-2 text-xs font-bold cursor-pointer"
+                                                className="cursor-pointer"
                                             >
                                                 {processing ? (
                                                     <>
@@ -648,15 +654,18 @@ export default function Profile(
                                 <div className="pt-2 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
                                     <Button
                                         type="button"
+                                        variant="outline"
+                                        size="sm"
                                         onClick={() => setShowPhoneModal(false)}
-                                        className="btn-outline-turquoise rounded-full px-4 py-2 text-xs font-bold"
                                     >
                                         Batalkan
                                     </Button>
                                     <Button
                                         type="submit"
+                                        variant="default"
+                                        size="sm"
                                         disabled={isSubmittingPhone}
-                                        className="btn-gradient-primary rounded-full px-5 py-2 text-xs font-bold cursor-pointer"
+                                        className="cursor-pointer"
                                     >
                                         {isSubmittingPhone ? (
                                             <>

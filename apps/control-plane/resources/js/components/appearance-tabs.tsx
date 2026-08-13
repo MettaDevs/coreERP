@@ -30,9 +30,9 @@ export default function AppearanceToggleTab({
                     key={value}
                     onClick={() => updateAppearance(value)}
                     className={cn(
-                        'flex items-center rounded-full px-4 py-2 text-xs font-bold transition-all duration-150 cursor-pointer',
+                        'flex items-center rounded-lg px-4 py-2 text-xs font-semibold transition-all duration-150 cursor-pointer',
                         appearance === value
-                            ? 'btn-gradient-primary text-white shadow-md shadow-cyan-500/25 border border-cyan-500/30'
+                            ? 'bg-primary text-primary-foreground shadow-xs'
                             : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700/60 dark:hover:text-slate-100',
                     )}
                 >

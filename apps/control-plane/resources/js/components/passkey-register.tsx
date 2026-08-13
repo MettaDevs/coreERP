@@ -67,7 +67,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
         return (
             <Button
                 onClick={() => setShowForm(true)}
-                className="btn-gradient-primary text-white font-bold text-xs rounded-full px-5 py-2.5 cursor-pointer"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs rounded-md px-4 py-2 cursor-pointer"
             >
                 Tambah Passkey
             </Button>

@@ -45,8 +45,9 @@ export default function DeleteUser() {
                 <Dialog>
                     <DialogTrigger asChild>
                         <Button
+                            variant="destructive"
                             data-test="delete-user-button"
-                            className="bg-[#FF4D4F] hover:bg-[#DC2626] text-white px-5 py-2.5 rounded-full font-bold text-xs shadow-xs cursor-pointer shrink-0 border-none transition-all"
+                            className="cursor-pointer shrink-0 font-bold text-xs"
                         >
                             <Trash2 className="size-4 mr-2" />
                             <span>Hapus Akun Permanen</span>
@@ -93,7 +94,7 @@ export default function DeleteUser() {
                                     <DialogFooter className="gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 bg-transparent px-0 pb-0">
                                         <DialogCancel
                                             onClick={() => resetAndClearErrors()}
-                                            className="border border-[#00AFC0] text-[#00AFC0] hover:bg-[#EAFBFC] rounded-full px-4 py-2 text-xs font-bold bg-transparent transition-all cursor-pointer"
+                                            className="border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 rounded-md px-4 py-2 text-xs font-bold bg-transparent transition-all cursor-pointer"
                                         >
                                             Batal
                                         </DialogCancel>
@@ -101,7 +102,7 @@ export default function DeleteUser() {
                                             type="submit"
                                             disabled={processing}
                                             data-test="confirm-delete-user-button"
-                                            className="bg-[#FF4D4F] hover:bg-[#DC2626] disabled:bg-[#FFECEC] disabled:text-[#FFA39E] text-white rounded-full px-5 py-2 text-xs font-bold cursor-pointer border-none transition-all shadow-xs"
+                                            className="bg-red-600 hover:bg-red-700 text-white rounded-md px-5 py-2 text-xs font-bold cursor-pointer border-none transition-all shadow-xs"
                                         >
                                             Hapus Akun Permanen
                                         </DialogAction>
