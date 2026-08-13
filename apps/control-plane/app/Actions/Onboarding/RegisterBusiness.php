@@ -20,6 +20,8 @@ use Illuminate\Support\Str;
 use LogicException;
 use RuntimeException;
 
+use Illuminate\Validation\ValidationException;
+
 class RegisterBusiness
 {
     /**
@@ -45,12 +47,32 @@ class RegisterBusiness
             if ($user) {
                 $count = TenantMembership::where('user_id', $user->id)->count();
                 if ($count >= 3) {
-                    throw new RuntimeException('Email ini telah terdaftar untuk 3 bisnis (batas maksimal). Silakan gunakan email lain atau login.');
+                    throw ValidationException::withMessages([
+                        'email' => 'Email ini telah terdaftar untuk 3 bisnis (batas maksimal). Silakan gunakan email lain atau login.',
+                    ]);
+                }
+
+                if (! Hash::check($data['password'], $user->password)) {
+                    throw ValidationException::withMessages([
+                        'password' => 'Password tidak sesuai dengan kata sandi akun terdaftar Anda.',
+                    ]);
+                }
+
+                $updates = [];
+                if (! empty($data['name'])) {
+                    $updates['name'] = $data['name'];
+                }
+                if (! empty($data['phone_number'])) {
+                    $updates['phone_number'] = $data['phone_number'];
+                }
+                if (! empty($updates)) {
+                    $user->update($updates);
                 }
             } else {
                 $user = User::create([
                     'name' => $data['name'],
                     'email' => $email,
+                    'phone_number' => $data['phone_number'] ?? null,
                     'password' => $hashedPassword,
                 ]);
             }

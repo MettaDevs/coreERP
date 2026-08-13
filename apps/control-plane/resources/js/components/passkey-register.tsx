@@ -57,16 +57,19 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
 
     if (!isSupported) {
         return (
-            <div className="text-sm text-muted-foreground">
-                Passkeys are not supported in this browser.
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+                Fitur Passkey tidak didukung di browser ini.
             </div>
         );
     }
 
     if (!showForm) {
         return (
-            <Button variant="outline" onClick={() => setShowForm(true)}>
-                Add passkey
+            <Button
+                onClick={() => setShowForm(true)}
+                className="btn-gradient-primary text-white font-bold text-xs rounded-full px-5 py-2.5 cursor-pointer"
+            >
+                Tambah Passkey
             </Button>
         );
     }
@@ -74,31 +77,41 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
     return (
         <form
             onSubmit={handleSubmit}
-            className="space-y-4 rounded-lg border border-border bg-muted/50 p-4"
+            className="space-y-4 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 p-4"
         >
-            <div className="grid gap-2">
+            <div className="space-y-1">
                 <Input
                     id="passkey-name"
-                    label="Passkey name"
+                    label="Nama Passkey"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="mt-1 block w-full border-foreground/20"
+                    className="w-full rounded-xl focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20"
+                    placeholder="Contoh: Chrome on Windows"
                     autoFocus
                 />
-                <p className="text-xs text-muted-foreground">
-                    A name helps you identify this passkey later.
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Nama ini memudahkan Anda mengidentifikasi perangkat passkey ini nanti.
                 </p>
             </div>
 
             {error && <InputError message={error} />}
 
-            <div className="flex gap-2">
-                <Button type="submit" disabled={isLoading || !name.trim()}>
-                    {isLoading ? 'Registering...' : 'Register passkey'}
+            <div className="flex gap-2 pt-1">
+                <Button
+                    type="submit"
+                    disabled={isLoading || !name.trim()}
+                    className="btn-gradient-primary text-white font-bold text-xs rounded-full px-5 py-2 cursor-pointer"
+                >
+                    {isLoading ? 'Mendaftarkan...' : 'Daftarkan Passkey'}
                 </Button>
-                <Button type="button" variant="ghost" onClick={handleCancel}>
-                    Cancel
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleCancel}
+                    className="rounded-full text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                    Batal
                 </Button>
             </div>
         </form>

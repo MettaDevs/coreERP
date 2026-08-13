@@ -79,7 +79,21 @@ class FortifyServiceProvider extends ServiceProvider
         $this->app->singleton(RegisterResponseContract::class, function () {
             return new class implements RegisterResponseContract {
                 public function toResponse($request) {
-                    return redirect()->route('login')->with('status', 'Registrasi berhasil. Selamat datang. Silakan login.');
+                    auth()->guard('web')->logout();
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+
+                    return redirect()->route('login')->with('status', 'Registrasi bisnis berhasil. Silakan masuk menggunakan akun Anda.');
+                }
+            };
+        });
+
+        $this->app->singleton(LoginResponseContract::class, \App\Http\Responses\LoginResponse::class);
+
+        $this->app->singleton(\Laravel\Fortify\Contracts\LogoutResponse::class, function () {
+            return new class implements \Laravel\Fortify\Contracts\LogoutResponse {
+                public function toResponse($request) {
+                    return redirect()->route('login');
                 }
             };
         });

@@ -50,6 +50,38 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, function (Login $event): void {
             $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+
+            try {
+                \App\Models\SecurityActivity::create([
+                    'user_id' => $event->user->id,
+                    'type' => 'login_success',
+                    'title' => 'Login Berhasil',
+                    'detail' => request()->header('User-Agent', 'Web Browser') . ' (' . (request()->ip() ?? '127.0.0.1') . ')',
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->header('User-Agent'),
+                    'status' => 'success',
+                ]);
+            } catch (\Throwable $e) {
+                // Ignore fallback if table not migrated yet
+            }
+        });
+
+        Event::listen(\Illuminate\Auth\Events\Failed::class, function (\Illuminate\Auth\Events\Failed $event): void {
+            if ($event->user) {
+                try {
+                    \App\Models\SecurityActivity::create([
+                        'user_id' => $event->user->id,
+                        'type' => 'login_failed',
+                        'title' => 'Login Gagal',
+                        'detail' => request()->header('User-Agent', 'Web Browser') . ' (' . (request()->ip() ?? '127.0.0.1') . ') — Kata sandi salah',
+                        'ip_address' => request()->ip(),
+                        'user_agent' => request()->header('User-Agent'),
+                        'status' => 'warning',
+                    ]);
+                } catch (\Throwable $e) {
+                    // Ignore fallback
+                }
+            }
         });
 
         // Keyed per app and tenant so one noisy app cannot starve another, and so a stolen token cannot burn a

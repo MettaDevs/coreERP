@@ -12,6 +12,7 @@ use App\Http\Controllers\Onboarding\BusinessRegistrationController;
 use App\Http\Controllers\Onboarding\InvitationRedemptionController;
 use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\WorkspaceContextController;
+use App\Http\Controllers\Organization\WorkspaceSelectionController;
 use App\Http\Controllers\Provider\AppCatalogController;
 use App\Http\Controllers\Provider\AppReleaseController;
 use App\Http\Controllers\Provider\AppServiceCredentialController;
@@ -143,6 +144,9 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('select-workspace', [WorkspaceSelectionController::class, 'index'])->name('workspace.select');
+    Route::post('select-workspace', [WorkspaceSelectionController::class, 'store'])->name('workspace.select.store');
+
     Route::get('apps/{app}', function (CoreApp $app, Request $request, CurrentWorkspace $workspace, LaunchableAppCatalog $catalog, AppContextToken $tokens) {
         $membership = $workspace->membership($request);
         abort_unless($membership && collect($catalog->for($membership))->contains('id', $app->id), 403);
@@ -179,6 +183,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('apps.host');
 
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    Route::inertia('notifications', 'notifications')->name('notifications.index');
     Route::get('settings/access', [AccessController::class, 'index'])->name('access.index');
     Route::get('settings/security-configuration', [SecurityConfigurationController::class, 'index'])->name('security-configuration.index');
     Route::post('settings/security-configuration/privileges', [SecurityConfigurationController::class, 'storePrivilege'])->name('security-configuration.privileges.store');

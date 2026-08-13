@@ -102,17 +102,17 @@ export default function TwoFactorChallenge() {
 
                             <Button
                                 type="submit"
-                                className="w-full"
+                                className="w-full h-11 rounded-full btn-gradient-primary cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2 font-bold"
                                 disabled={processing}
                             >
-                                Continue
+                                Lanjutkan
                             </Button>
 
-                            <div className="text-center text-sm text-muted-foreground">
-                                <span>or you can </span>
+                            <div className="text-center text-xs font-semibold text-slate-500">
+                                <span>atau Anda dapat </span>
                                 <button
                                     type="button"
-                                    className="cursor-pointer text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
+                                    className="cursor-pointer text-[#00AFC0] hover:text-[#008B9B] hover:underline font-bold transition-colors"
                                     onClick={() =>
                                         toggleRecoveryMode(clearErrors)
                                     }

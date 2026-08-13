@@ -44,6 +44,28 @@ class ProfileController extends Controller
     }
 
     /**
+     * Update the user's avatar image in real-time and save to database.
+     */
+    public function updateAvatar(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+
+        if ($request->hasFile('avatar')) {
+            $request->validate([
+                'avatar' => ['required', 'image', 'max:5120'],
+            ]);
+            $path = $request->file('avatar')->store('avatars', 'public');
+            $user->avatar_url = '/storage/' . $path;
+            $user->save();
+        } elseif ($request->filled('avatar_url')) {
+            $user->avatar_url = $request->input('avatar_url');
+            $user->save();
+        }
+
+        return to_route('profile.edit');
+    }
+
+    /**
      * Delete the user's profile.
      */
     public function destroy(ProfileDeleteRequest $request): RedirectResponse

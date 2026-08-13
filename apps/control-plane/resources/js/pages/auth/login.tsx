@@ -2,15 +2,13 @@ import { useState } from 'react';
 import { useForm, Head, Link } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
 import { Spinner } from '@apperp/ui/spinner';
 import { register } from '@/routes';
-import { request } from '@/routes/password';
-import { LogIn } from 'lucide-react';
+import { ArrowRight, Building2, Lock, Mail } from 'lucide-react';
 
 type Props = {
     status?: string;
@@ -127,48 +125,6 @@ export default function Login({ status, canResetPassword }: Props) {
         post('/login');
     };
 
-    const [isCheckingForgotPassword, setIsCheckingForgotPassword] = useState(false);
-
-    const handleForgotPasswordClick = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        const trimmedEmail = data.email.trim();
-
-        if (!trimmedEmail) {
-            setClientEmailError('Email wajib diisi untuk mereset kata sandi.');
-            return;
-        }
-
-        if (!EMAIL_REGEX.test(trimmedEmail)) {
-            setClientEmailError('Format email tidak valid.');
-            return;
-        }
-
-        setIsCheckingForgotPassword(true);
-        try {
-            const response = await fetch('/check-email', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-                },
-                body: JSON.stringify({ email: trimmedEmail }),
-            });
-
-            const result = await response.json();
-            if (!result.exists) {
-                setClientEmailError('Email tidak ditemukan.');
-                setIsCheckingForgotPassword(false);
-                return;
-            }
-
-            window.location.href = `/forgot-password?email=${encodeURIComponent(trimmedEmail)}`;
-        } catch (err) {
-            console.error('Error checking forgot password email:', err);
-            setIsCheckingForgotPassword(false);
-        }
-    };
-
     const emailDisplayError = errors.email || clientEmailError;
     const passwordDisplayError = errors.password || clientPasswordError;
 
@@ -177,114 +133,139 @@ export default function Login({ status, canResetPassword }: Props) {
             <Head title="Masuk Akun" />
 
             {status && (
-                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-center text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                     {status}
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-                <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                <div className="space-y-3.5">
+                    {/* Alamat Email Input with Icon */}
                     <div className="space-y-1.5">
-                        <Input
-                            id="email"
-                            label="Alamat Email"
-                            type="email"
-                            name="email"
-                            value={data.email}
-                            onChange={(e) => handleEmailChange(e.target.value)}
-                            onBlur={handleEmailBlur}
-                            aria-invalid={Boolean(emailDisplayError)}
-                            required
-                            autoFocus
-                            tabIndex={1}
-                            autoComplete="email"
-                            placeholder="nama@perusahaan.com"
-                        />
+                        <Label htmlFor="email" className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                            Alamat Email
+                        </Label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <Mail className="size-4" />
+                            </div>
+                            <Input
+                                id="email"
+                                type="email"
+                                name="email"
+                                value={data.email}
+                                onChange={(e) => handleEmailChange(e.target.value)}
+                                onBlur={handleEmailBlur}
+                                aria-invalid={Boolean(emailDisplayError)}
+                                required
+                                autoFocus
+                                tabIndex={1}
+                                autoComplete="email"
+                                placeholder="contoh@email.com"
+                                className="pl-10 h-11 rounded-xl border-slate-200 focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20 transition-all text-xs"
+                            />
+                        </div>
                         <InputError message={emailDisplayError} />
                     </div>
 
+                    {/* Kata Sandi Input with Icon */}
                     <div className="space-y-1.5">
-                        <Label htmlFor="password">Kata Sandi</Label>
-                        <PasswordInput
-                            id="password"
-                            name="password"
-                            value={data.password}
-                            onChange={(e) => handlePasswordChange(e.target.value)}
-                            onBlur={handlePasswordBlur}
-                            aria-invalid={Boolean(passwordDisplayError)}
-                            required
-                            tabIndex={2}
-                            autoComplete="current-password"
-                            placeholder="••••••••"
-                        />
-                        <InputError message={passwordDisplayError} />
-                        {canResetPassword && (
-                            <div className="text-right pt-1">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="password" className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                                Kata Sandi
+                            </Label>
+                            {canResetPassword && (
                                 <Link
                                     href={data.email.trim() ? `/forgot-password?email=${encodeURIComponent(data.email.trim())}` : '/forgot-password'}
-                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium cursor-pointer"
+                                    className="text-xs text-[#00AFC0] hover:text-[#008B9B] font-semibold cursor-pointer transition-colors"
                                     tabIndex={5}
                                 >
                                     Lupa kata sandi?
                                 </Link>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1">
-                        <div className="flex items-center space-x-2.5">
-                            <Checkbox
-                                id="remember"
-                                name="remember"
-                                checked={data.remember}
-                                onCheckedChange={(checked) => setData('remember', checked === true)}
-                                tabIndex={3}
-                            />
-                            <Label
-                                htmlFor="remember"
-                                className="text-xs font-normal text-slate-600 dark:text-slate-400 cursor-pointer"
-                            >
-                                Ingat saya di perangkat ini
-                            </Label>
+                            )}
                         </div>
+                        <div className="relative">
+                            <PasswordInput
+                                id="password"
+                                name="password"
+                                value={data.password}
+                                onChange={(e) => handlePasswordChange(e.target.value)}
+                                onBlur={handlePasswordBlur}
+                                aria-invalid={Boolean(passwordDisplayError)}
+                                required
+                                tabIndex={2}
+                                autoComplete="current-password"
+                                placeholder="Masukkan kata sandi"
+                                className="h-11 rounded-xl border-slate-200 focus:border-[#08BFC3] focus:ring-2 focus:ring-[#08BFC3]/20 transition-all text-xs"
+                            />
+                        </div>
+                        <InputError message={passwordDisplayError} />
                     </div>
 
+                    {/* Checkbox Ingat Saya */}
+                    <div className="flex items-center space-x-2.5 pt-0.5">
+                        <Checkbox
+                            id="remember"
+                            name="remember"
+                            checked={data.remember}
+                            onCheckedChange={(checked) => setData('remember', checked === true)}
+                            tabIndex={3}
+                            className="rounded-md border-slate-300 data-[state=checked]:bg-[#08BFC3] data-[state=checked]:border-[#08BFC3]"
+                        />
+                        <Label
+                            htmlFor="remember"
+                            className="text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer select-none"
+                        >
+                            Ingat saya di perangkat ini
+                        </Label>
+                    </div>
+
+                    {/* Primary Button: Masuk ke Akun */}
                     <Button
                         type="submit"
-                        className="w-full h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-[0.99] mt-2 cursor-pointer"
+                        className="w-full h-11 sm:h-12 rounded-full btn-gradient-primary text-white font-extrabold text-xs sm:text-sm cursor-pointer active:scale-[0.99] mt-2 flex items-center justify-center gap-2 transition-all border-none"
                         tabIndex={4}
                         disabled={processing}
                         data-test="login-button"
                     >
                         {processing ? (
                             <>
-                                <Spinner className="mr-2" />
+                                <Spinner className="mr-2 text-white" />
                                 Memproses...
                             </>
                         ) : (
                             <>
-                                <LogIn className="size-4 mr-2" />
-                                Masuk ke Akun
+                                <ArrowRight className="size-4 text-white" />
+                                <span>Masuk ke Akun</span>
                             </>
                         )}
                     </Button>
                 </div>
 
-                {/* Navigation Links */}
-                <div className="pt-2 text-center text-xs text-slate-500 dark:text-slate-400">
-                    <p>
-                        Belum memiliki akun bisnis?{' '}
-                        <TextLink href={register()} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline" tabIndex={5}>
-                            Daftar Bisnis Baru
-                        </TextLink>
-                    </p>
+                {/* Divider 'atau' */}
+                <div className="relative flex items-center justify-center my-3.5">
+                    <div className="border-t border-slate-200/80 dark:border-slate-800 w-full" />
+                    <span className="bg-white/95 dark:bg-[#071527] px-3 text-[11px] font-semibold text-slate-400 dark:text-slate-500 rounded-full shrink-0 absolute">
+                        atau
+                    </span>
                 </div>
+
+                {/* Secondary Button: Daftar Bisnis Baru */}
+                <Link href={register()} className="block">
+                    <Button
+                        type="button"
+                        className="w-full h-11 sm:h-12 rounded-full border-2 border-[#08BFC3] dark:border-cyan-500/70 text-[#007C89] dark:text-cyan-300 hover:bg-[#C8F1F5]/60 dark:hover:bg-cyan-950/70 dark:hover:border-cyan-400 dark:hover:text-cyan-200 font-extrabold text-xs sm:text-sm bg-white dark:bg-slate-800/90 cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2 transition-all shadow-xs"
+                    >
+                        <Building2 className="size-4 text-[#007C89] dark:text-cyan-400" />
+                        <span>Daftar Bisnis Baru</span>
+                    </Button>
+                </Link>
             </form>
         </>
     );
 }
 
 Login.layout = {
-    title: 'Masuk ke Akun Anda',
+    title: 'Selamat Datang!',
     description: 'Masukkan email dan kata sandi untuk mengakses platform operasional ERP.',
 };

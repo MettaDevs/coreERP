@@ -93,7 +93,7 @@ function TwoFactorSetupStep({
                     </div>
 
                     <div className="flex w-full space-x-5">
-                        <Button className="w-full" onClick={onNextStep}>
+                        <Button className="w-full btn-gradient-primary rounded-full font-bold" onClick={onNextStep}>
                             {buttonText}
                         </Button>
                     </div>
@@ -204,7 +204,7 @@ function TwoFactorVerificationStep({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="flex-1"
+                                className="flex-1 btn-outline-turquoise font-bold"
                                 onClick={onBack}
                                 disabled={processing}
                             >
@@ -212,7 +212,7 @@ function TwoFactorVerificationStep({
                             </Button>
                             <Button
                                 type="submit"
-                                className="flex-1"
+                                className="flex-1 btn-gradient-primary rounded-full font-bold"
                                 disabled={
                                     processing || code.length < OTP_MAX_LENGTH
                                 }

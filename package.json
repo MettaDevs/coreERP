@@ -1,0 +1,9 @@
+{
+  "name": "coreERP",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix apps/control-plane",
+    "build": "npm run build --prefix apps/control-plane",
+    "install": "npm install --prefix apps/control-plane"
+  }
+}

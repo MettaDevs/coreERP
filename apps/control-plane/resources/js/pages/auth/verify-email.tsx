@@ -18,19 +18,22 @@ export default function VerifyEmail({ status }: { status?: string }) {
                 </div>
             )}
 
-            <Form {...send.form()} className="space-y-6 text-center">
+            <Form {...send.form()} className="space-y-4 text-center">
                 {({ processing }) => (
                     <>
-                        <Button disabled={processing} variant="secondary">
-                            {processing && <Spinner />}
-                            Resend verification email
+                        <Button
+                            disabled={processing}
+                            className="w-full h-11 rounded-full btn-gradient-primary cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2 font-bold"
+                        >
+                            {processing && <Spinner className="mr-2 text-white" />}
+                            Kirim Ulang Email Verifikasi
                         </Button>
 
                         <TextLink
                             href={logout()}
-                            className="mx-auto block text-sm"
+                            className="mx-auto block text-xs font-bold text-[#00AFC0] hover:text-[#008B9B]"
                         >
-                            Log out
+                            Keluar Akun
                         </TextLink>
                     </>
                 )}

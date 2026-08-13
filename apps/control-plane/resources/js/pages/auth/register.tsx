@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Building2, KeyRound, Package, ShieldCheck, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Building2, Package, ShieldCheck, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 
 import PasswordInput from '@/components/password-input';
@@ -28,7 +28,6 @@ export default function Register({ passwordRules, apps }: Props) {
         name: '',
         business_name: '',
         email: '',
-        phone_number: '',
         app_ids: [] as string[],
         password: '',
         password_confirmation: '',
@@ -232,13 +231,13 @@ export default function Register({ passwordRules, apps }: Props) {
             <Tabs
                 value={step}
                 onValueChange={(value) => setStep(value as Step)}
-                className="space-y-4"
+                className="space-y-3"
             >
-                {/* Modern Step Navigation Tabs Header */}
-                <TabsList className="grid w-full grid-cols-3 h-11 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl">
+                {/* Modern Step Navigation Tabs Header (Matching Reference Image) */}
+                <TabsList className="grid w-full grid-cols-3 h-9.5 bg-slate-100/90 dark:bg-slate-800/80 p-1 rounded-full border-none outline-none ring-0 shadow-none">
                     <TabsTrigger
                         value="business"
-                        className="rounded-lg text-xs font-semibold gap-1.5 transition-all cursor-pointer data-[state=active]:bg-blue-600 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400"
+                        className="rounded-full text-[11px] font-bold gap-1.5 transition-all cursor-pointer border-none outline-none ring-0 focus-visible:ring-0 focus-visible:outline-none focus:outline-none shadow-none data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#005F73] data-[state=active]:via-[#00A8B5] data-[state=active]:to-[#00C9C8] data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-cyan-600/30 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400"
                     >
                         <Building2 className="size-3.5" />
                         <span className="hidden sm:inline">1. Bisnis</span>
@@ -247,7 +246,7 @@ export default function Register({ passwordRules, apps }: Props) {
                     <TabsTrigger
                         value="products"
                         disabled={!isStep1Valid}
-                        className="rounded-lg text-xs font-semibold gap-1.5 transition-all cursor-pointer data-[state=active]:bg-blue-600 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 disabled:opacity-40"
+                        className="rounded-full text-[11px] font-bold gap-1.5 transition-all cursor-pointer border-none outline-none ring-0 focus-visible:ring-0 focus-visible:outline-none focus:outline-none shadow-none data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#005F73] data-[state=active]:via-[#00A8B5] data-[state=active]:to-[#00C9C8] data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-cyan-600/30 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 disabled:opacity-40"
                     >
                         <Package className="size-3.5" />
                         <span className="hidden sm:inline">2. Produk</span>
@@ -256,7 +255,7 @@ export default function Register({ passwordRules, apps }: Props) {
                     <TabsTrigger
                         value="security"
                         disabled={!isStep1Valid || form.data.app_ids.length === 0}
-                        className="rounded-lg text-xs font-semibold gap-1.5 transition-all cursor-pointer data-[state=active]:bg-blue-600 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 disabled:opacity-40"
+                        className="rounded-full text-[11px] font-bold gap-1.5 transition-all cursor-pointer border-none outline-none ring-0 focus-visible:ring-0 focus-visible:outline-none focus:outline-none shadow-none data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#005F73] data-[state=active]:via-[#00A8B5] data-[state=active]:to-[#00C9C8] data-[state=active]:text-white data-[state=active]:shadow-md data-[state=active]:shadow-cyan-600/30 data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 disabled:opacity-40"
                     >
                         <ShieldCheck className="size-3.5" />
                         <span className="hidden sm:inline">3. Keamanan</span>
@@ -265,19 +264,19 @@ export default function Register({ passwordRules, apps }: Props) {
                 </TabsList>
 
                 {/* STEP 1: BUSINESS IDENTIFICATION */}
-                <TabsContent value="business" className="space-y-4 focus:outline-none">
-                    <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-2">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Building2 className="size-4 text-blue-600 dark:text-blue-400" />
+                <TabsContent value="business" className="space-y-3 focus:outline-none">
+                    <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <Building2 className="size-3.5 text-[#00AFC0]" />
                             Identitas Pemilik &amp; Perusahaan
                         </h3>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug">
                             Lengkapi identitas Anda sebagai pemilik akun utama serta nama unit bisnis.
                         </p>
                     </div>
 
-                    <FieldGroup className="space-y-3">
-                        <Field data-invalid={Boolean(getFieldError('name'))}>
+                    <div className="space-y-2.5">
+                        <Field className="!gap-1" data-invalid={Boolean(getFieldError('name'))}>
                             <Input
                                 id="name"
                                 name="name"
@@ -289,11 +288,12 @@ export default function Register({ passwordRules, apps }: Props) {
                                 autoComplete="name"
                                 autoFocus
                                 placeholder="Nama lengkap Anda"
+                                className="w-full h-9.5 rounded-xl border-slate-200 focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20 text-xs transition-all"
                             />
                             <FieldError>{getFieldError('name')}</FieldError>
                         </Field>
 
-                        <Field data-invalid={Boolean(getFieldError('business_name'))}>
+                        <Field className="!gap-1" data-invalid={Boolean(getFieldError('business_name'))}>
                             <Input
                                 id="business_name"
                                 name="business_name"
@@ -304,11 +304,12 @@ export default function Register({ passwordRules, apps }: Props) {
                                 aria-invalid={Boolean(getFieldError('business_name'))}
                                 autoComplete="organization"
                                 placeholder="Contoh: PT. Sanata System"
+                                className="w-full h-9.5 rounded-xl border-slate-200 focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20 text-xs transition-all"
                             />
                             <FieldError>{getFieldError('business_name')}</FieldError>
                         </Field>
 
-                        <Field data-invalid={Boolean(getFieldError('email'))}>
+                        <Field className="!gap-1" data-invalid={Boolean(getFieldError('email'))}>
                             <Input
                                 id="email"
                                 name="email"
@@ -320,42 +321,28 @@ export default function Register({ passwordRules, apps }: Props) {
                                 aria-invalid={Boolean(getFieldError('email'))}
                                 autoComplete="email"
                                 placeholder="pemilik@perusahaan.com"
+                                className="w-full h-9.5 rounded-xl border-slate-200 focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20 text-xs transition-all"
                             />
                             <FieldError>{getFieldError('email')}</FieldError>
                         </Field>
+                    </div>
 
-                        <Field data-invalid={Boolean(getFieldError('phone_number'))}>
-                            <Input
-                                id="phone_number"
-                                name="phone_number"
-                                label="Nomor Telepon (Opsional)"
-                                type="tel"
-                                value={form.data.phone_number}
-                                onChange={(event) => handleFieldChange('phone_number', event.target.value)}
-                                aria-invalid={Boolean(getFieldError('phone_number'))}
-                                autoComplete="tel"
-                                placeholder="Contoh: 081234567890"
-                            />
-                            <FieldError>{getFieldError('phone_number')}</FieldError>
-                        </Field>
-                    </FieldGroup>
-
-                    <div className="pt-2 flex justify-end">
+                    <div className="pt-1">
                         <Button
                             type="button"
                             disabled={!isStep1Valid || isCheckingEmail}
                             onClick={handleNextToProducts}
-                            className="h-11 px-6 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all gap-2 text-xs cursor-pointer active:scale-[0.99]"
+                            className="w-full h-10 rounded-full btn-gradient-primary cursor-pointer active:scale-[0.99] gap-2 text-xs sm:text-sm font-bold flex items-center justify-center border-none shadow-md shadow-cyan-600/25"
                         >
                             {isCheckingEmail ? (
                                 <>
-                                    <Spinner className="mr-1.5" />
+                                    <Spinner className="mr-1.5 text-white" />
                                     Memeriksa...
                                 </>
                             ) : (
                                 <>
-                                    Lanjutkan ke Produk
-                                    <ArrowRight className="size-3.5" />
+                                    <span>Lanjutkan ke Produk</span>
+                                    <ArrowRight className="size-4" />
                                 </>
                             )}
                         </Button>
@@ -363,42 +350,42 @@ export default function Register({ passwordRules, apps }: Props) {
                 </TabsContent>
 
                 {/* STEP 2: PRODUCT SELECTION */}
-                <TabsContent value="products" className="space-y-4 focus:outline-none">
-                    <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-2">
-                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Package className="size-4 text-blue-600 dark:text-blue-400" />
+                <TabsContent value="products" className="space-y-3 focus:outline-none">
+                    <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                            <Package className="size-3.5 text-[#00AFC0]" />
                             Pilih Modul Aplikasi ERP
                         </h3>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <p className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug">
                             Pilih minimal 1 produk awal yang dibutuhkan oleh operasional bisnis Anda.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {apps.map((app) => {
                             const isSelected = form.data.app_ids.includes(app.id);
                             return (
                                 <div
                                     key={app.id}
                                     onClick={() => toggleApp(app.id)}
-                                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 relative group ${
+                                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between space-y-1 relative group ${
                                         isSelected
-                                            ? 'bg-blue-50/60 dark:bg-blue-950/40 border-blue-500 dark:border-blue-500 ring-2 ring-blue-500/20'
+                                            ? 'bg-cyan-50/60 dark:bg-cyan-950/40 border-[#00AFC0] dark:border-[#00AFC0] ring-2 ring-[#00AFC0]/20'
                                             : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                                     }`}
                                 >
                                     <div className="flex items-start justify-between">
-                                        <div className="size-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 group-hover:scale-105 transition-transform">
-                                            <Package className="size-4 text-blue-600 dark:text-blue-400" />
+                                        <div className="size-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 group-hover:scale-105 transition-transform">
+                                            <Package className="size-3.5 text-[#00AFC0]" />
                                         </div>
                                         <div
-                                            className={`size-4.5 rounded-full flex items-center justify-center transition-all ${
+                                            className={`size-3.5 rounded-full flex items-center justify-center transition-all ${
                                                 isSelected
-                                                    ? 'bg-blue-600 text-white'
+                                                    ? 'bg-[#00AFC0] text-white'
                                                     : 'border border-slate-300 dark:border-slate-700'
                                             }`}
                                         >
-                                            {isSelected && <CheckCircle2 className="size-3 stroke-[3]" />}
+                                            {isSelected && <CheckCircle2 className="size-2 stroke-[3]" />}
                                         </div>
                                     </div>
 
@@ -406,7 +393,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                         <h4 className="text-xs font-bold text-slate-900 dark:text-white">
                                             {app.name}
                                         </h4>
-                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
                                             {app.description || 'Sistem manajemen operasional terpadu.'}
                                         </p>
                                     </div>
@@ -416,70 +403,69 @@ export default function Register({ passwordRules, apps }: Props) {
                     </div>
 
                     {form.errors.app_ids && (
-                        <p className="text-xs font-medium text-red-500 mt-1">
+                        <p className="text-xs font-medium text-red-500 mt-0.5">
                             {form.errors.app_ids}
                         </p>
                     )}
 
-                    <div className="pt-2 flex items-center justify-between">
+                    <div className="pt-1 flex items-center justify-between gap-2.5">
                         <Button
                             type="button"
-                            variant="outline"
                             onClick={() => setStep('business')}
-                            className="h-10 px-4 rounded-xl gap-2 text-xs cursor-pointer"
+                            className="h-10 px-4 rounded-full btn-outline-turquoise cursor-pointer gap-2 text-xs font-bold"
                         >
                             <ArrowLeft className="size-3.5" />
-                            Kembali
+                            <span>Kembali</span>
                         </Button>
                         <Button
                             type="button"
                             disabled={form.data.app_ids.length === 0}
                             onClick={handleNextToSecurity}
-                            className="h-11 px-6 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all gap-2 text-xs cursor-pointer active:scale-[0.99]"
+                            className="h-10 px-5 rounded-full btn-gradient-primary cursor-pointer active:scale-[0.99] gap-2 text-xs font-bold flex-1 flex items-center justify-center border-none shadow-md shadow-cyan-600/25"
                         >
-                            Lanjutkan ke Keamanan
+                            <span>Lanjutkan ke Keamanan</span>
                             <ArrowRight className="size-3.5" />
                         </Button>
                     </div>
                 </TabsContent>
 
                 {/* STEP 3: SECURITY & CONFIRMATION */}
-                <TabsContent value="security" className="space-y-4 focus:outline-none">
-                    <form onSubmit={submit} className="space-y-4" noValidate>
-                        <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-2">
-                            <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                                <ShieldCheck className="size-4 text-blue-600 dark:text-blue-400" />
+                <TabsContent value="security" className="space-y-3 focus:outline-none">
+                    <form onSubmit={submit} className="space-y-3" noValidate>
+                        <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                            <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <ShieldCheck className="size-3.5 text-[#00AFC0]" />
                                 Keamanan &amp; Kata Sandi
                             </h3>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            <p className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-snug">
                                 Buat kata sandi aman untuk akun pemilik tenant bisnis.
                             </p>
                         </div>
 
-                        <FieldGroup className="space-y-3">
+                        <div className="space-y-2.5">
                             {isExistingEmail ? (
-                                <Alert className="bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 py-2.5">
-                                    <CheckCircle2 className="size-4 text-amber-600 dark:text-amber-400" />
+                                <Alert className="bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 py-1.5">
+                                    <CheckCircle2 className="size-3.5 text-amber-600 dark:text-amber-400" />
                                     <AlertTitle className="text-xs font-semibold text-amber-950 dark:text-amber-200">
                                         Akun Terdaftar Ditemukan ({form.data.email})
                                     </AlertTitle>
-                                    <AlertDescription className="text-[11px] text-amber-800 dark:text-amber-300">
+                                    <AlertDescription className="text-[10.5px] text-amber-800 dark:text-amber-300">
                                         Email ini sudah terdaftar. Bisnis <strong>{form.data.business_name}</strong> akan ditambahkan ke akun Anda yang ada. Masukkan kata sandi akun Anda untuk mengonfirmasi.
                                     </AlertDescription>
                                 </Alert>
                             ) : (
-                                <Alert className="bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 py-2.5">
-                                    <Building2 className="size-4 text-blue-600 dark:text-blue-400" />
-                                    <AlertTitle className="text-xs font-semibold text-blue-950 dark:text-blue-200">
+                                <Alert className="bg-[#EAFBFC]/80 dark:bg-cyan-950/40 border-[#00AFC0]/30 py-1.5">
+                                    <Building2 className="size-3.5 text-[#00AFC0]" />
+                                    <AlertTitle className="text-xs font-semibold text-cyan-950 dark:text-cyan-200">
                                         Perusahaan: {form.data.business_name}
                                     </AlertTitle>
-                                    <AlertDescription className="text-[11px] text-blue-800 dark:text-blue-300">
+                                    <AlertDescription className="text-[10.5px] text-cyan-800 dark:text-cyan-300">
                                         {form.data.app_ids.length} modul aplikasi terpilih. Tenant dan database akan disiapkan secara otomatis setelah pendaftaran selesai.
                                     </AlertDescription>
                                 </Alert>
                             )}
 
-                            <Field data-invalid={Boolean(getFieldError('password'))}>
+                            <Field className="!gap-1" data-invalid={Boolean(getFieldError('password'))}>
                                 <PasswordInput
                                     id="password"
                                     name="password"
@@ -491,11 +477,12 @@ export default function Register({ passwordRules, apps }: Props) {
                                     autoComplete="new-password"
                                     passwordrules={passwordRules}
                                     placeholder="••••••••"
+                                    className="w-full h-9.5 rounded-xl border-slate-200 focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20 text-xs transition-all"
                                 />
                                 <FieldError>{getFieldError('password')}</FieldError>
                             </Field>
 
-                            <Field data-invalid={Boolean(getFieldError('password_confirmation'))}>
+                            <Field className="!gap-1" data-invalid={Boolean(getFieldError('password_confirmation'))}>
                                 <PasswordInput
                                     id="password_confirmation"
                                     name="password_confirmation"
@@ -507,33 +494,36 @@ export default function Register({ passwordRules, apps }: Props) {
                                     autoComplete="new-password"
                                     passwordrules={passwordRules}
                                     placeholder="••••••••"
+                                    className="w-full h-9.5 rounded-xl border-slate-200 focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20 text-xs transition-all"
                                 />
                                 <FieldError>{getFieldError('password_confirmation')}</FieldError>
                             </Field>
-                        </FieldGroup>
+                        </div>
 
-                        <div className="pt-2 flex items-center justify-between">
+                        <div className="pt-1 flex items-center justify-between gap-2.5">
                             <Button
                                 type="button"
-                                variant="outline"
                                 onClick={() => setStep('products')}
-                                className="h-10 px-4 rounded-xl gap-2 text-xs cursor-pointer"
+                                className="h-10 px-4 rounded-full btn-outline-turquoise cursor-pointer gap-2 text-xs font-bold"
                             >
                                 <ArrowLeft className="size-3.5" />
-                                Kembali
+                                <span>Kembali</span>
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={form.processing}
-                                className="h-11 px-6 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all cursor-pointer active:scale-[0.99]"
+                                className="h-10 px-5 rounded-full btn-gradient-primary cursor-pointer active:scale-[0.99] gap-2 text-xs font-bold flex-1 flex items-center justify-center border-none shadow-md shadow-cyan-600/25"
                             >
                                 {form.processing ? (
                                     <>
-                                        <Spinner className="mr-2" />
-                                        Memproses...
+                                        <Spinner className="mr-1.5 text-white" />
+                                        Mendaftarkan...
                                     </>
                                 ) : (
-                                    'Daftar Business Account'
+                                    <>
+                                        <span>Selesaikan Pendaftaran</span>
+                                        <CheckCircle2 className="size-4" />
+                                    </>
                                 )}
                             </Button>
                         </div>
@@ -541,9 +531,9 @@ export default function Register({ passwordRules, apps }: Props) {
                 </TabsContent>
             </Tabs>
 
-            <div className="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 mt-3">
+            <div className="pt-2 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 mt-1">
                 Sudah memiliki akun bisnis?{' '}
-                <TextLink href={login()} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                <TextLink href={login()} className="font-semibold text-[#00AFC0] hover:text-[#008B9B] hover:underline">
                     Masuk ke Akun
                 </TextLink>
             </div>
@@ -555,3 +545,4 @@ Register.layout = {
     title: 'Pendaftaran Bisnis Baru',
     description: 'Isi data pemilik akun dan pilih produk awal untuk bisnis Anda.',
 };
+

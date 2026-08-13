@@ -16,3 +16,4 @@ storage/pail/
 # VitePress
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+apps/control-plane/resources/js/pages/auth/join.tsx

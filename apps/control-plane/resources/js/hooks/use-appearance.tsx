@@ -52,6 +52,32 @@ const applyTheme = (appearance: Appearance): void => {
     document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
 };
 
+export function applyAllAppearanceSettings(): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+        return;
+    }
+
+    // 1. Theme (Light/Dark/System)
+    currentAppearance = getStoredAppearance();
+    applyTheme(currentAppearance);
+
+    // 2. Display Density (Compact / Default / Comfortable)
+    const density = localStorage.getItem('ui_density') || 'default';
+    document.documentElement.setAttribute('data-density', density);
+    document.documentElement.classList.toggle('density-compact', density === 'compact');
+    document.documentElement.classList.toggle('density-comfortable', density === 'comfortable');
+
+    // 3. Interface Animations (Enabled/Disabled)
+    const animations = localStorage.getItem('ui_animations');
+    const enableAnimations = animations === null ? true : animations === 'true';
+    document.documentElement.classList.toggle('no-animations', !enableAnimations);
+
+    // 4. Sidebar Tooltips (Enabled/Disabled)
+    const tooltips = localStorage.getItem('ui_tooltips');
+    const enableTooltips = tooltips === null ? true : tooltips === 'true';
+    document.documentElement.setAttribute('data-tooltips', String(enableTooltips));
+}
+
 const subscribe = (callback: () => void) => {
     listeners.add(callback);
 
@@ -80,8 +106,7 @@ export function initializeTheme(): void {
         setCookie('appearance', 'system');
     }
 
-    currentAppearance = getStoredAppearance();
-    applyTheme(currentAppearance);
+    applyAllAppearanceSettings();
 
     // Set up system theme change listener
     mediaQuery()?.addEventListener('change', handleSystemThemeChange);

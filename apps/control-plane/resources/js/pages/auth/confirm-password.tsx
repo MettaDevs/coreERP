@@ -46,12 +46,12 @@ export default function ConfirmPassword() {
 
                         <div className="flex items-center">
                             <Button
-                                className="w-full"
+                                className="w-full h-11 rounded-full btn-gradient-primary cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2 font-bold"
                                 disabled={processing}
                                 data-test="confirm-password-button"
                             >
-                                {processing && <Spinner />}
-                                Confirm password
+                                {processing && <Spinner className="mr-2 text-white" />}
+                                Konfirmasi Kata Sandi
                             </Button>
                         </div>
                     </div>

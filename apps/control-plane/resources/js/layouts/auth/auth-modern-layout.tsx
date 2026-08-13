@@ -1,9 +1,13 @@
-import { Link, usePage } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { home } from '@/routes';
-import { cn } from '@/lib/utils';
-import { Boxes, ShieldCheck, Sparkles, Layers, CheckCircle2 } from 'lucide-react';
+import {
+    Network,
+    Code2,
+    ShieldCheck,
+    Shield,
+} from 'lucide-react';
 
 export default function AuthModernLayout({
     children,
@@ -14,133 +18,80 @@ export default function AuthModernLayout({
     title?: string;
     description?: string;
 }) {
-    const { name } = usePage().props;
-    const appName = typeof name === 'string' && name ? name : 'CoreERP';
-
     return (
-        <div className="min-h-screen w-full lg:grid lg:grid-cols-12 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
-            {/* Left Hero Panel */}
-            <div className="relative hidden lg:col-span-5 lg:flex flex-col justify-between p-12 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white overflow-hidden border-r border-slate-800/60 shadow-2xl">
-                {/* Decorative background ambient lighting & grid */}
-                <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none" />
+        <div className="h-screen w-full relative overflow-hidden bg-[#F4F9FC] dark:bg-[#070F1E] font-sans flex flex-col justify-center transition-colors duration-300">
+            {/* ================================================== */}
+            {/* 1. BACKGROUND SCENE (LIGHT & DARK DUAL THEME)      */}
+            {/* ================================================== */}
+            <div className="absolute inset-0 z-0 pointer-events-none select-none overflow-hidden">
+                {/* Light Mode Original Background */}
+                <img
+                    src="/images/auth-bg-full.jpg?v=20260813_0954"
+                    alt="Sanata System Enterprise Background Illustration"
+                    className="w-full h-full object-cover object-center dark:hidden"
+                />
 
-                {/* Header Logo */}
-                <div className="relative z-10">
-                    <Link
-                        href={home()}
-                        className="inline-flex items-center gap-3 group transition-transform active:scale-95"
-                    >
-                        <div className="flex size-11 items-center justify-center rounded-xl bg-white p-2 shadow-lg shadow-blue-500/20 ring-1 ring-white/30 group-hover:shadow-blue-500/40 transition-all overflow-hidden">
+                {/* Dark Mode Enterprise Background */}
+                <img
+                    src="/images/auth-bg-dark.png?v=20260813_0956"
+                    alt="Sanata System Enterprise Dark Mode Background Illustration"
+                    className="w-full h-full object-cover hidden dark:block"
+                    style={{ objectPosition: 'left center' }}
+                />
+            </div>
+
+            {/* ================================================== */}
+            {/* 2. MAIN CONTENT LAYOUT WRAPPER                     */}
+            {/* ================================================== */}
+            <div className="relative z-10 w-full h-full flex flex-col lg:flex-row items-center justify-between p-4 sm:p-6 lg:p-7 xl:p-8 max-w-[1480px] mx-auto gap-6 sm:gap-8 overflow-y-auto lg:overflow-hidden">
+                
+                {/* ===== LEFT BRANDING AREA ===== */}
+                <div className="w-full lg:w-[50%] xl:w-[48%] max-w-[540px] flex flex-col justify-between h-full py-2 text-slate-800 dark:text-slate-100 space-y-4">
+                    
+                    {/* Top Logo Header */}
+                    <Link href={home()} className="inline-flex items-center gap-3.5 group w-fit">
+                        <div className="flex size-12 sm:size-13 items-center justify-center rounded-2xl bg-white dark:bg-slate-900/90 p-2 shadow-lg shadow-cyan-900/10 dark:shadow-[0_0_15px_rgba(0,201,200,0.25)] border border-[#DCE8F0] dark:border-cyan-500/50 group-hover:scale-105 transition-all overflow-hidden shrink-0">
                             <AppLogoIcon className="size-full" />
                         </div>
                         <div>
-                            <span className="text-xl font-extrabold tracking-tight text-white block">
+                            <span className="text-lg sm:text-xl font-black tracking-tight text-[#0B2040] dark:text-white block leading-tight">
                                 PT SANATA SYSTEM
                             </span>
-                            <span className="block text-xs font-medium text-blue-300/90 tracking-wider uppercase">
-                                IT Solutions & Enterprise System
+                            <span className="block text-[10px] sm:text-[10.5px] font-extrabold text-[#007C89] dark:text-cyan-400 tracking-[0.2em] uppercase mt-0.5">
+                                IT Solutions &amp; Enterprise System
                             </span>
                         </div>
                     </Link>
+
                 </div>
 
-                {/* Content Feature Highlights */}
-                <div className="relative z-10 my-auto py-8 space-y-8">
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-400/20 backdrop-blur-md text-xs font-medium text-blue-300">
-                        <Sparkles className="size-3.5 text-blue-400 animate-pulse" />
-                        <span>Sistem ERP & Asset Management Modern</span>
-                    </div>
-
-                    <div className="space-y-3">
-                        <h2 className="text-3xl font-extrabold tracking-tight text-white leading-tight">
-                            Kelola Aset & Operasional Bisnis Terintegrasi
-                        </h2>
-                        <p className="text-sm text-slate-300/90 leading-relaxed max-w-md">
-                            Platform terpusat untuk otomatisasi hirarki aset, penomoran berjenjang, jadwal pemeliharaan, serta kontrol akses berbasis peran.
-                        </p>
-                    </div>
-
-                    <div className="space-y-3.5 pt-2">
-                        <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all hover:bg-white/10">
-                            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400 shrink-0">
-                                <Boxes className="size-4" />
-                            </div>
-                            <div>
-                                <h4 className="text-xs font-semibold text-white">Master Data & Asset Hierarchy</h4>
-                                <p className="text-xs text-slate-300">Entitas, Group, Kategori, Jenis Aset, hingga Kondisi & Maintenance.</p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all hover:bg-white/10">
-                            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400 shrink-0">
-                                <Layers className="size-4" />
-                            </div>
-                            <div>
-                                <h4 className="text-xs font-semibold text-white">Number Sequence Automatic</h4>
-                                <p className="text-xs text-slate-300">Penomoran kode master otomatis oleh backend tanpa input manual.</p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm transition-all hover:bg-white/10">
-                            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400 shrink-0">
-                                <ShieldCheck className="size-4" />
-                            </div>
-                            <div>
-                                <h4 className="text-xs font-semibold text-white">Multi-tenant Security & RBAC</h4>
-                                <p className="text-xs text-slate-300">Isolasi data antar tenant dengan otorisasi hak akses berlapis.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Footer status */}
-                <div className="relative z-10 flex items-center justify-between text-xs text-slate-400 border-t border-white/10 pt-6">
-                    <div className="flex items-center gap-2">
-                        <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="font-medium text-slate-300">System Ready & Operational</span>
-                    </div>
-                    <span>v0.1.0 Enterprise</span>
-                </div>
-            </div>
-
-            {/* Right Form Panel */}
-            <div className="lg:col-span-7 flex min-h-screen flex-col items-center justify-center p-4 sm:p-6 lg:p-8 relative bg-slate-50 dark:bg-slate-950">
-                <div className="w-full max-w-md space-y-4 my-auto">
-                    {/* Mobile Header Logo */}
-                    <div className="flex lg:hidden flex-col items-center gap-2 text-center mb-4">
-                        <Link
-                            href={home()}
-                            className="inline-flex items-center gap-3 group"
-                        >
-                            <div className="flex size-11 items-center justify-center rounded-xl bg-white p-2 shadow-md border border-slate-200 overflow-hidden">
+                {/* ===== RIGHT FLOATING FORM CARD ===== */}
+                <div className="w-full lg:w-[46%] xl:w-[42%] flex items-center justify-center my-auto h-full max-h-full">
+                    <div className="w-full max-w-[425px] bg-white dark:bg-[#071527]/75 dark:backdrop-blur-2xl rounded-3xl p-5 sm:p-6 shadow-xl shadow-cyan-900/10 dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] border border-[#DCE8F0] dark:border-cyan-500/30 dark:ring-1 dark:ring-cyan-500/20 relative z-20 space-y-3.5 text-slate-800 dark:text-slate-100 transition-colors duration-200">
+                        
+                        {/* Top Logo Badge */}
+                        <div className="flex flex-col items-center text-center">
+                            <div className="size-11 rounded-xl bg-[#F4F9FC] dark:bg-slate-800 border border-[#DCE8F0] dark:border-cyan-500/50 shadow-xs dark:shadow-[0_0_12px_rgba(0,201,200,0.2)] p-2 flex items-center justify-center text-[#08BFC3] dark:text-cyan-400 shrink-0">
                                 <AppLogoIcon className="size-full" />
                             </div>
-                            <span className="text-xl font-extrabold text-slate-900 dark:text-white">
-                                PT SANATA SYSTEM
-                            </span>
-                        </Link>
-                    </div>
-
-                    {/* Main Auth Form Container Card */}
-                    <div className="bg-white dark:bg-slate-900/90 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 sm:p-7 shadow-xl shadow-slate-200/50 dark:shadow-none backdrop-blur-xl space-y-4">
-                        <div className="space-y-1">
+                            
                             {title && (
-                                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                                <h2 className="text-lg sm:text-xl font-extrabold text-[#0B2040] dark:text-slate-100 tracking-tight mt-2">
                                     {title}
-                                </h1>
+                                </h2>
                             )}
                             {description && (
-                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                                <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-medium max-w-[270px] mx-auto leading-tight mt-0.5">
                                     {description}
                                 </p>
                             )}
                         </div>
 
+                        {/* Form Body */}
                         {children}
                     </div>
                 </div>
+
             </div>
         </div>
     );

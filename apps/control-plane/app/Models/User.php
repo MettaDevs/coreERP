@@ -33,7 +33,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property-read Collection<int, TenantMembership> $memberships
  * @property-read ProviderAccess|null $providerAccess
  */
-#[Fillable(['name', 'email', 'password'])]
+ #[Fillable(['name', 'email', 'phone_number', 'phone_updated_at', 'password', 'avatar_url', 'password_changed_at'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -50,6 +50,8 @@ class User extends Authenticatable implements PasskeyUser
         return [
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'password_changed_at' => 'datetime',
+            'phone_updated_at' => 'datetime',
             'password' => 'hashed',
             /* @chisel-2fa */
             'two_factor_confirmed_at' => 'datetime',

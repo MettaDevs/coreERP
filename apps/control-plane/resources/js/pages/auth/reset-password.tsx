@@ -56,7 +56,7 @@ export default function ResetPassword({ token, email }: Props) {
             <Head title="Buat Kata Sandi Baru" />
 
             <div className="space-y-4">
-                <div className="flex items-center justify-center size-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/60 mx-auto">
+                <div className="flex items-center justify-center size-12 rounded-2xl bg-[#EAFBFC] text-[#00AFC0] border border-[#00AFC0]/20 mx-auto">
                     <KeyRound className="size-6" />
                 </div>
 
@@ -116,13 +116,13 @@ export default function ResetPassword({ token, email }: Props) {
 
                     <Button
                         type="submit"
-                        className="w-full h-11 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all active:scale-[0.99] mt-2 cursor-pointer"
+                        className="w-full h-11 btn-gradient-primary cursor-pointer active:scale-[0.99] mt-1 flex items-center justify-center gap-2"
                         disabled={form.processing}
                         data-test="reset-password-button"
                     >
                         {form.processing ? (
                             <>
-                                <Spinner className="mr-2" />
+                                <Spinner className="mr-2 text-white" />
                                 Memproses...
                             </>
                         ) : (
@@ -134,7 +134,7 @@ export default function ResetPassword({ token, email }: Props) {
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
                     <Link
                         href="/login"
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#00AFC0] hover:text-[#008B9B] hover:underline transition-colors cursor-pointer"
                     >
                         <ArrowLeft className="size-3.5" />
                         <span>Kembali ke Login</span>

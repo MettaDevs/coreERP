@@ -29,14 +29,25 @@ final class CurrentWorkspace
     public function membership(Request $request): ?TenantMembership
     {
         $memberships = $this->memberships($request);
-        $membership = $memberships->firstWhere('id', $request->session()->get(self::MEMBERSHIP_KEY)) ?? $memberships->first();
-        if ($membership) {
-            $request->session()->put(self::MEMBERSHIP_KEY, $membership->id);
-        } else {
-            $request->session()->forget([self::MEMBERSHIP_KEY, self::LEGAL_ENTITY_KEY, self::OPERATING_UNIT_KEY]);
+        $sessionMembershipId = $request->session()->get(self::MEMBERSHIP_KEY);
+
+        if ($sessionMembershipId) {
+            $membership = $memberships->firstWhere('id', $sessionMembershipId);
+            if ($membership) {
+                return $membership;
+            }
         }
 
-        return $membership;
+        if ($memberships->count() === 1) {
+            $membership = $memberships->first();
+            $request->session()->put(self::MEMBERSHIP_KEY, $membership->id);
+
+            return $membership;
+        }
+
+        $request->session()->forget([self::MEMBERSHIP_KEY, self::LEGAL_ENTITY_KEY, self::OPERATING_UNIT_KEY]);
+
+        return null;
     }
 
     /** @return Collection<int, Organization> */
@@ -69,18 +80,34 @@ final class CurrentWorkspace
         return $this->selected($request, $membership, 'operating_unit', self::OPERATING_UNIT_KEY);
     }
 
-    public function activate(Request $request, TenantMembership $membership, ?Organization $legalEntity, ?Organization $operatingUnit): void
+    public function activate(Request $request, TenantMembership $membership, ?Organization $legalEntity = null, ?Organization $operatingUnit = null): void
     {
         $request->session()->put(self::MEMBERSHIP_KEY, $membership->id);
-        $this->storeSelection($request, self::LEGAL_ENTITY_KEY, $legalEntity);
-        $this->storeSelection($request, self::OPERATING_UNIT_KEY, $operatingUnit);
+
+        $organizations = $this->organizations($membership);
+
+        $validLegalEntity = ($legalEntity && $legalEntity->tenant_id === $membership->tenant_id)
+            ? $legalEntity
+            : $organizations->where('classification', 'legal_entity')->first();
+
+        $validOperatingUnit = ($operatingUnit && $operatingUnit->tenant_id === $membership->tenant_id)
+            ? $operatingUnit
+            : $organizations->where('classification', 'operating_unit')->first();
+
+        $this->storeSelection($request, self::LEGAL_ENTITY_KEY, $validLegalEntity);
+        $this->storeSelection($request, self::OPERATING_UNIT_KEY, $validOperatingUnit);
     }
 
     private function selected(Request $request, TenantMembership $membership, string $classification, string $key): ?Organization
     {
         $organizations = $this->organizations($membership)->where('classification', $classification);
-        $selected = $organizations->firstWhere('id', $request->session()->get($key)) ?? $organizations->first();
-        $this->storeSelection($request, $key, $selected);
+        $sessionOrgId = $request->session()->get($key);
+        $selected = $sessionOrgId ? $organizations->firstWhere('id', $sessionOrgId) : null;
+
+        if (! $selected) {
+            $selected = $organizations->first();
+            $this->storeSelection($request, $key, $selected);
+        }
 
         return $selected;
     }
