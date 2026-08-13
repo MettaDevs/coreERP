@@ -140,14 +140,7 @@ export default function AppearancePage() {
             {/* =====================================================
                 GLOBAL DYNAMIC BACKGROUND PT SANATA SYSTEM
             ====================================================== */}
-            <div className="pointer-events-none fixed inset-0 overflow-hidden print:hidden z-0">
-                <div className="absolute inset-0 bg-[linear-gradient(125deg,#E8F5FC_0%,#F6FBFF_38%,#DDFBFC_100%)] dark:bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] dark:from-[#0B1E36] dark:via-[#070D18] dark:to-[#04070E]" />
-                <div className="absolute -right-[140px] -top-[100px] h-[550px] w-[550px] rounded-full bg-[#00B8C8]/15 blur-[120px] dark:bg-[#00C9C8]/15 dark:blur-[140px]" />
-                <div className="absolute -left-[180px] top-[140px] h-[520px] w-[520px] rounded-full bg-[#1677FF]/10 blur-[120px] dark:bg-[#005F73]/25 dark:blur-[130px]" />
-                <div className="absolute -right-[200px] top-[320px] h-[650px] w-[650px] rounded-full border-[60px] border-[#00B8C8]/10 dark:border-[#00C9C8]/10 dark:blur-sm" />
-                <div className="absolute -left-[220px] -bottom-[280px] h-[700px] w-[700px] rounded-full border-[50px] border-[#1677FF]/10 dark:border-[#005F73]/15 dark:blur-sm" />
-                <div className="absolute inset-0 opacity-[0.15] dark:opacity-[0.06] [background-image:radial-gradient(circle,rgba(0,201,200,0.35)_1px,transparent_1px)] [background-size:28px_28px]" />
-            </div>
+            <div className="pointer-events-none fixed inset-0 overflow-hidden print:hidden z-0 bg-slate-50/50 dark:bg-slate-950" />
 
             <div className="relative z-10 flex flex-col gap-6 w-full max-w-[1400px] mx-auto p-4 sm:p-6 min-w-0">
                 {/* --- HEADER HALAMAN --- */}

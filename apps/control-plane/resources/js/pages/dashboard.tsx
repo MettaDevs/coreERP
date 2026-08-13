@@ -778,24 +778,24 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                         opacity: 1 !important;
                     }
                     .recharts-bar-rectangle, path.recharts-rectangle, .recharts-bar-rectangles path {
-                        fill: #00AFC0 !important;
+                        fill: #334155 !important;
                         visibility: visible !important;
                         opacity: 1 !important;
                     }
                     .recharts-area-area, path.recharts-area-area {
-                        fill: #00AFC0 !important;
+                        fill: #334155 !important;
                         fill-opacity: 0.35 !important;
                         visibility: visible !important;
                         opacity: 1 !important;
                     }
                     .recharts-area-curve, path.recharts-area-curve {
-                        stroke: #00AFC0 !important;
+                        stroke: #334155 !important;
                         stroke-width: 2.5px !important;
                         visibility: visible !important;
                         opacity: 1 !important;
                     }
                     .recharts-line-curve, path.recharts-line-curve {
-                        stroke: #00AFC0 !important;
+                        stroke: #334155 !important;
                         stroke-width: 2.5px !important;
                         visibility: visible !important;
                         opacity: 1 !important;
@@ -803,7 +803,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                         stroke-dashoffset: 0 !important;
                     }
                     .recharts-dot {
-                        fill: #00AFC0 !important;
+                        fill: #334155 !important;
                         opacity: 1 !important;
                     }
                     .grid > div, table, tr {
@@ -823,14 +823,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
             {/* =====================================================
                 GLOBAL DYNAMIC BACKGROUND PT SANATA SYSTEM (EXACT MATCH PROFILE / SECURITY)
             ====================================================== */}
-            <div className="pointer-events-none fixed inset-0 overflow-hidden print:hidden z-0" aria-hidden>
-                <div className="absolute inset-0 bg-[linear-gradient(125deg,#E8F5FC_0%,#F6FBFF_38%,#DDFBFC_100%)] dark:bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] dark:from-[#0B1E36] dark:via-[#070D18] dark:to-[#04070E]" />
-                <div className="absolute -right-[140px] -top-[100px] h-[550px] w-[550px] rounded-full bg-[#00B8C8]/15 blur-[120px] dark:bg-[#00C9C8]/15 dark:blur-[140px]" />
-                <div className="absolute -left-[180px] top-[140px] h-[520px] w-[520px] rounded-full bg-[#1677FF]/10 blur-[120px] dark:bg-[#005F73]/25 dark:blur-[130px]" />
-                <div className="absolute -right-[200px] top-[320px] h-[650px] w-[650px] rounded-full border-[60px] border-[#00B8C8]/10 dark:border-[#00C9C8]/10 dark:blur-sm" />
-                <div className="absolute -left-[220px] -bottom-[280px] h-[700px] w-[700px] rounded-full border-[50px] border-[#1677FF]/10 dark:border-[#005F73]/15 dark:blur-sm" />
-                <div className="absolute inset-0 opacity-[0.15] dark:opacity-[0.06] [background-image:radial-gradient(circle,rgba(0,201,200,0.35)_1px,transparent_1px)] [background-size:28px_28px]" />
-            </div>
+            <div className="pointer-events-none fixed inset-0 overflow-hidden print:hidden z-0 bg-slate-50/50 dark:bg-slate-950" aria-hidden />
 
             <div id="dashboard-print-root" className={`relative z-10 flex flex-col gap-5 text-slate-800 dark:text-slate-100 w-full max-w-[1600px] mx-auto overflow-x-hidden print-container ${isExportingPdf ? 'p-5' : 'p-3 md:p-6'}`}>
                 {/* --- PRINTABLE PDF REPORT HEADER --- */}
@@ -1616,22 +1609,22 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
 
                         <div className="h-44 mt-1">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={areaBukuHabis} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                 <AreaChart data={areaBukuHabis} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="blueGradientBuku" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#00AFC0" stopOpacity={0.35} />
-                                            <stop offset="95%" stopColor="#00AFC0" stopOpacity={0.02} />
+                                            <stop offset="5%" stopColor="#334155" stopOpacity={0.35} />
+                                            <stop offset="95%" stopColor="#334155" stopOpacity={0.02} />
                                         </linearGradient>
                                     </defs>
                                     <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} domain={[0, 4]} />
                                     <RechartsTooltip content={<CustomChartTooltip unitFormatter={(v: any) => `Rp ${v} Miliar`} />} />
-                                    <Area type="monotone" dataKey="value" stroke="#00AFC0" strokeWidth={2.5} fillOpacity={1} fill="url(#blueGradientBuku)" dot={{ r: 3.5, fill: '#00AFC0', stroke: '#ffffff', strokeWidth: 1.5 }} activeDot={{ r: 5, fill: '#008B9B' }} isAnimationActive={false} />
+                                    <Area type="monotone" dataKey="value" stroke="#334155" strokeWidth={2.5} fillOpacity={1} fill="url(#blueGradientBuku)" dot={{ r: 3.5, fill: '#334155', stroke: '#ffffff', strokeWidth: 1.5 }} activeDot={{ r: 5, fill: '#1e293b' }} isAnimationActive={false} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                         <div className="flex items-center gap-2 mt-2 text-[11px] text-slate-500 font-medium">
-                            <span className="size-2 rounded-full bg-[#00AFC0]" />
+                            <span className="size-2 rounded-full bg-slate-700" />
                             <span>Nilai Buku Bersih (Rp Miliar)</span>
                         </div>
                     </div>
@@ -1738,19 +1731,19 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                 <AreaChart data={lineTrend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="blueGradientPengadaan" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#00AFC0" stopOpacity={0.35} />
-                                            <stop offset="95%" stopColor="#00AFC0" stopOpacity={0.02} />
+                                            <stop offset="5%" stopColor="#334155" stopOpacity={0.35} />
+                                            <stop offset="95%" stopColor="#334155" stopOpacity={0.02} />
                                         </linearGradient>
                                     </defs>
                                     <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} domain={[0, 35]} />
                                     <RechartsTooltip content={<CustomChartTooltip unitFormatter={(v: any) => `Rp ${v} Juta`} />} />
-                                    <Area type="monotone" dataKey="value" stroke="#00AFC0" strokeWidth={2.5} fillOpacity={1} fill="url(#blueGradientPengadaan)" dot={{ r: 3.5, fill: '#00AFC0', stroke: '#ffffff', strokeWidth: 1.5 }} activeDot={{ r: 5, fill: '#008B9B' }} isAnimationActive={false} />
+                                    <Area type="monotone" dataKey="value" stroke="#334155" strokeWidth={2.5} fillOpacity={1} fill="url(#blueGradientPengadaan)" dot={{ r: 3.5, fill: '#334155', stroke: '#ffffff', strokeWidth: 1.5 }} activeDot={{ r: 5, fill: '#1e293b' }} isAnimationActive={false} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                         <div className="flex items-center gap-2 mt-2 text-[11px] text-slate-500 font-medium">
-                            <span className="size-2 rounded-full bg-[#00AFC0]" />
+                            <span className="size-2 rounded-full bg-slate-700" />
                             <span>Nilai Pengadaan (Rp Juta)</span>
                         </div>
                     </div>
@@ -1770,9 +1763,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                     <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-4">
                         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-2">
-                                <div className="p-2 rounded-xl bg-[#EAFBFC] text-[#00AFC0]">
-                                    <Calendar className="size-5" />
-                                </div>
+                                <Calendar className="size-5 text-slate-600 dark:text-slate-300" />
                                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Pilih Rentang Tanggal Custom</h3>
                             </div>
                             <button
@@ -1790,7 +1781,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                     type="date"
                                     value={customStartDate}
                                     onChange={(e) => setCustomStartDate(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:border-[#00AFC0] focus:ring-[#00AFC0]/20"
+                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs"
                                 />
                             </div>
                             <div>
@@ -1799,7 +1790,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                     type="date"
                                     value={customEndDate}
                                     onChange={(e) => setCustomEndDate(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:border-[#00AFC0] focus:ring-[#00AFC0]/20"
+                                    className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs"
                                 />
                             </div>
                         </div>
@@ -1858,7 +1849,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {ALL_MAINTENANCE_ASSETS.map((item) => (
                                         <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-all">
-                                            <td className="py-3 font-mono text-[#00AFC0] dark:text-cyan-400 font-bold">{item.id}</td>
+                                            <td className="py-3 font-mono font-bold text-slate-800 dark:text-slate-100">{item.id}</td>
                                             <td className="py-3 font-semibold text-slate-800 dark:text-slate-100">{item.name}</td>
                                             <td className="py-3 text-slate-500">{item.category}</td>
                                             <td className="py-3 text-slate-500">{item.location}</td>
@@ -1866,7 +1857,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                             <td className="py-3 text-right">
                                                 <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                                                     item.status === 'Selesai'
-                                                        ? 'bg-[#EAFBFC] text-[#00AFC0] border border-[#00AFC0]/20'
+                                                        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200'
                                                         : item.status === 'Dalam Proses'
                                                         ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-100 dark:border-amber-900/60'
                                                         : 'bg-red-50 text-red-500 dark:bg-red-950/60 dark:text-red-400 border border-red-100 dark:border-red-900/60'
@@ -1901,7 +1892,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                     <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-5">
                         <div className="flex items-start justify-between">
                             <div>
-                                <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#EAFBFC] text-[#00AFC0] font-mono text-[11px] font-bold mb-1 border border-[#00AFC0]/20">
+                                <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] font-bold mb-1 border border-slate-200 dark:border-slate-700">
                                     {selectedAssetDetail.id}
                                 </span>
                                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{selectedAssetDetail.name}</h3>
@@ -1924,7 +1915,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                 <span className="text-slate-400 block text-[10px] uppercase tracking-wider font-semibold">Status Perbaikan</span>
                                 <span className={`font-semibold ${
                                     selectedAssetDetail.status === 'Selesai'
-                                        ? 'text-[#00AFC0] font-bold'
+                                        ? 'text-emerald-600 font-bold'
                                         : selectedAssetDetail.status === 'Dalam Proses'
                                         ? 'text-amber-600 dark:text-amber-400'
                                         : 'text-red-500 dark:text-red-400'

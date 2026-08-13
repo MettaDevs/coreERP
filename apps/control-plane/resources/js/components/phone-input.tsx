@@ -199,8 +199,8 @@ export default function PhoneInput({
                         className={`w-full h-9.5 pl-3 pr-9 rounded-r-xl border text-xs font-medium transition-all outline-none ${showInputError
                                 ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 text-red-900 bg-red-50/30'
                                 : showSuccess
-                                    ? 'border-emerald-500 focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20 bg-emerald-50/20'
-                                    : 'border-slate-200 dark:border-slate-700 focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20'
+                                    ? 'border-emerald-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 bg-emerald-50/20'
+                                    : 'border-slate-200 dark:border-slate-700 focus:border-slate-400 focus:ring-2 focus:ring-slate-400/20'
                             }`}
                     />
 

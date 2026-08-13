@@ -80,7 +80,7 @@ export default function NotificationsPage() {
             case 'error':
                 return <AlertTriangle className="size-5 text-red-500 shrink-0" />;
             default:
-                return <Clock className="size-5 text-[#00AFC0] shrink-0" />;
+                return <Clock className="size-5 text-slate-600 dark:text-slate-400 shrink-0" />;
         }
     };
 
@@ -105,21 +105,13 @@ export default function NotificationsPage() {
         <>
             <Head title="Pusat Pemberitahuan & Notifikasi Aset" />
 
-            {/* Global Dynamic Background */}
-            <div className="pointer-events-none fixed inset-0 overflow-hidden print:hidden z-0">
-                <div className="absolute inset-0 bg-[linear-gradient(125deg,#E8F5FC_0%,#F6FBFF_38%,#DDFBFC_100%)] dark:bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] dark:from-[#0B1E36] dark:via-[#070D18] dark:to-[#04070E]" />
-                <div className="absolute -right-[140px] -top-[100px] h-[550px] w-[550px] rounded-full bg-[#00B8C8]/15 blur-[120px] dark:bg-[#00C9C8]/15 dark:blur-[140px]" />
-                <div className="absolute -left-[180px] top-[140px] h-[520px] w-[520px] rounded-full bg-[#1677FF]/10 blur-[120px] dark:bg-[#005F73]/25 dark:blur-[130px]" />
-                <div className="absolute inset-0 opacity-[0.15] dark:opacity-[0.06] [background-image:radial-gradient(circle,rgba(0,201,200,0.35)_1px,transparent_1px)] [background-size:28px_28px]" />
-            </div>
+            <div className="pointer-events-none fixed inset-0 overflow-hidden print:hidden z-0 bg-slate-50/50 dark:bg-slate-950" />
 
             <div className="relative z-10 flex flex-col gap-6 w-full max-w-[1400px] mx-auto p-4 sm:p-6 min-w-0">
                 {/* --- HEADER --- */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800">
                     <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-                        <div className="p-3 rounded-2xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0">
-                            <Bell className="size-6" />
-                        </div>
+                        <Bell className="size-6 text-slate-700 dark:text-slate-200 shrink-0" />
                         <div className="min-w-0">
                             <div className="flex items-center gap-2.5 flex-wrap">
                                 <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
@@ -141,8 +133,8 @@ export default function NotificationsPage() {
                         <Button
                             type="button"
                             variant="outline"
+                            size="sm"
                             onClick={handleSimulateNew}
-                            className="text-xs border-[#00AFC0] text-[#00AFC0] hover:bg-[#EAFBFC] dark:hover:bg-cyan-950/60 rounded-full font-bold px-3.5 cursor-pointer"
                         >
                             <Sparkles className="size-3.5 mr-1.5" />
                             <span>Simulasi Notifikasi Realtime</span>
@@ -205,7 +197,7 @@ export default function NotificationsPage() {
                                 className={cn(
                                     'px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap',
                                     activeFilter === tab.key
-                                        ? 'bg-[#00AFC0] text-white shadow-xs'
+                                        ? 'bg-primary text-primary-foreground shadow-xs'
                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                                 )}
                             >
@@ -239,7 +231,7 @@ export default function NotificationsPage() {
                                 className={cn(
                                     'p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all relative group',
                                     notif.unread
-                                        ? 'bg-[#EAFBFC]/40 dark:bg-cyan-950/20'
+                                        ? 'bg-slate-50/90 dark:bg-slate-800/40'
                                         : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
                                 )}
                             >
@@ -274,11 +266,11 @@ export default function NotificationsPage() {
                                         <Button
                                             type="button"
                                             variant="outline"
+                                            size="xs"
                                             onClick={() => {
                                                 markAsRead(notif.id);
                                                 router.visit(notif.link!);
                                             }}
-                                            className="text-xs border-[#00AFC0] text-[#00AFC0] hover:bg-[#EAFBFC] dark:hover:bg-cyan-950/60 rounded-full font-bold px-3 py-1.5 h-auto cursor-pointer"
                                         >
                                             <span>Buka Tautan</span>
                                             <ArrowUpRight className="size-3.5 ml-1" />

@@ -189,14 +189,7 @@ export default function Profile(
             {/* =====================================================
                 GLOBAL DYNAMIC BACKGROUND PT SANATA SYSTEM
             ====================================================== */}
-            <div className="pointer-events-none fixed inset-0 overflow-hidden print:hidden z-0">
-                <div className="absolute inset-0 bg-[linear-gradient(125deg,#E8F5FC_0%,#F6FBFF_38%,#DDFBFC_100%)] dark:bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] dark:from-[#0B1E36] dark:via-[#070D18] dark:to-[#04070E]" />
-                <div className="absolute -right-[140px] -top-[100px] h-[550px] w-[550px] rounded-full bg-[#00B8C8]/15 blur-[120px] dark:bg-[#00C9C8]/15 dark:blur-[140px]" />
-                <div className="absolute -left-[180px] top-[140px] h-[520px] w-[520px] rounded-full bg-[#1677FF]/10 blur-[120px] dark:bg-[#005F73]/25 dark:blur-[130px]" />
-                <div className="absolute -right-[200px] top-[320px] h-[650px] w-[650px] rounded-full border-[60px] border-[#00B8C8]/10 dark:border-[#00C9C8]/10 dark:blur-sm" />
-                <div className="absolute -left-[220px] -bottom-[280px] h-[700px] w-[700px] rounded-full border-[50px] border-[#1677FF]/10 dark:border-[#005F73]/15 dark:blur-sm" />
-                <div className="absolute inset-0 opacity-[0.15] dark:opacity-[0.06] [background-image:radial-gradient(circle,rgba(0,201,200,0.35)_1px,transparent_1px)] [background-size:28px_28px]" />
-            </div>
+            <div className="pointer-events-none fixed inset-0 overflow-hidden print:hidden z-0 bg-slate-50/50 dark:bg-slate-950" />
 
             <div className="relative z-10 flex flex-col gap-6 w-full max-w-[1400px] mx-auto p-4 sm:p-6 min-w-0">
                 {/* --- 1. HEADER HALAMAN --- */}
@@ -399,9 +392,7 @@ export default function Profile(
                         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
                             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0]">
-                                        <Edit3 className="size-4" />
-                                    </div>
+                                    <Edit3 className="size-4 text-slate-600 dark:text-slate-300" />
                                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                         Ubah Nama Lengkap
                                     </h3>
@@ -440,7 +431,7 @@ export default function Profile(
                                                 required
                                                 autoComplete="name"
                                                 defaultValue={auth.user.name}
-                                                className="w-full rounded-xl focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20"
+                                                className="w-full rounded-xl"
                                                 autoFocus
                                             />
                                             <InputError message={errors.name} />
@@ -454,7 +445,7 @@ export default function Profile(
                                                 required
                                                 autoComplete="current-password"
                                                 placeholder="••••••••"
-                                                className="w-full rounded-xl focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20"
+                                                className="w-full rounded-xl"
                                             />
                                             <InputError message={errors.current_password} />
                                         </div>
@@ -498,9 +489,7 @@ export default function Profile(
                         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
                             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0]">
-                                        <MailCheck className="size-4" />
-                                    </div>
+                                    <MailCheck className="size-4 text-slate-600 dark:text-slate-300" />
                                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                         Ubah Alamat Email
                                     </h3>
@@ -539,7 +528,7 @@ export default function Profile(
                                                 required
                                                 autoComplete="email"
                                                 defaultValue={auth.user.email}
-                                                className="w-full rounded-xl focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20"
+                                                className="w-full rounded-xl"
                                                 autoFocus
                                             />
                                             <InputError message={errors.email} />
@@ -553,7 +542,7 @@ export default function Profile(
                                                 required
                                                 autoComplete="current-password"
                                                 placeholder="••••••••"
-                                                className="w-full rounded-xl focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20"
+                                                className="w-full rounded-xl"
                                             />
                                             <InputError message={errors.current_password} />
                                         </div>
@@ -597,9 +586,7 @@ export default function Profile(
                         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
                             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                                 <div className="flex items-center gap-2.5">
-                                    <div className="p-2 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0]">
-                                        <Phone className="size-4" />
-                                    </div>
+                                    <Phone className="size-4 text-slate-600 dark:text-slate-300" />
                                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                         Ubah Nomor Telepon
                                     </h3>
@@ -639,7 +626,7 @@ export default function Profile(
                                         required
                                         autoComplete="current-password"
                                         placeholder="••••••••"
-                                        className="w-full rounded-xl focus:border-[#00AFC0] focus:ring-2 focus:ring-[#00AFC0]/20"
+                                        className="w-full rounded-xl"
                                     />
                                     <InputError message={phonePasswordError} />
                                 </div>
@@ -722,7 +709,7 @@ export default function Profile(
                             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                                 Bisnis Aktif
                             </span>
-                            <span className="text-xs sm:text-sm font-bold text-[#00AFC0] dark:text-cyan-400 truncate block">
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate block">
                                 {currentTenantName}
                             </span>
                         </div>
