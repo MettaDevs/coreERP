@@ -29,9 +29,7 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
     return (
         <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 p-4 last:border-b-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors rounded-xl">
             <div className="flex items-center gap-3.5 min-w-0">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20">
-                    <KeyRound className="h-5 w-5 text-[#00AFC0]" />
-                </div>
+                <KeyRound className="h-5 w-5 text-slate-600 dark:text-slate-300 shrink-0" />
                 <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight truncate">
@@ -61,15 +59,15 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                 <DialogTrigger asChild>
                     <button
                         type="button"
-                        className="p-2 text-[#FF4D4F] hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full transition-all cursor-pointer shrink-0 border border-transparent hover:border-[#FF4D4F]/30"
+                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-all cursor-pointer shrink-0"
                         title="Hapus Passkey"
                     >
-                        <Trash2 className="size-4 text-[#FF4D4F]" />
+                        <Trash2 className="size-4" />
                     </button>
                 </DialogTrigger>
                 <DialogContent size="compact" className="rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
                     <DialogHeader className="flex flex-row items-center gap-3 space-y-0 text-left border-b-0 p-0">
-                        <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200/60 dark:border-red-900/60 text-[#FF4D4F] shrink-0">
+                        <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200/60 dark:border-red-900/60 text-red-600 shrink-0">
                             <Trash2 className="size-5" />
                         </div>
                         <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
@@ -80,13 +78,14 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                         Apakah Anda yakin ingin menghapus passkey "{passkey.name}"? Anda tidak akan dapat lagi menggunakannya untuk masuk.
                     </DialogDescription>
                     <DialogFooter className="gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 bg-transparent px-0 pb-0">
-                        <DialogCancel className="border border-[#00AFC0] text-[#00AFC0] hover:bg-[#EAFBFC] rounded-full px-4 py-2 text-xs font-bold bg-transparent transition-all cursor-pointer">
+                        <DialogCancel variant="outline" size="sm">
                             Batal
                         </DialogCancel>
                         <DialogAction
+                            variant="destructive"
+                            size="sm"
                             onClick={handleDelete}
                             disabled={isDeleting}
-                            className="bg-[#FF4D4F] hover:bg-[#DC2626] disabled:bg-[#FFECEC] disabled:text-[#FFA39E] text-white rounded-full px-5 py-2 text-xs font-bold cursor-pointer border-none transition-all shadow-xs"
                         >
                             {isDeleting ? 'Menghapus...' : 'Hapus Passkey'}
                         </DialogAction>

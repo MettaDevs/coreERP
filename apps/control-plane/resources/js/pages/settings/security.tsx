@@ -176,17 +176,12 @@ export default function Security(props: Props) {
                 {/* --- 1. HEADER HALAMAN --- */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
                     <div className="flex items-start sm:items-center gap-3 min-w-0">
-                        <div className="p-3 rounded-2xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 dark:border-cyan-900/60 shrink-0">
-                            <Shield className="size-6" />
-                        </div>
+                        <Shield className="size-6 text-slate-700 dark:text-slate-200 shrink-0" />
                         <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
                                     Keamanan Akun
                                 </h1>
-                                <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-[#EAFBFC] dark:bg-cyan-950/80 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 flex items-center gap-1 shrink-0">
-                                    <Sparkles className="size-3 text-[#00AFC0]" /> Proteksi Akun
-                                </span>
                             </div>
                             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 truncate">
                                 Kelola kata sandi, autentikasi dua langkah, passkey, sesi perangkat, dan aktivitas keamanan akun Anda.
@@ -199,9 +194,7 @@ export default function Security(props: Props) {
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
                         <div className="flex items-start gap-3.5">
-                            <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                                <Lock className="size-5" />
-                            </div>
+                            <Lock className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                             <div>
                                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                     Kata Sandi
@@ -352,9 +345,7 @@ export default function Security(props: Props) {
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between h-full space-y-4">
                         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-start gap-3">
-                                <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                                    <ShieldCheck className="size-5" />
-                                </div>
+                                <ShieldCheck className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                                 <div>
                                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                         Two-Factor Authentication
@@ -394,9 +385,7 @@ export default function Security(props: Props) {
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between h-full space-y-4">
                         <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-start gap-3">
-                                <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                                    <KeyRound className="size-5" />
-                                </div>
+                                <KeyRound className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                                 <div>
                                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                         Passkeys
@@ -405,7 +394,7 @@ export default function Security(props: Props) {
                                         Gunakan passkey untuk masuk dengan aman tanpa harus mengetik kata sandi.
                                     </p>
                                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                                        <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-300 border border-[#00AFC0]/20">
+                                        <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                                             {props.passkeys && props.passkeys.length > 0 ? `${props.passkeys.length} Passkey terdaftar` : 'Belum ada passkey yang terdaftar'}
                                         </span>
                                     </div>
@@ -430,9 +419,7 @@ export default function Security(props: Props) {
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-slate-800">
                         <div className="flex items-start gap-3.5">
-                            <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                                <Smartphone className="size-5" />
-                            </div>
+                            <Smartphone className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                             <div>
                                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                     Sesi &amp; Perangkat
@@ -446,9 +433,10 @@ export default function Security(props: Props) {
                         {devices.filter((d) => !d.isCurrent).length > 0 && (
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="destructive"
+                                size="sm"
                                 onClick={() => setShowLogoutOtherModal(true)}
-                                className="text-xs border-red-200 dark:border-red-900/60 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full px-4 py-2 font-bold transition-all cursor-pointer self-start sm:self-center"
+                                className="cursor-pointer self-start sm:self-center font-bold text-xs"
                             >
                                 <LogOut className="size-3.5 mr-1.5" />
                                 <span>Keluar dari Perangkat Lain</span>
@@ -460,16 +448,14 @@ export default function Security(props: Props) {
                         {devices.map((device) => (
                             <div key={device.id} className="py-3.5 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
                                 <div className="flex items-center gap-3.5 min-w-0">
-                                    <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0">
-                                        {device.deviceType === 'mobile' ? <Smartphone className="size-4" /> : <Laptop className="size-4" />}
-                                    </div>
+                                    {device.deviceType === 'mobile' ? <Smartphone className="size-4 text-slate-600 dark:text-slate-300 shrink-0" /> : <Laptop className="size-4 text-slate-600 dark:text-slate-300 shrink-0" />}
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
                                                 {device.browser} · {device.os}
                                             </span>
                                             {device.isCurrent ? (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#00AFC0] dark:text-cyan-400 bg-[#EAFBFC] dark:bg-cyan-950/60 px-2.5 py-0.5 rounded-full border border-[#00AFC0]/20">
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
                                                     <CheckCircle2 className="size-3" />
                                                     <span>Perangkat ini</span>
                                                 </span>
@@ -488,9 +474,10 @@ export default function Security(props: Props) {
                                 {!device.isCurrent && (
                                     <Button
                                         type="button"
-                                        variant="outline"
+                                        variant="destructive"
+                                        size="xs"
                                         onClick={() => handleLogoutDevice(device.id)}
-                                        className="border border-[#FF4D4F] text-[#FF4D4F] hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full px-3.5 py-1 text-xs font-bold transition-all cursor-pointer shrink-0 bg-transparent flex items-center gap-1"
+                                        className="cursor-pointer shrink-0 flex items-center gap-1 font-bold text-xs"
                                     >
                                         <LogOut className="size-3.5" />
                                         <span>Keluar</span>
@@ -504,10 +491,8 @@ export default function Security(props: Props) {
                     {showLogoutOtherModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-sm animate-in fade-in duration-200">
                             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
-                                <div className="flex items-center gap-3 text-[#FF4D4F]">
-                                    <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200/60 dark:border-red-900/60">
-                                        <AlertTriangle className="size-5" />
-                                    </div>
+                                <div className="flex items-center gap-3 text-red-600">
+                                    <AlertTriangle className="size-5 shrink-0" />
                                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                         Keluar dari Perangkat Lain?
                                     </h3>
@@ -521,15 +506,16 @@ export default function Security(props: Props) {
                                     <Button
                                         type="button"
                                         variant="outline"
+                                        size="sm"
                                         onClick={() => setShowLogoutOtherModal(false)}
-                                        className="border border-[#00AFC0] text-[#00AFC0] hover:bg-[#EAFBFC] rounded-full px-4 py-2 text-xs font-bold bg-transparent transition-all cursor-pointer"
                                     >
                                         Batalkan
                                     </Button>
                                     <Button
                                         type="button"
+                                        variant="destructive"
+                                        size="sm"
                                         onClick={handleLogoutAllOtherDevices}
-                                        className="bg-[#FF4D4F] hover:bg-[#DC2626] text-white font-bold text-xs px-5 py-2 rounded-full shadow-xs transition-all cursor-pointer border-none"
                                     >
                                         Ya, Keluar Semua
                                     </Button>
@@ -543,9 +529,7 @@ export default function Security(props: Props) {
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-slate-800">
                         <div className="flex items-start gap-3.5">
-                            <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                                <History className="size-5" />
-                            </div>
+                            <History className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                             <div>
                                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                     Aktivitas Keamanan
@@ -559,11 +543,12 @@ export default function Security(props: Props) {
                         {securityLogs.length > 0 && (
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="destructive"
+                                size="sm"
                                 onClick={() => setShowDeleteAllActivitiesModal(true)}
-                                className="border border-[#FF4D4F] text-[#FF4D4F] hover:bg-red-50 dark:hover:bg-red-950/40 rounded-full px-4 py-1.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 bg-transparent self-start sm:self-center"
+                                className="cursor-pointer flex items-center gap-1.5 self-start sm:self-center font-bold text-xs"
                             >
-                                <Trash2 className="size-3.5 text-[#FF4D4F]" />
+                                <Trash2 className="size-3.5" />
                                 <span>Hapus Semua Aktivitas</span>
                             </Button>
                         )}

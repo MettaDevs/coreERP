@@ -72,8 +72,9 @@ export default function ManageTwoFactor(props: Props) {
                                 <Button
                                     variant="destructive"
                                     type="submit"
+                                    size="sm"
                                     disabled={processing}
-                                    className="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs rounded-xl px-4 py-2.5 shadow-md shadow-red-500/20 cursor-pointer"
+                                    className="cursor-pointer font-bold text-xs"
                                 >
                                     {processing ? 'Memproses...' : 'Nonaktifkan 2FA'}
                                 </Button>
@@ -84,9 +85,7 @@ export default function ManageTwoFactor(props: Props) {
             ) : (
                 <div className="flex flex-col justify-between flex-1 space-y-4">
                     <div className="p-5 text-center rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex-1 flex flex-col items-center justify-center">
-                        <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20">
-                            <ShieldCheck className="h-5 w-5" />
-                        </div>
+                        <ShieldCheck className="h-6 w-6 text-slate-400 mx-auto mb-3" />
                         <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Verifikasi Dua Langkah</p>
                         <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
                             Saat diaktifkan, Anda akan diminta kode verifikasi dari aplikasi authenticator di ponsel saat masuk ke akun.

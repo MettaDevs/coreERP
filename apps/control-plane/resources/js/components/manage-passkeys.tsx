@@ -14,9 +14,7 @@ export type Props = {
 const EmptyState = () => {
     return (
         <div className="p-6 text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20">
-                <KeyRound className="h-6 w-6" />
-            </div>
+            <KeyRound className="h-6 w-6 text-slate-400 mx-auto mb-3" />
             <p className="text-xs font-bold text-slate-900 dark:text-slate-100">Belum ada passkey</p>
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                 Tambahkan passkey untuk masuk tanpa menggunakan kata sandi.

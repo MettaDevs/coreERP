@@ -153,17 +153,12 @@ export default function AppearancePage() {
                 {/* --- HEADER HALAMAN --- */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
                     <div className="flex items-start sm:items-center gap-3 min-w-0">
-                        <div className="p-3 rounded-2xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 dark:border-cyan-900/60 shrink-0">
-                            <Palette className="size-6" />
-                        </div>
+                        <Palette className="size-6 text-slate-700 dark:text-slate-200 shrink-0" />
                         <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
                                     Appearance
                                 </h1>
-                                <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-[#EAFBFC] dark:bg-cyan-950/80 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 flex items-center gap-1 shrink-0">
-                                    <Sparkles className="size-3 text-[#00AFC0]" /> Tampilan &amp; UI
-                                </span>
                             </div>
                             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 truncate">
                                 Atur tema dan tampilan aplikasi sesuai kenyamanan penggunaan Anda.
