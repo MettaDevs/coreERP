@@ -11,6 +11,7 @@ import {
     ArrowRight,
     X,
 } from 'lucide-react';
+import { Button } from '@apperp/ui/button';
 import { useNotifications, NotificationItem } from '@/hooks/use-notifications';
 import { cn } from '@/lib/utils';
 
@@ -55,12 +56,14 @@ export function NotificationDropdown({ className, align = 'right' }: Notificatio
 
     return (
         <div className="relative inline-block text-left">
-            <button
+            <Button
+                variant="outline"
+                size="icon"
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
-                    'relative h-9 w-9 flex items-center justify-center rounded-full border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all focus:outline-none shadow-xs cursor-pointer',
-                    isOpen && 'ring-2 ring-[#00AFC0]/30 border-[#00AFC0]',
+                    'relative size-9 shrink-0 cursor-pointer',
+                    isOpen && 'ring-2 ring-primary/30 border-primary',
                     className
                 )}
                 title="Notifikasi & Pemberitahuan Aset"
@@ -71,7 +74,7 @@ export function NotificationDropdown({ className, align = 'right' }: Notificatio
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
-            </button>
+            </Button>
 
             {isOpen && (
                 <>

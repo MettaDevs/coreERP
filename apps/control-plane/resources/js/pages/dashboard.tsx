@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Head, usePage, Link } from '@inertiajs/react';
 import { NotificationDropdown } from '@/components/notification-dropdown';
+import { Button } from '@apperp/ui/button';
 import { dashboard } from '@/routes';
 import {
     Search,
@@ -899,7 +900,9 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
 
                         {/* 2. Global Single Periode Filter Dropdown */}
                         <div className="relative shrink-0">
-                            <button
+                            <Button
+                                variant="outline"
+                                size="sm"
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -908,19 +911,17 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                     setShowNotifications(false);
                                     setShowDateRangeMenu(next);
                                 }}
-                                className="flex items-center justify-between gap-1.5 h-9 px-3.5 text-xs font-bold rounded-full border border-[#00AFC0]/30 bg-[#EAFBFC] dark:bg-cyan-950/60 hover:bg-[#EAFBFC]/80 text-[#00AFC0] dark:text-cyan-300 shadow-xs transition-all focus:outline-none shrink-0 cursor-pointer"
+                                className="h-9 gap-1.5 font-medium cursor-pointer"
                             >
-                                <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                    <Calendar className="size-3.5 text-[#00AFC0] shrink-0" />
-                                    <span className="truncate">{dateRange}</span>
-                                </div>
-                                <ChevronDown className="size-3 text-[#00AFC0] shrink-0 ml-0.5" />
-                            </button>
+                                <Calendar className="size-3.5 text-slate-500 shrink-0" />
+                                <span>{dateRange}</span>
+                                <ChevronDown className="size-3 text-slate-500 shrink-0 ml-0.5" />
+                            </Button>
 
                             {showDateRangeMenu && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setShowDateRangeMenu(false)} />
-                                    <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 py-2 text-xs animate-in fade-in slide-in-from-top-2">
+                                    <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 py-2 text-xs animate-in fade-in slide-in-from-top-2">
                                         <div className="px-4 py-1.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">Pilih Periode Global</div>
                                         {DASHBOARD_PERIOD_OPTIONS.map((item) => (
                                             <button
@@ -935,10 +936,10 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                                         handleSelectPeriod(item.label);
                                                     }
                                                 }}
-                                                className={`w-full text-left px-4 py-2 hover:bg-[#EAFBFC]/70 dark:hover:bg-cyan-950/50 flex items-center justify-between transition-all cursor-pointer ${dateRange === item.label ? 'font-bold text-[#00AFC0] dark:text-cyan-400 bg-[#EAFBFC]/40 dark:bg-cyan-950/30' : 'text-slate-700 dark:text-slate-200'}`}
+                                                className={`w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between transition-all cursor-pointer ${dateRange === item.label ? 'font-bold text-primary bg-slate-100/60 dark:bg-slate-800/60' : 'text-slate-700 dark:text-slate-200'}`}
                                             >
                                                 <span>{item.label}</span>
-                                                {dateRange === item.label && <Check className="size-3.5 text-[#00AFC0]" />}
+                                                {dateRange === item.label && <Check className="size-3.5 text-primary" />}
                                             </button>
                                         ))}
                                     </div>
@@ -948,7 +949,9 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
 
                         {/* 3. Export / Cetak Dropdown Menu */}
                         <div className="relative shrink-0 print:hidden">
-                            <button
+                            <Button
+                                variant="default"
+                                size="sm"
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -957,17 +960,17 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                     setShowNotifications(false);
                                     setShowExportMenu(next);
                                 }}
-                                className="bg-[#009EA9] hover:bg-[#008F9B] text-white flex items-center gap-1.5 h-9 px-4 text-xs font-bold rounded-full transition-all shadow-xs shrink-0 whitespace-nowrap cursor-pointer"
+                                className="h-9 gap-1.5 font-medium cursor-pointer"
                             >
                                 <Printer className="size-3.5" />
                                 <span>Export / Cetak</span>
-                                <ChevronDown className="size-3 text-white/80 ml-0.5" />
-                            </button>
+                                <ChevronDown className="size-3 opacity-70 ml-0.5" />
+                            </Button>
 
                             {showExportMenu && (
                                 <>
                                     <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
-                                    <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 p-2 text-xs animate-in fade-in slide-in-from-top-2">
+                                    <div className="absolute right-0 mt-2 w-72 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 p-2 text-xs animate-in fade-in slide-in-from-top-2">
                                         <div className="px-3 py-1.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                                             Pilih Format Export / Cetak
                                         </div>
@@ -978,7 +981,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                                 setShowExportMenu(false);
                                                 handleExportPdf();
                                             }}
-                                            className="w-full text-left px-3 py-2.5 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/50 rounded-xl flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group cursor-pointer"
+                                            className="w-full text-left px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group cursor-pointer"
                                         >
                                             <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform mt-0.5">
                                                 <FileText className="size-4" />
@@ -1000,7 +1003,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                                 setShowExportMenu(false);
                                                 handlePrintDialog();
                                             }}
-                                            className="w-full text-left px-3 py-2.5 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/50 rounded-xl flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group mt-1 cursor-pointer"
+                                            className="w-full text-left px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group mt-1 cursor-pointer"
                                         >
                                             <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 group-hover:scale-105 transition-transform mt-0.5">
                                                 <Printer className="size-4" />
@@ -1021,7 +1024,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                                 setShowExportMenu(false);
                                                 handleExportPng();
                                             }}
-                                            className="w-full text-left px-3 py-2.5 hover:bg-indigo-50/70 dark:hover:bg-indigo-950/50 rounded-xl flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group mt-1 cursor-pointer"
+                                            className="w-full text-left px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group mt-1 cursor-pointer"
                                         >
                                             <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform mt-0.5">
                                                 <Download className="size-4" />
@@ -1044,15 +1047,17 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                         <NotificationDropdown />
 
                         {/* 5. Refresh / Reset Filter Button */}
-                        <button
+                        <Button
+                            variant="outline"
+                            size="icon"
                             type="button"
                             onClick={handleResetAllFilters}
                             title="Refresh Data & Reset Filter"
                             disabled={isRefreshing}
-                            className="flex items-center justify-center h-9 w-9 text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 hover:bg-[#EAFBFC] dark:hover:bg-slate-800 rounded-full transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-60"
+                            className="h-9 w-9 shrink-0 cursor-pointer"
                         >
-                            <RefreshCw className={`size-4 text-slate-700 dark:text-slate-200 ${isRefreshing ? 'animate-spin text-[#00AFC0]' : ''}`} />
-                        </button>
+                            <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin text-primary' : ''}`} />
+                        </Button>
                     </div>
                 </div>
 
