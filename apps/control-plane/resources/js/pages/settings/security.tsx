@@ -567,23 +567,18 @@ export default function Security(props: Props) {
                                     <div
                                         key={log.id}
                                         className={cn(
-                                            "flex items-start justify-between gap-3.5 p-3.5 rounded-xl border transition-all group",
+                                            "flex items-center justify-between gap-3.5 p-3.5 rounded-xl border transition-all group",
                                             isWarning
                                                 ? "bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900/40"
-                                                : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-100 dark:border-slate-800/60 hover:border-[#00AFC0]/30"
+                                                : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800"
                                         )}
                                     >
-                                        <div className="flex items-start gap-3.5 min-w-0">
-                                            <div
-                                                className={cn(
-                                                    "p-2 rounded-lg shrink-0 mt-0.5",
-                                                    isWarning
-                                                        ? "bg-red-100 text-red-600 dark:bg-red-900/60 dark:text-red-300"
-                                                        : "bg-[#EAFBFC] dark:bg-cyan-950 text-[#00AFC0] dark:text-cyan-400"
-                                                )}
-                                            >
-                                                {isWarning ? <AlertCircle className="size-4" /> : <ShieldCheck className="size-4" />}
-                                            </div>
+                                        <div className="flex items-center gap-3.5 min-w-0">
+                                            {isWarning ? (
+                                                <AlertCircle className="size-4 text-red-600 dark:text-red-400 shrink-0" />
+                                            ) : (
+                                                <ShieldCheck className="size-4 text-slate-600 dark:text-slate-300 shrink-0" />
+                                            )}
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <h4 className={cn("text-xs sm:text-sm font-bold", isWarning ? "text-red-700 dark:text-red-300" : "text-slate-900 dark:text-slate-100")}>
@@ -599,14 +594,16 @@ export default function Security(props: Props) {
                                             </div>
                                         </div>
 
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="ghost"
+                                            size="icon-xs"
                                             onClick={() => handleDeleteSingleActivity(log.id)}
-                                            className="opacity-0 group-hover:opacity-100 text-[#FF4D4F] hover:bg-[#FF4D4F] hover:text-white p-1.5 rounded-full border border-[#FF4D4F]/30 hover:border-[#FF4D4F] transition-all cursor-pointer shrink-0 self-center shadow-xs"
+                                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md cursor-pointer shrink-0"
                                             title="Hapus Aktivitas Ini"
                                         >
                                             <Trash2 className="size-3.5" />
-                                        </button>
+                                        </Button>
                                     </div>
                                 );
                             })}
@@ -617,9 +614,7 @@ export default function Security(props: Props) {
                     <Dialog open={showDeleteAllActivitiesModal} onOpenChange={setShowDeleteAllActivitiesModal}>
                         <DialogContent size="compact" className="rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
                             <DialogHeader className="flex flex-row items-center gap-3 space-y-0 text-left border-b-0 p-0">
-                                <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200/60 dark:border-red-900/60 text-[#FF4D4F] shrink-0">
-                                    <Trash2 className="size-5" />
-                                </div>
+                                <Trash2 className="size-5 text-red-600 shrink-0" />
                                 <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
                                     Hapus Seluruh Aktivitas Keamanan?
                                 </DialogTitle>
@@ -628,10 +623,19 @@ export default function Security(props: Props) {
                                 Data riwayat aktivitas keamanan yang dihapus tidak dapat ditampilkan kembali. Apakah Anda yakin ingin membersihkan seluruh catatan?
                             </DialogDescription>
                             <DialogFooter className="gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 bg-transparent px-0 pb-0">
-                                <DialogCancel onClick={() => setShowDeleteAllActivitiesModal(false)} className="border border-[#00AFC0] text-[#00AFC0] hover:bg-[#EAFBFC] rounded-full px-4 py-2 text-xs font-bold bg-transparent transition-all cursor-pointer">
+                                <DialogCancel
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowDeleteAllActivitiesModal(false)}
+                                >
                                     Batal
                                 </DialogCancel>
-                                <DialogAction type="button" onClick={handleDeleteAllActivities} className="bg-[#FF4D4F] hover:bg-[#DC2626] text-white rounded-full px-5 py-2 text-xs font-bold border-none transition-all cursor-pointer shadow-xs">
+                                <DialogAction
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={handleDeleteAllActivities}
+                                >
                                     Hapus Aktivitas
                                 </DialogAction>
                             </DialogFooter>
