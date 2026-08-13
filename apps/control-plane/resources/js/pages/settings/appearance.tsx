@@ -185,7 +185,7 @@ export default function AppearancePage() {
                                     className={cn(
                                         'flex flex-col items-start p-4 rounded-xl text-left border transition-all cursor-pointer relative',
                                         isActive
-                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-primary shadow-xs ring-1 ring-primary/30'
+                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-slate-900 dark:border-slate-100 shadow-xs ring-1 ring-slate-900/20 dark:ring-slate-100/20'
                                             : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-800/80'
                                     )}
                                 >
@@ -194,14 +194,14 @@ export default function AppearancePage() {
                                             className={cn(
                                                 'p-2 rounded-lg',
                                                 isActive
-                                                    ? 'bg-primary text-primary-foreground'
+                                                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
                                                     : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400'
                                             )}
                                         >
                                             <Icon className="size-4" />
                                         </div>
                                         {isActive && (
-                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary text-primary-foreground shadow-xs">
+                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs">
                                                 Aktif
                                             </span>
                                         )}
@@ -243,7 +243,7 @@ export default function AppearancePage() {
                                     className={cn(
                                         'flex items-center gap-3.5 p-4 rounded-xl text-left border transition-all cursor-pointer relative',
                                         isActive
-                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-primary shadow-xs ring-1 ring-primary/30'
+                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-slate-900 dark:border-slate-100 shadow-xs ring-1 ring-slate-900/20 dark:ring-slate-100/20'
                                             : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-800/80'
                                     )}
                                 >
@@ -251,7 +251,7 @@ export default function AppearancePage() {
                                         className={cn(
                                             'p-2.5 rounded-lg shrink-0',
                                             isActive
-                                                ? 'bg-primary text-primary-foreground'
+                                                ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
                                                 : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400'
                                         )}
                                     >
@@ -263,7 +263,7 @@ export default function AppearancePage() {
                                                 {label}
                                             </span>
                                             {isActive && (
-                                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary text-primary-foreground shadow-xs">
+                                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs">
                                                     Aktif
                                                 </span>
                                             )}
@@ -303,7 +303,7 @@ export default function AppearancePage() {
                                     className={cn(
                                         'flex flex-col items-start p-4 rounded-xl text-left border transition-all cursor-pointer relative',
                                         isActive
-                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-primary shadow-xs ring-1 ring-primary/30'
+                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-slate-900 dark:border-slate-100 shadow-xs ring-1 ring-slate-900/20 dark:ring-slate-100/20'
                                             : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-800/80'
                                     )}
                                 >
@@ -312,14 +312,14 @@ export default function AppearancePage() {
                                             className={cn(
                                                 'p-2 rounded-lg',
                                                 isActive
-                                                    ? 'bg-primary text-primary-foreground'
+                                                    ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
                                                     : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400'
                                             )}
                                         >
                                             <LayoutGrid className="size-4" />
                                         </div>
                                         {isActive && (
-                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary text-primary-foreground shadow-xs">
+                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-xs">
                                                 Aktif
                                             </span>
                                         )}
