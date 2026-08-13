@@ -24,9 +24,7 @@ export default function DeleteUser() {
     return (
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-red-200/80 dark:border-red-950/60 shadow-xs space-y-4 relative overflow-hidden">
             <div className="flex items-center gap-3.5 pb-3 border-b border-red-100/60 dark:border-red-950/40">
-                <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200/60 dark:border-red-900/60 shrink-0">
-                    <AlertTriangle className="size-5" />
-                </div>
+                <AlertTriangle className="size-5 text-red-600 shrink-0" />
                 <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                         Zona Berbahaya
@@ -55,9 +53,7 @@ export default function DeleteUser() {
                     </DialogTrigger>
                     <DialogContent size="compact" className="rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4">
                         <DialogHeader className="flex flex-row items-center gap-3 space-y-0 text-left border-b-0 p-0">
-                            <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/60 border border-red-200/60 dark:border-red-900/60 text-[#FF4D4F] shrink-0">
-                                <Trash2 className="size-5" />
-                            </div>
+                            <Trash2 className="size-5 text-red-600 shrink-0" />
                             <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
                                 Hapus akun secara permanen?
                             </DialogTitle>
@@ -93,16 +89,18 @@ export default function DeleteUser() {
 
                                     <DialogFooter className="gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 bg-transparent px-0 pb-0">
                                         <DialogCancel
+                                            variant="outline"
+                                            size="sm"
                                             onClick={() => resetAndClearErrors()}
-                                            className="border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 rounded-md px-4 py-2 text-xs font-bold bg-transparent transition-all cursor-pointer"
                                         >
                                             Batal
                                         </DialogCancel>
                                         <DialogAction
                                             type="submit"
+                                            variant="destructive"
+                                            size="sm"
                                             disabled={processing}
                                             data-test="confirm-delete-user-button"
-                                            className="bg-red-600 hover:bg-red-700 text-white rounded-md px-5 py-2 text-xs font-bold cursor-pointer border-none transition-all shadow-xs"
                                         >
                                             Hapus Akun Permanen
                                         </DialogAction>

@@ -855,12 +855,12 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                 {/* --- HEADER SECTION --- */}
                 <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-200/60 dark:border-slate-800/60 w-full ${isExportingPdf ? 'hidden' : 'print:hidden'}`}>
                     <div className="flex flex-col gap-1 w-full md:w-auto">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-[#021B27] dark:text-white">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
                                 Dashboard Asset — {currentTenantName}
                             </h1>
-                            <span className="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-[#EAFBFC] dark:bg-cyan-950/80 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/30 flex items-center gap-1 shrink-0 shadow-xs">
-                                <Sparkles className="size-3 text-[#00AFC0]" /> Live Control
+                            <span className="px-2.5 py-0.5 text-[10px] font-semibold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1 shrink-0">
+                                <Sparkles className="size-3 text-slate-500" /> Live Control
                             </span>
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed">
@@ -885,7 +885,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                 placeholder="Cari kode aset, nama"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-9 pr-7 h-9 text-xs rounded-full border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-[#00AFC0]/20 focus:border-[#00AFC0] transition-all w-full sm:w-48 md:w-56 shadow-xs"
+                                className="pl-9 pr-7 h-9 text-xs rounded-full border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500/20 focus:border-slate-500 transition-all w-full sm:w-48 md:w-56 shadow-xs"
                             />
                             {searchQuery && (
                                 <button
@@ -936,10 +936,10 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                                         handleSelectPeriod(item.label);
                                                     }
                                                 }}
-                                                className={`w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between transition-all cursor-pointer ${dateRange === item.label ? 'font-bold text-primary bg-slate-100/60 dark:bg-slate-800/60' : 'text-slate-700 dark:text-slate-200'}`}
+                                                className={`w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between transition-all cursor-pointer ${dateRange === item.label ? 'font-bold bg-slate-100/60 dark:bg-slate-800/60' : 'text-slate-700 dark:text-slate-200'}`}
                                             >
                                                 <span>{item.label}</span>
-                                                {dateRange === item.label && <Check className="size-3.5 text-primary" />}
+                                                {dateRange === item.label && <Check className="size-3.5" />}
                                             </button>
                                         ))}
                                     </div>
@@ -983,13 +983,13 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                             }}
                                             className="w-full text-left px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group cursor-pointer"
                                         >
-                                            <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform mt-0.5">
+                                            <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:scale-105 transition-transform mt-0.5">
                                                 <FileText className="size-4" />
                                             </div>
                                             <div>
                                                 <div className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                                                     <span>Unduh File PDF</span>
-                                                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 rounded-md">1 Halaman</span>
+                                                    <span className="px-1.5 py-0.5 text-[9px] font-bold bg-slate-100 dark:bg-slate-800 rounded-md">1 Halaman</span>
                                                 </div>
                                                 <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5">
                                                     Simpan langsung PDF A4 Landscape lengkap dengan grafik visual.
@@ -1005,7 +1005,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                             }}
                                             className="w-full text-left px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group mt-1 cursor-pointer"
                                         >
-                                            <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 group-hover:scale-105 transition-transform mt-0.5">
+                                            <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:scale-105 transition-transform mt-0.5">
                                                 <Printer className="size-4" />
                                             </div>
                                             <div>
@@ -1026,7 +1026,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                             }}
                                             className="w-full text-left px-3 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-start gap-3 transition-all text-slate-800 dark:text-slate-100 group mt-1 cursor-pointer"
                                         >
-                                            <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform mt-0.5">
+                                            <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:scale-105 transition-transform mt-0.5">
                                                 <Download className="size-4" />
                                             </div>
                                             <div>
@@ -1056,27 +1056,27 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                             disabled={isRefreshing}
                             className="h-9 w-9 shrink-0 cursor-pointer"
                         >
-                            <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin text-primary' : ''}`} />
+                            <RefreshCw className={`size-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                         </Button>
                     </div>
                 </div>
 
                 {!isInitialDemoBusiness && (
-                    <div className="p-5 md:p-6 rounded-2xl bg-gradient-to-r from-[#005F73] via-[#00A8B5] to-[#00C9C8] text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-cyan-500/30 my-1">
+                    <div className="p-5 md:p-6 rounded-2xl bg-slate-900 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-slate-700 my-1">
                         <div className="space-y-1.5 min-w-0">
-                            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-white/20 text-xs font-semibold backdrop-blur-sm">
+                            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-white/10 text-xs font-semibold backdrop-blur-sm">
                                 <Building2 className="size-3.5" />
                                 <span>Workspace Aktif: {currentTenantName}</span>
                             </div>
                             <h2 className="text-lg md:text-xl font-bold">Workspace {currentTenantName} Siap Digunakan</h2>
-                            <p className="text-xs text-cyan-100 max-w-2xl leading-relaxed">
+                            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
                                 Workspace ini masih bersih (belum memiliki aset atau transaksi). Tambahkan aset baru untuk mulai mengelola operasional bisnis ini.
                             </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                             <Link
                                 href="/master-data/entitas-aset"
-                                className="px-4 py-2.5 text-xs font-bold rounded-full bg-white text-[#00AFC0] hover:bg-cyan-50 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                                className="px-4 py-2.5 text-xs font-bold rounded-full bg-white text-slate-900 hover:bg-slate-100 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                             >
                                 <Plus className="size-4" />
                                 <span>Tambah Entitas Aset</span>
@@ -1087,15 +1087,13 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
 
                 {/* --- INSTANT SEARCH RESULT TABLE CARD --- */}
                 {searchQuery.trim() !== '' && (
-                    <div className="flex flex-col gap-4 p-5 bg-white dark:bg-slate-900 border border-[#00AFC0]/30 rounded-2xl shadow-lg animate-in fade-in slide-in-from-top-2">
+                    <div className="flex flex-col gap-4 p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-lg animate-in fade-in slide-in-from-top-2">
                         <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center gap-2.5">
-                                <div className="p-2 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/80 text-[#00AFC0]">
-                                    <Search className="size-4" />
-                                </div>
+                                <Search className="size-4 text-slate-600 dark:text-slate-300" />
                                 <div>
                                     <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                                        Hasil Pencarian Aset (Pencarian: <span className="text-[#00AFC0]">Kode, Nama, Kategori, Lokasi</span>)
+                                        Hasil Pencarian Aset (Pencarian: Kode, Nama, Kategori, Lokasi)
                                     </h3>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                         Ditemukan <strong>{filteredSearchResults.length}</strong> aset untuk kata kunci "<span className="font-semibold text-slate-700 dark:text-slate-200">{searchQuery}</span>".
@@ -1116,12 +1114,14 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                 <Box className="size-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
                                 <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">Tidak ada aset yang cocok dengan kata kunci "{searchQuery}"</p>
                                 <p className="text-[11px] text-slate-400 mt-1">Gunakan pencarian berdasarkan Kode (AST-...), Nama (Mesin, AC, Generator), Kategori, atau Lokasi (Bandung, Surabaya, Kaltim, Jakarta).</p>
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     onClick={() => setSearchQuery('')}
-                                    className="mt-3 px-3.5 py-1.5 text-xs font-bold text-[#00AFC0] bg-[#EAFBFC] dark:bg-cyan-950/60 hover:bg-[#EAFBFC]/80 rounded-full transition-all"
+                                    className="mt-3"
                                 >
                                     Reset Pencarian
-                                </button>
+                                </Button>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -1141,7 +1141,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                                         {filteredSearchResults.map((asset) => (
                                             <tr key={asset.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                                                <td className="py-2.5 px-3 font-mono font-bold text-[#00AFC0]">{asset.id}</td>
+                                                <td className="py-2.5 px-3 font-mono font-bold text-slate-800 dark:text-slate-100">{asset.id}</td>
                                                 <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-100">{asset.name}</td>
                                                 <td className="py-2.5 px-3 text-slate-500">{asset.category}</td>
                                                 <td className="py-2.5 px-3">
@@ -1152,28 +1152,26 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center font-bold">{asset.count} WO</td>
                                                 <td className="py-2.5 px-3">
-                                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
                                                         asset.status === 'Selesai'
-                                                            ? 'bg-[#EAFBFC] text-[#00AFC0] border border-[#00AFC0]/20'
+                                                            ? 'bg-slate-100 text-slate-700 border-slate-200'
                                                             : asset.status === 'Dalam Proses'
-                                                            ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-100 dark:border-amber-900/60'
-                                                            : 'bg-red-50 text-red-500 dark:bg-red-950/60 dark:text-red-400 border border-red-100 dark:border-red-900/60'
+                                                            ? 'bg-slate-100 text-slate-700 border-slate-200'
+                                                            : 'bg-slate-100 text-slate-700 border-slate-200'
                                                     }`}>
-                                                        <span className={`size-1.5 rounded-full ${
-                                                            asset.status === 'Selesai' ? 'bg-[#00AFC0]' : asset.status === 'Dalam Proses' ? 'bg-amber-500' : 'bg-red-500'
-                                                        }`} />
                                                         {asset.status}
                                                     </span>
                                                 </td>
                                                 <td className="py-2.5 px-3 text-right font-semibold text-slate-700 dark:text-slate-200">{asset.cost}</td>
                                                 <td className="py-2.5 px-3 text-center">
-                                                    <button
+                                                    <Button
+                                                        variant="outline"
+                                                        size="xs"
                                                         onClick={() => setSelectedAssetDetail(asset)}
-                                                        className="btn-gradient-primary inline-flex items-center gap-1 px-3 py-1 text-[11px] font-bold text-white rounded-full transition-all shadow-xs"
                                                     >
-                                                        <Eye className="size-3" />
+                                                        <Eye className="size-3 mr-1" />
                                                         Detail
-                                                    </button>
+                                                    </Button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -1193,20 +1191,17 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                             setFocusedKpi(next);
                             showToast(next ? 'Menampilkan detail Total Asset' : 'Reset filter KPI');
                         }}
-                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'total' ? 'ring-2 ring-[#00AFC0] border-[#00AFC0] shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
+                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'total' ? 'ring-2 ring-slate-900 dark:ring-slate-500 border-slate-900 dark:border-slate-500 shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
                     >
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#005F73] via-[#00A8B5] to-[#00C9C8] opacity-90" />
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Aset</span>
-                            <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/50 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 group-hover:scale-110 transition-transform">
-                                <Box className="size-5" />
-                            </div>
+                            <Box className="size-5 text-slate-600 dark:text-slate-300" />
                         </div>
                         <div className="mt-3">
                             <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                                 {totalKondisi.toLocaleString('id-ID')}
                             </div>
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-1">
                                 {isInitialDemoBusiness ? (
                                     <>
                                         <TrendingUp className="size-3" />
@@ -1226,18 +1221,15 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                             setFocusedKpi(next);
                             showToast(next ? 'Menampilkan detail Nilai Asset' : 'Reset filter KPI');
                         }}
-                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'nilai' ? 'ring-2 ring-[#00AFC0] border-[#00AFC0] shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
+                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'nilai' ? 'ring-2 ring-slate-900 dark:ring-slate-500 border-slate-900 dark:border-slate-500 shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
                     >
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#005F73] via-[#00A8B5] to-[#00C9C8] opacity-90" />
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Nilai Aset</span>
-                            <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/50 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 group-hover:scale-110 transition-transform">
-                                <Wallet className="size-5" />
-                            </div>
+                            <Wallet className="size-5 text-slate-600 dark:text-slate-300" />
                         </div>
                         <div className="mt-3">
                             <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Rp {totalNilaiAssetMiliar} M</div>
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-1">
                                 {isInitialDemoBusiness ? (
                                     <>
                                         <TrendingUp className="size-3" />
@@ -1257,20 +1249,17 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                             setFocusedKpi(next);
                             showToast(next ? 'Menampilkan detail Kondisi Baik' : 'Reset filter KPI');
                         }}
-                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'kondisi' ? 'ring-2 ring-[#00AFC0] border-[#00AFC0] shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
+                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'kondisi' ? 'ring-2 ring-slate-900 dark:ring-slate-500 border-slate-900 dark:border-slate-500 shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
                     >
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#005F73] via-[#00A8B5] to-[#00C9C8] opacity-90" />
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Kondisi Aset (Baik)</span>
-                            <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/50 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 group-hover:scale-110 transition-transform">
-                                <ShieldCheck className="size-5" />
-                            </div>
+                            <ShieldCheck className="size-5 text-slate-600 dark:text-slate-300" />
                         </div>
                         <div className="mt-3">
                             <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                                 {baikPercent}
                             </div>
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-rose-500 mt-1">
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-1">
                                 {isInitialDemoBusiness ? (
                                     <>
                                         <TrendingDown className="size-3" />
@@ -1290,18 +1279,15 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                             setFocusedKpi(next);
                             showToast(next ? 'Menampilkan detail Nilai Buku Bersih' : 'Reset filter KPI');
                         }}
-                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'buku' ? 'ring-2 ring-[#00AFC0] border-[#00AFC0] shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
+                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'buku' ? 'ring-2 ring-slate-900 dark:ring-slate-500 border-slate-900 dark:border-slate-500 shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
                     >
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#005F73] via-[#00A8B5] to-[#00C9C8] opacity-90" />
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Nilai Buku Bersih</span>
-                            <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/50 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 group-hover:scale-110 transition-transform">
-                                <TrendingUp className="size-5" />
-                            </div>
+                            <TrendingUp className="size-5 text-slate-600 dark:text-slate-300" />
                         </div>
                         <div className="mt-3">
                             <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Rp {latestBukuHabisValue} M</div>
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-1">
                                 {isInitialDemoBusiness ? (
                                     <>
                                         <TrendingUp className="size-3" />
@@ -1321,20 +1307,17 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                             setFocusedKpi(next);
                             showToast(next ? 'Menampilkan detail Work Order Selesai' : 'Reset filter KPI');
                         }}
-                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'wo' ? 'ring-2 ring-[#00AFC0] border-[#00AFC0] shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
+                        className={`relative z-10 p-4 rounded-2xl bg-white dark:bg-slate-900 border transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden group ${focusedKpi === 'wo' ? 'ring-2 ring-slate-900 dark:ring-slate-500 border-slate-900 dark:border-slate-500 shadow-md' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs hover:shadow-lg hover:-translate-y-0.5'}`}
                     >
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#005F73] via-[#00A8B5] to-[#00C9C8] opacity-90" />
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Work Order Selesai</span>
-                            <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/50 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 group-hover:scale-110 transition-transform">
-                                <Wrench className="size-5" />
-                            </div>
+                            <Wrench className="size-5 text-slate-600 dark:text-slate-300" />
                         </div>
                         <div className="mt-3">
                             <div className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
                                 {woSelesaiValue.toLocaleString('id-ID')}
                             </div>
-                            <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                            <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-slate-400 mt-1">
                                 {isInitialDemoBusiness ? (
                                     <>
                                         <TrendingUp className="size-3" />
@@ -1359,7 +1342,9 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
 
                             {/* Location Selector (Filter lokasi diperbolehkan) */}
                             <div className="relative">
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="xs"
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -1369,14 +1354,12 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                         setShowCategoryUnitMenu(false);
                                         setShowLocationMenu(!showLocationMenu);
                                     }}
-                                    className="flex items-center justify-between gap-1.5 h-8 px-3 text-xs font-bold rounded-full border border-[#00AFC0]/30 bg-[#EAFBFC] dark:bg-cyan-950/40 hover:bg-[#EAFBFC]/80 text-[#00AFC0] dark:text-cyan-300 shadow-xs transition-all focus:outline-none shrink-0 cursor-pointer"
+                                    className="h-8 gap-1.5 font-bold cursor-pointer"
                                 >
-                                    <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                        <MapPin className="size-3.5 text-[#00AFC0] shrink-0" />
-                                        <span className="truncate">{location}</span>
-                                    </div>
-                                    <ChevronDown className="size-3 text-[#00AFC0] shrink-0 ml-0.5" />
-                                </button>
+                                    <MapPin className="size-3.5 text-slate-500 shrink-0" />
+                                    <span>{location}</span>
+                                    <ChevronDown className="size-3 text-slate-500 shrink-0 ml-0.5" />
+                                </Button>
 
                                 {showLocationMenu && (
                                     <>
@@ -1392,10 +1375,10 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                                         setShowLocationMenu(false);
                                                         showToast(`Lokasi diganti: ${loc}`);
                                                     }}
-                                                    className={`w-full text-left px-4 py-2 hover:bg-[#EAFBFC]/70 dark:hover:bg-cyan-950/50 flex items-center justify-between transition-all cursor-pointer ${location === loc ? 'font-bold text-[#00AFC0] dark:text-cyan-400 bg-[#EAFBFC]/40 dark:bg-cyan-950/30' : 'text-slate-700 dark:text-slate-200'}`}
+                                                    className={`w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between transition-all cursor-pointer ${location === loc ? 'font-bold bg-slate-100/60 dark:bg-slate-800/60' : 'text-slate-700 dark:text-slate-200'}`}
                                                 >
                                                     <span>{loc}</span>
-                                                    {location === loc && <Check className="size-3.5 text-[#00AFC0]" />}
+                                                    {location === loc && <Check className="size-3.5" />}
                                                 </button>
                                             ))}
                                         </div>
@@ -1438,7 +1421,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-1">
                                     {hoveredKondisi ? (
                                         <div className="animate-in fade-in zoom-in-95 duration-150">
-                                            <span className="text-xl font-extrabold tracking-tight block leading-tight" style={{ color: hoveredKondisi.color }}>
+                                            <span className="text-xl font-extrabold tracking-tight block leading-tight text-slate-900 dark:text-white">
                                                 {hoveredKondisi.value.toLocaleString('id-ID')}
                                             </span>
                                             <span className="block text-[10px] font-bold text-slate-700 dark:text-slate-200 truncate max-w-[80px] mx-auto">
@@ -1497,7 +1480,9 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
 
                             {/* Category Unit Selector */}
                             <div className="relative">
-                                <button
+                                <Button
+                                    variant="outline"
+                                    size="xs"
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -1507,13 +1492,11 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                         setShowLocationMenu(false);
                                         setShowCategoryUnitMenu(!showCategoryUnitMenu);
                                     }}
-                                    className="flex items-center justify-between gap-1.5 h-8 px-3 text-xs font-bold rounded-full border border-[#00AFC0]/30 bg-[#EAFBFC] dark:bg-cyan-950/40 hover:bg-[#EAFBFC]/80 text-[#00AFC0] dark:text-cyan-300 shadow-xs transition-all focus:outline-none shrink-0 cursor-pointer"
+                                    className="h-8 gap-1.5 font-bold cursor-pointer"
                                 >
-                                    <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                        <span className="truncate">{categoryUnit}</span>
-                                    </div>
-                                    <ChevronDown className="size-3 text-[#00AFC0] shrink-0 ml-0.5" />
-                                </button>
+                                    <span>{categoryUnit}</span>
+                                    <ChevronDown className="size-3 text-slate-500 shrink-0 ml-0.5" />
+                                </Button>
 
                                 {showCategoryUnitMenu && (
                                     <>
@@ -1529,10 +1512,10 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                                         setShowCategoryUnitMenu(false);
                                                         showToast(`Skala grafik diubah ke: ${unit}`);
                                                     }}
-                                                    className={`w-full text-left px-4 py-2 hover:bg-[#EAFBFC]/70 dark:hover:bg-cyan-950/50 flex items-center justify-between transition-all cursor-pointer ${categoryUnit === unit ? 'font-bold text-[#00AFC0] dark:text-cyan-400 bg-[#EAFBFC]/40 dark:bg-cyan-950/30' : 'text-slate-700 dark:text-slate-200'}`}
+                                                    className={`w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between transition-all cursor-pointer ${categoryUnit === unit ? 'font-bold bg-slate-100/60 dark:bg-slate-800/60' : 'text-slate-700 dark:text-slate-200'}`}
                                                 >
                                                     <span>{unit}</span>
-                                                    {categoryUnit === unit && <Check className="size-3.5 text-[#00AFC0]" />}
+                                                    {categoryUnit === unit && <Check className="size-3.5" />}
                                                 </button>
                                             ))}
                                         </div>
@@ -1566,8 +1549,8 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                         cursor={{ fill: 'rgba(148, 163, 184, 0.1)' }}
                                         content={<CustomChartTooltip unitFormatter={(v: any) => categoryUnit === 'Jumlah Unit' ? `${v} Unit` : `Rp ${v} ${categoryUnit.includes('Juta') ? 'Juta' : 'Miliar'}`} />}
                                     />
-                                    <Bar dataKey="value" fill="#00AFC0" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
-                                        <LabelList dataKey="displayVal" position="top" fill="#00AFC0" fontSize={11} fontWeight={800} offset={6} />
+                                    <Bar dataKey="value" fill="#334155" radius={[4, 4, 0, 0]} barSize={24} isAnimationActive={false}>
+                                        <LabelList dataKey="displayVal" position="top" fill="#334155" fontSize={11} fontWeight={800} offset={6} />
                                     </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
@@ -1581,7 +1564,7 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                             <button
                                 type="button"
                                 onClick={() => setShowAllMaintenanceModal(true)}
-                                className="text-xs font-bold text-[#00AFC0] hover:text-[#008B9B] hover:underline cursor-pointer transition-colors"
+                                className="text-xs font-bold text-slate-700 dark:text-slate-200 hover:underline cursor-pointer transition-colors"
                             >
                                 Lihat Semua
                             </button>
@@ -1603,20 +1586,14 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                                             onClick={() => setSelectedAssetDetail(item)}
                                             className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all group"
                                         >
-                                            <td className="py-2 pr-2 font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px] group-hover:text-[#00AFC0]">
+                                            <td className="py-2 pr-2 font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[130px] group-hover:text-slate-900">
                                                 {item.name}
                                             </td>
                                             <td className="py-2 px-2 text-center font-bold text-slate-700 dark:text-slate-300 font-mono text-xs">
                                                 {item.count}
                                             </td>
                                             <td className="py-2 pl-2 text-right shrink-0">
-                                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                                    item.status === 'Selesai'
-                                                        ? 'bg-[#EAFBFC] text-[#00AFC0] border border-[#00AFC0]/20'
-                                                        : item.status === 'Dalam Proses'
-                                                        ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-100 dark:border-amber-900/60'
-                                                        : 'bg-red-50 text-red-500 dark:bg-red-950/60 dark:text-red-400 border border-red-100 dark:border-red-900/60'
-                                                }`}>
+                                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                                                     {item.status}
                                                 </span>
                                             </td>
@@ -1828,18 +1805,22 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                         </div>
 
                         <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
-                            <button
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setShowCustomDateModal(false)}
-                                className="btn-outline-turquoise rounded-full px-4 py-2 text-xs font-bold"
                             >
                                 Batal
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="default"
+                                size="sm"
                                 onClick={handleApplyCustomDate}
-                                className="btn-gradient-primary rounded-full px-5 py-2 text-xs font-bold text-white transition-all shadow-xs cursor-pointer"
                             >
                                 Terapkan Filter
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -1901,12 +1882,14 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
 
                         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs">
                             <span className="text-slate-500">Menampilkan {ALL_MAINTENANCE_ASSETS.length} asset</span>
-                            <button
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => setShowAllMaintenanceModal(false)}
-                                className="btn-outline-turquoise rounded-full px-4 py-2 font-bold"
                             >
                                 Tutup
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -1952,16 +1935,17 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                         </div>
 
                         <div className="flex flex-col gap-2">
-                            <button
+                            <Button
+                                type="button"
+                                variant="default"
                                 onClick={() => {
                                     setSelectedAssetDetail(null);
                                     showToast(`Work Order baru berhasil dibuat untuk: ${selectedAssetDetail.name}`);
                                 }}
-                                className="btn-gradient-primary rounded-full w-full py-2.5 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                             >
-                                <Plus className="size-4" />
+                                <Plus className="size-4 mr-2" />
                                 <span>Buat Work Order Baru</span>
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

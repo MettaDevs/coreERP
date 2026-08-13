@@ -170,9 +170,7 @@ export default function AppearancePage() {
                 {/* --- SECTION 1: TEMA --- */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-5">
                     <div className="flex items-start gap-3.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-                        <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                            <Sun className="size-5" />
-                        </div>
+                        <Sun className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                         <div>
                             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                 Tema Antarmuka
@@ -194,7 +192,7 @@ export default function AppearancePage() {
                                     className={cn(
                                         'flex flex-col items-start p-4 rounded-xl text-left border transition-all cursor-pointer relative',
                                         isActive
-                                            ? 'bg-[#EAFBFC]/50 dark:bg-cyan-950/60 border-[#00AFC0] dark:border-cyan-500/80 shadow-sm ring-1 ring-[#00AFC0]/20 dark:ring-cyan-500/30'
+                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-primary shadow-xs ring-1 ring-primary/30'
                                             : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-800/80'
                                     )}
                                 >
@@ -203,14 +201,14 @@ export default function AppearancePage() {
                                             className={cn(
                                                 'p-2 rounded-lg',
                                                 isActive
-                                                    ? 'bg-[#00AFC0] text-white'
+                                                    ? 'bg-primary text-primary-foreground'
                                                     : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400'
                                             )}
                                         >
                                             <Icon className="size-4" />
                                         </div>
                                         {isActive && (
-                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#00AFC0] text-white shadow-xs">
+                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary text-primary-foreground shadow-xs">
                                                 Aktif
                                             </span>
                                         )}
@@ -230,9 +228,7 @@ export default function AppearancePage() {
                 {/* --- SECTION 2: SIDEBAR --- */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-5">
                     <div className="flex items-start gap-3.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-                        <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                            <PanelLeft className="size-5" />
-                        </div>
+                        <PanelLeft className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                         <div>
                             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                 Modus Sidebar
@@ -254,7 +250,7 @@ export default function AppearancePage() {
                                     className={cn(
                                         'flex items-center gap-3.5 p-4 rounded-xl text-left border transition-all cursor-pointer relative',
                                         isActive
-                                            ? 'bg-[#EAFBFC]/50 dark:bg-cyan-950/60 border-[#00AFC0] dark:border-cyan-500/80 shadow-sm ring-1 ring-[#00AFC0]/20 dark:ring-cyan-500/30'
+                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-primary shadow-xs ring-1 ring-primary/30'
                                             : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-800/80'
                                     )}
                                 >
@@ -262,7 +258,7 @@ export default function AppearancePage() {
                                         className={cn(
                                             'p-2.5 rounded-lg shrink-0',
                                             isActive
-                                                ? 'bg-[#00AFC0] text-white'
+                                                ? 'bg-primary text-primary-foreground'
                                                 : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400'
                                         )}
                                     >
@@ -274,7 +270,7 @@ export default function AppearancePage() {
                                                 {label}
                                             </span>
                                             {isActive && (
-                                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#00AFC0] text-white shadow-xs">
+                                                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary text-primary-foreground shadow-xs">
                                                     Aktif
                                                 </span>
                                             )}
@@ -292,9 +288,7 @@ export default function AppearancePage() {
                 {/* --- SECTION 3: KEPADATAN TAMPILAN --- */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-5">
                     <div className="flex items-start gap-3.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-                        <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                            <Sliders className="size-5" />
-                        </div>
+                        <Sliders className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                         <div>
                             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                 Kepadatan Tampilan (Density)
@@ -316,7 +310,7 @@ export default function AppearancePage() {
                                     className={cn(
                                         'flex flex-col items-start p-4 rounded-xl text-left border transition-all cursor-pointer relative',
                                         isActive
-                                            ? 'bg-[#EAFBFC]/50 dark:bg-cyan-950/60 border-[#00AFC0] dark:border-cyan-500/80 shadow-sm ring-1 ring-[#00AFC0]/20 dark:ring-cyan-500/30'
+                                            ? 'bg-slate-100/80 dark:bg-slate-800 border-primary shadow-xs ring-1 ring-primary/30'
                                             : 'bg-slate-50/50 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800 hover:bg-slate-100/70 dark:hover:bg-slate-800/80'
                                     )}
                                 >
@@ -325,14 +319,14 @@ export default function AppearancePage() {
                                             className={cn(
                                                 'p-2 rounded-lg',
                                                 isActive
-                                                    ? 'bg-[#00AFC0] text-white'
+                                                    ? 'bg-primary text-primary-foreground'
                                                     : 'bg-slate-200/60 dark:bg-slate-700/60 text-slate-600 dark:text-slate-400'
                                             )}
                                         >
                                             <LayoutGrid className="size-4" />
                                         </div>
                                         {isActive && (
-                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#00AFC0] text-white shadow-xs">
+                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-primary text-primary-foreground shadow-xs">
                                                 Aktif
                                             </span>
                                         )}
@@ -352,9 +346,7 @@ export default function AppearancePage() {
                 {/* --- SECTION 4: PREFERENSI TAMPILAN --- */}
                 <div className="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-7 border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-5">
                     <div className="flex items-start gap-3.5 pb-3 border-b border-slate-100 dark:border-slate-800">
-                        <div className="p-2.5 rounded-xl bg-[#EAFBFC] dark:bg-cyan-950/60 text-[#00AFC0] dark:text-cyan-400 border border-[#00AFC0]/20 shrink-0 mt-0.5">
-                            <Sparkles className="size-5" />
-                        </div>
+                        <Sparkles className="size-5 text-slate-700 dark:text-slate-200 shrink-0 mt-0.5" />
                         <div>
                             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
                                 Preferensi Antarmuka
@@ -383,7 +375,7 @@ export default function AppearancePage() {
                                 id="toggle-animations"
                                 checked={enableAnimations}
                                 onCheckedChange={handleAnimationsToggle}
-                                className="data-[state=checked]:bg-[#00AFC0] shrink-0"
+                                className="shrink-0"
                             />
                         </div>
 
@@ -404,7 +396,7 @@ export default function AppearancePage() {
                                 id="toggle-tooltips"
                                 checked={enableTooltips}
                                 onCheckedChange={handleTooltipsToggle}
-                                className="data-[state=checked]:bg-[#00AFC0] shrink-0"
+                                className="shrink-0"
                             />
                         </div>
                     </div>
