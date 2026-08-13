@@ -5,7 +5,6 @@ import { useAppearance } from '@/hooks/use-appearance';
 
 import { AppCommandPalette } from '@/components/app-command-palette';
 import { ProductLauncher } from '@/components/product-launcher';
-import { NotificationDropdown } from '@/components/notification-dropdown';
 import { Avatar, AvatarFallback, AvatarImage } from '@apperp/ui/avatar';
 import { Button } from '@apperp/ui/button';
 import {
@@ -25,9 +24,9 @@ export function AppSidebarHeader({
 }: {
     isScrolled?: boolean;
 }) {
-    const { auth } = usePage<any>().props;
-    const { appearance, updateAppearance } = useAppearance();
+    const { auth } = usePage().props;
     const [commandOpen, setCommandOpen] = useState(false);
+    const { appearance, updateAppearance } = useAppearance();
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -70,26 +69,28 @@ export function AppSidebarHeader({
 
                 <div className="ml-auto flex items-center gap-1">
                     <ProductLauncher />
-                    <NotificationDropdown />
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Notifications"
+                    >
+                        <Bell />
+                    </Button>
                     <Button
                         variant="ghost"
                         size="icon"
                         aria-label="Toggle theme"
                         onClick={() => updateAppearance(appearance === 'dark' ? 'light' : 'dark')}
-                        title={`Mode saat ini: ${appearance === 'dark' ? 'Dark' : 'Light'}. Klik untuk beralih.`}
+                        className="cursor-pointer"
                     >
-                        {appearance === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                        {appearance === 'dark' ? <Sun className="size-4 text-amber-400" /> : <Moon className="size-4" />}
                     </Button>
                     <Button
-                        asChild
                         variant="ghost"
                         size="icon"
                         aria-label="Theme presets"
-                        title="Pengaturan Tampilan"
                     >
-                        <Link href="/settings/appearance">
-                            <Palette className="size-4" />
-                        </Link>
+                        <Palette />
                     </Button>
                     <div className="mx-2 hidden h-6 w-px bg-border sm:block" />
                     {auth.user ? (
