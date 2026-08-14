@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
     Background,
@@ -9,14 +10,34 @@ import {
 } from '@xyflow/react';
 import type { Edge, Node as FlowNode, NodeProps, NodeTypes } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Building2, Network, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+
+import {
+    Building2,
+    Check,
+    ChevronRight,
+    CircleAlert,
+    CreditCard,
+    FileText,
+    Globe,
+    Hash,
+    Image,
+    Layers,
+    Mail,
+    MapPin,
+    Network,
+    Pencil,
+    Plus,
+    Search,
+    Shield,
+    Trash2,
+} from 'lucide-react';
 
 import Heading from '@/components/heading';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
     AlertDialog,
+    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -41,8 +62,12 @@ import {
 } from '@apperp/ui/accordion';
 import {
     Dialog,
+    DialogAction,
+    DialogBody,
+    DialogCancel,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -65,6 +90,7 @@ import {
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 
 type Organization = {
     id: string;
@@ -133,23 +159,30 @@ function CreateOrganizationDialog({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button>
-                    <Plus />
+                <Button size="sm" className="shadow-xs font-medium text-xs">
+                    <Plus className="mr-1.5 size-3.5" />
                     {triggerLabel}
                 </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent size="wide">
                 <DialogHeader>
-                    <DialogTitle>
-                        {legalEntity
-                            ? 'Legal entity baru'
-                            : 'Operating unit baru'}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {legalEntity
-                            ? 'Simpan identitas badan hukum yang dipakai untuk transaksi resmi.'
-                            : 'Simpan unit operasional yang akan ditempatkan pada hierarchy bila diperlukan.'}
-                    </DialogDescription>
+                    <div className="flex items-center gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                            {legalEntity ? <Building2 className="size-5" /> : <Layers className="size-5" />}
+                        </div>
+                        <div>
+                            <DialogTitle>
+                                {legalEntity
+                                    ? 'Legal Entity Baru'
+                                    : 'Operating Unit Baru'}
+                            </DialogTitle>
+                            <DialogDescription>
+                                {legalEntity
+                                    ? 'Simpan identitas badan hukum resmi yang dipakai untuk transaksi, pajak, dan laporan.'
+                                    : 'Simpan unit operasional seperti departemen, divisi, atau cabang perusahaan.'}
+                            </DialogDescription>
+                        </div>
+                    </div>
                 </DialogHeader>
                 <form
                     onSubmit={(event) => {
@@ -162,106 +195,117 @@ function CreateOrganizationDialog({
                         });
                     }}
                 >
-                    <FieldGroup>
-                        <Field data-invalid={Boolean(form.errors.name)}>
-                            <Input
-                                label="Nama organisasi"
-                                value={form.data.name}
-                                onChange={(event) =>
-                                    form.setData('name', event.target.value)
-                                }
-                                aria-invalid={Boolean(form.errors.name)}
-                            />
-                            <FieldError>{form.errors.name}</FieldError>
-                        </Field>
-                        {legalEntity ? (
-                            <>
-                                <Field
-                                    data-invalid={Boolean(
-                                        form.errors.company_code,
-                                    )}
-                                >
-                                    <Input
-                                        label="Kode perusahaan"
-                                        value={form.data.company_code}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'company_code',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
+                    <DialogBody className="space-y-4 py-3">
+                        <FieldGroup>
+                            <Field data-invalid={Boolean(form.errors.name)}>
+                                <Input
+                                    label="Nama Organisasi"
+                                    value={form.data.name}
+                                    onChange={(event) =>
+                                        form.setData('name', event.target.value)
+                                    }
+                                    placeholder={
+                                        legalEntity
+                                            ? 'Contoh: PT ERP Solusi Nusantara'
+                                            : 'Contoh: Departemen Keuangan & Akuntansi'
+                                    }
+                                    aria-invalid={Boolean(form.errors.name)}
+                                />
+                                <FieldError>{form.errors.name}</FieldError>
+                            </Field>
+                            {legalEntity ? (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <Field
+                                        data-invalid={Boolean(
                                             form.errors.company_code,
                                         )}
-                                    />
-                                    <FieldDescription>
-                                        2–16 karakter: huruf, angka, atau tanda
-                                        hubung.
-                                    </FieldDescription>
-                                    <FieldError>
-                                        {form.errors.company_code}
-                                    </FieldError>
-                                </Field>
-                                <Field
-                                    data-invalid={Boolean(
-                                        form.errors.country_code,
-                                    )}
-                                >
-                                    <Input
-                                        label="Kode negara"
-                                        value={form.data.country_code}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'country_code',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
+                                    >
+                                        <Input
+                                            label="Kode Perusahaan"
+                                            value={form.data.company_code}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'company_code',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="Contoh: PT-ERS"
+                                            aria-invalid={Boolean(
+                                                form.errors.company_code,
+                                            )}
+                                        />
+                                        <FieldDescription>
+                                            2–16 karakter unik.
+                                        </FieldDescription>
+                                        <FieldError>
+                                            {form.errors.company_code}
+                                        </FieldError>
+                                    </Field>
+                                    <Field
+                                        data-invalid={Boolean(
                                             form.errors.country_code,
                                         )}
-                                        maxLength={2}
-                                    />
-                                    <FieldError>
-                                        {form.errors.country_code}
-                                    </FieldError>
-                                </Field>
-                            </>
-                        ) : (
-                            <Field
-                                data-invalid={Boolean(
-                                    form.errors.operating_unit_type,
-                                )}
-                            >
-                                <NativeSelect
-                                    label="Tipe operating unit"
-                                    value={form.data.operating_unit_type}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'operating_unit_type',
-                                            event.target.value,
-                                        )
-                                    }
-                                    aria-invalid={Boolean(
+                                    >
+                                        <Input
+                                            label="Kode Negara (ISO)"
+                                            value={form.data.country_code}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'country_code',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            aria-invalid={Boolean(
+                                                form.errors.country_code,
+                                            )}
+                                            maxLength={2}
+                                            placeholder="ID"
+                                        />
+                                        <FieldError>
+                                            {form.errors.country_code}
+                                        </FieldError>
+                                    </Field>
+                                </div>
+                            ) : (
+                                <Field
+                                    data-invalid={Boolean(
                                         form.errors.operating_unit_type,
                                     )}
                                 >
-                                    {Object.entries(operatingUnitTypes).map(
-                                        ([value, label]) => (
-                                            <option key={value} value={value}>
-                                                {label}
-                                            </option>
-                                        ),
-                                    )}
-                                </NativeSelect>
-                                <FieldError>
-                                    {form.errors.operating_unit_type}
-                                </FieldError>
-                            </Field>
-                        )}
-                        <Button type="submit" disabled={form.processing}>
-                            Simpan organisasi
-                        </Button>
-                    </FieldGroup>
+                                    <NativeSelect
+                                        label="Tipe Operating Unit"
+                                        value={form.data.operating_unit_type}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'operating_unit_type',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.operating_unit_type,
+                                        )}
+                                    >
+                                        {Object.entries(operatingUnitTypes).map(
+                                            ([value, label]) => (
+                                                <option key={value} value={value}>
+                                                    {label}
+                                                </option>
+                                            ),
+                                        )}
+                                    </NativeSelect>
+                                    <FieldError>
+                                        {form.errors.operating_unit_type}
+                                    </FieldError>
+                                </Field>
+                            )}
+                        </FieldGroup>
+                    </DialogBody>
+                    <DialogFooter>
+                        <DialogAction type="submit" disabled={form.processing}>
+                            Simpan Organisasi
+                        </DialogAction>
+                        <DialogCancel />
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -282,7 +326,7 @@ function OrganizationExtraSectionContent({
 }) {
     if (section.value === 'report-company-logo') {
         return (
-            <div className="space-y-3 rounded-md border border-dashed bg-slate-50 p-4 dark:bg-white">
+            <div className="space-y-3 rounded-lg border border-dashed border-border bg-card/50 p-4">
                 <Field>
                     <Input
                         label="Logo perusahaan untuk laporan"
@@ -290,7 +334,7 @@ function OrganizationExtraSectionContent({
                         disabled
                     />
                 </Field>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground italic">
                     Wadah sudah tersedia. Upload logo belum aktif karena integrasi file belum tersedia.
                 </p>
             </div>
@@ -298,14 +342,14 @@ function OrganizationExtraSectionContent({
     }
 
     return (
-        <div className="rounded-md border border-dashed bg-slate-50 p-4 dark:bg-white">
+        <div className="rounded-lg border border-dashed border-border bg-card/40 p-4">
             <p className="text-sm text-muted-foreground">{section.description}</p>
             {section.action && (
-                <Button type="button" variant="outline" className="mt-3" disabled>
+                <Button type="button" variant="outline" size="sm" className="mt-3 text-xs" disabled>
                     {section.action}
                 </Button>
             )}
-            <p className="mt-2 text-xs text-muted-foreground">
+            <p className="mt-2 text-xs text-muted-foreground italic">
                 Wadah tersedia; fungsi ini akan dihubungkan oleh modul pemiliknya.
             </p>
         </div>
@@ -330,135 +374,134 @@ function OrganizationDetailPage({
         operating_unit_type: organization.operating_unit?.type ?? 'department',
     });
     const unitType = operatingUnitTypes[organization.operating_unit?.type ?? ''] ?? organization.operating_unit?.type;
-    const extraSections: OrganizationExtraSection[] = legalEntity
+    const extraSections: (OrganizationExtraSection & { icon: React.ComponentType<{ className?: string }> })[] = legalEntity
         ? [
               {
                   value: 'addresses',
-                  title: 'Alamat',
-                  description: 'Simpan alamat utama dan alamat tambahan legal entity.',
-                  action: 'Tambah alamat',
+                  title: 'Alamat Utama & Cabang',
+                  description: 'Simpan alamat utama dan lokasi kantor legal entity.',
+                  action: 'Tambah Alamat',
+                  icon: MapPin,
               },
               {
                   value: 'contact-information',
-                  title: 'Informasi kontak',
-                  description: 'Simpan email, nomor telepon, dan kontak organisasi.',
-                  action: 'Tambah kontak',
+                  title: 'Informasi Kontak & Komunikasi',
+                  description: 'Simpan email resmi, nomor telepon, dan narahubung organisasi.',
+                  action: 'Tambah Kontak',
+                  icon: Mail,
               },
               {
                   value: 'statutory-reporting',
-                  title: 'Pelaporan wajib',
-                  description: 'Tempat untuk konfigurasi pelaporan resmi dan periode pelaporan.',
-                  action: 'Tambah pengaturan pelaporan',
+                  title: 'Pelaporan Wajib & Regulasi',
+                  description: 'Konfigurasi pelaporan resmi pemerintah dan periode pelaporan.',
+                  action: 'Pengaturan Pelaporan',
+                  icon: FileText,
               },
               {
                   value: 'registration-numbers',
-                  title: 'Nomor registrasi',
-                  description: 'Tempat untuk nomor registrasi badan hukum.',
-                  action: 'Tambah nomor registrasi',
+                  title: 'Nomor Registrasi Legal (NIB / NPWP)',
+                  description: 'Nomor registrasi legalitas badan hukum perusahaan.',
+                  action: 'Tambah Registrasi',
+                  icon: Hash,
               },
               {
                   value: 'bank-account-information',
-                  title: 'Informasi rekening bank',
-                  description: 'Tempat untuk rekening bank yang terkait dengan legal entity.',
-                  action: 'Tambah rekening bank',
-              },
-              {
-                  value: 'foreign-trade-and-logistics',
-                  title: 'Perdagangan luar negeri dan logistik',
-                  description: 'Tempat untuk pengaturan perdagangan lintas negara dan logistik.',
-                  action: 'Tambah pengaturan',
+                  title: 'Informasi Rekening Bank',
+                  description: 'Rekening bank resmi yang terdaftar atas nama legal entity.',
+                  action: 'Tambah Rekening',
+                  icon: CreditCard,
               },
               {
                   value: 'number-sequences',
-                  title: 'Nomor urut',
-                  description: 'Tempat untuk nomor otomatis yang dipakai dokumen organisasi.',
-                  action: 'Buka nomor urut',
-              },
-              {
-                  value: 'additional-registration',
-                  title: 'Registrasi tambahan',
-                  description: 'Tempat untuk data registrasi tambahan yang diperlukan organisasi.',
-                  action: 'Tambah registrasi',
-              },
-              {
-                  value: 'dashboard-image',
-                  title: 'Gambar dashboard',
-                  description: 'Tempat untuk gambar yang ditampilkan pada dashboard organisasi.',
-                  action: 'Pilih gambar',
+                  title: 'Nomor Urut Dokumen (Sequences)',
+                  description: 'Pengaturan penomoran otomatis dokumen transaksi legal entity ini.',
+                  action: 'Kelola Nomor Urut',
+                  icon: Hash,
               },
               {
                   value: 'report-company-logo',
-                  title: 'Logo perusahaan untuk laporan',
-                  description: 'Logo untuk laporan yang menggunakan legal entity ini.',
-              },
-              {
-                  value: 'print-destination-default',
-                  title: 'Default tujuan cetak',
-                  description: 'Tempat untuk tujuan cetak default organisasi.',
-                  action: 'Atur tujuan cetak',
-              },
-              {
-                  value: 'regulatory-establishments',
-                  title: 'Instansi regulator',
-                  description: 'Tempat untuk instansi regulator yang terkait organisasi.',
-                  action: 'Tambah instansi',
-              },
-              {
-                  value: 'tax-registration',
-                  title: 'Registrasi pajak',
-                  description: 'Tempat untuk data registrasi pajak legal entity.',
-                  action: 'Tambah registrasi pajak',
+                  title: 'Logo Perusahaan Cetakan & Laporan',
+                  description: 'Logo yang dicetak pada invoice, kwitansi, dan surat resmi.',
+                  icon: Image,
               },
           ]
         : [
               {
                   value: 'addresses',
-                  title: 'Alamat',
-                  description: 'Simpan alamat unit operasional.',
-                  action: 'Tambah alamat',
+                  title: 'Alamat Lokasi Kerja',
+                  description: 'Simpan alamat fisik unit operasional ini.',
+                  action: 'Tambah Alamat',
+                  icon: MapPin,
               },
               {
                   value: 'contact-information',
-                  title: 'Informasi kontak',
-                  description: 'Simpan email, nomor telepon, dan kontak unit operasional.',
-                  action: 'Tambah kontak',
+                  title: 'Informasi Kontak Unit',
+                  description: 'Simpan email dan kontak penanggung jawab unit operasional.',
+                  action: 'Tambah Kontak',
+                  icon: Mail,
               },
               {
                   value: 'operating-unit-details',
-                  title: 'Detail operating unit',
-                  description: `Tempat untuk detail khusus tipe ${unitType ?? 'operating unit'}.`,
-                  action: 'Buka detail tipe unit',
+                  title: 'Detail Spesifik Operating Unit',
+                  description: `Atribut khusus untuk tipe ${unitType ?? 'Operating Unit'}.`,
+                  action: 'Buka Detail Unit',
+                  icon: Layers,
               },
           ];
 
     return (
-        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-white text-slate-900 dark:bg-white dark:text-slate-900">
-            <div className="sticky top-0 z-10 flex min-w-0 shrink-0 flex-wrap items-start justify-between gap-3 border-b bg-white px-4 py-4 dark:bg-white">
-                <div className="min-w-0">
-                    <CardTitle>{organization.name}</CardTitle>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                        <Badge variant="outline">
-                            {legalEntity ? 'Legal entity' : 'Operating unit'}
-                        </Badge>
-                        <span>
-                            {legalEntity
-                                ? `${organization.legal_entity?.company_code ?? 'Belum ada kode'} · ${organization.legal_entity?.country_code ?? 'Belum ada negara'}`
-                                : unitType}
-                        </span>
+        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-card text-foreground">
+            {/* Header Sticky Detail dengan Banner Khas */}
+            <div className="sticky top-0 z-10 flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/90 backdrop-blur-md px-6 py-4">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs">
+                        {legalEntity ? <Building2 className="size-5" /> : <Layers className="size-5" />}
+                    </div>
+                    <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                            <CardTitle className="text-base font-bold text-foreground truncate">
+                                {organization.name}
+                            </CardTitle>
+                            <Tooltip clickToPin>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label="Lihat rincian"
+                                        className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted transition-colors cursor-pointer"
+                                    >
+                                        <CircleAlert className="size-4" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-xs text-xs">
+                                    Detail identitas dan atribut resmi organisasi {organization.name}.
+                                </TooltipContent>
+                            </Tooltip>
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            <Badge variant="outline">
+                                {legalEntity ? 'Legal entity' : 'Operating unit'}
+                            </Badge>
+                            <span>
+                                {legalEntity
+                                    ? `${organization.legal_entity?.company_code ?? 'Belum ada kode'} · ${organization.legal_entity?.country_code ?? 'Belum ada negara'}`
+                                    : unitType}
+                            </span>
+                        </div>
                     </div>
                 </div>
                 {canManage && (
                     <div className="shrink-0">
                         {!editing ? (
-                            <Button type="button" onClick={() => setEditing(true)}>
-                                <Pencil />
-                                Edit
+                            <Button type="button" size="sm" onClick={() => setEditing(true)} className="shadow-xs font-medium text-xs">
+                                <Pencil className="mr-1.5 size-3.5" /> Edit Organization
                             </Button>
                         ) : (
                             <div className="flex gap-2">
                                 <Button
                                     type="button"
+                                    size="sm"
                                     variant="outline"
+                                    className="text-xs"
                                     onClick={() => {
                                         form.reset();
                                         form.clearErrors();
@@ -470,17 +513,21 @@ function OrganizationDetailPage({
                                 </Button>
                                 <Button
                                     type="submit"
+                                    size="sm"
+                                    className="text-xs shadow-xs"
                                     form={`organization-form-${organization.id}`}
                                     disabled={form.processing}
                                 >
-                                    Simpan
+                                    <Check className="mr-1.5 size-3.5" /> Simpan
                                 </Button>
                             </div>
                         )}
                     </div>
                 )}
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+
+            {/* Content Accordion */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
                 <form
                     id={`organization-form-${organization.id}`}
                     onSubmit={(event) => {
@@ -491,124 +538,134 @@ function OrganizationDetailPage({
                         );
                     }}
                 >
-                    <Accordion type="multiple" defaultValue={['general']}>
-                        <AccordionItem value="general">
-                            <AccordionTrigger className="py-3 hover:no-underline">
-                                Umum
+                    <Accordion type="multiple" defaultValue={['general']} className="space-y-3">
+                        <AccordionItem value="general" className="border border-border/80 rounded-xl px-5 bg-card shadow-2xs">
+                            <AccordionTrigger className="py-3.5 text-xs font-bold uppercase tracking-wider text-foreground hover:no-underline">
+                                <span className="flex items-center gap-2">
+                                    <Building2 className="size-4 text-primary shrink-0" />
+                                    Identitas Umum Organisasi
+                                </span>
                             </AccordionTrigger>
-                            <AccordionContent className="pt-2">
-                                <FieldGroup className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <Field data-invalid={Boolean(form.errors.name)}>
-                            <Input
-                                label="Nama organisasi"
-                                value={form.data.name}
-                                disabled={!editing}
-                                onChange={(event) =>
-                                    form.setData('name', event.target.value)
-                                }
-                                aria-invalid={Boolean(form.errors.name)}
-                            />
-                            <FieldError>{form.errors.name}</FieldError>
-                        </Field>
-                        {legalEntity ? (
-                            <>
-                                <Field
-                                    data-invalid={Boolean(
-                                        form.errors.company_code,
+                            <AccordionContent className="pb-5 pt-1">
+                                <FieldGroup className="grid gap-4 md:grid-cols-2">
+                                    <Field data-invalid={Boolean(form.errors.name)}>
+                                        <Input
+                                            label="Nama Organisasi"
+                                            value={form.data.name}
+                                            disabled={!editing}
+                                            onChange={(event) =>
+                                                form.setData('name', event.target.value)
+                                            }
+                                            aria-invalid={Boolean(form.errors.name)}
+                                        />
+                                        <FieldError>{form.errors.name}</FieldError>
+                                    </Field>
+                                    {legalEntity ? (
+                                        <>
+                                            <Field
+                                                data-invalid={Boolean(
+                                                    form.errors.company_code,
+                                                )}
+                                            >
+                                                <Input
+                                                    label="Kode Perusahaan"
+                                                    value={form.data.company_code}
+                                                    disabled={!editing}
+                                                    onChange={(event) =>
+                                                        form.setData(
+                                                            'company_code',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    aria-invalid={Boolean(
+                                                        form.errors.company_code,
+                                                    )}
+                                                />
+                                                <FieldError>
+                                                    {form.errors.company_code}
+                                                </FieldError>
+                                            </Field>
+                                            <Field
+                                                data-invalid={Boolean(
+                                                    form.errors.country_code,
+                                                )}
+                                            >
+                                                <Input
+                                                    label="Kode Negara (ISO)"
+                                                    value={form.data.country_code}
+                                                    disabled={!editing}
+                                                    onChange={(event) =>
+                                                        form.setData(
+                                                            'country_code',
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    aria-invalid={Boolean(
+                                                        form.errors.country_code,
+                                                    )}
+                                                    maxLength={2}
+                                                />
+                                                <FieldError>
+                                                    {form.errors.country_code}
+                                                </FieldError>
+                                            </Field>
+                                        </>
+                                    ) : (
+                                        <Field
+                                            data-invalid={Boolean(
+                                                form.errors.operating_unit_type,
+                                            )}
+                                        >
+                                            <NativeSelect
+                                                label="Tipe Operating Unit"
+                                                value={form.data.operating_unit_type}
+                                                disabled={!editing}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'operating_unit_type',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                aria-invalid={Boolean(
+                                                    form.errors.operating_unit_type,
+                                                )}
+                                            >
+                                                {Object.entries(operatingUnitTypes).map(
+                                                    ([value, label]) => (
+                                                        <option key={value} value={value}>
+                                                            {label}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </NativeSelect>
+                                            <FieldError>
+                                                {form.errors.operating_unit_type}
+                                            </FieldError>
+                                        </Field>
                                     )}
-                                >
-                                    <Input
-                                        label="Kode perusahaan"
-                                        value={form.data.company_code}
-                                        disabled={!editing}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'company_code',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
-                                            form.errors.company_code,
-                                        )}
-                                    />
-                                    <FieldError>
-                                        {form.errors.company_code}
-                                    </FieldError>
-                                </Field>
-                                <Field
-                                    data-invalid={Boolean(
-                                        form.errors.country_code,
-                                    )}
-                                >
-                                    <Input
-                                        label="Kode negara"
-                                        value={form.data.country_code}
-                                        disabled={!editing}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'country_code',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
-                                            form.errors.country_code,
-                                        )}
-                                        maxLength={2}
-                                    />
-                                    <FieldError>
-                                        {form.errors.country_code}
-                                    </FieldError>
-                                </Field>
-                            </>
-                        ) : (
-                            <Field
-                                data-invalid={Boolean(
-                                    form.errors.operating_unit_type,
-                                )}
-                            >
-                                <NativeSelect
-                                    label="Tipe operating unit"
-                                    value={form.data.operating_unit_type}
-                                    disabled={!editing}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'operating_unit_type',
-                                            event.target.value,
-                                        )
-                                    }
-                                    aria-invalid={Boolean(
-                                        form.errors.operating_unit_type,
-                                    )}
-                                >
-                                    {Object.entries(operatingUnitTypes).map(
-                                        ([value, label]) => (
-                                            <option key={value} value={value}>
-                                                {label}
-                                            </option>
-                                        ),
-                                    )}
-                                </NativeSelect>
-                                <FieldError>
-                                    {form.errors.operating_unit_type}
-                                </FieldError>
-                            </Field>
-                        )}
                                 </FieldGroup>
                             </AccordionContent>
                         </AccordionItem>
-                        {extraSections.map((section) => (
-                            <AccordionItem
-                                key={section.value}
-                                value={section.value}
-                            >
-                                <AccordionTrigger className="py-3 hover:no-underline">
-                                    {section.title}
-                                </AccordionTrigger>
-                                <AccordionContent className="pt-2">
-                                    <OrganizationExtraSectionContent section={section} />
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
+                        {extraSections.map((section) => {
+                            const SectionIcon = section.icon;
+                            return (
+                                <AccordionItem
+                                    key={section.value}
+                                    value={section.value}
+                                    className="border border-border/80 rounded-xl px-5 bg-card shadow-2xs"
+                                >
+                                    <AccordionTrigger className="py-3.5 text-xs font-bold text-foreground hover:no-underline">
+                                        <span className="flex items-center gap-2">
+                                            <SectionIcon className="size-4 text-primary shrink-0" />
+                                            {section.title}
+                                        </span>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pb-5 pt-1">
+                                        <OrganizationExtraSectionContent section={section} />
+                                    </AccordionContent>
+                                </AccordionItem>
+                            );
+                        })}
                     </Accordion>
                 </form>
             </div>
@@ -631,18 +688,23 @@ function CreateHierarchyDialog({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" disabled={!organizations.length}>
-                    <Plus />
-                    Buat hierarchy
+                <Button size="sm" className="shadow-xs font-medium text-xs">
+                    <Plus className="mr-1.5 size-3.5" /> Hierarchy Baru
                 </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent size="wide">
                 <DialogHeader>
-                    <DialogTitle>Draft hierarchy baru</DialogTitle>
-                    <DialogDescription>
-                        Satu hierarchy dapat dipakai beberapa tujuan bila
-                        susunan organisasinya sama.
-                    </DialogDescription>
+                    <div className="flex items-center gap-3">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                            <Network className="size-5" />
+                        </div>
+                        <div>
+                            <DialogTitle>Draft Hierarchy Baru</DialogTitle>
+                            <DialogDescription>
+                                Satu hierarchy dapat dipakai oleh beberapa tujuan proses bisnis yang memiliki susunan sama.
+                            </DialogDescription>
+                        </div>
+                    </div>
                 </DialogHeader>
                 <form
                     onSubmit={(event) => {
@@ -655,100 +717,109 @@ function CreateHierarchyDialog({
                         });
                     }}
                 >
-                    <FieldGroup>
-                        <Field data-invalid={Boolean(form.errors.name)}>
-                            <Input
-                                label="Nama hierarchy"
-                                value={form.data.name}
-                                onChange={(event) =>
-                                    form.setData('name', event.target.value)
-                                }
-                                aria-invalid={Boolean(form.errors.name)}
-                            />
-                            <FieldError>{form.errors.name}</FieldError>
-                        </Field>
-                        <FieldSet
-                            data-invalid={Boolean(form.errors.purpose_codes)}
-                        >
-                            <FieldLegend hint="Pilih proses bisnis yang akan membaca susunan ini.">
-                                Tujuan hierarchy
-                            </FieldLegend>
-                            <ToggleGroup
-                                type="multiple"
-                                variant="outline"
-                                className="grid grid-cols-2"
-                                value={form.data.purpose_codes}
-                                onValueChange={(values) =>
-                                    form.setData('purpose_codes', values)
-                                }
+                    <DialogBody className="space-y-4 py-3">
+                        <FieldGroup>
+                            <Field data-invalid={Boolean(form.errors.name)}>
+                                <Input
+                                    label="Nama Hierarchy"
+                                    value={form.data.name}
+                                    onChange={(event) =>
+                                        form.setData('name', event.target.value)
+                                    }
+                                    placeholder="Contoh: Bagan Organisasi Holding Utama"
+                                    aria-invalid={Boolean(form.errors.name)}
+                                />
+                                <FieldError>{form.errors.name}</FieldError>
+                            </Field>
+                            <FieldSet
+                                data-invalid={Boolean(form.errors.purpose_codes)}
                             >
-                                {purposes.map((purpose) => (
-                                    <ToggleGroupItem
-                                        key={purpose.code}
-                                        value={purpose.code}
+                                <FieldLegend hint="Pilih proses bisnis yang akan membaca susunan ini.">
+                                    Tujuan Hierarchy
+                                </FieldLegend>
+                                <ToggleGroup
+                                    type="multiple"
+                                    variant="outline"
+                                    className="grid grid-cols-2 gap-2"
+                                    value={form.data.purpose_codes}
+                                    onValueChange={(values) =>
+                                        form.setData('purpose_codes', values)
+                                    }
+                                >
+                                    {purposes.map((purpose) => (
+                                        <ToggleGroupItem
+                                            key={purpose.code}
+                                            value={purpose.code}
+                                            className="text-xs font-medium border-border/80"
+                                        >
+                                            {purpose.name}
+                                        </ToggleGroupItem>
+                                    ))}
+                                </ToggleGroup>
+                                <FieldError>{form.errors.purpose_codes}</FieldError>
+                            </FieldSet>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <Field
+                                    data-invalid={Boolean(
+                                        form.errors.root_organization_id,
+                                    )}
+                                >
+                                    <NativeSelect
+                                        label="Organisasi Paling Atas (Root)"
+                                        value={form.data.root_organization_id}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'root_organization_id',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.root_organization_id,
+                                        )}
                                     >
-                                        {purpose.name}
-                                    </ToggleGroupItem>
-                                ))}
-                            </ToggleGroup>
-                            <FieldError>{form.errors.purpose_codes}</FieldError>
-                        </FieldSet>
-                        <Field
-                            data-invalid={Boolean(
-                                form.errors.root_organization_id,
-                            )}
-                        >
-                            <NativeSelect
-                                label="Organisasi paling atas"
-                                value={form.data.root_organization_id}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'root_organization_id',
-                                        event.target.value,
-                                    )
-                                }
-                                aria-invalid={Boolean(
-                                    form.errors.root_organization_id,
-                                )}
-                            >
-                                {organizations.map((organization) => (
-                                    <option
-                                        key={organization.id}
-                                        value={organization.id}
-                                    >
-                                        {organization.name}
-                                    </option>
-                                ))}
-                            </NativeSelect>
-                            <FieldError>
-                                {form.errors.root_organization_id}
-                            </FieldError>
-                        </Field>
-                        <Field
-                            data-invalid={Boolean(form.errors.effective_from)}
-                        >
-                            <Input
-                                label="Berlaku mulai"
-                                type="date"
-                                value={form.data.effective_from}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'effective_from',
-                                        event.target.value,
-                                    )
-                                }
-                                aria-invalid={Boolean(
-                                    form.errors.effective_from,
-                                )}
-                            />
-                            <FieldError>
-                                {form.errors.effective_from}
-                            </FieldError>
-                        </Field>
-                        <Button type="submit" disabled={form.processing}>
-                            Buat draft
-                        </Button>
-                    </FieldGroup>
+                                        {organizations.map((organization) => (
+                                            <option
+                                                key={organization.id}
+                                                value={organization.id}
+                                            >
+                                                {organization.name}
+                                            </option>
+                                        ))}
+                                    </NativeSelect>
+                                    <FieldError>
+                                        {form.errors.root_organization_id}
+                                    </FieldError>
+                                </Field>
+                                <Field
+                                    data-invalid={Boolean(form.errors.effective_from)}
+                                >
+                                    <Input
+                                        label="Berlaku Mulai Tanggal"
+                                        type="date"
+                                        value={form.data.effective_from}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'effective_from',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(
+                                            form.errors.effective_from,
+                                        )}
+                                    />
+                                    <FieldError>
+                                        {form.errors.effective_from}
+                                    </FieldError>
+                                </Field>
+                            </div>
+                        </FieldGroup>
+                    </DialogBody>
+                    <DialogFooter>
+                        <DialogAction type="submit" disabled={form.processing}>
+                            Buat Draf Hierarchy
+                        </DialogAction>
+                        <DialogCancel />
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -775,7 +846,7 @@ function DraftActions({
 
     return (
         <form
-            className="flex flex-col gap-3 rounded-lg border p-4"
+            className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs"
             onSubmit={(event) => {
                 event.preventDefault();
                 form.post(
@@ -790,7 +861,7 @@ function DraftActions({
             <div className="grid gap-3 md:grid-cols-2">
                 <Field data-invalid={Boolean(form.errors.organization_id)}>
                     <NativeSelect
-                        label="Organisasi yang ditambahkan"
+                        label="Organisasi Yang Ditambahkan"
                         value={form.data.organization_id}
                         onChange={(event) =>
                             form.setData('organization_id', event.target.value)
@@ -813,7 +884,7 @@ function DraftActions({
                     data-invalid={Boolean(form.errors.parent_organization_id)}
                 >
                     <NativeSelect
-                        label="Berada di bawah"
+                        label="Berada Di Bawah Parent"
                         value={form.data.parent_organization_id}
                         onChange={(event) =>
                             form.setData(
@@ -836,30 +907,35 @@ function DraftActions({
                     </FieldError>
                 </Field>
             </div>
-            <FieldDescription>
-                Hubungan ini hanya berlaku pada draft hierarchy ini, bukan
-                mengubah identitas organisasi.
-            </FieldDescription>
-            <div className="flex justify-end gap-2">
-                <Button
-                    variant="outline"
-                    type="submit"
-                    disabled={!unplaced.length || form.processing}
-                >
-                    Tambah penempatan
-                </Button>
-                <Button
-                    type="button"
-                    disabled={form.processing}
-                    onClick={() =>
-                        form.post(
-                            `/settings/organization/hierarchy-versions/${version.id}/publish`,
-                            { preserveScroll: true },
-                        )
-                    }
-                >
-                    Publikasikan
-                </Button>
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/40">
+                <p className="text-xs text-muted-foreground">
+                    Hubungan ini berlaku pada draf hierarchy ini untuk menyusun struktur pohon.
+                </p>
+                <div className="flex gap-2">
+                    <Button
+                        variant="outline"
+                        type="submit"
+                        size="sm"
+                        className="text-xs font-medium"
+                        disabled={!unplaced.length || form.processing}
+                    >
+                        <Plus className="mr-1.5 size-3.5" /> Tambah Penempatan
+                    </Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        className="text-xs font-medium shadow-xs"
+                        disabled={form.processing}
+                        onClick={() =>
+                            form.post(
+                                `/settings/organization/hierarchy-versions/${version.id}/publish`,
+                                { preserveScroll: true },
+                            )
+                        }
+                    >
+                        <Check className="mr-1.5 size-3.5" /> Publikasikan
+                    </Button>
+                </div>
             </div>
         </form>
     );
@@ -879,15 +955,20 @@ function OrganizationHierarchyFlowNode({
     data,
 }: NodeProps<OrganizationHierarchyFlowNode>) {
     return (
-        <div className="min-w-52 rounded-lg border bg-white px-4 py-3 text-slate-900 shadow-sm dark:bg-white dark:text-slate-900">
-            <Handle type="target" position={Position.Top} />
-            <p className="text-sm font-semibold">{data.label}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+        <div className="min-w-56 rounded-xl border border-border bg-card px-4 py-3 text-foreground shadow-xs">
+            <Handle type="target" position={Position.Top} className="!size-3 !bg-muted-foreground !border-2 !border-background" />
+            <div className="flex items-center gap-2">
+                <span className="flex size-5 items-center justify-center rounded bg-primary/10 text-primary text-[10px] font-bold">
+                    {data.classification === 'legal_entity' ? 'LE' : 'OU'}
+                </span>
+                <p className="text-xs font-bold text-foreground truncate">{data.label}</p>
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
                 {data.classification === 'legal_entity'
-                    ? 'Legal entity'
-                    : data.operatingUnitType ?? 'Operating unit'}
+                    ? 'Legal Entity (Badan Hukum)'
+                    : data.operatingUnitType ?? 'Operating Unit'}
             </p>
-            <Handle type="source" position={Position.Bottom} />
+            <Handle type="source" position={Position.Bottom} className="!size-3 !bg-muted-foreground !border-2 !border-background" />
         </div>
     );
 }
@@ -917,10 +998,9 @@ function buildHierarchyGraph(version: Version): {
         childrenByParent.set(parentId, children);
     }
 
-    // ponytail: deterministic tree layout; use a graph layout engine only if hierarchies become DAGs.
-    const nodeWidth = 208;
-    const horizontalGap = 56;
-    const verticalGap = 170;
+    const nodeWidth = 224;
+    const horizontalGap = 64;
+    const verticalGap = 180;
     const subtreeWidths = new Map<string, number>();
     const measure = (node: HierarchyNode, path = new Set<string>()): number => {
         if (path.has(node.id)) {
@@ -1012,11 +1092,16 @@ function HierarchyCanvas({ version }: { version: Version }) {
     const graph = buildHierarchyGraph(version);
 
     return (
-        <div className="overflow-hidden rounded-lg border bg-white dark:bg-white">
-            <p className="border-b px-4 py-2 text-xs text-slate-600">
-                Tampilan susunan organisasi
-            </p>
-            <div className="h-[520px]">
+        <div className="overflow-hidden rounded-xl border border-border bg-background shadow-xs">
+            <div className="border-b border-border bg-card/80 px-4 py-2.5 flex items-center justify-between text-xs font-semibold text-foreground">
+                <span className="flex items-center gap-2">
+                    <Network className="size-4 text-primary" /> Visualisasi Organigram Struktur Perusahaan
+                </span>
+                <Badge variant="outline" className="text-[10px] font-mono bg-primary/5 text-primary border-primary/20">
+                    {version.nodes.length} Unit Terhubung
+                </Badge>
+            </div>
+            <div className="h-[520px] bg-background">
                 <ReactFlow
                     nodes={graph.nodes}
                     edges={graph.edges}
@@ -1028,7 +1113,7 @@ function HierarchyCanvas({ version }: { version: Version }) {
                 >
                     <Background gap={18} size={1} />
                     <Controls />
-                    <MiniMap pannable zoomable />
+                    <MiniMap pannable zoomable className="!bottom-3 !right-3 !rounded-lg overflow-hidden border border-border/60" />
                 </ReactFlow>
             </div>
         </div>
@@ -1057,9 +1142,7 @@ function RemovePlacementAction({
                 <AlertDialogHeader>
                     <AlertDialogTitle>Batalkan penempatan?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        {node.organization.name} akan dilepas dari draft ini dan
-                        dapat ditempatkan kembali di bawah organisasi yang
-                        benar.
+                        {node.organization.name} akan dilepas dari draft ini dan dapat ditempatkan kembali di bawah organisasi yang benar.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1080,7 +1163,7 @@ function RemovePlacementAction({
                             )
                         }
                     >
-                        Batalkan penempatan
+                        Batalkan Penempatan
                     </Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
@@ -1097,13 +1180,15 @@ function CreateVersionDraftAction({ version }: { version: Version }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline">Buat versi baru</Button>
+                <Button variant="outline" size="sm" className="text-xs font-medium">
+                    <Plus className="mr-1.5 size-3.5" /> Buat Versi Baru
+                </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent size="wide">
                 <DialogHeader>
-                    <DialogTitle>Buat draft versi baru</DialogTitle>
+                    <DialogTitle>Buat Draft Versi Baru</DialogTitle>
                     <DialogDescription>
-                        Versi yang sudah dipublikasikan tetap menjadi riwayat.
+                        Versi yang sudah dipublikasikan tetap menjadi riwayat resmi.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -1115,32 +1200,37 @@ function CreateVersionDraftAction({ version }: { version: Version }) {
                         );
                     }}
                 >
-                    <FieldGroup>
-                        <Field
-                            data-invalid={Boolean(form.errors.effective_from)}
-                        >
-                            <Input
-                                label="Berlaku mulai"
-                                type="date"
-                                value={form.data.effective_from}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'effective_from',
-                                        event.target.value,
-                                    )
-                                }
-                                aria-invalid={Boolean(
-                                    form.errors.effective_from,
-                                )}
-                            />
-                            <FieldError>
-                                {form.errors.effective_from}
-                            </FieldError>
-                        </Field>
-                        <Button type="submit" disabled={form.processing}>
-                            Buat draft
-                        </Button>
-                    </FieldGroup>
+                    <DialogBody className="space-y-4 py-3">
+                        <FieldGroup>
+                            <Field
+                                data-invalid={Boolean(form.errors.effective_from)}
+                            >
+                                <Input
+                                    label="Berlaku Mulai Tanggal"
+                                    type="date"
+                                    value={form.data.effective_from}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'effective_from',
+                                            event.target.value,
+                                        )
+                                    }
+                                    aria-invalid={Boolean(
+                                        form.errors.effective_from,
+                                    )}
+                                />
+                                <FieldError>
+                                    {form.errors.effective_from}
+                                </FieldError>
+                            </Field>
+                        </FieldGroup>
+                    </DialogBody>
+                    <DialogFooter>
+                        <DialogAction type="submit" disabled={form.processing}>
+                            Buat Draft
+                        </DialogAction>
+                        <DialogCancel />
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -1160,9 +1250,13 @@ export default function OrganizationPage({
     const [organizationSearch, setOrganizationSearch] = useState('');
     const isHierarchySection = section === 'hierarchies';
     const classification = section === 'operating-units' ? 'operating_unit' : 'legal_entity';
+    
     const visibleOrganizations = organizations.filter(
         (organization) => organization.classification === classification,
     );
+    const legalEntitiesCount = organizations.filter((o) => o.classification === 'legal_entity').length;
+    const operatingUnitsCount = organizations.filter((o) => o.classification === 'operating_unit').length;
+    
     const organizationSearchTerm = organizationSearch.trim().toLocaleLowerCase();
     const filteredOrganizations = visibleOrganizations.filter((organization) => {
         if (!organizationSearchTerm) {
@@ -1185,266 +1279,325 @@ export default function OrganizationPage({
         visibleOrganizations.find(
             (organization) => organization.id === selectedOrganizationId,
         ) ?? filteredOrganizations[0] ?? null;
+
     return (
         <>
             <Head title="Organisasi" />
             <main className="mx-auto flex min-h-screen w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
+                {/* Header Judul Utama */}
                 <Heading
-                    title="Organisasi"
-                    description={`Kelola identitas organisasi dan hierarchy ${tenant.name}.`}
+                    title="Organisasi Perusahaan"
+                    description={`Pengelolaan identitas entitas legal, unit operasional, dan bagan hirarki organisasi untuk ${tenant.name}.`}
+                    icon={Building2}
                 />
+
+
+
+                {/* Navigasi Tab Bagian Organisasi */}
                 <nav
                     aria-label="Bagian organisasi"
-                    className="flex flex-wrap gap-2 rounded-lg border bg-white p-2 dark:bg-white"
+                    className="flex flex-wrap gap-1.5 rounded-xl border border-border/80 bg-muted/40 p-1.5 shadow-2xs"
                 >
                     {[
-                        ['legal-entities', 'Legal entities'],
-                        ['operating-units', 'Operating units'],
-                        ['hierarchies', 'Hierarchy'],
-                    ].map(([value, label]) => (
-                        <Link
-                            key={value}
-                            href={`/settings/organization?section=${value}`}
-                            aria-current={section === value ? 'page' : undefined}
-                            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                                section === value
-                                    ? 'bg-primary text-primary-foreground'
-                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                            }`}
-                        >
-                            {label}
-                        </Link>
-                    ))}
-                </nav>
-                {!isHierarchySection && <Card className="w-full min-w-0 bg-white text-slate-900 dark:bg-white dark:text-slate-900">
-                    <CardHeader className="min-w-0">
-                        <CardTitle>
-                            {classification === 'legal_entity'
-                                ? 'Legal entities'
-                                : 'Operating units'}
-                        </CardTitle>
-                        <CardDescription>
-                            {classification === 'legal_entity'
-                                ? 'Badan hukum untuk transaksi resmi, pajak, dan laporan.'
-                                : 'Unit operasional untuk proses, akses, dan hierarchy organisasi.'}
-                        </CardDescription>
-                        {canManage && (
-                            <CardAction>
-                                <CreateOrganizationDialog
-                                    classification={classification}
-                                    operatingUnitTypes={operatingUnitTypes}
-                                    triggerLabel="New"
-                                />
-                            </CardAction>
-                        )}
-                    </CardHeader>
-                    <CardContent className="w-full min-w-0">
-                        {visibleOrganizations.length ? (
-                            <div className="grid min-w-0 gap-4 lg:h-[calc(100vh-18rem)] lg:min-h-[32rem] lg:max-h-[42.5rem] lg:grid-cols-[18rem_minmax(0,1fr)]">
-                                <aside className="flex min-h-[20rem] min-w-0 flex-col overflow-hidden rounded-lg border bg-white dark:bg-white lg:min-h-0">
-                                    <div className="shrink-0 space-y-3 border-b px-4 py-3">
-                                        <p className="font-medium">Daftar organisasi</p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Pilih satu organisasi untuk melihat detailnya.
-                                        </p>
-                                        <Input
-                                            label="Cari"
-                                            placeholder="Cari organisasi..."
-                                            value={organizationSearch}
-                                            onChange={(event) =>
-                                                setOrganizationSearch(event.target.value)
-                                            }
-                                        />
-                                    </div>
-                                    <div className="min-h-0 flex-1 overflow-y-auto">
-                                        {filteredOrganizations.length ? filteredOrganizations.map((organization) => {
-                                            const selected = organization.id === selectedOrganization?.id;
-                                            const subtitle = organization.legal_entity
-                                                ? `${organization.legal_entity.company_code} · ${organization.legal_entity.country_code}`
-                                                : (operatingUnitTypes[
-                                                      organization.operating_unit?.type ?? ''
-                                                  ] ?? organization.operating_unit?.type);
+                        ['legal-entities', 'Legal Entities', Building2],
+                        ['operating-units', 'Operating Units', Layers],
+                        ['hierarchies', 'Hierarchy Organisasi', Network],
+                    ].map(([value, label, IconComp]) => {
+                        const isActive = section === value;
 
-                                            return (
-                                                <button
-                                                    key={organization.id}
-                                                    type="button"
-                                                    aria-pressed={selected}
-                                                    onClick={() => setSelectedOrganizationId(organization.id)}
-                                                    className={`w-full border-b px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset dark:hover:bg-slate-100 ${
-                                                        selected
-                                                            ? 'border-l-2 border-l-primary bg-primary/10'
-                                                            : 'border-l-2 border-l-transparent'
-                                                    }`}
-                                                >
-                                                    <span className="block truncate font-medium">
-                                                        {organization.name}
-                                                    </span>
-                                                    <span className="mt-1 block truncate text-xs text-muted-foreground">
-                                                        {subtitle}
-                                                    </span>
-                                                </button>
-                                            );
-                                        }) : (
-                                            <p className="p-4 text-sm text-muted-foreground">
-                                                Tidak ada organisasi yang cocok.
-                                            </p>
+                        return (
+                            <Link
+                                key={value as string}
+                                href={`/settings/organization?section=${value}`}
+                                aria-current={isActive ? 'page' : undefined}
+                                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+                                    isActive
+                                        ? 'bg-card text-foreground shadow-xs border border-border/80 font-bold'
+                                        : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'
+                                }`}
+                            >
+                                <IconComp className={`size-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                                {label as string}
+                            </Link>
+                        );
+                    })}
+                </nav>
+
+                {!isHierarchySection && (
+                    <Card className="w-full min-w-0 shadow-xs border border-border overflow-hidden">
+                        <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
+                            <div className="flex items-center justify-between gap-4 w-full">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                                        {classification === 'legal_entity' ? (
+                                            <Building2 className="size-4" />
+                                        ) : (
+                                            <Layers className="size-4" />
                                         )}
                                     </div>
-                                </aside>
-                                {selectedOrganization && (
-                                    <div className="flex min-h-[32rem] min-w-0 overflow-hidden rounded-lg border bg-white dark:bg-white lg:min-h-0">
-                                        <OrganizationDetailPage
-                                            key={selectedOrganization.id}
-                                            organization={selectedOrganization}
-                                            canManage={canManage}
-                                            operatingUnitTypes={operatingUnitTypes}
-                                        />
+                                    <div className="min-w-0">
+                                        <CardTitle>
+                                            {classification === 'legal_entity'
+                                                ? 'Daftar Legal Entities'
+                                                : 'Daftar Operating Units'}
+                                        </CardTitle>
+                                        <CardDescription className="mt-0.5 text-sm text-muted-foreground">
+                                            {classification === 'legal_entity'
+                                                ? 'Badan hukum untuk transaksi resmi, pajak, dan laporan.'
+                                                : 'Unit operasional untuk proses, akses, dan hierarchy organisasi.'}
+                                        </CardDescription>
                                     </div>
+                                </div>
+                                {canManage && (
+                                    <CardAction className="shrink-0">
+                                        <CreateOrganizationDialog
+                                            classification={classification}
+                                            operatingUnitTypes={operatingUnitTypes}
+                                            triggerLabel={
+                                                classification === 'legal_entity'
+                                                    ? 'Legal Entity'
+                                                    : 'Operating Unit'
+                                            }
+                                        />
+                                    </CardAction>
                                 )}
                             </div>
-                        ) : (
-                            <Empty>
-                                <EmptyHeader>
-                                    <EmptyMedia variant="icon">
-                                        <Building2 />
-                                    </EmptyMedia>
-                                    <EmptyTitle>
-                                        Belum ada {classification === 'legal_entity' ? 'legal entity' : 'operating unit'}
-                                    </EmptyTitle>
-                                    <EmptyDescription>
-                                        {classification === 'legal_entity'
-                                            ? 'Buat legal entity pertama agar transaksi resmi memiliki badan hukum.'
-                                            : 'Buat operating unit bila proses bisnis membutuhkan unit operasional.'}
-                                    </EmptyDescription>
-                                </EmptyHeader>
-                            </Empty>
-                        )}
-                    </CardContent>
-                </Card>}
-                {isHierarchySection && <Card className="bg-white text-slate-900 dark:bg-white dark:text-slate-900">
-                    <CardHeader>
-                        <CardTitle>Hierarchy organisasi</CardTitle>
-                        <CardDescription>
-                            Susun hubungan parent-child hanya untuk proses bisnis yang membutuhkannya.
-                        </CardDescription>
-                        {canManage && (
-                            <CardAction>
-                                <CreateHierarchyDialog
-                                    organizations={organizations}
-                                    purposes={purposes}
-                                />
-                            </CardAction>
-                        )}
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {hierarchies.length ? (
-                            hierarchies.map((hierarchy) => {
-                                const version = hierarchy.versions[0];
-
-                                if (!version) {
-                                    return null;
-                                }
-
-                                return (
-                                    <div
-                                        key={hierarchy.id}
-                                            className="space-y-4 rounded-lg border bg-white p-4 dark:bg-white"
-                                    >
-                                        <div className="flex flex-wrap items-start justify-between gap-3">
-                                            <div>
-                                                <h3 className="font-medium">
-                                                    {hierarchy.name}
-                                                </h3>
-                                                <p className="text-sm text-muted-foreground">
-                                                    {hierarchy.purposes
-                                                        .map(
-                                                            (purpose) =>
-                                                                purpose.name,
-                                                        )
-                                                        .join(' · ')}
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {visibleOrganizations.length ? (
+                                <div className="grid min-w-0 gap-0 lg:h-[calc(100vh-16rem)] lg:min-h-[34rem] lg:grid-cols-[20rem_minmax(0,1fr)]">
+                                    {/* Sidebar Daftar Organisasi Kiri */}
+                                    <aside className="flex min-w-0 flex-col overflow-hidden border-r border-border bg-card/40">
+                                        <div className="shrink-0 space-y-2 border-b border-border p-4">
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                                                    Pilih Organisasi
                                                 </p>
+                                                <Badge variant="outline" className="text-[10px]">
+                                                    {filteredOrganizations.length} Total
+                                                </Badge>
                                             </div>
-                                            <Badge>
-                                                {version.status === 'draft'
-                                                    ? 'Draft'
-                                                    : `Published v${version.version_number}`}
-                                            </Badge>
-                                        </div>
-                                        <HierarchyCanvas version={version} />
-                                        <p className="text-xs text-muted-foreground">
-                                            Tipe organisasi yang diizinkan akan diatur per tujuan hierarchy. Saat ini belum ada batasan tipe yang diaktifkan.
-                                        </p>
-                                        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-                                            {version.nodes.map((node) => (
-                                                <div
-                                                    key={node.id}
-                                                    className="flex items-start justify-between gap-2 rounded-md bg-muted p-3 text-sm"
-                                                >
-                                                    <div>
-                                                        <span className="font-medium">
-                                                            {
-                                                                node
-                                                                    .organization
-                                                                    .name
-                                                            }
-                                                        </span>
-                                                        <span className="block text-muted-foreground">
-                                                            {node.parent_node
-                                                                ? `Di bawah ${node.parent_node.organization.name}`
-                                                                : 'Paling atas'}
-                                                        </span>
-                                                    </div>
-                                                    {canManage &&
-                                                        version.status ===
-                                                            'draft' &&
-                                                        node.parent_node && (
-                                                            <RemovePlacementAction
-                                                                version={
-                                                                    version
-                                                                }
-                                                                node={node}
-                                                            />
-                                                        )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        {canManage &&
-                                            version.status === 'draft' && (
-                                                <DraftActions
-                                                    version={version}
-                                                    organizations={
-                                                        organizations
+                                            <div className="relative">
+                                                <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+                                                <Input
+                                                    placeholder="Cari nama atau kode..."
+                                                    value={organizationSearch}
+                                                    className="pl-8 text-xs bg-background h-8"
+                                                    onChange={(event) =>
+                                                        setOrganizationSearch(event.target.value)
                                                     }
                                                 />
+                                            </div>
+                                        </div>
+                                        <div className="min-h-0 flex-1 overflow-y-auto space-y-1 p-2">
+                                            {filteredOrganizations.length ? (
+                                                filteredOrganizations.map((organization) => {
+                                                    const selected = organization.id === selectedOrganization?.id;
+                                                    const subtitle = organization.legal_entity
+                                                        ? `${organization.legal_entity.company_code} · ${organization.legal_entity.country_code}`
+                                                        : (operatingUnitTypes[
+                                                              organization.operating_unit?.type ?? ''
+                                                          ] ?? organization.operating_unit?.type);
+
+                                                    return (
+                                                        <button
+                                                            key={organization.id}
+                                                            type="button"
+                                                            aria-pressed={selected}
+                                                            onClick={() => setSelectedOrganizationId(organization.id)}
+                                                            className={`group flex w-full items-center justify-between rounded-lg border-l-4 p-3 text-left transition-all ${
+                                                                selected
+                                                                    ? 'border-l-primary bg-primary/10 font-semibold text-primary shadow-2xs'
+                                                                    : 'border-l-transparent text-foreground hover:bg-muted/50'
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-start gap-2.5 min-w-0 flex-1 pr-2">
+                                                                {organization.legal_entity ? (
+                                                                    <Building2 className="size-4 text-primary shrink-0 mt-0.5" />
+                                                                ) : (
+                                                                    <Layers className="size-4 text-primary shrink-0 mt-0.5" />
+                                                                )}
+                                                                <div className="min-w-0 flex-1">
+                                                                    <span className="block truncate text-xs font-semibold leading-tight">
+                                                                        {organization.name}
+                                                                    </span>
+                                                                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground font-normal">
+                                                                        {subtitle}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
+                                                        </button>
+                                                    );
+                                                })
+                                            ) : (
+                                                <p className="p-4 text-center text-xs text-muted-foreground italic">
+                                                    Tidak ada organisasi yang cocok.
+                                                </p>
                                             )}
-                                        {canManage &&
-                                            version.status === 'published' && (
-                                                <div className="flex justify-end">
-                                                    <CreateVersionDraftAction
-                                                        version={version}
-                                                    />
+                                        </div>
+                                    </aside>
+
+                                    {/* Section Detail Organisasi Terpilih */}
+                                    {selectedOrganization && (
+                                        <div className="flex min-w-0 overflow-hidden bg-card">
+                                            <OrganizationDetailPage
+                                                key={selectedOrganization.id}
+                                                organization={selectedOrganization}
+                                                canManage={canManage}
+                                                operatingUnitTypes={operatingUnitTypes}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <Empty className="py-16">
+                                    <EmptyHeader>
+                                        <EmptyMedia variant="icon">
+                                            <Building2 className="size-8 text-muted-foreground" />
+                                        </EmptyMedia>
+                                        <EmptyTitle>
+                                            Belum Ada {classification === 'legal_entity' ? 'Legal Entity' : 'Operating Unit'}
+                                        </EmptyTitle>
+                                        <EmptyDescription className="text-xs text-muted-foreground max-w-sm">
+                                            {classification === 'legal_entity'
+                                                ? 'Buat legal entity pertama agar transaksi resmi dan perpajakan memiliki identitas badan hukum.'
+                                                : 'Buat operating unit bila proses bisnis membutuhkan struktur departemen atau divisi.'}
+                                        </EmptyDescription>
+                                    </EmptyHeader>
+                                </Empty>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {isHierarchySection && (
+                    <Card className="shadow-xs border border-border overflow-hidden">
+                        <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
+                            <div className="flex items-center justify-between gap-4 w-full">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                                        <Network className="size-4" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <CardTitle>Hierarchy Organisasi</CardTitle>
+                                        <CardDescription className="mt-0.5 text-sm text-muted-foreground">
+                                            Susun hubungan parent-child hanya untuk proses bisnis yang membutuhkannya.
+                                        </CardDescription>
+                                    </div>
+                                </div>
+                                {canManage && (
+                                    <CardAction className="shrink-0">
+                                        <CreateHierarchyDialog
+                                            organizations={organizations}
+                                            purposes={purposes}
+                                        />
+                                    </CardAction>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-6 space-y-8">
+                            {hierarchies.length ? (
+                                hierarchies.map((hierarchy) => {
+                                    const version = hierarchy.versions[0];
+
+                                    if (!version) {
+                                        return null;
+                                    }
+
+                                    return (
+                                        <div
+                                            key={hierarchy.id}
+                                            className="space-y-4 border-b border-border pb-8 last:border-b-0 last:pb-0"
+                                        >
+                                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                                <div>
+                                                    <h3 className="font-bold text-base text-foreground">
+                                                        {hierarchy.name}
+                                                    </h3>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        Tujuan: {hierarchy.purposes
+                                                            .map((purpose) => purpose.name)
+                                                            .join(' · ') || '—'}
+                                                    </p>
+                                                </div>
+                                                <Badge variant="outline">
+                                                    {version.status === 'draft'
+                                                        ? 'Draft'
+                                                        : `Published v${version.version_number}`}
+                                                </Badge>
+                                            </div>
+
+                                            <HierarchyCanvas version={version} />
+
+                                            <div className="space-y-3 pt-2">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                                        Daftar Penempatan Unit Organisasi
+                                                    </p>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {version.nodes.length} Unit Terpasang
+                                                    </span>
+                                                </div>
+                                                <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
+                                                    {version.nodes.map((node) => (
+                                                        <div
+                                                            key={node.id}
+                                                            className="flex items-center justify-between gap-2 rounded-lg bg-card px-3.5 py-2.5 text-xs border border-border/80 shadow-2xs"
+                                                        >
+                                                            <div className="min-w-0 flex-1">
+                                                                <span className="font-bold text-foreground block truncate">
+                                                                    {node.organization.name}
+                                                                </span>
+                                                                <span className="block text-[11px] text-muted-foreground truncate mt-0.5">
+                                                                    {node.parent_node
+                                                                        ? `Di bawah ${node.parent_node.organization.name}`
+                                                                        : 'Root (Organisasi Puncak)'}
+                                                                </span>
+                                                            </div>
+                                                            {canManage &&
+                                                                version.status === 'draft' &&
+                                                                node.parent_node && (
+                                                                    <RemovePlacementAction
+                                                                        version={version}
+                                                                        node={node}
+                                                                    />
+                                                                )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {canManage && version.status === 'draft' && (
+                                                <DraftActions
+                                                    version={version}
+                                                    organizations={organizations}
+                                                />
+                                            )}
+                                            {canManage && version.status === 'published' && (
+                                                <div className="flex justify-end pt-2">
+                                                    <CreateVersionDraftAction version={version} />
                                                 </div>
                                             )}
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            <Empty>
-                                <EmptyHeader>
-                                    <EmptyMedia variant="icon">
-                                        <Network />
-                                    </EmptyMedia>
-                                    <EmptyTitle>Belum ada hierarchy</EmptyTitle>
-                                    <EmptyDescription>
-                                        Tenant dengan satu legal entity dapat
-                                        bekerja tanpa hierarchy.
-                                    </EmptyDescription>
-                                </EmptyHeader>
-                            </Empty>
-                        )}
-                    </CardContent>
-                </Card>}
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <Empty className="py-16">
+                                    <EmptyHeader>
+                                        <EmptyMedia variant="icon">
+                                            <Network className="size-8 text-muted-foreground" />
+                                        </EmptyMedia>
+                                        <EmptyTitle>Belum Ada Hierarchy Organisasi</EmptyTitle>
+                                        <EmptyDescription className="text-xs text-muted-foreground max-w-sm">
+                                            Buat hierarchy baru untuk menyusun bagan organigram dan struktur hubungan antar unit bisnis.
+                                        </EmptyDescription>
+                                    </EmptyHeader>
+                                </Empty>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </main>
         </>
     );
