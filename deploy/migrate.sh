@@ -6,4 +6,4 @@
 # melakukan seeding data bisnis.
 set -eu
 
-php /var/www/html/artisan migrate --force --no-interaction --path=/var/www/database/migrations
+php /var/www/html/artisan migrate --force --no-interaction --path=../database/migrations
