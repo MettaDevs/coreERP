@@ -15,6 +15,7 @@ flowchart TD
     S6 --> S7[7 · Masuk stack lokal]
     S7 --> S8[8 · Gate concurrency]
     S8 --> S9[9 · Katalog dan release]
+    S9 --> S10[10 · Dokumentasi untuk developer]
 ```
 
 ---
@@ -293,7 +294,7 @@ Gate kebenaran wajib **nol**, diverifikasi lewat SQL langsung ke database — bu
 Nol pelanggaran lintas tenant, nol nomor ganda, nol eskalasi hak, nol 5xx aplikasi. Kalau load test tidak dapat dijalankan, nyatakan app belum terverifikasi di bawah concurrency dan **jangan** laporkan selesai.
 :::
 
-Implementasi rujukan lengkap ada di `app-erp-management-aset/loadtest/`. Aturan: [Load dan concurrency testing](/dev/15-load-and-concurrency-testing).
+Implementasi rujukan lengkap ada di `app-erp-management-aset/loadtest/`. Aturan: [Load dan concurrency testing](/dev/20-load-and-concurrency-testing).
 
 ---
 

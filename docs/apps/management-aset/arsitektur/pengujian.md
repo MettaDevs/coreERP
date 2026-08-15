@@ -95,7 +95,7 @@ Periksa daftar resource di skrip terhadap rute yang ada. Nama yang kebetulan ter
 
 ## Gate sebelum menyebut modul selesai
 
-Ini aturan platform, bukan pilihan modul. Rinciannya di [Load dan concurrency testing](/dev/15-load-and-concurrency-testing).
+Ini aturan platform, bukan pilihan modul. Rinciannya di [Load dan concurrency testing](/dev/20-load-and-concurrency-testing).
 
 Yang harus nol, dan tidak bergantung pada kecepatan mesin:
 
@@ -116,6 +116,6 @@ Temuan pentingnya bukan angka throughput, melainkan **apa yang jenuh lebih dulu*
 
 ## Halaman terkait
 
-- [Load dan concurrency testing](/dev/15-load-and-concurrency-testing) — gate platform
+- [Load dan concurrency testing](/dev/20-load-and-concurrency-testing) — gate platform
 - [Database dan migration](/apps/management-aset/arsitektur/database) — batasan yang diandalkan pengujian
 - `loadtest/README.md` di repo app — cara menjalankan dan batas kejujuran hasilnya

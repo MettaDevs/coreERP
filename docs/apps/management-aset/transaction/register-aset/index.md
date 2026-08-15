@@ -176,7 +176,7 @@ App tidak pernah menyentuh database Core. Semua lewat API atau token. Lihat [Num
 1. Endpoint baru wajib masuk `contracts/src/paths/aset.yaml`, lalu jalankan `python contracts/bundle.py`. Ada pemeriksa di CI yang menolak rute tanpa kontrak.
 2. Kueri baru wajib lewat `OrganizationScope`, bukan hanya `where('tenant_id')`.
 3. Aksi baru butuh permission sendiri di `app.yaml`, bukan menumpang permission yang sudah ada.
-4. Kalau menambah endpoint yang mengganti sekumpulan baris sekaligus, kunci baris pemiliknya dulu. Alasannya ada di [gate concurrency](/dev/15-load-and-concurrency-testing).
+4. Kalau menambah endpoint yang mengganti sekumpulan baris sekaligus, kunci baris pemiliknya dulu. Alasannya ada di [gate concurrency](/dev/20-load-and-concurrency-testing).
 
 ## Lihat juga
 
@@ -184,4 +184,4 @@ App tidak pernah menyentuh database Core. Semua lewat API atau token. Lihat [Num
 - [Standar module](/dev/02-module-standard) — kontrak yang harus dipenuhi setiap app
 - [Identity dan access](/dev/09-identity-and-access) — permission, duty, dan scope organisasi
 - [Number sequence](/dev/14-number-sequences) — cara nomor diterbitkan
-- [Load dan concurrency testing](/dev/15-load-and-concurrency-testing) — gate sebelum modul disebut selesai
+- [Load dan concurrency testing](/dev/20-load-and-concurrency-testing) — gate sebelum modul disebut selesai

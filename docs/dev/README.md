@@ -34,12 +34,12 @@ Target yang dikunci:
 | [12-external-module-integration.md](12-external-module-integration.md) | Panduan integrasi sistem eksternal ke modul CoreERP |
 | [13-publishing-an-app-release.md](13-publishing-an-app-release.md) | Kontrak CI untuk mendaftarkan katalog dan release app dari repository terpisah |
 | [14-number-sequences.md](14-number-sequences.md) | Reference nomor aplikasi, konfigurasi tenant, scope, periode reset fiskal, API penerbitan, dan scale-out |
-| [15-load-and-concurrency-testing.md](15-load-and-concurrency-testing.md) | Gate concurrency wajib sebelum modul dinyatakan selesai: 1000+ VU, 100+ tenant, multi-instance, dan oracle kebenaran |
 | [15-fiscal-calendars.md](15-fiscal-calendars.md) | Kalender fiskal, tahun dan periode fiskal, serta kepemilikannya oleh entitas legal |
 | [16-units-of-measure.md](16-units-of-measure.md) | Cara menyiapkan kelas, sistem, satuan, dan konversi umum |
 | [17-healthcare-finance-subledger.md](17-healthcare-finance-subledger.md) | Healthcare sebagai subledger, proses verifikasi, dan posting Finance yang dapat dikonfigurasi per faskes |
 | [18-module-discovery-and-decision-gate.md](18-module-discovery-and-decision-gate.md) | Gate keputusan sebelum membuat app, master, transaksi, workflow, nomor, atau integrasi |
 | [19-transaction-security-chain.md](19-transaction-security-chain.md) | Rantai keamanan satu modul transaksi: empat lapis manifest, lalu security role sampai user |
+| [20-load-and-concurrency-testing.md](20-load-and-concurrency-testing.md) | Gate concurrency wajib sebelum modul dinyatakan selesai: 1000+ VU, 100+ tenant, multi-instance, penguncian endpoint pengganti, dan oracle kebenaran |
 
 ## Referensi utama
 

@@ -67,7 +67,7 @@ Karena itu tiap penggantian menahan baris pemiliknya lebih dulu.
 
 Tabel kaitan pekerjaan × jenis aset punya kerumitan tambahan: ia disunting dari **dua arah**. Mengunci pemilik masing-masing arah tidak menolong, karena keduanya memegang kunci pada tabel berbeda. Jadi kedua arah mengunci sisi yang sama — sisi pekerjaan — atas gabungan daftar lama dan baru, dalam urutan id yang tetap supaya tidak saling menunggu.
 
-Kalau Anda menambah endpoint sejenis, ikuti pola itu. Lihat [gate concurrency](/dev/15-load-and-concurrency-testing).
+Kalau Anda menambah endpoint sejenis, ikuti pola itu. Lihat [gate concurrency](/dev/20-load-and-concurrency-testing).
 
 ## Data awal
 

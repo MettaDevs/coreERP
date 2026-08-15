@@ -81,7 +81,7 @@ Tautkan ke aturan platform yang berlaku, bukan menyalin isinya:
 - [Standar module](/dev/02-module-standard)
 - [Identity dan access](/dev/09-identity-and-access)
 - [Number sequence](/dev/14-number-sequences)
-- [Load dan concurrency testing](/dev/15-load-and-concurrency-testing)
+- [Load dan concurrency testing](/dev/20-load-and-concurrency-testing)
 
 Halaman baru wajib didaftarkan di `docs/.vitepress/config.ts` — sidebar disusun manual, jadi halaman yang tidak didaftarkan tidak akan ditemukan orang.
 

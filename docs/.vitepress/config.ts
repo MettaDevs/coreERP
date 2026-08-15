@@ -195,7 +195,7 @@ export default withMermaid({
           text: 'Gate kualitas',
           collapsed: true,
           items: [
-            { text: 'Load dan concurrency testing', link: '/dev/15-load-and-concurrency-testing' },
+            { text: 'Load dan concurrency testing', link: '/dev/20-load-and-concurrency-testing' },
           ],
         },
         {

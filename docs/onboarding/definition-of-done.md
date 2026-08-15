@@ -61,7 +61,7 @@ Semua di atas, plus **gate load test**. Module tidak selesai hanya karena featur
 
 Diverifikasi lewat **SQL langsung ke database** sesudah run — bukan lewat API. API adalah yang sedang diuji; ia tidak boleh jadi hakim atas dirinya sendiri. Probe lintas tenant dijalankan *selama* beban penuh, bukan sesudahnya.
 
-Detail lengkap termasuk gate latensi: [Load dan concurrency testing](/dev/15-load-and-concurrency-testing). Implementasi rujukan ada di `app-erp-management-aset/loadtest/`.
+Detail lengkap termasuk gate latensi: [Load dan concurrency testing](/dev/20-load-and-concurrency-testing). Implementasi rujukan ada di `app-erp-management-aset/loadtest/`.
 
 ## Kalau gate tidak bisa dijalankan
 
@@ -82,5 +82,5 @@ Di [`docs/todo/`](/todo/), sebuah item hanya boleh ditandai `[x]` kalau memenuhi
 ## Lihat juga
 
 - [Gate fondasi Core](/dev/10-core-foundation-gates) — kapan sebuah fondasi boleh mulai dibangun
-- [Load dan concurrency testing](/dev/15-load-and-concurrency-testing)
+- [Load dan concurrency testing](/dev/20-load-and-concurrency-testing)
 - [Cara berkontribusi](/onboarding/kontribusi)

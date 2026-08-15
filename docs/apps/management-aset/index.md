@@ -81,7 +81,7 @@ Semua master memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core,
 
 **Reference nomor** — daftar lengkapnya di `app.yaml` bagian `number_sequences.references`; jumlahnya bertambah tiap kali ada master baru, jadi jangan menyalin angkanya ke sini. Dokumen dekomisioning memakai `management-aset.dekomisioning-aset` dengan prefix `DKMA`. Admin tenant mengaktifkan dan mengatur formatnya lewat **Nomor dokumen** di Control Plane.
 
-**Workflow** — manifest mendaftarkan tipe **Verifikasi usulan pemusnahan aset**. Admin tenant memilih approver dan mengaktifkan versinya di Core. App mengonsumsi keputusan lewat event bertanda tangan `core.workflow.decision.v1`; setelah `approved` diterima, aset menjadi `decommissioned` dan baru boleh dijual atau dimusnahkan.
+**Workflow** — manifest mendaftarkan tipe **Verifikasi usulan pemusnahan aset**. Admin tenant memilih approver dan mengaktifkan versinya di Core. App mengonsumsi keputusan lewat event bertanda tangan `core.workflow.decision.v2`; setelah `approved` diterima, aset menjadi `decommissioned` dan baru boleh dijual atau dimusnahkan.
 
 ## Struktur kode
 
@@ -153,7 +153,7 @@ Diakses lewat shell Core di `http://localhost:8000`.
 - [Standar module](/dev/02-module-standard) — kontrak app
 - [Identity dan access](/dev/09-identity-and-access) — permission dan scope
 - [Number sequence](/dev/14-number-sequences) — penerbitan `kode`
-- [Load dan concurrency testing](/dev/15-load-and-concurrency-testing) — gate yang sudah dilewati app ini
+- [Load dan concurrency testing](/dev/20-load-and-concurrency-testing) — gate yang sudah dilewati app ini
 - [Backlog app management aset](/todo/general/06-app-management-aset) — temuan audit yang menunggu review
 
 ## Lihat juga
