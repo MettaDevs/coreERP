@@ -44104,7 +44104,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "ui/src/master/detail/MasterDetailPage.tsx",
-      "source_location": "L77",
+      "source_location": "L76",
       "weight": 1.0,
       "_origin": "ast",
       "source": "ui_src_master_detail_masterdetailpage_masterdetailpage",

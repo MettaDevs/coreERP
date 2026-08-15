@@ -325,8 +325,8 @@
     "semantic_hash": ""
   },
   "app.yaml": {
-    "mtime": 1786701110.186683,
-    "ast_hash": "ba69c87e2471db8529ae4cdcd3ccdab9",
+    "mtime": 1786696839.4863172,
+    "ast_hash": "609208fce61e67c318d9dcfe78ad58d5",
     "semantic_hash": ""
   },
   "contracts/asyncapi.yaml": {
@@ -940,8 +940,8 @@
     "semantic_hash": ""
   },
   "ui/src/master/detail/MasterDetailPage.tsx": {
-    "mtime": 1786702080.3690443,
-    "ast_hash": "53ae86e60ea3beed538556bc19b27e10",
+    "mtime": 1786697013.8762643,
+    "ast_hash": "9aba7c1b737c5f34d90c4f6eb34a5f25",
     "semantic_hash": ""
   },
   "ui/src/master/detail/RecordDetailPane.tsx": {

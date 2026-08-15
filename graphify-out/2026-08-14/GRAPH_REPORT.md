@@ -1,7 +1,7 @@
 # Graph Report - app-erp-management-aset  (2026-08-14)
 
 ## Corpus Check
-- 201 files · ~110,915 words
+- 201 files · ~110,880 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
