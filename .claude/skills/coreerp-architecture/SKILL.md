@@ -1,6 +1,6 @@
 ---
 name: coreerp-architecture
-description: Guard CoreERP architecture boundaries, organization model, authorization, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, installation, placement, deployment, product launcher, upgrades, SaaS/on-prem packaging, or module availability UI/API.
+description: Guard CoreERP architecture boundaries, organization model, authorization, contracts, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, installation, placement, deployment, product launcher, upgrades, SaaS/on-prem packaging, or module availability UI/API. Also use when touching any cross-module surface — OpenAPI/AsyncAPI contract files, `internal/v1` endpoints, published events, webhooks, event envelopes or versions — or when adding a route another app calls.
 ---
 
 # CoreERP Architecture
@@ -89,6 +89,160 @@ Before adding or changing a Number Sequence reference, manifest, setting, or API
 7. Keep business references in the app manifest. Keep tenant configuration, counter, audit, and issuance in Control Plane. Never grant an app direct database access.
 8. If any of those choices are absent from the request, recommend the smallest safe setting and ask before changing code or documentation as if it were settled.
 
+### Data policy decision gate
+
+Before creating or changing an app resource that stores or exposes operational
+records:
+
+1. Classify the resource as tenant-wide reference data, legal-entity-scoped
+   data, or data that needs an organization security policy. Do not make an
+   operating unit a universal filter merely because it exists in the workspace.
+2. For a policy-scoped resource, the app manifest/contract must declare one
+   stable, namespaced policy code (for example
+   `management-aset.asset-responsibility`), the protected entry points/actions,
+   the required legal-entity and operating-unit dimensions, and whether an
+   organization grant may include descendants.
+3. The app contract must state which business record fields/relations it uses
+   to enforce the policy. Those implementation details remain inside the app;
+   Core must not receive table names, query its database, or own its query.
+4. Core owns the policy catalog, role-assignment grants, hierarchy/version
+   resolution, effective dates, provenance, audit, and signed policy-specific
+   context claims. The app owns enforcement on every list, search, detail,
+   create, update, delete, and sensitive action endpoint.
+5. A workspace selection may default a filter or new-record value only. It is
+   never authorization, and browser-supplied organization IDs are never proof
+   of access.
+6. Define and test the combination rule before implementation when more than
+   one role, policy, grant, automatic source, or temporary source can apply.
+   Do not silently assume union; XDS policies may intersect, while a process
+   can have its own documented organization-grant rule.
+
+Use the implementation backlog in
+`docs/todo/addNewRulestoCoreforFleksibilitas/README.md` until its target model
+is promoted into the canonical design. The Dynamics references behind this gate
+are the organization, Budget planning security, and XDS documentation linked
+there.
+
+### Contract decision gate
+
+A contract is the promise a module makes to code it does not control. It is not
+documentation of the code, and it is not optional once an endpoint or event
+crosses a module boundary.
+
+Before adding or changing anything reachable from outside the module — any
+`internal/v1` endpoint, any published event, any webhook, any signed payload:
+
+1. **Decide the transport from the semantics, not from convenience.** REST is a
+   command or a query: "do this", "give me that". An event is a fact that already
+   happened. A synchronous call documented as a channel, or a fact modelled as a
+   command, is a wrong contract even when the code works.
+2. **The contract is written, not generated, for every cross-module surface.**
+   Generated specs are acceptable only for surfaces whose sole consumer is this
+   module's own UI. A generated file cannot be the source of truth for a promise,
+   because changing the code silently changes the promise.
+3. **An undocumented cross-module surface is an incomplete change.** If a route
+   exists that another app calls and it is absent from the contract, the change is
+   not finished. Absence is the most common failure here and it is invisible in
+   tests — nothing fails when a contract omits an endpoint. For Control Plane, the
+   app-facing surface lives in `contracts/openapi-internal.yaml` and is enforced by
+   `python contracts/check-contract-coverage.py`, which also runs in CI. Run it after
+   any change to `routes/api.php`.
+
+   **Every app carries its own coverage check, not only Control Plane**, and it runs in
+   CI — a checker no pipeline invokes is a file, not a gate. Three things decide whether
+   it is worth having:
+
+   - **Read routes from the framework, not from the route file's text.** Masters are
+     commonly registered by looping over an array, so their paths never appear as
+     literals; a regular expression reports a clean run while missing most of the
+     surface. `php artisan route:list --json` is the only authoritative list.
+   - **Expand path templates whose parameter carries an `enum` before comparing.** One
+     templated path can legitimately document several concrete resources. Compared
+     literally it reports real, documented endpoints as missing, and a check that cries
+     wolf is a check people learn to skip — worse than having none.
+   - **Name deferred gaps; never allowlist them silently.** A gap that is known and owned
+     belongs in an explicit list carrying its reason, printed on every run. An entry that
+     no longer matches a live route must fail, or a stale exemption quietly excuses
+     whatever route later claims that path.
+4. **Code must not accept what the contract forbids.** The aspirational-shape rule has a
+   mirror that is easier to miss: a handler validating a field the contract declares
+   impossible — `additionalProperties: false` with that key absent — advertises a
+   capability nobody can use. It is not merely dead code; the next reader concludes the
+   publisher can send it. Where the contract defers a field, the code waits for the
+   contract, never the other way round.
+5. **Events carry the full envelope and an explicit version.** Channel names are
+   `module.aggregate.action.vN` per `docs/dev/04-api-and-integration.md`; the
+   envelope carries `id`, `type`, `occurred_at`, `tenant_id`, `correlation_id`,
+   and `data`, plus `legal_entity_id` when the fact has legal or accounting
+   consequence and `org_unit_id` when an operating unit owns it. A channel without
+   `.vN` has no way to change without breaking every consumer.
+6. **Document what is true, then name the gap.** When the code does not yet satisfy
+   the canonical rule, the contract describes the code and states the gap in
+   `info.description`. Never write the aspirational shape — a consumer would build
+   against a field that never arrives.
+7. **A published version is immutable.** Adding a required field, removing one, or
+   narrowing a type is `vN+1`, not an edit to `vN`. Widening an enum a consumer
+   switches on is also breaking.
+8. **Both sides move together.** Publisher and consumer contracts live in separate
+   repos; a change to one is incomplete until the other matches in the same piece of
+   work. State explicitly which files in which repos were changed. A published event
+   is only real when all three legs exist: the publisher writes it, the transport
+   routes it to a URL, and the consumer has a route that accepts it. Two of the three
+   is a fact nobody receives.
+
+   Because such a change lands as several branches, start each from the updated default
+   branch. `git checkout -b` branches from wherever you are standing, so continuing
+   straight from the previous feature branch silently carries its commits along; every
+   PR then targets the default branch and shows the same work again, and a reviewer
+   reads the same diff several times. When one change genuinely builds on another,
+   branch from it deliberately and set the PR's base to that branch, not to the default
+   one.
+9. **Transport security is part of the contract.** Signature headers, the exact
+   string that is signed, and the failure status belong in the spec. A consumer
+   cannot verify a signature it has to reverse-engineer from the publisher's source.
+10. **Split before the file becomes unreviewable.** Past roughly 1500 lines, break the
+   spec into `paths/` and `components/` joined by `$ref`, and commit a bundled
+   artifact next to the split source for tooling that cannot resolve cross-file
+   refs. One 10k-line spec guarantees merge conflicts between unrelated features.
+
+#### Envelope fields cannot be added retroactively
+
+`core.workflow.decision` reached `v2` because `v1` shipped without `correlation_id`.
+The lesson is about *when* a field must exist, not about that one field:
+
+- **A field that records what happened at request time must be persisted at request
+  time.** A workflow decision is emitted days after the request that started it, so
+  reading the correlation from the current request is impossible — it has to live on
+  the aggregate (`workflow_instances.correlation_id`) before it can reach the event.
+  Any envelope field describing the *origin* of a fact has this shape.
+- **History cannot be backfilled.** Events already delivered without a correlation are
+  permanently uncorrelated. This is why the cost of omitting such a field grows with
+  time while the cost of adding it stays flat — add it when the table is created.
+- **Batch envelope changes into one version.** `correlation_id` and `legal_entity_id`
+  went out together in `v2` because making every consumer migrate twice for one
+  envelope is a cost with no benefit. Before bumping a version, check whether any
+  other known envelope gap should ride along.
+- **A publisher must refuse to emit a payload that violates its own contract.** When a
+  required envelope field is missing, hold the row back and report it. Sending a
+  half-formed event moves the failure to the consumer, where it looks like a bug in
+  code that did nothing wrong.
+- **Deriving a field is part of the design, not an afterthought.** `legal_entity_id`
+  is not on the workflow instance; it is reached through the configuration version the
+  instance ran against. If a required envelope field has no obvious source, resolve
+  where it comes from before promising it in the contract.
+- **The consumer's transport client sends what the publisher needs.** A correlation
+  only exists if the caller supplies it — `WorkflowClient` sends `X-Correlation-Id`.
+  An envelope field nobody populates is a contract that is true and useless.
+
+Security objects follow the same rule and have a specific trap. Entry points,
+permissions, privileges, and duties are **declared in the app manifest** and travel
+with the release. Tenants compose roles and duties from those declarations; they
+never mint new codes. Dynamics 365 F&O allows security objects to be created through
+the UI, which stores them only in that environment's database under generated GUID
+names — unreviewable, unversioned, and lost on refresh. CoreERP deliberately rejects
+that model (`docs/dev/09-identity-and-access.md`). Never add a path that lets a
+tenant create a permission code or entry point at runtime.
+
 Before implementing module-availability UI or API:
 
 1. Translate the user's exact noun into a lifecycle state.
@@ -124,6 +278,25 @@ Before reporting any new module complete, run a load test that satisfies **all**
 
 Multiple instances are not decoration. They are the only way to prove the module keeps no counter, no tenant identity, and no permission cache in the memory of one API process.
 
+### Replace endpoints must hold the row they replace
+
+An endpoint that swaps a whole set — "these are now the linked records" — deletes and
+re-inserts. Inside a transaction that still is not enough: two callers can interleave so
+one deletes, the other deletes and inserts, then the first inserts on top. The result is
+the **union of both sets**, which neither caller asked for and which no database
+constraint rejects, because every surviving row is individually valid. Take
+`lockForUpdate()` on the owning row inside the transaction, before the delete.
+
+A join table edited from **both** ends needs more care. Locking each direction's own
+owner does not serialise anything — the two directions hold locks on different tables and
+still overwrite each other. Both directions must lock the **same** side, over the union of
+the old and new sets, so that any two operations touching link `(a, b)` share a lock. Take
+those locks in a fixed order (sort by id) or two transactions will grab the same rows in
+opposite order and wait on each other forever.
+
+Feature tests cannot show any of this, and neither can a code review that only reads one
+request at a time. It belongs in the load test below.
+
 ### Correctness gate — hard, applies on any hardware
 
 These must be **exactly zero**. They do not scale with CPU, so a slow laptop is never an excuse:
@@ -137,6 +310,20 @@ These must be **exactly zero**. They do not scale with CPU, so a slow laptop is 
 - any number-sequence prefix belonging to a different reference than the master that stored it
 
 Verify these with SQL against the database after the run, not through the API. The API is the thing under test; it cannot be its own oracle.
+
+**A scenario that never contends proves nothing.** Spreading virtual users evenly across
+every tenant and every record is the right shape for saturation, and the wrong shape for
+a race: two writers almost never meet, the run comes back green, and the defect ships.
+Race scenarios concentrate — many users, few records, writing deliberately conflicting
+values — and assert the read-back equals one of the values submitted, never a blend of
+them. Keep them as their own profile alongside saturation; each answers a question the
+other cannot.
+
+**Every new surface needs its own scenario.** A module whose load test covers the masters
+it shipped with, but not the ones added later, is unverified for the part that changed.
+Check the scenario's resource list against the routes before claiming a module is
+covered — a name that merely sounds related (an old master that happens to contain the
+word) is not coverage.
 
 ### Latency gate — measured at sustainable concurrency
 
