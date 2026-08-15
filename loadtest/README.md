@@ -51,6 +51,21 @@ Uji khusus penggantian Values bersamaan dengan koreksi nilai atribut aset:
 docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=attribute-race -e VUS=32 -e DURATION=90s -e RUN_ID=attribute-run1 grafana/k6:0.55.0 run /scripts/master-data.js
 ```
 
+Setup maintenance. Profil `link-race` sengaja memusatkan banyak VU pada sedikit
+tenant, karena menyebar beban ke 128 tenant membuat balapan hampir tidak pernah
+terjadi. Endpoint penggantian kaitan menghapus lalu menyisipkan ulang; tanpa
+kunci baris, dua penulis dapat saling menyela dan menghasilkan gabungan dua
+himpunan — keadaan yang tidak diminta siapa pun dan yang tidak ditolak batasan
+basis data mana pun. Metrik `link_merged_sets` menghitungnya dan digate ke nol:
+
+```bash
+docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=link-race -e VUS=32 -e DURATION=90s -e RUN_ID=mnt-race1 grafana/k6:0.55.0 run /scripts/maintenance.js
+```
+
+```bash
+docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=saturation -e VUS=1000 -e DURATION=120s -e RUN_ID=mnt-run1 grafana/k6:0.55.0 run /scripts/maintenance.js
+```
+
 Skenario penyusutan menyiapkan tiga periode per tenant dan menguji retry
 proposal/finalisasi pada 1000 VU:
 
