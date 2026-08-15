@@ -20,7 +20,6 @@ final class TenantProvisioningController
             'data' => ['sometimes', 'array'],
             'data.app_ids' => ['required', 'array'],
             'data.app_ids.*' => ['string', 'max:80'],
-            'data.template_key' => ['sometimes', 'string', 'max:160'],
         ]);
 
         if (! in_array((string) config('services.coreerp.app_id'), $data['data']['app_ids'], true)) {
@@ -30,7 +29,13 @@ final class TenantProvisioningController
             ]]);
         }
 
-        $result = $provisioner->forTenant($data['tenant_id'], $data['data']['template_key'] ?? null);
+        // Versi template tidak diambil dari payload. `core.tenant.provisioned.v1`
+        // mendeklarasikan `data` dengan `additionalProperties: false` dan hanya
+        // `app_ids`, jadi field lain tidak akan pernah tiba lewat jalur yang sah;
+        // menerimanya di sini hanya mengiklankan kemampuan yang tidak ada. Pemilihan
+        // template menunggu versi envelope berikutnya, dan saat itu kontrak Core dan
+        // kontrak app ini harus berubah bersama.
+        $result = $provisioner->forTenant($data['tenant_id']);
 
         return response()->json(['data' => [
             'tenant_id' => $data['tenant_id'],
