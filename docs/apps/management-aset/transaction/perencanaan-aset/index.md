@@ -4,12 +4,14 @@ Halaman ini untuk developer. Isinya dokumen rencana pengadaan aset — yang dibu
 
 Rencana aset adalah daftar barang yang akan diadakan beserta jumlah dan satuannya. Ia belum menjadi aset; aset baru lahir saat barangnya diterima.
 
-## Bentuknya: satu kepala, banyak baris
+## Bentuknya: satu dokumen, banyak baris
 
-| Bagian | Isi |
+| Tabel | Isi |
 | --- | --- |
-| Kepala | Nomor rencana, entitas, unit kerja, status |
-| Baris (`details`) | Barang apa, berapa banyak, satuan apa |
+| `tr_perencanaan_aset` | Dokumennya: nomor rencana, entitas, unit kerja, status, versi |
+| `tr_perencanaan_aset_details` | Baris: barang apa, berapa banyak, satuan apa |
+
+Dokumen permintaan pembelian memakai bentuk yang sama — `tr_permintaan_pengadaan_aset` dan `tr_permintaan_pengadaan_aset_details` — tetapi perilakunya belum diputuskan.
 
 Satuan diambil dari Core lewat `UnitOfMeasureClient`, bukan disimpan sebagai teks bebas. Kalau layanan satuan belum bisa dihubungi, permintaan gagal 503 — bukan menyimpan satuan yang tidak bisa diverifikasi.
 
@@ -50,7 +52,7 @@ Pola yang sama dipakai work order.
 
 ## Hubungannya dengan pengadaan
 
-Rencana **belum** memesan apa pun. Dokumen permintaan pembelian adalah langkah berikutnya, dan sampai sekarang baru berupa rangka rute — perilakunya belum diputuskan, jadi kontraknya sengaja belum ditulis.
+Rencana **belum** memesan apa pun. Dokumen permintaan pembelian adalah langkah berikutnya, dan sampai sekarang rutenya sudah ada tetapi isinya belum dikerjakan — perilakunya belum diputuskan, jadi kontraknya sengaja belum ditulis.
 
 Lihat catatan di [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/).
 

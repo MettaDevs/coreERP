@@ -15,10 +15,18 @@ Kontrak adalah **janji ke kode yang tidak kita kendalikan**. Ia bukan dokumentas
 
 ```
 contracts/src/
-├── openapi.yaml            kerangka dan daftar bagian
-├── paths/                  per area: aset, master-data, penyusutan, maintenance…
-└── components/             schema, response, parameter, security
+├── openapi.yaml                    kerangka dan daftar bagian
+├── paths/
+│   ├── platform.yaml               health, context, reference-data
+│   ├── master-data.yaml            semua master beserta endpoint turunannya
+│   ├── maintenance.yaml            setup maintenance dan penautannya
+│   ├── aset.yaml                   register aset dan dokumen siklus
+│   ├── pemeliharaan-aset.yaml      work order
+│   └── penyusutan.yaml             proposal, finalisasi, pembalikan
+└── components/                     schema, response, parameter, security
 ```
+
+Urutan berkas di `paths/` ditentukan `x-bundle` pada `src/openapi.yaml`; berkas baru harus didaftarkan di sana, kalau tidak isinya tidak ikut tergabung dan pemeriksa cakupan akan melaporkan rutenya sebagai tak terdokumentasi.
 
 Setelah menyunting `src/`, bangun ulang:
 
@@ -40,7 +48,7 @@ Tiga hal yang membuatnya berguna, dan yang perlu Anda pertahankan kalau menyunti
 
 **Rute dibaca dari Laravel**, lewat `php artisan route:list --json`, bukan dari teks `routes/api.php`. Sebagian besar master didaftarkan lewat loop atas array `$masters`, jadi jalurnya tidak pernah muncul sebagai literal — pendekatan pencocokan teks akan melapor bersih sambil melewatkan puluhan rute.
 
-**Jalur bertemplat ber-`enum` dimekarkan** sebelum dibandingkan. `/api/v1/{lifecycleDocument}` mendokumentasikan empat resource nyata lewat satu jalur. Dibandingkan apa adanya, ia melaporkan endpoint yang sebenarnya terdokumentasi sebagai hilang — dan pemeriksa yang berteriak serigala adalah pemeriksa yang orang belajar abaikan.
+**Jalur bertemplat ber-`enum` dimekarkan** sebelum dibandingkan. `/api/v1/{lifecycleDocument}` mendokumentasikan empat resource nyata lewat satu jalur. Dibandingkan apa adanya, ia melaporkan endpoint yang sebenarnya terdokumentasi sebagai hilang. Pemeriksa yang sering salah memberi peringatan akan berhenti dipercaya, lalu diabaikan — dan itu lebih buruk daripada tidak punya pemeriksa sama sekali.
 
 **Celah yang ditunda disebut, bukan dimaafkan diam-diam.** Daftar `DEFERRED` memuat alasannya dan dicetak tiap kali pemeriksa jalan. Entry yang tidak lagi cocok dengan rute hidup dilaporkan sebagai galat, supaya pengecualian basi tidak memaafkan rute lain yang kelak memakai jalur itu.
 

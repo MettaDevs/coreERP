@@ -49,6 +49,8 @@ Kelas itu hanya memegang grafik transisi dan haknya. Syarat isi data — baris p
 
 **Riwayat status disimpan.** Tabel `tr_pemeliharaan_aset_status_log` mencatat tiap perpindahan. Detail work order mengembalikannya sebagai `status_log`.
 
+Tabel lain yang terlibat: `tr_pemeliharaan_aset_details` menyimpan baris pekerjaan, dan `tr_pemeliharaan_aset_checklist` menyimpan hasil pemeriksaan yang dimekarkan dari template.
+
 **Perubahan memakai penanda versi.** Kalau dokumen sudah berubah sejak terakhir dibaca, permintaan ditolak sebagai versi basi, bukan ditimpa. Dua orang yang membuka pekerjaan yang sama tidak saling menghapus perubahan tanpa sadar.
 
 **Checklist dari template dimekarkan saat diisi**, bukan disalin saat template dibuat. Jadi memperbaiki template memperbaiki pekerjaan yang belum diisi, dan tidak mengubah yang sudah diisi.
@@ -60,6 +62,8 @@ Kelas itu hanya memegang grafik transisi dan haknya. Syarat isi data — baris p
 | `api/app/Support/WorkOrderStatus.php` | Grafik transisi dan hak penjaganya |
 | `api/app/Http/Controllers/transaksi/PemeliharaanAset/PemeliharaanAsetController.php` | Dokumen work order |
 | `api/app/Http/Controllers/transaksi/PemeliharaanAset/PelaksanaanController.php` | Pengisian checklist dan pemekaran template |
+| `ui/src/transactions/pemeliharaan-aset/WorkOrderPage.tsx` | Layar work order |
+| `ui/src/transactions/pemeliharaan-aset/StatusValidationPage.tsx` | Layar matriks validasi status |
 | `database/migrations/2026_08_15_110000_create_work_order_tables.php` | Tabel work order |
 | `api/tests/Feature/WorkOrderTest.php`, `WorkOrderExecutionTest.php` | Test |
 

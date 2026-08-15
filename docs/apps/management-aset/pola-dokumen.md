@@ -46,6 +46,16 @@ Kalau Anda tidak tahu alasannya, cari di komentar kode atau riwayat git. Kalau t
 - **Bahasa Indonesia sehari-hari.** Tulis seperti menjelaskan ke rekan kerja, bukan seperti dokumen resmi.
 - **Hindari kata yang jarang dipakai.** Tulis "berkas" bukan "artefak", "susunan" bukan "arsitektur data", "bagian" bukan "komponen" kalau memang bisa.
 - **Istilah teknis yang memang nama benda tetap dipakai apa adanya** — `tenant_id`, endpoint, permission, idempotency. Menerjemahkannya justru membingungkan waktu orang mencari di kode.
+- **Jangan menerjemahkan kiasan Inggris kata per kata.** Ini kesalahan yang paling sering lolos, karena hasilnya terlihat seperti bahasa Indonesia padahal tidak berarti apa-apa:
+
+  | Jangan | Kenapa | Tulis |
+  | --- | --- | --- |
+  | "jendelanya 300 detik" | *Time window*. Dalam bahasa Indonesia jendela ya jendela rumah | "batas selisihnya 300 detik" |
+  | "pemeriksa yang berteriak serigala" | *Cry wolf*. Ceritanya tidak dikenal sebagai peribahasa di sini | "pemeriksa yang sering salah memberi peringatan" |
+  | "stempel karet" | *Rubber stamp* | "persetujuan yang hanya formalitas" |
+  | "tidak bisa jadi saksi bagi dirinya sendiri" | Terdengar seperti sidang | "jawabannya tidak bisa dipakai menilai dirinya sendiri" |
+
+  Ujinya: bacakan kalimatnya keras-keras ke orang yang tidak tahu bahasa Inggris. Kalau ia berhenti dan bertanya "maksudnya apa?", ganti.
 - **Jangan menakut-nakuti dan jangan menjual.** Tidak perlu "sangat penting", "krusial", "wajib diperhatikan". Kalau memang penting, alasannya yang menunjukkan.
 
 ## Angka yang berubah jangan disalin

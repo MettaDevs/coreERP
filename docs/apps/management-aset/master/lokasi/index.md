@@ -6,10 +6,10 @@ Lokasi menjawab **di mana barangnya berada**. Yang membuatnya lebih menarik dari
 
 ## Dua master
 
-| Master | Isi |
-| --- | --- |
-| `tipe-lokasi-aset` | Golongan lokasi, misalnya gudang, kantor, area produksi |
-| `lokasi-aset` | Lokasi sebenarnya, boleh berinduk lokasi lain |
+| Master | Tabel | Isi |
+| --- | --- | --- |
+| `tipe-lokasi-aset` | `m_tipe_lokasi_aset` | Golongan lokasi, misalnya gudang, kantor, area produksi |
+| `lokasi-aset` | `m_lokasi_aset` | Lokasi sebenarnya, boleh berinduk lokasi lain |
 
 Lokasi bisa bersarang: gedung berisi lantai, lantai berisi ruang. Karena itu ia punya `parent_id` yang menunjuk tabelnya sendiri.
 

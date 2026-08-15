@@ -62,6 +62,7 @@ Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, atu
 | [Proses penyusutan](/apps/management-aset/transaction/penyusutan/) | Proposal, finalisasi, pembalikan |
 | [Pemeliharaan aset](/apps/management-aset/transaction/pemeliharaan-aset/) | Work order dan mesin statusnya |
 | [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/) | Dekomisioning, penjualan, pemusnahan |
+| [Monitoring dan layar kosong](/apps/management-aset/transaction/monitoring/) | Ringkasan aset, dan dua layar setup yang sengaja belum berisi |
 
 Kalau menambah halaman baru, ikuti [Pola dokumen fitur](/apps/management-aset/pola-dokumen).
 

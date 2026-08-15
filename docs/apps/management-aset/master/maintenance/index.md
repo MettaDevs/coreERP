@@ -6,13 +6,18 @@ Setup maintenance menjawab satu pertanyaan: **kalau ada pekerjaan pada aset jeni
 
 ## Susunannya
 
-| Master | Isi |
-| --- | --- |
-| **Tipe pekerjaan** (`maintenance-job-types`) | Jenis pekerjaan, misalnya "Servis berkala" |
-| **Varian** (`maintenance-job-type-variants`) | Turunan pekerjaan, misalnya "Servis 10.000 km" |
-| **Default** (`maintenance-job-type-defaults`) | Nilai bawaan saat pekerjaan dibuat |
-| **Variabel checklist** (`maintenance-checklist-variables`) | Hal yang diukur atau dinilai, beserta pilihan hasilnya |
-| **Template checklist** (`maintenance-checklist-templates`) | Susunan baris pemeriksaan |
+| Master | Tabel | Isi |
+| --- | --- | --- |
+| **Tipe pekerjaan** | `m_maintenance_job_type` | Jenis pekerjaan, misalnya "Servis berkala" |
+| **Varian** | `m_maintenance_job_type_variant` | Turunan pekerjaan, misalnya "Servis 10.000 km" |
+| **Default** | `m_maintenance_job_type_default` | Nilai bawaan saat pekerjaan dibuat |
+| **Variabel checklist** | `m_maintenance_checklist_variable`, pilihan nilainya di `m_maintenance_checklist_variable_value` | Hal yang diukur atau dinilai |
+| **Template checklist** | `m_maintenance_checklist_template`, barisnya di `m_maintenance_checklist_template_line` | Susunan baris pemeriksaan |
+| **Kaitan ke jenis aset** | `m_maintenance_job_type_asset_type` | Pekerjaan mana berlaku untuk jenis aset mana |
+
+::: tip Tabel yang sudah dihapus
+`m_maintenance_job_type_requirement` pernah ada untuk menyimpan syarat keahlian dan sertifikat, lalu dihapus migration `2026_08_15_140000`. Alasannya ada di [Master work order](/apps/management-aset/master/work-order/): kompetensi itu milik Human Resources dan dipasang pada pekerja, bukan ditulis sebagai teks bebas di sini.
+:::
 
 Ditambah master pendukung yang dipakai saat pekerjaan dikerjakan — tipe work order, tingkat layanan, sebab kerusakan, tindakan perbaikan, dan keahlian — yang dibahas di [Master work order](/apps/management-aset/master/work-order/).
 

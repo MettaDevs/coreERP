@@ -14,6 +14,7 @@ Yang perlu dipahami:
 
 - **App tidak boleh punya penghitung sendiri.** Nomor yang tidak bisa dipertanggungjawabkan lebih buruk daripada gagal.
 - Kalau reference-nya belum diaktifkan admin tenant, permintaan gagal **503**. Ini bukan kegagalan yang perlu disembunyikan; ia memberi tahu admin ada yang belum disiapkan.
+- Kegagalan dari Core dibungkus `NumberSequenceException`, yang membawa kode galat dan status HTTP-nya sendiri. Controller meneruskannya apa adanya ke pemanggil, bukan mengubahnya jadi 500 — pemanggil perlu tahu bedanya "belum disiapkan" dan "ada yang rusak".
 - Permintaan membawa **kunci idempotency**, sehingga permintaan yang diulang tidak membuang nomor.
 - Permintaan untuk aset membawa `legal_entity_id`, karena penomorannya bisa direset per tahun buku — dan tahun buku milik badan hukum, bukan unit operasi.
 
@@ -40,9 +41,37 @@ Semuanya masuk lewat `POST /api/internal/v1/...` dan diverifikasi middleware `co
 
 ### Tanda tangan
 
-Header `X-CoreERP-Event-Timestamp` dan `X-CoreERP-Event-Signature`. Tanda tangannya HMAC SHA-256 atas gabungan timestamp dan isi mentah, memakai kunci bersama.
+Diperiksa `VerifyCoreErpEvent` sebelum controller mana pun dipanggil. Header `X-CoreERP-Event-Timestamp` dan `X-CoreERP-Event-Signature`; tanda tangannya HMAC SHA-256 atas gabungan timestamp dan **isi mentah** permintaan, memakai kunci bersama.
+
+Tiga hal yang membuat permintaan ditolak 401:
+
+- Timestamp bukan angka, atau **selisihnya lebih dari 300 detik** dari waktu sekarang. Batas ini yang mencegah permintaan lama direkam lalu dikirim ulang orang lain.
+- Kunci penandatangan kosong di sisi app.
+- Tanda tangan tidak cocok. Dibandingkan dengan `hash_equals`, bukan `===`, supaya lama pembandingan tidak membocorkan isi tanda tangan.
 
 Kunci itu — `COREERP_APP_CONTEXT_SIGNING_KEY` — harus **sama persis** di Core dan di app. Kalau berbeda, event ditolak dan gejalanya terlihat seperti "persetujuan tidak pernah sampai".
+
+::: warning Jam yang meleset ikut menolak event
+Karena batas selisihnya 300 detik, jam server app yang meleset lebih dari lima menit dari Core akan menolak **semua** event dengan 401 — meski kunci dan tanda tangannya benar. Kalau event tiba-tiba berhenti diterima tanpa ada perubahan kode, periksa jam sebelum memeriksa kunci.
+:::
+
+### Event yang sama bisa datang dua kali
+
+Pengiriman event tidak menjamin sampai tepat sekali. Kalau jaringan putus setelah app selesai memproses tetapi sebelum jawabannya sampai ke Core, Core akan mengirim ulang — dan tanpa penjagaan, satu keputusan persetujuan akan diproses dua kali.
+
+Karena itu ada tabel `processed_core_events` dengan kunci unik `(tenant_id, event_id)`:
+
+```php
+if (DB::table('processed_core_events')->insertOrIgnore([...]) === 0) {
+    // sudah pernah diproses, jawab sukses tanpa mengerjakan apa pun
+}
+```
+
+`insertOrIgnore` mengembalikan jumlah baris yang benar-benar masuk. Nol berarti event itu sudah pernah dicatat, jadi pemrosesannya dilewati dan permintaannya tetap dijawab sukses — mengembalikan galat justru membuat Core mengirim ulang lagi.
+
+Penjagaan ini ada di **database**, bukan di memori, karena app berjalan di beberapa instance sekaligus. Dua salinan event yang tiba bersamaan di dua instance berbeda hanya bisa dipisahkan oleh sesuatu yang mereka bagi bersama.
+
+Kalau Anda menambah penerima event baru, ikuti pola ini. Melewatkannya tidak akan pernah terlihat di feature test.
 
 ### Keputusan bisa datang berhari-hari kemudian
 

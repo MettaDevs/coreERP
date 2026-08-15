@@ -39,7 +39,7 @@ Yang boleh diubah tenant hanya dua: apakah aturan itu aktif, dan seberapa parah 
 | `peringatan` | Transisi tetap berjalan, tetapi tersimpan pada jejak status |
 | `galat` | Transisi ditolak |
 
-Endpointnya `GET`/`PUT /api/v1/validasi-status-work-order` — mengganti seluruh matriks sekaligus, bukan per baris.
+Tabelnya `m_validasi_status_work_order`. Endpointnya `GET`/`PUT /api/v1/validasi-status-work-order` — mengganti seluruh matriks sekaligus, bukan per baris.
 
 Alasan bentuknya begini: daftar aturan adalah bagian dari perilaku aplikasi, jadi ia dirilis bersama kode. Yang boleh berbeda antar tenant hanya seberapa keras aturan itu ditegakkan.
 

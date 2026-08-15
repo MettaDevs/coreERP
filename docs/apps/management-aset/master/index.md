@@ -2,7 +2,9 @@
 
 Halaman ini untuk developer. Isinya perilaku yang **dipakai bersama oleh semua master** di modul aset — bukan penjelasan satu per satu.
 
-Master data adalah daftar pilihan yang dipakai berulang: group aset, jenis aset, kondisi, pabrikan, lokasi, tipe pekerjaan maintenance, dan seterusnya. Daftar lengkapnya ada di `api/routes/api.php` pada array `$masters`.
+Master data adalah daftar pilihan yang dipakai berulang: `group-aset`, `jenis-aset`, `kondisi-aset`, `pabrikan-aset`, `model-aset`, `lokasi-aset`, `tipe-lokasi-aset`, `tipe-atribut`, `profil-penyusutan`, `buku-penyusutan`, tipe pekerjaan maintenance, dan master work order. Daftar lengkapnya ada di `api/routes/api.php` pada array `$masters`.
+
+Sebagian punya aturan khusus dan dibahas di halamannya sendiri; sisanya — seperti `kondisi-aset` dan `trade` — hanya memakai bentuk dasar di halaman ini, tanpa kolom maupun aturan tambahan.
 
 ## Satu controller untuk semua
 
@@ -102,7 +104,9 @@ Kodenya di `api/app/Services/ProvisionIndonesiaStarterData.php`, isinya di `api/
 | `api/app/Models/master/` | Model |
 | `api/app/Support/MasterParent.php`, `MasterChild.php` | Deklarasi hubungan induk dan anak |
 | `api/app/Services/ProvisionIndonesiaStarterData.php` | Data awal |
-| `ui/src/master/` | Layar master, satu komponen untuk semua |
+| `ui/src/master/MasterPage.tsx`, `MasterForm.tsx` | Layar dan form master — satu komponen dipakai semua master, dibentuk dari konfigurasi di `masters.ts` |
+| `ui/src/master/detail/MasterDetailPage.tsx` | Panel detail dua kolom untuk master yang dibaca dengan membandingkan satu record dengan lainnya |
+| `ui/src/master/` | Panel khusus: `JenisAsetModels`, `JenisAsetAtribut`, `TipeAtributNilai`, `MaintenanceChecklistTemplateLines`, dan sejenisnya |
 
 ## Halaman terkait
 

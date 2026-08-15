@@ -8,7 +8,31 @@ Halaman ini untuk developer. Isinya apa yang bisa dan **tidak bisa** dilihat tia
 cd api && php artisan test
 ```
 
-Berjalan satu permintaan pada satu proses terhadap SQLite. Yang dijaganya:
+Berjalan satu permintaan pada satu proses terhadap SQLite.
+
+### Di mana menambah test
+
+| Berkas | Menjaga |
+| --- | --- |
+| `AssetRegisterTest` | Pembuatan aset, idempotency, kolom yang disalin dari group |
+| `AssetLifecycleTest` | Perpindahan status hidup aset |
+| `AssetLocationTest` | Lokasi dan pemetaan dimensi keuangan |
+| `AssetAttributeTest` | Atribut per jenis aset dan penguncian tipe data |
+| `AssetPlanningTest` | Rencana pengadaan dan penanda versinya |
+| `ModelAsetTest` | Aturan kombinasi jenis, pabrikan, dan model |
+| `MasterDataAsetTest` | Perilaku bersama semua master |
+| `ProfilPenyusutanTest`, `DepreciationBookTest` | Profil dan buku |
+| `DepreciationTest`, `DepreciationEndToEndTest` | Proposal, finalisasi, pembalikan |
+| `DepreciationCalculatorTest` | Hitungan murni, tanpa HTTP |
+| `DepreciationScaleTest` | Perilaku pada jumlah data besar |
+| `MaintenanceSetupTest` | Setup maintenance dan penautannya |
+| `WorkOrderTest`, `WorkOrderExecutionTest` | Dokumen work order dan pengisian checklist |
+| `IndonesiaStarterProvisioningTest` | Penyiapan tenant, termasuk pengulangannya |
+| `NumberSequenceFailureTest` | Perilaku saat Core menolak atau tidak bisa dihubungi |
+
+`InteractsWithCoreErpContext` adalah trait yang menyusun token konteks palsu untuk test. Pakai itu, jangan membuat token sendiri — kalau bentuk token berubah, satu tempat yang perlu disesuaikan.
+
+### Yang dijaganya
 
 - Induk lintas tenant tertolak.
 - Hak satu master tidak merembet ke master lain.
@@ -82,7 +106,7 @@ Yang harus nol, dan tidak bergantung pada kecepatan mesin:
 - permission satu resource yang memberi akses ke resource sebelah,
 - dua permintaan dengan `Idempotency-Key` sama menghasilkan dua record.
 
-Diperiksa dengan SQL langsung ke database setelah run, **bukan** lewat API. API adalah yang sedang diuji; ia tidak bisa menjadi saksi bagi dirinya sendiri.
+Diperiksa dengan SQL langsung ke database setelah run, **bukan** lewat API. API adalah yang sedang diuji; jawabannya tidak bisa dipakai untuk menilai dirinya sendiri.
 
 ## Hasil yang sudah tercatat
 

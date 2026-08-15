@@ -2,7 +2,7 @@
 
 Halaman ini untuk developer. Isinya cara aset dihentikan pemakaiannya dan dilepas.
 
-Ada empat jenis dokumen, semuanya memakai controller yang sama:
+Ada empat jenis dokumen, semuanya tersimpan di `tr_dokumen_siklus_aset` dan memakai controller yang sama:
 
 | Dokumen | Gunanya |
 | --- | --- |
@@ -50,7 +50,7 @@ Setelah `approved` diterima, aset menjadi `decommissioned`.
 
 ## Yang belum dirancang
 
-`permintaan-pembelian-aset` baru berupa rangka rute. Perilaku yang akan dijanjikannya belum diputuskan, jadi tiga endpoint-nya sengaja **belum masuk kontrak**. Celah itu tercatat di daftar `DEFERRED` pada `contracts/check-contract-coverage.py` dan dicetak tiap kali pemeriksa jalan — supaya ia tidak terlupa, bukan supaya ia dimaafkan.
+`permintaan-pembelian-aset` rutenya sudah ada tetapi isinya belum dikerjakan. Perilaku yang akan dijanjikannya belum diputuskan, jadi tiga endpoint-nya sengaja **belum masuk kontrak**. Celah itu tercatat di daftar `DEFERRED` pada `contracts/check-contract-coverage.py` dan dicetak tiap kali pemeriksa jalan — supaya ia tidak terlupa, bukan supaya ia dimaafkan.
 
 Jangan menulis kontraknya sebelum perilakunya diputuskan; kontrak yang mendahului keputusan menggambarkan bentuk yang tidak bisa diandalkan pemanggil.
 
@@ -61,7 +61,7 @@ Jangan menulis kontraknya sebelum perilakunya diputuskan; kontrak yang mendahulu
 | `api/app/Http/Controllers/transaksi/DokumenSiklusAset/DokumenSiklusAsetController.php` | Keempat jenis dokumen |
 | `api/app/Http/Controllers/transaksi/DekomisioningAset/WorkflowDecisionController.php` | Penerima keputusan workflow |
 | `api/app/Services/WorkflowClient.php` | Pengiriman ke Core |
-| `api/app/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — rangka rute, belum dikontrakkan |
+| `api/app/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — rutenya ada, isinya belum dikerjakan |
 | `contracts/asyncapi.yaml` | Kontrak event yang diterima |
 | `ui/src/transactions/_shared/LifecycleDocumentPage.tsx` | Layar, satu untuk semua jenis |
 

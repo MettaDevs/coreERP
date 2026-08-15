@@ -13,6 +13,21 @@ Sering tertukar, padahal berbeda:
 
 Setiap tabel punya `tenant_id`, dan setiap kueri menyaringnya. Nilainya diambil dari token konteks yang dikirim Core — `$request->attributes->get('coreerp.tenant_id')` — **tidak pernah** dari isi permintaan.
 
+### Dari mana nilai itu datang
+
+`RequireCoreErpContext` memverifikasi token pada tiap permintaan, lalu menaruh isinya di `$request->attributes`:
+
+| Kunci | Isi |
+| --- | --- |
+| `coreerp.tenant_id` | Tenant pemanggil |
+| `coreerp.legal_entity_id` | Badan hukum yang sedang dipilih |
+| `coreerp.org_unit_id` | Unit kerja yang sedang dipilih |
+| `coreerp.user_id` | Pengguna |
+| `coreerp.permissions` | Daftar permission efektif |
+| `coreerp.data_policies` | Batas organisasi per kebijakan |
+
+Semua controller membaca dari sana, tidak pernah dari body atau query. Kalau Anda menemukan kode yang mengambil `tenant_id` dari isi permintaan, itu cacat keamanan, bukan sekadar gaya penulisan yang berbeda.
+
 ### Lapis kedua di database
 
 Penyaringan di kode saja tidak cukup, karena satu kueri yang lupa menyaring sudah membocorkan. Karena itu batasnya juga ditegakkan skema.

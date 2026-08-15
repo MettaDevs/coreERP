@@ -12,6 +12,8 @@ Penyusutan di modul ini punya tiga lapis yang sering tertukar:
 
 Satu aset bisa disusutkan beberapa kali dengan cara berbeda — sekali untuk laporan keuangan, sekali untuk pajak. Itu sebabnya buku dan profil terpisah.
 
+Tabelnya: `m_profil_penyusutan`, `m_buku_penyusutan`, `m_group_buku_penyusutan` untuk matriksnya, dan `tr_buku_aset` untuk buku milik tiap aset.
+
 ## Profil penyusutan
 
 Master biasa dengan kolom tambahan yang menentukan hitungan:
