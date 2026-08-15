@@ -14,9 +14,15 @@ Setup maintenance menjawab satu pertanyaan: **kalau ada pekerjaan pada aset jeni
 | **Variabel checklist** (`maintenance-checklist-variables`) | Hal yang diukur atau dinilai, beserta pilihan hasilnya |
 | **Template checklist** (`maintenance-checklist-templates`) | Susunan baris pemeriksaan |
 
-Ditambah master pendukung: tipe work order, tingkat layanan, sebab kerusakan, tindakan perbaikan, dan keahlian (`trade`).
+Ditambah master pendukung yang dipakai saat pekerjaan dikerjakan — tipe work order, tingkat layanan, sebab kerusakan, tindakan perbaikan, dan keahlian — yang dibahas di [Master work order](/apps/management-aset/master/work-order/).
 
 Semuanya mewarisi perilaku di [Master data](/apps/management-aset/master/).
+
+::: warning Dua master lama yang namanya mirip
+`item-checklist-maintenance` dan `analisa-maintenance` **bukan** bagian dari susunan di atas. Keduanya master sederhana dari rancangan sebelumnya, tanpa kolom khusus, dan tidak dipakai template checklist maupun tipe pekerjaan.
+
+Ini penting saat memeriksa cakupan: skenario load test yang memuat kedua nama itu **tidak** menguji setup maintenance. Nama yang kebetulan terdengar mirip bukan cakupan.
+:::
 
 ## Template checklist bisa bersarang
 
@@ -73,8 +79,12 @@ Sifatnya idempoten dan tidak menimpa perubahan tenant.
 | Berkas | Isinya |
 | --- | --- |
 | `api/app/Http/Controllers/master/MaintenanceJobTypeController.php` | Tipe pekerjaan |
-| `api/app/Http/Controllers/master/MaintenanceSetupLinkController.php` | Semua endpoint penautan dan penguncian barisnya |
+| `api/app/Http/Controllers/master/MaintenanceJobTypeVariantController.php` | Varian |
+| `api/app/Http/Controllers/master/MaintenanceJobTypeDefaultController.php` | Nilai bawaan |
+| `api/app/Http/Controllers/master/MaintenanceChecklistVariableController.php` | Variabel checklist |
 | `api/app/Http/Controllers/master/MaintenanceChecklistTemplateController.php` | Template checklist |
+| `api/app/Http/Controllers/master/MaintenanceSetupLinkController.php` | Semua endpoint penautan dan penguncian barisnya |
+| `api/app/Http/Controllers/master/ItemChecklistMaintenanceController.php`, `AnalisaMaintenanceController.php` | Dua master lama yang disebut di peringatan atas |
 | `database/migrations/2026_08_14_110000_create_maintenance_setup_tables.php` | Tabel setup |
 | `loadtest/k6/maintenance.js` | Uji beban, termasuk balapan penautan |
 

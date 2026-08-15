@@ -61,6 +61,7 @@ Jangan menulis kontraknya sebelum perilakunya diputuskan; kontrak yang mendahulu
 | `api/app/Http/Controllers/transaksi/DokumenSiklusAset/DokumenSiklusAsetController.php` | Keempat jenis dokumen |
 | `api/app/Http/Controllers/transaksi/DekomisioningAset/WorkflowDecisionController.php` | Penerima keputusan workflow |
 | `api/app/Services/WorkflowClient.php` | Pengiriman ke Core |
+| `api/app/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — rangka rute, belum dikontrakkan |
 | `contracts/asyncapi.yaml` | Kontrak event yang diterima |
 | `ui/src/transactions/_shared/LifecycleDocumentPage.tsx` | Layar, satu untuk semua jenis |
 

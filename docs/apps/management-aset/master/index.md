@@ -20,6 +20,24 @@ Kalau master itu punya induk atau anak, ia menambah `parentMasters()` dan `child
 
 Artinya: **kalau Anda menemukan bug pada satu master, kemungkinan besar bug itu ada di semua master.** Perbaiki di base controller, jangan di satu turunannya.
 
+## Base kedua: tabel penghubung
+
+Tidak semua yang tersimpan adalah master. Matriks group × buku, kaitan pekerjaan ke jenis aset, dan baris template checklist adalah **tabel penghubung** — mereka disunting di dalam form pemiliknya, bukan berdiri sendiri di navigasi.
+
+Base-nya `MasterLinkController`, dan ia sengaja **bukan** turunan `MasterDataController`. Bedanya:
+
+| | Master | Tabel penghubung |
+| --- | --- | --- |
+| Punya `kode` | Ya | Tidak |
+| Minta nomor ke Core | Ya | Tidak |
+| Butuh `Idempotency-Key` | Ya | Tidak |
+| Permission | Milik sendiri | Milik pemiliknya |
+| Cara menyimpan | Per record | Satu `PUT` mengganti seluruh daftar |
+
+Baris penghubung tidak butuh kunci idempotency karena bentuk penyimpanannya sudah idempoten: permintaan yang sama diulang menghasilkan keadaan yang sama, bukan baris tambahan.
+
+Yang perlu diperhatikan: karena ia mengganti seluruh daftar, ia **menghapus lalu menyisipkan ulang** — dan itu harus mengunci baris pemiliknya lebih dulu. Alasannya di [Setup maintenance](/apps/management-aset/master/maintenance/).
+
 ## Bentuk yang sama untuk semua
 
 Setiap master punya kolom yang sama:
@@ -78,7 +96,9 @@ Kodenya di `api/app/Services/ProvisionIndonesiaStarterData.php`, isinya di `api/
 | Berkas | Isinya |
 | --- | --- |
 | `api/app/Http/Controllers/MasterDataController.php` | Seluruh perilaku bersama di atas |
-| `api/app/Http/Controllers/master/` | Turunan per master, biasanya hanya beberapa baris |
+| `api/app/Http/Controllers/MasterLinkController.php` | Base untuk tabel penghubung |
+| `api/app/Http/Controllers/master/` | Turunan per master, biasanya hanya beberapa baris. Contoh yang paling sederhana: `KondisiAsetController`, `TradeController` |
+| `api/app/Http/Controllers/master/TipeAtributController.php`, `TipeAtributNilaiController.php` | Definisi atribut dan pilihan nilainya |
 | `api/app/Models/master/` | Model |
 | `api/app/Support/MasterParent.php`, `MasterChild.php` | Deklarasi hubungan induk dan anak |
 | `api/app/Services/ProvisionIndonesiaStarterData.php` | Data awal |

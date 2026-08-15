@@ -78,6 +78,7 @@ Untuk tenant lama yang sudah ada sebelum event ini dibuat, Core menyediakan peri
 | `api/app/Services/WorkflowClient.php` | Pengiriman untuk persetujuan |
 | `api/app/Services/FiscalCalendarClient.php` | Tahun buku |
 | `api/app/Services/UnitOfMeasureClient.php` | Satuan |
+| `api/app/Http/Controllers/ReferenceDataController.php` | Endpoint referensi yang meneruskan satuan dan kelompok fiskal |
 | `api/app/Http/Controllers/TenantProvisioningController.php` | Penerima event penyiapan |
 | `contracts/asyncapi.yaml` | Kontrak event yang diterima |
 

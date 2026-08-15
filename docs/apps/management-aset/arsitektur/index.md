@@ -46,9 +46,30 @@ api/app/
 └── Support/                              aturan yang dipakai bersama
 ```
 
+Di luar folder itu ada tiga controller yang melayani platform: `ContextController`, `HealthController`, dan `ReferenceDataController`.
+
 `Services/` berisi hal yang berbicara keluar (`NumberSequenceClient`, `WorkflowClient`, `FiscalCalendarClient`, `UnitOfMeasureClient`) dan `DepreciationCalculator`. `Support/` berisi aturan murni: `OrganizationScope`, `WorkOrderStatus`, `AssetAttributeValidator`.
 
 Kalau Anda menaruh aturan bisnis di controller padahal ia dipakai lebih dari satu tempat, ia akan menyimpang. Contoh yang sudah benar: status work order dikumpulkan di `WorkOrderStatus`, bukan disebar sebagai pemeriksaan di tiap endpoint.
+
+## Endpoint yang bukan milik fitur mana pun
+
+Tiga endpoint melayani platform, bukan salah satu fitur:
+
+| Endpoint | Gunanya |
+| --- | --- |
+| `GET /api/v1/health` | Dipakai Docker dan Core untuk memastikan API hidup. Tidak menyentuh database |
+| `GET /api/v1/context` | Menyajikan hak akses efektif pada token: permission, badan hukum, unit kerja, id pengguna |
+| `GET /api/v1/reference-data/units-of-measure` | Satuan, diteruskan dari Core |
+| `GET /api/v1/reference-data/kelompok-harta-fiskal` | Kelompok pajak milik tenant |
+
+`/context` dipakai UI untuk menentukan tombol apa yang ditampilkan. Perlu ditegaskan: **ia bukan penjaga akses.** Penjaga sebenarnya ada di tiap endpoint; `/context` hanya membuat layar tidak menawarkan hal yang akan ditolak server.
+
+::: tip Kenapa controller, bukan closure
+`ContextController` dan `HealthController` ditulis sebagai controller meski isinya pendek. Satu closure di berkas rute membuat `php artisan route:cache` diam-diam berhenti bekerja, dan cache rute itu yang dipakai image produksi.
+:::
+
+Kalau layanan satuan Core belum bisa dihubungi, endpoint satuan menjawab **503**, bukan daftar kosong. Daftar kosong akan terbaca sebagai "tidak ada satuan", padahal yang terjadi adalah "belum tahu".
 
 ## Yang wajib ada di setiap endpoint baru
 

@@ -50,6 +50,7 @@ Alasan bentuknya begini: daftar aturan adalah bagian dari perilaku aplikasi, jad
 | `api/app/Http/Controllers/master/TipeWorkOrderController.php` | Tipe work order |
 | `api/app/Http/Controllers/master/TingkatLayananController.php` | Tingkat layanan |
 | `api/app/Http/Controllers/master/TradeController.php` | Keahlian |
+| `api/app/Http/Controllers/master/SebabKerusakanController.php`, `TindakanPerbaikanController.php` | Sebab kerusakan dan tindakan perbaikan |
 | `api/app/Http/Controllers/master/ValidasiStatusWorkOrderController.php` | Matriks validasi status |
 | `api/app/Support/WorkOrderValidation.php` | Daftar keparahan yang sah |
 | `database/migrations/2026_08_15_100000_create_work_order_masters.php` | Tabel master di halaman ini |

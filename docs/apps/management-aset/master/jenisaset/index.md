@@ -64,6 +64,8 @@ Endpoint itu butuh **dua** permission sekaligus: `jenis-aset.update` karena yang
 | `api/app/Http/Controllers/master/JenisAsetController.php` | Master jenis aset |
 | `api/app/Http/Controllers/master/JenisAsetModelController.php` | Kaitan jenis ke model |
 | `api/app/Http/Controllers/master/JenisAsetDetailController.php` | Angka pada panel detail |
+| `api/app/Http/Controllers/master/JenisAsetAtributController.php`, `JenisAsetAtributDefinisiController.php` | Nilai dan definisi atribut |
+| `api/app/Http/Controllers/master/TipeAtributController.php`, `TipeAtributNilaiController.php` | Master tipe atribut dan pilihan nilainya |
 | `api/app/Support/AssetAttributeValidator.php` | Validasi nilai atribut |
 | `database/migrations/2026_08_07_130000_create_asset_attribute_tables.php` | Empat tabel atribut |
 | `ui/src/master/DynamicField.tsx` | Field yang dibentuk dari definisi atribut |
