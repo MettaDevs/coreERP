@@ -28,13 +28,42 @@ Klasifikasi aset memakai **dua sumbu yang saling lepas**, mengikuti model Dynami
 
 Klasifikasi itu **struktur domain app**, bukan organization hierarchy Core. Karena itu ia memang memakai foreign key permanen pada tabelnya sendiri; larangan `parent_id` permanen berlaku untuk identitas organization di Core, bukan untuk klasifikasi seperti ini.
 
-### Halaman fitur
+### Halaman untuk developer
 
-**Master** — [Master data](/apps/management-aset/master/) (perilaku bersama semua master), [Jenis aset dan atribut](/apps/management-aset/master/jenisaset/), [Penyusutan: profil, buku, dan matriks](/apps/management-aset/master/depresiasi/), [Setup maintenance](/apps/management-aset/master/maintenance/).
+Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, aturan apa yang dijaga kode, dan **kenapa** aturannya begitu.
 
-**Transaksi** — [Register aset](/apps/management-aset/transaction/register-aset/), [Proses penyusutan](/apps/management-aset/transaction/penyusutan/), [Pemeliharaan aset](/apps/management-aset/transaction/pemeliharaan-aset/), [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/).
+**Mulai dari sini kalau baru pertama membuka repo** — [Peta modul](/apps/management-aset/arsitektur/).
 
-Semuanya ditulis untuk developer: apa yang disimpan, aturan apa yang dijaga kode, dan kenapa aturannya begitu. Kalau menambah halaman baru, ikuti [Pola dokumen fitur](/apps/management-aset/pola-dokumen).
+| Arsitektur | Isi |
+| --- | --- |
+| [Peta modul](/apps/management-aset/arsitektur/) | Lapisan, susunan folder, konvensi nama tabel |
+| [Batas tenant dan organisasi](/apps/management-aset/arsitektur/batas-tenant-dan-organisasi) | Dua lapis penyaringan dan kenapa keduanya perlu |
+| [Integrasi dengan Core](/apps/management-aset/arsitektur/integrasi-core) | Nomor, workflow, event, penyiapan tenant |
+| [Kontrak](/apps/management-aset/arsitektur/kontrak) | OpenAPI, AsyncAPI, pemeriksa cakupan |
+| [Database dan migration](/apps/management-aset/arsitektur/database) | Pola kunci gabungan antar tenant |
+| [Pengujian](/apps/management-aset/arsitektur/pengujian) | Apa yang tidak bisa dilihat feature test |
+
+| Master | Isi |
+| --- | --- |
+| [Master data](/apps/management-aset/master/) | Perilaku yang dipakai bersama semua master |
+| [Group aset](/apps/management-aset/master/groupaset/) | Sumbu uang: pajak, penyusutan, pembebanan |
+| [Jenis aset dan atribut](/apps/management-aset/master/jenisaset/) | Sumbu teknis: atribut dan pekerjaan |
+| [Pabrikan dan model](/apps/management-aset/master/katalog-model/) | Katalog dan aturan kombinasinya |
+| [Lokasi dan dimensi keuangan](/apps/management-aset/master/lokasi/) | Di mana barangnya, dan siapa yang menanggung biayanya |
+| [Penyusutan: profil, buku, matriks](/apps/management-aset/master/depresiasi/) | Tiga lapis yang sering tertukar |
+| [Setup maintenance](/apps/management-aset/master/maintenance/) | Tipe pekerjaan, varian, template checklist |
+| [Master work order](/apps/management-aset/master/work-order/) | Tipe, tingkat layanan, sebab, tindakan, keahlian |
+
+| Transaksi | Isi |
+| --- | --- |
+| [Perencanaan aset](/apps/management-aset/transaction/perencanaan-aset/) | Rencana pengadaan, sebelum barang ada |
+| [Register aset](/apps/management-aset/transaction/register-aset/) | Catatan satu barang, sejak diterima sampai dilepas |
+| [Penempatan dan mutasi](/apps/management-aset/transaction/penempatan/) | Perpindahan dan kenapa riwayatnya tidak ditimpa |
+| [Proses penyusutan](/apps/management-aset/transaction/penyusutan/) | Proposal, finalisasi, pembalikan |
+| [Pemeliharaan aset](/apps/management-aset/transaction/pemeliharaan-aset/) | Work order dan mesin statusnya |
+| [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/) | Dekomisioning, penjualan, pemusnahan |
+
+Kalau menambah halaman baru, ikuti [Pola dokumen fitur](/apps/management-aset/pola-dokumen).
 
 **Bukan milik app ini** — identity, tenant membership, security role, scope organisasi, dan penerbitan nomor. Semuanya milik Core dan diterima lewat token konteks bertanda tangan.
 
