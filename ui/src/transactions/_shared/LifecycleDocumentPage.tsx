@@ -22,7 +22,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@apperp/ui/sheet";
-import { api, errorMessage } from "../../api";
+import { api, errorMessage, newIdempotencyKey } from "../../api";
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Record = {
@@ -71,7 +71,7 @@ export default function LifecycleDocumentPage({
     try {
       await api("/" + config.resource, {
         method: "POST",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
+        headers: { "Idempotency-Key": newIdempotencyKey() },
         body: JSON.stringify({
           legal_entity_id: context.legal_entity_id,
           responsible_org_unit_id: context.org_unit_id,

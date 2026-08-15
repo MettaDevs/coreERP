@@ -59,6 +59,8 @@ export default function DepreciationPage({
   const [periods, setPeriods] = useState<Period[]>([]);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Book | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkResult, setBulkResult] = useState("");
   const [saving, setSaving] = useState(false);
   const load = async () => {
     try {
@@ -98,6 +100,38 @@ export default function DepreciationPage({
       setSaving(false);
     }
   };
+  /**
+   * Tutup bulan tidak dikerjakan aset demi aset. Buku yang tidak dapat diusulkan
+   * dilewati beserta alasannya, jadi hasilnya dilaporkan sebagai ringkasan, bukan
+   * sekadar berhasil atau gagal.
+   */
+  const proposeBulk = async (form: HTMLFormElement) => {
+    const data = new FormData(form);
+    setSaving(true);
+    setBulkResult("");
+    try {
+      const result = await api<{
+        data: { dibuat: number; dilewati: number };
+      }>("/penyusutan/proposal-massal", {
+        method: "POST",
+        body: JSON.stringify({
+          period_starts_on: data.get("period_starts_on"),
+          period_ends_on: data.get("period_ends_on"),
+        }),
+      });
+      setBulkResult(
+        `${result.data.dibuat} proposal dibuat, ${result.data.dilewati} buku dilewati.`,
+      );
+      setBulkOpen(false);
+      await load();
+    } catch (caught) {
+      setError(
+        errorMessage(caught, "Proposal massal belum dapat dijalankan."),
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
   const finalize = async (period: Period) => {
     if (
       !window.confirm(
@@ -133,10 +167,11 @@ export default function DepreciationPage({
           <CardAction>
             {canCreate && (
               <Button
-                onClick={() => setSelected(books[0] ?? null)}
+                variant="outline"
+                onClick={() => setBulkOpen(true)}
                 disabled={!books.length}
               >
-                Buat proposal
+                Proposal seluruh buku
               </Button>
             )}
           </CardAction>
@@ -144,6 +179,11 @@ export default function DepreciationPage({
         <CardContent className="px-0">
           {error && (
             <p className="px-5 py-3 text-sm text-destructive">{error}</p>
+          )}
+          {bulkResult && (
+            <p className="px-5 py-3 text-sm text-muted-foreground">
+              {bulkResult}
+            </p>
           )}
           {!books.length ? (
             <Empty>
@@ -246,6 +286,57 @@ export default function DepreciationPage({
           )}
         </CardContent>
       </Card>
+      {bulkOpen && (
+        <Sheet open onOpenChange={(open) => !open && setBulkOpen(false)}>
+          <SheetContent side="right">
+            <SheetHeader>
+              <SheetTitle>Proposal seluruh buku</SheetTitle>
+            </SheetHeader>
+            <form
+              className="space-y-4 p-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void proposeBulk(event.currentTarget);
+              }}
+            >
+              <p className="text-sm text-muted-foreground">
+                Menghitung satu periode untuk seluruh buku aset yang aktif. Buku
+                yang sudah punya periode ini, sudah habis, atau asetnya sudah
+                dilepas akan dilewati. Metode berdasarkan pemakaian tidak ikut
+                karena angka pemakaiannya berbeda tiap aset.
+              </p>
+              <Field>
+                <Input
+                  name="period_starts_on"
+                  label="Periode mulai"
+                  type="date"
+                  required
+                />
+              </Field>
+              <Field>
+                <Input
+                  name="period_ends_on"
+                  label="Periode selesai"
+                  type="date"
+                  required
+                />
+              </Field>
+              <SheetFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setBulkOpen(false)}
+                >
+                  Batal
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Menghitung…" : "Jalankan"}
+                </Button>
+              </SheetFooter>
+            </form>
+          </SheetContent>
+        </Sheet>
+      )}
       {selected && (
         <Sheet open onOpenChange={(open) => !open && setSelected(null)}>
           <SheetContent side="right">

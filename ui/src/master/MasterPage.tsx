@@ -9,6 +9,7 @@ import { Select } from '@apperp/ui/select';
 import { api, errorMessage } from '../api';
 import GroupBookMatrix from './GroupBookMatrix';
 import MasterForm from './MasterForm';
+import TipeAtributNilai from './TipeAtributNilai';
 import {
     MasterAction,
     MasterConfig,
@@ -24,6 +25,22 @@ const emptyMeta: ListMeta = { current_page: 1, last_page: 1, total: 0 };
 
 const optionLabel = (option: ParentSummary) => `${option.kode} — ${option.nama}`;
 const allLabel = (label: string) => `Semua ${label.toLowerCase()}`;
+
+/**
+ * Bagian yang disunting di dalam form pemiliknya, bukan sebagai menu tersendiri.
+ *
+ * Seluruhnya butuh id pemilik, jadi baru muncul setelah record tersimpan. Pilihan nilai
+ * hanya relevan untuk atribut teks; ada atau tidaknya Values menentukan apakah form
+ * aset memakai dropdown atau teks bebas.
+ */
+function extraSectionFor(resource: string, record: MasterRecord, canEdit: boolean) {
+    if (resource === 'group-aset') return <GroupBookMatrix groupId={record.id} canEdit={canEdit} />;
+    if (resource === 'tipe-atribut' && record.data_type === 'string') {
+        return <TipeAtributNilai tipeAtributId={record.id} canEdit={canEdit} />;
+    }
+
+    return undefined;
+}
 
 export default function MasterPage({ config, permissions }: { config: MasterConfig; permissions: Permission[] }) {
     const parents = useMemo(() => config.parents ?? [], [config.parents]);
@@ -148,6 +165,15 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
         load();
     }
 
+    const typeLabel: Record<string, string> = {
+        string: 'Teks', decimal: 'Desimal', integer: 'Bilangan bulat', date: 'Tanggal', boolean: 'Ya/tidak',
+    };
+    const attributeColumns: DataTableColumn<MasterRecord>[] = config.resource === 'tipe-atribut' ? [
+        { id: 'data_type', header: 'Tipe data', cell: (item) => typeLabel[String(item.data_type)] ?? String(item.data_type), width: 150 },
+        { id: 'satuan', header: 'Satuan', cell: (item) => <span className="muted">{String(item.satuan ?? '—')}</span>, width: 110 },
+        { id: 'values', header: 'Values', cell: (item) => Number(item.values_count ?? 0), width: 90 },
+        { id: 'asset-types', header: 'Jenis aset', cell: (item) => Number(item.asset_types_count ?? 0), width: 110 },
+    ] : [];
     const columns: DataTableColumn<MasterRecord>[] = [
         { id: 'kode', header: config.kodeLabel, cell: (item) => <span className="code">{item.kode}</span>, sortValue: (item) => item.kode, width: 170 },
         { id: 'nama', header: config.namaLabel, cell: (item) => <span className="name">{item.nama}</span>, sortValue: (item) => item.nama, width: 260 },
@@ -160,6 +186,7 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
             },
             width: 220,
         })),
+        ...attributeColumns,
         { id: 'keterangan', header: 'Keterangan', cell: (item) => <span className="muted">{item.keterangan || '—'}</span>, width: 260 },
         { id: 'status', header: 'Status', cell: (item) => <Badge variant={item.aktif ? 'default' : 'secondary'}>{item.aktif ? 'Aktif' : 'Tidak aktif'}</Badge>, width: 120 },
     ];
@@ -263,10 +290,7 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
                     parentOptionsError={parentOptionsError}
                     onClose={() => setEditing(undefined)}
                     onSaved={() => { setEditing(undefined); load(); }}
-                    // Matriks butuh id group, jadi ia baru muncul setelah group tersimpan.
-                    extraSection={config.resource === 'group-aset' && editing
-                        ? <GroupBookMatrix groupId={editing.id} canEdit={can('update')} />
-                        : undefined}
+                    extraSection={editing ? extraSectionFor(config.resource, editing, can('update')) : undefined}
                 />
             )}
         </div>

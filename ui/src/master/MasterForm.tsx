@@ -1,12 +1,12 @@
 import { FormEvent, ReactNode, useMemo, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@apperp/ui/field';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldTitle } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
-import { api, errorMessage } from '../api';
+import { api, errorMessage, newIdempotencyKey } from '../api';
 import DynamicField from './DynamicField';
 import { FieldValue, isVisible, payloadValue, valueFrom } from './fields';
 import { MasterConfig, MasterParentConfig, MasterRecord, ParentSummary, parentIdOf, parentSummaryOf } from './masters';
@@ -48,12 +48,13 @@ export default function MasterForm({
         Object.fromEntries(parents.map((parent) => [parent.field, value ? parentIdOf(value, parent) : ''])),
     );
     const extraFields = useMemo(() => config.extraFields ?? [], [config.extraFields]);
+    const isAssetLocation = config.resource === 'lokasi-aset';
     const [extra, setExtra] = useState<Record<string, FieldValue>>(() =>
         Object.fromEntries(extraFields.map((field) => [field.name, valueFrom(value, field)])),
     );
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
-    const creationKey = useRef(crypto.randomUUID());
+    const creationKey = useRef(newIdempotencyKey());
     const sheetContentRef = useRef<HTMLDivElement>(null);
 
     /**
@@ -113,7 +114,7 @@ export default function MasterForm({
         return (
             <Field key={parent.field} data-invalid={Boolean(loadError)}>
                 <Select
-                    label={parent.required === false ? parent.label : `${parent.label} *`}
+                    label={parent.label}
                     required={parent.required !== false}
                     items={options.map(optionLabel)}
                     value={selected ? optionLabel(selected) : undefined}
@@ -149,14 +150,30 @@ export default function MasterForm({
                         </Field>
                         {/* Induk dirender sejajar: tidak ada yang menyaring pilihan yang lain. */}
                         {parents.map(parentField)}
+                        {isAssetLocation && (
+                            <Field>
+                                <FieldTitle>Dimensi keuangan</FieldTitle>
+                                <div className="rounded-md border border-dashed bg-muted/40 px-3 py-2" role="status">
+                                    <p className="text-sm font-medium">Belum tersedia</p>
+                                </div>
+                                <FieldDescription>Pengaturan ini menunggu Finance. Lokasi fisik tetap dapat disimpan tanpa pengaturan ini.</FieldDescription>
+                            </Field>
+                        )}
                         {extraFields.filter((field) => isVisible(field, extra)).map((field) => (
-                            <DynamicField
-                                key={field.name}
-                                config={field}
-                                value={extra[field.name]}
-                                onChange={(next) => setExtra((current) => ({ ...current, [field.name]: next }))}
-                                portalContainer={sheetContentRef}
-                            />
+                            value?.data_type_locked && field.name === 'data_type' ? (
+                                <Field key={field.name} data-disabled="true">
+                                    <Input label="Tipe data" value={field.options?.find((option) => option.value === extra[field.name])?.label ?? String(extra[field.name] ?? '')} disabled />
+                                    <FieldDescription>Tipe data terkunci karena atribut ini sudah pernah diisi pada aset. Buat tipe atribut baru bila bentuk datanya berbeda.</FieldDescription>
+                                </Field>
+                            ) : (
+                                <DynamicField
+                                    key={field.name}
+                                    config={field}
+                                    value={extra[field.name]}
+                                    onChange={(next) => setExtra((current) => ({ ...current, [field.name]: next }))}
+                                    portalContainer={sheetContentRef}
+                                />
+                            )
                         ))}
                         <Field>
                             <FieldLabel htmlFor="description">Keterangan</FieldLabel>
