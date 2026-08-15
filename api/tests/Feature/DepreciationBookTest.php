@@ -61,6 +61,13 @@ class DepreciationBookTest extends TestCase
         $this->assertSame('2026-03-01', substr((string) $books->first()->depreciation_start_on, 0, 10));
     }
 
+    public function test_buku_baru_tidak_mengaktifkan_bridge_finance_secara_default(): void
+    {
+        $book = $this->master('buku-penyusutan', ['nama' => 'Buku tanpa bridge']);
+
+        $this->assertFalse((bool) DB::table('m_buku_penyusutan')->where('id', $book)->value('export_to_backoffice'));
+    }
+
     public function test_aset_di_bawah_ambang_kapitalisasi_tetap_tercatat_tetapi_tidak_menyusut(): void
     {
         $group = $this->master('group-aset', ['nama' => 'Inventaris', 'capitalization_threshold' => 1000000]);
@@ -105,6 +112,33 @@ class DepreciationBookTest extends TestCase
 
         $this->assertSame(1, DB::table('m_group_buku_penyusutan')->whereNull('deleted_at')->count());
         $this->assertSame(1, DB::table('m_group_buku_penyusutan')->whereNotNull('deleted_at')->count());
+    }
+
+    public function test_matriks_menolak_buku_tanpa_profil_efektif(): void
+    {
+        $group = $this->master('group-aset', ['nama' => 'Group tanpa profil']);
+        $buku = $this->master('buku-penyusutan', ['nama' => 'Buku tanpa profil']);
+
+        $this->matrix($group, [['buku_id' => $buku]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('rows.0.depreciation_profile_id');
+
+        $this->assertSame(0, DB::table('m_group_buku_penyusutan')->where('group_aset_id', $group)->count());
+    }
+
+    public function test_profil_yang_sudah_dipakai_buku_aset_tidak_dapat_diubah(): void
+    {
+        $group = $this->master('group-aset', ['nama' => 'Group immutable']);
+        $jenis = $this->master('jenis-aset', ['nama' => 'Jenis immutable']);
+        $profil = $this->profil('Profil immutable', 'straight_line', 12);
+        $buku = $this->master('buku-penyusutan', ['nama' => 'Buku immutable', 'depreciation_profile_id' => $profil]);
+        $this->matrix($group, [['buku_id' => $buku]])->assertOk();
+        $this->receive($group, $jenis);
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('profil-penyusutan')))
+            ->patchJson('/api/v1/profil-penyusutan/'.$profil, ['useful_life_periods' => 24])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('method');
     }
 
     public function test_matriks_memakai_hak_akses_group_dan_menolak_buku_tenant_lain(): void

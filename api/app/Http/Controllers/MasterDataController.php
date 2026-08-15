@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MasterData;
 use App\Services\NumberSequenceClient;
+use App\Services\NumberSequenceException;
 use App\Support\MasterChild;
 use App\Support\MasterParent;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,9 +12,9 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
-use RuntimeException;
 
 /**
  * Perilaku bersama seluruh master Management Aset: hak akses per resource, batas
@@ -68,7 +69,7 @@ abstract class MasterDataController extends Controller
             ...$parentFilterRules,
         ]);
 
-        $query = $this->tenantQuery($request);
+        $query = $this->prepareQuery($this->tenantQuery($request), $request);
         // Perbandingan eksplisit terhadap string kosong, bukan truthiness: pencarian "0"
         // adalah kata kunci yang sah dan tidak boleh diperlakukan sebagai tanpa filter.
         $search = trim((string) ($validated['q'] ?? ''));
@@ -118,6 +119,7 @@ abstract class MasterDataController extends Controller
         if ($existing = $this->creationKeyQuery($tenantId, $creationKey)->first()) {
             return $this->replay($existing, $payload);
         }
+        $this->afterWriteValidation($data, $tenantId, creating: true);
 
         try {
             $kode = $numbers->issue(
@@ -125,8 +127,8 @@ abstract class MasterDataController extends Controller
                 $tenantId,
                 $this->resource().':'.$creationKey,
             );
-        } catch (RuntimeException $exception) {
-            return response()->json(['error' => ['code' => 'number_sequence_unavailable', 'message' => $exception->getMessage()]], 503);
+        } catch (NumberSequenceException $exception) {
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], $exception->status);
         }
 
         try {
@@ -160,16 +162,22 @@ abstract class MasterDataController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $this->requirePermission($request, 'update');
-        $data = $request->validate($this->writeRules($this->tenantId($request), creating: false));
-        $record = $this->find($request, $id);
-        $this->rejectParentCycle($record, $data);
-        $record->update($this->changes($data));
-        // Induk boleh berpindah, jadi relasi lama dibuang agar dimuat ulang saat disajikan.
-        foreach ($this->parentMasters() as $parent) {
-            $record->unsetRelation($parent->relation);
-        }
+        $tenantId = $this->tenantId($request);
+        $data = $request->validate($this->writeRules($tenantId, creating: false));
+        $write = function () use ($request, $id, $data, $tenantId): JsonResponse {
+            $record = $this->find($request, $id, $this->updateUnderLock());
+            $this->afterWriteValidation($data, $tenantId, creating: false, record: $record);
+            $this->rejectParentCycle($record, $data);
+            $record->update($this->changes($data));
+            // Induk boleh berpindah, jadi relasi lama dibuang agar dimuat ulang saat disajikan.
+            foreach ($this->parentMasters() as $parent) {
+                $record->unsetRelation($parent->relation);
+            }
 
-        return response()->json(['data' => $this->present($record)]);
+            return response()->json(['data' => $this->present($record)]);
+        };
+
+        return $this->updateUnderLock() ? DB::transaction($write) : $write();
     }
 
     public function destroy(Request $request, string $id): JsonResponse
@@ -219,9 +227,11 @@ abstract class MasterDataController extends Controller
         return $this->newQuery()->withTrashed()->where('tenant_id', $tenantId)->where('creation_key', $creationKey);
     }
 
-    private function find(Request $request, string $id): MasterData
+    private function find(Request $request, string $id, bool $lock = false): MasterData
     {
-        return $this->tenantQuery($request)->findOrFail($id);
+        $query = $this->prepareQuery($this->tenantQuery($request), $request);
+
+        return ($lock ? $query->lockForUpdate() : $query)->findOrFail($id);
     }
 
     /** Master yang menunjuk dirinya sendiri (contohnya lokasi) tidak boleh membentuk siklus. */
@@ -342,11 +352,11 @@ abstract class MasterDataController extends Controller
         foreach ($this->childMasters() as $child) {
             $referenced = DB::table($child->table)
                 ->where('tenant_id', $record->tenant_id)
-                ->where($child->column, $record->getKey())
-                ->whereNull('deleted_at')
-                ->exists();
-
-            if ($referenced) {
+                ->where($child->column, $record->getKey());
+            if (Schema::hasColumn($child->table, 'deleted_at')) {
+                $referenced->whereNull('deleted_at');
+            }
+            if ($referenced->exists()) {
                 return $child;
             }
         }
@@ -418,6 +428,15 @@ abstract class MasterDataController extends Controller
     }
 
     /**
+     * Validasi yang baru dapat dilakukan setelah seluruh field master tervalidasi.
+     * Controller turunan memakai ini untuk menjaga aturan yang bergantung pada data
+     * transaksi atau kombinasi beberapa field.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function afterWriteValidation(array $data, string $tenantId, bool $creating, ?MasterData $record = null): void {}
+
+    /**
      * Nilai kolom tambahan yang disimpan saat pembuatan.
      *
      * @param  array<string, mixed>  $data
@@ -436,5 +455,17 @@ abstract class MasterDataController extends Controller
     protected function extraPresent(MasterData $record): array
     {
         return [];
+    }
+
+    /** Memperkaya query master tanpa menambah query per baris. */
+    protected function prepareQuery(Builder $query, ?Request $request = null): Builder
+    {
+        return $query;
+    }
+
+    /** Master tertentu dapat meminta PATCH berjalan di dalam transaksi dengan row lock. */
+    protected function updateUnderLock(): bool
+    {
+        return false;
     }
 }

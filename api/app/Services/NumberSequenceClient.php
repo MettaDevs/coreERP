@@ -5,13 +5,15 @@ namespace App\Services;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
-use RuntimeException;
+use Illuminate\Support\Facades\Log;
 
 class NumberSequenceClient
 {
     /**
      * Menerbitkan satu nomor untuk reference milik app ini. Format, status, dan counter
      * adalah milik Control Plane; app hanya menerima nomor yang sudah jadi.
+     *
+     * @throws NumberSequenceException
      */
     public function issue(string $reference, string $tenantId, string $idempotencyKey, ?string $legalEntityId = null): string
     {
@@ -20,7 +22,7 @@ class NumberSequenceClient
         $token = (string) config('services.coreerp.service_token');
 
         if ($url === '' || $token === '') {
-            throw new RuntimeException('Layanan nomor belum dikonfigurasi.');
+            throw $this->fail('number_sequence_not_configured', 'Layanan nomor belum dikonfigurasi.', $reference, $appId, $tenantId);
         }
 
         try {
@@ -43,16 +45,82 @@ class NumberSequenceClient
                     'legal_entity_id' => $legalEntityId,
                 ])
                 ->throw();
-        } catch (ConnectionException|RequestException $exception) {
-            report($exception);
-            throw new RuntimeException('Nomor belum dapat diterbitkan.', previous: $exception);
+        } catch (ConnectionException $exception) {
+            throw $this->fail('number_sequence_unreachable', 'Layanan nomor belum dapat dihubungi.', $reference, $appId, $tenantId, null, $exception);
+        } catch (RequestException $exception) {
+            [$code, $message] = $this->classify($exception->response->status(), $reference);
+            throw $this->fail($code, $message, $reference, $appId, $tenantId, $exception->response->status(), $exception);
         }
 
         $number = $response->json('data.number');
         if (! is_string($number) || $number === '') {
-            throw new RuntimeException('Layanan nomor mengembalikan data yang tidak valid.');
+            throw $this->fail('number_sequence_invalid_response', 'Layanan nomor mengembalikan data yang tidak valid.', $reference, $appId, $tenantId, $response->status());
         }
 
         return $number;
+    }
+
+    /**
+     * Menerjemahkan jawaban Core menjadi sebab yang dapat ditindaklanjuti.
+     *
+     * Core menjawab, jadi jaringannya sehat. Yang membedakan adalah apakah app ini tidak
+     * dipercaya, referencenya belum ada, permintaannya ditolak, atau Core sendiri sedang
+     * bermasalah — empat hal dengan penanganan yang sama sekali berbeda.
+     *
+     * @return array{string, string}
+     */
+    private function classify(int $status, string $reference): array
+    {
+        return match (true) {
+            // Bukan masalah tenant maupun pengguna: kredensial service app ini ditolak Core.
+            // Lazimnya token service tidak sinkron dengan yang tercatat di Control Plane.
+            in_array($status, [401, 403], true) => [
+                'number_sequence_forbidden',
+                'Aplikasi ini belum dipercaya Core untuk menerbitkan nomor.',
+            ],
+            $status === 404 => [
+                'number_sequence_reference_unknown',
+                'Reference nomor "'.$reference.'" belum terdaftar di Core.',
+            ],
+            $status === 429 => [
+                'number_sequence_throttled',
+                'Permintaan nomor terlalu sering. Coba lagi sebentar lagi.',
+            ],
+            $status >= 500 => [
+                'number_sequence_unavailable',
+                'Nomor belum dapat diterbitkan.',
+            ],
+            default => [
+                'number_sequence_rejected',
+                'Permintaan nomor ditolak Core.',
+            ],
+        };
+    }
+
+    /**
+     * Mencatat sebabnya sebelum melemparkannya.
+     *
+     * Konteks di sini sengaja lengkap: tanpa status HTTP dan reference, menelusuri
+     * kegagalan berarti membandingkan digest kredensial satu per satu. Token tidak pernah
+     * ikut dicatat, termasuk potongannya.
+     */
+    private function fail(
+        string $code,
+        string $message,
+        string $reference,
+        string $appId,
+        string $tenantId,
+        ?int $status = null,
+        ?\Throwable $previous = null,
+    ): NumberSequenceException {
+        Log::error('Penerbitan nomor gagal: '.$code, [
+            'error_code' => $code,
+            'reference' => $reference,
+            'app_id' => $appId,
+            'tenant_id' => $tenantId,
+            'core_http_status' => $status,
+        ]);
+
+        return new NumberSequenceException($code, $message, previous: $previous);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\master\TipeAtribut;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -52,6 +51,20 @@ final class AssetAttributeValidator
      */
     public function rowsFor(string $tenantId, string $jenisAsetId, array $submitted): array
     {
+        $typeIds = DB::table('m_jenis_aset_atribut')
+            ->where(['tenant_id' => $tenantId, 'jenis_aset_id' => $jenisAsetId])
+            ->whereNull('deleted_at')
+            ->orderBy('tipe_atribut_id')
+            ->pluck('tipe_atribut_id');
+        if ($typeIds->isNotEmpty()) {
+            DB::table('m_tipe_atribut')
+                ->where('tenant_id', $tenantId)
+                ->whereIn('id', $typeIds->all())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id']);
+        }
+
         $definitions = collect($this->definitions($tenantId, $jenisAsetId))->keyBy('tipe_atribut_id');
         $values = collect($submitted)->keyBy('tipe_atribut_id');
 
@@ -109,18 +122,22 @@ final class AssetAttributeValidator
     private function column(array $definition, mixed $raw, string $field, array &$errors): ?array
     {
         switch ($definition['data_type']) {
-            case 'number':
-            case TipeAtribut::RANGE_TYPE:
+            case 'decimal':
+            case 'integer':
                 if (! is_numeric($raw)) {
                     $errors[$field] = [$definition['nama'].' harus berupa angka.'];
 
                     return null;
                 }
                 $number = (float) $raw;
+                if ($definition['data_type'] === 'integer' && floor($number) !== $number) {
+                    $errors[$field] = [$definition['nama'].' harus berupa bilangan bulat.'];
+
+                    return null;
+                }
                 $min = $definition['min_value'];
                 $max = $definition['max_value'];
-                if ($definition['data_type'] === TipeAtribut::RANGE_TYPE
-                    && (($min !== null && $number < (float) $min) || ($max !== null && $number > (float) $max))) {
+                if (($min !== null && $number < (float) $min) || ($max !== null && $number > (float) $max)) {
                     $errors[$field] = [$definition['nama'].' harus antara '.$min.' dan '.$max.'.'];
 
                     return null;
@@ -140,18 +157,24 @@ final class AssetAttributeValidator
 
                 return ['nilai_date' => $raw];
 
-            case TipeAtribut::LIST_TYPE:
-                $choice = collect($definition['nilai_pilihan'])->firstWhere('nilai', (string) $raw);
-                if (! $choice) {
-                    $errors[$field] = [$definition['nama'].' harus dipilih dari daftar yang tersedia.'];
+            case 'string':
+                if ($definition['nilai_pilihan'] !== []) {
+                    $choice = collect($definition['nilai_pilihan'])->firstWhere('nilai', (string) $raw);
+                    if (! $choice) {
+                        $errors[$field] = [$definition['nama'].' harus dipilih dari daftar yang tersedia.'];
 
-                    return null;
+                        return null;
+                    }
+
+                    return ['tipe_atribut_nilai_id' => $choice['id'], 'nilai_text' => $choice['nilai']];
                 }
 
-                return ['tipe_atribut_nilai_id' => $choice['id'], 'nilai_text' => $choice['nilai']];
+                return ['nilai_text' => (string) $raw];
 
             default:
-                return ['nilai_text' => (string) $raw];
+                $errors[$field] = [$definition['nama'].' memakai tipe data yang tidak dikenal.'];
+
+                return null;
         }
     }
 

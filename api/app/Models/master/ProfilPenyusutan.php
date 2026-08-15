@@ -28,6 +28,7 @@ class ProfilPenyusutan extends MasterData
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',
         'method', 'frequency', 'year_basis', 'convention',
         'useful_life_periods', 'rate_percent', 'manual_schedule',
+        'effective_from', 'effective_to',
     ];
 
     protected function casts(): array
@@ -39,6 +40,8 @@ class ProfilPenyusutan extends MasterData
             'manual_schedule' => 'array',
             'useful_life_periods' => 'integer',
             'rate_percent' => 'decimal:4',
+            'effective_from' => 'date',
+            'effective_to' => 'date',
         ];
     }
 }

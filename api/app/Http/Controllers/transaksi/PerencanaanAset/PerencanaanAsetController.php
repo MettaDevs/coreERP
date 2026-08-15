@@ -4,6 +4,7 @@ namespace App\Http\Controllers\transaksi\PerencanaanAset;
 
 use App\Http\Controllers\Controller;
 use App\Services\NumberSequenceClient;
+use App\Services\NumberSequenceException;
 use App\Services\UnitOfMeasureClient;
 use App\Support\OrganizationScope;
 use Illuminate\Database\QueryException;
@@ -64,8 +65,8 @@ class PerencanaanAsetController extends Controller
         $unitMap = $this->validateLookupMasters($tenant, $data['details'], $units);
         try {
             $kode = $numbers->issue('management-aset.perencanaan-aset', $tenant, 'perencanaan-aset:'.$key, $data['legal_entity_id']);
-        } catch (RuntimeException $exception) {
-            return response()->json(['error' => ['code' => 'number_sequence_unavailable', 'message' => $exception->getMessage()]], 503);
+        } catch (NumberSequenceException $exception) {
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], $exception->status);
         }
 
         try {

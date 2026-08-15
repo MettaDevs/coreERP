@@ -80,6 +80,145 @@ class ModelAsetTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_pabrikan_detail_menghitung_model_dan_aset_dengan_izin_masing_masing(): void
+    {
+        $pabrikan = $this->pabrikan();
+        $model = $this->model($pabrikan);
+        $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+
+        $permissions = [
+            'management-aset.pabrikan-aset.read',
+            'management-aset.model-aset.read',
+            'management-aset.aset.read',
+        ];
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, [
+            'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
+        ]))
+            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+            ->assertOk()
+            ->assertJsonPath('data.model_count', 1)
+            ->assertJsonPath('data.asset_count', 1);
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, [
+            'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
+        ]))
+            ->getJson('/api/v1/model-aset?pabrikan_aset_id='.$pabrikan)
+            ->assertOk()
+            ->assertJsonPath('data.0.asset_count', 1);
+    }
+
+    public function test_pabrikan_detail_menyembunyikan_angka_yang_tidak_boleh_dibaca(): void
+    {
+        $pabrikan = $this->pabrikan();
+        $model = $this->model($pabrikan);
+        $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.pabrikan-aset.read']))
+            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+            ->assertOk()
+            ->assertJsonPath('data.model_count', null)
+            ->assertJsonPath('data.asset_count', null);
+    }
+
+    public function test_pabrikan_detail_dan_daftar_model_menghormati_scope_dan_arsip(): void
+    {
+        $pabrikan = $this->pabrikan();
+        $model = $this->model($pabrikan);
+        $legalEntity = (string) Str::ulid();
+        $operatingUnit = (string) Str::ulid();
+        $asset = $this->asset($pabrikan, $model, $legalEntity, $operatingUnit);
+        $permissions = [
+            'management-aset.pabrikan-aset.read',
+            'management-aset.model-aset.read',
+            'management-aset.aset.read',
+        ];
+        $outsideScope = [
+            'data_policies' => ['management-aset.asset-responsibility' => [
+                'all' => false,
+                'scope_grants' => [['legal_entity_id' => (string) Str::ulid(), 'operating_unit_ids' => [(string) Str::ulid()]]],
+            ]],
+        ];
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, $outsideScope))
+            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+            ->assertOk()
+            ->assertJsonPath('data.model_count', 1)
+            ->assertJsonPath('data.asset_count', 0);
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, $outsideScope))
+            ->getJson('/api/v1/model-aset?pabrikan_aset_id='.$pabrikan)
+            ->assertOk()
+            ->assertJsonPath('data.0.asset_count', 0);
+
+        DB::table('tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
+        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, [
+            'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
+        ]))
+            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+            ->assertOk()
+            ->assertJsonPath('data.asset_count', 0);
+    }
+
+    public function test_jumlah_aset_hanya_menghitung_aset_yang_masih_aktif(): void
+    {
+        $pabrikan = $this->pabrikan();
+        $model = $this->model($pabrikan);
+        $active = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $decommissioned = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $disposed = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        DB::table('tr_penerimaan_aset')->where('id', $decommissioned)->update(['lifecycle_state' => 'decommissioned']);
+        DB::table('tr_penerimaan_aset')->where('id', $disposed)->update(['lifecycle_state' => 'disposed']);
+
+        $permissions = [
+            'management-aset.pabrikan-aset.read',
+            'management-aset.model-aset.read',
+            'management-aset.aset.read',
+        ];
+        $headers = $this->contextHeaders($this->tenantId, $permissions, [
+            'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
+        ]);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+            ->assertOk()
+            ->assertJsonPath('data.asset_count', 1);
+
+        $this->withHeaders($headers)
+            ->getJson('/api/v1/model-aset?pabrikan_aset_id='.$pabrikan)
+            ->assertOk()
+            ->assertJsonPath('data.0.asset_count', 1);
+
+        $this->assertDatabaseHas('tr_penerimaan_aset', ['id' => $active, 'lifecycle_state' => 'received']);
+    }
+
+    public function test_model_tidak_dapat_diarsipkan_saat_masih_dipakai_aset(): void
+    {
+        $pabrikan = $this->pabrikan();
+        $model = $this->model($pabrikan);
+        $asset = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+
+        $this->withContext(['management-aset.model-aset.archive'])
+            ->deleteJson('/api/v1/model-aset/'.$model)
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'referenced_by_children');
+
+        DB::table('tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
+
+        $this->withContext(['management-aset.model-aset.archive'])
+            ->deleteJson('/api/v1/model-aset/'.$model)
+            ->assertNoContent();
+    }
+
+    public function test_pabrikan_detail_tidak_membuka_data_tenant_lain(): void
+    {
+        $pabrikan = $this->pabrikan();
+
+        $this->withHeaders($this->contextHeaders((string) Str::ulid(), ['management-aset.pabrikan-aset.read']))
+            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+            ->assertNotFound();
+    }
+
     public function test_gateway_context_and_permission_are_required(): void
     {
         $this->getJson('/api/v1/model-aset')->assertUnauthorized();
@@ -111,6 +250,69 @@ class ModelAsetTest extends TestCase
             'aktif' => true,
             'created_at' => $now,
             'updated_at' => $now,
+        ]);
+
+        return $id;
+    }
+
+    private function model(string $pabrikanId): string
+    {
+        $id = (string) Str::ulid();
+        DB::table('m_model_aset')->insert([
+            'id' => $id,
+            'tenant_id' => $this->tenantId,
+            'creation_key' => 'model-'.Str::ulid(),
+            'pabrikan_aset_id' => $pabrikanId,
+            'jenis_aset_id' => null,
+            'kode' => 'MDL'.Str::random(6),
+            'nama' => 'Model uji',
+            'aktif' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    private function asset(string $pabrikanId, string $modelId, string $legalEntityId, string $operatingUnitId): string
+    {
+        $group = $this->reference('m_group_aset', 'group');
+        $jenis = $this->reference('m_jenis_aset', 'jenis');
+        $id = (string) Str::ulid();
+        DB::table('tr_penerimaan_aset')->insert([
+            'id' => $id,
+            'tenant_id' => $this->tenantId,
+            'creation_key' => 'asset-'.Str::ulid(),
+            'kode' => 'AST'.Str::random(6),
+            'legal_entity_id' => $legalEntityId,
+            'responsible_org_unit_id' => $operatingUnitId,
+            'group_aset_id' => $group,
+            'jenis_aset_id' => $jenis,
+            'pabrikan_aset_id' => $pabrikanId,
+            'model_aset_id' => $modelId,
+            'acquired_on' => '2026-08-14',
+            'acquisition_value' => 1000,
+            'currency_code' => 'IDR',
+            'lifecycle_state' => 'received',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
+    private function reference(string $table, string $prefix): string
+    {
+        $id = (string) Str::ulid();
+        DB::table($table)->insert([
+            'id' => $id,
+            'tenant_id' => $this->tenantId,
+            'creation_key' => $prefix.'-'.Str::ulid(),
+            'kode' => strtoupper(substr($prefix, 0, 3)).Str::random(6),
+            'nama' => 'Referensi uji',
+            'aktif' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         return $id;

@@ -113,6 +113,15 @@ class ProfilPenyusutanTest extends TestCase
             ->assertJsonValidationErrors('method');
     }
 
+    public function test_rentang_tanggal_berlaku_tidak_boleh_terbalik(): void
+    {
+        $this->create([
+            'nama' => 'Versi tidak valid', 'method' => 'straight_line', 'frequency' => 'monthly',
+            'year_basis' => 'calendar', 'useful_life_periods' => 12,
+            'effective_from' => '2027-01-01', 'effective_to' => '2026-12-31',
+        ])->assertStatus(422)->assertJsonValidationErrors('effective_to');
+    }
+
     public function test_retry_dengan_kunci_sama_tidak_menerbitkan_nomor_kedua(): void
     {
         $payload = ['nama' => 'Garis lurus', 'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar', 'useful_life_periods' => 12];

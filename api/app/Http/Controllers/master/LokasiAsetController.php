@@ -47,6 +47,9 @@ class LokasiAsetController extends MasterDataController
         return [
             new MasterChild(table: 'm_lokasi_aset', column: 'parent_id', label: 'lokasi anak'),
             new MasterChild(table: 'tr_penerimaan_aset', column: 'asset_location_id', label: 'aset'),
+            // Group yang memakai lokasi ini sebagai lokasi bawaan penerimaan. Tanpa ini
+            // mengarsipkan lokasi meninggalkan group yang diam-diam menunjuk data mati.
+            new MasterChild(table: 'm_group_aset', column: 'asset_location_id', label: 'group aset'),
         ];
     }
 
