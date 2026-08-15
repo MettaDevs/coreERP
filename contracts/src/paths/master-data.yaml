@@ -419,6 +419,67 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+/api/v1/jenis-aset/{id}/models:
+  parameters:
+  - $ref: '#/components/parameters/RecordId'
+  put:
+    tags:
+    - Master data
+    operationId: replaceJenisAsetModels
+    summary: Mengganti seluruh model yang dikaitkan ke satu jenis aset
+    description: |
+      Relasi disunting dari sisi pemiliknya, yaitu jenis aset. Katalog model dan pabrikan
+      tidak dibuat atau diubah di sini; endpoint ini hanya memindahkan keanggotaan.
+
+      Isinya menggantikan, bukan menambah: model yang sebelumnya terkait tetapi tidak ada
+      pada `model_ids` akan dilepas. Kirim array kosong untuk melepas semuanya.
+
+      Memerlukan `management-aset.jenis-aset.update` sekaligus `management-aset.model-aset.read`,
+      karena tindakannya mengubah jenis aset tetapi membaca isi resource model. Satu model
+      hanya boleh dimiliki satu jenis aset; mengaitkan model yang sudah dipegang jenis aset
+      lain ditolak sebagai galat validasi, bukan dipindahkan diam-diam.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - model_ids
+            properties:
+              model_ids:
+                type: array
+                maxItems: 100
+                uniqueItems: true
+                items:
+                  $ref: '#/components/schemas/Ulid'
+    responses:
+      '200':
+        description: Daftar model yang kini terkait
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - data
+              properties:
+                data:
+                  type: object
+                  required:
+                  - model_ids
+                  properties:
+                    model_ids:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/Ulid'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        $ref: '#/components/responses/ValidationError'
 /api/v1/tipe-atribut/{id}/nilai:
   parameters:
   - $ref: '#/components/parameters/RecordId'
