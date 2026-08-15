@@ -98,6 +98,30 @@ export default withMermaid({
             { text: 'Human Resources', link: '/apps/human-resources/' },
           ],
         },
+        {
+          text: 'Management Aset — master',
+          items: [
+            { text: 'Master data', link: '/apps/management-aset/master/' },
+            { text: 'Jenis aset dan atribut', link: '/apps/management-aset/master/jenisaset/' },
+            { text: 'Penyusutan: profil dan buku', link: '/apps/management-aset/master/depresiasi/' },
+            { text: 'Setup maintenance', link: '/apps/management-aset/master/maintenance/' },
+          ],
+        },
+        {
+          text: 'Management Aset — transaksi',
+          items: [
+            { text: 'Register aset', link: '/apps/management-aset/transaction/register-aset/' },
+            { text: 'Proses penyusutan', link: '/apps/management-aset/transaction/penyusutan/' },
+            { text: 'Pemeliharaan aset', link: '/apps/management-aset/transaction/pemeliharaan-aset/' },
+            { text: 'Dokumen siklus aset', link: '/apps/management-aset/transaction/siklus-aset/' },
+          ],
+        },
+        {
+          text: 'Menulis dokumen',
+          items: [
+            { text: 'Pola dokumen fitur', link: '/apps/management-aset/pola-dokumen' },
+          ],
+        },
       ],
 
       '/dev/': [
