@@ -66,6 +66,13 @@ final class MaintenanceSetupLinkController extends Controller
 
         $data = $request->validate($this->jobTypeIdsRules($tenant));
         DB::transaction(function () use ($tenant, $jenisAsetId, $data): void {
+            // Dikunci dari sisi job type, bukan sisi jenis aset, karena arah yang
+            // satunya juga mengunci job type. Lihat lockJobTypes().
+            $current = DB::table('m_maintenance_job_type_asset_type')
+                ->where(['tenant_id' => $tenant, 'jenis_aset_id' => $jenisAsetId])
+                ->pluck('job_type_id')->all();
+            $this->lockJobTypes($tenant, [...$current, ...$data['jenis_aset_ids']]);
+
             DB::table('m_maintenance_job_type_asset_type')
                 ->where(['tenant_id' => $tenant, 'jenis_aset_id' => $jenisAsetId])->delete();
             foreach ($data['jenis_aset_ids'] as $jobTypeId) {
@@ -102,6 +109,7 @@ final class MaintenanceSetupLinkController extends Controller
             'values.*.result_code' => ['required', Rule::in(['pass', 'fail'])],
         ]);
         DB::transaction(function () use ($tenant, $variableId, $data): void {
+            $this->lockRecord('m_maintenance_checklist_variable', $tenant, $variableId);
             DB::table('m_maintenance_checklist_variable_value')->where(['tenant_id' => $tenant, 'variable_id' => $variableId])->delete();
             foreach ($data['values'] as $value) {
                 DB::table('m_maintenance_checklist_variable_value')->insert([
@@ -142,6 +150,7 @@ final class MaintenanceSetupLinkController extends Controller
             'lines.*.nested_template_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('m_maintenance_checklist_template', 'id')->where('tenant_id', $tenant)],
         ]);
         DB::transaction(function () use ($tenant, $templateId, $data): void {
+            $this->lockRecord('m_maintenance_checklist_template', $tenant, $templateId);
             DB::table('m_maintenance_checklist_template_line')->where(['tenant_id' => $tenant, 'template_id' => $templateId])->delete();
             foreach ($data['lines'] as $line) {
                 if ($line['type'] === 'measurement' && empty($line['unit'])) {
@@ -183,6 +192,7 @@ final class MaintenanceSetupLinkController extends Controller
     private function replaceAssetTypeLink(string $tenant, string $jobTypeId, array $jenisAsetIds): void
     {
         DB::transaction(function () use ($tenant, $jobTypeId, $jenisAsetIds): void {
+            $this->lockJobTypes($tenant, [$jobTypeId]);
             DB::table('m_maintenance_job_type_asset_type')->where(['tenant_id' => $tenant, 'job_type_id' => $jobTypeId])->delete();
             foreach ($jenisAsetIds as $jenisAsetId) {
                 DB::table('m_maintenance_job_type_asset_type')->insert([
@@ -207,6 +217,47 @@ final class MaintenanceSetupLinkController extends Controller
             'jenis_aset_ids' => ['present', 'array', 'max:200'],
             'jenis_aset_ids.*' => ['required', 'distinct', 'ulid', Rule::exists('m_maintenance_job_type', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
         ];
+    }
+
+    /**
+     * Menahan baris pemilik selama transaksi penggantian berjalan.
+     *
+     * Setiap endpoint "replace" di sini menghapus lalu menyisipkan ulang. Tanpa
+     * kunci, dua permintaan atas pemilik yang sama bisa saling menyela: yang satu
+     * menghapus, yang lain menghapus dan menyisipkan, lalu yang pertama menyisipkan
+     * di atasnya. Hasilnya gabungan dua himpunan — bukan kehendak salah satu
+     * pengguna, dan tidak ada batasan basis data yang menolaknya karena tiap baris
+     * masing-masing sah. Feature test tidak akan pernah melihat ini: ia menjalankan
+     * satu permintaan pada satu proses.
+     */
+    private function lockRecord(string $table, string $tenant, string $id): void
+    {
+        DB::table($table)->where(['tenant_id' => $tenant, 'id' => $id])->lockForUpdate()->first();
+    }
+
+    /**
+     * Mengunci baris job type yang terlibat, selalu terurut menurut id.
+     *
+     * `m_maintenance_job_type_asset_type` disunting dari dua arah: per job type dan
+     * per jenis aset. Mengunci baris pemilik masing-masing arah tidak menolong,
+     * karena keduanya akan memegang kunci pada tabel yang berbeda dan tetap saling
+     * menimpa. Karena itu kedua arah mengunci sisi yang sama, yaitu job type: dua
+     * operasi yang dapat menyentuh baris kaitan `(j, a)` yang sama pasti sama-sama
+     * memuat `j` dalam himpunan kuncinya, sehingga berurutan.
+     *
+     * Urutan `id` yang tetap mencegah dua transaksi mengambil kunci yang sama dalam
+     * urutan berlawanan dan saling menunggu selamanya.
+     */
+    private function lockJobTypes(string $tenant, array $jobTypeIds): void
+    {
+        $ids = array_values(array_unique(array_map('strval', $jobTypeIds)));
+        if ($ids === []) {
+            return;
+        }
+
+        DB::table('m_maintenance_job_type')
+            ->where('tenant_id', $tenant)->whereIn('id', $ids)
+            ->orderBy('id')->lockForUpdate()->get(['id']);
     }
 
     private function tenant(Request $request): string
