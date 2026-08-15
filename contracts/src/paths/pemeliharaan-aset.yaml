@@ -1,0 +1,305 @@
+# Work order pemeliharaan aset. Menggantikan jalur dokumen siklus generik yang dulu
+# melayani `pemeliharaan-aset` sebagai catatan satu baris.
+/api/v1/pemeliharaan-aset:
+  get:
+    tags:
+    - Pemeliharaan aset
+    operationId: listWorkOrders
+    summary: Menampilkan work order pemeliharaan dalam jangkauan organisasi pengguna
+    responses:
+      '200':
+        description: Daftar work order beserta tipe, tingkat layanan, dan jumlah baris pekerjaan
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+  post:
+    tags:
+    - Pemeliharaan aset
+    operationId: createWorkOrder
+    summary: Membuat work order draf beserta baris pekerjaannya
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkOrderWrite'
+    responses:
+      '200':
+        description: Permintaan yang sama diulang; work order dikembalikan tanpa menerbitkan nomor baru
+        headers:
+          Idempotent-Replayed:
+            schema:
+              type: string
+              const: 'true'
+      '201':
+        description: Work order dibuat berstatus draf
+        headers:
+          Location:
+            schema:
+              type: string
+              format: uri
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+      '503':
+        $ref: '#/components/responses/NumberSequenceUnavailable'
+/api/v1/pemeliharaan-aset/saya:
+  get:
+    tags:
+    - Pemeliharaan aset
+    operationId: listMyWorkOrderJobs
+    summary: >-
+      Menampilkan baris pekerjaan yang ditugaskan kepada pengguna yang sedang masuk.
+      Penyaringan dilakukan pada baris, bukan header, karena satu work order dapat
+      dikerjakan beberapa orang untuk aset yang berbeda.
+    responses:
+      '200':
+        description: Baris pekerjaan berstatus dijadwalkan atau dikerjakan milik pengguna
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+/api/v1/pemeliharaan-aset/{id}/status:
+  post:
+    tags:
+    - Pemeliharaan aset
+    operationId: transitionWorkOrder
+    summary: >-
+      Memindahkan status work order dan mencatatnya pada jejak status. Hak yang dituntut
+      mengikuti transisinya: penjadwalan dan pembatalan memakai schedule, mulai dan selesai
+      memakai execute, penutupan memakai close.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - ke_status
+            - version
+            properties:
+              ke_status:
+                type: string
+                enum:
+                - draft
+                - dijadwalkan
+                - dikerjakan
+                - selesai
+                - ditutup
+                - dibatalkan
+              alasan:
+                type: string
+                maxLength: 2000
+                description: Wajib diisi ketika tujuannya adalah dibatalkan.
+                nullable: true
+              version:
+                type: integer
+                minimum: 1
+    responses:
+      '200':
+        description: Status berpindah
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Version sudah berubah
+      '422':
+        description: >-
+          Transisi tidak sah, atau syarat isi data belum terpenuhi — misalnya masih ada
+          pemeriksaan wajib yang kosong, atau sebab dan tindakan belum diisi pada tipe work
+          order yang mewajibkannya.
+/api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist:
+  parameters:
+  - $ref: '#/components/parameters/RecordId'
+  - name: jobId
+    in: path
+    required: true
+    schema:
+      $ref: '#/components/schemas/Ulid'
+  get:
+    tags:
+    - Pemeliharaan aset
+    operationId: getWorkOrderChecklist
+    summary: Membaca baris checklist satu baris pekerjaan
+    responses:
+      '200':
+        description: Baris checklist beserta nilai dan penanda pemeriksaannya
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  put:
+    tags:
+    - Pemeliharaan aset
+    operationId: saveWorkOrderChecklist
+    summary: >-
+      Menyimpan hasil pemeriksaan sekaligus. Hanya nilai, penanda tidak berlaku, dan catatan
+      teknisi yang dapat diubah; nama, tipe, satuan, dan penanda wajib adalah salinan
+      prosedur dan tidak dapat disunting dari lapangan.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - baris
+            properties:
+              baris:
+                type: array
+                maxItems: 200
+                items:
+                  type: object
+                  required:
+                  - id
+                  properties:
+                    id:
+                      $ref: '#/components/schemas/Ulid'
+                    nilai:
+                      type: string
+                      maxLength: 255
+                      nullable: true
+                    tidak_berlaku:
+                      type: boolean
+                    catatan_teknisi:
+                      type: string
+                      maxLength: 2000
+                      nullable: true
+    responses:
+      '200':
+        description: Hasil pemeriksaan tersimpan
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        description: >-
+          Pekerjaan belum berstatus dikerjakan, ada baris yang bukan milik pekerjaan ini,
+          atau nilai di luar pilihan yang ditetapkan variabelnya.
+/api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template:
+  parameters:
+  - $ref: '#/components/parameters/RecordId'
+  - name: jobId
+    in: path
+    required: true
+    schema:
+      $ref: '#/components/schemas/Ulid'
+  post:
+    tags:
+    - Pemeliharaan aset
+    operationId: copyWorkOrderChecklistFromTemplate
+    summary: >-
+      Menyalin baris template checklist ke baris pekerjaan. Baris bertipe template
+      dimekarkan menjadi isinya dan dinomori ulang berurutan, sehingga teknisi melihat satu
+      daftar datar. Salinan bersifat snapshot; perubahan template setelahnya tidak mengubah
+      pemeriksaan yang sudah dikerjakan.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - template_id
+            properties:
+              template_id:
+                $ref: '#/components/schemas/Ulid'
+    responses:
+      '201':
+        description: Baris checklist tersalin; baris sebelumnya pada pekerjaan ini digantikan
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        description: Pekerjaan sudah dimulai, atau template belum memiliki baris pemeriksaan
+/api/v1/pemeliharaan-aset/{id}:
+  get:
+    tags:
+    - Pemeliharaan aset
+    operationId: showWorkOrder
+    summary: Menampilkan satu work order beserta baris pekerjaan dan jejak perpindahan statusnya
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Work order, baris pekerjaan, dan status log
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  patch:
+    tags:
+    - Pemeliharaan aset
+    operationId: updateWorkOrder
+    summary: >-
+      Mengubah work order draf dengan version saat ini. Baris pekerjaan diganti seluruhnya,
+      dan itulah sebabnya perubahan hanya sah selama status masih draf.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/WorkOrderWrite'
+            - type: object
+              required:
+              - version
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+    responses:
+      '200':
+        description: Work order diperbarui
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Version sudah berubah
+      '422':
+        description: Work order tidak lagi berstatus draf, atau payload tidak lolos validasi
+  delete:
+    tags:
+    - Pemeliharaan aset
+    operationId: archiveWorkOrder
+    summary: Mengarsipkan work order draf atau yang sudah dibatalkan tanpa menghapus data fisik
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - version
+            properties:
+              version:
+                type: integer
+                minimum: 1
+    responses:
+      '204':
+        description: Work order diarsipkan
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Version sudah berubah
+      '422':
+        description: Hanya work order draf atau yang sudah dibatalkan yang dapat diarsipkan

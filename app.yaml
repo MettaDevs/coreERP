@@ -17,6 +17,8 @@ ui:
     rail:
       - id: master
         label: Master data
+      - id: maintenance
+        label: Maintenance
       - id: transaksi
         label: Transaksi
     sidebar:
@@ -30,20 +32,11 @@ ui:
           label: Jenis aset
           permission: management-aset.jenis-aset.read
         - id: pabrikan-aset
-          label: Pabrikan aset
+          label: Pabrikan dan model
           permission: management-aset.pabrikan-aset.read
-        - id: model-aset
-          label: Model aset
-          permission: management-aset.model-aset.read
         - id: kondisi-aset
           label: Kondisi aset
           permission: management-aset.kondisi-aset.read
-        - id: item-checklist-maintenance
-          label: Item checklist maintenance
-          permission: management-aset.item-checklist-maintenance.read
-        - id: analisa-maintenance
-          label: Analisa maintenance
-          permission: management-aset.analisa-maintenance.read
         - id: tipe-lokasi-aset
           label: Tipe lokasi aset
           permission: management-aset.tipe-lokasi-aset.read
@@ -65,6 +58,43 @@ ui:
         - id: fixed-asset-posting-profiles
           label: Profil posting aset
           permission: management-aset.fixed-asset-posting-profiles.read
+      maintenance:
+        - id: item-checklist-maintenance
+          label: Item checklist maintenance
+          permission: management-aset.item-checklist-maintenance.read
+        - id: analisa-maintenance
+          label: Analisa maintenance
+          permission: management-aset.analisa-maintenance.read
+        - id: maintenance-job-types
+          label: Jenis pekerjaan maintenance
+          permission: management-aset.maintenance-job-types.read
+        - id: maintenance-job-type-defaults
+          label: Default jenis pekerjaan maintenance
+          permission: management-aset.maintenance-job-type-defaults.read
+        - id: maintenance-checklist-variables
+          label: Variabel checklist maintenance
+          permission: management-aset.maintenance-checklist-variables.read
+        - id: maintenance-checklist-templates
+          label: Template checklist maintenance
+          permission: management-aset.maintenance-checklist-templates.read
+        - id: tipe-work-order
+          label: Tipe work order
+          permission: management-aset.tipe-work-order.read
+        - id: tingkat-layanan
+          label: Tingkat layanan
+          permission: management-aset.tingkat-layanan.read
+        - id: trade
+          label: Bidang keahlian
+          permission: management-aset.trade.read
+        - id: sebab-kerusakan
+          label: Sebab kerusakan
+          permission: management-aset.sebab-kerusakan.read
+        - id: tindakan-perbaikan
+          label: Tindakan perbaikan
+          permission: management-aset.tindakan-perbaikan.read
+        - id: validasi-status-work-order
+          label: Validasi status work order
+          permission: management-aset.validasi-status-work-order.read
       transaksi:
         - id: perencanaan-aset
           label: Perencanaan aset
@@ -117,6 +147,7 @@ security:
       protected_permissions:
         - management-aset.aset.read
         - management-aset.aset.create
+        - management-aset.aset.update
         - management-aset.aset.mutate
         - management-aset.perencanaan-aset.read
         - management-aset.perencanaan-aset.create
@@ -126,6 +157,11 @@ security:
         - management-aset.permintaan-pembelian-aset.create
         - management-aset.pemeliharaan-aset.read
         - management-aset.pemeliharaan-aset.create
+        - management-aset.pemeliharaan-aset.update
+        - management-aset.pemeliharaan-aset.archive
+        - management-aset.pemeliharaan-aset.schedule
+        - management-aset.pemeliharaan-aset.execute
+        - management-aset.pemeliharaan-aset.close
         - management-aset.dekomisioning-aset.read
         - management-aset.dekomisioning-aset.create
         - management-aset.dekomisioning-aset.verify
@@ -145,7 +181,7 @@ security:
   # duty adalah bagian proses bisnis yang disusun tenant menjadi security role.
   entry_points:
     - code: management-aset.model-aset.form
-      name: Layar model aset
+      name: Bagian model pada layar pabrikan dan model
       type: form
     - code: management-aset.model-aset.api
       name: API model aset
@@ -169,7 +205,7 @@ security:
       name: API kondisi aset
       type: api
     - code: management-aset.pabrikan-aset.form
-      name: Layar pabrikan aset
+      name: Layar pabrikan dan model
       type: form
     - code: management-aset.pabrikan-aset.api
       name: API pabrikan aset
@@ -185,6 +221,69 @@ security:
       type: form
     - code: management-aset.analisa-maintenance.api
       name: API analisa maintenance
+      type: api
+    - code: management-aset.maintenance-job-types.form
+      name: Layar jenis pekerjaan maintenance
+      type: form
+    - code: management-aset.maintenance-job-types.api
+      name: API jenis pekerjaan maintenance
+      type: api
+    - code: management-aset.maintenance-job-type-variants.api
+      name: API varian jenis pekerjaan maintenance
+      type: api
+    - code: management-aset.maintenance-job-type-defaults.form
+      name: Layar default jenis pekerjaan maintenance
+      type: form
+    - code: management-aset.maintenance-job-type-defaults.api
+      name: API default jenis pekerjaan maintenance
+      type: api
+    - code: management-aset.maintenance-checklist-variables.form
+      name: Layar variabel checklist maintenance
+      type: form
+    - code: management-aset.maintenance-checklist-variables.api
+      name: API variabel checklist maintenance
+      type: api
+    - code: management-aset.maintenance-checklist-templates.form
+      name: Layar template checklist maintenance
+      type: form
+    - code: management-aset.maintenance-checklist-templates.api
+      name: API template checklist maintenance
+      type: api
+    - code: management-aset.tipe-work-order.form
+      name: Layar tipe work order
+      type: form
+    - code: management-aset.tipe-work-order.api
+      name: API tipe work order
+      type: api
+    - code: management-aset.tingkat-layanan.form
+      name: Layar tingkat layanan
+      type: form
+    - code: management-aset.tingkat-layanan.api
+      name: API tingkat layanan
+      type: api
+    - code: management-aset.trade.form
+      name: Layar bidang keahlian
+      type: form
+    - code: management-aset.trade.api
+      name: API bidang keahlian
+      type: api
+    - code: management-aset.sebab-kerusakan.form
+      name: Layar sebab kerusakan
+      type: form
+    - code: management-aset.sebab-kerusakan.api
+      name: API sebab kerusakan
+      type: api
+    - code: management-aset.tindakan-perbaikan.form
+      name: Layar tindakan perbaikan
+      type: form
+    - code: management-aset.tindakan-perbaikan.api
+      name: API tindakan perbaikan
+      type: api
+    - code: management-aset.validasi-status-work-order.form
+      name: Layar validasi status work order
+      type: form
+    - code: management-aset.validasi-status-work-order.api
+      name: API validasi status work order
       type: api
     - code: management-aset.aset.form
       name: Layar register aset
@@ -389,6 +488,174 @@ security:
       name: Arsipkan analisa maintenance
       entry_point: management-aset.analisa-maintenance.api
       access: delete
+    - code: management-aset.maintenance-job-types.read
+      name: Lihat jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-types.form
+      access: read
+    - code: management-aset.maintenance-job-types.create
+      name: Tambah jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-types.api
+      access: create
+    - code: management-aset.maintenance-job-types.update
+      name: Ubah jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-types.api
+      access: update
+    - code: management-aset.maintenance-job-types.archive
+      name: Arsipkan jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-types.api
+      access: delete
+    - code: management-aset.maintenance-job-type-variants.read
+      name: Lihat varian jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-variants.api
+      access: read
+    - code: management-aset.maintenance-job-type-variants.create
+      name: Tambah varian jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-variants.api
+      access: create
+    - code: management-aset.maintenance-job-type-variants.update
+      name: Ubah varian jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-variants.api
+      access: update
+    - code: management-aset.maintenance-job-type-variants.archive
+      name: Arsipkan varian jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-variants.api
+      access: delete
+    - code: management-aset.maintenance-job-type-defaults.read
+      name: Lihat default jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-defaults.form
+      access: read
+    - code: management-aset.maintenance-job-type-defaults.create
+      name: Tambah default jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-defaults.api
+      access: create
+    - code: management-aset.maintenance-job-type-defaults.update
+      name: Ubah default jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-defaults.api
+      access: update
+    - code: management-aset.maintenance-job-type-defaults.archive
+      name: Arsipkan default jenis pekerjaan maintenance
+      entry_point: management-aset.maintenance-job-type-defaults.api
+      access: delete
+    - code: management-aset.maintenance-checklist-variables.read
+      name: Lihat variabel checklist maintenance
+      entry_point: management-aset.maintenance-checklist-variables.form
+      access: read
+    - code: management-aset.maintenance-checklist-variables.create
+      name: Tambah variabel checklist maintenance
+      entry_point: management-aset.maintenance-checklist-variables.api
+      access: create
+    - code: management-aset.maintenance-checklist-variables.update
+      name: Ubah variabel checklist maintenance
+      entry_point: management-aset.maintenance-checklist-variables.api
+      access: update
+    - code: management-aset.maintenance-checklist-variables.archive
+      name: Arsipkan variabel checklist maintenance
+      entry_point: management-aset.maintenance-checklist-variables.api
+      access: delete
+    - code: management-aset.maintenance-checklist-templates.read
+      name: Lihat template checklist maintenance
+      entry_point: management-aset.maintenance-checklist-templates.form
+      access: read
+    - code: management-aset.maintenance-checklist-templates.create
+      name: Tambah template checklist maintenance
+      entry_point: management-aset.maintenance-checklist-templates.api
+      access: create
+    - code: management-aset.maintenance-checklist-templates.update
+      name: Ubah template checklist maintenance
+      entry_point: management-aset.maintenance-checklist-templates.api
+      access: update
+    - code: management-aset.maintenance-checklist-templates.archive
+      name: Arsipkan template checklist maintenance
+      entry_point: management-aset.maintenance-checklist-templates.api
+      access: delete
+    - code: management-aset.tipe-work-order.read
+      name: Lihat tipe work order
+      entry_point: management-aset.tipe-work-order.form
+      access: read
+    - code: management-aset.tipe-work-order.create
+      name: Tambah tipe work order
+      entry_point: management-aset.tipe-work-order.api
+      access: create
+    - code: management-aset.tipe-work-order.update
+      name: Ubah tipe work order
+      entry_point: management-aset.tipe-work-order.api
+      access: update
+    - code: management-aset.tipe-work-order.archive
+      name: Arsipkan tipe work order
+      entry_point: management-aset.tipe-work-order.api
+      access: delete
+    - code: management-aset.tingkat-layanan.read
+      name: Lihat tingkat layanan
+      entry_point: management-aset.tingkat-layanan.form
+      access: read
+    - code: management-aset.tingkat-layanan.create
+      name: Tambah tingkat layanan
+      entry_point: management-aset.tingkat-layanan.api
+      access: create
+    - code: management-aset.tingkat-layanan.update
+      name: Ubah tingkat layanan
+      entry_point: management-aset.tingkat-layanan.api
+      access: update
+    - code: management-aset.tingkat-layanan.archive
+      name: Arsipkan tingkat layanan
+      entry_point: management-aset.tingkat-layanan.api
+      access: delete
+    - code: management-aset.trade.read
+      name: Lihat bidang keahlian
+      entry_point: management-aset.trade.form
+      access: read
+    - code: management-aset.trade.create
+      name: Tambah bidang keahlian
+      entry_point: management-aset.trade.api
+      access: create
+    - code: management-aset.trade.update
+      name: Ubah bidang keahlian
+      entry_point: management-aset.trade.api
+      access: update
+    - code: management-aset.trade.archive
+      name: Arsipkan bidang keahlian
+      entry_point: management-aset.trade.api
+      access: delete
+    - code: management-aset.sebab-kerusakan.read
+      name: Lihat sebab kerusakan
+      entry_point: management-aset.sebab-kerusakan.form
+      access: read
+    - code: management-aset.sebab-kerusakan.create
+      name: Tambah sebab kerusakan
+      entry_point: management-aset.sebab-kerusakan.api
+      access: create
+    - code: management-aset.sebab-kerusakan.update
+      name: Ubah sebab kerusakan
+      entry_point: management-aset.sebab-kerusakan.api
+      access: update
+    - code: management-aset.sebab-kerusakan.archive
+      name: Arsipkan sebab kerusakan
+      entry_point: management-aset.sebab-kerusakan.api
+      access: delete
+    - code: management-aset.tindakan-perbaikan.read
+      name: Lihat tindakan perbaikan
+      entry_point: management-aset.tindakan-perbaikan.form
+      access: read
+    - code: management-aset.tindakan-perbaikan.create
+      name: Tambah tindakan perbaikan
+      entry_point: management-aset.tindakan-perbaikan.api
+      access: create
+    - code: management-aset.tindakan-perbaikan.update
+      name: Ubah tindakan perbaikan
+      entry_point: management-aset.tindakan-perbaikan.api
+      access: update
+    - code: management-aset.tindakan-perbaikan.archive
+      name: Arsipkan tindakan perbaikan
+      entry_point: management-aset.tindakan-perbaikan.api
+      access: delete
+    - code: management-aset.validasi-status-work-order.read
+      name: Lihat aturan validasi status work order
+      entry_point: management-aset.validasi-status-work-order.form
+      access: read
+    - code: management-aset.validasi-status-work-order.update
+      name: Ubah aturan validasi status work order
+      entry_point: management-aset.validasi-status-work-order.api
+      access: update
     - code: management-aset.aset.read
       name: Lihat register aset
       entry_point: management-aset.aset.form
@@ -397,6 +664,10 @@ security:
       name: Terima aset
       entry_point: management-aset.aset.api
       access: create
+    - code: management-aset.aset.update
+      name: Koreksi data aset
+      entry_point: management-aset.aset.api
+      access: update
     - code: management-aset.aset.mutate
       name: Mutasi aset
       entry_point: management-aset.aset.api
@@ -437,6 +708,26 @@ security:
       name: Catat pemeliharaan aset
       entry_point: management-aset.pemeliharaan-aset.api
       access: create
+    - code: management-aset.pemeliharaan-aset.update
+      name: Ubah work order pemeliharaan draf
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: update
+    - code: management-aset.pemeliharaan-aset.archive
+      name: Arsipkan work order pemeliharaan
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: delete
+    - code: management-aset.pemeliharaan-aset.schedule
+      name: Jadwalkan, tugaskan, dan batalkan work order pemeliharaan
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: invoke
+    - code: management-aset.pemeliharaan-aset.execute
+      name: Kerjakan work order pemeliharaan dan isi checklist
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: invoke
+    - code: management-aset.pemeliharaan-aset.close
+      name: Tutup dan kunci work order pemeliharaan
+      entry_point: management-aset.pemeliharaan-aset.api
+      access: invoke
     - code: management-aset.dekomisioning-aset.read
       name: Lihat dekomisioning aset
       entry_point: management-aset.dekomisioning-aset.form
@@ -644,11 +935,118 @@ security:
       name: Arsipkan analisa maintenance
       permissions:
         - management-aset.analisa-maintenance.archive
+    - code: management-aset.maintenance-job-types.maintain
+      name: Pelihara jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-types.read
+        - management-aset.maintenance-job-types.create
+        - management-aset.maintenance-job-types.update
+    - code: management-aset.maintenance-job-types.retire
+      name: Arsipkan jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-types.archive
+    - code: management-aset.maintenance-job-type-variants.maintain
+      name: Pelihara varian jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-type-variants.read
+        - management-aset.maintenance-job-type-variants.create
+        - management-aset.maintenance-job-type-variants.update
+    - code: management-aset.maintenance-job-type-variants.retire
+      name: Arsipkan varian jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-type-variants.archive
+    - code: management-aset.maintenance-job-type-defaults.maintain
+      name: Pelihara default jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-type-defaults.read
+        - management-aset.maintenance-job-type-defaults.create
+        - management-aset.maintenance-job-type-defaults.update
+    - code: management-aset.maintenance-job-type-defaults.retire
+      name: Arsipkan default jenis pekerjaan maintenance
+      permissions:
+        - management-aset.maintenance-job-type-defaults.archive
+    - code: management-aset.maintenance-checklist-variables.maintain
+      name: Pelihara variabel checklist maintenance
+      permissions:
+        - management-aset.maintenance-checklist-variables.read
+        - management-aset.maintenance-checklist-variables.create
+        - management-aset.maintenance-checklist-variables.update
+    - code: management-aset.maintenance-checklist-variables.retire
+      name: Arsipkan variabel checklist maintenance
+      permissions:
+        - management-aset.maintenance-checklist-variables.archive
+    - code: management-aset.maintenance-checklist-templates.maintain
+      name: Pelihara template checklist maintenance
+      permissions:
+        - management-aset.maintenance-checklist-templates.read
+        - management-aset.maintenance-checklist-templates.create
+        - management-aset.maintenance-checklist-templates.update
+    - code: management-aset.maintenance-checklist-templates.retire
+      name: Arsipkan template checklist maintenance
+      permissions:
+        - management-aset.maintenance-checklist-templates.archive
+    - code: management-aset.tipe-work-order.maintain
+      name: Pelihara tipe work order
+      permissions:
+        - management-aset.tipe-work-order.read
+        - management-aset.tipe-work-order.create
+        - management-aset.tipe-work-order.update
+    - code: management-aset.tipe-work-order.retire
+      name: Arsipkan tipe work order
+      permissions:
+        - management-aset.tipe-work-order.archive
+    - code: management-aset.tingkat-layanan.maintain
+      name: Pelihara tingkat layanan
+      permissions:
+        - management-aset.tingkat-layanan.read
+        - management-aset.tingkat-layanan.create
+        - management-aset.tingkat-layanan.update
+    - code: management-aset.tingkat-layanan.retire
+      name: Arsipkan tingkat layanan
+      permissions:
+        - management-aset.tingkat-layanan.archive
+    - code: management-aset.trade.maintain
+      name: Pelihara bidang keahlian
+      permissions:
+        - management-aset.trade.read
+        - management-aset.trade.create
+        - management-aset.trade.update
+    - code: management-aset.trade.retire
+      name: Arsipkan bidang keahlian
+      permissions:
+        - management-aset.trade.archive
+    - code: management-aset.sebab-kerusakan.maintain
+      name: Pelihara sebab kerusakan
+      permissions:
+        - management-aset.sebab-kerusakan.read
+        - management-aset.sebab-kerusakan.create
+        - management-aset.sebab-kerusakan.update
+    - code: management-aset.sebab-kerusakan.retire
+      name: Arsipkan sebab kerusakan
+      permissions:
+        - management-aset.sebab-kerusakan.archive
+    - code: management-aset.tindakan-perbaikan.maintain
+      name: Pelihara tindakan perbaikan
+      permissions:
+        - management-aset.tindakan-perbaikan.read
+        - management-aset.tindakan-perbaikan.create
+        - management-aset.tindakan-perbaikan.update
+    - code: management-aset.tindakan-perbaikan.retire
+      name: Arsipkan tindakan perbaikan
+      permissions:
+        - management-aset.tindakan-perbaikan.archive
+    # Tidak ada tambah dan hapus: barisnya matriks tetap yang disemai saat provisioning.
+    - code: management-aset.validasi-status-work-order.maintain
+      name: Atur aturan validasi status work order
+      permissions:
+        - management-aset.validasi-status-work-order.read
+        - management-aset.validasi-status-work-order.update
     - code: management-aset.aset.receive
       name: Terima aset
       permissions:
         - management-aset.aset.read
         - management-aset.aset.create
+        - management-aset.aset.update
     - code: management-aset.aset.transfer
       name: Mutasi aset
       permissions:
@@ -664,8 +1062,23 @@ security:
       name: Kelola permintaan pembelian aset
       permissions: [management-aset.permintaan-pembelian-aset.read, management-aset.permintaan-pembelian-aset.create]
     - code: management-aset.pemeliharaan-aset.maintain
-      name: Kelola pemeliharaan aset
-      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.create]
+      name: Susun work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.create, management-aset.pemeliharaan-aset.update]
+    - code: management-aset.pemeliharaan-aset.retire
+      name: Arsipkan work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.archive]
+    # Dipisahkan supaya penjadwalan, pengerjaan, dan penutupan dapat diberikan kepada
+    # orang yang berbeda. Teknisi harus dapat mengerjakan tanpa dapat membuat atau
+    # menutup work order; penyelia menutup tanpa perlu ikut mengerjakan.
+    - code: management-aset.pemeliharaan-aset.dispatch
+      name: Jadwalkan dan tugaskan work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.schedule]
+    - code: management-aset.pemeliharaan-aset.perform
+      name: Kerjakan work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.execute]
+    - code: management-aset.pemeliharaan-aset.finalize
+      name: Tutup work order pemeliharaan
+      permissions: [management-aset.pemeliharaan-aset.read, management-aset.pemeliharaan-aset.close]
     - code: management-aset.dekomisioning-aset.maintain
       name: Kelola usulan dekomisioning aset
       permissions: [management-aset.dekomisioning-aset.read, management-aset.dekomisioning-aset.create]
@@ -781,6 +1194,60 @@ security:
       privileges:
         - management-aset.analisa-maintenance.maintain
         - management-aset.analisa-maintenance.retire
+    - code: management-aset.maintenance-job-types.manage
+      name: Kelola jenis pekerjaan maintenance
+      privileges:
+        - management-aset.maintenance-job-types.maintain
+        - management-aset.maintenance-job-types.retire
+    - code: management-aset.maintenance-job-type-variants.manage
+      name: Kelola varian jenis pekerjaan maintenance
+      privileges:
+        - management-aset.maintenance-job-type-variants.maintain
+        - management-aset.maintenance-job-type-variants.retire
+    - code: management-aset.maintenance-job-type-defaults.manage
+      name: Kelola default jenis pekerjaan maintenance
+      privileges:
+        - management-aset.maintenance-job-type-defaults.maintain
+        - management-aset.maintenance-job-type-defaults.retire
+    - code: management-aset.maintenance-checklist-variables.manage
+      name: Kelola variabel checklist maintenance
+      privileges:
+        - management-aset.maintenance-checklist-variables.maintain
+        - management-aset.maintenance-checklist-variables.retire
+    - code: management-aset.maintenance-checklist-templates.manage
+      name: Kelola template checklist maintenance
+      privileges:
+        - management-aset.maintenance-checklist-templates.maintain
+        - management-aset.maintenance-checklist-templates.retire
+    - code: management-aset.tipe-work-order.manage
+      name: Kelola tipe work order
+      privileges:
+        - management-aset.tipe-work-order.maintain
+        - management-aset.tipe-work-order.retire
+    - code: management-aset.tingkat-layanan.manage
+      name: Kelola tingkat layanan
+      privileges:
+        - management-aset.tingkat-layanan.maintain
+        - management-aset.tingkat-layanan.retire
+    - code: management-aset.trade.manage
+      name: Kelola bidang keahlian
+      privileges:
+        - management-aset.trade.maintain
+        - management-aset.trade.retire
+    - code: management-aset.sebab-kerusakan.manage
+      name: Kelola sebab kerusakan
+      privileges:
+        - management-aset.sebab-kerusakan.maintain
+        - management-aset.sebab-kerusakan.retire
+    - code: management-aset.tindakan-perbaikan.manage
+      name: Kelola tindakan perbaikan
+      privileges:
+        - management-aset.tindakan-perbaikan.maintain
+        - management-aset.tindakan-perbaikan.retire
+    - code: management-aset.validasi-status-work-order.manage
+      name: Kelola aturan validasi status work order
+      privileges:
+        - management-aset.validasi-status-work-order.maintain
     - code: management-aset.aset.manage
       name: Kelola register aset
       privileges:
@@ -793,8 +1260,14 @@ security:
       name: Kelola permintaan pembelian aset
       privileges: [management-aset.permintaan-pembelian-aset.maintain]
     - code: management-aset.pemeliharaan-aset.manage
-      name: Kelola pemeliharaan aset
-      privileges: [management-aset.pemeliharaan-aset.maintain]
+      name: Kelola work order pemeliharaan
+      privileges: [management-aset.pemeliharaan-aset.maintain, management-aset.pemeliharaan-aset.retire, management-aset.pemeliharaan-aset.dispatch]
+    - code: management-aset.pemeliharaan-aset.execute-work
+      name: Kerjakan work order pemeliharaan di lapangan
+      privileges: [management-aset.pemeliharaan-aset.perform]
+    - code: management-aset.pemeliharaan-aset.close-work
+      name: Tutup work order pemeliharaan yang sudah selesai
+      privileges: [management-aset.pemeliharaan-aset.finalize]
     - code: management-aset.dekomisioning-aset.manage
       name: Kelola dekomisioning aset
       privileges: [management-aset.dekomisioning-aset.maintain]
@@ -878,6 +1351,56 @@ number_sequences:
     - code: management-aset.analisa-maintenance
       name: Kode analisa maintenance
       default_prefix: ANMA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.maintenance-job-types
+      name: Kode jenis pekerjaan maintenance
+      default_prefix: JPMA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.maintenance-job-type-variants
+      name: Kode varian jenis pekerjaan maintenance
+      default_prefix: VJMA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.maintenance-job-type-defaults
+      name: Kode default jenis pekerjaan maintenance
+      default_prefix: DJMA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.maintenance-checklist-variables
+      name: Kode variabel checklist maintenance
+      default_prefix: VCMA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.maintenance-checklist-templates
+      name: Kode template checklist maintenance
+      default_prefix: TCMA
+      allowed_scopes:
+        - tenant
+    - code: management-aset.tipe-work-order
+      name: Kode tipe work order
+      default_prefix: TPWO
+      allowed_scopes:
+        - tenant
+    - code: management-aset.tingkat-layanan
+      name: Kode tingkat layanan
+      default_prefix: TGLY
+      allowed_scopes:
+        - tenant
+    - code: management-aset.trade
+      name: Kode bidang keahlian
+      default_prefix: TRDE
+      allowed_scopes:
+        - tenant
+    - code: management-aset.sebab-kerusakan
+      name: Kode sebab kerusakan
+      default_prefix: SBKR
+      allowed_scopes:
+        - tenant
+    - code: management-aset.tindakan-perbaikan
+      name: Kode tindakan perbaikan
+      default_prefix: TDPB
       allowed_scopes:
         - tenant
     - code: management-aset.aset

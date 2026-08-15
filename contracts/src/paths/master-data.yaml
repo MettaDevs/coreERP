@@ -289,7 +289,7 @@
       Baris disunting di dalam form group, jadi endpoint ini memakai permission
       `management-aset.group-aset.update` dan bukan permission tersendiri.
 
-      Semantiknya ganti-seluruh-himpunan: kiriman memuat daftar penuh, dan baris yang
+      Saat disimpan, daftar yang dikirim menggantikan seluruh baris lama. Baris yang
       tidak disertakan diarsipkan. Karena itu permintaan yang sama dapat diulang tanpa
       efek tambahan dan tidak memerlukan `Idempotency-Key`.
     requestBody:
@@ -341,8 +341,8 @@
     summary: Mengganti seluruh atribut yang menempel pada satu jenis aset
     description: |
       Disunting di dalam form pemiliknya, jadi memakai permission pemilik dan bukan
-      permission tersendiri. Semantiknya ganti-seluruh-himpunan: kiriman memuat daftar
-      penuh, baris yang tidak disertakan diarsipkan, dan permintaan yang sama dapat
+      permission tersendiri. Saat disimpan, daftar yang dikirim menggantikan seluruh
+      baris lama. Baris yang tidak disertakan diarsipkan. Permintaan yang sama dapat
       diulang tanpa efek tambahan sehingga tidak memerlukan header idempotency.
     requestBody:
       required: true
@@ -387,6 +387,38 @@
         $ref: '#/components/responses/Unauthenticated'
       '403':
         $ref: '#/components/responses/Forbidden'
+/api/v1/jenis-aset/{id}/detail:
+  parameters:
+  - $ref: '#/components/parameters/RecordId'
+  get:
+    tags:
+    - Master data
+    operationId: getJenisAsetDetail
+    summary: Menampilkan jumlah data yang menggantung pada satu jenis aset
+    description: |
+      Angka untuk panel detail jenis aset. Berdiri sendiri, bukan bagian respons master,
+      supaya daftar tidak menghitung apa pun dan tiap angka dapat menegakkan izin
+      resource-nya sendiri.
+
+      `atribut_count` memakai permission jenis aset karena atribut memang milik jenis aset
+      dan disunting di dalam formnya. `model_count` dan `asset_count` adalah isi resource
+      lain, jadi keduanya bernilai `null` bila pemanggil tidak memegang
+      `management-aset.model-aset.read` / `management-aset.aset.read` — `null`, bukan 0,
+      karena 0 adalah pernyataan bahwa tidak ada. `asset_count` juga dibatasi tanggung
+      jawab organisasi pemanggil, sama seperti jalur baca aset lainnya.
+    responses:
+      '200':
+        description: Jumlah turunan jenis aset tersebut
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JenisAsetDetail'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
 /api/v1/tipe-atribut/{id}/nilai:
   parameters:
   - $ref: '#/components/parameters/RecordId'
@@ -415,9 +447,10 @@
     summary: Mengganti seluruh pilihan nilai satu tipe atribut
     description: |
       Disunting di dalam form pemiliknya, jadi memakai permission pemilik dan bukan
-      permission tersendiri. Semantiknya ganti-seluruh-himpunan: kiriman memuat daftar
-      penuh, baris yang tidak disertakan diarsipkan, dan permintaan yang sama dapat
-      diulang tanpa efek tambahan sehingga tidak memerlukan header idempotency.
+      permission tersendiri. Saat disimpan, daftar yang dikirim menggantikan seluruh
+      pilihan lama. Pilihan yang tidak disertakan diarsipkan. Daftar kosong membuat
+      atribut kembali menjadi teks bebas. Daftar nonkosong ditolak bila tidak mencakup
+      seluruh nilai aset yang masih tersimpan.
     requestBody:
       required: true
       content:
@@ -437,6 +470,8 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/AttributeValuesInUse'
       '422':
         $ref: '#/components/responses/ValidationError'
 /api/v1/item-checklist-maintenance:
@@ -1579,7 +1614,7 @@
     tags:
     - Master data
     operationId: updateTipeAtribut
-    summary: Mengubah tipe atribut, termasuk tipe data dan batas nilainya
+    summary: Mengubah tipe atribut, termasuk tipe dasar dan batas angka opsional
     requestBody:
       required: true
       content:
@@ -1599,6 +1634,12 @@
         $ref: '#/components/responses/Forbidden'
       '404':
         $ref: '#/components/responses/NotFound'
+      '409':
+        description: Tipe dasar terkunci (`data_type_locked`) atau Values harus dikosongkan dahulu (`attribute_type_has_values`)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ErrorResponse'
       '422':
         $ref: '#/components/responses/ValidationError'
   delete:
@@ -1685,6 +1726,32 @@
         $ref: '#/components/responses/ValidationError'
       '503':
         $ref: '#/components/responses/NumberSequenceUnavailable'
+/api/v1/pabrikan-aset/{id}/detail:
+  parameters:
+  - $ref: '#/components/parameters/RecordId'
+  get:
+    tags:
+    - Master data
+    operationId: getPabrikanAsetDetail
+    summary: Menampilkan jumlah model dan aset pada satu pabrikan
+    description: |
+      Angka untuk panel detail pabrikan dan model. `model_count` bernilai `null` bila
+      pemanggil tidak memegang `management-aset.model-aset.read`. `asset_count` bernilai
+      `null` bila pemanggil tidak memegang `management-aset.aset.read`; bila boleh dibaca,
+      angka tersebut tetap dibatasi tanggung jawab organisasi yang sama dengan daftar aset.
+    responses:
+      '200':
+        description: Jumlah turunan pabrikan tersebut
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PabrikanAsetDetail'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
 /api/v1/pabrikan-aset/{id}:
   parameters:
   - $ref: '#/components/parameters/RecordId'

@@ -8,6 +8,45 @@
     responses:
       '201':
         description: Proposal dibuat
+/api/v1/penyusutan/proposal-massal:
+  post:
+    tags:
+    - Penyusutan
+    operationId: proposeDepreciationBulk
+    summary: Membuat proposal penyusutan seluruh Asset Book aktif satu periode sekaligus tanpa jurnal GL
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - period_starts_on
+            - period_ends_on
+            properties:
+              period_starts_on:
+                type: string
+                format: date
+              period_ends_on:
+                type: string
+                format: date
+              group_aset_id:
+                type: string
+                nullable: true
+                description: Menjalankan hanya untuk aset dari satu group.
+              buku_id:
+                type: string
+                nullable: true
+                description: Menjalankan hanya untuk satu buku, misalnya komersial lebih dahulu.
+    responses:
+      '201':
+        description: >-
+          Ringkasan proposal. Buku yang tidak dapat diusulkan dilewati beserta alasannya,
+          bukan menggagalkan seluruh proses.
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        $ref: '#/components/responses/ValidationError'
 /api/v1/penyusutan:
   get:
     tags:
@@ -31,7 +70,7 @@
     tags:
     - Penyusutan
     operationId: finalizeDepreciation
-    summary: Mengunci subledger periode dan mengembalikan export bridge tanpa posting GL
+    summary: Mengunci subledger periode dan mengembalikan bridge internal tanpa posting GL
     parameters:
     - $ref: '#/components/parameters/RecordId'
     responses:
@@ -47,6 +86,6 @@
     - $ref: '#/components/parameters/RecordId'
     responses:
       '201':
-        description: Pembalikan dan export bridge dibuat
+      description: Pembalikan dan bridge internal dibuat tanpa posting GL
       '409':
         description: Periode tidak dapat dibalik
