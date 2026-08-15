@@ -56,6 +56,20 @@ class RegisterBusiness
                 'status' => 'active',
             ]);
             app(ProvisionDefaultUnitsOfMeasure::class)->forTenant($tenant->id);
+            // Tenant provisioning adalah fakta lintas app. Payload starter sengaja
+            // kosong: setiap app memilih template versinya sendiri dari konfigurasi,
+            // sedangkan Core hanya meneruskan tenant context yang tepercaya.
+            DB::table('outbox_events')->insert([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $tenant->id,
+                'type' => 'core.tenant.provisioned.v1',
+                'correlation_id' => $tenant->id,
+                'legal_entity_id' => null,
+                'payload' => json_encode(['app_ids' => $appIds->values()->all()], JSON_THROW_ON_ERROR),
+                'occurred_at' => now(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
             $profile = (string) config('coreerp.deployment.profile');
             $placement = (string) config('coreerp.deployment.placement');
             if (! in_array($profile, ['pooled', 'isolated'], true) || ! preg_match('/^[a-z0-9][a-z0-9-]{0,119}$/', $placement)) {

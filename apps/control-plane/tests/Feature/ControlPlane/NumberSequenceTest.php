@@ -308,12 +308,105 @@ class NumberSequenceTest extends TestCase
 
         $created = TenantNumberSequence::query()->where('tenant_id', $context['tenant_id'])->firstOrFail();
         $this->assertSame('active', $created->status);
+        $this->assertSame('tenant', $created->scope_type);
         $this->assertSame(0, $created->minimum_number);
         $this->assertSame(19999, $created->maximum_number);
         $this->assertSame([
             ['type' => 'constant', 'value' => 'DOC'],
             ['type' => 'number', 'length' => 5],
         ], $created->segments);
+    }
+
+    public function test_materialization_falls_back_to_the_only_scope_declared_by_the_manifest(): void
+    {
+        [$sequence, $context] = $this->sequence();
+        $reference = $sequence->reference;
+        $sequence->delete();
+        $reference->update(['allowed_scopes' => ['legal_entity']]);
+        $this->readyAppForTenant($context['tenant_id'], $context['app_id']);
+
+        $drafts = app(EnsureNumberSequenceDrafts::class);
+        $drafts->forReadyTenant($context['tenant_id']);
+        $created = TenantNumberSequence::query()->where('tenant_id', $context['tenant_id'])->firstOrFail();
+
+        $this->assertSame('legal_entity', $created->scope_type);
+
+        $drafts->forReadyTenant($context['tenant_id']);
+        $this->assertDatabaseCount('tenant_number_sequences', 1);
+    }
+
+    public function test_internal_issue_materializes_a_ready_tenant_sequence_before_issuing(): void
+    {
+        [$sequence, $context] = $this->sequence();
+        $reference = $sequence->reference;
+        $sequence->delete();
+        $reference->update(['allowed_scopes' => ['legal_entity']]);
+        $this->readyAppForTenant($context['tenant_id'], $context['app_id']);
+        AppServiceCredential::query()->create([
+            'app_id' => $context['app_id'], 'name' => 'seed', 'secret_hash' => Hash::make('seed-token'), 'status' => 'active',
+        ]);
+        $legalEntityId = $this->organization($context['tenant_id'], 'legal_entity', 'SEED');
+        DB::table('legal_entities')->insert([
+            'organization_id' => $legalEntityId, 'company_code' => 'SEED', 'country_code' => 'ID',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->withHeaders([
+            'X-CoreERP-App-Id' => $context['app_id'],
+            'X-CoreERP-Service-Token' => 'seed-token',
+            'X-CoreERP-Tenant-Id' => $context['tenant_id'],
+        ])->postJson('/api/internal/v1/number-sequences/sample-app.document/issue', [
+            'idempotency_key' => 'seed-before-sequence',
+            'legal_entity_id' => $legalEntityId,
+        ])->assertOk()->assertJsonPath('data.number', '00000');
+
+        $this->assertDatabaseHas('tenant_number_sequences', [
+            'tenant_id' => $context['tenant_id'],
+            'reference_id' => $reference->id,
+            'scope_type' => 'legal_entity',
+        ]);
+    }
+
+    public function test_scope_repair_migration_repairs_unused_rows_but_preserves_used_rows(): void
+    {
+        [$baseSequence, $context] = $this->sequence();
+        $unusedReference = NumberSequenceReference::query()->create([
+            'app_id' => $context['app_id'], 'code' => 'sample-app.legal-only-unused',
+            'name' => 'Nomor legal entity belum dipakai', 'default_prefix' => 'UNUS',
+            'allowed_scopes' => ['legal_entity'],
+        ]);
+        $usedReference = NumberSequenceReference::query()->create([
+            'app_id' => $context['app_id'], 'code' => 'sample-app.legal-only-used',
+            'name' => 'Nomor legal entity sudah dipakai', 'default_prefix' => 'USED',
+            'allowed_scopes' => ['legal_entity'],
+        ]);
+        $settings = [
+            'tenant_id' => $context['tenant_id'],
+            'profile_code' => 'non-continuous-default',
+            'scope_type' => 'tenant',
+            'status' => 'active',
+            'is_continuous' => false,
+            'allow_manual' => false,
+            'reset_period' => 'never',
+            'preallocation_enabled' => true,
+            'preallocation_quantity' => 20,
+            'minimum_number' => 0,
+            'maximum_number' => 19999,
+            'segments' => [['type' => 'number', 'length' => 5]],
+        ];
+        $unusedSequence = TenantNumberSequence::query()->create([...$settings, 'reference_id' => $unusedReference->id]);
+        $usedSequence = TenantNumberSequence::query()->create([...$settings, 'reference_id' => $usedReference->id]);
+        app(NumberSequenceService::class)->issue([
+            'tenant_id' => $context['tenant_id'], 'app_id' => $context['app_id'],
+            'legal_entity_id' => null, 'org_unit_id' => null,
+        ], $usedReference->code, 'used-before-repair');
+
+        $migration = require database_path('migrations/2026_08_12_120000_repair_unused_number_sequence_scopes.php');
+        $migration->up();
+
+        $this->assertSame('legal_entity', $unusedSequence->refresh()->scope_type);
+        $this->assertSame('tenant', $usedSequence->refresh()->scope_type);
+        $this->assertSame('tenant', $baseSequence->refresh()->scope_type);
     }
 
     public function test_reserve_refuses_to_replay_a_cancelled_idempotency_key(): void
