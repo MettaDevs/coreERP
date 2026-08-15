@@ -138,6 +138,35 @@ depreciation_rounding_not_finished as (
         having count(p.id) >= b.useful_life_periods
            and b.net_book_value <> coalesce(b.residual_value, 0)
     ) d
+),
+attribute_value_outside_active_values as (
+    select count(*) as n
+    from tr_aset_atribut a
+    join m_tipe_atribut t
+      on t.tenant_id = a.tenant_id and t.id = a.tipe_atribut_id
+    where t.data_type = 'string'
+      and exists (
+          select 1 from m_tipe_atribut_nilai v
+          where v.tenant_id = t.tenant_id and v.tipe_atribut_id = t.id and v.deleted_at is null
+      )
+      and not exists (
+          select 1 from m_tipe_atribut_nilai v
+          where v.tenant_id = a.tenant_id and v.tipe_atribut_id = a.tipe_atribut_id
+            and v.deleted_at is null and v.nilai = a.nilai_text
+      )
+),
+integer_fraction as (
+    select count(*) as n
+    from tr_aset_atribut a
+    join m_tipe_atribut t
+      on t.tenant_id = a.tenant_id and t.id = a.tipe_atribut_id
+    where t.data_type = 'integer' and a.nilai_number <> trunc(a.nilai_number)
+),
+attribute_cross_tenant as (
+    select
+        (select count(*) from tr_aset_atribut a join m_tipe_atribut t on t.id = a.tipe_atribut_id where t.tenant_id <> a.tenant_id)
+      + (select count(*) from m_tipe_atribut_nilai v join m_tipe_atribut t on t.id = v.tipe_atribut_id where t.tenant_id <> v.tenant_id)
+      + (select count(*) from m_jenis_aset_atribut l join m_tipe_atribut t on t.id = l.tipe_atribut_id where t.tenant_id <> l.tenant_id) as n
 )
 select 'kode ganda dalam satu tenant' as pemeriksaan, n as pelanggaran from duplikat_kode
 union all select 'creation_key ganda dalam satu tenant', n from duplikat_kunci
@@ -155,7 +184,10 @@ union all select 'posting export penyusutan ganda', n from export_ganda
 union all select 'nilai penyusutan negatif', n from depreciation_negative
 union all select 'NBV melewati nilai residual atau nol', n from depreciation_nbv_below_residual
 union all select 'finalisasi periode ganda', n from depreciation_final_ganda
-union all select 'round-off tidak mendarat di residual atau nol', n from depreciation_rounding_not_finished;
+union all select 'round-off tidak mendarat di residual atau nol', n from depreciation_rounding_not_finished
+union all select 'nilai teks di luar Values aktif', n from attribute_value_outside_active_values
+union all select 'nilai pecahan tersimpan pada integer', n from integer_fraction
+union all select 'atribut menunjuk data tenant lain', n from attribute_cross_tenant;
 
 \echo
 \echo '=== VOLUME DATA ==='

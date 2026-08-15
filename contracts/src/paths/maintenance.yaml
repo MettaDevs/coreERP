@@ -1,0 +1,187 @@
+# Setup maintenance: konfigurasi tenant untuk job type, default, dan checklist.
+/api/v1/maintenance-job-types:
+  get:
+    tags: [Master data]
+    operationId: listMaintenanceJobTypes
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    responses:
+      '200': {description: Daftar jenis pekerjaan maintenance, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeList'}}}}
+  post:
+    tags: [Master data]
+    operationId: createMaintenanceJobType
+    parameters: [$ref: '#/components/parameters/IdempotencyKey']
+    requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeCreate'}}}}
+    responses:
+      '201': {description: Jenis pekerjaan maintenance dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeResponse'}}}}
+/api/v1/maintenance-job-types/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get:
+    tags: [Master data]
+    operationId: getMaintenanceJobType
+    responses: {'200': {description: Jenis pekerjaan maintenance, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeResponse'}}}}}
+  patch:
+    tags: [Master data]
+    operationId: updateMaintenanceJobType
+    requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypePatch'}}}}
+    responses: {'200': {description: Jenis pekerjaan maintenance diubah, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeResponse'}}}}}
+  delete:
+    tags: [Master data]
+    operationId: archiveMaintenanceJobType
+    responses: {'204': {description: Jenis pekerjaan maintenance diarsipkan}}
+/api/v1/maintenance-job-type-variants:
+  get:
+    tags: [Master data]
+    operationId: listMaintenanceJobTypeVariants
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    responses: {'200': {description: Daftar varian, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeVariantList'}}}}}
+  post:
+    tags: [Master data]
+    operationId: createMaintenanceJobTypeVariant
+    parameters: [$ref: '#/components/parameters/IdempotencyKey']
+    requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeVariantCreate'}}}}
+    responses: {'201': {description: Varian dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeVariantResponse'}}}}}
+/api/v1/maintenance-job-type-variants/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getMaintenanceJobTypeVariant, responses: {'200': {description: Varian, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeVariantResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateMaintenanceJobTypeVariant, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Varian diubah, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeVariantResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveMaintenanceJobTypeVariant, responses: {'204': {description: Varian diarsipkan}}}
+/api/v1/maintenance-job-type-defaults:
+  get:
+    tags: [Master data]
+    operationId: listMaintenanceJobTypeDefaults
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    responses: {'200': {description: Daftar default, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeDefaultList'}}}}}
+  post:
+    tags: [Master data]
+    operationId: createMaintenanceJobTypeDefault
+    parameters: [$ref: '#/components/parameters/IdempotencyKey']
+    requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeDefaultCreate'}}}}
+    responses: {'201': {description: Default dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeDefaultResponse'}}}}}
+/api/v1/maintenance-job-type-defaults/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getMaintenanceJobTypeDefault, responses: {'200': {description: Default, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeDefaultResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateMaintenanceJobTypeDefault, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Default diubah, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeDefaultResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveMaintenanceJobTypeDefault, responses: {'204': {description: Default diarsipkan}}}
+/api/v1/maintenance-job-type-defaults/{id}/copy:
+  parameters: [$ref: '#/components/parameters/RecordId', $ref: '#/components/parameters/IdempotencyKey']
+  post:
+    tags: [Master data]
+    operationId: copyMaintenanceJobTypeDefault
+    requestBody: {required: true, content: {application/json: {schema: {type: object, required: [nama], properties: {nama: {type: string, maxLength: 150}}}}}}
+    responses: {'201': {description: Default disalin, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceJobTypeDefaultResponse'}}}}}
+/api/v1/maintenance-checklist-variables:
+  get: {tags: [Master data], operationId: listMaintenanceChecklistVariables, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar variabel, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistVariableList'}}}}}}
+  post: {tags: [Master data], operationId: createMaintenanceChecklistVariable, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Variabel dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistVariableResponse'}}}}}}
+/api/v1/maintenance-checklist-variables/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getMaintenanceChecklistVariable, responses: {'200': {description: Variabel, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistVariableResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateMaintenanceChecklistVariable, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Variabel diubah, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistVariableResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveMaintenanceChecklistVariable, responses: {'204': {description: Variabel diarsipkan}}}
+/api/v1/maintenance-checklist-templates:
+  get: {tags: [Master data], operationId: listMaintenanceChecklistTemplates, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar template, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistTemplateList'}}}}}}
+  post: {tags: [Master data], operationId: createMaintenanceChecklistTemplate, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Template dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistTemplateResponse'}}}}}}
+/api/v1/maintenance-checklist-templates/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getMaintenanceChecklistTemplate, responses: {'200': {description: Template, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistTemplateResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateMaintenanceChecklistTemplate, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Template diubah, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistTemplateResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveMaintenanceChecklistTemplate, responses: {'204': {description: Template diarsipkan}}}
+/api/v1/tipe-work-order:
+  get: {tags: [Master data], operationId: listTipeWorkOrder, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar tipe work order, content: {application/json: {schema: {$ref: '#/components/schemas/TipeWorkOrderList'}}}}}}
+  post: {tags: [Master data], operationId: createTipeWorkOrder, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Tipe work order dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/TipeWorkOrderResponse'}}}}}}
+/api/v1/tipe-work-order/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getTipeWorkOrder, responses: {'200': {description: Tipe work order, content: {application/json: {schema: {$ref: '#/components/schemas/TipeWorkOrderResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateTipeWorkOrder, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Tipe work order diubah, content: {application/json: {schema: {$ref: '#/components/schemas/TipeWorkOrderResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveTipeWorkOrder, responses: {'204': {description: Tipe work order diarsipkan}}}
+/api/v1/tingkat-layanan:
+  get: {tags: [Master data], operationId: listTingkatLayanan, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar tingkat layanan, content: {application/json: {schema: {$ref: '#/components/schemas/TingkatLayananList'}}}}}}
+  post: {tags: [Master data], operationId: createTingkatLayanan, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Tingkat layanan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/TingkatLayananResponse'}}}}}}
+/api/v1/tingkat-layanan/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getTingkatLayanan, responses: {'200': {description: Tingkat layanan, content: {application/json: {schema: {$ref: '#/components/schemas/TingkatLayananResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateTingkatLayanan, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Tingkat layanan diubah, content: {application/json: {schema: {$ref: '#/components/schemas/TingkatLayananResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveTingkatLayanan, responses: {'204': {description: Tingkat layanan diarsipkan}}}
+/api/v1/trade:
+  get: {tags: [Master data], operationId: listTrade, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar bidang keahlian, content: {application/json: {schema: {$ref: '#/components/schemas/TradeList'}}}}}}
+  post: {tags: [Master data], operationId: createTrade, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Bidang keahlian dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/TradeResponse'}}}}}}
+/api/v1/trade/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getTrade, responses: {'200': {description: Bidang keahlian, content: {application/json: {schema: {$ref: '#/components/schemas/TradeResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateTrade, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Bidang keahlian diubah, content: {application/json: {schema: {$ref: '#/components/schemas/TradeResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveTrade, responses: {'204': {description: Bidang keahlian diarsipkan}}}
+/api/v1/sebab-kerusakan:
+  get: {tags: [Master data], operationId: listSebabKerusakan, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar sebab kerusakan, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanList'}}}}}}
+  post: {tags: [Master data], operationId: createSebabKerusakan, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Sebab kerusakan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanResponse'}}}}}}
+/api/v1/sebab-kerusakan/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getSebabKerusakan, responses: {'200': {description: Sebab kerusakan, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateSebabKerusakan, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Sebab kerusakan diubah, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveSebabKerusakan, responses: {'204': {description: Sebab kerusakan diarsipkan}}}
+/api/v1/tindakan-perbaikan:
+  get: {tags: [Master data], operationId: listTindakanPerbaikan, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar tindakan perbaikan, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanList'}}}}}}
+  post: {tags: [Master data], operationId: createTindakanPerbaikan, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Tindakan perbaikan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanResponse'}}}}}}
+/api/v1/tindakan-perbaikan/{id}:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getTindakanPerbaikan, responses: {'200': {description: Tindakan perbaikan, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateTindakanPerbaikan, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Tindakan perbaikan diubah, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanResponse'}}}}}}
+  delete: {tags: [Master data], operationId: archiveTindakanPerbaikan, responses: {'204': {description: Tindakan perbaikan diarsipkan}}}
+/api/v1/maintenance-job-types/{id}/variants:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: listJobTypeVariants, responses: {'200': {description: Varian job type, content: {application/json: {schema: {type: object}}}}}}
+/api/v1/maintenance-job-types/{id}/asset-types:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getJobTypeAssetTypes, responses: {'200': {description: Relasi jenis aset, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
+  put: {tags: [Master data], operationId: replaceJobTypeAssetTypes, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [jenis_aset_ids], properties: {jenis_aset_ids: {type: array, items: {$ref: '#/components/schemas/Ulid'}}}}}}}, responses: {'200': {description: Relasi disimpan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
+/api/v1/jenis-aset/{id}/maintenance-job-types:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getJenisAsetMaintenanceJobTypes, responses: {'200': {description: Relasi jenis pekerjaan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
+  put: {tags: [Master data], operationId: replaceJenisAsetMaintenanceJobTypes, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [jenis_aset_ids], properties: {jenis_aset_ids: {type: array, items: {$ref: '#/components/schemas/Ulid'}}}}}}}, responses: {'200': {description: Relasi disimpan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
+/api/v1/maintenance-checklist-variables/{id}/values:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getChecklistVariableValues, responses: {'200': {description: Nilai variabel, content: {application/json: {schema: {type: object}}}}}}
+  put: {tags: [Master data], operationId: replaceChecklistVariableValues, requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'200': {description: Nilai variabel disimpan, content: {application/json: {schema: {type: object}}}}}}
+/api/v1/maintenance-checklist-templates/{id}/lines:
+  parameters: [$ref: '#/components/parameters/RecordId']
+  get: {tags: [Master data], operationId: getChecklistTemplateLines, responses: {'200': {description: Baris checklist, content: {application/json: {schema: {type: object}}}}}}
+  put: {tags: [Master data], operationId: replaceChecklistTemplateLines, requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'200': {description: Baris checklist disimpan, content: {application/json: {schema: {type: object}}}}}}
+/api/v1/validasi-status-work-order:
+  get:
+    tags: [Master data]
+    operationId: listWorkOrderStatusValidations
+    summary: >-
+      Aturan yang harus dipenuhi sebelum work order boleh berpindah ke satu status. Barisnya
+      matriks tetap status x aturan yang disemai saat tenant disiapkan; tidak ada tambah dan
+      tidak ada hapus.
+    responses:
+      '200': {description: Daftar aturan validasi status}
+      '403': {$ref: '#/components/responses/Forbidden'}
+  put:
+    tags: [Master data]
+    operationId: replaceWorkOrderStatusValidations
+    summary: >-
+      Mengubah keaktifan dan tingkat keparahan aturan. Keparahan `informasi` hanya dicatat,
+      `peringatan` membiarkan transisi berjalan tetapi tersimpan pada jejak status, dan
+      `error` menolak transisi.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [aturan]
+            properties:
+              aturan:
+                type: array
+                maxItems: 100
+                items:
+                  type: object
+                  required: [status, aturan, aktif, keparahan]
+                  properties:
+                    status: {type: string, enum: [dijadwalkan, dikerjakan, selesai, ditutup]}
+                    aturan: {type: string, enum: [checklist_wajib, sebab_kerusakan, tindakan_perbaikan]}
+                    aktif: {type: boolean}
+                    keparahan: {type: string, enum: [informasi, peringatan, error]}
+    responses:
+      '200': {description: Aturan tersimpan}
+      '403': {$ref: '#/components/responses/Forbidden'}
+      '422': {$ref: '#/components/responses/ValidationError'}

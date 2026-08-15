@@ -22,6 +22,39 @@
         $ref: '#/components/responses/Forbidden'
       '503':
         $ref: '#/components/responses/NumberSequenceUnavailable'
+/api/v1/aset/{id}:
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: showAset
+    summary: Menampilkan satu aset beserta nilai atribut jenisnya
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Aset beserta atributnya
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  patch:
+    tags:
+    - Lifecycle aset
+    operationId: updateAset
+    summary: Mengoreksi data aset; group tidak dapat diganti dan nilai perolehan terkunci setelah ada periode penyusutan
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Aset diperbarui
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Aset sudah dilepas, atau nilainya terkunci oleh periode penyusutan
+      '422':
+        $ref: '#/components/responses/ValidationError'
 /api/v1/aset/{id}/history:
   get:
     tags:
@@ -167,7 +200,7 @@
     tags:
     - Lifecycle aset
     operationId: listLifecycleDocument
-    summary: Menampilkan permintaan pembelian, pemeliharaan, dekomisioning, penjualan, atau pemusnahan
+    summary: Menampilkan permintaan pembelian, dekomisioning, penjualan, atau pemusnahan
     parameters:
     - name: lifecycleDocument
       in: path
@@ -176,7 +209,6 @@
         type: string
         enum:
         - permintaan-pembelian-aset
-        - pemeliharaan-aset
         - dekomisioning-aset
         - penjualan-aset
         - pemusnahan-aset
@@ -196,7 +228,6 @@
         type: string
         enum:
         - permintaan-pembelian-aset
-        - pemeliharaan-aset
         - dekomisioning-aset
         - penjualan-aset
         - pemusnahan-aset

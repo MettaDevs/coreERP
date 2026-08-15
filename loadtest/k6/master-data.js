@@ -51,6 +51,7 @@ const readLatency = new Trend('op_read', true);
 const writeLatency = new Trend('op_write', true);
 const violations = new Counter('correctness_violations');
 const serverErrors = new Counter('server_errors');
+const gatewayErrors = new Counter('gateway_errors');
 const idempotencyReplays = new Counter('idempotency_replays');
 const crossTenantProbes = new Counter('cross_tenant_probes');
 const scopeProbes = new Counter('permission_scope_probes');
@@ -73,7 +74,13 @@ const correctnessThresholds = {
 };
 
 export const options =
-    PROFILE === 'latency4' || PROFILE === 'latency8' || PROFILE === 'latency16'
+    PROFILE === 'attribute-race'
+        ? {
+              scenarios: { attributeRace: { executor: 'constant-vus', vus: VUS, duration: DURATION, gracefulStop: '20s' } },
+              thresholds: correctnessThresholds,
+              summaryTrendStats: ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
+          }
+        : PROFILE === 'latency4' || PROFILE === 'latency8' || PROFILE === 'latency16'
         ? {
               scenarios: { latency: { executor: 'constant-vus', vus: PROFILE === 'latency4' ? 4 : PROFILE === 'latency8' ? 8 : 16, duration: '90s', gracefulStop: '20s' } },
               thresholds: { ...correctnessThresholds, ...LATENCY_SLO },
@@ -196,12 +203,42 @@ export function setup() {
         ]),
     );
 
+    const tipeAtributIds = stage(
+        'tipe-atribut',
+        TENANTS.map((tenant, index) => [
+            'POST',
+            `${BASE}/api/v1/tipe-atribut`,
+            JSON.stringify({ nama: `Warna load test ${index}`, data_type: 'string' }),
+            auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-tipe-atribut-${index}` }),
+        ]),
+    );
+
+    stage(
+        'values tipe-atribut',
+        TENANTS.map((tenant, index) => [
+            'PUT',
+            `${BASE}/api/v1/tipe-atribut/${tipeAtributIds[index]}/nilai`,
+            JSON.stringify({ rows: [{ nilai: 'A', urutan: 0 }, { nilai: 'B', urutan: 1 }] }),
+            auth(tenant.token),
+        ]),
+    );
+
+    stage(
+        'atribut jenis-aset',
+        TENANTS.map((tenant, index) => [
+            'PUT',
+            `${BASE}/api/v1/jenis-aset/${jenisIds[index]}/atribut`,
+            JSON.stringify({ rows: [{ tipe_atribut_id: tipeAtributIds[index], urutan: 0 }] }),
+            auth(tenant.token),
+        ]),
+    );
+
     const assetIds = stage(
         'aset',
         TENANTS.map((tenant, index) => [
             'POST',
             `${BASE}/api/v1/aset`,
-            JSON.stringify({ legal_entity_id: tenant.legalEntityId, usage_org_unit_id: tenant.orgUnitId, group_aset_id: groupIds[index], jenis_aset_id: jenisIds[index], acquired_on: '2026-01-01', acquisition_value: 1000000, currency_code: 'IDR' }),
+            JSON.stringify({ legal_entity_id: tenant.legalEntityId, usage_org_unit_id: tenant.orgUnitId, group_aset_id: groupIds[index], jenis_aset_id: jenisIds[index], acquired_on: '2026-01-01', acquisition_value: 1000000, currency_code: 'IDR', atribut: [{ tipe_atribut_id: tipeAtributIds[index], nilai: 'A' }] }),
             auth(tenant.token, { 'Idempotency-Key': `seed-${RUN_ID}-aset-${index}` }),
         ]),
     );
@@ -219,6 +256,7 @@ export function setup() {
             orgUnitId: tenant.orgUnitId,
             satuanId: tenant.satuanId,
             assetId: assetIds[index],
+            tipeAtributId: tipeAtributIds[index],
         });
     });
 
@@ -229,14 +267,19 @@ export function setup() {
 
 // ---------------------------------------------------------------- operations
 
-function record(response, latency, expected, label) {
-    latency.add(response.timings.duration);
-    if (response.status >= 500) {
-        serverErrors.add(1, { label });
-    }
+function recordFailure(response, label) {
     if (response.status === 0) {
         timeouts.add(1, { label });
+    } else if (response.status === 502 || response.status === 504) {
+        gatewayErrors.add(1, { label });
+    } else if (response.status >= 500) {
+        serverErrors.add(1, { label });
     }
+}
+
+function record(response, latency, expected, label) {
+    latency.add(response.timings.duration);
+    recordFailure(response, label);
 
     return check(response, { [label]: (r) => r.status === expected });
 }
@@ -324,7 +367,7 @@ function replaceMatrix(tenant) {
         { ...auth(tenant.token), tags: { op: 'replace_link', resource: 'group-buku-penyusutan' } },
     );
     record(response, writeLatency, 200, 'replace matrix 200');
-    if (response.status >= 500) {
+    if (response.status >= 500 && response.status !== 502 && response.status !== 504) {
         violation('link_replace_conflict', { status: response.status });
     }
 }
@@ -354,12 +397,8 @@ function idempotencyRace(tenant) {
     const bothOk = check({ first, second }, { 'race keduanya 2xx': () => ok(first) && ok(second) });
 
     if (!bothOk) {
-        if (first.status >= 500 || second.status >= 500) {
-            serverErrors.add(1, { label: 'race' });
-        }
-        if (first.status === 0 || second.status === 0) {
-            timeouts.add(1, { label: 'race' });
-        }
+        recordFailure(first, 'race');
+        recordFailure(second, 'race');
 
         return;
     }
@@ -442,7 +481,7 @@ function planningIdempotencyRace(tenant) {
     const [first, second] = http.batch([['POST', `${BASE}/api/v1/perencanaan-aset`, body, params], ['POST', `${BASE}/api/v1/perencanaan-aset`, body, params]]);
     [first, second].forEach((response) => writeLatency.add(response.timings.duration));
     const bothOk = check({ first, second }, { 'race rencana keduanya 2xx': () => first.status >= 200 && first.status < 300 && second.status >= 200 && second.status < 300 });
-    if (!bothOk) { if (first.status >= 500 || second.status >= 500) serverErrors.add(1, { label: 'plan-race' }); return; }
+    if (!bothOk) { recordFailure(first, 'plan-race'); recordFailure(second, 'plan-race'); return; }
     if (first.json('data.id') !== second.json('data.id')) violation('plan_idempotency_produced_two_records');
 }
 
@@ -451,11 +490,49 @@ function mutateAsset(tenant) {
     record(response, writeLatency, 200, 'mutate 200');
 }
 
+/**
+ * Values dipersempit ke A tepat saat aset mencoba menyimpan B. Hasil yang sah hanya:
+ * Values menang lalu aset ditolak, atau aset menang lalu Values ditolak. Keduanya 200
+ * berarti row lock gagal dan database dapat menyimpan B di luar Values aktif.
+ */
+function attributeConstraintRace(tenant) {
+    const valuesBody = JSON.stringify({ rows: [{ nilai: 'A', urutan: 0 }] });
+    const assetBody = JSON.stringify({ atribut: [{ tipe_atribut_id: tenant.tipeAtributId, nilai: 'B' }] });
+    const [values, asset] = http.batch([
+        ['PUT', `${BASE}/api/v1/tipe-atribut/${tenant.tipeAtributId}/nilai`, valuesBody, {
+            ...auth(tenant.token),
+            tags: { op: 'attribute_race_values', resource: 'tipe-atribut' },
+            responseCallback: http.expectedStatuses(200, 409),
+        }],
+        ['PATCH', `${BASE}/api/v1/aset/${tenant.assetId}`, assetBody, {
+            ...auth(tenant.token),
+            tags: { op: 'attribute_race_asset', resource: 'aset' },
+            responseCallback: http.expectedStatuses(200, 422),
+        }],
+    ]);
+
+    [values, asset].forEach((response) => {
+        writeLatency.add(response.timings.duration);
+        recordFailure(response, 'attribute-race');
+    });
+    const unavailable = [values, asset].some((response) => response.status === 0 || response.status === 502 || response.status === 504);
+    const valid = (values.status === 200 && asset.status === 422)
+        || (values.status === 409 && asset.status === 200);
+    check({ values, asset }, { 'race Values dan aset tetap konsisten': () => unavailable || valid });
+    if (!unavailable && !valid) violation('attribute_values_race', { values: values.status, asset: asset.status });
+}
+
 // ---------------------------------------------------------------- vu loop
 
 export default function (data) {
     const tenants = data.tenants;
     const tenant = tenants[Math.floor(Math.random() * tenants.length)];
+    if (PROFILE === 'attribute-race') {
+        attributeConstraintRace(tenant);
+
+        return;
+    }
+
     const roll = Math.random();
 
     if (roll < 0.35) {
@@ -476,7 +553,9 @@ export default function (data) {
         idempotencyRace(tenant);
     } else if (roll < 0.94) {
         planningIdempotencyRace(tenant);
-    } else if (roll < 0.98) {
+    } else if (roll < 0.96) {
+        attributeConstraintRace(tenant);
+    } else if (roll < 0.99) {
         let victim = tenants[Math.floor(Math.random() * tenants.length)];
         if (victim.id === tenant.id) {
             victim = tenants[(tenants.indexOf(tenant) + 1) % tenants.length];
@@ -506,6 +585,7 @@ export function handleSummary(data) {
         checks_rate: metric('checks', 'rate'),
         correctness_violations: data.metrics.correctness_violations?.values?.count ?? 0,
         server_errors: data.metrics.server_errors?.values?.count ?? 0,
+        gateway_errors: data.metrics.gateway_errors?.values?.count ?? 0,
         idempotency_replays: data.metrics.idempotency_replays?.values?.count ?? 0,
         client_timeouts: data.metrics.client_timeouts?.values?.count ?? 0,
         cross_tenant_probes: data.metrics.cross_tenant_probes?.values?.count ?? 0,

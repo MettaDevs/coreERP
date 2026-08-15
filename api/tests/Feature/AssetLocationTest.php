@@ -96,6 +96,7 @@ class AssetLocationTest extends TestCase
         $tanpaUnit = $this->create('lokasi-aset', ['nama' => 'Koridor'])->assertCreated()->json('data.id');
 
         $classification = $this->classification();
+        $this->configureReadyBook($classification['group_aset_id']);
         $assetPermissions = ['management-aset.aset.read', 'management-aset.aset.create', 'management-aset.aset.mutate'];
 
         $asset = $this->withHeaders($this->contextHeaders($this->tenantId, $assetPermissions))
@@ -137,6 +138,30 @@ class AssetLocationTest extends TestCase
         DB::table('m_jenis_aset')->insert(['id' => $jenis, 'tenant_id' => $this->tenantId, 'creation_key' => 'j-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
 
         return ['group_aset_id' => $group, 'jenis_aset_id' => $jenis];
+    }
+
+    private function configureReadyBook(string $groupId): void
+    {
+        $now = now();
+        $profile = (string) Str::ulid();
+        $book = (string) Str::ulid();
+        DB::table('m_profil_penyusutan')->insert([
+            'id' => $profile, 'tenant_id' => $this->tenantId, 'creation_key' => 'profile-ready-'.Str::ulid(),
+            'kode' => 'P'.Str::random(8), 'nama' => 'Profil siap', 'aktif' => true,
+            'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar',
+            'useful_life_periods' => 12, 'created_at' => $now, 'updated_at' => $now,
+        ]);
+        DB::table('m_buku_penyusutan')->insert([
+            'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-ready-'.Str::ulid(),
+            'kode' => 'B'.Str::random(8), 'nama' => 'Buku siap', 'aktif' => true,
+            'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => $profile,
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+        DB::table('m_group_buku_penyusutan')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'group_aset_id' => $groupId,
+            'buku_id' => $book, 'depreciate' => true, 'useful_life_periods' => 12,
+            'convention' => 'full_month', 'created_at' => $now, 'updated_at' => $now,
+        ]);
     }
 
     /** @param array<string, mixed> $payload */

@@ -34,8 +34,32 @@ class GroupAsetController extends MasterDataController
     protected function extraRules(string $tenantId, bool $creating): array
     {
         return [
-            'tipe_harta' => ['sometimes', 'nullable', Rule::in(GroupAset::TIPE_HARTA)],
-            'major_type' => ['sometimes', 'nullable', Rule::in(GroupAset::MAJOR_TYPE)],
+            // Klasifikasi fiskal adalah reference data berversi. Validasi hanya
+            // memastikan ID aktif milik tenant yang sama; daftar nilainya bukan enum PHP.
+            'kelompok_harta_fiskal_id' => [
+                'sometimes', 'nullable', 'ulid',
+                Rule::exists('m_kelompok_harta_fiskal', 'id')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at')
+                    ->where('aktif', true),
+            ],
+            // Tolak nama lama secara eksplisit supaya client lama tidak diam-diam
+            // kehilangan klasifikasi ketika beralih ke reference ID.
+            'tipe_harta' => ['prohibited'],
+            // Sifat harta dibuang dari group: ia tidak menggerakkan apa pun di sini, dan
+            // akun ditentukan posting profile milik Finance. Menolaknya lebih baik
+            // daripada menerima diam-diam, karena client lama yang mengirim `low_value`
+            // sebenarnya bermaksud menandai barang non-kapitalisasi — maksud yang
+            // sekarang hanya terekam benar lewat `property_type`.
+            'major_type' => ['prohibited'],
+            'property_type' => ['sometimes', 'nullable', Rule::in(GroupAset::PROPERTY_TYPE)],
+            // Lokasi bawaan; hanya nilai awal saat aset diterima, bukan lokasi yang berlaku.
+            'asset_location_id' => [
+                'sometimes', 'nullable', 'ulid',
+                Rule::exists('m_lokasi_aset', 'id')
+                    ->where('tenant_id', $tenantId)
+                    ->whereNull('deleted_at'),
+            ],
             'capitalization_threshold' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'posting_layers' => ['sometimes', 'nullable', 'array'],
             'posting_layers.*' => [Rule::in(GroupAset::POSTING_LAYERS)],
@@ -45,7 +69,7 @@ class GroupAsetController extends MasterDataController
     protected function extraPayload(array $data): array
     {
         $payload = [];
-        foreach (['tipe_harta', 'major_type', 'capitalization_threshold'] as $column) {
+        foreach (['kelompok_harta_fiskal_id', 'property_type', 'asset_location_id', 'capitalization_threshold'] as $column) {
             if (array_key_exists($column, $data)) {
                 $payload[$column] = $data[$column];
             }
@@ -64,8 +88,9 @@ class GroupAsetController extends MasterDataController
     protected function extraPresent(MasterData $record): array
     {
         return [
-            'tipe_harta' => $record->tipe_harta,
-            'major_type' => $record->major_type,
+            'kelompok_harta_fiskal_id' => $record->kelompok_harta_fiskal_id,
+            'property_type' => $record->property_type,
+            'asset_location_id' => $record->asset_location_id,
             'capitalization_threshold' => $record->capitalization_threshold,
             'posting_layers' => $record->posting_layers === null ? [] : explode(',', $record->posting_layers),
         ];

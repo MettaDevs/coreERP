@@ -8,6 +8,16 @@ export type MasterResource =
     | 'pabrikan-aset'
     | 'item-checklist-maintenance'
     | 'analisa-maintenance'
+    | 'maintenance-job-types'
+    | 'maintenance-job-type-variants'
+    | 'maintenance-job-type-defaults'
+    | 'maintenance-checklist-variables'
+    | 'maintenance-checklist-templates'
+    | 'tipe-work-order'
+    | 'tingkat-layanan'
+    | 'trade'
+    | 'sebab-kerusakan'
+    | 'tindakan-perbaikan'
     | 'tipe-lokasi-aset'
     | 'lokasi-aset'
     | 'tipe-atribut'
@@ -18,9 +28,13 @@ export type MasterAction = 'read' | 'create' | 'update' | 'archive';
 
 export type Permission =
     | `management-aset.${MasterResource}.${MasterAction}`
-    | `management-aset.aset.${'read' | 'create' | 'mutate'}`
+    | `management-aset.aset.${'read' | 'create' | 'update' | 'mutate'}`
     | 'management-aset.mutasi-aset.read'
-    | `management-aset.${'perencanaan-aset' | 'permintaan-pembelian-aset' | 'pemeliharaan-aset' | 'penjualan-aset' | 'pemusnahan-aset'}.${'read' | 'create'}`
+    | `management-aset.${'perencanaan-aset' | 'permintaan-pembelian-aset' | 'penjualan-aset' | 'pemusnahan-aset'}.${'read' | 'create'}`
+    // Work order memisahkan menyusun, menjadwalkan, mengerjakan, dan menutup supaya
+    // ketiganya dapat diberikan kepada orang yang berbeda.
+    | `management-aset.pemeliharaan-aset.${'read' | 'create' | 'update' | 'archive' | 'schedule' | 'execute' | 'close'}`
+    | `management-aset.validasi-status-work-order.${'read' | 'update'}`
     | 'management-aset.monitoring-aset.read'
     | 'management-aset.fixed-asset-parameters.read'
     | 'management-aset.fixed-asset-posting-profiles.read'
@@ -58,6 +72,7 @@ export type MasterParentConfig = {
 export type MasterConfig = {
     resource: MasterResource;
     nav: string;
+    showInNavigation?: boolean;
     title: string;
     subtitle: string;
     kodeLabel: string;
@@ -80,30 +95,22 @@ export const MASTERS: MasterConfig[] = [
         singular: 'group aset',
         extraFields: [
             {
-                name: 'tipe_harta',
-                label: 'Kelompok harta',
-                type: 'select',
-                help: 'Menentukan masa manfaat dan tarif fiskal aset dalam group ini.',
-                options: [
-                    { value: 'kelompok_1', label: 'Kelompok 1' },
-                    { value: 'kelompok_2', label: 'Kelompok 2' },
-                    { value: 'kelompok_3', label: 'Kelompok 3' },
-                    { value: 'kelompok_4', label: 'Kelompok 4' },
-                    { value: 'bangunan_permanen', label: 'Bangunan permanen' },
-                    { value: 'bangunan_non_permanen', label: 'Bangunan tidak permanen' },
-                    { value: 'bukan_objek_penyusutan', label: 'Bukan objek penyusutan' },
-                ],
+                name: 'kelompok_harta_fiskal_id',
+                label: 'Kelompok harta fiskal',
+                type: 'reference',
+                resource: 'reference-data/kelompok-harta-fiskal',
+                help: 'Menentukan aturan fiskal dan masa manfaat yang dipakai group ini. Versi aturan baru dapat ditambahkan tanpa mengubah form.',
             },
             {
-                name: 'major_type',
-                label: 'Jenis harta',
+                name: 'property_type',
+                label: 'Perlakuan pencatatan',
                 type: 'select',
                 options: [
-                    { value: 'tangible', label: 'Berwujud' },
-                    { value: 'intangible', label: 'Tidak berwujud' },
-                    { value: 'right_of_use', label: 'Hak guna' },
-                    { value: 'low_value', label: 'Bernilai rendah' },
+                    { value: 'fixed_asset', label: 'Aset tetap (masuk neraca)' },
+                    { value: 'inventory_item', label: 'Barang inventaris (tidak masuk neraca)' },
+                    { value: 'other', label: 'Lainnya' },
                 ],
+                help: 'Barang inventaris tetap dicatat dan dilacak, tetapi tidak disajikan sebagai aset tetap di neraca.',
             },
             {
                 name: 'capitalization_threshold',
@@ -111,7 +118,14 @@ export const MASTERS: MasterConfig[] = [
                 type: 'number',
                 min: 0,
                 step: 0.01,
-                help: 'Perolehan di bawah nilai ini dibebankan, tidak dicatat sebagai aset.',
+                help: 'Perolehan di bawah nilai ini tetap dicatat sebagai aset, tetapi bukunya tidak menyusut.',
+            },
+            {
+                name: 'asset_location_id',
+                label: 'Lokasi bawaan',
+                type: 'reference',
+                resource: 'lokasi-aset',
+                help: 'Mengisi lokasi saat aset diterima. Hanya nilai awal; lokasi aset dapat diubah setelahnya tanpa menyentuh group.',
             },
             {
                 name: 'posting_layers',
@@ -138,6 +152,7 @@ export const MASTERS: MasterConfig[] = [
     {
         resource: 'model-aset',
         nav: 'Model aset',
+        showInNavigation: false,
         title: 'Model aset',
         subtitle: 'Katalog model barang per pabrikan yang dapat dipilih saat menerima aset.',
         kodeLabel: 'Kode model aset',
@@ -159,9 +174,9 @@ export const MASTERS: MasterConfig[] = [
     },
     {
         resource: 'pabrikan-aset',
-        nav: 'Pabrikan aset',
-        title: 'Pabrikan aset',
-        subtitle: 'Daftar pabrikan atau merek pembuat aset.',
+        nav: 'Pabrikan dan model',
+        title: 'Pabrikan dan model',
+        subtitle: 'Daftar pabrikan dan model aset yang dapat dipilih saat menerima aset.',
         kodeLabel: 'Kode pabrikan aset',
         namaLabel: 'Nama pabrikan aset',
         singular: 'pabrikan aset',
@@ -185,6 +200,120 @@ export const MASTERS: MasterConfig[] = [
         singular: 'analisa maintenance',
     },
     {
+        resource: 'maintenance-job-types',
+        nav: 'Jenis pekerjaan maintenance',
+        title: 'Jenis pekerjaan maintenance',
+        subtitle: 'Atur pekerjaan, varian, persyaratan, dan jenis aset yang menggunakan maintenance.',
+        kodeLabel: 'Kode jenis pekerjaan',
+        namaLabel: 'Nama jenis pekerjaan',
+        singular: 'jenis pekerjaan maintenance',
+        extraFields: [
+            {
+                name: 'category_code', label: 'Kategori pekerjaan', type: 'select', required: true,
+                options: [
+                    { value: 'preventive', label: 'Preventif' },
+                    { value: 'corrective', label: 'Korektif' },
+                    { value: 'service', label: 'Servis' },
+                    { value: 'condition_assessment', label: 'Pemeriksaan kondisi' },
+                ],
+            },
+            { name: 'maintenance_downtime_activities', label: 'Aktivitas downtime maintenance', type: 'boolean' },
+        ],
+    },
+    {
+        resource: 'maintenance-job-type-variants',
+        nav: 'Varian job type', showInNavigation: false,
+        title: 'Varian jenis pekerjaan maintenance',
+        subtitle: 'Pilihan interval atau varian dari jenis pekerjaan maintenance.',
+        kodeLabel: 'Kode varian', namaLabel: 'Nama varian', singular: 'varian job type',
+        parents: [{ resource: 'maintenance-job-types', field: 'maintenance_job_type_id', summaryKey: 'maintenance_job_type', label: 'Jenis pekerjaan maintenance' }],
+    },
+    {
+        resource: 'maintenance-job-type-defaults',
+        nav: 'Default job type',
+        title: 'Default jenis pekerjaan maintenance',
+        subtitle: 'Nilai bawaan yang dapat dipakai saat menyiapkan pekerjaan maintenance.',
+        kodeLabel: 'Kode default', namaLabel: 'Nama default', singular: 'default job type',
+        parents: [
+            { resource: 'maintenance-job-types', field: 'maintenance_job_type_id', summaryKey: 'maintenance_job_type', label: 'Jenis pekerjaan maintenance' },
+            { resource: 'maintenance-job-type-variants', field: 'variant_id', summaryKey: 'variant', label: 'Varian job type', required: false },
+            { resource: 'maintenance-checklist-templates', field: 'checklist_template_id', summaryKey: 'checklist_template', label: 'Template checklist', required: false },
+        ],
+        extraFields: [
+            { name: 'trade', label: 'Trade', type: 'select', options: [{ value: 'Mekanik', label: 'Mekanik' }, { value: 'Elektrik', label: 'Elektrik' }, { value: 'HVAC', label: 'HVAC' }, { value: 'Teknisi umum', label: 'Teknisi umum' }] },
+            { name: 'functional_location_id', label: 'Functional location', type: 'reference', resource: 'lokasi-aset' },
+            { name: 'jenis_aset_id', label: 'Jenis aset', type: 'reference', resource: 'jenis-aset' },
+            { name: 'pabrikan_aset_id', label: 'Pabrikan', type: 'reference', resource: 'pabrikan-aset' },
+            { name: 'model_aset_id', label: 'Model', type: 'reference', resource: 'model-aset' },
+            { name: 'asset_id', label: 'Aset', type: 'reference', resource: 'aset' },
+            { name: 'hours', label: 'Jam kerja', type: 'number', min: 0, step: 0.01 },
+            { name: 'items_count', label: 'Items', type: 'number', min: 0, step: 1 },
+            { name: 'expenses_count', label: 'Expenses', type: 'number', min: 0, step: 1 },
+            { name: 'fees_count', label: 'Fees', type: 'number', min: 0, step: 1 },
+        ],
+    },
+    {
+        resource: 'maintenance-checklist-variables',
+        nav: 'Variabel checklist',
+        title: 'Variabel checklist maintenance',
+        subtitle: 'Buat pilihan nilai yang dapat dipakai pada baris checklist.',
+        kodeLabel: 'Kode variabel', namaLabel: 'Nama variabel', singular: 'variabel checklist',
+    },
+    {
+        resource: 'maintenance-checklist-templates',
+        nav: 'Template checklist',
+        title: 'Template checklist maintenance',
+        subtitle: 'Susun baris pemeriksaan yang akan diisi saat maintenance.',
+        kodeLabel: 'Kode template', namaLabel: 'Nama template', singular: 'template checklist',
+    },
+    {
+        resource: 'tipe-work-order',
+        nav: 'Tipe work order',
+        title: 'Tipe work order',
+        subtitle: 'Tipe pekerjaan dan batasan penugasannya. Aturan isi data diatur pada validasi status work order.',
+        kodeLabel: 'Kode tipe work order', namaLabel: 'Nama tipe work order', singular: 'tipe work order',
+        extraFields: [
+            {
+                name: 'satu_pekerja', label: 'Hanya satu pelaksana', type: 'boolean',
+                help: 'Seluruh baris pekerjaan pada work order tipe ini harus ditugaskan ke orang yang sama.',
+            },
+        ],
+    },
+    {
+        resource: 'tingkat-layanan',
+        nav: 'Tingkat layanan',
+        title: 'Tingkat layanan',
+        subtitle: 'Urgensi penanganan yang dapat dipilih pada work order.',
+        kodeLabel: 'Kode tingkat layanan', namaLabel: 'Nama tingkat layanan', singular: 'tingkat layanan',
+        extraFields: [
+            {
+                name: 'urutan', label: 'Urutan urgensi', type: 'number', min: 0, step: 1,
+                help: 'Angka lebih kecil berarti lebih mendesak. Hanya mengurutkan daftar; tidak menghitung tenggat.',
+            },
+        ],
+    },
+    {
+        resource: 'trade',
+        nav: 'Bidang keahlian',
+        title: 'Bidang keahlian',
+        subtitle: 'Keahlian yang dibutuhkan sebuah pekerjaan, misalnya mekanik, elektrik, atau HVAC.',
+        kodeLabel: 'Kode bidang keahlian', namaLabel: 'Nama bidang keahlian', singular: 'bidang keahlian',
+    },
+    {
+        resource: 'sebab-kerusakan',
+        nav: 'Sebab kerusakan',
+        title: 'Sebab kerusakan',
+        subtitle: 'Akar sebab yang dapat dipilih saat pekerjaan maintenance ditutup.',
+        kodeLabel: 'Kode sebab kerusakan', namaLabel: 'Nama sebab kerusakan', singular: 'sebab kerusakan',
+    },
+    {
+        resource: 'tindakan-perbaikan',
+        nav: 'Tindakan perbaikan',
+        title: 'Tindakan perbaikan',
+        subtitle: 'Perbaikan yang dikerjakan, dicatat terpisah dari sebabnya agar keduanya dapat dihitung.',
+        kodeLabel: 'Kode tindakan perbaikan', namaLabel: 'Nama tindakan perbaikan', singular: 'tindakan perbaikan',
+    },
+    {
         resource: 'tipe-lokasi-aset',
         nav: 'Tipe lokasi aset',
         title: 'Tipe lokasi aset',
@@ -205,14 +334,6 @@ export const MASTERS: MasterConfig[] = [
             { resource: 'lokasi-aset', field: 'parent_id', summaryKey: 'parent', label: 'Lokasi induk', required: false },
             { resource: 'tipe-lokasi-aset', field: 'tipe_lokasi_id', summaryKey: 'tipe_lokasi', label: 'Tipe lokasi', required: false },
         ],
-        extraFields: [
-            {
-                name: 'org_unit_id',
-                label: 'ID unit organisasi',
-                type: 'text',
-                help: 'Opsional. Aset yang ditempatkan di lokasi ini memakai unit tersebut sebagai dimensi keuangannya.',
-            },
-        ],
     },
     {
         resource: 'tipe-atribut',
@@ -229,34 +350,37 @@ export const MASTERS: MasterConfig[] = [
                 type: 'select',
                 required: true,
                 options: [
-                    { value: 'text', label: 'Teks' },
-                    { value: 'number', label: 'Angka' },
-                    { value: 'boolean', label: 'Ya / tidak' },
+                    { value: 'string', label: 'Teks' },
+                    { value: 'decimal', label: 'Desimal' },
+                    { value: 'integer', label: 'Bilangan bulat' },
                     { value: 'date', label: 'Tanggal' },
-                    { value: 'fixed_list', label: 'Pilihan dari daftar' },
-                    { value: 'value_range', label: 'Angka dalam rentang' },
+                    { value: 'boolean', label: 'Ya/tidak' },
                 ],
+                help: 'Tipe data tidak dapat diubah lagi setelah atribut pertama kali diisi pada aset.',
             },
             {
-                name: 'satuan',
+                name: 'satuan_id',
                 label: 'Satuan',
-                type: 'text',
-                help: 'Ditampilkan di belakang isian, misalnya liter atau kg.',
-                visibleWhen: (form) => form.data_type === 'number' || form.data_type === 'value_range',
+                type: 'reference',
+                resource: 'reference-data/units-of-measure',
+                help: 'Diambil dari daftar satuan Core, bukan diketik, supaya "cm" berarti hal yang sama di seluruh aplikasi. Ditampilkan di belakang isian saat aset diterima.',
+                visibleWhen: (form) => form.data_type === 'decimal' || form.data_type === 'integer',
             },
             {
                 name: 'min_value',
                 label: 'Nilai minimum',
                 type: 'number',
-                required: true,
-                visibleWhen: (form) => form.data_type === 'value_range',
+                step: 0.000001,
+                help: 'Isi bersama nilai maksimum untuk membatasi isian. Kosongkan keduanya bila angka tidak perlu dibatasi.',
+                visibleWhen: (form) => form.data_type === 'decimal' || form.data_type === 'integer',
             },
             {
                 name: 'max_value',
                 label: 'Nilai maksimum',
                 type: 'number',
-                required: true,
-                visibleWhen: (form) => form.data_type === 'value_range',
+                step: 0.000001,
+                help: 'Isi bersama nilai minimum untuk membatasi isian. Kosongkan keduanya bila angka tidak perlu dibatasi.',
+                visibleWhen: (form) => form.data_type === 'decimal' || form.data_type === 'integer',
             },
         ],
     },
@@ -271,7 +395,7 @@ export const MASTERS: MasterConfig[] = [
         extraFields: [
             {
                 name: 'posting_layer',
-                label: 'Lapisan pembukuan',
+                label: 'Lapisan posting',
                 type: 'select',
                 options: [
                     { value: 'current', label: 'Komersial' },
@@ -279,12 +403,13 @@ export const MASTERS: MasterConfig[] = [
                     { value: 'tax', label: 'Fiskal' },
                     { value: 'none', label: 'Memorandum' },
                 ],
+                help: 'Buku komersial mengikuti kebijakan akuntansi tenant/legal entity. Buku fiskal memakai referensi pajak yang berversi; metode dan masa manfaat keduanya boleh berbeda.',
             },
             {
                 name: 'export_to_backoffice',
-                label: 'Kirim ke backoffice',
+                label: 'Ekspor ke Finance',
                 type: 'boolean',
-                help: 'Matikan untuk buku fiskal agar backoffice tidak menjurnal dua kali untuk aset yang sama.',
+                help: 'Saat ini hanya menyiapkan bridge tanpa jurnal. Biarkan mati sampai kontrak posting dan kepemilikan COA Finance tersedia.',
             },
             {
                 name: 'round_off_depreciation',
@@ -296,14 +421,16 @@ export const MASTERS: MasterConfig[] = [
             },
             {
                 name: 'depreciation_profile_id',
-                label: 'ID profil penyusutan bawaan',
-                type: 'text',
-                help: 'Dipakai bila baris matriks group tidak menentukan profilnya sendiri.',
+                label: 'Profil utama',
+                type: 'reference',
+                resource: 'profil-penyusutan',
+                help: 'Dipakai bila baris matriks group tidak menentukan profil khusus.',
             },
             {
                 name: 'alternative_profile_id',
-                label: 'ID profil pengganti',
-                type: 'text',
+                label: 'Profil pengganti (opsional)',
+                type: 'reference',
+                resource: 'profil-penyusutan',
                 help: 'Dipakai saat saldo menurun sudah menghasilkan angka lebih kecil daripada garis lurus sisa umur.',
             },
         ],
@@ -352,6 +479,18 @@ export const MASTERS: MasterConfig[] = [
                     { value: 'fiscal', label: 'Tahun fiskal' },
                 ],
             },
+            {
+                name: 'effective_from',
+                label: 'Berlaku mulai',
+                type: 'date',
+                help: 'Kosong berarti profil tidak dibatasi dari tanggal awal.',
+            },
+            {
+                name: 'effective_to',
+                label: 'Berlaku sampai',
+                type: 'date',
+                help: 'Kosong berarti profil tetap berlaku sampai diganti versi baru.',
+            },
             // Field berikut hanya relevan untuk sebagian metode; disembunyikan agar
             // pengguna tidak mengisi nilai yang tidak akan pernah dipakai.
             {
@@ -392,12 +531,11 @@ export const MASTERS: MasterConfig[] = [
                     return amounts.length ? amounts.map((amount) => ({ amount: Number(amount) })) : null;
                 },
             },
-            {
-                name: 'convention',
-                label: 'Konvensi',
-                type: 'text',
-                help: 'Belum dipakai perhitungan; akan diaktifkan bersama buku penyusutan.',
-            },
+            // Konvensi sengaja tidak ada di sini. Perlakuan periode pertama diambil dari
+            // baris matriks group x buku, karena satu profil yang sama dipakai banyak
+            // group dengan tanggal mulai yang berbeda. Menyediakannya juga di profil
+            // berarti dua tempat mengaku menentukan hal yang sama, dan yang di profil
+            // tidak pernah dibaca perhitungan.
         ],
     },
 ];

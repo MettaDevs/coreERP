@@ -45,6 +45,12 @@ skenario berikut. Fixture default berisi 128 tenant.
 docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=saturation -e VUS=1000 -e DURATION=120s -e RUN_ID=run1 grafana/k6:0.55.0 run /scripts/master-data.js
 ```
 
+Uji khusus penggantian Values bersamaan dengan koreksi nilai atribut aset:
+
+```bash
+docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=attribute-race -e VUS=32 -e DURATION=90s -e RUN_ID=attribute-run1 grafana/k6:0.55.0 run /scripts/master-data.js
+```
+
 Skenario penyusutan menyiapkan tiga periode per tenant dan menguji retry
 proposal/finalisasi pada 1000 VU:
 
@@ -67,6 +73,7 @@ Pada Git Bash Windows, awali perintah `docker` yang memuat path container dengan
 | Profil | Menjawab | Yang digate |
 | --- | --- | --- |
 | `PROFILE=saturation VUS=1000` | Apakah modul tetap **benar** saat jenuh? | Kebenaran: 0 pelanggaran, 0 error aplikasi |
+| `PROFILE=attribute-race` | Apakah Values dan nilai aset tetap cocok saat diubah bersamaan? | 0 nilai di luar Values, 0 error aplikasi |
 | `PROFILE=latency` | Berapa concurrency yang masih memenuhi SLO? | p95/p99 per jenis operasi |
 
 Latensi pada beban jenuh mengukur kedalaman antrean, bukan biaya kode. Karena itu gate latensi diambil pada concurrency yang masih tertahan, bukan pada titik jenuh.

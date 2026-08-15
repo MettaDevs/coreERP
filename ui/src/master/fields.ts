@@ -10,13 +10,21 @@ export type FieldOption = { value: string; label: string };
 export type FieldConfig = {
     name: string;
     label: string;
-    type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'select' | 'multiselect';
+    type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'select' | 'multiselect' | 'reference';
     required?: boolean;
     options?: FieldOption[];
+    /**
+     * Slug master sumber pilihan untuk `reference`, misalnya `profil-penyusutan`.
+     *
+     * Berbeda dari `select` yang pilihannya ditulis di konfigurasi, `reference` memuat
+     * pilihannya dari API saat dirender. Ini yang membedakan kolom foreign key dari
+     * enum: isinya milik tenant dan berubah tanpa menyentuh kode.
+     */
+    resource?: string;
     /** Batas untuk `number`; berasal dari definisi atribut bertipe rentang nilai. */
     min?: number;
     max?: number;
-    step?: number;
+    step?: number | 'any';
     /** Satuan yang ditempel di belakang input, misalnya "kg" atau "IDR". */
     suffix?: string;
     placeholder?: string;

@@ -23,18 +23,91 @@ class AssetAttributeTest extends TestCase
 
     private int $issued = 0;
 
+    /** Satuan milik Core yang dikenali stub di bawah; yang lain dianggap tidak ada. */
+    private string $unitId;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->tenantId = (string) Str::ulid();
+        $this->unitId = (string) Str::ulid();
         $this->configureCoreErpContext();
-        Http::fake(fn () => Http::response(['data' => ['number' => 'NS-'.str_pad((string) ++$this->issued, 6, '0', STR_PAD_LEFT)]]));
+        $unit = fn (string $id): array => [
+            'id' => $id, 'code' => 'cm', 'name' => 'Sentimeter', 'symbol' => 'cm', 'decimal_places' => 2,
+        ];
+        Http::fake(function ($request) use ($unit) {
+            if (str_ends_with($request->url(), '/units-of-measure/resolve')) {
+                // Core hanya mengembalikan satuan yang benar-benar ada. Klien yang meminta
+                // satuan tak dikenal menerima daftar lebih pendek, dan `resolve()` menolaknya.
+                $asked = (array) ($request->data()['unit_ids'] ?? []);
+
+                return Http::response(['data' => array_map($unit, array_values(
+                    array_filter($asked, fn ($id) => $id === $this->unitId),
+                ))]);
+            }
+            if (str_ends_with($request->url(), '/units-of-measure')) {
+                return Http::response(['data' => [$unit($this->unitId)]]);
+            }
+
+            return Http::response(['data' => ['number' => 'NS-'.str_pad((string) ++$this->issued, 6, '0', STR_PAD_LEFT)]]);
+        });
+    }
+
+    public function test_satuan_tipe_atribut_dirujuk_ke_core_dan_kodenya_disalin(): void
+    {
+        $id = $this->master('tipe-atribut', [
+            'nama' => 'Kedalaman', 'data_type' => 'decimal', 'satuan_id' => $this->unitId,
+        ]);
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+            ->getJson('/api/v1/tipe-atribut/'.$id)
+            ->assertOk()
+            ->assertJsonPath('data.satuan_id', $this->unitId)
+            // Kode satuan datang dari Core, bukan dari kiriman klien.
+            ->assertJsonPath('data.satuan', 'cm');
+    }
+
+    public function test_satuan_yang_tidak_dikenal_core_ditolak(): void
+    {
+        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+            ->withHeader('Idempotency-Key', 'satuan-asing')
+            ->postJson('/api/v1/tipe-atribut', [
+                'nama' => 'Kedalaman', 'data_type' => 'decimal', 'satuan_id' => (string) Str::ulid(),
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('satuan_id');
+        $this->assertDatabaseCount('m_tipe_atribut', 0);
+    }
+
+    /** Satuan tidak bermakna untuk teks atau daftar tetap, jadi tidak boleh diam-diam tersimpan. */
+    public function test_satuan_ditolak_untuk_tipe_data_yang_tidak_mengenal_satuan(): void
+    {
+        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+            ->withHeader('Idempotency-Key', 'satuan-salah-tipe')
+            ->postJson('/api/v1/tipe-atribut', [
+                'nama' => 'Warna', 'data_type' => 'string', 'satuan_id' => $this->unitId,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('satuan_id');
+    }
+
+    /** Daftar satuan dibaca dari dalam layar tipe atribut, jadi izinnya ikut layar itu. */
+    public function test_daftar_satuan_dapat_dibaca_dengan_izin_tipe_atribut(): void
+    {
+        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.tipe-atribut.read']))
+            ->getJson('/api/v1/reference-data/units-of-measure')
+            ->assertOk()
+            ->assertJsonPath('data.0.kode', 'cm');
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.group-aset.read']))
+            ->getJson('/api/v1/reference-data/units-of-measure')
+            ->assertForbidden();
     }
 
     public function test_aset_menyimpan_nilai_atribut_sesuai_tipenya(): void
     {
         $jenis = $this->master('jenis-aset', ['nama' => 'Kompresor']);
-        $kapasitas = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'number', 'satuan' => 'liter']);
+        $kapasitas = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'decimal']);
         $bergaransi = $this->master('tipe-atribut', ['nama' => 'Bergaransi', 'data_type' => 'boolean']);
         $dipasang = $this->master('tipe-atribut', ['nama' => 'Tanggal pasang', 'data_type' => 'date']);
         $this->attach($jenis, [
@@ -57,10 +130,113 @@ class AssetAttributeTest extends TestCase
         $this->assertSame('2026-03-20', substr((string) DB::table('tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $dipasang])->value('nilai_date'), 0, 10));
     }
 
+    public function test_detail_jenis_aset_menghitung_atribut_model_dan_aset(): void
+    {
+        ['jenis' => $jenis] = $this->jenisDenganTurunan();
+
+        $this->detail($jenis, [
+            ...$this->permissionsFor('jenis-aset'),
+            'management-aset.model-aset.read',
+            'management-aset.aset.read',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.atribut_count', 2)
+            ->assertJsonPath('data.model_count', 1)
+            ->assertJsonPath('data.asset_count', 1)
+            ->assertJsonPath('data.models.0.manufacturer', 'Komatsu')
+            ->assertJsonPath('data.models.0.model', 'PC200-8')
+            ->assertJsonPath('data.models.0.description', null)
+            ->assertJsonCount(0, 'data.available_models');
+    }
+
+    /**
+     * Angka milik resource lain tidak boleh bocor lewat izin jenis aset. `null`, bukan 0:
+     * 0 berarti "tidak ada", dan itu jawaban yang tidak berhak ia terima.
+     */
+    public function test_detail_menyembunyikan_angka_resource_yang_tidak_boleh_dibaca(): void
+    {
+        ['jenis' => $jenis] = $this->jenisDenganTurunan();
+
+        $this->detail($jenis, ['management-aset.jenis-aset.read'])
+            ->assertOk()
+            ->assertJsonPath('data.atribut_count', 2)
+            ->assertJsonPath('data.model_count', null)
+            ->assertJsonPath('data.asset_count', null)
+            ->assertJsonPath('data.models', null)
+            ->assertJsonPath('data.available_models', null);
+    }
+
+    public function test_model_dapat_dikaitkan_dari_detail_jenis_aset(): void
+    {
+        $jenis = $this->master('jenis-aset', ['nama' => 'Kompresor']);
+        $pabrikan = $this->master('pabrikan-aset', ['nama' => 'Komatsu']);
+        $modelA = $this->master('model-aset', ['nama' => 'PC200-8', 'pabrikan_aset_id' => $pabrikan]);
+        $modelB = $this->master('model-aset', ['nama' => 'PC210-10', 'pabrikan_aset_id' => $pabrikan]);
+        $permissions = [...$this->permissionsFor('jenis-aset'), 'management-aset.model-aset.read'];
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions))
+            ->putJson('/api/v1/jenis-aset/'.$jenis.'/models', ['model_ids' => [$modelA, $modelB]])
+            ->assertOk()
+            ->assertJsonPath('data.model_ids.0', $modelA)
+            ->assertJsonPath('data.model_ids.1', $modelB);
+
+        $this->assertDatabaseHas('m_model_aset', ['id' => $modelA, 'jenis_aset_id' => $jenis]);
+        $this->assertDatabaseHas('m_model_aset', ['id' => $modelB, 'jenis_aset_id' => $jenis]);
+    }
+
+    /**
+     * Aset dibatasi tanggung jawab organisasi. Pemegang izin baca aset yang scope-nya tidak
+     * mencakup aset tersebut tetap tidak boleh menghitungnya lewat jalur detail.
+     */
+    public function test_detail_menghormati_batas_tanggung_jawab_organisasi(): void
+    {
+        ['jenis' => $jenis] = $this->jenisDenganTurunan();
+        $permissions = [...$this->permissionsFor('jenis-aset'), 'management-aset.aset.read'];
+
+        $diLuarScope = $this->contextHeaders($this->tenantId, $permissions, ['data_policies' => [
+            'management-aset.asset-responsibility' => [
+                'all' => false,
+                'scope_grants' => [[
+                    'legal_entity_id' => (string) Str::ulid(),
+                    'operating_unit_ids' => [(string) Str::ulid()],
+                ]],
+            ],
+        ]]);
+
+        $this->withHeaders($diLuarScope)
+            ->getJson('/api/v1/jenis-aset/'.$jenis.'/detail')
+            ->assertOk()
+            ->assertJsonPath('data.asset_count', 0)
+            // Atribut milik jenis aset, bukan aset, jadi ia tidak ikut dibatasi scope.
+            ->assertJsonPath('data.atribut_count', 2);
+    }
+
+    public function test_detail_menolak_jenis_aset_milik_tenant_lain(): void
+    {
+        ['jenis' => $jenis] = $this->jenisDenganTurunan();
+
+        $this->withHeaders($this->contextHeaders((string) Str::ulid(), $this->permissionsFor('jenis-aset')))
+            ->getJson('/api/v1/jenis-aset/'.$jenis.'/detail')
+            ->assertNotFound();
+    }
+
+    /** Daftar master tidak ikut menghitung turunan; itu tugas endpoint detail. */
+    public function test_daftar_jenis_aset_tidak_membawa_angka_turunan(): void
+    {
+        $this->jenisDenganTurunan();
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('jenis-aset')))
+            ->getJson('/api/v1/jenis-aset')
+            ->assertOk()
+            ->assertJsonMissingPath('data.0.atribut_count')
+            ->assertJsonMissingPath('data.0.model_count')
+            ->assertJsonMissingPath('data.0.asset_count');
+    }
+
     public function test_atribut_wajib_yang_kosong_ditolak(): void
     {
         $jenis = $this->master('jenis-aset', ['nama' => 'Kompresor']);
-        $kapasitas = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'number']);
+        $kapasitas = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'decimal']);
         $this->attach($jenis, [['tipe_atribut_id' => $kapasitas, 'wajib' => true]])->assertOk();
 
         $this->receiveRaw($jenis, [])->assertStatus(422)->assertJsonValidationErrors('atribut.'.$kapasitas);
@@ -70,7 +246,7 @@ class AssetAttributeTest extends TestCase
     public function test_atribut_yang_tidak_terdaftar_pada_jenis_ditolak(): void
     {
         $jenis = $this->master('jenis-aset', ['nama' => 'Kompresor']);
-        $liar = $this->master('tipe-atribut', ['nama' => 'Warna', 'data_type' => 'text']);
+        $liar = $this->master('tipe-atribut', ['nama' => 'Warna', 'data_type' => 'string']);
 
         // Tidak di-attach ke jenis mana pun, jadi mengirimnya hampir pasti salah jenis.
         $this->receiveRaw($jenis, [['tipe_atribut_id' => $liar, 'nilai' => 'Merah']])
@@ -81,7 +257,7 @@ class AssetAttributeTest extends TestCase
     public function test_daftar_tetap_hanya_menerima_nilai_dari_daftarnya(): void
     {
         $jenis = $this->master('jenis-aset', ['nama' => 'Kendaraan']);
-        $bahanBakar = $this->master('tipe-atribut', ['nama' => 'Bahan bakar', 'data_type' => 'fixed_list']);
+        $bahanBakar = $this->master('tipe-atribut', ['nama' => 'Bahan bakar', 'data_type' => 'string']);
         $this->values($bahanBakar, [['nilai' => 'Bensin'], ['nilai' => 'Solar', 'urutan' => 1]])
             ->assertOk()->assertJsonCount(2, 'data');
         $this->attach($jenis, [['tipe_atribut_id' => $bahanBakar]])->assertOk();
@@ -100,7 +276,7 @@ class AssetAttributeTest extends TestCase
     public function test_rentang_nilai_menolak_angka_di_luar_batas(): void
     {
         $jenis = $this->master('jenis-aset', ['nama' => 'Genset']);
-        $daya = $this->master('tipe-atribut', ['nama' => 'Daya', 'data_type' => 'value_range', 'min_value' => 10, 'max_value' => 100, 'satuan' => 'kVA']);
+        $daya = $this->master('tipe-atribut', ['nama' => 'Daya', 'data_type' => 'decimal', 'min_value' => 10, 'max_value' => 100]);
         $this->attach($jenis, [['tipe_atribut_id' => $daya]])->assertOk();
 
         $this->receiveRaw($jenis, [['tipe_atribut_id' => $daya, 'nilai' => 250]])
@@ -113,11 +289,11 @@ class AssetAttributeTest extends TestCase
         $this->receive($jenis, [['tipe_atribut_id' => $daya, 'nilai' => 50]]);
     }
 
-    public function test_rentang_nilai_wajib_punya_batas_saat_dibuat(): void
+    public function test_batas_nilai_harus_diisi_berpasangan(): void
     {
         $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
             ->withHeader('Idempotency-Key', 'tanpa-batas')
-            ->postJson('/api/v1/tipe-atribut', ['nama' => 'Daya', 'data_type' => 'value_range'])
+            ->postJson('/api/v1/tipe-atribut', ['nama' => 'Daya', 'data_type' => 'decimal', 'min_value' => 10])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['min_value', 'max_value']);
     }
@@ -125,30 +301,157 @@ class AssetAttributeTest extends TestCase
     public function test_definisi_atribut_jenis_dapat_dibaca_untuk_merender_form(): void
     {
         $jenis = $this->master('jenis-aset', ['nama' => 'Kendaraan']);
-        $bahanBakar = $this->master('tipe-atribut', ['nama' => 'Bahan bakar', 'data_type' => 'fixed_list']);
+        $bahanBakar = $this->master('tipe-atribut', ['nama' => 'Bahan bakar', 'data_type' => 'string']);
         $this->values($bahanBakar, [['nilai' => 'Solar', 'urutan' => 1], ['nilai' => 'Bensin', 'urutan' => 0]])->assertOk();
         $this->attach($jenis, [['tipe_atribut_id' => $bahanBakar, 'wajib' => true]])->assertOk();
 
         $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.jenis-aset.read']))
             ->getJson('/api/v1/jenis-aset/'.$jenis.'/atribut-definisi')
             ->assertOk()
-            ->assertJsonPath('data.0.data_type', 'fixed_list')
+            ->assertJsonPath('data.0.data_type', 'string')
             ->assertJsonPath('data.0.wajib', true)
             // Pilihan tersaji terurut sesuai kolom urutan, bukan urutan penyimpanan.
             ->assertJsonPath('data.0.nilai_pilihan.0.nilai', 'Bensin')
             ->assertJsonPath('data.0.nilai_pilihan.1.nilai', 'Solar');
     }
 
+    public function test_enum_lama_ditolak_dan_integer_menolak_pecahan(): void
+    {
+        foreach (['text', 'number', 'fixed_list', 'value_range'] as $legacy) {
+            $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+                ->withHeader('Idempotency-Key', 'legacy-'.$legacy)
+                ->postJson('/api/v1/tipe-atribut', ['nama' => 'Legacy '.$legacy, 'data_type' => $legacy])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors('data_type');
+        }
+
+        $jenis = $this->master('jenis-aset', ['nama' => 'Mesin ukur']);
+        $desimal = $this->master('tipe-atribut', ['nama' => 'Presisi', 'data_type' => 'decimal']);
+        $bulat = $this->master('tipe-atribut', ['nama' => 'Jumlah kanal', 'data_type' => 'integer']);
+        $this->attach($jenis, [
+            ['tipe_atribut_id' => $desimal],
+            ['tipe_atribut_id' => $bulat],
+        ])->assertOk();
+
+        $this->receiveRaw($jenis, [
+            ['tipe_atribut_id' => $desimal, 'nilai' => 1.5],
+            ['tipe_atribut_id' => $bulat, 'nilai' => 2.5],
+        ])->assertStatus(422)->assertJsonValidationErrors('atribut.'.$bulat);
+
+        $this->receive($jenis, [
+            ['tipe_atribut_id' => $desimal, 'nilai' => 1.5],
+            ['tipe_atribut_id' => $bulat, 'nilai' => 2],
+        ]);
+    }
+
+    public function test_tipe_data_dapat_diubah_sebelum_dipakai_lalu_terkunci_permanen(): void
+    {
+        $jenis = $this->master('jenis-aset', ['nama' => 'Pompa']);
+        $atribut = $this->master('tipe-atribut', ['nama' => 'Tekanan', 'data_type' => 'string']);
+        $headers = $this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut'));
+
+        $this->withHeaders($headers)
+            ->patchJson('/api/v1/tipe-atribut/'.$atribut, ['data_type' => 'decimal'])
+            ->assertOk()
+            ->assertJsonPath('data.data_type', 'decimal')
+            ->assertJsonPath('data.data_type_locked', false);
+
+        $this->attach($jenis, [['tipe_atribut_id' => $atribut]])->assertOk();
+        $this->receive($jenis, [['tipe_atribut_id' => $atribut, 'nilai' => 12.5]]);
+
+        $this->withHeaders($headers)
+            ->patchJson('/api/v1/tipe-atribut/'.$atribut, ['data_type' => 'integer'])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'data_type_locked');
+        $this->assertDatabaseHas('m_tipe_atribut', [
+            'tenant_id' => $this->tenantId,
+            'id' => $atribut,
+            'data_type' => 'decimal',
+            'data_type_locked' => true,
+        ]);
+    }
+
+    public function test_values_melindungi_nilai_lama_dan_dapat_dikosongkan_kembali(): void
+    {
+        $jenis = $this->master('jenis-aset', ['nama' => 'Kendaraan proyek']);
+        $warna = $this->master('tipe-atribut', ['nama' => 'Warna', 'data_type' => 'string']);
+        $this->attach($jenis, [['tipe_atribut_id' => $warna]])->assertOk();
+        $this->receive($jenis, [['tipe_atribut_id' => $warna, 'nilai' => 'Biru khusus']]);
+
+        $this->values($warna, [['nilai' => 'Merah']])
+            ->assertStatus(409)
+            ->assertJsonPath('error.code', 'attribute_values_in_use')
+            ->assertJsonPath('error.conflicting_count', 1)
+            ->assertJsonPath('error.conflicting_values.0', 'Biru khusus');
+        $this->assertDatabaseCount('m_tipe_atribut_nilai', 0);
+
+        $this->values($warna, [['nilai' => 'Biru khusus'], ['nilai' => 'Merah']])->assertOk();
+        $this->receiveRaw($jenis, [['tipe_atribut_id' => $warna, 'nilai' => 'Hijau']])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('atribut.'.$warna);
+
+        $this->values($warna, [])->assertOk()->assertJsonCount(0, 'data');
+        $this->receive($jenis, [['tipe_atribut_id' => $warna, 'nilai' => 'Hijau']]);
+    }
+
+    public function test_daftar_tipe_atribut_menghitung_values_dan_jenis_aset_aktif(): void
+    {
+        $jenis = $this->master('jenis-aset', ['nama' => 'Generator']);
+        $atribut = $this->master('tipe-atribut', ['nama' => 'Fase', 'data_type' => 'string']);
+        $this->values($atribut, [['nilai' => 'Satu'], ['nilai' => 'Tiga']])->assertOk();
+        $this->attach($jenis, [['tipe_atribut_id' => $atribut]])->assertOk();
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+            ->getJson('/api/v1/tipe-atribut')
+            ->assertOk()
+            ->assertJsonPath('data.0.values_count', 2)
+            ->assertJsonPath('data.0.asset_types_count', 1);
+    }
+
     public function test_tipe_atribut_yang_masih_dipakai_tidak_dapat_diarsipkan(): void
     {
         $jenis = $this->master('jenis-aset', ['nama' => 'Kompresor']);
-        $atribut = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'number']);
+        $atribut = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'decimal']);
         $this->attach($jenis, [['tipe_atribut_id' => $atribut]])->assertOk();
 
         $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
             ->deleteJson('/api/v1/tipe-atribut/'.$atribut)
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
+    }
+
+    /**
+     * Satu jenis aset dengan tepat satu turunan pada tiap sumbu yang dapat dihitung:
+     * dua tipe atribut terpasang, satu model aset, satu aset diterima.
+     *
+     * @return array{jenis:string,atribut:list<string>,model:string}
+     */
+    private function jenisDenganTurunan(): array
+    {
+        $jenis = $this->master('jenis-aset', ['nama' => 'Kompresor']);
+        $kapasitas = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'decimal']);
+        $bergaransi = $this->master('tipe-atribut', ['nama' => 'Bergaransi', 'data_type' => 'boolean']);
+        $this->attach($jenis, [
+            ['tipe_atribut_id' => $kapasitas],
+            ['tipe_atribut_id' => $bergaransi],
+        ])->assertOk();
+
+        $pabrikan = $this->master('pabrikan-aset', ['nama' => 'Komatsu']);
+        $model = $this->master('model-aset', ['nama' => 'PC200-8', 'pabrikan_aset_id' => $pabrikan, 'jenis_aset_id' => $jenis]);
+
+        $this->receive($jenis, [
+            ['tipe_atribut_id' => $kapasitas, 'nilai' => 10],
+            ['tipe_atribut_id' => $bergaransi, 'nilai' => true],
+        ]);
+
+        return ['jenis' => $jenis, 'atribut' => [$kapasitas, $bergaransi], 'model' => $model];
+    }
+
+    /** @param list<string> $permissions */
+    private function detail(string $jenisId, array $permissions): TestResponse
+    {
+        return $this->withHeaders($this->contextHeaders($this->tenantId, $permissions))
+            ->getJson('/api/v1/jenis-aset/'.$jenisId.'/detail');
     }
 
     /** @param array<string, mixed> $payload */

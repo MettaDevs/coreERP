@@ -65,6 +65,99 @@ AssetPlanningWrite:
       minItems: 1
       items:
         $ref: '#/components/schemas/AssetPlanningDetailWrite'
+WorkOrderWrite:
+  type: object
+  description: >-
+    Work order pemeliharaan. Aset tidak berada di header melainkan pada setiap baris
+    pekerjaan, sehingga satu perintah kerja dapat mencakup beberapa aset. Sebab kerusakan
+    dan tindakan perbaikan tidak diterima di sini karena keduanya adalah temuan saat
+    pengerjaan, bukan bagian dari rencana.
+  required:
+  - legal_entity_id
+  - responsible_org_unit_id
+  - tipe_work_order_id
+  - details
+  properties:
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_id:
+      $ref: '#/components/schemas/Ulid'
+    tipe_work_order_id:
+      $ref: '#/components/schemas/Ulid'
+    tingkat_layanan_id:
+      allOf:
+      - $ref: '#/components/schemas/Ulid'
+      nullable: true
+    keterangan:
+      type: string
+      maxLength: 2000
+      nullable: true
+    penanggung_jawab_user_id:
+      type: string
+      maxLength: 64
+      nullable: true
+    diharapkan_mulai:
+      type: string
+      format: date-time
+      nullable: true
+    diharapkan_selesai:
+      type: string
+      format: date-time
+      nullable: true
+    dijadwalkan_mulai:
+      type: string
+      format: date-time
+      nullable: true
+    dijadwalkan_selesai:
+      type: string
+      format: date-time
+      nullable: true
+    details:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/components/schemas/WorkOrderJobWrite'
+WorkOrderJobWrite:
+  type: object
+  description: Satu baris pekerjaan; lokasi aset disalin server sebagai snapshot saat baris dibuat.
+  required:
+  - asset_id
+  - maintenance_job_type_id
+  properties:
+    asset_id:
+      $ref: '#/components/schemas/Ulid'
+    maintenance_job_type_id:
+      $ref: '#/components/schemas/Ulid'
+    variant_id:
+      allOf:
+      - $ref: '#/components/schemas/Ulid'
+      description: Wajib berasal dari jenis pekerjaan pada baris yang sama.
+      nullable: true
+    trade_id:
+      allOf:
+      - $ref: '#/components/schemas/Ulid'
+      nullable: true
+    ditugaskan_ke_user_id:
+      type: string
+      maxLength: 64
+      nullable: true
+    dijadwalkan_mulai:
+      type: string
+      format: date-time
+      nullable: true
+    dijadwalkan_selesai:
+      type: string
+      format: date-time
+      nullable: true
+    estimasi_jam:
+      type: number
+      minimum: 0
+      maximum: 9999
+      nullable: true
+    catatan:
+      type: string
+      maxLength: 2000
+      nullable: true
 HealthResponse:
   type: object
   required:
@@ -94,6 +187,82 @@ PaginationMeta:
       type: integer
     total:
       type: integer
+FiscalClassification:
+  description: |
+    Referensi aturan fiskal tenant yang berversi. Record ini bukan master bisnis dan
+    tidak memiliki nomor urut; `template_key` dipakai untuk seed idempoten. Group aset
+    menyimpan ID record ini, sedangkan aset menyimpan snapshot ID saat diterima.
+  type: object
+  required:
+  - id
+  - template_key
+  - jurisdiction
+  - label
+  - effective_from
+  - allow_reducing_balance
+  - depreciable
+  - aktif
+  properties:
+    id:
+      $ref: '#/components/schemas/Ulid'
+    template_key:
+      type: string
+      maxLength: 160
+    jurisdiction:
+      type: string
+      maxLength: 32
+    label:
+      type: string
+      maxLength: 150
+    display_label:
+      type: string
+      description: Label siap tampil yang membedakan versi berdasarkan tanggal berlaku.
+    regulation_reference:
+      type:
+      - string
+      - 'null'
+      maxLength: 250
+    effective_from:
+      type: string
+      format: date
+    effective_to:
+      type:
+      - string
+      - 'null'
+      format: date
+    useful_life_years:
+      type:
+      - integer
+      - 'null'
+      minimum: 1
+    straight_line_rate_percent:
+      type:
+      - string
+      - 'null'
+      format: decimal
+    reducing_balance_rate_percent:
+      type:
+      - string
+      - 'null'
+      format: decimal
+    allow_reducing_balance:
+      type: boolean
+    depreciable:
+      type: boolean
+    aktif:
+      type: boolean
+FiscalClassificationList:
+  type: object
+  required:
+  - data
+  - meta
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/components/schemas/FiscalClassification'
+    meta:
+      $ref: '#/components/schemas/PaginationMeta'
 ErrorResponse:
   type: object
   required:
@@ -109,6 +278,27 @@ ErrorResponse:
           type: string
         message:
           type: string
+AttributeValuesConflictResponse:
+  type: object
+  required: [error]
+  properties:
+    error:
+      type: object
+      required: [code, message, conflicting_count, conflicting_values]
+      properties:
+        code:
+          type: string
+          const: attribute_values_in_use
+        message:
+          type: string
+        conflicting_count:
+          type: integer
+          minimum: 1
+        conflicting_values:
+          type: array
+          maxItems: 20
+          items:
+            type: string
 MasterSummary:
   description: Ringkasan induk untuk ditampilkan tanpa permintaan tambahan. Induk yang sudah diarsipkan tetap disertakan.
   type: object
@@ -203,9 +393,7 @@ ModelAset:
     required:
     - pabrikan_aset_id
     - pabrikan_aset
-    - jenis_aset_id
-    - jenis_aset
-    - model_number
+    - asset_count
     properties:
       pabrikan_aset_id:
         $ref: '#/components/schemas/Ulid'
@@ -226,12 +414,24 @@ ModelAset:
         - string
         - 'null'
         maxLength: 150
+      asset_count:
+        description: Aset yang memakai model ini, dibatasi tanggung jawab organisasi pemanggil.
+        type:
+        - integer
+        - 'null'
+        minimum: 0
   examples:
   - id: 01JZ0000000000000000000000
     kode: MDLA-000001
     nama: Kompresor Angin PK-100
     keterangan: Kompresor 100 liter untuk lini produksi.
+    pabrikan_aset_id: 01JZ0000000000000000000001
+    pabrikan_aset:
+      id: 01JZ0000000000000000000001
+      kode: PBRA-000001
+      nama: Pabrikan contoh
     model_number: PK-100
+    asset_count: 3
     aktif: true
     created_at: '2026-07-26T02:00:00.000000Z'
     updated_at: '2026-07-26T02:00:00.000000Z'
@@ -296,34 +496,42 @@ GroupAsetFields:
     Perlakuan finansial yang melekat pada group; padanan field pada "Fixed asset group"
     di Dynamics 365 F&O. Seluruhnya opsional supaya tenant yang belum memetakan
     perlakuan pajaknya tetap dapat membuat group.
+
+    Sifat harta (berwujud, tidak berwujud, hak guna) tidak ada di sini. Klasifikasi itu
+    menentukan akun, dan akun ditentukan posting profile milik Finance; aset yang perlu
+    dibedakan sifatnya dibedakan dengan group tersendiri. Field lama `major_type` ditolak
+    bila masih dikirim.
   type: object
   properties:
-    tipe_harta:
-      description: Kelompok harta berwujud menurut PMK; menentukan masa manfaat dan tarif fiskal.
+    kelompok_harta_fiskal_id:
+      description: Referensi aturan fiskal berversi milik tenant yang dipakai group ini.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    property_type:
+      description: |
+        Apakah perolehan disajikan di neraca. `inventory_item` tetap diinventarisasi
+        tetapi tidak dikapitalisasi; padanan `Continuing property` di F&O dan barang
+        ekstrakomptabel pada penatausahaan barang di Indonesia.
       type:
       - string
       - 'null'
       enum:
-      - kelompok_1
-      - kelompok_2
-      - kelompok_3
-      - kelompok_4
-      - bangunan_permanen
-      - bangunan_non_permanen
-      - bukan_objek_penyusutan
+      - fixed_asset
+      - inventory_item
+      - other
       - null
-    major_type:
-      type:
-      - string
-      - 'null'
-      enum:
-      - tangible
-      - intangible
-      - right_of_use
-      - low_value
-      - null
+    asset_location_id:
+      description: |
+        Lokasi bawaan saat aset diterima. Hanya nilai awal; lokasi yang berlaku tetap
+        hidup pada aset dan penempatannya, dan tidak pernah dibaca ulang dari group.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
     capitalization_threshold:
-      description: Perolehan di bawah nilai ini dibebankan, tidak dikapitalisasi sebagai aset.
+      description: |
+        Perolehan di bawah nilai ini tetap dicatat sebagai aset, tetapi bukunya tidak
+        menyusut. Ambang ini tidak membatalkan pencatatan aset.
       type:
       - string
       - 'null'
@@ -457,6 +665,28 @@ PabrikanAsetList:
         $ref: '#/components/schemas/PabrikanAset'
     meta:
       $ref: '#/components/schemas/PaginationMeta'
+PabrikanAsetDetail:
+  description: |
+    Jumlah model dan aset pada satu pabrikan untuk panel detail. `null` berarti pemanggil
+    tidak berhak membaca resource tersebut, dan dibedakan dari 0 yang berarti benar-benar
+    tidak ada.
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [model_count, asset_count]
+      properties:
+        model_count:
+          description: Model yang belum diarsipkan pada pabrikan ini.
+          type: integer
+          minimum: 0
+          nullable: true
+        asset_count:
+          description: Aset yang memakai pabrikan ini, dibatasi tanggung jawab organisasi pemanggil.
+          type: integer
+          minimum: 0
+          nullable: true
 ItemChecklistMaintenance:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -513,6 +743,179 @@ AnalisaMaintenanceList:
         $ref: '#/components/schemas/AnalisaMaintenance'
     meta:
       $ref: '#/components/schemas/PaginationMeta'
+MaintenanceJobType:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    properties:
+      category_code: {type: string, enum: [preventive, corrective, service, condition_assessment]}
+      maintenance_downtime_activities: {type: boolean}
+      variants_count: {type: integer, minimum: 0}
+MaintenanceJobTypeCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - type: object
+    properties:
+      category_code: {type: string, enum: [preventive, corrective, service, condition_assessment]}
+      maintenance_downtime_activities: {type: boolean}
+MaintenanceJobTypePatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - type: object
+    properties:
+      category_code: {type: string, enum: [preventive, corrective, service, condition_assessment]}
+      maintenance_downtime_activities: {type: boolean}
+MaintenanceJobTypeResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MaintenanceJobType'}}
+MaintenanceJobTypeList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobType'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenanceJobTypeVariant:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    required: [maintenance_job_type_id]
+    properties:
+      maintenance_job_type_id: {$ref: '#/components/schemas/Ulid'}
+      maintenance_job_type: {$ref: '#/components/schemas/MasterSummary'}
+MaintenanceJobTypeVariantCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - type: object
+    required: [maintenance_job_type_id]
+    properties: {maintenance_job_type_id: {$ref: '#/components/schemas/Ulid'}}
+MaintenanceJobTypeVariantResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MaintenanceJobTypeVariant'}}
+MaintenanceJobTypeVariantList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobTypeVariant'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenanceJobTypeDefault:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    properties:
+      maintenance_job_type_id: {$ref: '#/components/schemas/Ulid'}
+      variant_id: {$ref: '#/components/schemas/Ulid', nullable: true}
+      trade: {type: string, nullable: true}
+      hours: {type: number, minimum: 0}
+      items_count: {type: integer, minimum: 0}
+      expenses_count: {type: integer, minimum: 0}
+      fees_count: {type: integer, minimum: 0}
+      checklist_template_id: {$ref: '#/components/schemas/Ulid', nullable: true}
+MaintenanceJobTypeDefaultCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - type: object
+    required: [maintenance_job_type_id]
+    properties:
+      maintenance_job_type_id: {$ref: '#/components/schemas/Ulid'}
+      variant_id: {$ref: '#/components/schemas/Ulid', nullable: true}
+      checklist_template_id: {$ref: '#/components/schemas/Ulid', nullable: true}
+      trade: {type: string, nullable: true}
+      hours: {type: number, minimum: 0}
+MaintenanceJobTypeDefaultResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MaintenanceJobTypeDefault'}}
+MaintenanceJobTypeDefaultList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobTypeDefault'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenanceChecklistVariable:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    properties: {values_count: {type: integer, minimum: 0}}
+MaintenanceChecklistVariableResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MaintenanceChecklistVariable'}}
+MaintenanceChecklistVariableList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistVariable'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenanceChecklistTemplate:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    properties: {checks_count: {type: integer, minimum: 0}}
+MaintenanceChecklistTemplateResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MaintenanceChecklistTemplate'}}
+MaintenanceChecklistTemplateList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistTemplate'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+TipeWorkOrder:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    description: >-
+      Batasan bentuk penugasan. Aturan isi data tidak di sini melainkan pada validasi status
+      work order, supaya kekerasannya dapat berbeda di tiap langkah.
+    properties: {satu_pekerja: {type: boolean}}
+TipeWorkOrderResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/TipeWorkOrder'}}
+TipeWorkOrderList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/TipeWorkOrder'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+TingkatLayanan:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    properties: {urutan: {type: integer, minimum: 0, description: Angka lebih kecil berarti lebih mendesak.}}
+TingkatLayananResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/TingkatLayanan'}}
+TingkatLayananList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/TingkatLayanan'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+TradeResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MasterRecord'}}
+TradeList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+SebabKerusakanResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MasterRecord'}}
+SebabKerusakanList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+TindakanPerbaikanResponse:
+  type: object
+  required: [data]
+  properties: {data: {$ref: '#/components/schemas/MasterRecord'}}
+TindakanPerbaikanList:
+  type: object
+  required: [data, meta]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenanceTransferResponse:
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [remaining, selected]
+      properties:
+        remaining: {type: array, items: {$ref: '#/components/schemas/MasterSummary'}}
+        selected: {type: array, items: {$ref: '#/components/schemas/MasterSummary'}}
 TipeLokasiAset:
   description: |
     Tingkatan lokasi yang dipakai tenant; padanan "Functional location type" di
@@ -618,13 +1021,15 @@ ProfilPenyusutanFields:
     Aturan penyusutan yang dapat dipakai ulang lintas aset; padanan "Depreciation profile"
     di Dynamics 365 F&O. Field mana yang wajib bergantung pada `method`:
     `useful_life_periods` untuk garis lurus dan saldo menurun, `rate_percent` untuk
-    saldo menurun, `manual_schedule` untuk metode manual.
+    saldo menurun, `manual_schedule` untuk metode manual. `effective_from` dan
+    `effective_to` membatasi versi profil; nilai null berarti tidak dibatasi pada sisi itu.
   type: object
   properties:
     method:
       type: string
       enum:
       - straight_line
+      - straight_line_life_remaining
       - reducing_balance
       - manual
       - consumption
@@ -640,6 +1045,18 @@ ProfilPenyusutanFields:
       enum:
       - calendar
       - fiscal
+    effective_from:
+      description: Tanggal mulai profil ini berlaku; null berarti berlaku sejak awal.
+      type:
+      - string
+      - 'null'
+      format: date
+    effective_to:
+      description: Tanggal terakhir profil ini berlaku; null berarti belum berakhir.
+      type:
+      - string
+      - 'null'
+      format: date
     convention:
       description: Belum dibaca mesin penyusutan; diaktifkan bersama buku penyusutan.
       type:
@@ -713,16 +1130,17 @@ BukuPenyusutanFields:
   type: object
   properties:
     posting_layer:
-      description: Lapisan pembukuan buku ini. `tax` lazim dipakai buku fiskal.
+      description: Lapisan posting buku ini. `tax` lazim dipakai buku fiskal.
       type: string
       enum: [current, operations, tax, none]
       default: current
     export_to_backoffice:
       description: |
-        App ini tidak menjurnal; ia mengekspor periode final ke backoffice. Buku fiskal
-        umumnya dimatikan agar backoffice tidak menjurnal dua kali untuk aset yang sama.
+        App ini belum menjurnal. Saat aktif, field ini hanya menyiapkan bridge internal;
+        pengiriman ke Finance baru boleh dilakukan setelah kontrak posting dan ownership
+        COA tersedia.
       type: boolean
-      default: true
+      default: false
     round_off_depreciation:
       description: Kelipatan nominal pembulatan penyusutan. Nol berarti tanpa pembulatan.
       type:
@@ -731,6 +1149,7 @@ BukuPenyusutanFields:
       minimum: 0
       format: decimal
     depreciation_profile_id:
+      description: Profil utama buku; boleh kosong bila setiap group memberi profil pada matriksnya.
       oneOf:
       - $ref: '#/components/schemas/Ulid'
       - type: 'null'
@@ -774,15 +1193,16 @@ BukuPenyusutanList:
 GroupBukuPenyusutanRow:
   description: |
     Satu baris matriks group x buku; padanan "Fixed asset group/book" di F&O. Nilainya
-    menjadi default yang disalin ke buku aset saat aset diterima, bukan acuan hidup:
-    mengubah matriks tidak menulis ulang aset yang sudah berjalan.
+    adalah sumber konfigurasi efektif yang disalin ke buku aset saat aset diterima, bukan
+    acuan hidup: mengubah matriks tidak menulis ulang aset yang sudah berjalan. Profil
+    utama harus berasal dari baris ini atau header buku sebelum aset dapat ditempatkan.
   type: object
   required: [buku_id]
   properties:
     buku_id:
       $ref: '#/components/schemas/Ulid'
     depreciation_profile_id:
-      description: Mengalahkan profil bawaan buku untuk group ini. Kosong berarti memakai profil buku.
+      description: Profil utama untuk group ini. Kosong berarti memakai profil utama buku.
       oneOf:
       - $ref: '#/components/schemas/Ulid'
       - type: 'null'
@@ -851,20 +1271,47 @@ TipeAtributFields:
   properties:
     data_type:
       description: |
-        Menentukan kolom mana yang dipakai menyimpan nilainya pada aset dan bagaimana
-        field-nya dirender. `fixed_list` mengambil pilihan dari daftar nilai atribut,
-        `value_range` dibatasi `min_value` dan `max_value`.
+        Tipe dasar nilai, terpisah dari batasannya. `string` tanpa Values menjadi teks
+        bebas dan dengan Values menjadi dropdown. `decimal`/`integer` tanpa min/max
+        menerima angka bebas dan dengan min/max menegakkan rentang.
       type: string
-      enum: [text, number, boolean, date, fixed_list, value_range]
+      enum: [string, decimal, integer, date, boolean]
+    satuan_id:
+      description: |
+        Satuan milik Core yang dirujuk atribut ini. Hanya bermakna untuk `decimal` dan
+        `integer`; dikirim untuk tipe lain akan ditolak. Inilah yang ditulis klien —
+        `satuan` tidak diterima sebagai masukan.
+      type: [string, 'null']
+      format: ulid
     satuan:
+      description: |
+        Kode satuan hasil rujukan di atas, disalin saat disimpan supaya layar dapat
+        menampilkan "cm" tanpa menghubungi Core. Hanya keluaran; kiriman diabaikan.
+      readOnly: true
       type: [string, 'null']
       maxLength: 50
     min_value:
+      description: Batas minimum opsional. Wajib diisi bersama `max_value` dan hanya berlaku untuk decimal/integer.
       type: [string, 'null']
       format: decimal
     max_value:
+      description: Batas maksimum opsional. Wajib diisi bersama `min_value` dan hanya berlaku untuk decimal/integer.
       type: [string, 'null']
       format: decimal
+    values_count:
+      description: Jumlah Values yang belum diarsipkan. Hanya keluaran.
+      readOnly: true
+      type: integer
+      minimum: 0
+    asset_types_count:
+      description: Jumlah jenis aset yang masih memasang atribut ini. Hanya keluaran.
+      readOnly: true
+      type: integer
+      minimum: 0
+    data_type_locked:
+      description: Bernilai benar setelah atribut pernah berhasil disimpan pada aset. Hanya keluaran.
+      readOnly: true
+      type: boolean
 TipeAtribut:
   description: |
     Padanan "Attribute type" di Dynamics 365 F&O. Inilah cara menambah pembeda aset
@@ -873,10 +1320,14 @@ TipeAtribut:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
   - $ref: '#/components/schemas/TipeAtributFields'
+  - type: object
+    required: [data_type, satuan_id, satuan, min_value, max_value, values_count, asset_types_count, data_type_locked]
 TipeAtributCreate:
   allOf:
   - $ref: '#/components/schemas/MasterCreate'
   - $ref: '#/components/schemas/TipeAtributFields'
+  - type: object
+    required: [data_type]
 TipeAtributPatch:
   allOf:
   - $ref: '#/components/schemas/MasterPatch'
@@ -969,6 +1420,36 @@ JenisAsetAtributList:
             type: boolean
           urutan:
             type: integer
+JenisAsetDetail:
+  description: |
+    Jumlah data yang menggantung pada satu jenis aset, untuk kotak angka pada panel
+    detailnya. `null` berarti pemanggil tidak berhak membaca resource tersebut, dan
+    sengaja dibedakan dari 0 yang berarti benar-benar tidak ada.
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [atribut_count, model_count, asset_count]
+      properties:
+        atribut_count:
+          description: Tipe atribut yang terpasang pada jenis aset ini.
+          type: integer
+          minimum: 0
+        model_count:
+          description: |
+            Model aset yang memakai jenis ini. `null` bila pemanggil tidak memegang
+            `management-aset.model-aset.read`.
+          type: integer
+          minimum: 0
+          nullable: true
+        asset_count:
+          description: |
+            Aset yang memakai jenis ini, dibatasi tanggung jawab organisasi pemanggil.
+            `null` bila pemanggil tidak memegang `management-aset.aset.read`.
+          type: integer
+          minimum: 0
+          nullable: true
 JenisAsetAtributDefinisi:
   description: |
     Definisi atribut satu jenis aset, siap dipakai form penerimaan aset untuk merender

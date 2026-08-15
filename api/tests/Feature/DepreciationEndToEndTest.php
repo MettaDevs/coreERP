@@ -171,10 +171,13 @@ class DepreciationEndToEndTest extends TestCase
 
     public function test_payload_export_tidak_membawa_resolusi_finance(): void
     {
-        $book = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200);
+        $book = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200, export: true);
         $this->fastForward($book, 1);
 
         $payload = json_decode((string) DB::table('tr_export_penyusutan')->value('payload'), true);
+        // Barisnya harus benar-benar ada; tanpa ini `null` akan lolos sebagai "tidak
+        // membawa akun" dan test berhenti membuktikan apa pun.
+        $this->assertIsArray($payload, 'Buku yang mengekspor harus menghasilkan satu baris export.');
         $this->assertArrayNotHasKey('akun', $payload);
         $this->assertArrayNotHasKey('posting_layer', $payload);
         $this->assertArrayNotHasKey('financial_dimension_org_unit_id', $payload);
@@ -257,6 +260,10 @@ class DepreciationEndToEndTest extends TestCase
     /**
      * Menyiapkan satu aset lengkap dengan bukunya dan mengembalikan id buku aset.
      *
+     * Ekspor ke backoffice mati kecuali diminta, mengikuti default produk: bridge ke
+     * Finance harus dipilih secara sadar. Test yang memeriksa isi payload ekspor wajib
+     * menyalakannya sendiri, supaya jelas bahwa ekspor itu bagian dari skenarionya.
+     *
      * @param  array<string, mixed>  $profile
      */
     private function scenario(
@@ -265,11 +272,16 @@ class DepreciationEndToEndTest extends TestCase
         float $residual = 0,
         string $convention = 'full_month',
         string $placedInService = '2026-06-15',
+        bool $export = false,
     ): string {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(6)]);
         $jenis = $this->master('jenis-aset', ['nama' => 'Jenis '.Str::random(6)]);
         $profilId = $this->profil('Profil '.Str::random(6), $profile);
-        $buku = $this->master('buku-penyusutan', ['nama' => 'Buku '.Str::random(6), 'depreciation_profile_id' => $profilId]);
+        $buku = $this->master('buku-penyusutan', [
+            'nama' => 'Buku '.Str::random(6),
+            'depreciation_profile_id' => $profilId,
+            'export_to_backoffice' => $export,
+        ]);
         $this->matrix($group, [[
             'buku_id' => $buku,
             'useful_life_periods' => $profile['useful_life_periods'] ?? null,

@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
  * Ia sengaja bukan MasterDataController: baris penghubung bukan master. Ia tidak punya
  * kode, tidak menerbitkan nomor dari Core, dan tidak berdiri sendiri di navigasi.
  *
- * Semantiknya adalah ganti-seluruh-himpunan lewat satu `PUT` berisi daftar penuh.
+ * Saat disimpan, satu `PUT` berisi daftar penuh menggantikan seluruh baris lama.
  * Karena itu permintaan yang sama dapat diulang tanpa efek tambahan, sehingga tidak
  * memerlukan idempotency key per baris. Hak akses memakai permission pemiliknya,
  * sebab baris ini memang bagian dari pengelolaan pemilik.
@@ -52,6 +52,15 @@ abstract class MasterLinkController extends Controller
     /** Kolom yang disajikan pada respons. @return list<string> */
     abstract protected function columns(): array;
 
+    /**
+     * Validasi kombinasi seluruh baris sebelum transaksi mengganti himpunan lama.
+     * Hook ini sengaja berada setelah validasi per-field agar controller dapat memakai
+     * default dari owner/book tanpa menyentuh data yang belum tervalidasi.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    protected function afterRowsValidated(string $tenantId, string $ownerId, array $rows): void {}
+
     public function index(Request $request, string $ownerId): JsonResponse
     {
         $this->requirePermission($request, 'read');
@@ -72,7 +81,6 @@ abstract class MasterLinkController extends Controller
             $rules['rows.*.'.$column] = $rule;
         }
         $data = $request->validate($rules);
-
         DB::transaction(function () use ($tenantId, $ownerId, $data): void {
             // Mengunci baris pemilik lebih dahulu supaya dua penyuntingan bersamaan pada
             // pemilik yang sama berjalan berurutan.
@@ -85,6 +93,10 @@ abstract class MasterLinkController extends Controller
                 ->where(['tenant_id' => $tenantId, 'id' => $ownerId])
                 ->lockForUpdate()
                 ->first();
+
+            // Aturan yang membaca keadaan pemilik/anak harus diperiksa setelah lock agar
+            // hasilnya tetap benar bila ada penulisan lain pada saat yang sama.
+            $this->afterRowsValidated($tenantId, $ownerId, $data['rows']);
 
             // Baris yang hilang dari kiriman diarsipkan, bukan dihapus fisik, supaya
             // buku aset yang sudah terlanjur menyalin aturannya tetap dapat ditelusuri.

@@ -3,5 +3,8 @@
 @source '../node_modules/@apperp/ui/dist';
 
 * { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+html:has([data-layout="master-detail"]),
+body:has([data-layout="master-detail"]) { overflow: hidden; }
 body { margin: 0; min-width: 320px; }
 main { width: 100%; }

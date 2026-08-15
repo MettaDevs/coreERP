@@ -8,7 +8,7 @@ import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
 import { Textarea } from '@apperp/ui/textarea';
-import { api, errorMessage } from '../../api';
+import { api, errorMessage, newIdempotencyKey } from '../../api';
 import { toast } from 'sonner';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
@@ -232,7 +232,7 @@ export default function PlanningPage({ context, permissions }: { context: Contex
             } else {
                 await api('/perencanaan-aset', {
                     method: 'POST',
-                    headers: { 'Idempotency-Key': crypto.randomUUID() },
+                    headers: { 'Idempotency-Key': newIdempotencyKey() },
                     body: JSON.stringify(body),
                 });
             }

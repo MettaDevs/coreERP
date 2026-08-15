@@ -13,6 +13,7 @@ Database ini hanya dimiliki Management Aset. Referensi tenant dan unit organisas
 | Tabel | Foreign key |
 | --- | --- |
 | `m_group_aset` | — |
+| `m_kelompok_harta_fiskal` | Referensi fiskal tenant; tidak memakai Number Sequence |
 | `m_jenis_aset` | — |
 | `m_model_aset` | `(tenant_id, pabrikan_aset_id)` → `m_pabrikan_aset (tenant_id, id)`, `(tenant_id, jenis_aset_id)` → `m_jenis_aset (tenant_id, id)` |
 | `m_kondisi_aset` | — |
@@ -22,8 +23,54 @@ Database ini hanya dimiliki Management Aset. Referensi tenant dan unit organisas
 | `m_item_checklist_maintenance` | — |
 | `m_analisa_maintenance` | — |
 | `m_profil_penyusutan` | — |
+| `m_tipe_atribut` | — |
+| `m_tipe_atribut_nilai` | `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut (tenant_id, id)` |
+| `m_jenis_aset_atribut` | `(tenant_id, jenis_aset_id)` → `m_jenis_aset`, `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut` |
 
-Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`tipe_harta`, `major_type`, `capitalization_threshold`, `posting_layers`), `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
+Maintenance setup menambah tabel `m_maintenance_job_type`, `m_maintenance_job_type_variant`,
+`m_maintenance_job_type_default`, `m_maintenance_job_type_asset_type`,
+`m_maintenance_checklist_variable`, `m_maintenance_checklist_variable_value`,
+`m_maintenance_checklist_template`, dan `m_maintenance_checklist_template_line`. Semua tabel
+ini tenant-scoped dan memakai foreign key gabungan dengan `tenant_id` untuk mencegah
+referensi lintas tenant.
+
+`m_maintenance_job_type_requirement` sudah dihapus. Skill dan sertifikat adalah kompetensi
+milik Human Resources yang dipasang pada pekerja; job type hanya boleh menyimpan persyaratan
+yang merujuk kompetensi itu, bukan menuliskannya sebagai teks bebas di database aset.
+Persyaratan dibangun ulang sebagai referensi ke Workforce Core setelah kontraknya tersedia,
+bersama penjadwalan berbasis kompetensi yang menjadi satu-satunya pembacanya.
+
+Work order menambah master `m_tipe_work_order`, `m_tingkat_layanan`, `m_trade`,
+`m_sebab_kerusakan`, dan `m_tindakan_perbaikan`, serta transaksi `tr_pemeliharaan_aset`,
+`tr_pemeliharaan_aset_details`, `tr_pemeliharaan_aset_checklist`, dan
+`tr_pemeliharaan_aset_status_log`.
+
+`m_validasi_status_work_order` menyimpan aturan yang harus dipenuhi sebelum work order boleh
+berpindah ke satu status. Ia melekat pada status tujuan, bukan pada tipe work order,
+sehingga pemeriksaan yang sama dapat longgar saat pekerjaan dijadwalkan dan ketat saat
+dinyatakan selesai. Tiap aturan punya tingkat keparahan: `informasi` hanya dicatat,
+`peringatan` membiarkan transisi berjalan tetapi tersimpan di kolom `peringatan` pada jejak
+status, dan `error` menolak transisi. Barisnya matriks tetap status x aturan yang disemai
+saat provisioning; tenant hanya mengubah keaktifan dan keparahannya.
+
+Master maintenance memakai nomor tenant-scoped `JPMA`, `VJMA`, `DJMA`, `VCMA`, dan `TCMA`.
+Seed Indonesia bersifat idempoten melalui `creation_key`; baris yang sudah ada tidak ditimpa
+sehingga tenant dapat menyesuaikan kategori, trade, varian, dan checklistnya.
+
+Seed katalog Indonesia–Asia pada `m_pabrikan_aset` dan `m_model_aset` memakai sub-template
+`id:manufacturer-models:indonesia-asia:v1`. Isinya 68 pabrikan dan 209 model/seri; setiap
+model menunjuk pabrikan yang sama tenant, sementara `jenis_aset_id` dan `model_number`
+dibiarkan `NULL` agar tenant dapat mengaitkannya kemudian.
+
+Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `asset_location_id`, `capitalization_threshold`, `posting_layers`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
+
+`m_tipe_atribut.data_type` menyimpan tipe dasar `string`, `decimal`, `integer`, `date`, atau `boolean`. Values aktif berada terpisah di `m_tipe_atribut_nilai`; min/max opsional berada pada tipe atribut dan wajib berpasangan untuk angka. `data_type_locked` menjadi benar saat nilai pertama berhasil ditulis ke `tr_aset_atribut` dan tidak dibuka kembali saat nilai aset dikoreksi atau dihapus.
+
+`m_kelompok_harta_fiskal` memiliki `template_key`, yurisdiksi, label, metadata regulasi,
+tanggal berlaku, umur manfaat, tarif penyusutan, dan penanda aktif. `template_key` hanya
+untuk seed idempoten; ia bukan nomor bisnis. `tr_penerimaan_aset.kelompok_harta_fiskal_id`
+adalah snapshot versi yang dipakai ketika aset diterima, sehingga perubahan referensi group
+tidak menulis ulang histori aset.
 
 `m_lokasi_aset.org_unit_id` dan `tr_penerimaan_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
 
@@ -44,6 +91,7 @@ Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation
 | `tr_dokumen_siklus_aset` | Dokumen lifecycle yang sudah tersedia. |
 | `tr_perencanaan_aset` | Header perencanaan aset per entitas legal dan unit kerja. |
 | `tr_perencanaan_aset_details` | Rincian jenis aset, jumlah, harga perkiraan, dan spesifikasi yang diminta. |
+| `tr_aset_atribut` | Nilai atribut bertipe per aset; tipe dasar pemiliknya dikunci saat baris pertama tersimpan. |
 
 Konvensi tabel: master memakai `m_`; transaksi memakai `tr_`; dan detail
 transaksi yang memiliki header sendiri memakai akhiran `_details`.

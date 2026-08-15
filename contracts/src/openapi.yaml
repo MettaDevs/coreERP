@@ -33,12 +33,16 @@ tags:
 - name: Lifecycle aset
   description: Dokumen lifecycle aset, register, mutasi, dan pelepasan tanpa jurnal GL.
 - name: Penyusutan
-  description: Proposal dan finalisasi penyusutan beserta export bridge backoffice.
+  description: Proposal dan finalisasi penyusutan beserta bridge internal tanpa posting GL.
+- name: Reference data
+  description: Referensi konfigurasi yang dibaca oleh form dan proses Management Aset.
 x-bundle:
   paths:
   - paths/platform.yaml
   - paths/master-data.yaml
+  - paths/maintenance.yaml
   - paths/aset.yaml
+  - paths/pemeliharaan-aset.yaml
   - paths/penyusutan.yaml
   components:
     securitySchemes: components/security.yaml

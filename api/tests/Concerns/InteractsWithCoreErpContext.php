@@ -50,7 +50,10 @@ trait InteractsWithCoreErpContext
             'iat' => time(),
             'exp' => time() + 300,
         ];
-        foreach (['legal_entity_id', 'org_unit_id', 'user_id', 'data_policies'] as $claim) {
+        // `sub` ikut dapat ditentukan karena identitas pengguna dibaca dari sana oleh
+        // middleware konteks; fitur yang menyaring per pengguna, seperti daftar pekerjaan
+        // milik seorang teknisi, tidak dapat diuji tanpa mengendalikannya.
+        foreach (['sub', 'legal_entity_id', 'org_unit_id', 'user_id', 'data_policies'] as $claim) {
             if (array_key_exists($claim, $claims)) {
                 $payloadData[$claim] = $claims[$claim];
             }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\transaksi\DokumenSiklusAset;
 
 use App\Http\Controllers\Controller;
 use App\Services\NumberSequenceClient;
+use App\Services\NumberSequenceException;
 use App\Services\WorkflowClient;
 use App\Support\OrganizationScope;
 use Illuminate\Http\JsonResponse;
@@ -15,7 +16,13 @@ use RuntimeException;
 
 class DokumenSiklusAsetController extends Controller
 {
-    private const TYPES = ['permintaan-pembelian-aset', 'pemeliharaan-aset', 'dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'];
+    /**
+     * `pemeliharaan-aset` sengaja tidak lagi di sini. Ia dulu sebuah catatan satu baris
+     * dan kini menjadi work order dengan baris pekerjaan, checklist, penugasan, dan
+     * status pengerjaan sendiri; lihat `transaksi\PemeliharaanAset`. Baris lama pada
+     * `tr_dokumen_siklus_aset` tidak disentuh, hanya tidak lagi dilayani route ini.
+     */
+    private const TYPES = ['permintaan-pembelian-aset', 'dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'];
 
     public function indexByRoute(Request $request): JsonResponse
     {
@@ -48,7 +55,7 @@ class DokumenSiklusAsetController extends Controller
             'nilai' => ['nullable', 'numeric', 'min:0'], 'keterangan' => ['nullable', 'string', 'max:2000'],
         ]);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
-        if (in_array($type, ['pemeliharaan-aset', 'dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'], true)) {
+        if (in_array($type, ['dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'], true)) {
             validator($data, ['asset_id' => ['required']])->validate();
         }
         if ($data['asset_id'] ?? null) {
@@ -75,17 +82,43 @@ class DokumenSiklusAsetController extends Controller
         }
         try {
             $kode = $numbers->issue('management-aset.'.$type, $tenant, $type.':'.$key, (string) $data['legal_entity_id']);
-        } catch (RuntimeException $e) {
-            return response()->json(['error' => ['code' => 'number_sequence_unavailable', 'message' => $e->getMessage()]], 503);
+        } catch (NumberSequenceException $e) {
+            return response()->json(['error' => ['code' => $e->errorCode, 'message' => $e->getMessage()]], $e->status);
         }
         $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'jenis_dokumen' => $type, 'kode' => $kode, 'legal_entity_id' => $data['legal_entity_id'], 'responsible_org_unit_id' => $data['responsible_org_unit_id'], 'asset_id' => $data['asset_id'] ?? null, 'tanggal' => $data['tanggal'], 'status' => $type === 'dekomisioning-aset' ? 'submitted' : 'draft', 'nilai' => $data['nilai'] ?? null, 'keterangan' => $data['keterangan'] ?? null, 'created_at' => now(), 'updated_at' => now()];
-        DB::table('tr_dokumen_siklus_aset')->insert($record);
+        DB::transaction(function () use ($record, $type, $tenant): void {
+            DB::table('tr_dokumen_siklus_aset')->insert($record);
+            if (in_array($type, ['penjualan-aset', 'pemusnahan-aset'], true)) {
+                $this->dispose($tenant, (string) $record['asset_id'], (string) $record['tanggal']);
+            }
+        });
         if ($type === 'dekomisioning-aset') {
             $this->submitWorkflow((object) $record, $tenant, $key, $workflow);
         }
         $record = (array) DB::table('tr_dokumen_siklus_aset')->where('id', $record['id'])->first();
 
         return response()->json(['data' => $record], 201);
+    }
+
+    /**
+     * Melepas aset dan menutup buku penyusutannya.
+     *
+     * Penjualan dan pemusnahan adalah akhir masa hidup aset di subledger ini. Tanpa
+     * langkah ini `lifecycle_state` tidak pernah menjadi `disposed` — nilainya hanya
+     * dibaca sebagai penjaga di beberapa tempat dan tidak pernah ditulis — sehingga aset
+     * yang sudah dijual tetap muncul sebagai buku aktif dan masih menerima proposal
+     * penyusutan bulan berikutnya.
+     *
+     * Ini murni subledger: menutup buku tidak menjurnal apa pun.
+     */
+    private function dispose(string $tenant, string $assetId, string $tanggal): void
+    {
+        DB::table('tr_penerimaan_aset')
+            ->where(['tenant_id' => $tenant, 'id' => $assetId])
+            ->update(['lifecycle_state' => 'disposed', 'updated_at' => now()]);
+        DB::table('tr_buku_aset')
+            ->where(['tenant_id' => $tenant, 'asset_id' => $assetId, 'status' => 'active'])
+            ->update(['status' => 'closed', 'closed_on' => $tanggal, 'updated_at' => now()]);
     }
 
     private function submitWorkflow(object $record, string $tenant, string $key, WorkflowClient $workflow): void

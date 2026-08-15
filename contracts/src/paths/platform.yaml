@@ -47,3 +47,25 @@
         description: Daftar satuan aktif
       '503':
         description: Layanan satuan Core belum dapat dihubungi
+/api/v1/reference-data/kelompok-harta-fiskal:
+  get:
+    tags:
+    - Reference data
+    operationId: listFiscalClassifications
+    summary: Menampilkan referensi klasifikasi fiskal aktif untuk Group aset
+    parameters:
+    - $ref: '#/components/parameters/Search'
+    - $ref: '#/components/parameters/ActiveFilter'
+    - $ref: '#/components/parameters/Page'
+    - $ref: '#/components/parameters/PerPage'
+    responses:
+      '200':
+        description: Daftar referensi klasifikasi fiskal tenant aktif
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FiscalClassificationList'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'

@@ -4,14 +4,16 @@ import { Card, CardContent } from '@apperp/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
 import { api, errorMessage, setContextToken } from './api';
 import MasterPage from './master/MasterPage';
+import MasterDetailPage, { DETAIL_LAYOUT_RESOURCES } from './master/detail/MasterDetailPage';
 import AssetPage from './transactions/inventarisasi-aset/AssetPage';
 import DepreciationPage from './transactions/inventarisasi-aset/DepreciationPage';
 import LifecycleDocumentPage from './transactions/_shared/LifecycleDocumentPage';
 import MutationPage from './transactions/mutasi-aset/MutationPage';
 import MonitoringPage from './transactions/monitoring-aset/MonitoringPage';
 import PlanningPage from './transactions/perencanaan-aset/PlanningPage';
+import StatusValidationPage from './transactions/pemeliharaan-aset/StatusValidationPage';
+import WorkOrderPage from './transactions/pemeliharaan-aset/WorkOrderPage';
 import { config as permintaanPembelianAset } from './transactions/permintaan-pembelian-aset/config';
-import { config as pemeliharaanAset } from './transactions/pemeliharaan-aset/config';
 import { config as dekomisioningAset } from './transactions/dekomisioning-aset/config';
 import { config as penjualanAset } from './transactions/penjualan-aset/config';
 import { config as pemusnahanAset } from './transactions/pemusnahan-aset/config';
@@ -41,7 +43,7 @@ export default function App() {
 
     // Hanya master yang boleh dilihat pengguna ini yang muncul pada navigasi.
     const visible = useMemo(
-        () => MASTERS.filter((master) => permissions.includes(permission(master.resource, 'read'))),
+        () => MASTERS.filter((master) => master.showInNavigation !== false && permissions.includes(permission(master.resource, 'read'))),
         [permissions],
     );
     const active = visible.find((master) => master.resource === hashResource) ?? visible[0];
@@ -90,7 +92,7 @@ export default function App() {
     }
 
     if (hashResource === 'aset' && permissions.includes('management-aset.aset.read')) {
-        return <main><AssetPage context={assetContext} /></main>;
+        return <main><AssetPage context={assetContext} canUpdate={permissions.includes('management-aset.aset.update')} /></main>;
     }
     if (hashResource === 'penyusutan' && permissions.includes('management-aset.penyusutan.read')) return <main><DepreciationPage canCreate={permissions.includes('management-aset.penyusutan.create')} canFinalize={permissions.includes('management-aset.penyusutan.finalize')} canCorrect={permissions.includes('management-aset.penyusutan.correct')} /></main>;
     if (hashResource === 'fixed-asset-parameters' && permissions.includes('management-aset.fixed-asset-parameters.read')) return <main><FixedAssetSetupPlaceholderPage kind="parameters" /></main>;
@@ -99,8 +101,12 @@ export default function App() {
     if (hashResource === 'mutasi-aset' && permissions.includes('management-aset.mutasi-aset.read')) return <main><MutationPage /></main>;
     if (hashResource === 'monitoring-aset' && permissions.includes('management-aset.monitoring-aset.read')) return <main><MonitoringPage /></main>;
     if (hashResource === 'perencanaan-aset' && permissions.includes('management-aset.perencanaan-aset.read')) return <main><PlanningPage context={assetContext} permissions={permissions} /></main>;
+    if (hashResource === 'validasi-status-work-order' && permissions.includes('management-aset.validasi-status-work-order.read')) return <main><StatusValidationPage permissions={permissions} /></main>;
+    // Pemeliharaan aset tidak lagi memakai halaman dokumen siklus generik: ia kini work
+    // order dengan baris pekerjaan, checklist, penugasan, dan status pengerjaan sendiri.
+    if (hashResource === 'pemeliharaan-aset' && permissions.includes('management-aset.pemeliharaan-aset.read')) return <main><WorkOrderPage context={assetContext} permissions={permissions} /></main>;
     const lifecycle = Object.fromEntries(
-        [permintaanPembelianAset, pemeliharaanAset, dekomisioningAset, penjualanAset, pemusnahanAset]
+        [permintaanPembelianAset, dekomisioningAset, penjualanAset, pemusnahanAset]
             .map((config) => [config.resource, config]),
     );
     if (lifecycle[hashResource] && permissions.includes(`management-aset.${hashResource}.read` as Permission)) return <main><LifecycleDocumentPage context={assetContext} config={lifecycle[hashResource]} /></main>;
@@ -113,9 +119,16 @@ export default function App() {
         );
     }
 
+    // Sementara hanya sebagian master yang memakai tata letak daftar-detail. Saat seluruh
+    // master pindah, yang dihapus adalah cabang ini beserta MasterPage.
+    const Page = DETAIL_LAYOUT_RESOURCES.includes(active.resource) ? MasterDetailPage : MasterPage;
+
     return (
-        <main>
-            <MasterPage key={active.resource} config={active} permissions={permissions} />
+        <main
+            data-layout={Page === MasterDetailPage ? 'master-detail' : undefined}
+            className={Page === MasterDetailPage ? 'h-full min-h-0 overflow-hidden' : undefined}
+        >
+            <Page key={active.resource} config={active} permissions={permissions} />
         </main>
     );
 }

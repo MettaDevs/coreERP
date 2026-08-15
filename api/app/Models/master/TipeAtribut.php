@@ -12,25 +12,27 @@ use App\Models\MasterData;
  */
 class TipeAtribut extends MasterData
 {
-    public const DATA_TYPES = ['text', 'number', 'boolean', 'date', 'fixed_list', 'value_range'];
+    public const DATA_TYPES = ['string', 'decimal', 'integer', 'date', 'boolean'];
 
-    /** Tipe yang nilainya dipilih dari daftar tetap milik atribut itu sendiri. */
-    public const LIST_TYPE = 'fixed_list';
-
-    /** Tipe yang nilainya angka dan dibatasi min/max. */
-    public const RANGE_TYPE = 'value_range';
+    /**
+     * Tipe yang satuannya bermakna. Teks, ya/tidak, tanggal, dan daftar tetap tidak pernah
+     * membawa satuan, jadi satuan yang terkirim untuk tipe-tipe itu diabaikan, bukan
+     * disimpan diam-diam untuk kemudian tampil di tempat yang tidak diharapkan.
+     */
+    public const NUMERIC_TYPES = ['decimal', 'integer'];
 
     protected $table = 'm_tipe_atribut';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',
-        'data_type', 'satuan', 'min_value', 'max_value',
+        'data_type', 'data_type_locked', 'satuan_id', 'satuan', 'min_value', 'max_value',
     ];
 
     protected function casts(): array
     {
         return [
             ...parent::casts(),
+            'data_type_locked' => 'boolean',
             'min_value' => 'decimal:6',
             'max_value' => 'decimal:6',
         ];

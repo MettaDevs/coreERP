@@ -131,9 +131,12 @@ class AssetRegisterTest extends TestCase
 
     private function receive(): string
     {
+        $classification = $this->classification();
+        $this->configureReadyBook($classification['group_aset_id']);
+
         return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
             ->withHeader('Idempotency-Key', 'receipt-test')->postJson('/api/v1/aset', [
-                'legal_entity_id' => (string) Str::ulid(), ...$this->classification(),
+                'legal_entity_id' => (string) Str::ulid(), ...$classification,
                 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
             ])->assertCreated()->json('data.id');
     }
@@ -152,5 +155,29 @@ class AssetRegisterTest extends TestCase
         DB::table('m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
 
         return ['group_aset_id' => $group, 'jenis_aset_id' => $type];
+    }
+
+    private function configureReadyBook(string $groupId): void
+    {
+        $now = now();
+        $profile = (string) Str::ulid();
+        $book = (string) Str::ulid();
+        DB::table('m_profil_penyusutan')->insert([
+            'id' => $profile, 'tenant_id' => $this->tenantId, 'creation_key' => 'profile-ready-'.Str::ulid(),
+            'kode' => 'P'.Str::random(8), 'nama' => 'Profil siap', 'aktif' => true,
+            'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar',
+            'useful_life_periods' => 12, 'created_at' => $now, 'updated_at' => $now,
+        ]);
+        DB::table('m_buku_penyusutan')->insert([
+            'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-ready-'.Str::ulid(),
+            'kode' => 'B'.Str::random(8), 'nama' => 'Buku siap', 'aktif' => true,
+            'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => $profile,
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+        DB::table('m_group_buku_penyusutan')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'group_aset_id' => $groupId,
+            'buku_id' => $book, 'depreciate' => true, 'useful_life_periods' => 12,
+            'convention' => 'full_month', 'created_at' => $now, 'updated_at' => $now,
+        ]);
     }
 }

@@ -52,6 +52,11 @@ class MasterDataAsetTest extends TestCase
             'pabrikan aset' => ['pabrikan-aset', 'm_pabrikan_aset'],
             'item checklist maintenance' => ['item-checklist-maintenance', 'm_item_checklist_maintenance'],
             'analisa maintenance' => ['analisa-maintenance', 'm_analisa_maintenance'],
+            'tipe work order' => ['tipe-work-order', 'm_tipe_work_order'],
+            'tingkat layanan' => ['tingkat-layanan', 'm_tingkat_layanan'],
+            'trade' => ['trade', 'm_trade'],
+            'sebab kerusakan' => ['sebab-kerusakan', 'm_sebab_kerusakan'],
+            'tindakan perbaikan' => ['tindakan-perbaikan', 'm_tindakan_perbaikan'],
         ];
     }
 
@@ -295,18 +300,46 @@ class MasterDataAsetTest extends TestCase
         Http::assertSentCount(4);
     }
 
+    public function test_reference_fiskal_hanya_menampilkan_data_tenant_aktif(): void
+    {
+        $reference = $this->fiscalReference();
+        $this->fiscalReference((string) Str::ulid(), 'tenant-lain:kelompok-1');
+        DB::table('m_kelompok_harta_fiskal')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $this->tenantId,
+            'template_key' => 'test:tidak-aktif',
+            'jurisdiction' => 'ID',
+            'label' => 'Tidak aktif',
+            'effective_from' => '2023-07-17',
+            'allow_reducing_balance' => false,
+            'depreciable' => true,
+            'aktif' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.group-aset.read']))
+            ->getJson('/api/v1/reference-data/kelompok-harta-fiskal?aktif=true&per_page=100')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $reference)
+            ->assertJsonPath('data.0.display_label', 'Kelompok uji — berlaku 17/07/2023')
+            ->assertJsonPath('meta.total', 1);
+    }
+
     public function test_group_aset_menyimpan_dan_menyajikan_field_finansialnya(): void
     {
+        $reference = $this->fiscalReference();
         $created = $this->createRecord('group-aset', [
             'nama' => 'Bangunan',
-            'tipe_harta' => 'bangunan_permanen',
-            'major_type' => 'tangible',
+            'kelompok_harta_fiskal_id' => $reference,
+            'property_type' => 'fixed_asset',
             'capitalization_threshold' => 1000,
             'posting_layers' => ['current', 'tax'],
         ])->assertCreated();
 
-        $created->assertJsonPath('data.tipe_harta', 'bangunan_permanen');
-        $created->assertJsonPath('data.major_type', 'tangible');
+        $created->assertJsonPath('data.kelompok_harta_fiskal_id', $reference);
+        $created->assertJsonPath('data.property_type', 'fixed_asset');
         $created->assertJsonPath('data.capitalization_threshold', '1000.00');
         $created->assertJsonPath('data.posting_layers', ['current', 'tax']);
 
@@ -314,11 +347,16 @@ class MasterDataAsetTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.posting_layers', ['tax'])
             // Field lain tidak ikut tergeser saat satu field diubah.
-            ->assertJsonPath('data.tipe_harta', 'bangunan_permanen');
+            ->assertJsonPath('data.kelompok_harta_fiskal_id', $reference);
     }
 
-    public function test_nilai_di_luar_daftar_pada_field_finansial_ditolak(): void
+    public function test_reference_fiskal_tidak_boleh_dipakai_lintas_tenant_dan_field_lama_ditolak(): void
     {
+        $foreignReference = $this->fiscalReference((string) Str::ulid(), 'tenant-lain:kelompok-1');
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'kelompok_harta_fiskal_id' => $foreignReference])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('kelompok_harta_fiskal_id');
+
         $this->createRecord('group-aset', ['nama' => 'Salah', 'tipe_harta' => 'kelompok_9'])
             ->assertStatus(422)
             ->assertJsonValidationErrors('tipe_harta');
@@ -326,6 +364,30 @@ class MasterDataAsetTest extends TestCase
         $this->createRecord('group-aset', ['nama' => 'Salah', 'posting_layers' => ['gudang']])
             ->assertStatus(422)
             ->assertJsonValidationErrors('posting_layers.0');
+    }
+
+    /**
+     * Sifat harta dibuang dari group; akun ditentukan posting profile milik Finance.
+     * Client lama yang masih mengirim `major_type` harus gagal keras, karena diterima
+     * diam-diam berarti klasifikasinya hilang tanpa jejak.
+     */
+    public function test_field_sifat_harta_ditolak_dan_property_type_divalidasi(): void
+    {
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'major_type' => 'tangible'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('major_type');
+
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'property_type' => 'ekstrakomptabel'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('property_type');
+    }
+
+    /** Lokasi bawaan harus milik tenant yang sama; ULID asing tidak boleh lolos. */
+    public function test_lokasi_bawaan_group_tidak_boleh_lintas_tenant(): void
+    {
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'asset_location_id' => (string) Str::ulid()])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('asset_location_id');
     }
 
     /**
@@ -525,6 +587,30 @@ class MasterDataAsetTest extends TestCase
             'pabrikan-aset' => $pabrikan,
             'model-aset' => $model,
         ];
+    }
+
+    private function fiscalReference(?string $tenantId = null, string $templateKey = 'test:kelompok-1'): string
+    {
+        $id = (string) Str::ulid();
+        DB::table('m_kelompok_harta_fiskal')->insert([
+            'id' => $id,
+            'tenant_id' => $tenantId ?? $this->tenantId,
+            'template_key' => $templateKey,
+            'jurisdiction' => 'ID',
+            'label' => 'Kelompok uji',
+            'regulation_reference' => 'Referensi uji',
+            'effective_from' => '2023-07-17',
+            'useful_life_years' => 4,
+            'straight_line_rate_percent' => 25,
+            'reducing_balance_rate_percent' => 50,
+            'allow_reducing_balance' => true,
+            'depreciable' => true,
+            'aktif' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $id;
     }
 
     /** @param array<string, mixed> $payload */
