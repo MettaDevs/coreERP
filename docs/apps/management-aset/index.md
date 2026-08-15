@@ -22,9 +22,19 @@ Nama repository dan nama folder berbeda satu huruf. `compose.yaml` build dari `.
 
 ## Domain yang dimiliki
 
-**Milik app ini** — delapan master data dengan rantai klasifikasi `group aset → kategori aset → jenis aset → entitas aset`, plus dokumen transaksi seperti dekomisioning aset.
+**Milik app ini** — master data aset, register aset, penyusutan, setup dan pelaksanaan maintenance, serta dokumen siklus aset. Daftar master yang berlaku ada di `api/routes/api.php` pada array `$masters`; jumlahnya berubah seiring modul tumbuh, jadi angkanya tidak disalin ke sini.
 
-Rantai klasifikasi itu **struktur domain app**, bukan organization hierarchy Core. Karena itu ia memang memakai foreign key permanen pada tabelnya sendiri; larangan `parent_id` permanen berlaku untuk identitas organization di Core, bukan untuk klasifikasi seperti ini.
+Klasifikasi aset memakai **dua sumbu yang saling lepas**, mengikuti model Dynamics 365 F&O: **group aset** membawa perlakuan uang (penyusutan, kelompok harta fiskal, pembebanan), **jenis aset** membawa perlakuan teknis (atribut, pekerjaan maintenance). Keduanya ditunjuk langsung dari aset, dan tidak ada yang menyaring yang lain. Rantai lama `group → kategori → jenis → entitas` sudah dibongkar.
+
+Klasifikasi itu **struktur domain app**, bukan organization hierarchy Core. Karena itu ia memang memakai foreign key permanen pada tabelnya sendiri; larangan `parent_id` permanen berlaku untuk identitas organization di Core, bukan untuk klasifikasi seperti ini.
+
+### Halaman fitur
+
+**Master** — [Master data](/apps/management-aset/master/) (perilaku bersama semua master), [Jenis aset dan atribut](/apps/management-aset/master/jenisaset/), [Penyusutan: profil, buku, dan matriks](/apps/management-aset/master/depresiasi/), [Setup maintenance](/apps/management-aset/master/maintenance/).
+
+**Transaksi** — [Register aset](/apps/management-aset/transaction/register-aset/), [Proses penyusutan](/apps/management-aset/transaction/penyusutan/), [Pemeliharaan aset](/apps/management-aset/transaction/pemeliharaan-aset/), [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/).
+
+Semuanya ditulis untuk developer: apa yang disimpan, aturan apa yang dijaga kode, dan kenapa aturannya begitu. Kalau menambah halaman baru, ikuti [Pola dokumen fitur](/apps/management-aset/pola-dokumen).
 
 **Bukan milik app ini** — identity, tenant membership, security role, scope organisasi, dan penerbitan nomor. Semuanya milik Core dan diterima lewat token konteks bertanda tangan.
 
@@ -39,7 +49,7 @@ Rantai klasifikasi itu **struktur domain app**, bukan organization hierarchy Cor
 
 Semua master memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, `keterangan`, dan penanda `aktif`. Data selalu dibatasi tenant pada token konteks.
 
-**Reference nomor** — delapan reference terdaftar. Dokumen dekomisioning memakai `management-aset.dekomisioning-aset` dengan prefix `DKMA`. Admin tenant mengaktifkan dan mengatur formatnya lewat **Nomor dokumen** di Control Plane.
+**Reference nomor** — daftar lengkapnya di `app.yaml` bagian `number_sequences.references`; jumlahnya bertambah tiap kali ada master baru, jadi jangan menyalin angkanya ke sini. Dokumen dekomisioning memakai `management-aset.dekomisioning-aset` dengan prefix `DKMA`. Admin tenant mengaktifkan dan mengatur formatnya lewat **Nomor dokumen** di Control Plane.
 
 **Workflow** — manifest mendaftarkan tipe **Verifikasi usulan pemusnahan aset**. Admin tenant memilih approver dan mengaktifkan versinya di Core. App mengonsumsi keputusan lewat event bertanda tangan `core.workflow.decision.v1`; setelah `approved` diterima, aset menjadi `decommissioned` dan baru boleh dijual atau dimusnahkan.
 
@@ -97,7 +107,7 @@ Diakses lewat shell Core di `http://localhost:8000`.
 1. Daftarkan `app.yaml` lewat alur publish sampai installation registry menyatakan release `ready`. Kirim ulang registrasi setiap kali permission, duty, atau reference nomor bertambah.
 2. Buat service credential untuk `management-aset`, isi `COREERP_SERVICE_TOKEN` pada API.
 3. Pakai nilai `COREERP_APP_CONTEXT_SIGNING_KEY` yang sama pada Core dan API Aset.
-4. Aktifkan kedelapan reference pada **Nomor dokumen** di Control Plane.
+4. Aktifkan semua reference nomor pada **Nomor dokumen** di Control Plane. Reference yang belum aktif membuat pembuatan record gagal dengan 503, bukan diam-diam memakai nomor buatan sendiri.
 5. Jalankan migration API dan build UI.
 
 ## Dokumen terkait
