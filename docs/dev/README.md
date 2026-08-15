@@ -2,7 +2,7 @@
 
 > **Baru bergabung dengan tim?** Mulai dari [panduan onboarding](../onboarding/index.md), bukan dari halaman ini. Dokumen di bawah adalah spesifikasi, bukan orientasi.
 >
-> **Mau membuat app atau modul baru?** Langkah teknisnya ada di [jalur membangun app baru](../apps/membangun-app-baru.md) — persiapan, konvensi penamaan dan alokasi, artefak wajib, lalu sepuluh tahap dengan gate keluar. Dokumen di halaman ini adalah aturannya; halaman itu urutan mengerjakannya.
+> **Mau membuat app atau modul baru?** Langkah teknisnya ada di [jalur membangun app baru](../apps/membangun-app-baru.md) — persiapan, konvensi penamaan dan alokasi, berkas yang wajib ada, lalu sepuluh tahap dengan gate keluar. Dokumen di halaman ini adalah aturannya; halaman itu urutan mengerjakannya.
 
 Dokumen ini adalah **desain kanonik** untuk CoreERP. Ia menggantikan asumsi awal bahwa seluruh modul adalah Composer package dalam satu Laravel runtime dan satu data-plane bersama.
 

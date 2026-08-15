@@ -4,7 +4,42 @@ Halaman ini untuk developer. Isinya perilaku yang **dipakai bersama oleh semua m
 
 Master data adalah daftar pilihan yang dipakai berulang: `group-aset`, `jenis-aset`, `kondisi-aset`, `pabrikan-aset`, `model-aset`, `lokasi-aset`, `tipe-lokasi-aset`, `tipe-atribut`, `profil-penyusutan`, `buku-penyusutan`, tipe pekerjaan maintenance, dan master work order. Daftar lengkapnya ada di `api/routes/api.php` pada array `$masters`.
 
-Sebagian punya aturan khusus dan dibahas di halamannya sendiri; sisanya — seperti `kondisi-aset` dan `trade` — hanya memakai bentuk dasar di halaman ini, tanpa kolom maupun aturan tambahan.
+Sebagian punya aturan khusus dan dibahas di halamannya sendiri; sisanya hanya memakai bentuk dasar di halaman ini, tanpa kolom maupun aturan tambahan. Tetapi **tidak punya aturan khusus bukan berarti tidak punya fungsi** — daftar lengkapnya di bawah.
+
+## Fungsi tiap master
+
+| Master | Menjawab | Dibahas di |
+| --- | --- | --- |
+| `group-aset` | Barang ini disusutkan bagaimana, masuk kelompok pajak apa | [Group aset](/apps/management-aset/master/groupaset/) |
+| `jenis-aset` | Data teknis apa yang harus diisi, pekerjaan apa yang berlaku | [Jenis aset](/apps/management-aset/master/jenisaset/) |
+| `tipe-atribut` | Hal apa saja yang bisa dicatat sebagai data tambahan | [Jenis aset](/apps/management-aset/master/jenisaset/) |
+| `pabrikan-aset` | Barang ini buatan siapa | [Pabrikan dan model](/apps/management-aset/master/katalog-model/) |
+| `model-aset` | Tipe barang dari pabrikan itu | [Pabrikan dan model](/apps/management-aset/master/katalog-model/) |
+| `kondisi-aset` | Keadaan fisik barang sekarang — baik, rusak ringan, rusak berat. Dipakai menyaring daftar dan menilai apakah barang masih layak dipakai | halaman ini |
+| `tipe-lokasi-aset` | Golongan lokasi: gudang, kantor, area produksi | [Lokasi](/apps/management-aset/master/lokasi/) |
+| `lokasi-aset` | Di mana barangnya berada, dan siapa yang menanggung biayanya | [Lokasi](/apps/management-aset/master/lokasi/) |
+| `profil-penyusutan` | Cara menghitung penyusutan | [Penyusutan](/apps/management-aset/master/depresiasi/) |
+| `buku-penyusutan` | Untuk keperluan apa penyusutan dihitung | [Penyusutan](/apps/management-aset/master/depresiasi/) |
+| `maintenance-job-types` | Jenis pekerjaan perawatan | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `maintenance-job-type-variants` | Turunan pekerjaan, misalnya servis per jarak tempuh | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `maintenance-job-type-defaults` | Nilai bawaan saat pekerjaan dibuat | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `maintenance-checklist-variables` | Hal yang diukur atau dinilai saat pemeriksaan | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `maintenance-checklist-templates` | Susunan baris pemeriksaan yang dipakai berulang | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `tipe-work-order` | Golongan pekerjaan, sekaligus aturan apa yang wajib diisi sebelum boleh ditutup | [Master work order](/apps/management-aset/master/work-order/) |
+| `tingkat-layanan` | Seberapa mendesak penanganannya | [Master work order](/apps/management-aset/master/work-order/) |
+| `trade` | Keahlian apa yang dibutuhkan pekerjaan itu | [Master work order](/apps/management-aset/master/work-order/) |
+| `sebab-kerusakan` | Kenapa pekerjaan itu diperlukan | halaman ini |
+| `tindakan-perbaikan` | Apa yang dilakukan untuk memperbaikinya | halaman ini |
+| `item-checklist-maintenance` | Daftar pemeriksaan dari rancangan lama | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `analisa-maintenance` | Kategori analisa dari rancangan lama | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+
+### Kenapa sebab dan tindakan jadi master, bukan teks bebas
+
+`sebab-kerusakan`, `tindakan-perbaikan`, dan `trade` dulunya pilihan yang ditulis langsung di UI — atau tidak ada sama sekali, dan teknisi mengetik sendiri.
+
+Dipindahkan jadi master karena dua alasan: tenant bisa menambah nilainya tanpa menunggu rilis aplikasi, dan **hasil pekerjaan bisa dihitung**. "Aki soak" yang diketik tiga teknisi akan jadi tiga tulisan berbeda; sebagai master, ia satu baris yang bisa dijumlahkan jadi laporan penyebab kerusakan tersering.
+
+Ini pertimbangan yang berlaku umum: kalau sebuah teks bebas kelak ingin dihitung, ia seharusnya master sejak awal.
 
 ## Satu controller untuk semua
 
