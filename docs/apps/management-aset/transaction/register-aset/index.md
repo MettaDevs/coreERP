@@ -74,7 +74,7 @@ Pola yang sama berlaku untuk lokasi. Mengubah lokasi bawaan group tidak memindah
 
 ## Endpoint
 
-Empat, semuanya di bawah `/api/v1`:
+Semuanya di bawah `/api/v1`:
 
 | Endpoint | Gunanya |
 | --- | --- |

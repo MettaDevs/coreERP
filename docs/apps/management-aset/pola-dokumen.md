@@ -45,7 +45,11 @@ Kalau Anda tidak tahu alasannya, cari di komentar kode atau riwayat git. Kalau t
 
 - **Bahasa Indonesia sehari-hari.** Tulis seperti menjelaskan ke rekan kerja, bukan seperti dokumen resmi.
 - **Hindari kata yang jarang dipakai.** Tulis "berkas" bukan "artefak", "susunan" bukan "arsitektur data", "bagian" bukan "komponen" kalau memang bisa.
-- **Istilah teknis yang memang nama benda tetap dipakai apa adanya** — `tenant_id`, endpoint, permission, idempotency. Menerjemahkannya justru membingungkan waktu orang mencari di kode.
+- **Istilah teknis yang memang nama benda tetap dipakai apa adanya** — `tenant_id`, endpoint, permission, idempotency, deploy, release, event, scope. Menerjemahkannya justru membingungkan waktu orang mencari di kode.
+
+  Batasnya: **selama masih di konteks teknis, biarkan.** "Event bertanda tangan dari Core" jelas bagi developer, dan menggantinya jadi "kejadian bertanda tangan" malah mengaburkan. Yang tidak boleh adalah membawa istilah itu ke kalimat sehari-hari atau ke layar pengguna bisnis — daftar yang dilarang tampil di UI ada di [glosarium](/onboarding/glosarium).
+
+  Yang diganti hanyalah kata yang **tidak punya alasan teknis** dan sudah ada padanan biasanya: "artefak" jadi "berkas", "krusial" jadi menjelaskan kenapa penting.
 - **Jangan menerjemahkan kiasan Inggris kata per kata.** Ini kesalahan yang paling sering lolos, karena hasilnya terlihat seperti bahasa Indonesia padahal tidak berarti apa-apa:
 
   | Jangan | Kenapa | Tulis |

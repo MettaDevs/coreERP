@@ -75,7 +75,7 @@ Kalau Anda menambah penerima event baru, ikuti pola ini. Melewatkannya tidak aka
 
 ### Keputusan bisa datang berhari-hari kemudian
 
-Ini yang paling sering salah dirancang. Workflow bisa selesai jauh setelah permintaan yang memulainya berakhir. Karena itu id korelasi **disimpan pada dokumen sejak awal** — membacanya dari request yang sedang berjalan tidak mungkin, request itu sudah lama selesai.
+Ini yang paling sering salah dirancang. Workflow bisa selesai jauh setelah permintaan yang memulainya berakhir. Karena itu id korelasi **disimpan pada dokumen sejak awal** — membacanya dari permintaan yang sedang berjalan tidak mungkin, permintaan itu sudah lama selesai.
 
 Kalau Anda menambah event baru yang membawa asal-usul suatu kejadian, simpan datanya saat kejadian itu dicatat, bukan saat event dikirim.
 

@@ -33,7 +33,7 @@ Core menjalankan alur persetujuan yang dikonfigurasi admin tenant — siapa appr
 Yang perlu dipahami saat menulis kode di sini:
 
 - App **tidak tahu dan tidak boleh tahu** siapa approver-nya. Itu urusan Core.
-- Keputusan bisa datang **berhari-hari kemudian**. Karena itu id korelasi disimpan pada dokumen sejak awal — membacanya dari request yang sedang berjalan tidak mungkin, karena request itu sudah lama selesai.
+- Keputusan bisa datang **berhari-hari kemudian**. Karena itu id korelasi disimpan pada dokumen sejak awal — membacanya dari permintaan yang sedang berjalan tidak mungkin, karena permintaan itu sudah lama selesai.
 - Event diverifikasi tanda tangannya lewat middleware `coreerp-event` sebelum isinya diproses.
 
 Setelah `approved` diterima, aset menjadi `decommissioned`.

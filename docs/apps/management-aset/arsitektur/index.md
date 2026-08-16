@@ -54,7 +54,7 @@ Kalau Anda menaruh aturan bisnis di controller padahal ia dipakai lebih dari sat
 
 ## Endpoint yang bukan milik fitur mana pun
 
-Tiga endpoint melayani platform, bukan salah satu fitur:
+Beberapa endpoint melayani platform, bukan salah satu fitur:
 
 | Endpoint | Gunanya |
 | --- | --- |
@@ -73,7 +73,7 @@ Kalau layanan satuan Core belum bisa dihubungi, endpoint satuan menjawab **503**
 
 ## Yang wajib ada di setiap endpoint baru
 
-1. **Permission sendiri**, bukan menumpang yang sudah ada. Diperiksa dari `coreerp.permissions` pada request.
+1. **Permission sendiri**, bukan menumpang yang sudah ada. Diperiksa dari `coreerp.permissions` pada permintaan.
 2. **Batas tenant.** Setiap kueri menyaring `tenant_id`.
 3. **Batas organisasi** untuk data aset — lewat `OrganizationScope`, bukan hanya `tenant_id`.
 4. **Masuk kontrak.** Ada pemeriksa di CI yang menolak rute tanpa kontrak.
