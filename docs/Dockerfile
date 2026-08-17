@@ -13,7 +13,12 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# npm dapat diam-diam melewatkan optional native binding ketika unduhannya gagal
+# (npm/cli#4828): instalasinya tetap melapor sukses, lalu build meledak jauh
+# kemudian dengan pesan yang menuduh lockfile, padahal penyebabnya jaringan.
+# Pemeriksaan ini membuat kegagalan muncul di langkah yang benar, dan satu kali
+# percobaan ulang menutup kasus yang memang cuma unduhan meleset.
+RUN npm ci && node --input-type=module -e 'await import("rollup")' || (rm -rf node_modules && npm ci && node --input-type=module -e 'await import("rollup")')
 
 COPY . .
 

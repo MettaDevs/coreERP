@@ -11,7 +11,12 @@ WORKDIR /app
 ENV WAYFINDER_COMMAND=true
 COPY package.json package-lock.json ./
 COPY .packages ./.packages
-RUN npm ci
+# npm dapat diam-diam melewatkan optional native binding ketika unduhannya gagal
+# (npm/cli#4828): instalasinya tetap melapor sukses, lalu build meledak jauh
+# kemudian dengan pesan yang menuduh lockfile, padahal penyebabnya jaringan.
+# Pemeriksaan ini membuat kegagalan muncul di langkah yang benar, dan satu kali
+# percobaan ulang menutup kasus yang memang cuma unduhan meleset.
+RUN npm ci && node --input-type=module -e 'await import("rolldown")' || (rm -rf node_modules && npm ci && node --input-type=module -e 'await import("rolldown")')
 COPY resources ./resources
 COPY --from=vendor /app/resources/js/actions ./resources/js/actions
 COPY --from=vendor /app/resources/js/routes ./resources/js/routes
