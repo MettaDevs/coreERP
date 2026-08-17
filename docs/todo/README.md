@@ -48,7 +48,7 @@ Sebuah item hanya boleh ditandai `[x]` bila memenuhi aturan 3 pada
 [`docs/dev/10-core-foundation-gates.md`](../dev/10-core-foundation-gates.md):
 punya writer, reader, failure state, dan test yang membuktikan state sebelumnya
 tidak dapat menyamar sebagai state berikutnya. Untuk modul, gate load test pada
-[`docs/dev/15-load-and-concurrency-testing.md`](../dev/15-load-and-concurrency-testing.md)
+[`docs/dev/20-load-and-concurrency-testing.md`](../dev/20-load-and-concurrency-testing.md)
 juga berlaku.
 
 ## Tingkat keparahan
