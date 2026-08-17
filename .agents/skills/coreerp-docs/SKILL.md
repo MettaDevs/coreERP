@@ -1,0 +1,94 @@
+---
+name: coreerp-docs
+description: Write and maintain CoreERP developer documentation under docs/. Use when adding or changing any page in docs/, when documenting a feature, app, master, or process, when a feature is finished and needs its page, or when auditing documentation for coverage, stale claims, or wording.
+---
+
+# CoreERP developer documentation
+
+`docs/` is written for the developer who will touch the code, not for the end user. A page explains **what is stored, which rules the code enforces, and why those rules exist** — never how to click through a screen.
+
+The full pattern, section order, and worked examples live in the repository at `docs/apps/management-aset/pola-dokumen.md`. Read it before writing; this skill does not restate it, because a second copy of a style guide drifts from the first.
+
+## Documentation is part of finishing, not a follow-up
+
+A feature that passes every gate and ships without its page forces the next person to read controllers line by line to learn the rules it enforces. Those rules live in one person's head and in code comments, and both disappear when that person moves on.
+
+`docs/apps/membangun-app-baru.md` makes this stage 10 with its own exit gate. Treat a feature as unfinished until its page exists, is registered in `docs/.vitepress/config.ts`, and `npx vitepress build docs` passes with no dead links.
+
+## Counts in prose go stale, and they contradict themselves
+
+Two distinct failures, both common:
+
+**Counting something that grows.** "Eight master data", "twenty-nine number references" — wrong within weeks, and a wrong document is worse than none. Point at the source instead: *"the list lives in `api/routes/api.php` under `$masters`"*. The same applies to column lists, permission lists, and package versions.
+
+**A count that contradicts the list beneath it.** "Four endpoints, all under `/api/v1`" above a table of six. This is easy to introduce by editing the table and not the sentence, and easy to detect mechanically:
+
+```powershell
+# compare each number word in prose against the table that follows it
+```
+
+Prefer a sentence with no number at all. If a number genuinely helps, verify it against the list every time either changes.
+
+## Do not translate English figures of speech word for word
+
+This is the failure that survives review, because the result looks like Indonesian while meaning nothing:
+
+| Wrong | Why | Write instead |
+| --- | --- | --- |
+| "jendelanya 300 detik" | *Time window*. In Indonesian a `jendela` is a window in a house | "batas selisihnya 300 detik" |
+| "pemeriksa yang berteriak serigala" | *Cry wolf*. The fable is not a local proverb | "pemeriksa yang sering salah memberi peringatan" |
+| "stempel karet" | *Rubber stamp* | "persetujuan yang hanya formalitas" |
+
+Test it by reading the sentence aloud to someone who does not speak English. If they stop and ask what it means, rewrite it.
+
+### Where the loanword boundary sits
+
+Technical terms that name a thing stay as they are: `tenant_id`, endpoint, permission, idempotency, deploy, release, event, scope. Translating them makes the text harder to search against the code, not easier.
+
+What gets replaced is the word with **no technical reason** that already has a plain equivalent — "artefak" becomes "berkas", "krusial" becomes an explanation of why it matters. And no architecture term reaches a business user's screen; the forbidden list is in `docs/onboarding/glosarium.md`.
+
+## Coverage is verified mechanically, never by feeling finished
+
+"I think I covered everything" is not a result. Compare the code surface against the documentation and count what is missing. The dimensions that have actually caught gaps:
+
+| Dimension | Source of truth |
+| --- | --- |
+| Screens | `.form` entry points in `app.yaml` — closest thing to "every feature" |
+| Controllers, services, support classes, middleware | the directories themselves |
+| Tests | `api/tests/` — the page should say where to add one |
+| Load-test scenarios | `loadtest/k6/` |
+| Contract files | `contracts/src/paths/` |
+| Live tables | migrations, minus tables a later migration drops |
+| Referenced files | every `path/to/file.php` in the docs must exist |
+
+Run the sweep, fix what it finds, then run it again. Repeat until two consecutive runs are clean — the first clean run is often clean because the check is wrong.
+
+## Verify the checker before trusting the check
+
+A checker that reports success is worth nothing until you have seen it fail on purpose. Both of these happened while writing the asset documentation:
+
+- A table-coverage check flagged a table as undocumented; the table had been dropped by a later migration and no longer existed.
+- The fix then treated `dropIfExists` inside every migration's own `down()` as a drop, so it silently discarded almost every table and reported "8 tables, all covered". That reads exactly like success.
+
+Before believing a clean run, break something on purpose and confirm the check catches it. A silent pass from a broken checker is more dangerous than no checker, because it ends the search.
+
+## Windows: PowerShell destroys UTF-8 in these files
+
+`Set-Content` and `Out-File` in Windows PowerShell 5.1 read UTF-8 as the ANSI codepage and write it back double-encoded. Every em dash and arrow becomes `â€"`. This has corrupted both documentation and skill files in this repository.
+
+Use the Edit tool for text edits. When a bulk replacement across many files is genuinely needed:
+
+```powershell
+$enc = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($path, $text, $enc)
+```
+
+Then check for damage before committing: search the changed files for `â€` and `â†`.
+
+## Checks before calling it done
+
+- `npx vitepress build docs` passes with no dead-link warnings.
+- Every new page is registered in `docs/.vitepress/config.ts` — the sidebar is hand-written, so an unregistered page is a page nobody finds.
+- No file numbering collides; two files sharing a number is how `15-fiscal-calendars` and `15-load-and-concurrency-testing` coexisted for months.
+- Every referenced code path exists in the repository it names.
+- No mojibake, no stale counts, no untranslated figures of speech.

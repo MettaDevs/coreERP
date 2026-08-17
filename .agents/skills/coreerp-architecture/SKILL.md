@@ -354,6 +354,12 @@ Connection handling dominates before module code does. Check this first, every t
 
 If a load test cannot be run because the environment is missing (no Docker, no real database), say so plainly and report the module as unverified under concurrency. Do not report it complete.
 
+### An undocumented module is also incomplete
+
+The rules a module enforces — what may not change after a record exists, which value is copied rather than referenced, why one permission is split from its neighbour — are invisible in the schema and only half-visible in the code. Left unwritten they survive in one person's memory and in comments, and both are lost when that person moves on.
+
+A module is finished when its behaviour is documented under `docs/apps/<app-id>/`, every page is registered in the sidebar, and the documentation build passes. See the `coreerp-docs` skill for the pattern and the coverage sweep that proves nothing was missed.
+
 ## Launcher rule
 
 A launcher labelled "produk terpasang" must query installation records for the active tenant and placement, normally filtering `status=ready`. Entitlement may be checked additionally for authorization, never as installation evidence.
