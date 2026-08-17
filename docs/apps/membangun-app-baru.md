@@ -45,7 +45,7 @@ Tahap 2, 3, dan 7 memakai tabel ini. Tetapkan seluruh nilainya sekaligus supaya 
 | Image API | `registry.apperp.local/apps/<app-key>-api:<versi>` | `.../procurement-api:0.1.0` |
 | Image UI | `registry.apperp.local/apps/<app-key>-ui:<versi>` | `.../procurement-ui:0.1.0` |
 | Service Compose | `<app>-db`, `<app>-api`, `<app>-ui` | `procurement-db` |
-| UI entry | `/apps-content/<app-id>/` | `/apps-content/procurement/` |
+| UI entry | ditentukan platform: `/apps-content/<placement>/<app-id>/` | `/apps-content/pooled-primary/procurement/` |
 | Kode keamanan | `<app>.<resource>.<aksi>` | `procurement.purchase-order.read` |
 | Channel event | `<app>.<aggregate>.<action>.vN` | `procurement.purchase-order.approved.v1` |
 
@@ -155,7 +155,7 @@ Pola kode keamanan mengikuti `<app>.<resource>.<aksi>` — Control Plane menolak
 
 | Blok | Kapan wajib | Akibatnya di Core |
 | --- | --- | --- |
-| `api`, `ui`, `database`, `events` | Selalu | Katalog mengenal artifact dan kontrak app |
+| `api`, `ui`, `database`, `events` | Selalu | Katalog mengenal artifact dan kontrak app. Blok `ui` menyatakan app punya UI; ia **tidak** boleh memuat `entry` |
 | `ui.navigation` | Selalu | Menu app muncul di shell Core; item menu hanya boleh memakai permission `read` app sendiri |
 | `security.entry_points`, `permissions`, `privileges`, `duties` | Selalu, keempatnya terpisah | Duty tersedia untuk disusun admin tenant jadi security role |
 | `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat role diberikan ke anggota |
@@ -246,12 +246,51 @@ Test feature menjaga hal yang tidak boleh regresi: induk lintas tenant tertolak,
 
 UI app dimuat Web Shell dan menerima token konteks lewat `postMessage`. Ia **tidak** menerima `tenant_id` dari browser.
 
+### Mengumumkan diri saat siap
+
+Setelah UI siap menerima konteks, ia wajib memberi tahu shell:
+
+```ts
+window.parent.postMessage({ type: 'coreerp.ready', appId: '<app-id>' }, parentOrigin);
+```
+
+`appId` wajib disebut; shell mengabaikan pengumuman tanpa itu. Pengumuman ini juga
+satu-satunya bukti app benar-benar hidup — ketika container UI mati, reverse proxy
+membalas halaman errornya sendiri dan halaman itu **berhasil** dimuat di iframe.
+App yang tidak pernah mengumumkan diri akan ditampilkan shell sebagai gagal dimuat
+setelah beberapa detik.
+
 Teks untuk pengguna bisnis memakai bahasa sehari-hari. Istilah internal — `entitlement`, `artifact`, `placement`, `tenant_id` — dilarang tampil.
 
 Komponen memakai SDK `@apperp/ui`. `Select` atau combobox di dalam `Sheet`, dialog, atau popover wajib menerima ref overlay lewat `portalContainer`; kalau tidak, menunya terbuka di bawah overlay dan tidak bisa dipilih.
 
+### Base build wajib relatif
+
+Pada Vite, `base` wajib `'./'`:
+
+```ts
+export default defineConfig({
+    base: './',
+});
+```
+
+Manifest **tidak** mendeklarasikan `ui.entry`; Control Plane menolak manifest yang
+masih memuatnya. Path konten ditentukan platform dan memuat nama placement, yang
+berbeda antar deployment:
+
+```text
+/apps-content/<placement>/<app-id>/
+```
+
+Base absolut memaksa satu build per placement, padahal satu image release harus bisa
+dipasang di semua placement. Base relatif aman karena UI app memakai hash routing,
+sehingga URL dokumen tetap berada di root direktorinya.
+
+Gejala kalau ini salah: halaman app tampil kosong dan asset-nya `404` pada path
+shell, bukan pada path app.
+
 ::: tip Gate keluar
-UI dibangun, dimuat Web Shell, dan tidak menampilkan istilah arsitektur ke pengguna bisnis.
+UI dibangun dengan `base: './'`, dimuat Web Shell, dan tidak menampilkan istilah arsitektur ke pengguna bisnis.
 :::
 
 Aturan lengkap: `.agents/skills/coreerp-ui/SKILL.md` dan `.agents/skills/coreerp-page-standard/SKILL.md`.
@@ -260,7 +299,7 @@ Aturan lengkap: `.agents/skills/coreerp-ui/SKILL.md` dan `.agents/skills/coreerp
 
 ## 7 · Masuk stack lokal
 
-Tambahkan tiga service ke `erp-dev/compose.yaml`: `<app>-db`, `<app>-api`, `<app>-ui`. Database mendapat volume dan port localhost unik berikutnya. Lalu daftarkan path manifest, alamat UI lokal, dan nama service ke bootstrap di `start.ps1`.
+Tambahkan tiga service ke `erp-dev/compose.yaml`: `<app>-db`, `<app>-api`, `<app>-ui`. Database mendapat volume dan port localhost unik berikutnya. Lalu daftarkan path manifest dan nama service ke bootstrap di `start.ps1`. Alamat UI tidak didaftarkan — Core menyusunnya sendiri dan mem-proxy path itu ke container UI app.
 
 ```powershell
 .\start.ps1 -Build

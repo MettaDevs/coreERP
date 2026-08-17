@@ -11,7 +11,6 @@ php artisan app:bootstrap-local-runtime /workspace/app.yaml \
     --ui-image="loadtest/core-ui@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
     --compose-project=core-loadtest \
     --compose-file=docker-compose.yml \
-    --ui-entry=http://localhost/apps-content/management-aset/ \
     --api-service=api \
     --ui-service=ui \
     --database-service=db

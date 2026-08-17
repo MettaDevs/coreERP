@@ -23,7 +23,7 @@ RUN npm run build
 FROM php:8.4-apache
 RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev unzip \
     && docker-php-ext-install bcmath intl pdo_pgsql pgsql zip \
-    && a2enmod rewrite \
+    && a2enmod rewrite proxy proxy_http \
     && sed -ri 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /var/www/html

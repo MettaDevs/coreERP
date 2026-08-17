@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\AppRelease;
 use App\Models\AppServiceCredential;
 use App\Models\CoreApp;
+use App\Support\AppContentPath;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -22,7 +23,6 @@ class BootstrapLocalAppRuntimeCommand extends Command
         {--ui-image=}
         {--compose-project=erp}
         {--compose-file=compose.yaml}
-        {--ui-entry=}
         {--api-service=}
         {--ui-service=}
         {--database-service=}
@@ -63,7 +63,6 @@ class BootstrapLocalAppRuntimeCommand extends Command
             'ui_image' => $this->option('ui-image'),
             'compose_project' => $this->option('compose-project'),
             'compose_file' => $this->option('compose-file'),
-            'ui_entry' => $this->option('ui-entry'),
             'api_service' => $this->option('api-service'),
             'ui_service' => $this->option('ui-service'),
             'database_service' => $this->option('database-service'),
@@ -78,12 +77,6 @@ class BootstrapLocalAppRuntimeCommand extends Command
             'ui_image' => ['required', 'string', 'max:500', 'regex:/^.+@sha256:[a-f0-9]{64}$/'],
             'compose_project' => $identifier,
             'compose_file' => ['required', 'string', 'max:120', 'regex:#^(?!.*\.\.)[A-Za-z0-9_./-]+\.ya?ml$#'],
-            'ui_entry' => [
-                'required',
-                'string',
-                'max:2048',
-                'regex:#^http://(?:localhost|(?:[0-9]{1,3}\.){3}[0-9]{1,3})(?::[0-9]{1,5})?/#',
-            ],
             'api_service' => $identifier,
             'ui_service' => $identifier,
             'database_service' => $identifier,
@@ -140,7 +133,6 @@ class BootstrapLocalAppRuntimeCommand extends Command
                     'id' => $placementId,
                     'release_version' => $app->version,
                     'profile' => $data['profile'],
-                    'ui_entry' => $data['ui_entry'],
                     'artifact_status' => 'placed',
                     'migration_status' => 'succeeded',
                     'runtime_status' => 'ready',
@@ -209,7 +201,10 @@ class BootstrapLocalAppRuntimeCommand extends Command
         if ($issuedToken) {
             $this->line('LOCAL_SERVICE_TOKEN='.$issuedToken);
         }
+        $contentPath = AppContentPath::for($app->id, $data['placement']);
         $this->components->info("Runtime lokal {$app->id} siap pada {$data['placement']}.");
+        $this->components->twoColumnDetail('<fg=gray>Path konten</>', $contentPath);
+        $this->components->warn('Jalankan app:render-proxy-config agar path ini dilayani reverse proxy.');
 
         return self::SUCCESS;
     }

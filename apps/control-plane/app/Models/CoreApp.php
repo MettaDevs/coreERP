@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property string $id
  * @property string $name
- * @property string|null $ui_entry
+ * @property bool $has_ui
  * @property array<string, mixed>|null $navigation
  * @property string|null $repository_url
  * @property string|null $contract_url
@@ -27,7 +27,7 @@ class CoreApp extends Model
         'version',
         'status',
         'database_name',
-        'ui_entry',
+        'has_ui',
         'navigation',
         'repository_url',
         'contract_url',
@@ -36,7 +36,7 @@ class CoreApp extends Model
 
     protected function casts(): array
     {
-        return ['navigation' => 'array'];
+        return ['navigation' => 'array', 'has_ui' => 'boolean'];
     }
 
     /** @return HasMany<Permission, $this> */

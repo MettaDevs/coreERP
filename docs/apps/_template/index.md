@@ -14,7 +14,7 @@
 | Repository | `app-erp-<app-key>` |
 | Nama folder lokal | `<isi bila berbeda dari nama repository>` |
 | Database | `app_erp_<app>` |
-| UI entry | `/apps-content/<app-id>/` |
+| UI entry | ditentukan platform: `/apps-content/<placement>/<app-id>/` |
 
 ## Domain yang dimiliki
 

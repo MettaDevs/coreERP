@@ -2779,13 +2779,9 @@
                         "pattern": "^[a-z][a-z0-9_]*$",
                         "maxLength": 120
                     },
-                    "ui_entry": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "pattern": "^\\/(?!\\/)",
-                        "maxLength": 2048
+                    "has_ui": {
+                        "type": "boolean",
+                        "description": "App menyatakan punya UI. Path konten diturunkan platform dari app dan placement; app tidak mendaftarkannya."
                     },
                     "navigation": {
                         "type": "object",
@@ -3290,11 +3286,8 @@
                         ],
                         "format": "date-time"
                     },
-                    "ui_entry": {
-                        "type": [
-                            "string",
-                            "null"
-                        ]
+                    "has_ui": {
+                        "type": "boolean"
                     },
                     "repository_url": {
                         "type": [
@@ -3325,7 +3318,7 @@
                     "description",
                     "created_at",
                     "updated_at",
-                    "ui_entry",
+                    "has_ui",
                     "repository_url",
                     "contract_url",
                     "navigation"

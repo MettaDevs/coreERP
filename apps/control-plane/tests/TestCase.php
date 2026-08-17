@@ -21,7 +21,7 @@ abstract class TestCase extends BaseTestCase
             'version' => '0.1.0',
             'status' => 'available',
             'database' => 'app_erp_management_aset',
-            'ui_entry' => '/apps-content/management-aset/',
+            'has_ui' => true,
             'navigation' => [
                 'rail' => [
                     ['id' => 'master', 'label' => 'Master data'],

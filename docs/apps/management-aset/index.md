@@ -14,7 +14,7 @@ App bisnis pertama. Mengelola entitas, kategori, dan maintenance aset perusahaan
 | Repository | `app-erp-management-**asset**` |
 | Nama folder lokal | `app-erp-management-**aset**` |
 | Database | `management_aset` |
-| UI entry | `/apps-content/management-aset/` |
+| UI entry | ditentukan platform: `/apps-content/<placement>/management-aset/` |
 
 ::: warning
 Nama repository dan nama folder berbeda satu huruf. `compose.yaml` build dari `../app-erp-management-aset`, jadi `git clone` tanpa menyebut nama folder akan menghasilkan folder yang tidak ditemukan build.

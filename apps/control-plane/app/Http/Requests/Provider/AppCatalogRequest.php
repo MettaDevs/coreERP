@@ -34,7 +34,11 @@ class AppCatalogRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:2000'],
             'version' => ['required', 'string', 'max:40', 'regex:/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/'],
             'database_name' => ['required', 'string', 'max:120', 'regex:/^[a-z][a-z0-9_]*$/'],
-            'ui_entry' => ['nullable', 'string', 'max:2048', 'regex:/^\/(?!\/)/'],
+            // Path konten UI ditentukan platform dari (app_id, placement), bukan
+            // didaftarkan app. Menerima nilai dari app akan membuat dua placement
+            // dari app yang sama berebut path yang sama.
+            'ui_entry' => ['prohibited'],
+            'has_ui' => ['nullable', 'boolean'],
             'navigation' => ['nullable', 'array'],
             'navigation.rail' => ['required_with:navigation', 'array', 'min:1'],
             'navigation.rail.*.id' => ['required', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
@@ -94,6 +98,14 @@ class AppCatalogRequest extends FormRequest
             'workflow_types.*.name' => ['required', 'string', 'max:160'],
             'workflow_types.*.scope' => ['nullable', Rule::in(['tenant', 'legal_entity'])],
             'workflow_types.*.decision_context_schema' => ['required', 'array'],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'ui_entry.prohibited' => 'Path konten UI ditentukan platform dari app dan placement; app tidak lagi mendaftarkannya.',
         ];
     }
 
@@ -234,7 +246,7 @@ class AppCatalogRequest extends FormRequest
         return array_values(array_unique($codes));
     }
 
-    /** @return array{id:string,name:string,description:?string,version:string,database_name:string,ui_entry:?string,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string} */
+    /** @return array{id:string,name:string,description:?string,version:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string} */
     public function appPayload(): array
     {
         return [
@@ -243,7 +255,7 @@ class AppCatalogRequest extends FormRequest
             'description' => $this->string('description')->trim()->toString() ?: null,
             'version' => $this->string('version')->toString(),
             'database_name' => $this->string('database_name')->toString(),
-            'ui_entry' => $this->string('ui_entry')->toString() ?: null,
+            'has_ui' => $this->boolean('has_ui'),
             'navigation' => $this->navigationPayload(),
             'repository_url' => $this->string('repository_url')->toString() ?: null,
             'contract_url' => $this->string('contract_url')->toString() ?: null,

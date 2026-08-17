@@ -3,8 +3,8 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Jobs\DeployAppPlacement;
-use App\Models\User;
 use App\Models\Tenant;
+use App\Models\User;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -197,7 +197,6 @@ class BusinessOnboardingTest extends TestCase
             'app_id' => 'management-aset',
             'release_version' => '0.1.0',
             'placement' => 'pooled-primary',
-            'ui_entry' => 'https://runtime.test/management-aset/',
             'profile' => 'pooled',
             'artifact_status' => 'placed',
             'migration_status' => 'succeeded',
@@ -224,10 +223,12 @@ class BusinessOnboardingTest extends TestCase
                 ->where('app.navigation.rails.0.label', 'Master data')
                 ->where('app.navigation.rails.0.items.1.label', 'Group aset')
                 ->where('app.navigation.activeItemId', 'group-aset')
-                ->where('app.contentEntry', 'https://runtime.test/management-aset/#/group-aset')
+                // Entry diturunkan dari placement yang melayani tenant ini, jadi
+                // path membawa nama placement — bukan nilai yang pernah disimpan.
+                ->where('app.contentEntry', '/apps-content/pooled-primary/management-aset/#/group-aset')
             );
 
-        DB::table('app_placements')->where('app_id', 'management-aset')->update(['ui_entry' => null]);
+        DB::table('app_placements')->where('app_id', 'management-aset')->update(['runtime_status' => 'starting']);
         $this->actingAs($owner)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
             ->has('launchableProducts', 0));
     }

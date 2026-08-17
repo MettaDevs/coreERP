@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import type { CoreErpTheme } from '@apperp/ui/theme';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppearance } from '@/hooks/use-appearance';
 
 type HostedApp = {
@@ -10,9 +10,61 @@ type HostedApp = {
     contextToken: string;
 };
 
+/**
+ * Iframe tidak memberi tahu apa pun saat isinya gagal dimuat, dan `onLoad` bukan
+ * bukti berhasil: saat container UI mati, reverse proxy membalas halaman errornya
+ * sendiri, halaman itu dimuat dengan sukses, dan pengguna melihat "500 Proxy Error"
+ * berbahasa Inggris seolah seluruh sistem mati.
+ *
+ * Karena itu app dianggap siap hanya setelah ia mengumumkan diri lewat
+ * `coreerp.ready` — satu-satunya sinyal yang tidak bisa dipalsukan halaman error.
+ * Selebihnya shell yang memegang status memuat dan status gagal.
+ */
+const LOAD_TIMEOUT_MS = 15_000;
+
+type FrameState = 'loading' | 'ready' | 'failed';
+
 export default function HostedApp({ app }: { app: HostedApp }) {
+    useEffect(() => {
+        const htmlOverflow = document.documentElement.style.overflow;
+        const bodyOverflow = document.body.style.overflow;
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            document.documentElement.style.overflow = htmlOverflow;
+            document.body.style.overflow = bodyOverflow;
+        };
+    }, []);
+
+    return (
+        <>
+            <Head title={app.name} />
+            {/*
+             * Frame di-remount lewat key setiap entry atau token berubah, sehingga
+             * statusnya kembali ke "memuat" tanpa perlu menulis state dari dalam
+             * effect.
+             */}
+            <AppFrame
+                key={`${app.contentEntry}:${app.contextToken}`}
+                app={app}
+            />
+        </>
+    );
+}
+
+/**
+ * Sandbox pada iframe di bawah adalah pembatas tambahan, bukan batas isolasi.
+ * Konten app disajikan same-origin, sehingga `allow-same-origin` — yang dibutuhkan
+ * agar pengecekan origin postMessage dan storage app bekerja — membuat frame tetap
+ * sederajat dengan shell. Isolasi sungguhan menuntut origin terpisah, dan itu
+ * bergantung pada keputusan addressing yang belum diambil; lihat
+ * App\Support\AppContentPath.
+ */
+function AppFrame({ app }: { app: HostedApp }) {
     const frame = useRef<HTMLIFrameElement>(null);
     const loadedEntry = useRef<string | null>(null);
+    const [state, setState] = useState<FrameState>('loading');
     const { resolvedAppearance } = useAppearance();
 
     const sendContext = () => {
@@ -49,6 +101,7 @@ export default function HostedApp({ app }: { app: HostedApp }) {
                 return;
             }
 
+            setState('ready');
             sendContext();
         };
 
@@ -66,31 +119,60 @@ export default function HostedApp({ app }: { app: HostedApp }) {
     }, [app.contentEntry, app.contextToken, app.id, resolvedAppearance]);
 
     useEffect(() => {
-        const htmlOverflow = document.documentElement.style.overflow;
-        const bodyOverflow = document.body.style.overflow;
-        document.documentElement.style.overflow = 'hidden';
-        document.body.style.overflow = 'hidden';
+        // Proxy yang tidak melayani path app umumnya membalas cepat, tetapi
+        // container UI yang hidup-tapi-menggantung tidak membalas sama sekali.
+        // Timeout menutup kasus kedua supaya frame tidak diam selamanya.
+        const timer = window.setTimeout(() => {
+            setState((current) => (current === 'loading' ? 'failed' : current));
+        }, LOAD_TIMEOUT_MS);
 
-        return () => {
-            document.documentElement.style.overflow = htmlOverflow;
-            document.body.style.overflow = bodyOverflow;
-        };
+        return () => window.clearTimeout(timer);
     }, []);
 
     return (
-        <>
-            <Head title={app.name} />
+        <div className="relative h-[calc(100svh-5rem)] w-full">
             <iframe
-                key={`${app.contentEntry}:${app.contextToken}`}
                 ref={frame}
-                className="block h-[calc(100svh-5rem)] w-full border-0 bg-transparent"
+                className="block h-full w-full border-0 bg-transparent"
                 src={app.contentEntry}
                 title={app.name}
+                sandbox="allow-scripts allow-forms allow-popups allow-downloads allow-same-origin"
                 onLoad={() => {
                     loadedEntry.current = app.contentEntry;
                     sendContext();
                 }}
+                onError={() => setState('failed')}
             />
-        </>
+
+            {state !== 'ready' && (
+                <div className="bg-background absolute inset-0 flex items-center justify-center p-6">
+                    {state === 'loading' ? (
+                        <p className="text-muted-foreground text-sm">
+                            Memuat {app.name}…
+                        </p>
+                    ) : (
+                        <div className="max-w-md space-y-2 text-center">
+                            <p className="font-medium">
+                                {app.name} belum bisa dimuat
+                            </p>
+                            <p className="text-muted-foreground text-sm">
+                                Halaman app tidak merespons. Biasanya ini
+                                berarti layanannya sedang tidak berjalan atau
+                                belum selesai dipasang. Coba muat ulang sebentar
+                                lagi; kalau tetap begini, beri tahu tim yang
+                                mengelola sistem.
+                            </p>
+                            <button
+                                type="button"
+                                className="text-sm underline underline-offset-4"
+                                onClick={() => router.reload()}
+                            >
+                                Muat ulang
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
     );
 }

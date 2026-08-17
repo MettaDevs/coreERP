@@ -5,6 +5,7 @@ namespace Tests\Feature\ControlPlane;
 use App\Models\CoreApp;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class BootstrapLocalAppRuntimeTest extends TestCase
@@ -28,12 +29,14 @@ class BootstrapLocalAppRuntimeTest extends TestCase
             'manifest' => $manifest,
             '--api-image' => 'local/sample-api@sha256:'.str_repeat('a', 64),
             '--ui-image' => 'local/sample-ui@sha256:'.str_repeat('b', 64),
-            '--ui-entry' => 'http://localhost:18092/',
             '--api-service' => 'sample-api',
             '--ui-service' => 'sample-ui',
             '--database-service' => 'sample-db',
         ])->expectsOutputToContain('LOCAL_SERVICE_TOKEN=')
             ->expectsOutputToContain('Runtime lokal sample-app siap pada pooled-primary.')
+            // Path konten dilaporkan agar developer tahu di mana app disajikan,
+            // tanpa nilai itu pernah ditulis ke database.
+            ->expectsOutputToContain('/apps-content/pooled-primary/sample-app/')
             ->assertSuccessful();
 
         $this->assertDatabaseHas('app_releases', [
@@ -47,7 +50,6 @@ class BootstrapLocalAppRuntimeTest extends TestCase
             'artifact_status' => 'placed',
             'migration_status' => 'succeeded',
             'runtime_status' => 'ready',
-            'ui_entry' => 'http://localhost:18092/',
         ]);
         $this->assertDatabaseHas('app_service_credentials', [
             'app_id' => 'sample-app',
@@ -60,23 +62,6 @@ class BootstrapLocalAppRuntimeTest extends TestCase
             'manifest' => $manifest,
             '--api-image' => 'local/sample-api@sha256:'.str_repeat('a', 64),
             '--ui-image' => 'local/sample-ui@sha256:'.str_repeat('b', 64),
-            '--ui-entry' => 'http://192.168.1.10:18092/',
-            '--api-service' => 'sample-api',
-            '--ui-service' => 'sample-ui',
-            '--database-service' => 'sample-db',
-        ])->assertSuccessful();
-
-        $this->assertDatabaseHas('app_placements', [
-            'app_id' => 'sample-app',
-            'placement' => 'pooled-primary',
-            'ui_entry' => 'http://192.168.1.10:18092/',
-        ]);
-
-        $this->artisan('app:bootstrap-local-runtime', [
-            'manifest' => $manifest,
-            '--api-image' => 'local/sample-api@sha256:'.str_repeat('a', 64),
-            '--ui-image' => 'local/sample-ui@sha256:'.str_repeat('b', 64),
-            '--ui-entry' => 'http://localhost:18092/',
             '--api-service' => 'sample-api',
             '--ui-service' => 'sample-ui',
             '--database-service' => 'sample-db',
@@ -84,5 +69,13 @@ class BootstrapLocalAppRuntimeTest extends TestCase
             ->assertSuccessful();
 
         $this->assertDatabaseCount('app_service_credentials', 1);
+    }
+
+    public function test_it_no_longer_stores_a_ui_entry_column(): void
+    {
+        // Kolomnya dihapus, bukan sekadar tidak diisi. Selama kolom itu ada,
+        // jalur tulis mana pun bisa mengembalikan nilai basi yang mengikat host.
+        $this->assertFalse(Schema::hasColumn('app_placements', 'ui_entry'));
+        $this->assertFalse(Schema::hasColumn('apps', 'ui_entry'));
     }
 }

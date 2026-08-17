@@ -65,7 +65,7 @@ Route::middleware(RestrictedDocsAccess::class)->group(function () {
 
 Route::get('api/v1/control/apps', fn () => response()->json([
     'data' => CoreApp::query()->where('status', 'available')->orderBy('name')->get([
-        'id', 'name', 'description', 'version', 'database_name', 'ui_entry',
+        'id', 'name', 'description', 'version', 'database_name', 'has_ui',
     ]),
 ]))->name('api.control.apps.index');
 
