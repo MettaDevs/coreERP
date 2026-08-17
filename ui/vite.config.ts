@@ -6,6 +6,12 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
 
     return {
+        // Web Shell menyajikan UI ini di bawah prefix yang memuat nama placement,
+        // dan placement berbeda antar deployment sedangkan image release-nya satu.
+        // Base absolut karena itu memaksa satu build per placement; base relatif
+        // membuat satu image jalan di semua placement. Aman karena app memakai
+        // hash routing, jadi URL dokumen tetap berada di root direktorinya.
+        base: './',
         plugins: [react(), tailwindcss()],
         server: {
             proxy: {

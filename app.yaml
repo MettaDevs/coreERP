@@ -12,7 +12,6 @@ api:
   openapi: contracts/openapi.yaml
 ui:
   image: registry.apperp.local/apps/management-aset-ui:0.1.0
-  entry: /apps-content/management-aset/
   navigation:
     rail:
       - id: master
