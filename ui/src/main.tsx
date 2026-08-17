@@ -11,8 +11,20 @@ import {
 import { Input } from "@apperp/ui/input";
 import { NativeSelect } from "@apperp/ui/native-select";
 import { applyCoreErpTheme, type CoreErpTheme } from "@apperp/ui/theme";
+import { TooltipProvider } from "@apperp/ui/tooltip";
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import "./styles.css";
+
+/**
+ * Alamat API selalu dihitung relatif terhadap dokumen, bukan terhadap root origin.
+ *
+ * Di dalam Web Shell, UI ini disajikan same-origin di bawah prefix per placement,
+ * sehingga `/api/v1` akan menunjuk control plane, bukan API app ini. Reverse proxy
+ * meneruskan seluruh isi prefix — termasuk `api/` — ke container app.
+ */
+function apiUrl(path: string): string {
+  return new URL(`api/v1/${path}`, document.baseURI).toString();
+}
 
 type AppContext = { token: string; theme: CoreErpTheme };
 type ViewId = "workers" | "jobs" | "positions" | "worker-position-assignments";
@@ -116,7 +128,12 @@ function App() {
 
     window.addEventListener("message", receiveContext);
     window.addEventListener("hashchange", receiveNavigation);
-    window.parent.postMessage({ type: "coreerp.ready" }, parentOrigin || "*");
+    // `appId` wajib: Web Shell mengabaikan pengumuman siap yang tidak menyebutkan
+    // app mana yang siap, dan tanpa itu shell menganggap app ini gagal dimuat.
+    window.parent.postMessage(
+      { type: "coreerp.ready", appId: "human-resources" },
+      parentOrigin || "*",
+    );
 
     return () => {
       window.removeEventListener("message", receiveContext);
@@ -125,7 +142,7 @@ function App() {
   }, []);
 
   const request = async (path: string) => {
-    const response = await fetch(`/api/v1/${path}`, {
+    const response = await fetch(apiUrl(path), {
       headers: {
         Accept: "application/json",
         Authorization: `Bearer ${context?.token}`,
@@ -202,7 +219,7 @@ function App() {
     setSaving(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/v1/${view}`, {
+      const response = await fetch(apiUrl(view), {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -474,4 +491,12 @@ function description(view: ViewId) {
   return "Jabatan menjadi dasar untuk membuat posisi kerja.";
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+// TooltipProvider wajib membungkus akar. Beberapa kontrol @apperp/ui memakai
+// tooltip di dalamnya, dan tanpa provider ini render langsung melempar error:
+// layar app tampil kosong, dan karena render gagal `coreerp.ready` tidak pernah
+// terkirim sehingga shell menampilkannya sebagai gagal dimuat.
+createRoot(document.getElementById("root")!).render(
+  <TooltipProvider delayDuration={0}>
+    <App />
+  </TooltipProvider>,
+);

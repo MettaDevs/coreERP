@@ -12,7 +12,6 @@ api:
   openapi: contracts/openapi.yaml
 ui:
   image: registry.apperp.local/apps/human-resources-ui:0.1.0
-  entry: /apps-content/human-resources/
   navigation:
     rail:
       - id: workforce
