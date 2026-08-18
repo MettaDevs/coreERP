@@ -36,7 +36,7 @@ Setelah stack naik, ini yang aktif:
 | Dokumentasi | `http://localhost:18090` | Situs ini. Ikut nyala bersama stack. |
 | Core database | `localhost:5543` | `core_erp` |
 | Management Aset — API | `localhost:18091` | App bisnis pertama |
-| Management Aset — UI | `localhost:18092` | |
+| Management Aset — UI | `localhost:18092` | Dibuka lewat shell Core, bukan langsung |
 | Management Aset — database | `localhost:5544` | `management_aset` |
 | HR — UI | `localhost:18093` | App bisnis kedua |
 

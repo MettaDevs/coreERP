@@ -50,6 +50,20 @@ Setiap API versioned memakai prefix `/api/v1`. OpenAPI mendefinisikan auth schem
 
 Producer menyimpan payload ke `outbox_events` dalam transaksi yang sama dengan data bisnis. Publisher mengirimkannya setelah commit. Consumer menyimpan message ID pada inbox/processed-events sehingga retry tidak menciptakan efek ganda.
 
+### Kontrak dijaga pemeriksa, bukan kedisiplinan
+
+**Tidak ada satu test pun yang gagal ketika sebuah endpoint absen dari kontrak.** Itu sebabnya endpoint tak terdokumentasi bisa bertahan lama sementara seluruh test hijau — dan kenapa setiap app wajib punya pemeriksa cakupan yang jalan di CI, bukan hanya Core.
+
+Pemeriksa membandingkan rute yang benar-benar terdaftar terhadap kontraknya, dua arah: rute tanpa kontrak, dan kontrak tanpa rute. Tiga hal menentukan apakah ia berguna:
+
+- **Baca rute dari framework, bukan dari teks berkas rute.** Rute yang didaftarkan lewat loop tidak pernah muncul sebagai literal, jadi pencocokan teks melapor bersih sambil melewatkan puluhan rute. `php artisan route:list --json` adalah daftar yang berwenang.
+- **Mekarkan jalur bertemplat yang parameternya ber-`enum`** sebelum membandingkan. Satu jalur bertemplat sah mendokumentasikan beberapa resource; dibandingkan apa adanya ia melaporkan endpoint yang sudah terdokumentasi sebagai hilang. Pemeriksa yang sering salah memberi peringatan akan berhenti dipercaya lalu diabaikan.
+- **Sebut celah yang ditunda, jangan maafkan diam-diam.** Celah yang diketahui dan ada pemiliknya masuk daftar pengecualian beserta alasannya, dicetak tiap kali pemeriksa jalan. Entry yang tidak lagi cocok dengan rute hidup harus gagal, supaya pengecualian basi tidak memaafkan rute lain yang kelak memakai jalur itu.
+
+Kebalikannya juga berlaku: **kode tidak boleh menerima field yang dilarang kontraknya.** Kalau skema memakai `additionalProperties: false` dan field itu tidak ada di dalamnya, ia tidak akan pernah tiba lewat jalur yang sah. Handler yang tetap memvalidasinya mengiklankan kemampuan yang tidak ada, dan pembaca berikutnya menyimpulkan penerbitnya bisa mengirimkannya. Kalau field itu memang ditunda, yang menunggu adalah kodenya, bukan kontraknya.
+
+Implementasi rujukan: `contracts/check-contract-coverage.py` di Control Plane dan di app Management Aset.
+
 ## POS dan Booking tanpa shared database
 
 ```mermaid

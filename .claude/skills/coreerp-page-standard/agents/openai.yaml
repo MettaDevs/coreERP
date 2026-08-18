@@ -1,0 +1,4 @@
+interface:
+  display_name: "CoreERP Page Standard"
+  short_description: "Standar halaman CoreERP yang konsisten"
+  default_prompt: "Use $coreerp-page-standard to build a CoreERP page that matches the platform layout and UI conventions."

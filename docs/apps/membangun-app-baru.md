@@ -15,6 +15,7 @@ flowchart TD
     S6 --> S7[7 · Masuk stack lokal]
     S7 --> S8[8 · Gate concurrency]
     S8 --> S9[9 · Katalog dan release]
+    S9 --> S10[10 · Dokumentasi untuk developer]
 ```
 
 ---
@@ -75,11 +76,11 @@ Database app berikutnya mengambil port `localhost` bebas berikutnya pada deret 5
 `management-aset` memakai database bernama `management_aset`, tanpa awalan `app_erp_`, sehingga menyimpang dari pola di [Standar module](/dev/02-module-standard). App baru **tetap memakai pola `app_erp_<app>`** — jangan meniru penyimpangan ini.
 :::
 
-## Artefak wajib di repository app
+## Berkas yang wajib ada di repository app
 
 Repository dianggap lengkap hanya bila seluruh berkas berikut ada dan berisi hal yang sebenarnya:
 
-| Artefak | Keterangan |
+| Berkas | Keterangan |
 | --- | --- |
 | `app.yaml` | Manifest: identitas, database, navigasi, empat lapis keamanan, reference nomor, data policy, tipe workflow |
 | `api/` | Service API beserta `Dockerfile` |
@@ -127,7 +128,7 @@ Buat repository baru dari `app-erp-template`. Jangan menyalin app yang sudah jad
 Repository app wajib berisi `api/`, `ui/`, `database/migrations/`, `contracts/`, dan `deploy/`.
 
 ::: tip Gate keluar
-Repository berdiri, dan `rg -ni "change-me|change me|template app|app-template"` tidak lagi menyisakan nama template pada artefak produk.
+Repository berdiri, dan `rg -ni "change-me|change me|template app|app-template"` tidak lagi menyisakan nama template pada berkas produk.
 :::
 
 ---
@@ -293,7 +294,7 @@ Gate kebenaran wajib **nol**, diverifikasi lewat SQL langsung ke database — bu
 Nol pelanggaran lintas tenant, nol nomor ganda, nol eskalasi hak, nol 5xx aplikasi. Kalau load test tidak dapat dijalankan, nyatakan app belum terverifikasi di bawah concurrency dan **jangan** laporkan selesai.
 :::
 
-Implementasi rujukan lengkap ada di `app-erp-management-aset/loadtest/`. Aturan: [Load dan concurrency testing](/dev/15-load-and-concurrency-testing).
+Implementasi rujukan lengkap ada di `app-erp-management-aset/loadtest/`. Aturan: [Load dan concurrency testing](/dev/20-load-and-concurrency-testing).
 
 ---
 
@@ -313,6 +314,27 @@ Detail: [Menerbitkan release app](/dev/13-publishing-an-app-release).
 
 ---
 
+## 10 · Dokumentasi untuk developer
+
+App yang sudah rilis tetapi tidak terdokumentasi memaksa orang berikutnya membaca controller baris per baris untuk mengetahui aturan yang dijaganya. Aturan itu ada di kepala penulisnya dan di komentar kode, dan keduanya hilang begitu ia pindah pekerjaan.
+
+Yang ditulis di `docs/apps/<app-id>/`:
+
+| Berkas | Isi |
+| --- | --- |
+| `index.md` | Ringkasan modul, dari template `docs/apps/_template/` |
+| `arsitektur/` | Hal lintas fitur: batas tenant, integrasi Core, kontrak, database, pengujian |
+| `master/` | Satu halaman per master yang punya aturan khusus |
+| `transaction/` | Satu halaman per dokumen atau proses |
+
+Isinya menjelaskan **apa yang disimpan, aturan apa yang dijaga kode, dan kenapa aturannya begitu** — bukan cara memakai layar. Bentuk, bahasa, dan hal yang tidak boleh ditulis ada di [Pola dokumen fitur](/apps/management-aset/pola-dokumen); contoh yang sudah jadi ada di [Management Aset](/apps/management-aset/).
+
+::: tip Gate keluar
+Tiap fitur yang lolos gate keluar tahap sebelumnya punya halamannya sendiri, seluruh halaman terdaftar di `docs/.vitepress/config.ts`, dan `npx vitepress build docs` lolos tanpa tautan mati.
+:::
+
+---
+
 ## Yang tidak termasuk jalur ini
 
 **Upgrade versi.** Menaikkan versi release bukan bagian dari pembuatan app. Ia memerlukan compatibility matrix, backup terverifikasi, traffic drain, dependency check, dan prosedur rollback. Selama app masih di release pengembangan, jalankan migration baru pada placement pengembangan dan jangan memperlakukannya sebagai upgrade produksi.
@@ -323,5 +345,6 @@ Detail: [Menerbitkan release app](/dev/13-publishing-an-app-release).
 
 - [Katalog app](/apps/) — app yang sudah ada beserta statusnya
 - [Management Aset](/apps/management-aset/) — contoh app yang sudah melewati gate concurrency
+- [Pola dokumen fitur](/apps/management-aset/pola-dokumen) — bentuk dokumen pada tahap 10
 - [Standar module](/dev/02-module-standard) — kontrak lengkap satu app
 - [Definition of done](/onboarding/definition-of-done) — standar selesai lintas jenis pekerjaan

@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: CoreERP Control Plane events
-  version: 2.0.0
+  version: 2.1.0
   description: |
     Event yang **diterbitkan** Control Plane ke aplikasi bisnis.
 
@@ -32,6 +32,12 @@ servers:
       berdasarkan `type` event. Tidak ada broker; pengiriman point-to-point.
 
 channels:
+  core.tenant.provisioned.v1:
+    address: core.tenant.provisioned.v1
+    description: Fakta bahwa tenant siap menerima provisioning reference dari aplikasi yang terpasang.
+    messages:
+      tenantProvisioned:
+        $ref: '#/components/messages/tenantProvisioned'
   core.workflow.decision.v2:
     address: core.workflow.decision.v2
     description: Keputusan akhir sebuah workflow instance yang dijalankan Core atas nama app.
@@ -51,6 +57,22 @@ operations:
 
 components:
   messages:
+    tenantProvisioned:
+      name: tenantProvisioned
+      title: Tenant siap diprovision
+      contentType: application/json
+      headers:
+        type: object
+        required: [X-CoreERP-Event-Timestamp, X-CoreERP-Event-Signature]
+        properties:
+          X-CoreERP-Event-Timestamp:
+            type: string
+            description: Unix timestamp saat request dikirim.
+          X-CoreERP-Event-Signature:
+            type: string
+            description: hash_hmac SHA-256 atas timestamp dan raw body dengan secret CoreERP.
+      payload:
+        $ref: '#/components/schemas/tenantProvisionedEvent'
     workflowDecision:
       name: workflowDecision
       title: Keputusan workflow
@@ -71,6 +93,37 @@ components:
         $ref: '#/components/schemas/workflowDecisionEvent'
 
   schemas:
+    tenantProvisionedEvent:
+      type: object
+      additionalProperties: false
+      required: [id, type, occurred_at, tenant_id, correlation_id, data]
+      properties:
+        id:
+          type: string
+          description: ULID event; consumer tetap wajib idempoten saat menerima retry.
+        type:
+          const: core.tenant.provisioned.v1
+        occurred_at:
+          type: string
+          format: date-time
+        tenant_id:
+          type: string
+          description: ULID tenant yang harus diprovision.
+        correlation_id:
+          type: string
+          description: ULID tenant sebagai akar korelasi provisioning.
+        legal_entity_id:
+          type: [string, 'null']
+        data:
+          type: object
+          additionalProperties: false
+          description: Disiapkan untuk pemilihan template pada versi berikutnya; v1 memakai default app.
+          required: [app_ids]
+          properties:
+            app_ids:
+              type: array
+              uniqueItems: true
+              items: { type: string }
     workflowDecisionEvent:
       type: object
       additionalProperties: false

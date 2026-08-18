@@ -78,7 +78,12 @@ class BootstrapLocalAppRuntimeCommand extends Command
             'ui_image' => ['required', 'string', 'max:500', 'regex:/^.+@sha256:[a-f0-9]{64}$/'],
             'compose_project' => $identifier,
             'compose_file' => ['required', 'string', 'max:120', 'regex:#^(?!.*\.\.)[A-Za-z0-9_./-]+\.ya?ml$#'],
-            'ui_entry' => ['required', 'string', 'max:2048', 'regex:#^http://localhost(?::[0-9]{1,5})?/#'],
+            'ui_entry' => [
+                'required',
+                'string',
+                'max:2048',
+                'regex:#^http://(?:localhost|(?:[0-9]{1,3}\.){3}[0-9]{1,3})(?::[0-9]{1,5})?/#',
+            ],
             'api_service' => $identifier,
             'ui_service' => $identifier,
             'database_service' => $identifier,

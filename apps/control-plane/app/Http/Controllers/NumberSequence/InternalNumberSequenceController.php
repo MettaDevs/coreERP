@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\NumberSequence;
 
+use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Actions\NumberSequence\NumberSequenceService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\NumberSequence\InternalNumberSequenceRequest;
@@ -10,14 +11,20 @@ use Illuminate\Http\Request;
 
 class InternalNumberSequenceController extends Controller
 {
-    public function issue(InternalNumberSequenceRequest $request, string $reference, NumberSequenceService $service): JsonResponse
+    public function issue(InternalNumberSequenceRequest $request, string $reference, NumberSequenceService $service, EnsureNumberSequenceDrafts $drafts): JsonResponse
     {
-        return response()->json(['data' => $service->issue($this->context($request), $reference, $request->string('idempotency_key')->toString(), $request->string('manual_value')->toString() ?: null)]);
+        $context = $this->context($request);
+        $drafts->forTenantAndApp($context['tenant_id'], $context['app_id']);
+
+        return response()->json(['data' => $service->issue($context, $reference, $request->string('idempotency_key')->toString(), $request->string('manual_value')->toString() ?: null)]);
     }
 
-    public function reserve(InternalNumberSequenceRequest $request, string $reference, NumberSequenceService $service): JsonResponse
+    public function reserve(InternalNumberSequenceRequest $request, string $reference, NumberSequenceService $service, EnsureNumberSequenceDrafts $drafts): JsonResponse
     {
-        return response()->json(['data' => $service->reserve($this->context($request), $reference, $request->string('idempotency_key')->toString())], 201);
+        $context = $this->context($request);
+        $drafts->forTenantAndApp($context['tenant_id'], $context['app_id']);
+
+        return response()->json(['data' => $service->reserve($context, $reference, $request->string('idempotency_key')->toString())], 201);
     }
 
     public function confirm(Request $request, string $reservation, NumberSequenceService $service): JsonResponse
