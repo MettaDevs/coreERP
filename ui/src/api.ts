@@ -36,8 +36,19 @@ export function newIdempotencyKey(): string {
     return `request-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
+/**
+ * Alamat API selalu dihitung relatif terhadap dokumen, bukan terhadap root origin.
+ *
+ * Di dalam Web Shell, UI ini disajikan same-origin di bawah prefix per placement,
+ * sehingga `/api/v1` akan menunjuk control plane, bukan API app ini. Reverse proxy
+ * meneruskan seluruh isi prefix — termasuk `api/` — ke container app.
+ */
+function apiUrl(path: string): string {
+    return new URL(`api/v1${path}`, document.baseURI).toString();
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(`/api/v1${path}`, {
+    const response = await fetch(apiUrl(path), {
         ...init,
         headers: {
             'Content-Type': 'application/json',
