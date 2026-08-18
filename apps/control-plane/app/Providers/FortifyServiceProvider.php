@@ -76,24 +76,18 @@ class FortifyServiceProvider extends ServiceProvider
             };
         });
 
-        $this->app->singleton(RegisterResponseContract::class, function () {
-            return new class implements RegisterResponseContract {
-                public function toResponse($request) {
-                    auth()->guard('web')->logout();
-                    $request->session()->invalidate();
-                    $request->session()->regenerateToken();
-
-                    return redirect()->route('login')->with('status', 'Registrasi bisnis berhasil. Silakan masuk menggunakan akun Anda.');
-                }
-            };
-        });
 
         $this->app->singleton(LoginResponseContract::class, \App\Http\Responses\LoginResponse::class);
 
-        $this->app->singleton(\Laravel\Fortify\Contracts\LogoutResponse::class, function () {
-            return new class implements \Laravel\Fortify\Contracts\LogoutResponse {
-                public function toResponse($request) {
-                    return redirect()->route('login');
+        $this->app->singleton(RegisterResponseContract::class, function () {
+            return new class implements RegisterResponseContract {
+                public function toResponse($request)
+                {
+                    auth()->guard()->logout();
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+
+                    return redirect()->route('login')->with('status', 'Registrasi berhasil! Silakan masuk dengan email dan kata sandi Anda.');
                 }
             };
         });
@@ -124,25 +118,18 @@ class FortifyServiceProvider extends ServiceProvider
 
             $request->validate([
                 'email' => ['required', 'string', 'email:filter'],
-                'password' => ['required', 'string', 'min:8'],
+                'password' => ['required', 'string'],
             ], [
                 'email.required' => 'Email wajib diisi.',
                 'email.email' => 'Format email tidak valid.',
                 'password.required' => 'Password wajib diisi.',
-                'password.min' => 'Password minimal 8 karakter.',
             ]);
 
             $user = User::where('email', $email)->first();
 
-            if (! $user) {
+            if (! $user || ! Hash::check($request->password, $user->password)) {
                 throw ValidationException::withMessages([
-                    'email' => ['Email tidak ditemukan.'],
-                ]);
-            }
-
-            if (! Hash::check($request->password, $user->password)) {
-                throw ValidationException::withMessages([
-                    'password' => ['Password salah.'],
+                    'email' => ['Email atau password salah.'],
                 ]);
             }
 
@@ -214,7 +201,7 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
-            return Limit::perMinute(5)->by($throttleKey);
+            return Limit::perMinute((int) config('coreerp.login_rate_limit', 15))->by($throttleKey);
         });
 
         /* @chisel-passkeys */

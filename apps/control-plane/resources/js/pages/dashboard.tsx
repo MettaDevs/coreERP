@@ -326,9 +326,15 @@ const CustomCategoryTick = (props: any) => {
 };
 
 export default function Dashboard() {
-    const { auth } = usePage<any>().props;
+    const { auth, workspace } = usePage<any>().props;
     const currentTenantName = auth?.membership?.tenant_name ?? 'PKL';
-    const isInitialDemoBusiness = true;
+    const currentTenantId = auth?.membership?.tenant_id;
+
+    // Only seeded demo business retains sample metrics; all newly created businesses are clean and empty by default
+    const isInitialDemoBusiness = useMemo(() => {
+        if (!auth?.membership) return false;
+        return Boolean(auth.membership.is_demo);
+    }, [auth?.membership]);
 
     // --- STATE MANAGEMENT ---
     const [searchQuery, setSearchQuery] = useState('');
@@ -1068,11 +1074,11 @@ html,body{width:297mm;height:210mm;overflow:hidden;background:#fff;-webkit-print
                         </div>
                         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
                             <Link
-                                href="/master-data/entitas-aset"
+                                href="/apps/management-aset"
                                 className="px-4 py-2.5 text-xs font-bold rounded-full bg-white text-slate-900 hover:bg-slate-100 shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
                             >
-                                <Plus className="size-4" />
-                                <span>Tambah Entitas Aset</span>
+                                <Box className="size-4" />
+                                <span>Buka Modul Aset</span>
                             </Link>
                         </div>
                     </div>

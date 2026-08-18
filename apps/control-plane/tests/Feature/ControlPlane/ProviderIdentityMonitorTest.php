@@ -15,6 +15,7 @@ class ProviderIdentityMonitorTest extends TestCase
 
     public function test_provider_seed_is_idempotent_and_monitor_does_not_grant_tenant_ownership(): void
     {
+        config()->set('coreerp.provider.email', 'provider@coreerp.local');
         config()->set('coreerp.provider.password', 'LocalProviderPassword!123');
         $this->seed(AppCatalogSeeder::class);
         $this->seed(ProviderAdminSeeder::class);

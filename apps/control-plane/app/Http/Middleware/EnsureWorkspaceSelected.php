@@ -18,17 +18,36 @@ class EnsureWorkspaceSelected
     {
         $user = $request->user();
 
-        if ($user && ! $request->routeIs('workspace.select', 'workspace.select.store', 'logout')) {
-            $workspace = app(CurrentWorkspace::class);
-            $memberships = $workspace->memberships($request);
+        if ($user && ! $request->is('api/*', 'settings/*', 'control/*') && ! $request->expectsJson()) {
+            $exemptRoutePatterns = [
+                'workspace.*',
+                'logout',
+                'login*',
+                'register*',
+                'password.*',
+                'verification.*',
+                'check-email',
+                'profile.*',
+                'security.*',
+                'security-configuration.*',
+                'user-password.*',
+                'appearance.*',
+                'two-factor.*',
+                'well-known.*',
+                'docs.*',
+                'scramble.*',
+            ];
 
-            $currentMembershipId = $request->session()->get('workspace.membership_id');
-            $currentMembership = $currentMembershipId ? $memberships->firstWhere('id', $currentMembershipId) : null;
+            if (! $request->routeIs($exemptRoutePatterns)) {
+                $workspace = app(CurrentWorkspace::class);
+                $memberships = $workspace->memberships($request);
 
-            if (! $currentMembership) {
-                $request->session()->forget(['workspace.membership_id', 'workspace.legal_entity_id', 'workspace.org_unit_id']);
+                $currentMembershipId = $request->session()->get('workspace.membership_id');
+                $currentMembership = $currentMembershipId ? $memberships->firstWhere('id', $currentMembershipId) : null;
 
-                if ($memberships->count() > 0) {
+                if (! $currentMembership) {
+                    $request->session()->forget(['workspace.membership_id', 'workspace.legal_entity_id', 'workspace.org_unit_id']);
+
                     return redirect()->route('workspace.select');
                 }
             }

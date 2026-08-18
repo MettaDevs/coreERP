@@ -30,10 +30,12 @@ class SecurityConfigurationTest extends TestCase
 
     public function test_custom_security_configuration_is_drafted_published_and_then_usable_by_a_role(): void
     {
-        $this->actingAs($this->owner)->post('/settings/security-configuration/privileges', [
+        $response = $this->actingAs($this->owner)->post('/settings/security-configuration/privileges', [
             'name' => 'Lihat perencanaan',
-            'permission_codes' => ['management-aset.perencanaan-aset.read'],
-        ])->assertRedirect();
+            'permission_codes' => ['management-aset.entitas-aset.read'],
+        ]);
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
         $privilege = SecurityPrivilege::query()->where('source', 'custom')->firstOrFail();
         $this->assertSame('draft', $privilege->status);
 
@@ -60,7 +62,7 @@ class SecurityConfigurationTest extends TestCase
             'role_id' => $roleId,
             'source' => 'manual', 'status' => 'active', 'valid_from' => now(),
         ]);
-        $this->assertContains('management-aset.perencanaan-aset.read', app(LaunchableAppCatalog::class)
+        $this->assertContains('management-aset.entitas-aset.read', app(LaunchableAppCatalog::class)
             ->permissionsFor($this->owner->activeMembership()->refresh(), 'management-aset'));
     }
 }

@@ -123,18 +123,6 @@ export function AppSidebar() {
                           },
                       ],
                   },
-                  {
-                      label: 'Master Data',
-                      icon: Database,
-                      href: '/master-data/entitas-aset',
-                      children: [
-                          {
-                              label: 'Entitas Aset',
-                              icon: Building2,
-                              href: '/master-data/entitas-aset',
-                          },
-                      ],
-                  },
                   ...(props.auth.membership &&
                   ['owner', 'admin'].includes(props.auth.membership.system_role)
                       ? [

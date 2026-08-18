@@ -34,6 +34,11 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
         return $this->appId.':'.$this->placement;
     }
 
+    public function uniqueVia(): \Illuminate\Contracts\Cache\Repository
+    {
+        return cache()->store(app()->runningUnitTests() ? 'array' : config('cache.default', 'database'));
+    }
+
     public function handle(): void
     {
         $this->validateIdentifier($this->appId, 80, 'app');

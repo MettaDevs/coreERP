@@ -18,10 +18,17 @@ class DashboardTest extends TestCase
 
     public function test_authenticated_users_can_visit_the_dashboard()
     {
+        $this->seed(\Database\Seeders\AppCatalogSeeder::class);
         $user = User::factory()->create();
-        $this->actingAs($user);
+        $membership = app(\App\Actions\Onboarding\RegisterBusiness::class)->createForUser($user, [
+            'business_name' => 'PT Test',
+            'app_ids' => ['management-aset'],
+        ]);
 
-        $response = $this->get(route('dashboard'));
+        $response = $this->actingAs($user)
+            ->withSession(['workspace.membership_id' => $membership->id])
+            ->get(route('dashboard'));
+
         $response->assertOk();
     }
 }

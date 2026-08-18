@@ -31,11 +31,15 @@
             so a SQLite suite cannot prove any of the concurrency guarantees.
         -->
         <env name="DB_CONNECTION" value="pgsql_test"/>
+        <env name="DB_TEST_DATABASE" value="core_erp_test"/>
+        <env name="DB_DATABASE" value="core_erp_test"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="LOG_CHANNEL" value="stderr"/>
         <env name="QUEUE_CONNECTION" value="database"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="COREERP_REGISTRATION_RATE_LIMIT" value="100"/>
+        <env name="COREERP_LOGIN_RATE_LIMIT" value="100"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

@@ -57,6 +57,7 @@ class HandleInertiaRequests extends Middleware
                     'system_role' => $membership->system_role,
                     'tenant_id' => $membership->tenant_id,
                     'tenant_name' => $membership->tenant->name,
+                    'is_demo' => in_array($membership->tenant_id, ['default-tenant', 'demo-tenant']) || $membership->tenant->slug === 'pt-sanata-system',
                 ] : null,
                 'provider_admin' => $user?->providerAccess()->where('role', 'provider_admin')->exists() ?? false,
             ],

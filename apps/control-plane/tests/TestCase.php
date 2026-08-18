@@ -7,9 +7,23 @@ use Laravel\Fortify\Features;
 
 abstract class TestCase extends BaseTestCase
 {
+    public function createApplication()
+    {
+        $app = parent::createApplication();
+        $app['config']->set('database.default', 'pgsql_test');
+        return $app;
+    }
+
+    protected function connectionsToTransact()
+    {
+        return ['pgsql_test'];
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);
 
         // Fixture katalog untuk test. Bentuknya sengaja memakai empat lapis
         // Dynamics 365 yang berbeda — entry point, permission, privilege, duty —

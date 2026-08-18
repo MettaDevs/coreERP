@@ -40,62 +40,6 @@ use Laravel\Fortify\Http\Controllers\RegisteredUserController;
 Route::get('/', function () {
     return Inertia::render('welcome');
 })->name('home');
-
-Route::get('login', function (Request $request) {
-    return Inertia::render('auth/login', [
-        'canResetPassword' => true,
-        'status' => $request->session()->get('status'),
-    ]);
-})->name('login');
-Route::post('login', [AuthenticatedSessionController::class, 'store']);
-
-Route::get('register', function () {
-    return Inertia::render('auth/register', [
-        'passwordRules' => Password::defaults()->toPasswordRulesString(),
-        'apps' => CoreApp::query()
-            ->where('status', 'available')
-            ->orderBy('name')
-            ->get(['id', 'name', 'description'])
-            ->map(fn (CoreApp $app): array => [
-                'id' => $app->id,
-                'name' => $app->name,
-                'description' => $app->description ?? '',
-            ])->values(),
-    ]);
-})->name('register');
-Route::post('check-email', function (Request $request) {
-    $email = \Illuminate\Support\Str::lower(trim((string) $request->input('email')));
-    $user = \App\Models\User::where('email', $email)->first();
-    $count = 0;
-    if ($user) {
-        $count = \App\Models\TenantMembership::where('user_id', $user->id)->count();
-    }
-    $maxReached = $count >= 3;
-    return response()->json([
-        'exists' => $user !== null,
-        'maxReached' => $maxReached,
-        'count' => $count,
-        'message' => $maxReached ? 'Email ini telah terdaftar untuk 3 bisnis (batas maksimal). Silakan gunakan email lain atau login.' : null,
-    ]);
-});
-Route::post('register', [RegisteredUserController::class, 'store']);
-
-Route::get('forgot-password', function (Request $request) {
-    return Inertia::render('auth/forgot-password', [
-        'status' => $request->session()->get('status'),
-        'email' => $request->query('email', ''),
-    ]);
-})->name('password.request');
-Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])->name('password.email');
-
-Route::get('reset-password/{token}', function (Request $request, string $token) {
-    return Inertia::render('auth/reset-password', [
-        'email' => $request->email,
-        'token' => $token,
-        'passwordRules' => Password::defaults()->toPasswordRulesString(),
-    ]);
-})->name('password.reset');
-Route::post('reset-password', [NewPasswordController::class, 'store'])->name('password.update');
 Route::inertia('ui-playground', 'ui-playground')->name('ui-playground');
 Route::inertia('lottie', 'lottie-gallery')->name('lottie-gallery');
 
@@ -135,6 +79,71 @@ Route::get('api/v1/control/apps', fn () => response()->json([
 ]))->name('api.control.apps.index');
 
 Route::middleware('guest')->group(function () {
+    Route::get('login', function (Request $request) {
+        return Inertia::render('auth/login', [
+            'canResetPassword' => true,
+            'status' => $request->session()->get('status'),
+        ]);
+    })->name('login');
+    Route::post('login', [AuthenticatedSessionController::class, 'store'])
+        ->name('login.store');
+
+    Route::get('register', function () {
+        return Inertia::render('auth/register', [
+            'passwordRules' => Password::defaults()->toPasswordRulesString(),
+            'apps' => CoreApp::query()
+                ->where('status', 'available')
+                ->orderBy('name')
+                ->get(['id', 'name', 'description'])
+                ->map(fn (CoreApp $app): array => [
+                    'id' => $app->id,
+                    'name' => $app->name,
+                    'description' => $app->description ?? '',
+                ])->values(),
+        ]);
+    })->name('register');
+    Route::post('register', [RegisteredUserController::class, 'store'])
+        ->middleware('throttle:'.config('coreerp.registration_rate_limit', 5).',1')
+        ->name('register.store');
+
+    Route::post('check-email', function (Request $request) {
+        $email = \Illuminate\Support\Str::lower(trim((string) $request->input('email')));
+        $exists = \App\Models\User::where('email', $email)->exists();
+
+        return response()->json([
+            'available' => ! $exists,
+            'message' => $exists ? 'Email sudah terdaftar. Silakan gunakan email lain atau login.' : null,
+        ]);
+    })->middleware('throttle:20,1')->name('check-email');
+
+    Route::get('forgot-password', function (Request $request) {
+        return Inertia::render('auth/forgot-password', [
+            'status' => $request->session()->get('status'),
+            'email' => $request->query('email', ''),
+        ]);
+    })->name('password.request');
+    Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('password.email');
+
+    Route::get('reset-password/{token}', function (Request $request, string $token) {
+        return Inertia::render('auth/reset-password', [
+            'email' => $request->email,
+            'token' => $token,
+            'passwordRules' => Password::defaults()->toPasswordRulesString(),
+        ]);
+    })->name('password.reset');
+    Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('password.update');
+
+    Route::get('join', fn () => Inertia::render('auth/join', [
+        'passwordRules' => Password::defaults()->toPasswordRulesString(),
+    ]))->name('join');
+    Route::post('join', [InvitationRedemptionController::class, 'store'])
+        ->middleware('throttle:5,1')
+        ->name('join.store');
+
     Route::post('api/v1/business-registrations', [BusinessRegistrationController::class, 'store'])
         ->middleware('throttle:'.config('coreerp.registration_rate_limit', 5).',1')
         ->name('api.business-registrations.store');
@@ -146,6 +155,8 @@ Route::middleware('guest')->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('select-workspace', [WorkspaceSelectionController::class, 'index'])->name('workspace.select');
     Route::post('select-workspace', [WorkspaceSelectionController::class, 'store'])->name('workspace.select.store');
+    Route::post('select-workspace/create', [WorkspaceSelectionController::class, 'createBusiness'])->name('workspace.create');
+    Route::delete('select-workspace/{membership}', [WorkspaceSelectionController::class, 'destroy'])->name('workspace.destroy');
 
     Route::get('apps/{app}', function (CoreApp $app, Request $request, CurrentWorkspace $workspace, LaunchableAppCatalog $catalog, AppContextToken $tokens) {
         $membership = $workspace->membership($request);
