@@ -147,26 +147,60 @@ Before adding or changing anything reachable from outside the module — any
    app-facing surface lives in `contracts/openapi-internal.yaml` and is enforced by
    `python contracts/check-contract-coverage.py`, which also runs in CI. Run it after
    any change to `routes/api.php`.
-4. **Events carry the full envelope and an explicit version.** Channel names are
+
+   **Every app carries its own coverage check, not only Control Plane**, and it runs in
+   CI — a checker no pipeline invokes is a file, not a gate. Three things decide whether
+   it is worth having:
+
+   - **Read routes from the framework, not from the route file's text.** Masters are
+     commonly registered by looping over an array, so their paths never appear as
+     literals; a regular expression reports a clean run while missing most of the
+     surface. `php artisan route:list --json` is the only authoritative list.
+   - **Expand path templates whose parameter carries an `enum` before comparing.** One
+     templated path can legitimately document several concrete resources. Compared
+     literally it reports real, documented endpoints as missing, and a check that cries
+     wolf is a check people learn to skip — worse than having none.
+   - **Name deferred gaps; never allowlist them silently.** A gap that is known and owned
+     belongs in an explicit list carrying its reason, printed on every run. An entry that
+     no longer matches a live route must fail, or a stale exemption quietly excuses
+     whatever route later claims that path.
+4. **Code must not accept what the contract forbids.** The aspirational-shape rule has a
+   mirror that is easier to miss: a handler validating a field the contract declares
+   impossible — `additionalProperties: false` with that key absent — advertises a
+   capability nobody can use. It is not merely dead code; the next reader concludes the
+   publisher can send it. Where the contract defers a field, the code waits for the
+   contract, never the other way round.
+5. **Events carry the full envelope and an explicit version.** Channel names are
    `module.aggregate.action.vN` per `docs/dev/04-api-and-integration.md`; the
    envelope carries `id`, `type`, `occurred_at`, `tenant_id`, `correlation_id`,
    and `data`, plus `legal_entity_id` when the fact has legal or accounting
    consequence and `org_unit_id` when an operating unit owns it. A channel without
    `.vN` has no way to change without breaking every consumer.
-5. **Document what is true, then name the gap.** When the code does not yet satisfy
+6. **Document what is true, then name the gap.** When the code does not yet satisfy
    the canonical rule, the contract describes the code and states the gap in
    `info.description`. Never write the aspirational shape — a consumer would build
    against a field that never arrives.
-6. **A published version is immutable.** Adding a required field, removing one, or
+7. **A published version is immutable.** Adding a required field, removing one, or
    narrowing a type is `vN+1`, not an edit to `vN`. Widening an enum a consumer
    switches on is also breaking.
-7. **Both sides move together.** Publisher and consumer contracts live in separate
+8. **Both sides move together.** Publisher and consumer contracts live in separate
    repos; a change to one is incomplete until the other matches in the same piece of
-   work. State explicitly which files in which repos were changed.
-8. **Transport security is part of the contract.** Signature headers, the exact
+   work. State explicitly which files in which repos were changed. A published event
+   is only real when all three legs exist: the publisher writes it, the transport
+   routes it to a URL, and the consumer has a route that accepts it. Two of the three
+   is a fact nobody receives.
+
+   Because such a change lands as several branches, start each from the updated default
+   branch. `git checkout -b` branches from wherever you are standing, so continuing
+   straight from the previous feature branch silently carries its commits along; every
+   PR then targets the default branch and shows the same work again, and a reviewer
+   reads the same diff several times. When one change genuinely builds on another,
+   branch from it deliberately and set the PR's base to that branch, not to the default
+   one.
+9. **Transport security is part of the contract.** Signature headers, the exact
    string that is signed, and the failure status belong in the spec. A consumer
    cannot verify a signature it has to reverse-engineer from the publisher's source.
-9. **Split before the file becomes unreviewable.** Past roughly 1500 lines, break the
+10. **Split before the file becomes unreviewable.** Past roughly 1500 lines, break the
    spec into `paths/` and `components/` joined by `$ref`, and commit a bundled
    artifact next to the split source for tooling that cannot resolve cross-file
    refs. One 10k-line spec guarantees merge conflicts between unrelated features.
@@ -244,6 +278,25 @@ Before reporting any new module complete, run a load test that satisfies **all**
 
 Multiple instances are not decoration. They are the only way to prove the module keeps no counter, no tenant identity, and no permission cache in the memory of one API process.
 
+### Replace endpoints must hold the row they replace
+
+An endpoint that swaps a whole set — "these are now the linked records" — deletes and
+re-inserts. Inside a transaction that still is not enough: two callers can interleave so
+one deletes, the other deletes and inserts, then the first inserts on top. The result is
+the **union of both sets**, which neither caller asked for and which no database
+constraint rejects, because every surviving row is individually valid. Take
+`lockForUpdate()` on the owning row inside the transaction, before the delete.
+
+A join table edited from **both** ends needs more care. Locking each direction's own
+owner does not serialise anything — the two directions hold locks on different tables and
+still overwrite each other. Both directions must lock the **same** side, over the union of
+the old and new sets, so that any two operations touching link `(a, b)` share a lock. Take
+those locks in a fixed order (sort by id) or two transactions will grab the same rows in
+opposite order and wait on each other forever.
+
+Feature tests cannot show any of this, and neither can a code review that only reads one
+request at a time. It belongs in the load test below.
+
 ### Correctness gate — hard, applies on any hardware
 
 These must be **exactly zero**. They do not scale with CPU, so a slow laptop is never an excuse:
@@ -257,6 +310,20 @@ These must be **exactly zero**. They do not scale with CPU, so a slow laptop is 
 - any number-sequence prefix belonging to a different reference than the master that stored it
 
 Verify these with SQL against the database after the run, not through the API. The API is the thing under test; it cannot be its own oracle.
+
+**A scenario that never contends proves nothing.** Spreading virtual users evenly across
+every tenant and every record is the right shape for saturation, and the wrong shape for
+a race: two writers almost never meet, the run comes back green, and the defect ships.
+Race scenarios concentrate — many users, few records, writing deliberately conflicting
+values — and assert the read-back equals one of the values submitted, never a blend of
+them. Keep them as their own profile alongside saturation; each answers a question the
+other cannot.
+
+**Every new surface needs its own scenario.** A module whose load test covers the masters
+it shipped with, but not the ones added later, is unverified for the part that changed.
+Check the scenario's resource list against the routes before claiming a module is
+covered — a name that merely sounds related (an old master that happens to contain the
+word) is not coverage.
 
 ### Latency gate — measured at sustainable concurrency
 
@@ -286,6 +353,12 @@ Connection handling dominates before module code does. Check this first, every t
 - Cache config and routes as production does. A closure in a route file silently disables `route:cache`; use a controller.
 
 If a load test cannot be run because the environment is missing (no Docker, no real database), say so plainly and report the module as unverified under concurrency. Do not report it complete.
+
+### An undocumented module is also incomplete
+
+The rules a module enforces — what may not change after a record exists, which value is copied rather than referenced, why one permission is split from its neighbour — are invisible in the schema and only half-visible in the code. Left unwritten they survive in one person's memory and in comments, and both are lost when that person moves on.
+
+A module is finished when its behaviour is documented under `docs/apps/<app-id>/`, every page is registered in the sidebar, and the documentation build passes. See the `coreerp-docs` skill for the pattern and the coverage sweep that proves nothing was missed.
 
 ## Launcher rule
 

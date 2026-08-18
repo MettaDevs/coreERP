@@ -81,6 +81,24 @@ Bagian dari stack lokal. Dari folder `erp-dev`:
 
 Diakses lewat shell Core di `http://localhost:8000`.
 
+## Halaman untuk developer
+
+Halaman ini hanya ringkasan modul. Tiap fitur yang sudah selesai butuh halamannya sendiri, yang menjelaskan **apa yang disimpan, aturan apa yang dijaga kode, dan kenapa aturannya begitu** — bukan cara memakai layar.
+
+Susunannya:
+
+```
+docs/apps/<nama-app>/
+├── index.md              halaman ini
+├── arsitektur/           hal lintas fitur: batas tenant, integrasi Core, kontrak, database, pengujian
+├── master/               satu halaman per master yang punya aturan khusus
+└── transaction/          satu halaman per dokumen atau proses
+```
+
+Bentuk tiap halaman, bahasa yang dipakai, dan hal yang tidak boleh ditulis ada di [Pola dokumen fitur](/apps/management-aset/pola-dokumen). Contoh yang sudah jadi ada di [Management Aset](/apps/management-aset/).
+
+Halaman baru wajib didaftarkan di `docs/.vitepress/config.ts` — sidebar disusun manual, jadi halaman yang tidak didaftarkan tidak akan ditemukan orang.
+
 ## Dokumen terkait
 
 **Di repository app** — <daftar berkas dokumen di repo app, dengan satu kalimat isi masing-masing.>
@@ -96,6 +114,7 @@ Diakses lewat shell Core di `http://localhost:8000`.
 
 - [Katalog app](/apps/)
 - [Membangun app baru](/apps/membangun-app-baru)
+- [Pola dokumen fitur](/apps/management-aset/pola-dokumen) — cara menulis halaman fitur
 
 ---
 

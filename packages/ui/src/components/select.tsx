@@ -92,7 +92,7 @@ function Select({
                             'pointer-events-none absolute start-3 z-10 px-1 leading-none transition-all',
                             hasValue
                                 ? 'top-0 -translate-y-1/2 bg-white text-xs text-foreground group-has-[button[data-popup-open]]/select:text-[#0284c7] dark:bg-input/30'
-                                : 'top-1/2 -translate-y-1/2 text-sm text-[#8a94a6]',
+                                : 'top-1/2 -translate-y-1/2 text-sm text-foreground',
                         )}
                     >
                         {label}{required && <span className="text-destructive"> *</span>}

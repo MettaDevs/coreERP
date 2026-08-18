@@ -132,7 +132,7 @@ App tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin me
 Contoh manifest utuh yang sudah berjalan ada di `app-erp-management-aset/app.yaml` — 787 baris, dengan blok `security` sepanjang 600 baris. Contoh di atas sengaja dipersingkat.
 
 #::: tip Mencari langkah mengerjakannya?
-Halaman ini menetapkan **aturannya**. Urutan mengerjakan beserta persiapan teknis, konvensi penamaan dan alokasi port, artefak wajib, dan gate per tahap ada di [jalur membangun app baru](../apps/membangun-app-baru.md).
+Halaman ini menetapkan **aturannya**. Urutan mengerjakan beserta persiapan teknis, konvensi penamaan dan alokasi port, berkas yang wajib ada, dan gate per tahap ada di [jalur membangun app baru](../apps/membangun-app-baru.md).
 :::
 
 ## Empat lapis keamanan tidak boleh diringkas

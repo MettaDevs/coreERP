@@ -98,6 +98,48 @@ export default withMermaid({
             { text: 'Human Resources', link: '/apps/human-resources/' },
           ],
         },
+        {
+          text: 'Management Aset — arsitektur',
+          items: [
+            { text: 'Peta modul', link: '/apps/management-aset/arsitektur/' },
+            { text: 'Batas tenant dan organisasi', link: '/apps/management-aset/arsitektur/batas-tenant-dan-organisasi' },
+            { text: 'Integrasi dengan Core', link: '/apps/management-aset/arsitektur/integrasi-core' },
+            { text: 'Kontrak', link: '/apps/management-aset/arsitektur/kontrak' },
+            { text: 'Database dan migration', link: '/apps/management-aset/arsitektur/database' },
+            { text: 'Pengujian', link: '/apps/management-aset/arsitektur/pengujian' },
+          ],
+        },
+        {
+          text: 'Management Aset — master',
+          items: [
+            { text: 'Master data', link: '/apps/management-aset/master/' },
+            { text: 'Group aset', link: '/apps/management-aset/master/groupaset/' },
+            { text: 'Jenis aset dan atribut', link: '/apps/management-aset/master/jenisaset/' },
+            { text: 'Pabrikan dan model', link: '/apps/management-aset/master/katalog-model/' },
+            { text: 'Lokasi dan dimensi keuangan', link: '/apps/management-aset/master/lokasi/' },
+            { text: 'Penyusutan: profil dan buku', link: '/apps/management-aset/master/depresiasi/' },
+            { text: 'Setup maintenance', link: '/apps/management-aset/master/maintenance/' },
+            { text: 'Master work order', link: '/apps/management-aset/master/work-order/' },
+          ],
+        },
+        {
+          text: 'Management Aset — transaksi',
+          items: [
+            { text: 'Perencanaan aset', link: '/apps/management-aset/transaction/perencanaan-aset/' },
+            { text: 'Register aset', link: '/apps/management-aset/transaction/register-aset/' },
+            { text: 'Penempatan dan mutasi', link: '/apps/management-aset/transaction/penempatan/' },
+            { text: 'Proses penyusutan', link: '/apps/management-aset/transaction/penyusutan/' },
+            { text: 'Pemeliharaan aset', link: '/apps/management-aset/transaction/pemeliharaan-aset/' },
+            { text: 'Dokumen siklus aset', link: '/apps/management-aset/transaction/siklus-aset/' },
+            { text: 'Monitoring dan layar kosong', link: '/apps/management-aset/transaction/monitoring/' },
+          ],
+        },
+        {
+          text: 'Menulis dokumen',
+          items: [
+            { text: 'Pola dokumen fitur', link: '/apps/management-aset/pola-dokumen' },
+          ],
+        },
       ],
 
       '/dev/': [
@@ -153,7 +195,7 @@ export default withMermaid({
           text: 'Gate kualitas',
           collapsed: true,
           items: [
-            { text: 'Load dan concurrency testing', link: '/dev/15-load-and-concurrency-testing' },
+            { text: 'Load dan concurrency testing', link: '/dev/20-load-and-concurrency-testing' },
           ],
         },
         {

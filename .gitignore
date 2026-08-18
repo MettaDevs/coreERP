@@ -12,6 +12,8 @@ storage/pail/
 .phpunit.cache/
 .phpunit.result.cache
 /graphify-out
+.vite-wayfinder.stdout.log
+.vite-wayfinder.stderr.log
 
 # VitePress
 docs/.vitepress/dist/

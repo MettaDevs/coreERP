@@ -31,6 +31,24 @@ Verifikasi lewat SQL langsung ke database sesudah run, bukan lewat API. API adal
 
 Bedakan 5xx aplikasi dari 502/504 load balancer. Yang pertama adalah cacat; yang kedua adalah kapasitas terlampaui dan wajib dinyatakan sebagai itu.
 
+## Endpoint pengganti wajib menahan baris yang digantinya
+
+Endpoint yang mengganti sekumpulan baris sekaligus — "ini sekarang daftar lengkapnya" — bekerja dengan menghapus lalu menyisipkan ulang. Transaksi saja tidak cukup: dua pemanggil dapat saling menyela sehingga yang satu menghapus, yang lain menghapus dan menyisipkan, lalu yang pertama menyisipkan di atasnya.
+
+Hasilnya **gabungan dua daftar**, yang tidak diminta pemanggil mana pun dan yang tidak ditolak batasan database mana pun, karena tiap baris yang tersisa masing-masing sah. Ambil `lockForUpdate()` pada baris pemiliknya di dalam transaksi, sebelum penghapusan.
+
+Tabel penghubung yang disunting dari **dua arah** perlu perlakuan tambahan. Mengunci pemilik masing-masing arah tidak menyerialkan apa pun — keduanya memegang kunci pada tabel berbeda dan tetap saling menimpa. Kedua arah wajib mengunci **sisi yang sama**, atas gabungan daftar lama dan baru, sehingga dua operasi yang menyentuh baris kaitan yang sama pasti berbagi kunci. Ambil kunci dalam urutan tetap — misalnya urut `id` — atau dua transaksi akan mengambil baris yang sama dalam urutan berlawanan lalu saling menunggu selamanya.
+
+Feature test tidak dapat memperlihatkan ini, dan review kode yang membaca satu request pada satu waktu juga tidak. Ia hanya terlihat di skenario yang benar-benar berebut.
+
+### Skenario yang tidak pernah berebut tidak membuktikan apa pun
+
+Menyebar pengguna merata ke seluruh tenant dan seluruh record adalah bentuk yang benar untuk profil saturasi, dan **salah** untuk balapan: dua penulis nyaris tidak pernah bertemu, run kembali hijau, dan cacatnya lolos.
+
+Skenario balapan memusat — banyak pengguna, sedikit record, menulis nilai yang sengaja bertabrakan — lalu memastikan hasil baca-baliknya sama dengan salah satu nilai yang dikirim, bukan campuran keduanya. Simpan sebagai profil tersendiri di samping saturasi; keduanya menjawab pertanyaan yang berbeda.
+
+**Permukaan baru butuh skenarionya sendiri.** Modul yang skenarionya mencakup master bawaan tetapi tidak yang ditambahkan kemudian berstatus belum terverifikasi untuk bagian yang berubah. Cocokkan daftar resource di skrip terhadap rute yang ada — nama yang kebetulan terdengar mirip bukan cakupan.
+
 ## Gate latensi
 
 Diukur pada concurrency tertinggi yang masih memenuhi SLO, bukan pada titik jenuh. Latensi pada beban jenuh mengukur kedalaman antrean, bukan biaya kode.

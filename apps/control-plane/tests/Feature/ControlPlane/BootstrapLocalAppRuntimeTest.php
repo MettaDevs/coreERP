@@ -60,6 +60,22 @@ class BootstrapLocalAppRuntimeTest extends TestCase
             'manifest' => $manifest,
             '--api-image' => 'local/sample-api@sha256:'.str_repeat('a', 64),
             '--ui-image' => 'local/sample-ui@sha256:'.str_repeat('b', 64),
+            '--ui-entry' => 'http://192.168.1.10:18092/',
+            '--api-service' => 'sample-api',
+            '--ui-service' => 'sample-ui',
+            '--database-service' => 'sample-db',
+        ])->assertSuccessful();
+
+        $this->assertDatabaseHas('app_placements', [
+            'app_id' => 'sample-app',
+            'placement' => 'pooled-primary',
+            'ui_entry' => 'http://192.168.1.10:18092/',
+        ]);
+
+        $this->artisan('app:bootstrap-local-runtime', [
+            'manifest' => $manifest,
+            '--api-image' => 'local/sample-api@sha256:'.str_repeat('a', 64),
+            '--ui-image' => 'local/sample-ui@sha256:'.str_repeat('b', 64),
             '--ui-entry' => 'http://localhost:18092/',
             '--api-service' => 'sample-api',
             '--ui-service' => 'sample-ui',

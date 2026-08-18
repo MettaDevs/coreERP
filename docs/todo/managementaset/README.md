@@ -16,6 +16,7 @@ dimensions, debit/kredit, serta rekonsiliasi jurnal.
 | 3 | [02-transaksi-aset-v1.md](02-transaksi-aset-v1.md) | Register aset dan lifecycle penerimaan sampai pelepasan |
 | 4 | [03-penyusutan-dan-bridge-backoffice.md](03-penyusutan-dan-bridge-backoffice.md) | Perhitungan, finalisasi, dan export penyusutan tanpa jurnal GL |
 | 5 | [04-ui-monitoring-laporan-dan-gate.md](04-ui-monitoring-laporan-dan-gate.md) | Desain visual, monitoring, laporan, serta gate bukti |
+| 6 | [05-standar-indonesia-dan-seed/README.md](05-standar-indonesia-dan-seed/README.md) | Perubahan organisasi, klasifikasi fiskal, seed Indonesia, buku/profil, dan gate Finance |
 
 Status memakai `[ ]` belum dikerjakan, `[~]` sedang dikerjakan, dan `[x]`
 selesai dengan bukti test. Jangan menandai `[x]` sebelum writer, reader,

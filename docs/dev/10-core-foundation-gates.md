@@ -45,6 +45,6 @@ Deployment SaaS production belum boleh dinyatakan aktif hanya karena worker ters
 - [Standar module](02-module-standard.md) — lifecycle yang gate-nya diatur di sini
 - [Release dan on-prem](03-release-and-on-prem.md) — gate deployment dan upgrade
 - [Identity dan access](09-identity-and-access.md) — fondasi akses yang masih menunggu gate
-- [Load dan concurrency testing](15-load-and-concurrency-testing.md) — gate terakhir sebelum module disebut selesai
+- [Load dan concurrency testing](20-load-and-concurrency-testing.md) — gate terakhir sebelum module disebut selesai
 - [Empat kebenaran lifecycle](../onboarding/empat-kebenaran.md) — ringkasan aturan keputusan nomor 4
 - [Backlog audit fondasi](../todo/README.md) — temuan yang menunggu review, bukan keputusan

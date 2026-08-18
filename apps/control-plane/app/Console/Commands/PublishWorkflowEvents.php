@@ -11,7 +11,11 @@ use RuntimeException;
 
 class PublishWorkflowEvents extends Command
 {
-    private const TYPE = 'core.workflow.decision.v2';
+    /** @var list<string> */
+    private const TYPES = [
+        'core.workflow.decision.v2',
+        'core.tenant.provisioned.v1',
+    ];
 
     protected $signature = 'workflow-events:publish {--limit=100}';
 
@@ -21,13 +25,13 @@ class PublishWorkflowEvents extends Command
     {
         $key = (string) config('coreerp.app_context_signing_key');
         $endpoints = collect(config('coreerp.event_endpoints', []))
-            ->filter(fn (mixed $endpoint): bool => is_array($endpoint) && ($endpoint['type'] ?? null) === self::TYPE && isset($endpoint['url']))
+            ->filter(fn (mixed $endpoint): bool => is_array($endpoint) && in_array($endpoint['type'] ?? null, self::TYPES, true) && isset($endpoint['url']))
             ->values();
         if ($key === '' || $endpoints->isEmpty()) {
             return self::SUCCESS;
         }
 
-        $events = DB::table('outbox_events')->where('type', self::TYPE)->whereNull('published_at')
+        $events = DB::table('outbox_events')->whereIn('type', self::TYPES)->whereNull('published_at')
             ->orderBy('occurred_at')->limit((int) $this->option('limit'))->get();
         foreach ($events as $event) {
             // correlation_id is required by the v2 envelope. A row without one would put a
@@ -36,6 +40,10 @@ class PublishWorkflowEvents extends Command
             if (($event->correlation_id ?? null) === null) {
                 report(new RuntimeException("Outbox event {$event->id} has no correlation_id and was not published."));
 
+                continue;
+            }
+            $eventEndpoints = $endpoints->where('type', $event->type)->values();
+            if ($eventEndpoints->isEmpty()) {
                 continue;
             }
             $body = json_encode(array_filter([
@@ -47,7 +55,7 @@ class PublishWorkflowEvents extends Command
             $timestamp = (string) now()->timestamp;
             $signature = hash_hmac('sha256', $timestamp.'.'.$body, $key);
             try {
-                foreach ($endpoints as $endpoint) {
+                foreach ($eventEndpoints as $endpoint) {
                     Http::acceptJson()->connectTimeout(2)->timeout(5)->withBody($body, 'application/json')
                         ->withHeaders(['X-CoreERP-Event-Timestamp' => $timestamp, 'X-CoreERP-Event-Signature' => $signature])
                         ->post((string) $endpoint['url'])->throw();
