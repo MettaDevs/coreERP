@@ -66,6 +66,13 @@ docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "
 docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=saturation -e VUS=1000 -e DURATION=120s -e RUN_ID=mnt-run1 grafana/k6:0.55.0 run /scripts/maintenance.js
 ```
 
+Work Order menjalankan fixture aset dari `master-data.js`, lalu menguji create,
+show, penjadwalan, pelaksanaan, penyelesaian, idempotency, dan isolasi tenant:
+
+```bash
+docker run --rm --network aset-loadtest_default --ulimit nofile=65536:65536 -v "$PWD/k6:/scripts:ro" -v "$PWD/results:/results" -e BASE_URL=http://lb -e PROFILE=saturation -e VUS=1000 -e DURATION=120s -e RUN_ID=wo-run1 grafana/k6:0.55.0 run /scripts/work-order.js
+```
+
 Skenario penyusutan menyiapkan tiga periode per tenant dan menguji retry
 proposal/finalisasi pada 1000 VU:
 

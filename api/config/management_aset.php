@@ -904,7 +904,38 @@ return [
                 ['code' => 'service', 'label' => 'Servis'],
                 ['code' => 'condition_assessment', 'label' => 'Pemeriksaan kondisi'],
             ],
-            'trades' => ['Mekanik', 'Elektrik', 'HVAC', 'Teknisi umum'],
+            'work_order_types' => [
+                ['template_key' => 'id:maintenance:work-order-type:korektif:v1', 'name' => 'Korektif', 'description' => 'Pekerjaan untuk memulihkan aset yang mengalami kerusakan.'],
+                ['template_key' => 'id:maintenance:work-order-type:preventif:v1', 'name' => 'Preventif', 'description' => 'Pekerjaan terjadwal untuk mencegah kerusakan.'],
+                ['template_key' => 'id:maintenance:work-order-type:servis:v1', 'name' => 'Servis', 'description' => 'Pekerjaan layanan umum pada aset.'],
+                ['template_key' => 'id:maintenance:work-order-type:pemeriksaan-kondisi:v1', 'name' => 'Pemeriksaan kondisi', 'description' => 'Pemeriksaan kondisi aset dan area kerja.'],
+            ],
+            'service_levels' => [
+                ['template_key' => 'id:maintenance:service-level:kritis:v1', 'name' => 'Kritis', 'description' => 'Pekerjaan harus ditangani segera.', 'order' => 1],
+                ['template_key' => 'id:maintenance:service-level:tinggi:v1', 'name' => 'Tinggi', 'description' => 'Pekerjaan diprioritaskan setelah kondisi kritis.', 'order' => 2],
+                ['template_key' => 'id:maintenance:service-level:normal:v1', 'name' => 'Normal', 'description' => 'Pekerjaan mengikuti antrean biasa.', 'order' => 3],
+                ['template_key' => 'id:maintenance:service-level:rendah:v1', 'name' => 'Rendah', 'description' => 'Pekerjaan dapat dijadwalkan setelah kebutuhan yang lebih mendesak.', 'order' => 4],
+            ],
+            'trades' => [
+                ['template_key' => 'id:maintenance:trade:mekanik:v1', 'name' => 'Mekanik', 'description' => 'Pekerjaan mekanik dan komponen bergerak.'],
+                ['template_key' => 'id:maintenance:trade:elektrik:v1', 'name' => 'Elektrik', 'description' => 'Pekerjaan kelistrikan dan panel.'],
+                ['template_key' => 'id:maintenance:trade:hvac:v1', 'name' => 'HVAC', 'description' => 'Pekerjaan tata udara dan pendingin.'],
+                ['template_key' => 'id:maintenance:trade:teknisi-umum:v1', 'name' => 'Teknisi umum', 'description' => 'Pekerjaan teknis umum pada aset.'],
+            ],
+            'fault_causes' => [
+                ['template_key' => 'id:maintenance:fault-cause:komponen-aus:v1', 'name' => 'Komponen aus'],
+                ['template_key' => 'id:maintenance:fault-cause:koneksi-longgar:v1', 'name' => 'Koneksi longgar'],
+                ['template_key' => 'id:maintenance:fault-cause:kotor-tersumbat:v1', 'name' => 'Kotor atau tersumbat'],
+                ['template_key' => 'id:maintenance:fault-cause:kesalahan-pengoperasian:v1', 'name' => 'Kesalahan pengoperasian'],
+                ['template_key' => 'id:maintenance:fault-cause:belum-diketahui:v1', 'name' => 'Belum diketahui'],
+            ],
+            'repair_actions' => [
+                ['template_key' => 'id:maintenance:repair-action:bersihkan:v1', 'name' => 'Bersihkan'],
+                ['template_key' => 'id:maintenance:repair-action:kencangkan:v1', 'name' => 'Kencangkan'],
+                ['template_key' => 'id:maintenance:repair-action:setel-ulang:v1', 'name' => 'Setel ulang'],
+                ['template_key' => 'id:maintenance:repair-action:ganti-komponen:v1', 'name' => 'Ganti komponen'],
+                ['template_key' => 'id:maintenance:repair-action:uji-kembali:v1', 'name' => 'Uji kembali'],
+            ],
             'job_types' => [
                 ['template_key' => 'id:maintenance:job-type:inspeksi:v1', 'name' => 'Inspeksi', 'category' => 'preventive', 'description' => 'Pemeriksaan rutin untuk memastikan aset tetap aman digunakan.'],
                 ['template_key' => 'id:maintenance:job-type:kalibrasi:v1', 'name' => 'Kalibrasi', 'category' => 'preventive', 'description' => 'Penyetelan dan pemeriksaan ketepatan alat ukur.'],
@@ -941,14 +972,15 @@ return [
                     'description' => 'Checklist dasar untuk pemeriksaan conveyor.',
                     'lines' => [
                         ['line_number' => 1, 'type' => 'header', 'name' => 'Pemeriksaan conveyor'],
-                        ['line_number' => 2, 'type' => 'text', 'name' => 'Periksa ketegangan belt'],
-                        ['line_number' => 3, 'type' => 'measurement', 'unit' => 'cm', 'name' => 'Celah roller'],
+                        ['line_number' => 2, 'type' => 'text', 'name' => 'Periksa ketegangan belt', 'mandatory' => true, 'instructions' => 'Pastikan belt tidak terlalu longgar atau terlalu kencang.'],
+                        ['line_number' => 3, 'type' => 'measurement', 'unit' => 'cm', 'name' => 'Celah roller', 'mandatory' => true, 'instructions' => 'Masukkan hasil pengukuran dalam sentimeter.'],
+                        ['line_number' => 4, 'type' => 'variable', 'variable_key' => 'id:maintenance:variable:kualitas-oli:v1', 'name' => 'Kualitas oli', 'mandatory' => true, 'instructions' => 'Pilih kondisi oli yang ditemukan.'],
                     ],
                 ],
             ],
             'defaults' => [
-                ['template_key' => 'id:maintenance:default:inspeksi:mingguan:v1', 'name' => 'Inspeksi mingguan', 'job_type_key' => 'id:maintenance:job-type:inspeksi:v1', 'variant_key' => 'id:maintenance:variant:mingguan:v1', 'trade' => 'Mekanik', 'hours' => 2],
-                ['template_key' => 'id:maintenance:default:preventif:tahunan:v1', 'name' => 'Preventif tahunan', 'job_type_key' => 'id:maintenance:job-type:preventif:v1', 'variant_key' => 'id:maintenance:variant:tahunan:v1', 'trade' => 'Teknisi umum', 'hours' => 4],
+                ['template_key' => 'id:maintenance:default:inspeksi:mingguan:v1', 'name' => 'Inspeksi mingguan', 'job_type_key' => 'id:maintenance:job-type:inspeksi:v1', 'variant_key' => 'id:maintenance:variant:mingguan:v1', 'checklist_template_key' => 'id:maintenance:template:pemeriksaan-conveyor:v1', 'trade' => 'Mekanik', 'hours' => 2],
+                ['template_key' => 'id:maintenance:default:preventif:tahunan:v1', 'name' => 'Preventif tahunan', 'job_type_key' => 'id:maintenance:job-type:preventif:v1', 'variant_key' => 'id:maintenance:variant:tahunan:v1', 'checklist_template_key' => 'id:maintenance:template:pemeriksaan-conveyor:v1', 'trade' => 'Teknisi umum', 'hours' => 4],
             ],
             /*
              * Aturan validasi perpindahan status work order. Seluruh kombinasi status x

@@ -71,7 +71,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $this->assertDatabaseCount('m_maintenance_checklist_variable', 1);
         $this->assertDatabaseCount('m_maintenance_checklist_variable_value', 3);
         $this->assertDatabaseCount('m_maintenance_checklist_template', 1);
-        $this->assertDatabaseCount('m_maintenance_checklist_template_line', 3);
+        $this->assertDatabaseCount('m_maintenance_checklist_template_line', 4);
         $this->assertDatabaseCount('m_maintenance_job_type_default', 2);
         $this->assertDatabaseHas('m_kelompok_harta_fiskal', [
             'tenant_id' => $tenant,
@@ -118,7 +118,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $this->call('POST', '/api/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
             ->assertOk();
 
-        $this->assertSame(353, $calls, 'Pengulangan event tidak boleh meminta nomor baru.');
+        $this->assertSame(375, $calls, 'Pengulangan event tidak boleh meminta nomor baru.');
         $this->assertDatabaseCount('m_kelompok_harta_fiskal', 7);
         $this->assertDatabaseCount('m_profil_penyusutan', 10);
         $this->assertDatabaseCount('m_buku_penyusutan', 2);
@@ -135,7 +135,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $this->assertDatabaseCount('m_maintenance_job_type', 7);
         $this->assertDatabaseCount('m_maintenance_job_type_variant', 42);
         $this->assertDatabaseCount('m_maintenance_checklist_variable_value', 3);
-        $this->assertDatabaseCount('m_maintenance_checklist_template_line', 3);
+        $this->assertDatabaseCount('m_maintenance_checklist_template_line', 4);
         $this->assertDatabaseCount('m_maintenance_job_type_default', 2);
         $this->assertDatabaseMissing('m_kelompok_harta_fiskal', ['tenant_id' => $otherTenant]);
     }

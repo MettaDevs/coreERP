@@ -29,6 +29,8 @@ const MASTERS = [
     'buku-penyusutan',
     'profil-penyusutan',
     'tipe-atribut',
+    'maintenance-job-types',
+    'tipe-work-order',
 ];
 const ACTIONS = ['read', 'create', 'update', 'archive'];
 
@@ -95,6 +97,7 @@ const transactionPermissions = [
     `${APP_ID}.penyusutan.read`, `${APP_ID}.penyusutan.create`, `${APP_ID}.penyusutan.finalize`, `${APP_ID}.penyusutan.correct`,
     ...['perencanaan-aset', 'permintaan-pembelian-aset', 'pemeliharaan-aset', 'penjualan-aset', 'pemusnahan-aset'].flatMap((resource) => [`${APP_ID}.${resource}.read`, `${APP_ID}.${resource}.create`]),
     `${APP_ID}.perencanaan-aset.update`, `${APP_ID}.perencanaan-aset.archive`,
+    `${APP_ID}.pemeliharaan-aset.schedule`, `${APP_ID}.pemeliharaan-aset.execute`, `${APP_ID}.pemeliharaan-aset.close`,
 ];
 
 const tenants = Array.from({ length: TENANT_COUNT }, () => {
