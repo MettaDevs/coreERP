@@ -19,7 +19,9 @@ return [
     // Requests per minute per app+tenant on the internal number sequence API. Sized for normal document traffic,
     // not for a caller trying to burn a tenant's number range.
     'internal_api_rate_limit' => env('COREERP_INTERNAL_API_RATE_LIMIT', 600),
-    'registration_rate_limit' => env('COREERP_REGISTRATION_RATE_LIMIT', 5),
+    'registration_rate_limit' => env('COREERP_REGISTRATION_RATE_LIMIT', 30),
+    'login_rate_limit' => env('COREERP_LOGIN_RATE_LIMIT', 30),
+    'max_businesses_per_user' => env('COREERP_MAX_BUSINESSES_PER_USER', 3),
     'password_breach_check' => env('COREERP_PASSWORD_BREACH_CHECK', true),
 
     // Reserved-but-unfinished reservations allowed per continuous sequence. An app that reserves and never confirms
