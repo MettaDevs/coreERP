@@ -105,12 +105,14 @@ Route::prefix('v1')->middleware('coreerp')->group(function () use ($masters): vo
     Route::get('validasi-status-work-order', [ValidasiStatusWorkOrderController::class, 'index']);
     Route::put('validasi-status-work-order', [ValidasiStatusWorkOrderController::class, 'replace']);
     Route::get('pemeliharaan-aset', [PemeliharaanAsetController::class, 'index']);
+    Route::get('pemeliharaan-aset/referensi/job-types', [PemeliharaanAsetController::class, 'jobTypesForAsset']);
     Route::post('pemeliharaan-aset', [PemeliharaanAsetController::class, 'store']);
     // Rute spesifik didahulukan agar `{id}` tidak menelan `saya`.
     Route::get('pemeliharaan-aset/saya', [PelaksanaanController::class, 'pekerjaanSaya']);
     Route::post('pemeliharaan-aset/{id}/status', [PelaksanaanController::class, 'pindahStatus']);
     Route::get('pemeliharaan-aset/{id}/jobs/{jobId}/checklist', [PelaksanaanController::class, 'checklist']);
     Route::put('pemeliharaan-aset/{id}/jobs/{jobId}/checklist', [PelaksanaanController::class, 'simpanChecklist']);
+    Route::patch('pemeliharaan-aset/{id}/jobs/{jobId}/execution', [PelaksanaanController::class, 'simpanPelaksanaan']);
     Route::post('pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template', [PelaksanaanController::class, 'salinDariTemplate']);
     Route::get('pemeliharaan-aset/{id}', [PemeliharaanAsetController::class, 'show']);
     Route::patch('pemeliharaan-aset/{id}', [PemeliharaanAsetController::class, 'update']);

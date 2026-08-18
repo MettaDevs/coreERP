@@ -187,6 +187,35 @@ class WorkOrderExecutionTest extends TestCase
         $this->assertSame('Ukur saat ban dingin.', $baris->first()->instruksi);
     }
 
+    public function test_default_job_type_menyalin_checklist_saat_work_order_dibuat(): void
+    {
+        DB::table('m_maintenance_job_type_default')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $this->tenantId,
+            'creation_key' => 'seed-'.Str::ulid(),
+            'kode' => 'DFLT-1',
+            'nama' => 'Checklist bawaan Ganti ban',
+            'maintenance_job_type_id' => $this->masters()['jobType'],
+            'checklist_template_id' => $this->masters()['template'],
+            'hours' => 1,
+            'items_count' => 0,
+            'expenses_count' => 0,
+            'fees_count' => 0,
+            'aktif' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $workOrder = $this->buatWorkOrder();
+        $jobId = $this->jobId($workOrder['id']);
+
+        $this->assertSame(
+            ['Tekanan ban depan', 'Kondisi alur ban', 'Cek baut roda', 'Cek rem'],
+            DB::table('tr_pemeliharaan_aset_checklist')->where('pemeliharaan_aset_detail_id', $jobId)
+                ->orderBy('line_number')->pluck('nama')->all(),
+        );
+    }
+
     public function test_hasil_baris_pekerjaan_diturunkan_dari_hasil_pemeriksaan(): void
     {
         $workOrder = $this->siapDikerjakan();
@@ -234,6 +263,29 @@ class WorkOrderExecutionTest extends TestCase
         $this->simpanChecklist($workOrder['id'], $jobId, [['id' => $pilihan->id, 'nilai' => 'Botak']])->assertOk();
         $this->assertDatabaseHas('tr_pemeliharaan_aset_checklist', [
             'id' => $pilihan->id, 'nilai' => 'Botak', 'result_code' => 'fail', 'diperiksa' => true,
+        ]);
+    }
+
+    public function test_hasil_pelaksanaan_menyimpan_jam_sebab_dan_tindakan_per_baris(): void
+    {
+        $workOrder = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $sebab = $this->master('m_sebab_kerusakan', 'Ban aus', 'SBKR-1');
+        $tindakan = $this->master('m_tindakan_perbaikan', 'Ganti ban', 'TDPB-1');
+
+        $this->withHeaders($this->headers(self::SEMUA, 'montir-1'))
+            ->patchJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/execution', [
+                'aktual_jam' => 2.25,
+                'sebab_kerusakan_id' => $sebab,
+                'tindakan_perbaikan_id' => $tindakan,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('tr_pemeliharaan_aset_details', [
+            'id' => $jobId,
+            'aktual_jam' => 2.25,
+            'sebab_kerusakan_id' => $sebab,
+            'tindakan_perbaikan_id' => $tindakan,
         ]);
     }
 

@@ -167,6 +167,25 @@ attribute_cross_tenant as (
         (select count(*) from tr_aset_atribut a join m_tipe_atribut t on t.id = a.tipe_atribut_id where t.tenant_id <> a.tenant_id)
       + (select count(*) from m_tipe_atribut_nilai v join m_tipe_atribut t on t.id = v.tipe_atribut_id where t.tenant_id <> v.tenant_id)
       + (select count(*) from m_jenis_aset_atribut l join m_tipe_atribut t on t.id = l.tipe_atribut_id where t.tenant_id <> l.tenant_id) as n
+),
+work_order_duplikat as (
+    select count(*) as n from (
+        select tenant_id, kode from tr_pemeliharaan_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, creation_key from tr_pemeliharaan_aset group by 1, 2 having count(*) > 1
+    ) d
+),
+work_order_prefix_salah as (
+    select count(*) as n from tr_pemeliharaan_aset where kode not like 'PMHA%'
+),
+work_order_tenant_kosong as (
+    select count(*) as n from tr_pemeliharaan_aset where tenant_id is null or length(tenant_id) <> 26
+),
+work_order_child_tidak_sah as (
+    select
+        (select count(*) from tr_pemeliharaan_aset_details d join tr_pemeliharaan_aset h on h.id = d.pemeliharaan_aset_id where d.tenant_id <> h.tenant_id)
+      + (select count(*) from tr_pemeliharaan_aset_details d left join tr_pemeliharaan_aset h on h.id = d.pemeliharaan_aset_id where h.id is null)
+      + (select count(*) from tr_pemeliharaan_aset_checklist c join tr_pemeliharaan_aset_details d on d.id = c.pemeliharaan_aset_detail_id where c.tenant_id <> d.tenant_id)
+      + (select count(*) from tr_pemeliharaan_aset_status_log l join tr_pemeliharaan_aset h on h.id = l.pemeliharaan_aset_id where l.tenant_id <> h.tenant_id) as n
 )
 select 'kode ganda dalam satu tenant' as pemeriksaan, n as pelanggaran from duplikat_kode
 union all select 'creation_key ganda dalam satu tenant', n from duplikat_kunci
@@ -187,7 +206,11 @@ union all select 'finalisasi periode ganda', n from depreciation_final_ganda
 union all select 'round-off tidak mendarat di residual atau nol', n from depreciation_rounding_not_finished
 union all select 'nilai teks di luar Values aktif', n from attribute_value_outside_active_values
 union all select 'nilai pecahan tersimpan pada integer', n from integer_fraction
-union all select 'atribut menunjuk data tenant lain', n from attribute_cross_tenant;
+union all select 'atribut menunjuk data tenant lain', n from attribute_cross_tenant
+union all select 'kode atau kunci work order ganda', n from work_order_duplikat
+union all select 'prefix nomor work order salah', n from work_order_prefix_salah
+union all select 'tenant_id work order kosong atau bukan ULID', n from work_order_tenant_kosong
+union all select 'detail/checklist/status log work order lintas tenant atau yatim', n from work_order_child_tidak_sah;
 
 \echo
 \echo '=== VOLUME DATA ==='

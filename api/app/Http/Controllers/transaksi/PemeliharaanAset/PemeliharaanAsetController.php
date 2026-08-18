@@ -5,6 +5,7 @@ namespace App\Http\Controllers\transaksi\PemeliharaanAset;
 use App\Http\Controllers\Controller;
 use App\Services\NumberSequenceClient;
 use App\Services\NumberSequenceException;
+use App\Services\MaintenanceChecklistSnapshot;
 use App\Support\OrganizationScope;
 use App\Support\WorkOrderStatus;
 use Illuminate\Database\QueryException;
@@ -46,6 +47,63 @@ class PemeliharaanAsetController extends Controller
         return response()->json(['data' => $this->withLookups($query, $tenant)
             ->orderByDesc('wo.created_at')
             ->get()]);
+    }
+
+    public function jobTypesForAsset(Request $request): JsonResponse
+    {
+        $this->guard($request, 'read');
+        $tenant = $this->tenant($request);
+        $assetId = $request->validate(['asset_id' => ['required', 'ulid']])['asset_id'];
+
+        $assetQuery = DB::table('tr_penerimaan_aset')
+            ->where(['tenant_id' => $tenant, 'id' => $assetId])
+            ->whereNull('deleted_at');
+        app(OrganizationScope::class)->assetQuery($assetQuery, $request);
+        $asset = $assetQuery->first(['jenis_aset_id']);
+        if (! $asset || $asset->jenis_aset_id === null) {
+            return response()->json(['data' => []]);
+        }
+
+        $linkedJobTypes = DB::table('m_maintenance_job_type_asset_type')
+            ->where('tenant_id', $tenant)
+            ->distinct()
+            ->pluck('job_type_id');
+
+        $data = DB::table('m_maintenance_job_type as pekerjaan')
+            ->join('m_maintenance_job_type_asset_type as relasi', function ($join): void {
+                $join->on('relasi.job_type_id', '=', 'pekerjaan.id')
+                    ->on('relasi.tenant_id', '=', 'pekerjaan.tenant_id');
+            })
+            ->where([
+                'pekerjaan.tenant_id' => $tenant,
+                'pekerjaan.aktif' => true,
+                'relasi.jenis_aset_id' => $asset->jenis_aset_id,
+            ])
+            ->whereNull('pekerjaan.deleted_at')
+            ->orderBy('pekerjaan.kode')
+            ->get(['pekerjaan.id', 'pekerjaan.kode', 'pekerjaan.nama']);
+
+        // Tenant yang belum mengisi relasi jenis aset tetap dapat membuat work order.
+        // Begitu satu job type mulai dikonfigurasi, pilihan untuk job type tersebut
+        // mengikuti relasi F&O dan hanya muncul untuk jenis aset yang sesuai.
+        if ($linkedJobTypes->isEmpty()) {
+            $data = DB::table('m_maintenance_job_type')
+                ->where(['tenant_id' => $tenant, 'aktif' => true])
+                ->whereNull('deleted_at')
+                ->orderBy('kode')
+                ->get(['id', 'kode', 'nama']);
+        } else {
+            $data = $data->merge(
+                DB::table('m_maintenance_job_type')
+                    ->where(['tenant_id' => $tenant, 'aktif' => true])
+                    ->whereNull('deleted_at')
+                    ->whereNotIn('id', $linkedJobTypes)
+                    ->orderBy('kode')
+                    ->get(['id', 'kode', 'nama'])
+            )->sortBy('kode')->values();
+        }
+
+        return response()->json(['data' => $data]);
     }
 
     public function show(Request $request, string $id): JsonResponse
@@ -222,18 +280,41 @@ class PemeliharaanAsetController extends Controller
         // Varian harus milik jenis pekerjaan pada baris yang sama; varian dari job type lain
         // akan lolos pemeriksaan keberadaan biasa dan diam-diam salah pasang.
         foreach ($details as $detail) {
-            if (($detail['variant_id'] ?? null) === null) {
+            if (($detail['variant_id'] ?? null) !== null) {
+                $matches = DB::table('m_maintenance_job_type_variant')
+                    ->where([
+                        'tenant_id' => $tenant,
+                        'id' => $detail['variant_id'],
+                        'maintenance_job_type_id' => $detail['maintenance_job_type_id'],
+                        'aktif' => true,
+                    ])->whereNull('deleted_at')->exists();
+                if (! $matches) {
+                    throw ValidationException::withMessages(['details' => 'Varian pekerjaan harus berasal dari jenis pekerjaan yang dipilih pada baris yang sama.']);
+                }
+            }
+
+            $jobTypeHasLinks = DB::table('m_maintenance_job_type_asset_type')
+                ->where(['tenant_id' => $tenant, 'job_type_id' => $detail['maintenance_job_type_id']])
+                ->exists();
+            if (! $jobTypeHasLinks) {
                 continue;
             }
-            $matches = DB::table('m_maintenance_job_type_variant')
+
+            $allowed = DB::table('m_maintenance_job_type_asset_type as relasi')
+                ->join('tr_penerimaan_aset as aset', function ($join): void {
+                    $join->on('aset.jenis_aset_id', '=', 'relasi.jenis_aset_id')
+                        ->on('aset.tenant_id', '=', 'relasi.tenant_id');
+                })
                 ->where([
-                    'tenant_id' => $tenant,
-                    'id' => $detail['variant_id'],
-                    'maintenance_job_type_id' => $detail['maintenance_job_type_id'],
-                    'aktif' => true,
-                ])->whereNull('deleted_at')->exists();
-            if (! $matches) {
-                throw ValidationException::withMessages(['details' => 'Varian pekerjaan harus berasal dari jenis pekerjaan yang dipilih pada baris yang sama.']);
+                    'relasi.tenant_id' => $tenant,
+                    'relasi.job_type_id' => $detail['maintenance_job_type_id'],
+                    'relasi.jenis_aset_id' => DB::table('tr_penerimaan_aset')
+                        ->where(['tenant_id' => $tenant, 'id' => $detail['asset_id']])
+                        ->value('jenis_aset_id'),
+                    'aset.id' => $detail['asset_id'],
+                ])->exists();
+            if (! $allowed) {
+                throw ValidationException::withMessages(['details' => 'Jenis pekerjaan tidak tersedia untuk jenis aset yang dipilih. Atur relasi jenis aset pada master maintenance terlebih dahulu.']);
             }
         }
 
@@ -315,7 +396,7 @@ class PemeliharaanAsetController extends Controller
      */
     private function replaceJobLines(string $workOrderId, string $tenant, array $details, array $locations): void
     {
-        DB::table('tr_pemeliharaan_aset_details')->insert(collect($details)->values()->map(fn (array $detail, int $index): array => [
+        $rows = collect($details)->values()->map(fn (array $detail, int $index): array => [
             'id' => (string) Str::ulid(),
             'tenant_id' => $tenant,
             'pemeliharaan_aset_id' => $workOrderId,
@@ -334,7 +415,13 @@ class PemeliharaanAsetController extends Controller
             'catatan' => $detail['catatan'] ?? null,
             'created_at' => now(),
             'updated_at' => now(),
-        ])->all());
+        ])->all();
+        DB::table('tr_pemeliharaan_aset_details')->insert($rows);
+
+        $snapshot = app(MaintenanceChecklistSnapshot::class);
+        foreach ($rows as $row) {
+            $snapshot->applyDefault($tenant, (object) $row);
+        }
     }
 
     /** Nama master ikut dibaca agar daftar tidak perlu satu permintaan tambahan per baris. */

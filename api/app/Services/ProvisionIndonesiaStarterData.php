@@ -50,6 +50,7 @@ final class ProvisionIndonesiaStarterData
             $template['conditions'],
         );
         $this->seedManufacturerModels($tenantId, $template['manufacturer_models'] ?? []);
+        $workOrder = $this->seedWorkOrderSetup($tenantId, $template['maintenance'] ?? []);
         $maintenance = $this->seedMaintenance($tenantId, $template['maintenance'] ?? []);
 
         return [
@@ -60,6 +61,7 @@ final class ProvisionIndonesiaStarterData
             'mappings' => $mappings,
             'location_types' => $locationTypes,
             'conditions' => $conditions,
+            ...$workOrder,
             ...$maintenance,
         ];
     }
@@ -76,7 +78,94 @@ final class ProvisionIndonesiaStarterData
             throw new LogicException('Template maintenance Indonesia tidak tersedia.');
         }
 
-        return ['template_key' => $maintenance['template_key'], ...$this->seedMaintenance($tenantId, $maintenance)];
+        return [
+            'template_key' => $maintenance['template_key'],
+            ...$this->seedWorkOrderSetup($tenantId, $maintenance),
+            ...$this->seedMaintenance($tenantId, $maintenance),
+        ];
+    }
+
+    /** @param array<string, mixed> $template @return array<string, int> */
+    private function seedWorkOrderSetup(string $tenantId, array $template): array
+    {
+        $created = [
+            'work_order_types' => 0,
+            'service_levels' => 0,
+            'trades' => 0,
+            'fault_causes' => 0,
+            'repair_actions' => 0,
+        ];
+
+        foreach ($template['work_order_types'] ?? [] as $item) {
+            $this->ensureNumberedMaster(
+                $tenantId,
+                'm_tipe_work_order',
+                'management-aset.tipe-work-order',
+                'tipe-work-order:starter:'.$item['template_key'],
+                [
+                    'nama' => $item['name'],
+                    'keterangan' => $item['description'] ?? null,
+                    'aktif' => true,
+                    'satu_pekerja' => (bool) ($item['one_worker'] ?? false),
+                ],
+                $created['work_order_types'],
+            );
+        }
+
+        foreach ($template['service_levels'] ?? [] as $item) {
+            $this->ensureNumberedMaster(
+                $tenantId,
+                'm_tingkat_layanan',
+                'management-aset.tingkat-layanan',
+                'tingkat-layanan:starter:'.$item['template_key'],
+                [
+                    'nama' => $item['name'],
+                    'keterangan' => $item['description'] ?? null,
+                    'aktif' => true,
+                    'urutan' => $item['order'],
+                ],
+                $created['service_levels'],
+            );
+        }
+
+        foreach ($template['trades'] ?? [] as $item) {
+            $this->ensureNumberedMaster(
+                $tenantId,
+                'm_trade',
+                'management-aset.trade',
+                'trade:starter:'.$item['template_key'],
+                [
+                    'nama' => $item['name'],
+                    'keterangan' => $item['description'] ?? null,
+                    'aktif' => true,
+                ],
+                $created['trades'],
+            );
+        }
+
+        foreach ($template['fault_causes'] ?? [] as $item) {
+            $this->ensureNumberedMaster(
+                $tenantId,
+                'm_sebab_kerusakan',
+                'management-aset.sebab-kerusakan',
+                'sebab-kerusakan:starter:'.$item['template_key'],
+                ['nama' => $item['name'], 'keterangan' => $item['description'] ?? null, 'aktif' => true],
+                $created['fault_causes'],
+            );
+        }
+
+        foreach ($template['repair_actions'] ?? [] as $item) {
+            $this->ensureNumberedMaster(
+                $tenantId,
+                'm_tindakan_perbaikan',
+                'management-aset.tindakan-perbaikan',
+                'tindakan-perbaikan:starter:'.$item['template_key'],
+                ['nama' => $item['name'], 'keterangan' => $item['description'] ?? null, 'aktif' => true],
+                $created['repair_actions'],
+            );
+        }
+
+        return $created;
     }
 
     /** @param array<string, mixed> $template @return array<string, int> */
@@ -140,7 +229,7 @@ final class ProvisionIndonesiaStarterData
                 ['nama' => $item['name'], 'keterangan' => $item['description'] ?? null, 'aktif' => true],
             );
             $templates[$item['template_key']] = $templateId;
-            $this->ensureChecklistTemplateLines($tenantId, $templateId, $item['lines'] ?? []);
+            $this->ensureChecklistTemplateLines($tenantId, $templateId, $item['lines'] ?? [], $variables);
         }
 
         $defaults = 0;
@@ -158,7 +247,9 @@ final class ProvisionIndonesiaStarterData
                 [
                     'maintenance_job_type_id' => $jobTypeId,
                     'variant_id' => $variantId,
-                    'checklist_template_id' => $templates['id:maintenance:template:pemeriksaan-conveyor:v1'] ?? null,
+                    'checklist_template_id' => isset($item['checklist_template_key'])
+                        ? ($templates[$item['checklist_template_key']] ?? null)
+                        : null,
                     'nama' => $item['name'],
                     'keterangan' => null,
                     'aktif' => true,
@@ -235,8 +326,8 @@ final class ProvisionIndonesiaStarterData
         }
     }
 
-    /** @param list<array<string, mixed>> $items */
-    private function ensureChecklistTemplateLines(string $tenantId, string $templateId, array $items): void
+    /** @param list<array<string, mixed>> $items @param array<string, string> $variables */
+    private function ensureChecklistTemplateLines(string $tenantId, string $templateId, array $items, array $variables = []): void
     {
         foreach ($items as $item) {
             $exists = DB::table('m_maintenance_checklist_template_line')->where([
@@ -247,8 +338,11 @@ final class ProvisionIndonesiaStarterData
             }
             DB::table('m_maintenance_checklist_template_line')->insert([
                 'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'template_id' => $templateId,
-                'line_number' => $item['line_number'], 'type' => $item['type'], 'variable_id' => null,
+                'line_number' => $item['line_number'], 'type' => $item['type'],
+                'variable_id' => isset($item['variable_key']) ? ($variables[$item['variable_key']] ?? null) : null,
                 'nested_template_id' => null, 'unit' => $item['unit'] ?? null, 'nama' => $item['name'],
+                'instruksi' => $item['instructions'] ?? null,
+                'wajib' => (bool) ($item['mandatory'] ?? false),
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }

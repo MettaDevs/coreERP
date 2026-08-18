@@ -3205,6 +3205,27 @@ paths:
       responses:
         '201':
           description: Dokumen dibuat
+  /api/v1/pemeliharaan-aset/referensi/job-types:
+    get:
+      tags:
+      - Pemeliharaan aset
+      operationId: listWorkOrderJobTypesForAsset
+      summary: Menampilkan jenis pekerjaan yang boleh dipilih untuk aset
+      parameters:
+      - name: asset_id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Jenis pekerjaan maintenance yang terkait dengan jenis aset
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/v1/pemeliharaan-aset:
     get:
       tags:
@@ -3381,6 +3402,48 @@ paths:
         '422':
           description: Pekerjaan belum berstatus dikerjakan, ada baris yang bukan milik pekerjaan ini, atau nilai di luar
             pilihan yang ditetapkan variabelnya.
+  /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/execution:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - name: jobId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Ulid'
+    patch:
+      tags:
+      - Pemeliharaan aset
+      operationId: saveWorkOrderJobExecution
+      summary: Menyimpan jam aktual, sebab kerusakan, dan tindakan perbaikan pada baris pekerjaan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                aktual_jam:
+                  type: number
+                  minimum: 0
+                  maximum: 999999.99
+                  nullable: true
+                sebab_kerusakan_id:
+                  allOf:
+                  - $ref: '#/components/schemas/Ulid'
+                  nullable: true
+                tindakan_perbaikan_id:
+                  allOf:
+                  - $ref: '#/components/schemas/Ulid'
+                  nullable: true
+      responses:
+        '200':
+          description: Hasil pelaksanaan tersimpan
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Pekerjaan belum dapat menerima hasil pelaksanaan atau referensi tidak valid
   /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template:
     parameters:
     - $ref: '#/components/parameters/RecordId'

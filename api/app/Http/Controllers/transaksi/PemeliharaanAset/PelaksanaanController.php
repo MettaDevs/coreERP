@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\transaksi\PemeliharaanAset;
 
 use App\Http\Controllers\Controller;
+use App\Services\MaintenanceChecklistSnapshot;
 use App\Support\OrganizationScope;
 use App\Support\WorkOrderStatus;
 use App\Support\WorkOrderValidation;
@@ -175,17 +176,10 @@ class PelaksanaanController extends Controller
                 ->where('tenant_id', $tenant)->whereNull('deleted_at')],
         ])['template_id'];
 
-        $lines = $this->mekarkanTemplate($tenant, $templateId);
-        if ($lines === []) {
+        $snapshot = app(MaintenanceChecklistSnapshot::class);
+        if ($snapshot->copyTemplate($tenant, $jobId, $templateId) === 0) {
             throw ValidationException::withMessages(['template_id' => 'Template checklist ini belum memiliki baris pemeriksaan.']);
         }
-
-        $rows = $this->barisUntukDisimpan($tenant, $jobId, $lines);
-        DB::transaction(function () use ($tenant, $jobId, $rows): void {
-            DB::table('tr_pemeliharaan_aset_checklist')
-                ->where(['tenant_id' => $tenant, 'pemeliharaan_aset_detail_id' => $jobId])->delete();
-            DB::table('tr_pemeliharaan_aset_checklist')->insert($rows);
-        });
 
         return response()->json(['data' => $this->barisChecklist($tenant, $jobId)], 201);
     }
@@ -245,6 +239,39 @@ class PelaksanaanController extends Controller
         });
 
         return response()->json(['data' => $this->barisChecklist($tenant, $jobId)]);
+    }
+
+    public function simpanPelaksanaan(Request $request, string $id, string $jobId): JsonResponse
+    {
+        $this->guard($request, 'execute');
+        $tenant = $this->tenant($request);
+        $workOrder = $this->workOrder($request, $id);
+        abort_unless(
+            in_array($workOrder->status, [WorkOrderStatus::DIKERJAKAN, WorkOrderStatus::SELESAI], true),
+            422,
+            'Hasil pelaksanaan hanya dapat diubah saat pekerjaan sedang dikerjakan atau sudah selesai.',
+        );
+        app(OrganizationScope::class)->require($request, $workOrder->legal_entity_id, $workOrder->responsible_org_unit_id);
+        $this->jobLine($request, $id, $jobId);
+
+        $data = $request->validate([
+            'aktual_jam' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'sebab_kerusakan_id' => ['nullable', 'ulid', Rule::exists('m_sebab_kerusakan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'tindakan_perbaikan_id' => ['nullable', 'ulid', Rule::exists('m_tindakan_perbaikan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+        ]);
+
+        DB::table('tr_pemeliharaan_aset_details')->where([
+            'tenant_id' => $tenant,
+            'id' => $jobId,
+            'pemeliharaan_aset_id' => $id,
+        ])->update([
+            'aktual_jam' => $data['aktual_jam'] ?? null,
+            'sebab_kerusakan_id' => $data['sebab_kerusakan_id'] ?? null,
+            'tindakan_perbaikan_id' => $data['tindakan_perbaikan_id'] ?? null,
+            'updated_at' => now(),
+        ]);
+
+        return response()->json(['data' => $this->workOrder($request, $id)]);
     }
 
     /**
@@ -385,71 +412,6 @@ class PelaksanaanController extends Controller
         return [];
     }
 
-    /**
-     * Baris bertipe `template` dimekarkan menjadi isinya. Penomoran ditata ulang berurutan
-     * mengikuti urutan penelusuran karena dua template dapat memakai nomor baris yang sama
-     * dan tabrakan itu akan ditolak unique index.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function mekarkanTemplate(string $tenant, string $templateId, array $dilalui = []): array
-    {
-        // Template yang memuat dirinya sendiri, langsung atau lewat perantara, akan
-        // memekar tanpa henti. Yang sudah dilalui dilewati, bukan dilaporkan sebagai
-        // error, supaya satu template rusak tidak memblokir seluruh checklist.
-        if (in_array($templateId, $dilalui, true)) {
-            return [];
-        }
-        $dilalui[] = $templateId;
-
-        $hasil = [];
-        $lines = DB::table('m_maintenance_checklist_template_line')
-            ->where(['tenant_id' => $tenant, 'template_id' => $templateId])->orderBy('line_number')->get();
-
-        foreach ($lines as $line) {
-            if ($line->type === 'template') {
-                $hasil = [...$hasil, ...$this->mekarkanTemplate($tenant, (string) $line->nested_template_id, $dilalui)];
-
-                continue;
-            }
-            $hasil[] = [
-                'tipe' => $line->type,
-                'nama' => $line->nama,
-                'instruksi' => $line->instruksi,
-                'satuan' => $line->unit,
-                'wajib' => (bool) $line->wajib,
-                'sumber' => 'template',
-                'sumber_id' => $line->id,
-                'variable_id' => $line->variable_id,
-            ];
-        }
-
-        return $hasil;
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $lines
-     * @return list<array<string, mixed>>
-     */
-    private function barisUntukDisimpan(string $tenant, string $jobId, array $lines): array
-    {
-        return collect($lines)->values()->map(fn (array $line, int $index): array => [
-            'id' => (string) Str::ulid(),
-            'tenant_id' => $tenant,
-            'pemeliharaan_aset_detail_id' => $jobId,
-            'line_number' => $index + 1,
-            'nama' => $line['nama'],
-            'instruksi' => $line['instruksi'],
-            'tipe' => $line['tipe'],
-            'satuan' => $line['satuan'],
-            'wajib' => $line['wajib'],
-            'sumber' => $line['sumber'],
-            'sumber_id' => $line['sumber_id'],
-            'created_at' => now(),
-            'updated_at' => now(),
-        ])->all();
-    }
-
     /** Nilai baris `variable` harus salah satu pilihan yang ditetapkan variabelnya. */
     private function pastikanNilaiSah(string $tenant, object $row, ?string $nilai): void
     {
@@ -485,9 +447,27 @@ class PelaksanaanController extends Controller
     /** @return Collection<int, object> */
     private function barisChecklist(string $tenant, string $jobId): Collection
     {
-        return DB::table('tr_pemeliharaan_aset_checklist')
+        $rows = DB::table('tr_pemeliharaan_aset_checklist')
             ->where(['tenant_id' => $tenant, 'pemeliharaan_aset_detail_id' => $jobId])
             ->orderBy('line_number')->get();
+
+        $sourceIds = $rows->pluck('sumber_id')->filter()->values();
+        $variables = DB::table('m_maintenance_checklist_template_line as baris')
+            ->join('m_maintenance_checklist_variable_value as nilai', function ($join): void {
+                $join->on('nilai.variable_id', '=', 'baris.variable_id')
+                    ->on('nilai.tenant_id', '=', 'baris.tenant_id');
+            })
+            ->where('baris.tenant_id', $tenant)
+            ->whereIn('baris.id', $sourceIds)
+            ->orderBy('nilai.line_number')
+            ->get(['baris.id as source_id', 'nilai.value', 'nilai.result_code'])
+            ->groupBy('source_id');
+
+        return $rows->map(function (object $row) use ($variables): object {
+            $row->pilihan = $variables->get($row->sumber_id, collect())->values();
+
+            return $row;
+        });
     }
 
     private function jobLine(Request $request, string $workOrderId, string $jobId): object
