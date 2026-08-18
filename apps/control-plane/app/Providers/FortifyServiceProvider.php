@@ -15,8 +15,18 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse as FailedPasswordResetLinkRequestResponseContract;
+use Laravel\Fortify\Contracts\FailedPasswordResetResponse as FailedPasswordResetResponseContract;
+use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
+use Laravel\Fortify\Contracts\PasswordResetResponse as PasswordResetResponseContract;
+use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse as SuccessfulPasswordResetLinkRequestResponseContract;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -25,7 +35,62 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(PasswordResetResponseContract::class, function () {
+            return new class implements PasswordResetResponseContract {
+                public function toResponse($request) {
+                    return redirect()->route('login')->with('status', 'Password berhasil diperbarui! Silakan login dengan password baru Anda.');
+                }
+            };
+        });
+
+        $this->app->singleton(FailedPasswordResetResponseContract::class, function () {
+            return new class implements FailedPasswordResetResponseContract {
+                public function toResponse($request) {
+                    return redirect()->route('password.request')->withErrors([
+                        'email' => 'Gagal memperbarui kata sandi. Token tidak valid atau email salah.',
+                    ]);
+                }
+            };
+        });
+
+        $this->app->singleton(SuccessfulPasswordResetLinkRequestResponseContract::class, function () {
+            return new class implements SuccessfulPasswordResetLinkRequestResponseContract {
+                public function toResponse($request) {
+                    return redirect()->route('password.request')->with('status', 'Link reset kata sandi telah dikirimkan ke email Anda.');
+                }
+            };
+        });
+
+        $this->app->singleton(FailedPasswordResetLinkRequestResponseContract::class, function ($app, $parameters = []) {
+            return new class ($parameters['status'] ?? null) implements FailedPasswordResetLinkRequestResponseContract {
+                protected $status;
+                public function __construct($status = null) {
+                    $this->status = $status;
+                }
+                public function toResponse($request) {
+                    $msg = $this->status === 'passwords.throttled'
+                        ? 'Harap tunggu beberapa saat sebelum meminta link reset kata sandi lagi.'
+                        : 'Alamat email tidak ditemukan dalam sistem kami.';
+                    return redirect()->route('password.request')->withErrors(['email' => $msg]);
+                }
+            };
+        });
+
+
+        $this->app->singleton(LoginResponseContract::class, \App\Http\Responses\LoginResponse::class);
+
+        $this->app->singleton(RegisterResponseContract::class, function () {
+            return new class implements RegisterResponseContract {
+                public function toResponse($request)
+                {
+                    auth()->guard()->logout();
+                    $request->session()->invalidate();
+                    $request->session()->regenerateToken();
+
+                    return redirect()->route('login')->with('status', 'Registrasi berhasil! Silakan masuk dengan email dan kata sandi Anda.');
+                }
+            };
+        });
     }
 
     /**
@@ -47,6 +112,29 @@ class FortifyServiceProvider extends ServiceProvider
         /* @chisel-registration */
         Fortify::createUsersUsing(CreateNewUser::class);
         /* @end-chisel-registration */
+
+        Fortify::authenticateUsing(function (Request $request) {
+            $email = Str::lower(trim((string) $request->email));
+
+            $request->validate([
+                'email' => ['required', 'string', 'email:filter'],
+                'password' => ['required', 'string'],
+            ], [
+                'email.required' => 'Email wajib diisi.',
+                'email.email' => 'Format email tidak valid.',
+                'password.required' => 'Password wajib diisi.',
+            ]);
+
+            $user = User::where('email', $email)->first();
+
+            if (! $user || ! Hash::check($request->password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'email' => ['Email atau password salah.'],
+                ]);
+            }
+
+            return $user;
+        });
     }
 
     /**
@@ -113,7 +201,7 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
-            return Limit::perMinute(5)->by($throttleKey);
+            return Limit::perMinute((int) config('coreerp.login_rate_limit', 15))->by($throttleKey);
         });
 
         /* @chisel-passkeys */
