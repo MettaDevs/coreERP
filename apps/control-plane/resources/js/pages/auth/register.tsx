@@ -1,5 +1,5 @@
 import { Head, useForm } from '@inertiajs/react';
-import { Building2, KeyRound, Package } from 'lucide-react';
+import { Building2, KeyRound, Package, ShieldCheck, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 
 import PasswordInput from '@/components/password-input';
@@ -7,28 +7,20 @@ import TextLink from '@/components/text-link';
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
-import {
     Field,
     FieldError,
     FieldGroup,
-    FieldLegend,
-    FieldSet,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Spinner } from '@apperp/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
-import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
+import { login } from '@/routes';
 
 type AppOption = { id: string; name: string; description: string };
 type Props = { passwordRules: string; apps: AppOption[] };
 type Step = 'business' | 'products' | 'security';
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 export default function Register({ passwordRules, apps }: Props) {
     const [step, setStep] = useState<Step>('business');
@@ -36,17 +28,177 @@ export default function Register({ passwordRules, apps }: Props) {
         name: '',
         business_name: '',
         email: '',
+        phone_number: '',
         app_ids: [] as string[],
         password: '',
         password_confirmation: '',
     });
-    const businessComplete =
-        form.data.name.trim() !== '' &&
-        form.data.business_name.trim() !== '' &&
-        form.data.email.trim() !== '';
-    const productsComplete = form.data.app_ids.length > 0;
 
-    const submit = () => {
+    const [clientErrors, setClientErrors] = useState<Record<string, string | undefined>>({});
+
+    const validateName = (val: string) => {
+        if (!val.trim()) return 'Nama pemilik akun wajib diisi.';
+        return undefined;
+    };
+
+    const validateBusinessName = (val: string) => {
+        if (!val.trim()) return 'Nama bisnis / perusahaan wajib diisi.';
+        return undefined;
+    };
+
+    const validateEmail = (val: string) => {
+        const trimmed = val.trim();
+        if (!trimmed) return 'Email wajib diisi.';
+        if (!EMAIL_REGEX.test(trimmed)) return 'Format email tidak valid.';
+        return undefined;
+    };
+
+    const validatePassword = (val: string) => {
+        if (!val) return 'Password wajib diisi.';
+        if (val.length < 8) return 'Password minimal 8 karakter.';
+        return undefined;
+    };
+
+    const validatePasswordConfirmation = (confVal: string, passVal: string) => {
+        if (!confVal) return 'Konfirmasi password wajib diisi.';
+        if (confVal !== passVal) return 'Konfirmasi password tidak cocok.';
+        return undefined;
+    };
+
+    const handleFieldChange = (field: keyof typeof form.data, value: any) => {
+        let finalVal = value;
+        if (field === 'email' && typeof value === 'string') {
+            finalVal = value.trimStart();
+        }
+        form.setData(field, finalVal);
+
+        if (clientErrors[field]) {
+            setClientErrors((prev) => ({ ...prev, [field]: undefined }));
+        }
+        if (form.errors[field as keyof typeof form.errors]) {
+            form.clearErrors(field as keyof typeof form.errors);
+        }
+    };
+
+    const handleBlur = (field: string) => {
+        let err: string | undefined = undefined;
+
+        if (field === 'email' && form.data.email.trim() !== '') {
+            if (!EMAIL_REGEX.test(form.data.email.trim())) {
+                err = 'Format email tidak valid.';
+            }
+        }
+        if (field === 'password' && form.data.password !== '') {
+            if (form.data.password.length < 8) {
+                err = 'Password minimal 8 karakter.';
+            }
+        }
+        if (field === 'password_confirmation' && form.data.password_confirmation !== '') {
+            if (form.data.password_confirmation !== form.data.password) {
+                err = 'Konfirmasi password tidak cocok.';
+            }
+        }
+
+        if (err !== undefined) {
+            setClientErrors((prev) => ({ ...prev, [field]: err }));
+        }
+    };
+
+    const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+    const [isExistingEmail, setIsExistingEmail] = useState(false);
+
+    const handleNextToProducts = async () => {
+        const nameErr = validateName(form.data.name);
+        const bizErr = validateBusinessName(form.data.business_name);
+        const emailErr = validateEmail(form.data.email);
+
+        setClientErrors((prev) => ({
+            ...prev,
+            name: nameErr,
+            business_name: bizErr,
+            email: emailErr,
+        }));
+
+        if (nameErr || bizErr || emailErr) {
+            return;
+        }
+
+        setIsCheckingEmail(true);
+        let hasError = false;
+        try {
+            const response = await fetch('/check-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+                },
+                body: JSON.stringify({ email: form.data.email.trim() }),
+            });
+
+            const result = await response.json();
+            if (result.maxReached) {
+                setClientErrors((prev) => ({
+                    ...prev,
+                    email: result.message || 'Email ini telah terdaftar untuk 3 bisnis (batas maksimal). Silakan gunakan email lain atau login.',
+                }));
+                hasError = true;
+                return;
+            }
+
+            if (result.exists) {
+                setIsExistingEmail(true);
+            } else {
+                setIsExistingEmail(false);
+            }
+        } catch (e) {
+            console.error('Error checking duplicate email:', e);
+            hasError = true;
+        } finally {
+            setIsCheckingEmail(false);
+        }
+
+        if (!hasError) {
+            setStep('products');
+        }
+    };
+
+    const handleNextToSecurity = () => {
+        if (form.data.app_ids.length > 0) {
+            setStep('security');
+        }
+    };
+
+    const toggleApp = (id: string) => {
+        const current = form.data.app_ids;
+        if (current.includes(id)) {
+            form.setData('app_ids', current.filter((item) => item !== id));
+        } else {
+            form.setData('app_ids', [...current, id]);
+        }
+    };
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const passErr = validatePassword(form.data.password);
+        const confErr = validatePasswordConfirmation(
+            form.data.password_confirmation,
+            form.data.password
+        );
+
+        setClientErrors((prev) => ({
+            ...prev,
+            password: passErr,
+            password_confirmation: confErr,
+        }));
+
+        if (passErr || confErr) {
+            return;
+        }
+
+        form.data.email = form.data.email.trim().toLowerCase();
+
         form.post('/register', {
             onError: (errors) => {
                 if (errors.name || errors.business_name || errors.email) {
@@ -60,280 +212,346 @@ export default function Register({ passwordRules, apps }: Props) {
         });
     };
 
+    const getFieldError = (field: string) => {
+        return form.errors[field as keyof typeof form.errors] || clientErrors[field];
+    };
+
+    const isStep1Valid =
+        form.data.name.trim() !== '' &&
+        form.data.business_name.trim() !== '' &&
+        form.data.email.trim() !== '' &&
+        !getFieldError('name') &&
+        !getFieldError('business_name') &&
+        !getFieldError('email') &&
+        !isCheckingEmail;
+
     return (
         <>
-            <Head title="Pendaftaran bisnis" />
+            <Head title="Pendaftaran Bisnis Baru" />
+
             <Tabs
                 value={step}
                 onValueChange={(value) => setStep(value as Step)}
+                className="space-y-4"
             >
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="business">1. Bisnis</TabsTrigger>
-                    <TabsTrigger value="products" disabled={!businessComplete}>
-                        2. Produk
+                {/* Modern Step Navigation Tabs Header */}
+                <TabsList className="grid w-full grid-cols-3 h-11 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl">
+                    <TabsTrigger
+                        value="business"
+                        className="rounded-lg text-xs font-semibold gap-1.5 transition-all cursor-pointer data-[state=active]:bg-blue-600 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400"
+                    >
+                        <Building2 className="size-3.5" />
+                        <span className="hidden sm:inline">1. Bisnis</span>
+                        <span className="sm:hidden">1</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="products"
+                        disabled={!isStep1Valid}
+                        className="rounded-lg text-xs font-semibold gap-1.5 transition-all cursor-pointer data-[state=active]:bg-blue-600 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 disabled:opacity-40"
+                    >
+                        <Package className="size-3.5" />
+                        <span className="hidden sm:inline">2. Produk</span>
+                        <span className="sm:hidden">2</span>
                     </TabsTrigger>
                     <TabsTrigger
                         value="security"
-                        disabled={!businessComplete || !productsComplete}
+                        disabled={!isStep1Valid || form.data.app_ids.length === 0}
+                        className="rounded-lg text-xs font-semibold gap-1.5 transition-all cursor-pointer data-[state=active]:bg-blue-600 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600 dark:data-[state=active]:text-white data-[state=active]:shadow-md data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 disabled:opacity-40"
                     >
-                        3. Keamanan
+                        <ShieldCheck className="size-3.5" />
+                        <span className="hidden sm:inline">3. Keamanan</span>
+                        <span className="sm:hidden">3</span>
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="business">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Pemilik dan bisnis</CardTitle>
-                            <CardDescription>
-                                Isi identitas pemilik akun dan nama bisnis.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <FieldGroup>
-                                <Field data-invalid={Boolean(form.errors.name)}>
-                                    <Input
-                                        label="Nama pemilik"
-                                        value={form.data.name}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'name',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(form.errors.name)}
-                                        autoComplete="name"
-                                        autoFocus
-                                    />
-                                    <FieldError>{form.errors.name}</FieldError>
-                                </Field>
-                                <Field
-                                    data-invalid={Boolean(
-                                        form.errors.business_name,
-                                    )}
-                                >
-                                    <Input
-                                        label="Nama bisnis"
-                                        value={form.data.business_name}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'business_name',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
-                                            form.errors.business_name,
-                                        )}
-                                        autoComplete="organization"
-                                    />
-                                    <FieldError>
-                                        {form.errors.business_name}
-                                    </FieldError>
-                                </Field>
-                                <Field
-                                    data-invalid={Boolean(form.errors.email)}
-                                >
-                                    <Input
-                                        label="Email pemilik"
-                                        type="email"
-                                        value={form.data.email}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'email',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
-                                            form.errors.email,
-                                        )}
-                                        autoComplete="email"
-                                    />
-                                    <FieldError>{form.errors.email}</FieldError>
-                                </Field>
-                            </FieldGroup>
-                        </CardContent>
-                        <CardFooter className="justify-end">
-                            <Button
-                                type="button"
-                                disabled={!businessComplete}
-                                onClick={() => setStep('products')}
-                            >
-                                Lanjutkan
-                            </Button>
-                        </CardFooter>
-                    </Card>
+                {/* STEP 1: BUSINESS IDENTIFICATION */}
+                <TabsContent value="business" className="space-y-4 focus:outline-none">
+                    <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Building2 className="size-4 text-blue-600 dark:text-blue-400" />
+                            Identitas Pemilik &amp; Perusahaan
+                        </h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Lengkapi identitas Anda sebagai pemilik akun utama serta nama unit bisnis.
+                        </p>
+                    </div>
+
+                    <FieldGroup className="space-y-3">
+                        <Field data-invalid={Boolean(getFieldError('name'))}>
+                            <Input
+                                id="name"
+                                name="name"
+                                label="Nama Pemilik Akun"
+                                value={form.data.name}
+                                onChange={(event) => handleFieldChange('name', event.target.value)}
+                                onBlur={() => handleBlur('name')}
+                                aria-invalid={Boolean(getFieldError('name'))}
+                                autoComplete="name"
+                                autoFocus
+                                placeholder="Nama lengkap Anda"
+                            />
+                            <FieldError>{getFieldError('name')}</FieldError>
+                        </Field>
+
+                        <Field data-invalid={Boolean(getFieldError('business_name'))}>
+                            <Input
+                                id="business_name"
+                                name="business_name"
+                                label="Nama Bisnis / Perusahaan"
+                                value={form.data.business_name}
+                                onChange={(event) => handleFieldChange('business_name', event.target.value)}
+                                onBlur={() => handleBlur('business_name')}
+                                aria-invalid={Boolean(getFieldError('business_name'))}
+                                autoComplete="organization"
+                                placeholder="Contoh: PT. Sanata System"
+                            />
+                            <FieldError>{getFieldError('business_name')}</FieldError>
+                        </Field>
+
+                        <Field data-invalid={Boolean(getFieldError('email'))}>
+                            <Input
+                                id="email"
+                                name="email"
+                                label="Alamat Email Utama"
+                                type="email"
+                                value={form.data.email}
+                                onChange={(event) => handleFieldChange('email', event.target.value)}
+                                onBlur={() => handleBlur('email')}
+                                aria-invalid={Boolean(getFieldError('email'))}
+                                autoComplete="email"
+                                placeholder="pemilik@perusahaan.com"
+                            />
+                            <FieldError>{getFieldError('email')}</FieldError>
+                        </Field>
+
+                        <Field data-invalid={Boolean(getFieldError('phone_number'))}>
+                            <Input
+                                id="phone_number"
+                                name="phone_number"
+                                label="Nomor Telepon (Opsional)"
+                                type="tel"
+                                value={form.data.phone_number}
+                                onChange={(event) => handleFieldChange('phone_number', event.target.value)}
+                                aria-invalid={Boolean(getFieldError('phone_number'))}
+                                autoComplete="tel"
+                                placeholder="Contoh: 081234567890"
+                            />
+                            <FieldError>{getFieldError('phone_number')}</FieldError>
+                        </Field>
+                    </FieldGroup>
+
+                    <div className="pt-2 flex justify-end">
+                        <Button
+                            type="button"
+                            disabled={!isStep1Valid || isCheckingEmail}
+                            onClick={handleNextToProducts}
+                            className="h-11 px-6 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all gap-2 text-xs cursor-pointer active:scale-[0.99]"
+                        >
+                            {isCheckingEmail ? (
+                                <>
+                                    <Spinner className="mr-1.5" />
+                                    Memeriksa...
+                                </>
+                            ) : (
+                                <>
+                                    Lanjutkan ke Produk
+                                    <ArrowRight className="size-3.5" />
+                                </>
+                            )}
+                        </Button>
+                    </div>
                 </TabsContent>
 
-                <TabsContent value="products">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Produk awal</CardTitle>
-                            <CardDescription>
-                                Struktur perusahaan diatur setelah pendaftaran,
-                                sesuai keadaan bisnis yang sebenarnya.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <FieldSet
-                                data-invalid={Boolean(form.errors.app_ids)}
-                            >
-                                <FieldLegend hint="Produk yang tidak dipilih belum dapat digunakan oleh bisnis Anda. Proses pemasangannya berlangsung terpisah.">
-                                    Pilihan produk
-                                </FieldLegend>
-                                <ToggleGroup
-                                    type="multiple"
-                                    variant="outline"
-                                    spacing={2}
-                                    className="grid w-full gap-3 md:grid-cols-2"
-                                    value={form.data.app_ids}
-                                    onValueChange={(values) =>
-                                        form.setData('app_ids', values)
-                                    }
+                {/* STEP 2: PRODUCT SELECTION */}
+                <TabsContent value="products" className="space-y-4 focus:outline-none">
+                    <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Package className="size-4 text-blue-600 dark:text-blue-400" />
+                            Pilih Modul Aplikasi ERP
+                        </h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Pilih minimal 1 produk awal yang dibutuhkan oleh operasional bisnis Anda.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {apps.map((app) => {
+                            const isSelected = form.data.app_ids.includes(app.id);
+                            return (
+                                <div
+                                    key={app.id}
+                                    onClick={() => toggleApp(app.id)}
+                                    className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between space-y-2 relative group ${
+                                        isSelected
+                                            ? 'bg-blue-50/60 dark:bg-blue-950/40 border-blue-500 dark:border-blue-500 ring-2 ring-blue-500/20'
+                                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                                    }`}
                                 >
-                                    {apps.map((app) => (
-                                        <ToggleGroupItem
-                                            key={app.id}
-                                            value={app.id}
-                                            className="h-auto min-h-24 w-full items-start justify-start p-4 text-left whitespace-normal"
+                                    <div className="flex items-start justify-between">
+                                        <div className="size-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 group-hover:scale-105 transition-transform">
+                                            <Package className="size-4 text-blue-600 dark:text-blue-400" />
+                                        </div>
+                                        <div
+                                            className={`size-4.5 rounded-full flex items-center justify-center transition-all ${
+                                                isSelected
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'border border-slate-300 dark:border-slate-700'
+                                            }`}
                                         >
-                                            <Package />
-                                            <span className="flex flex-col gap-1">
-                                                <span className="font-medium">
-                                                    {app.name}
-                                                </span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {app.description}
-                                                </span>
-                                            </span>
-                                        </ToggleGroupItem>
-                                    ))}
-                                </ToggleGroup>
-                                <FieldError>{form.errors.app_ids}</FieldError>
-                            </FieldSet>
-                        </CardContent>
-                        <CardFooter className="justify-between">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setStep('business')}
-                            >
-                                Kembali
-                            </Button>
-                            <Button
-                                type="button"
-                                disabled={!productsComplete}
-                                onClick={() => setStep('security')}
-                            >
-                                Lanjutkan
-                            </Button>
-                        </CardFooter>
-                    </Card>
+                                            {isSelected && <CheckCircle2 className="size-3 stroke-[3]" />}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                                            {app.name}
+                                        </h4>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 mt-0.5">
+                                            {app.description || 'Sistem manajemen operasional terpadu.'}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {form.errors.app_ids && (
+                        <p className="text-xs font-medium text-red-500 mt-1">
+                            {form.errors.app_ids}
+                        </p>
+                    )}
+
+                    <div className="pt-2 flex items-center justify-between">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setStep('business')}
+                            className="h-10 px-4 rounded-xl gap-2 text-xs cursor-pointer"
+                        >
+                            <ArrowLeft className="size-3.5" />
+                            Kembali
+                        </Button>
+                        <Button
+                            type="button"
+                            disabled={form.data.app_ids.length === 0}
+                            onClick={handleNextToSecurity}
+                            className="h-11 px-6 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all gap-2 text-xs cursor-pointer active:scale-[0.99]"
+                        >
+                            Lanjutkan ke Keamanan
+                            <ArrowRight className="size-3.5" />
+                        </Button>
+                    </div>
                 </TabsContent>
 
-                <TabsContent value="security">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Keamanan dan konfirmasi</CardTitle>
-                            <CardDescription>
-                                Buat kata sandi untuk akun pemilik bisnis.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <FieldGroup>
-                                <Alert>
-                                    <Building2 />
-                                    <AlertTitle>
-                                        {form.data.business_name}
+                {/* STEP 3: SECURITY & CONFIRMATION */}
+                <TabsContent value="security" className="space-y-4 focus:outline-none">
+                    <form onSubmit={submit} className="space-y-4" noValidate>
+                        <div className="space-y-0.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                            <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                                <ShieldCheck className="size-4 text-blue-600 dark:text-blue-400" />
+                                Keamanan &amp; Kata Sandi
+                            </h3>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                Buat kata sandi aman untuk akun pemilik tenant bisnis.
+                            </p>
+                        </div>
+
+                        <FieldGroup className="space-y-3">
+                            {isExistingEmail ? (
+                                <Alert className="bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 py-2.5">
+                                    <CheckCircle2 className="size-4 text-amber-600 dark:text-amber-400" />
+                                    <AlertTitle className="text-xs font-semibold text-amber-950 dark:text-amber-200">
+                                        Akun Terdaftar Ditemukan ({form.data.email})
                                     </AlertTitle>
-                                    <AlertDescription>
-                                        {form.data.app_ids.length} produk
-                                        dipilih. Legal entity dan unit
-                                        operasional dibuat setelah tenant aktif.
+                                    <AlertDescription className="text-[11px] text-amber-800 dark:text-amber-300">
+                                        Email ini sudah terdaftar. Bisnis <strong>{form.data.business_name}</strong> akan ditambahkan ke akun Anda yang ada. Masukkan kata sandi akun Anda untuk mengonfirmasi.
                                     </AlertDescription>
                                 </Alert>
-                                <Field
-                                    data-invalid={Boolean(form.errors.password)}
-                                >
-                                    <PasswordInput
-                                        label="Kata sandi"
-                                        value={form.data.password}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'password',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
-                                            form.errors.password,
-                                        )}
-                                        autoComplete="new-password"
-                                        passwordrules={passwordRules}
-                                    />
-                                    <FieldError>
-                                        {form.errors.password}
-                                    </FieldError>
-                                </Field>
-                                <Field
-                                    data-invalid={Boolean(
-                                        form.errors.password_confirmation,
-                                    )}
-                                >
-                                    <PasswordInput
-                                        label="Konfirmasi kata sandi"
-                                        value={form.data.password_confirmation}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'password_confirmation',
-                                                event.target.value,
-                                            )
-                                        }
-                                        aria-invalid={Boolean(
-                                            form.errors.password_confirmation,
-                                        )}
-                                        autoComplete="new-password"
-                                        passwordrules={passwordRules}
-                                    />
-                                    <FieldError>
-                                        {form.errors.password_confirmation}
-                                    </FieldError>
-                                </Field>
-                            </FieldGroup>
-                        </CardContent>
-                        <CardFooter className="justify-between">
+                            ) : (
+                                <Alert className="bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 py-2.5">
+                                    <Building2 className="size-4 text-blue-600 dark:text-blue-400" />
+                                    <AlertTitle className="text-xs font-semibold text-blue-950 dark:text-blue-200">
+                                        Perusahaan: {form.data.business_name}
+                                    </AlertTitle>
+                                    <AlertDescription className="text-[11px] text-blue-800 dark:text-blue-300">
+                                        {form.data.app_ids.length} modul aplikasi terpilih. Tenant dan database akan disiapkan secara otomatis setelah pendaftaran selesai.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
+
+                            <Field data-invalid={Boolean(getFieldError('password'))}>
+                                <PasswordInput
+                                    id="password"
+                                    name="password"
+                                    label="Kata Sandi Utama"
+                                    value={form.data.password}
+                                    onChange={(event) => handleFieldChange('password', event.target.value)}
+                                    onBlur={() => handleBlur('password')}
+                                    aria-invalid={Boolean(getFieldError('password'))}
+                                    autoComplete="new-password"
+                                    passwordrules={passwordRules}
+                                    placeholder="••••••••"
+                                />
+                                <FieldError>{getFieldError('password')}</FieldError>
+                            </Field>
+
+                            <Field data-invalid={Boolean(getFieldError('password_confirmation'))}>
+                                <PasswordInput
+                                    id="password_confirmation"
+                                    name="password_confirmation"
+                                    label="Konfirmasi Kata Sandi"
+                                    value={form.data.password_confirmation}
+                                    onChange={(event) => handleFieldChange('password_confirmation', event.target.value)}
+                                    onBlur={() => handleBlur('password_confirmation')}
+                                    aria-invalid={Boolean(getFieldError('password_confirmation'))}
+                                    autoComplete="new-password"
+                                    passwordrules={passwordRules}
+                                    placeholder="••••••••"
+                                />
+                                <FieldError>{getFieldError('password_confirmation')}</FieldError>
+                            </Field>
+                        </FieldGroup>
+
+                        <div className="pt-2 flex items-center justify-between">
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => setStep('products')}
+                                className="h-10 px-4 rounded-xl gap-2 text-xs cursor-pointer"
                             >
+                                <ArrowLeft className="size-3.5" />
                                 Kembali
                             </Button>
                             <Button
-                                type="button"
-                                disabled={
-                                    form.processing ||
-                                    form.data.password === '' ||
-                                    form.data.password_confirmation === ''
-                                }
-                                onClick={submit}
+                                type="submit"
+                                disabled={form.processing}
+                                className="h-11 px-6 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all cursor-pointer active:scale-[0.99]"
                             >
-                                {form.processing ? <Spinner /> : <KeyRound />}
-                                Buat tenant
+                                {form.processing ? (
+                                    <>
+                                        <Spinner className="mr-2" />
+                                        Memproses...
+                                    </>
+                                ) : (
+                                    'Daftar Business Account'
+                                )}
                             </Button>
-                        </CardFooter>
-                    </Card>
+                        </div>
+                    </form>
                 </TabsContent>
             </Tabs>
 
-            <p className="text-center text-sm text-muted-foreground">
-                Punya kode akses?{' '}
-                <TextLink href="/join">Daftar sebagai anggota</TextLink>
-                <span className="mx-2">·</span>
-                Sudah punya akun? <TextLink href="/login">Masuk</TextLink>
-            </p>
+            <div className="pt-3 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 mt-3">
+                Sudah memiliki akun bisnis?{' '}
+                <TextLink href={login()} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                    Masuk ke Akun
+                </TextLink>
+            </div>
         </>
     );
 }
 
 Register.layout = {
-    title: 'Pendaftaran bisnis',
-    description: 'Isi data pemilik akun dan pilih produk untuk bisnis Anda.',
+    title: 'Pendaftaran Bisnis Baru',
+    description: 'Isi data pemilik akun dan pilih produk awal untuk bisnis Anda.',
 };

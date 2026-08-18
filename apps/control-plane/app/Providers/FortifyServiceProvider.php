@@ -15,8 +15,18 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse as FailedPasswordResetLinkRequestResponseContract;
+use Laravel\Fortify\Contracts\FailedPasswordResetResponse as FailedPasswordResetResponseContract;
+use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
+use Laravel\Fortify\Contracts\PasswordResetResponse as PasswordResetResponseContract;
+use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse as SuccessfulPasswordResetLinkRequestResponseContract;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -25,7 +35,54 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(PasswordResetResponseContract::class, function () {
+            return new class implements PasswordResetResponseContract {
+                public function toResponse($request) {
+                    return redirect()->route('login')->with('status', 'Password berhasil diperbarui! Silakan login dengan password baru Anda.');
+                }
+            };
+        });
+
+        $this->app->singleton(FailedPasswordResetResponseContract::class, function () {
+            return new class implements FailedPasswordResetResponseContract {
+                public function toResponse($request) {
+                    return redirect()->route('password.request')->withErrors([
+                        'email' => 'Gagal memperbarui kata sandi. Token tidak valid atau email salah.',
+                    ]);
+                }
+            };
+        });
+
+        $this->app->singleton(SuccessfulPasswordResetLinkRequestResponseContract::class, function () {
+            return new class implements SuccessfulPasswordResetLinkRequestResponseContract {
+                public function toResponse($request) {
+                    return redirect()->route('password.request')->with('status', 'Link reset kata sandi telah dikirimkan ke email Anda.');
+                }
+            };
+        });
+
+        $this->app->singleton(FailedPasswordResetLinkRequestResponseContract::class, function ($app, $parameters = []) {
+            return new class ($parameters['status'] ?? null) implements FailedPasswordResetLinkRequestResponseContract {
+                protected $status;
+                public function __construct($status = null) {
+                    $this->status = $status;
+                }
+                public function toResponse($request) {
+                    $msg = $this->status === 'passwords.throttled'
+                        ? 'Harap tunggu beberapa saat sebelum meminta link reset kata sandi lagi.'
+                        : 'Alamat email tidak ditemukan dalam sistem kami.';
+                    return redirect()->route('password.request')->withErrors(['email' => $msg]);
+                }
+            };
+        });
+
+        $this->app->singleton(RegisterResponseContract::class, function () {
+            return new class implements RegisterResponseContract {
+                public function toResponse($request) {
+                    return redirect()->route('login')->with('status', 'Registrasi berhasil. Selamat datang. Silakan login.');
+                }
+            };
+        });
     }
 
     /**
@@ -47,6 +104,36 @@ class FortifyServiceProvider extends ServiceProvider
         /* @chisel-registration */
         Fortify::createUsersUsing(CreateNewUser::class);
         /* @end-chisel-registration */
+
+        Fortify::authenticateUsing(function (Request $request) {
+            $email = Str::lower(trim((string) $request->email));
+
+            $request->validate([
+                'email' => ['required', 'string', 'email:filter'],
+                'password' => ['required', 'string', 'min:8'],
+            ], [
+                'email.required' => 'Email wajib diisi.',
+                'email.email' => 'Format email tidak valid.',
+                'password.required' => 'Password wajib diisi.',
+                'password.min' => 'Password minimal 8 karakter.',
+            ]);
+
+            $user = User::where('email', $email)->first();
+
+            if (! $user) {
+                throw ValidationException::withMessages([
+                    'email' => ['Email tidak ditemukan.'],
+                ]);
+            }
+
+            if (! Hash::check($request->password, $user->password)) {
+                throw ValidationException::withMessages([
+                    'password' => ['Password salah.'],
+                ]);
+            }
+
+            return $user;
+        });
     }
 
     /**
