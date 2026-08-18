@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { ChevronDown, ChevronUp, CircleHelp, Plus, Save } from 'lucide-react';
+import { ChevronDown, CircleHelp, Plus, Save } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
@@ -8,6 +8,10 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@apperp/ui/collapsible';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import {
@@ -52,6 +56,7 @@ export default function UnitsOfMeasure({
     units,
     conversions,
 }: Props) {
+    const [isUnitsListOpen, setIsUnitsListOpen] = useState(true);
     const [classCode, setClassCode] = useState('');
     const [className, setClassName] = useState('');
     const [systemCode, setSystemCode] = useState('');
@@ -71,8 +76,6 @@ export default function UnitsOfMeasure({
         offset: '0',
         rounding_scale: '',
     });
-    const [isConversionsOpen, setIsConversionsOpen] = useState(false);
-    const [isUnitsListOpen, setIsUnitsListOpen] = useState(false);
     const classNameById = useMemo(
         () => new Map(classes.map((item) => [item.id, item.name])),
         [classes],
@@ -359,33 +362,24 @@ export default function UnitsOfMeasure({
                                 <Save /> Simpan konversi
                             </Button>
                         </form>
-                        <Collapsible
-                            open={isConversionsOpen}
-                            onOpenChange={setIsConversionsOpen}
-                            className="mt-6 border-t pt-4"
-                        >
-                            <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between">
-                                <h2 className="text-base font-semibold">
-                                    Konversi yang tersedia
-                                </h2>
-                                {isConversionsOpen ? (
-                                    <ChevronUp className="size-4 text-muted-foreground" />
-                                ) : (
-                                    <ChevronDown className="size-4 text-muted-foreground" />
-                                )}
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    Konversi khusus produk, seperti satu dus
-                                    berisi beberapa barang, akan diatur oleh
-                                    PIM/Inventory saat tersedia.
-                                </p>
+                        <p className="mt-3 text-sm text-muted-foreground">
+                            Konversi khusus produk, seperti satu dus berisi
+                            beberapa barang, akan diatur oleh PIM/Inventory saat
+                            tersedia.
+                        </p>
+
+                        <CollapsibleSectionGroup defaultValue={[]} className="mt-6">
+                            <CollapsibleSection
+                                value="conversions"
+                                title="Konversi yang tersedia"
+                                summary={`${conversions.length} konversi`}
+                            >
                                 {conversions.length === 0 ? (
-                                    <p className="mt-2 text-sm text-muted-foreground">
+                                    <p className="text-sm text-muted-foreground">
                                         Belum ada konversi umum.
                                     </p>
                                 ) : (
-                                    <div className="mt-3 overflow-x-auto">
+                                    <div className="overflow-x-auto">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
@@ -466,23 +460,26 @@ export default function UnitsOfMeasure({
                                         </Table>
                                     </div>
                                 )}
-                            </CollapsibleContent>
-                        </Collapsible>
+                            </CollapsibleSection>
+                        </CollapsibleSectionGroup>
                     </CardContent>
                 </Card>
-                <Collapsible
-                    open={isUnitsListOpen}
-                    onOpenChange={setIsUnitsListOpen}
-                >
-                    <Card>
-                        <CardHeader className="flex items-center justify-between px-6 py-0">
-                            <CollapsibleTrigger className="flex w-full cursor-pointer items-center justify-between">
-                                <CardTitle>Daftar satuan</CardTitle>
-                                {isUnitsListOpen ? (
-                                    <ChevronUp className="size-4 text-muted-foreground" />
-                                ) : (
-                                    <ChevronDown className="size-4 text-muted-foreground" />
-                                )}
+                <Card>
+                    <Collapsible
+                        open={isUnitsListOpen}
+                        onOpenChange={setIsUnitsListOpen}
+                        className="group"
+                    >
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Daftar satuan</CardTitle>
+                            <CollapsibleTrigger asChild>
+                                <button
+                                    type="button"
+                                    aria-label="Buka atau tutup daftar satuan"
+                                    className="p-1 rounded-md hover:bg-muted cursor-pointer"
+                                >
+                                    <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                                </button>
                             </CollapsibleTrigger>
                         </CardHeader>
                         <CollapsibleContent>
@@ -525,8 +522,8 @@ export default function UnitsOfMeasure({
                                 </div>
                             </CardContent>
                         </CollapsibleContent>
-                    </Card>
-                </Collapsible>
+                    </Collapsible>
+                </Card>
             </main>
         </>
     );

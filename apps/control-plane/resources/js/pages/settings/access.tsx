@@ -1,5 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Ban, Check, ChevronRight, Copy, Pencil, Save, ShieldCheck, Trash2, UserCog, UserPlus, Users } from 'lucide-react';
+import { Ban, Check, ChevronRight, Copy, Pencil, Save, ShieldCheck, UserCog, UserPlus, Users } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { toast } from 'sonner';
@@ -1630,33 +1630,27 @@ function MemberAccessDialog({
                         }
                     }}
                 >
-                    <DialogBody className="space-y-6 py-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                ROLE PLATFORM
-                            </label>
-                            <NativeSelect
-                                value={form.data.system_role}
-                                disabled={member?.system_role === 'owner'}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'system_role',
-                                        event.target.value,
-                                    )
-                                }
-                            >
-                                {member?.system_role === 'owner' && (
-                                    <option value="owner">Pemilik (Owner)</option>
-                                )}
-                                <option value="user">User</option>
-                                <option value="admin">Admin</option>
-                            </NativeSelect>
-                        </div>
-
-                        <div className="space-y-2">
-                            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                SECURITY ROLE & BATAS DATA
-                            </h4>
+                    <DialogBody>
+                        <FieldGroup>
+                            <Field>
+                                <NativeSelect
+                                    label="Role platform"
+                                    value={form.data.system_role}
+                                    disabled={member?.system_role === 'owner'}
+                                    onChange={(event) =>
+                                        form.setData(
+                                            'system_role',
+                                            event.target.value,
+                                        )
+                                    }
+                                >
+                                    {member?.system_role === 'owner' && (
+                                        <option value="owner">Pemilik</option>
+                                    )}
+                                    <option value="user">Anggota</option>
+                                    <option value="admin">Admin</option>
+                                </NativeSelect>
+                            </Field>
                             <AssignmentPicker
                                 assignments={form.data.assignments}
                                 roles={roles}
@@ -1668,16 +1662,13 @@ function MemberAccessDialog({
                                     form.setData('assignments', assignments)
                                 }
                             />
-                        </div>
-
-                        <div className="space-y-2">
-                            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                RINCIAN HAK AKSES ANGGOTA
-                            </h4>
-                            <p className="text-xs text-muted-foreground">
-                                Struktur hak akses dan izin yang berlaku berdasarkan role terpasang.
-                            </p>
-                            <div className="space-y-2 rounded-lg border border-border bg-card p-3 text-sm">
+                            <FieldSet>
+                                <FieldLegend>Rincian akses anggota</FieldLegend>
+                                <FieldDescription>
+                                    Menjelaskan alasan anggota dapat memakai
+                                    layar atau tindakan tertentu.
+                                </FieldDescription>
+                                <div className="space-y-2 rounded-md border p-3 text-sm">
                                 {(member?.assignments ?? []).map(
                                     (assignment) => {
                                         const role = roles.find(
@@ -1780,7 +1771,8 @@ function MemberAccessDialog({
                                     },
                                 )}
                             </div>
-                        </div>
+                            </FieldSet>
+                        </FieldGroup>
                     </DialogBody>
                     <DialogFooter>
                         <DialogAction type="submit" disabled={form.processing}>
@@ -1803,15 +1795,13 @@ export default function Access({
     dataPolicies,
     organizations,
     hierarchies,
-    invitations,
-    newInvitationCodes,
+    invitations = [],
+    newInvitationCodes = [],
 }: Props) {
-    const initialSection = new URLSearchParams(usePage().url.split('?')[1]).get(
-        'section',
-    );
-    const [activeSection, setActiveSection] = useState(
-        initialSection === 'invitations' ? 'invitations' : 'members',
-    );
+    const url = usePage().url;
+    const queryString = url.includes('?') ? url.split('?')[1] : '';
+    const section = new URLSearchParams(queryString).get('section');
+    const activeSection = section === 'invitations' ? section : 'members';
     const [editingMember, setEditingMember] = useState<Member | null>(null);
     const getInitials = useInitials();
     const copy = (code: string) => {
@@ -1819,33 +1809,23 @@ export default function Access({
         toast('Kode disalin');
     };
 
-    const avatarColors = [
-        'bg-[#ec4899] text-white',
-        'bg-[#0284c7] text-white',
-        'bg-[#8b5cf6] text-white',
-        'bg-[#10b981] text-white',
-        'bg-[#f59e0b] text-white',
-    ];
-    const getAvatarColor = (name: string) => {
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) {
-            hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        return avatarColors[Math.abs(hash) % avatarColors.length];
+    const platformRoleLabel: Record<string, string> = {
+        owner: 'Pemilik',
+        admin: 'Admin',
+        user: 'Anggota',
     };
 
     const memberColumns: DataTableColumn<Member>[] = [
         {
             id: 'identity',
             header: 'Identity',
-            width: 280,
             cell: (member) => (
                 <div className="flex items-center gap-3 py-0.5">
                     <Avatar size="default">
                         {member.avatar_url ? (
                             <AvatarImage src={member.avatar_url} alt={member.name} />
                         ) : null}
-                        <AvatarFallback className={cn('font-medium text-xs', getAvatarColor(member.name))}>
+                        <AvatarFallback className="bg-primary/10 text-primary font-medium text-xs">
                             {getInitials(member.name)}
                         </AvatarFallback>
                     </Avatar>
@@ -1860,94 +1840,41 @@ export default function Access({
         {
             id: 'platform-role',
             header: 'Role platform',
-            width: 160,
-            cell: (member) => {
-                const role = member.platform_role || member.system_role;
-                return (
-                    <Badge variant="default" className="rounded-full px-3 py-0.5 text-xs font-medium border-0">
-                        {role}
-                    </Badge>
-                );
-            },
+            cell: (member) => (
+                <Badge>
+                    {platformRoleLabel[member.system_role] ??
+                        member.system_role}
+                </Badge>
+            ),
         },
         {
             id: 'security-role',
             header: 'Security role',
-            width: 180,
-            cell: (member) => {
-                const secRole = member.security_role || (member.roles && member.roles.length > 0 ? member.roles.join(', ') : '');
-                if (!secRole || secRole === '—') {
-                    return <span className="text-muted-foreground">—</span>;
-                }
-                return <span className="text-foreground font-normal">{secRole}</span>;
-            },
+            cell: (member) => member.roles.join(', ') || '—',
         },
         {
             id: 'actions',
             header: 'Aksi',
-            align: 'center',
-            width: 200,
-            cell: (member) => (
-                <div className="flex items-center justify-center gap-2">
-                    {canManage && member.can_edit_access !== false ? (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="default"
-                            className="w-20 font-medium rounded-md px-2 py-1 text-xs shadow-none justify-center"
-                            onClick={() => setEditingMember(member)}
-                        >
-                            <Pencil className="size-3.5 mr-1 shrink-0" />
-                            Edit
-                        </Button>
-                    ) : null}
-                    {canManage ? (
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="destructive"
-                                    className="w-20 font-medium rounded-md px-2 py-1 text-xs shadow-none justify-center"
-                                >
-                                    <Trash2 className="size-3.5 mr-1 shrink-0" />
-                                    Hapus
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                        Hapus akses anggota?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Apakah Anda yakin ingin menghapus akses untuk{' '}
-                                        <span className="font-semibold text-foreground">{member.name}</span>?
-                                        Anggota ini tidak akan lagi dapat masuk ke bisnis ini.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                                    <AlertDialogAction
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                        onClick={() =>
-                                            router.delete(`/settings/access/members/${member.id}`)
-                                        }
-                                    >
-                                        Hapus akses
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    ) : null}
-                </div>
-            ),
+            align: 'right',
+            width: 140,
+            cell: (member) =>
+                canManage && member.can_edit_access ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingMember(member)}
+                    >
+                        <Pencil />
+                        Atur akses
+                    </Button>
+                ) : null,
         },
     ];
     const invitationColumns: DataTableColumn<Invitation>[] = [
         {
             id: 'label',
             header: 'Keterangan',
-            width: 240,
             cell: (invitation) =>
                 invitation.label || (
                     <span className="text-muted-foreground">
@@ -1959,11 +1886,10 @@ export default function Access({
         {
             id: 'status',
             header: 'Status',
-            width: 140,
+            width: 120,
             cell: (invitation) => (
                 <Badge
                     variant={invitation.revoked_at ? 'secondary' : 'default'}
-                    className="rounded-full px-3 py-0.5 text-xs font-medium border-0"
                 >
                     {invitation.revoked_at ? 'Dicabut' : 'Aktif'}
                 </Badge>
@@ -1972,45 +1898,36 @@ export default function Access({
         {
             id: 'access',
             header: 'Akses',
-            width: 220,
             cell: (invitation) =>
-                `${invitation.system_role} · sesuai batas data role`,
+                `${platformRoleLabel[invitation.system_role] ?? invitation.system_role} · sesuai batas data role`,
         },
         {
             id: 'roles',
             header: 'Security role',
-            width: 180,
-            cell: (invitation) => invitation.roles.join(', ') || '—',
+            cell: (invitation) => (invitation.roles ?? []).join(', ') || '—',
         },
         {
             id: 'actions',
             header: 'Aksi',
-            align: 'center',
-            width: 200,
+            align: 'right',
+            width: 240,
             cell: (invitation) =>
                 canManage && !invitation.revoked_at ? (
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-end gap-2 shrink-0 whitespace-nowrap">
                         {invitation.code ? (
                             <Button
                                 size="sm"
-                                type="button"
-                                variant="secondary"
-                                className="w-24 font-medium rounded-md px-2 py-1 text-xs border border-border shadow-none justify-center"
+                                variant="outline"
                                 onClick={() => copy(invitation.code ?? '')}
                             >
-                                <Copy className="size-3.5 mr-1 shrink-0" />
+                                <Copy />
                                 Salin kode
                             </Button>
                         ) : null}
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button
-                                    size="sm"
-                                    type="button"
-                                    variant="destructive"
-                                    className="w-20 font-medium rounded-md px-2 py-1 text-xs shadow-none justify-center"
-                                >
-                                    <Ban className="size-3.5 mr-1 shrink-0" />
+                                <Button size="sm" variant="outline">
+                                    <Ban />
                                     Cabut
                                 </Button>
                             </AlertDialogTrigger>
@@ -2028,7 +1945,6 @@ export default function Access({
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Batal</AlertDialogCancel>
                                     <AlertDialogAction
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                         onClick={() =>
                                             router.delete(
                                                 `/settings/access/invitations/${invitation.id}`,
@@ -2050,9 +1966,8 @@ export default function Access({
             <Head title="Identity & access" />
             <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
                 <Heading
-                    title="Identity & Access"
-                    description={`Kelola anggota, peran, dan hak akses bisnis untuk ${tenant.name}.`}
-                    icon={UserCog}
+                    title="Identity & access"
+                    description={`Kelola anggota dan tanggung jawab bisnis untuk ${tenant.name}.`}
                 />
 
                 {newInvitationCodes.length > 0 && (
@@ -2099,56 +2014,41 @@ export default function Access({
                 )}
 
                 {activeSection === 'members' && (
-                    <Card className="shadow-xs border border-border overflow-hidden">
-                        <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
-                            <div className="flex flex-wrap items-center gap-3">
-                                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                                    <Users className="size-4" />
-                                </div>
-                                <CardTitle>Daftar Anggota</CardTitle>
-                                <span className="hidden sm:inline text-muted-foreground/40">•</span>
-                                <CardDescription className="mt-0 text-sm text-muted-foreground">
-                                    Pengguna terdaftar yang memiliki akses ke bisnis ini.
-                                </CardDescription>
-                            </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Daftar anggota</CardTitle>
+                            <CardDescription>
+                                Orang yang dapat masuk ke bisnis ini.
+                            </CardDescription>
                         </CardHeader>
-                        <CardContent className="p-0">
+                        <CardContent>
                             <DataTable
                                 columns={memberColumns}
                                 data={members}
                                 getRowKey={(member) => member.id}
-                                className="[&_thead_th]:bg-primary [&_thead_th]:text-primary-foreground [&_thead_th]:font-semibold [&_thead_th]:border-r [&_thead_th]:border-primary-foreground/20 [&_tbody_td]:border-r [&_tbody_td]:border-b [&_tbody_td]:border-border [&_tbody_tr]:bg-card [&_tbody_tr:hover]:bg-accent/40"
                             />
                         </CardContent>
                     </Card>
                 )}
 
                 {activeSection === 'invitations' && (
-                    <Card className="shadow-xs border border-border overflow-hidden">
-                        <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
-                            <div className="flex items-center justify-between gap-4 w-full">
-                                <div className="flex flex-wrap items-center gap-3 min-w-0 flex-1">
-                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                                        <UserPlus className="size-4" />
-                                    </div>
-                                    <CardTitle>Kode Undangan Akses</CardTitle>
-                                    <span className="hidden sm:inline text-muted-foreground/40">•</span>
-                                    <CardDescription className="mt-0 text-sm text-muted-foreground truncate">
-                                        Kode pembuatan akun baru yang dapat digunakan berulang sampai dicabut.
-                                    </CardDescription>
-                                </div>
-                                {canManage && (
-                                    <CardAction className="shrink-0 ml-auto">
-                                        <InviteForm
-                                            roles={roles}
-                                            dataPolicies={dataPolicies}
-                                            organizations={organizations}
-                                            hierarchies={hierarchies}
-                                            invitations={invitations}
-                                        />
-                                    </CardAction>
-                                )}
-                            </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Kode undangan</CardTitle>
+                            <CardDescription>
+                                Kode dapat dipakai berulang sampai dicabut.
+                            </CardDescription>
+                            {canManage && (
+                                <CardAction>
+                                    <InviteForm
+                                        roles={roles}
+                                        dataPolicies={dataPolicies}
+                                        organizations={organizations}
+                                        hierarchies={hierarchies}
+                                        invitations={invitations}
+                                    />
+                                </CardAction>
+                            )}
                         </CardHeader>
                         <CardContent>
                             {invitations.length ? (
@@ -2156,7 +2056,6 @@ export default function Access({
                                     columns={invitationColumns}
                                     data={invitations}
                                     getRowKey={(invitation) => invitation.id}
-                                    className="[&_thead_th]:bg-primary [&_thead_th]:text-primary-foreground [&_thead_th]:font-semibold [&_thead_th]:border-r [&_thead_th]:border-primary-foreground/20 [&_tbody_td]:border-r [&_tbody_td]:border-b [&_tbody_td]:border-border [&_tbody_tr]:bg-card [&_tbody_tr:hover]:bg-accent/40"
                                 />
                             ) : (
                                 <Empty>
