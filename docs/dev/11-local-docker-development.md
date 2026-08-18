@@ -52,10 +52,34 @@ Password ada pada `D:\Kerja\erp-dev\.env`. Port hanya bind ke `localhost`; Postg
 1. Buat repository app mandiri berisi API, UI, migration database, OpenAPI/AsyncAPI contract, manifest, dan deploy definition.
 2. Buat image API dan UI di repository app. API build context harus mencakup `database/migrations` app itu.
 3. Tambahkan tiga service ke `erp-dev/compose.yaml`: `<app>-db`, `<app>-api`, dan `<app>-ui`. Database mendapat volume dan port localhost unik berikutnya; API dan UI mendapat port host unik bila perlu dibuka langsung.
-4. Tambahkan path manifest, alamat UI lokal, dan nama service ke bootstrap di `start.ps1`.
+4. Tambahkan path manifest dan nama service ke bootstrap di `start.ps1`. Alamat UI tidak lagi didaftarkan — lihat bagian berikut.
 5. Jalankan `.\start.ps1 -Build`. Script baru mencatat release/placement siap setelah migration dan seluruh health check berhasil.
 
 App tidak boleh membaca database app lain. Integrasi memakai REST/OpenAPI atau event/AsyncAPI.
+
+## Alamat UI app di stack lokal
+
+`app:bootstrap-local-runtime` tidak lagi menerima opsi `--ui-entry`. Shell menyusun
+sendiri path konten dari app dan placement, lalu container `core-app` mem-proxy path
+itu ke container UI app:
+
+```text
+http://localhost:8000/apps-content/<placement>/<app-id>/
+```
+
+Konfigurasi proxy dirender saat container web naik, oleh
+`docker/entrypoint.sh` yang memanggil `app:render-proxy-config`. Karena config itu
+statis, **placement yang dibuat setelah container hidup baru dilayani setelah
+`core-app` di-restart**. Command melaporkan setiap placement yang dilewati beserta
+alasannya, jadi periksa lognya bila sebuah app tidak muncul.
+
+Dua akibat yang memudahkan pekerjaan sehari-hari:
+
+- Alamat tidak lagi terikat IP mesin. Ganti jaringan, ganti lease DHCP, atau buka
+  dari laptop lain di LAN lewat `http://<ip-mesin>:8000` — semuanya tetap bekerja
+  tanpa menyentuh database.
+- UI app harus di-build dengan base relatif (`base: './'` pada Vite). Prefix path
+  memuat nama placement, sedangkan satu image UI dipakai semua placement.
 
 ## Git
 

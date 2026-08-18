@@ -20,12 +20,18 @@ class LaunchableAppCatalog
             ->all();
     }
 
+    /**
+     * Entry UI diturunkan dari placement yang melayani tenant ini, bukan dibaca
+     * dari kolom. Placement adalah unit silo/pool, jadi dua tenant pada
+     * placement berbeda memperoleh path berbeda tanpa nilai apa pun disimpan.
+     */
     public function runtimeFor(TenantMembership $membership, string $appId): ?string
     {
-        return $this->readyPlacementQuery($membership)
+        $placement = $this->readyPlacementQuery($membership)
             ->where('placements.app_id', $appId)
-            ->whereNotNull('placements.ui_entry')
-            ->value('placements.ui_entry');
+            ->value('placements.placement');
+
+        return $placement === null ? null : AppContentPath::for($appId, (string) $placement);
     }
 
     /**
@@ -64,7 +70,6 @@ class LaunchableAppCatalog
 
         $readyAppIds = $this->readyPlacementQuery($membership)
             ->whereIn('placements.app_id', $authorizedAppIds)
-            ->whereNotNull('placements.ui_entry')
             ->distinct()
             ->pluck('placements.app_id');
 

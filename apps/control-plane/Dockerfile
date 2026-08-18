@@ -11,7 +11,12 @@ WORKDIR /app
 ENV WAYFINDER_COMMAND=true
 COPY package.json package-lock.json ./
 COPY .packages ./.packages
-RUN npm ci
+# npm dapat diam-diam melewatkan optional native binding ketika unduhannya gagal
+# (npm/cli#4828): instalasinya tetap melapor sukses, lalu build meledak jauh
+# kemudian dengan pesan yang menuduh lockfile, padahal penyebabnya jaringan.
+# Pemeriksaan ini membuat kegagalan muncul di langkah yang benar, dan satu kali
+# percobaan ulang menutup kasus yang memang cuma unduhan meleset.
+RUN npm ci && node --input-type=module -e 'await import("rolldown")' || (rm -rf node_modules && npm ci && node --input-type=module -e 'await import("rolldown")')
 COPY resources ./resources
 COPY --from=vendor /app/resources/js/actions ./resources/js/actions
 COPY --from=vendor /app/resources/js/routes ./resources/js/routes
@@ -23,7 +28,7 @@ RUN npm run build
 FROM php:8.4-apache
 RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev unzip \
     && docker-php-ext-install bcmath intl pdo_pgsql pgsql zip \
-    && a2enmod rewrite \
+    && a2enmod rewrite proxy proxy_http \
     && sed -ri 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /var/www/html

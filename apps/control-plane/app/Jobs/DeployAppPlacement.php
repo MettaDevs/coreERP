@@ -50,7 +50,8 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
             if (
                 $existing->release_version === $app->version
                 && $existing->runtime_status === 'ready'
-                && filled($existing->ui_entry)
+                && $existing->artifact_status === 'placed'
+                && $existing->migration_status === 'succeeded'
                 && $app->releases()->where('version', $existing->release_version)->where('status', 'available')->exists()
             ) {
                 return;
@@ -122,7 +123,6 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
             $this->setPlacement($placementId, [
                 'artifact_status' => 'placed',
                 'runtime_status' => 'ready',
-                'ui_entry' => $app->ui_entry,
                 'ready_at' => $finished,
             ]);
             DB::table('app_installations')->where('id', $installationId)->update([

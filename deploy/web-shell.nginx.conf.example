@@ -1,9 +1,0 @@
-# Production: browser stays on one public domain.
-location /apps-content/management-aset/ {
-    proxy_pass http://management-aset-ui:80/;
-    proxy_set_header Host $host;
-}
-
-# Set COREERP_MANAGEMENT_ASET_UI_ENTRY=/apps-content/management-aset/
-# in Control Plane production environment. The launcher opens /apps/management-aset,
-# which renders the shared Core layout and loads this content path inside it.

@@ -200,7 +200,7 @@ Pada SaaS, control plane merupakan sumber kebenaran placement, entitlement, dan 
 | `tenant_app_entitlements` | Hak komersial tenant, masa berlaku, dan quota; bukan installation state. |
 | `app_catalog` / `app_releases` | Publisher, manifest, image digest, kontrak, dan compatibility matrix. |
 | `tenant_deployments` | Satu tenant SaaS ditempatkan pada target pooled atau isolated mana. |
-| `app_placements` | Endpoint API/UI, secret reference database, image release, dan health per app deployment. |
+| `app_placements` | Endpoint API, secret reference database, image release, dan health per app deployment. Path UI tidak disimpan di sini; lihat [Routing UI per placement](#routing-ui-per-placement). |
 | `app_installations` | Riwayat install, migration, enable, disable, upgrade, dan uninstall. |
 | `usage_records` | Metering per tenant/app untuk billing dan observability SaaS. |
 
@@ -215,6 +215,62 @@ app = API service + UI artifact + database + migrator + contracts + manifest
 Pada SaaS, gateway/UI shell meminta launch manifest setelah token tervalidasi. Entry app hanya dapat dimuat bila entitlement aktif, installation registry menyatakan release pada placement `ready`, dan user memiliki permission entry point. Pada on-prem perpetual, gateway membaca manifest bertanda tangan serta installation state lokal; local core runtime menyimpan administrator dan lisensi lokal.
 
 Dalam pooled cloud, code app boleh dideploy satu kali untuk satu placement yang melayani banyak tenant. Installation registry tetap mencatat artifact, release, migration, dan readiness placement; tenant binding serta entitlement dicatat terpisah. Dalam isolated cloud, install juga membentuk resource dan menjalankan migration database khusus. Dalam on-prem perpetual, installer lokal memverifikasi bundle dan lisensi bertanda tangan, lalu mencatat lifecycle pada installation state lokal; ia tidak melaporkan runtime health ke vendor.
+
+## Routing UI per placement
+
+Shell menyajikan UI app di dalam iframe pada path yang selalu berbentuk:
+
+```text
+/apps-content/<placement>/<app-id>/
+```
+
+Path ini **diturunkan**, bukan disimpan. `App\Support\AppContentPath` menyusunnya
+dari pasangan `(app_id, placement)`, dan itu satu-satunya tempat di seluruh
+control plane yang menyusun URL konten app.
+
+Penurunan ini bukan penghematan kolom. Ia menutup tiga kegagalan yang pernah
+terjadi atau pasti terjadi:
+
+- **Nilai tersimpan bisa basi.** Path yang pernah dicatat pada environment lokal
+  menunjuk alamat IP yang sudah tidak dipegang mesin mana pun, dan app tampak mati
+  padahal seluruh containernya sehat.
+- **Placement adalah unit silo/pool.** Satu app boleh punya banyak placement —
+  shard pooled kedua, atau silo milik satu tenant. Path yang hanya di-key app id
+  akan membuat dua runtime berbeda berebut alamat yang sama.
+- **Path bebas bisa bertabrakan dengan route host.** Nilai `/apps/<id>/` membuat
+  iframe memuat ulang halaman host-nya sendiri. Segmen `apps-content` berbeda dari
+  segmen `apps`, sehingga tabrakan itu tidak mungkin terjadi lagi.
+
+Reverse proxy menerjemahkan path tersebut ke container UI milik placement
+bersangkutan. Konfigurasinya di-generate dari registry, bukan ditulis tangan —
+lihat [Release dan on-prem](03-release-and-on-prem.md) dan berkas
+`deploy/apps-content-proxy.md` pada repository ini.
+
+Karena path relatif, ia mewarisi host mana pun tempat shell disajikan. Isolasi
+tenant tetap ditegakkan sebelum path ini dipakai: shell hanya memancarkannya
+setelah entitlement aktif, placement `ready`, dan user memiliki permission entry
+point.
+
+Readiness app di dalam frame diukur dari pengumuman `coreerp.ready` milik app,
+bukan dari `onLoad` iframe. Saat container UI mati, reverse proxy membalas halaman
+errornya sendiri dan halaman itu berhasil dimuat — `onLoad` akan menyatakan sukses
+untuk kegagalan. Pengumuman app adalah satu-satunya sinyal yang tidak bisa
+dipalsukan halaman error.
+
+### Keputusan yang belum diambil: cara mengalamati tenant
+
+Hari ini seluruh tenant berbagi satu host shell dan dibedakan lewat path. Apakah
+nanti kita memakai subdomain per tenant, custom domain milik pelanggan, atau tetap
+seperti sekarang, **belum diputuskan**.
+
+Path relatif membuat ketiganya tetap terbuka tanpa perubahan skema maupun migrasi
+data. Bila keputusan itu diambil, yang perlu berubah hanya `AppContentPath` dan
+perhitungan origin pada `apps/control-plane/resources/js/pages/apps/host.tsx`.
+
+Satu konsekuensi perlu dicatat sejak sekarang: karena konten app disajikan
+same-origin dengan shell, atribut `sandbox` pada iframe adalah pembatas tambahan,
+bukan batas isolasi. Isolasi origin yang sungguhan menuntut host terpisah, dan itu
+bagian dari keputusan yang sama.
 
 ## Silo dan customisasi
 

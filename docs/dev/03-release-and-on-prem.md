@@ -22,7 +22,29 @@ validate license/signature/version/dependency
 | Artifact | Sudah dideploy global per release | Pull/deploy per tenant placement | Operator memperoleh bundle image/manifest bertanda tangan untuk edition customer lalu memuatnya secara lokal |
 | Database | Resolve `app_pool_db` | Create/resolve `app_tenant_db` | Create volume/database app di Compose |
 | Enable | Entitlement per tenant | Entitlement + endpoint placement | Lisensi perpetual dan manifest instalasi lokal; tidak ada heartbeat vendor |
-| UI | CDN/registry manifest per tenant | Dedicated endpoint atau artifact | Static UI container pada server customer |
+| UI | Container UI per placement, di belakang path `/apps-content/<placement>/<app-id>/` | Sama, dengan placement khusus tenant | Static UI container pada server customer, path yang sama |
+
+### Config reverse proxy adalah artifact rilis
+
+Path konten UI diturunkan dari `(app_id, placement)` dan tidak pernah disimpan.
+Yang perlu disiapkan operator hanyalah reverse proxy yang menerjemahkan path itu ke
+container UI milik placement bersangkutan — dan config-nya **dirender dari registry
+placement, bukan ditulis tangan**:
+
+```bash
+php artisan app:render-proxy-config --target=nginx --output=/etc/nginx/conf.d/coreerp-apps-content.conf
+```
+
+Command melaporkan setiap placement yang dilewati beserta alasannya, sehingga config
+yang belum lengkap tidak terbaca seolah sudah lengkap. Detail dan jebakan trailing
+slash ada pada berkas `deploy/apps-content-proxy.md`.
+
+Batasnya perlu diketahui sebelum jumlah tenant bertambah: config ini statis, jadi
+setiap provisioning menuntut render ulang dan reload proxy pada semua replica. Cukup
+untuk puluhan placement. Karena path sudah di-key placement, penggantian ke resolusi
+dinamis — `resolver` nginx dengan `proxy_pass` bervariabel, ingress controller dengan
+aturan per-placement, atau service router yang membaca `app_placements` — tidak
+menuntut perubahan skema maupun migrasi data.
 
 ## Workflow tim dan release self-hosted
 

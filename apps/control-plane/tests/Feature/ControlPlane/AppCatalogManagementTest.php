@@ -35,7 +35,7 @@ class AppCatalogManagementTest extends TestCase
             'description' => 'Aplikasi untuk memeriksa katalog.',
             'version' => '1.0.0',
             'database_name' => 'core_app_sample',
-            'ui_entry' => '/apps/sample-app/',
+            'has_ui' => true,
             'navigation' => [
                 'rail' => [
                     ['id' => 'records', 'label' => 'Data'],

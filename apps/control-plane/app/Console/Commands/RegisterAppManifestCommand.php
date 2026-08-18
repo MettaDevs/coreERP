@@ -55,6 +55,18 @@ class RegisterAppManifestCommand extends Command
             return self::FAILURE;
         }
 
+        // Ditolak, bukan diabaikan diam-diam: penulis app yang masih menuliskan
+        // `ui.entry` perlu tahu bahwa nilainya tidak lagi dipakai, agar tidak
+        // mengira app-nya disajikan pada path yang ia tentukan sendiri.
+        if (isset($manifest['ui']['entry'])) {
+            $this->components->error(
+                'Manifest tidak boleh lagi mendeklarasikan `ui.entry`. Path konten UI '
+                .'ditentukan platform dari app dan placement; hapus baris itu dari app.yaml.'
+            );
+
+            return self::FAILURE;
+        }
+
         $request = $this->requestFor($this->toPayload($manifest));
         $validator = $this->validatorFor($request);
 
@@ -112,7 +124,10 @@ class RegisterAppManifestCommand extends Command
             'description' => $this->stringOption('description') ?? ($manifest['description'] ?? null),
             'version' => $this->asString($manifest['version'] ?? null),
             'database_name' => $this->asString($manifest['database']['logical_name'] ?? null),
-            'ui_entry' => $manifest['ui']['entry'] ?? null,
+            // Manifest hanya menyatakan bahwa app punya UI, bukan di path mana ia
+            // disajikan. Path itu milik platform karena ia bergantung pada
+            // placement, yang berbeda antar deployment dari release yang sama.
+            'has_ui' => isset($manifest['ui']) && is_array($manifest['ui']),
             'navigation' => $manifest['ui']['navigation'] ?? null,
             'repository_url' => $this->stringOption('repository-url') ?? ($manifest['repository_url'] ?? null),
             'contract_url' => $this->stringOption('contract-url') ?? ($manifest['contract_url'] ?? null),
@@ -157,7 +172,7 @@ class RegisterAppManifestCommand extends Command
         $this->components->twoColumnDetail('<fg=gray>Nama</>', $app['name']);
         $this->components->twoColumnDetail('<fg=gray>Versi</>', $app['version']);
         $this->components->twoColumnDetail('<fg=gray>Database</>', $app['database_name']);
-        $this->components->twoColumnDetail('<fg=gray>UI entry</>', $app['ui_entry'] ?? '-');
+        $this->components->twoColumnDetail('<fg=gray>Punya UI</>', $app['has_ui'] ? 'ya' : 'tidak');
         $this->components->twoColumnDetail('<fg=gray>Entry point</>', (string) count($security['entry_points']));
         $this->components->twoColumnDetail('<fg=gray>Permission</>', (string) count($security['permissions']));
         $this->components->twoColumnDetail('<fg=gray>Privilege</>', (string) count($security['privileges']));

@@ -141,14 +141,13 @@ class HandleInertiaRequests extends Middleware
     {
         return CoreApp::query()
             ->where('status', 'available')
-            ->whereNotNull('ui_entry')
+            ->where('has_ui', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'description', 'ui_entry'])
+            ->get(['id', 'name', 'description'])
             ->map(fn (CoreApp $app): array => [
                 'id' => $app->id,
                 'name' => $app->name,
                 'description' => $app->description ?? '',
-                'ui_entry' => $app->ui_entry,
             ])->all();
     }
 }

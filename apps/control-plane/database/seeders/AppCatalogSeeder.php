@@ -26,7 +26,7 @@ class AppCatalogSeeder extends Seeder
                     'description' => $definition['description'] ?? null,
                     'version' => $definition['version'],
                     'database_name' => $definition['database'],
-                    'ui_entry' => $definition['ui_entry'] ?? null,
+                    'has_ui' => (bool) ($definition['has_ui'] ?? false),
                     'navigation' => $definition['navigation'] ?? null,
                     'repository_url' => $definition['repository_url'] ?? null,
                     'contract_url' => $definition['contract_url'] ?? null,

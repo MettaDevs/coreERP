@@ -33,7 +33,7 @@ class AppCatalogController extends Controller
         return response()->json(['data' => $this->present($app)], $app->wasRecentlyCreated ? 201 : 200);
     }
 
-    /** @return array{id:string,name:string,description:?string,version:string,status:string,database_name:string,ui_entry:?string,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string} */
+    /** @return array{id:string,name:string,description:?string,version:string,status:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string} */
     private function present(CoreApp $app): array
     {
         return [
@@ -43,7 +43,7 @@ class AppCatalogController extends Controller
             'version' => $app->version,
             'status' => $app->status,
             'database_name' => $app->database_name,
-            'ui_entry' => $app->ui_entry,
+            'has_ui' => (bool) $app->has_ui,
             'navigation' => $app->navigation,
             'repository_url' => $app->repository_url,
             'contract_url' => $app->contract_url,
