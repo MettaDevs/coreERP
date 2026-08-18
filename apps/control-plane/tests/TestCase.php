@@ -40,6 +40,12 @@ abstract class TestCase extends BaseTestCase
                 ['code' => 'management-aset.entitas-aset.api', 'name' => 'API entitas aset', 'type' => 'api'],
                 ['code' => 'management-aset.group-aset.form', 'name' => 'Layar group aset', 'type' => 'form'],
                 ['code' => 'management-aset.group-aset.api', 'name' => 'API group aset', 'type' => 'api'],
+                // Sengaja tidak masuk privilege maupun duty mana pun. Owner menerima
+                // seluruh duty app yang di-entitle, jadi permission yang sudah terpakai
+                // di rantai katalog tidak dapat membuktikan apa pun tentang rantai
+                // custom yang disusun admin tenant. Yang ini hanya bisa diperoleh lewat
+                // privilege dan duty buatan sendiri.
+                ['code' => 'management-aset.perencanaan-aset.form', 'name' => 'Layar perencanaan aset', 'type' => 'form'],
             ],
             'permissions' => [
                 ['code' => 'management-aset.entitas-aset.read', 'name' => 'Lihat entitas aset', 'entry_point' => 'management-aset.entitas-aset.form', 'access' => 'read'],
@@ -47,6 +53,7 @@ abstract class TestCase extends BaseTestCase
                 ['code' => 'management-aset.entitas-aset.update', 'name' => 'Ubah entitas aset', 'entry_point' => 'management-aset.entitas-aset.api', 'access' => 'update'],
                 ['code' => 'management-aset.entitas-aset.archive', 'name' => 'Arsipkan entitas aset', 'entry_point' => 'management-aset.entitas-aset.api', 'access' => 'delete'],
                 ['code' => 'management-aset.group-aset.read', 'name' => 'Lihat group aset', 'entry_point' => 'management-aset.group-aset.form', 'access' => 'read'],
+                ['code' => 'management-aset.perencanaan-aset.read', 'name' => 'Lihat perencanaan aset', 'entry_point' => 'management-aset.perencanaan-aset.form', 'access' => 'read'],
                 ['code' => 'management-aset.group-aset.create', 'name' => 'Tambah group aset', 'entry_point' => 'management-aset.group-aset.api', 'access' => 'create'],
                 ['code' => 'management-aset.group-aset.update', 'name' => 'Ubah group aset', 'entry_point' => 'management-aset.group-aset.api', 'access' => 'update'],
                 ['code' => 'management-aset.group-aset.archive', 'name' => 'Arsipkan group aset', 'entry_point' => 'management-aset.group-aset.api', 'access' => 'delete'],

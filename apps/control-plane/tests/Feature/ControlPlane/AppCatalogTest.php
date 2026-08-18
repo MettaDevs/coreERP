@@ -23,6 +23,6 @@ class AppCatalogTest extends TestCase
 
         $this->assertDatabaseHas('permissions', ['code' => 'management-aset.entitas-aset.read']);
         $this->assertDatabaseMissing('permissions', ['code' => 'management-aset.asset.read']);
-        $this->assertSame(8, DB::table('permissions')->where('app_id', 'management-aset')->count());
+        $this->assertSame(9, DB::table('permissions')->where('app_id', 'management-aset')->count());
     }
 }

@@ -151,6 +151,7 @@ class SecurityConfigurationDuplicateTest extends TestCase
         $this->assertEqualsCanonicalizing([
             'management-aset.entitas-aset.read',
             'management-aset.group-aset.read',
+            'management-aset.perencanaan-aset.read',
         ], $effective);
     }
 
