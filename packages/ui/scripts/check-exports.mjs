@@ -3,8 +3,8 @@ import { access, readdir } from 'node:fs/promises';
 const components = (await readdir(new URL('../dist/components/', import.meta.url)))
     .filter((file) => file.endsWith('.js'));
 
-if (components.length !== 68) {
-    throw new Error(`Expected 68 component exports, found ${components.length}.`);
+if (components.length !== 69) {
+    throw new Error(`Expected 69 component exports, found ${components.length}.`);
 }
 
 await Promise.all(components.map((file) =>

@@ -218,11 +218,18 @@ function DataTable<T>({
           size="icon"
           className="size-6"
           aria-label={`Tindakan untuk ${getRowLabel?.(row) ?? "baris"}`}
+          /* Membuka menu bukan mengklik baris. Tanpa ini, tabel yang memakai
+             `onRowClick` ikut berpindah halaman begitu menunya dibuka, dan tindakan
+             yang baru saja dipilih pengguna langsung ditimpa tujuan baris. */
+          onClick={(event) => event.stopPropagation()}
         >
           <Ellipsis />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
+      {/* Menu ini diportal, tetapi peristiwa React tetap merambat lewat pohon komponen,
+          bukan pohon DOM: tanpa penghenti di sini, memilih satu tindakan juga menghitung
+          sebagai klik pada barisnya, dan tujuan baris menimpa tindakan yang dipilih. */}
+      <DropdownMenuContent align="start" onClick={(event) => event.stopPropagation()}>
         {actions.map((action) => (
           <React.Fragment key={action.id}>
             {action.separatorBefore && <DropdownMenuSeparator />}
@@ -250,7 +257,11 @@ function DataTable<T>({
       )}
     >
       {selection && (
-        <TableCell className="h-9 border-r border-b px-2 text-center">
+        /* Mencentang baris bukan membukanya; klik berhenti di sel ini. */
+        <TableCell
+          className="h-9 border-r border-b px-2 text-center"
+          onClick={(event) => event.stopPropagation()}
+        >
           <Checkbox
             checked={selectedKeys.has(getRowKey(row))}
             onCheckedChange={(checked) => {

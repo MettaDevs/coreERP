@@ -41,6 +41,22 @@ Kelas itu hanya memegang grafik transisi dan haknya. Syarat isi data — baris p
 | `GET`/`PUT /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist` | Mengisi checklist |
 | `POST /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template` | Mengisi checklist dari template |
 
+## Layar
+
+Daftar dan rincian adalah dua halaman dengan alamat masing-masing, bukan satu layar yang bertukar isi:
+
+| Alamat | Yang terbuka |
+| --- | --- |
+| `#/pemeliharaan-aset` | Daftar |
+| `#/pemeliharaan-aset/baru` | Work order baru |
+| `#/pemeliharaan-aset/<id>` | Rincian, mode baca |
+| `#/pemeliharaan-aset/<id>/ubah` | Rincian, mode sunting |
+| `#/pemeliharaan-aset/<id>/checklist/<jobId>` | Rincian dengan checklist terbuka |
+
+Karena mode dan checklist yang terbuka dibaca dari alamat, tombol kembali peramban membatalkan sunting alih-alih melompat keluar dari aplikasi, dan tautan yang disalin ke rekan kerja mendarat di work order yang sama.
+
+Rincian terbuka dalam mode baca dan berpindah ke mode sunting lewat tombol Ubah, sama seperti master. Tombolnya duduk di `@apperp/ui/record-action-bar`, bar yang sama dengan yang dipakai master, sehingga Simpan tetap terlihat saat formulir digulir. Hanya `draft` yang menawarkan Ubah; setelah dijadwalkan, isinya milik pelaksanaan dan yang tersisa adalah tombol transisi status yang sah untuk status itu.
+
 ## Aturan yang dijaga
 
 **Isi hanya bisa disunting pada status tertentu.** Diperiksa lewat `WorkOrderStatus::dapatDisunting()`, bukan daftar status yang ditulis ulang di tiap endpoint.
@@ -62,7 +78,10 @@ Tabel lain yang terlibat: `tr_pemeliharaan_aset_details` menyimpan baris pekerja
 | `api/app/Support/WorkOrderStatus.php` | Grafik transisi dan hak penjaganya |
 | `api/app/Http/Controllers/transaksi/PemeliharaanAset/PemeliharaanAsetController.php` | Dokumen work order |
 | `api/app/Http/Controllers/transaksi/PemeliharaanAset/PelaksanaanController.php` | Pengisian checklist dan pemekaran template |
-| `ui/src/transactions/pemeliharaan-aset/WorkOrderPage.tsx` | Layar work order |
+| `ui/src/transactions/pemeliharaan-aset/WorkOrderPage.tsx` | Pemilih halaman work order menurut alamat |
+| `ui/src/transactions/pemeliharaan-aset/WorkOrderListPage.tsx` | Daftar work order |
+| `ui/src/transactions/pemeliharaan-aset/WorkOrderDetailPage.tsx` | Rincian satu work order, checklist, dan pelaksanaan |
+| `ui/src/transactions/pemeliharaan-aset/workOrder.tsx` | Bentuk data, kosakata status, dan alamat halaman |
 | `ui/src/transactions/pemeliharaan-aset/StatusValidationPage.tsx` | Layar matriks validasi status |
 | `database/migrations/2026_08_15_110000_create_work_order_tables.php` | Tabel work order |
 | `api/tests/Feature/WorkOrderTest.php`, `WorkOrderExecutionTest.php` | Test |
