@@ -20,17 +20,30 @@ import { config as pemusnahanAset } from './transactions/pemusnahan-aset/config'
 import { MASTERS, MasterResource, Permission, permission } from './master/masters';
 import FixedAssetSetupPlaceholderPage from './fixed-assets-setup/FixedAssetSetupPlaceholderPage';
 
-function useHashResource(): string {
-    const read = () => window.location.hash.replace(/^#\/?/, '');
-    const [resource, setResource] = useState(read);
+/**
+ * Alamat dibaca sebagai nama sumber daya diikuti ruas-ruas miliknya, misalnya
+ * `#/pemeliharaan-aset/<id>/ubah`. Halaman yang membuka satu record pada layar
+ * tersendiri memakai ruas itu, sehingga tombol kembali peramban, muat ulang, dan tautan
+ * yang disalin semuanya mendarat di record yang sama.
+ */
+function useHashRoute(): { resource: string; segments: string[] } {
+    const read = () => {
+        const [resource = '', ...segments] = window.location.hash
+            .replace(/^#\/?/, '')
+            .split('/')
+            .filter((ruas) => ruas !== '');
+
+        return { resource, segments };
+    };
+    const [route, setRoute] = useState(read);
 
     useEffect(() => {
-        const onChange = () => setResource(read());
+        const onChange = () => setRoute(read());
         window.addEventListener('hashchange', onChange);
         return () => window.removeEventListener('hashchange', onChange);
     }, []);
 
-    return resource;
+    return route;
 }
 
 export default function App() {
@@ -39,7 +52,7 @@ export default function App() {
     const [contextToken, setAppContextToken] = useState('');
     const [contextError, setContextError] = useState('');
     const [assetContext, setAssetContext] = useState({ legal_entity_id: null as string | null, org_unit_id: null as string | null, user_id: null as string | number | null });
-    const hashResource = useHashResource();
+    const { resource: hashResource, segments } = useHashRoute();
 
     // Hanya master yang boleh dilihat pengguna ini yang muncul pada navigasi.
     const visible = useMemo(
@@ -91,7 +104,8 @@ export default function App() {
         );
     }
 
-    if (hashResource === 'aset' && permissions.includes('management-aset.aset.read')) {
+    // Id view mengikuti nama prosesnya; permission tetap `aset` karena ia kontrak.
+    if (hashResource === 'inventarisasi-aset' && permissions.includes('management-aset.aset.read')) {
         return <main><AssetPage context={assetContext} canUpdate={permissions.includes('management-aset.aset.update')} /></main>;
     }
     if (hashResource === 'penyusutan' && permissions.includes('management-aset.penyusutan.read')) return <main><DepreciationPage canCreate={permissions.includes('management-aset.penyusutan.create')} canFinalize={permissions.includes('management-aset.penyusutan.finalize')} canCorrect={permissions.includes('management-aset.penyusutan.correct')} /></main>;
@@ -104,7 +118,7 @@ export default function App() {
     if (hashResource === 'validasi-status-work-order' && permissions.includes('management-aset.validasi-status-work-order.read')) return <main><StatusValidationPage permissions={permissions} /></main>;
     // Pemeliharaan aset tidak lagi memakai halaman dokumen siklus generik: ia kini work
     // order dengan baris pekerjaan, checklist, penugasan, dan status pengerjaan sendiri.
-    if (hashResource === 'pemeliharaan-aset' && permissions.includes('management-aset.pemeliharaan-aset.read')) return <main><WorkOrderPage context={assetContext} permissions={permissions} /></main>;
+    if (hashResource === 'pemeliharaan-aset' && permissions.includes('management-aset.pemeliharaan-aset.read')) return <main data-layout="full-height" className="h-full min-h-0 overflow-hidden"><WorkOrderPage context={assetContext} permissions={permissions} segments={segments} /></main>;
     const lifecycle = Object.fromEntries(
         [permintaanPembelianAset, dekomisioningAset, penjualanAset, pemusnahanAset]
             .map((config) => [config.resource, config]),
@@ -125,7 +139,7 @@ export default function App() {
 
     return (
         <main
-            data-layout={Page === MasterDetailPage ? 'master-detail' : undefined}
+            data-layout={Page === MasterDetailPage ? 'full-height' : undefined}
             className={Page === MasterDetailPage ? 'h-full min-h-0 overflow-hidden' : undefined}
         >
             <Page key={active.resource} config={active} permissions={permissions} />

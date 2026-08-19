@@ -5,6 +5,7 @@ import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
+import EditShield from '../_shared/EditShield';
 import { FieldConfig, FieldValue } from './fields';
 import { optionLabel, useMasterOptions } from './useMasterOptions';
 
@@ -14,43 +15,6 @@ import { optionLabel, useMasterOptions } from './useMasterOptions';
  * sehingga sumber konfigurasi boleh berupa daftar statis milik master maupun definisi
  * atribut yang datang dari server.
  */
-
-/**
- * Perisai mode baca untuk kontrol yang tidak mengenal `readOnly`, yaitu Select dan Switch.
- *
- * `disabled` sengaja tidak dipakai: elemen disabled tidak memancarkan klik dan keluar dari
- * urutan tab, sehingga "klik nilainya untuk mulai menyunting" menjadi mustahil. Sebagai
- * gantinya kontrolnya tetap terlihat utuh tetapi mati sentuhan, dan sebuah tombol
- * transparan menutupinya. Tombol itu nyata, jadi tetap terjangkau papan ketik.
- *
- * Kliknya ditelan tombol, tidak diteruskan. Itu disengaja: satu klik yang sekaligus
- * membuka mode sunting dan membalik sebuah Switch akan mengubah data tanpa diminta.
- */
-function EditShield({
-    active,
-    label,
-    onActivate,
-    children,
-}: {
-    active: boolean;
-    label: string;
-    onActivate: () => void;
-    children: ReactNode;
-}) {
-    if (!active) return <>{children}</>;
-
-    return (
-        <div className="relative">
-            <div className="pointer-events-none">{children}</div>
-            <button
-                type="button"
-                aria-label={`Ubah ${label.toLowerCase()}`}
-                className="absolute inset-0 z-10 cursor-text rounded-md focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-                onClick={onActivate}
-            />
-        </div>
-    );
-}
 
 /**
  * Menaruh ikon bantuan kecil di sebelah kontrolnya, bukan membungkus seluruh kontrol
