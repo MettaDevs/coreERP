@@ -1,0 +1,101 @@
+import * as React from "react"
+
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./accordion"
+import { cn } from "../utils"
+
+/**
+ * A titled section that collapses, and keeps a summary of its contents readable while
+ * collapsed. The summary is the reason this exists: `Accordion` already gives the chevron,
+ * the animation and multiple-open behaviour, but it has no place to show what is inside a
+ * section the user has closed. Everything else is delegated, not reimplemented.
+ *
+ * Sections are independent — opening one never closes another.
+ */
+const OpenSectionsContext = React.createContext<readonly string[]>([])
+
+function CollapsibleSectionGroup({
+  value,
+  defaultValue,
+  onValueChange,
+  className,
+  children,
+}: {
+  /** Open section values. Pass this to control the group; omit it to let it manage itself. */
+  value?: string[]
+  defaultValue?: string[]
+  onValueChange?: (value: string[]) => void
+  className?: string
+  children: React.ReactNode
+}) {
+  const [uncontrolled, setUncontrolled] = React.useState<string[]>(defaultValue ?? [])
+  const open = value ?? uncontrolled
+
+  return (
+    <OpenSectionsContext.Provider value={open}>
+      <Accordion
+        type="multiple"
+        value={open}
+        onValueChange={(next: string[]) => {
+          if (value === undefined) setUncontrolled(next)
+          onValueChange?.(next)
+        }}
+        data-slot="collapsible-section-group"
+        className={cn("flex flex-col gap-3", className)}
+      >
+        {children}
+      </Accordion>
+    </OpenSectionsContext.Provider>
+  )
+}
+
+function CollapsibleSection({
+  value,
+  title,
+  summary,
+  className,
+  children,
+}: {
+  /** Identifier of this section, unique within its group. */
+  value: string
+  title: string
+  /**
+   * Key values shown beside the title while the section is collapsed. It is removed from
+   * the tree once the section opens rather than hidden with CSS, so a screen reader never
+   * reads the same value twice.
+   */
+  summary?: React.ReactNode
+  className?: string
+  children: React.ReactNode
+}) {
+  const isOpen = React.useContext(OpenSectionsContext).includes(value)
+
+  return (
+    <AccordionItem
+      value={value}
+      data-slot="collapsible-section"
+      className={cn("rounded-lg border bg-card last:border-b", className)}
+    >
+      <AccordionTrigger className="items-center px-4 py-3 hover:no-underline">
+        <span className="flex min-w-0 flex-1 items-baseline gap-3">
+          <span className="shrink-0 text-base font-medium">{title}</span>
+          {!isOpen && summary != null && (
+            <span className="truncate text-sm font-normal text-muted-foreground">{summary}</span>
+          )}
+        </span>
+      </AccordionTrigger>
+      {/*
+        `border-t` draws the line between the title row and its content — the trigger row
+        has no border of its own, so this is the only seam that can carry it.
+        `pt-3` (not `pt-0`) exists because `Input`'s floating label straddles the top edge
+        of the control (`top-0 -translate-y-1/2`, so roughly half its own height sits above
+        that edge by design). `AccordionContent`'s wrapper is `overflow-hidden` — required
+        for the open/close height animation — so with no top clearance the label's overshoot
+        was clipped for any field placed first inside a section. This padding is what gives
+        it room; it is not decorative spacing.
+      */}
+      <AccordionContent className="border-t px-4 pt-3 pb-4">{children}</AccordionContent>
+    </AccordionItem>
+  )
+}
+
+export { CollapsibleSectionGroup, CollapsibleSection }

@@ -2,7 +2,7 @@
 
 > **Baru bergabung dengan tim?** Mulai dari [panduan onboarding](../onboarding/index.md), bukan dari halaman ini. Dokumen di bawah adalah spesifikasi, bukan orientasi.
 >
-> **Mau membuat app atau modul baru?** Langkah teknisnya ada di [jalur membangun app baru](../apps/membangun-app-baru.md) — persiapan, konvensi penamaan dan alokasi, artefak wajib, lalu sepuluh tahap dengan gate keluar. Dokumen di halaman ini adalah aturannya; halaman itu urutan mengerjakannya.
+> **Mau membuat app atau modul baru?** Langkah teknisnya ada di [jalur membangun app baru](../apps/membangun-app-baru.md) — persiapan, konvensi penamaan dan alokasi, berkas yang wajib ada, lalu sepuluh tahap dengan gate keluar. Dokumen di halaman ini adalah aturannya; halaman itu urutan mengerjakannya.
 
 Dokumen ini adalah **desain kanonik** untuk CoreERP. Ia menggantikan asumsi awal bahwa seluruh modul adalah Composer package dalam satu Laravel runtime dan satu data-plane bersama.
 
@@ -34,12 +34,12 @@ Target yang dikunci:
 | [12-external-module-integration.md](12-external-module-integration.md) | Panduan integrasi sistem eksternal ke modul CoreERP |
 | [13-publishing-an-app-release.md](13-publishing-an-app-release.md) | Kontrak CI untuk mendaftarkan katalog dan release app dari repository terpisah |
 | [14-number-sequences.md](14-number-sequences.md) | Reference nomor aplikasi, konfigurasi tenant, scope, periode reset fiskal, API penerbitan, dan scale-out |
-| [15-load-and-concurrency-testing.md](15-load-and-concurrency-testing.md) | Gate concurrency wajib sebelum modul dinyatakan selesai: 1000+ VU, 100+ tenant, multi-instance, dan oracle kebenaran |
 | [15-fiscal-calendars.md](15-fiscal-calendars.md) | Kalender fiskal, tahun dan periode fiskal, serta kepemilikannya oleh entitas legal |
 | [16-units-of-measure.md](16-units-of-measure.md) | Cara menyiapkan kelas, sistem, satuan, dan konversi umum |
 | [17-healthcare-finance-subledger.md](17-healthcare-finance-subledger.md) | Healthcare sebagai subledger, proses verifikasi, dan posting Finance yang dapat dikonfigurasi per faskes |
 | [18-module-discovery-and-decision-gate.md](18-module-discovery-and-decision-gate.md) | Gate keputusan sebelum membuat app, master, transaksi, workflow, nomor, atau integrasi |
 | [19-transaction-security-chain.md](19-transaction-security-chain.md) | Rantai keamanan satu modul transaksi: empat lapis manifest, lalu security role sampai user |
+| [20-load-and-concurrency-testing.md](20-load-and-concurrency-testing.md) | Gate concurrency wajib sebelum modul dinyatakan selesai: 1000+ VU, 100+ tenant, multi-instance, penguncian endpoint pengganti, dan oracle kebenaran |
 
 ## Referensi utama
 

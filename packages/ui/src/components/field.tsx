@@ -9,8 +9,59 @@ import { Separator } from "./separator"
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "./tooltip"
+
+/**
+ * Penjelasan tambahan satu field, tersembunyi sampai diminta.
+ *
+ * Sebuah form yang menampilkan penjelasan setiap field sekaligus, permanen, di bawah tiap
+ * kontrol, terbaca sebagai dinding teks abu-abu — bukan bantuan. `FieldHint` menahannya di
+ * balik `children` yang dibungkusnya: hover sebentar untuk mengintip, klik untuk menahannya
+ * tetap terbuka, klik lagi untuk menutup. `children` biasanya sebuah ikon kecil yang dipasang
+ * caller di sebelah kontrolnya, bukan kontrolnya sendiri — pernah dicoba membungkus seluruh
+ * field sebagai target hover supaya tidak perlu mengarahkan kursor presisi ke ikon, tetapi
+ * itu membuat tooltip terpicu setiap kali kursor sekadar lewat menuju kontrolnya. Ikon
+ * terpisah, sekecil apa pun, tidak bertumpang tindih dengan area yang dipakai untuk
+ * benar-benar berinteraksi dengan field-nya.
+ *
+ * Karena triggernya sebuah tombol sungguhan, klik-untuk-menahan berjalan lewat keyboard juga
+ * (fokus ke tombol lalu Enter/Space), tanpa kode tambahan.
+ *
+ * Delay hover-nya SENGAJA dibungkus `TooltipProvider` miliknya sendiri, bukan mengandalkan
+ * provider milik app pemanggil. App boleh menyetel delay tooltip lain jadi instan untuk
+ * kebutuhannya sendiri; kontrak "tunggu sekitar satu detik" milik hint tetap harus berlaku
+ * di app mana pun komponen ini dipasang.
+ */
+function FieldHint({
+  hint,
+  children,
+  side = "top",
+  className,
+}: {
+  /** Isi penjelasannya. */
+  hint: React.ReactNode
+  /** Triggernya — biasanya ikon kecil di sebelah kontrol, bukan kontrol itu sendiri. */
+  children: React.ReactNode
+  side?: "top" | "right" | "bottom" | "left"
+  className?: string
+}) {
+  return (
+    <TooltipProvider delayDuration={1000}>
+      <Tooltip clickToPin>
+        <TooltipTrigger asChild>
+          <div data-slot="field-hint-trigger" className={cn("min-w-0", className)}>
+            {children}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side={side} className="max-w-72">
+          {hint}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
 
 function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">) {
   return (
@@ -51,20 +102,18 @@ function FieldLegend({
       <span className="inline-flex items-center gap-1">
         {children}
         {hint && (
-          <Tooltip clickToPin>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label="Lihat penjelasan"
-                className="shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <CircleAlert className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-72">
-              {hint}
-            </TooltipContent>
-          </Tooltip>
+          <FieldHint hint={hint} side="right" className="inline-flex">
+            {/* Judul seksi bukan kontrol yang bisa disunting, jadi ikon di sini tetap
+                menjadi target hover — tidak ada field untuk dibungkus seperti pada
+                `DynamicField`. Tetap tombol sungguhan supaya Tab dapat menjangkaunya. */}
+            <button
+              type="button"
+              aria-label="Lihat penjelasan"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <CircleAlert className="size-4" />
+            </button>
+          </FieldHint>
         )}
       </span>
     </legend>
@@ -270,6 +319,7 @@ export {
   FieldDescription,
   FieldError,
   FieldGroup,
+  FieldHint,
   FieldLegend,
   FieldSeparator,
   FieldSet,

@@ -95,7 +95,7 @@ Diakses lewat shell Core di `http://localhost:8000`.
 - [Identity dan access](/dev/09-identity-and-access) — workforce, position, dan rangkap penugasan
 - [Gate fondasi Core](/dev/10-core-foundation-gates) — fondasi yang menunggu app ini
 - [Standar module](/dev/02-module-standard) — kontrak app
-- [Load dan concurrency testing](/dev/15-load-and-concurrency-testing) — gate yang belum dilewati
+- [Load dan concurrency testing](/dev/20-load-and-concurrency-testing) — gate yang belum dilewati
 - [Backlog keamanan dan akses](/todo/general/02-keamanan-dan-akses) — temuan audit terkait
 
 ## Lihat juga

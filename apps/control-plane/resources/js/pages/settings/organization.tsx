@@ -493,7 +493,7 @@ function OrganizationDetailPage({
                     <div className="shrink-0">
                         {!editing ? (
                             <Button type="button" size="sm" onClick={() => setEditing(true)} className="shadow-xs font-medium text-xs">
-                                <Pencil className="mr-1.5 size-3.5" /> Edit Organization
+                                <Pencil className="mr-1.5 size-3.5" /> Ubah Organisasi
                             </Button>
                         ) : (
                             <div className="flex gap-2">
@@ -552,7 +552,7 @@ function OrganizationDetailPage({
                                         <Input
                                             label="Nama Organisasi"
                                             value={form.data.name}
-                                            disabled={!editing}
+                                            readOnly={!editing}
                                             onChange={(event) =>
                                                 form.setData('name', event.target.value)
                                             }
@@ -570,7 +570,7 @@ function OrganizationDetailPage({
                                                 <Input
                                                     label="Kode Perusahaan"
                                                     value={form.data.company_code}
-                                                    disabled={!editing}
+                                                    readOnly={!editing}
                                                     onChange={(event) =>
                                                         form.setData(
                                                             'company_code',
@@ -593,7 +593,7 @@ function OrganizationDetailPage({
                                                 <Input
                                                     label="Kode Negara (ISO)"
                                                     value={form.data.country_code}
-                                                    disabled={!editing}
+                                                    readOnly={!editing}
                                                     onChange={(event) =>
                                                         form.setData(
                                                             'country_code',
@@ -619,7 +619,13 @@ function OrganizationDetailPage({
                                             <NativeSelect
                                                 label="Tipe Operating Unit"
                                                 value={form.data.operating_unit_type}
-                                                disabled={!editing}
+                                                aria-readonly={!editing}
+                                                onMouseDown={(event) => {
+                                                    if (!editing) event.preventDefault();
+                                                }}
+                                                onKeyDown={(event) => {
+                                                    if (!editing) event.preventDefault();
+                                                }}
                                                 onChange={(event) =>
                                                     form.setData(
                                                         'operating_unit_type',

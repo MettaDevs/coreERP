@@ -33,6 +33,11 @@ Detail: [Tenant dan hierarki organisasi](/dev/01a-tenant-and-org-hierarchy), [Qu
 | **Addon app** | App tambahan, biasanya integration atau kebutuhan khusus customer. |
 | **Release unit** | Satu app sebagai satuan rilis: API, UI artifact, database, migration, kontrak, dan image Docker. |
 | **Manifest** | Deklarasi app: navigasi, security, duty, data policy, reference nomor. Sumber kebenaran untuk Core. |
+| **Module / modul** | Nama teknis **lama** untuk hal yang sekarang disebut app. Masih tersisa pada nama tabel, endpoint, dan kode yang sudah ada, jadi jangan dihapus dari sana. Tetapi untuk desain baru, dokumen baru, dan komunikasi produk, pakai **app**. |
+
+::: tip Kenapa dua kata itu masih bercampur
+Sebagian dokumen ditulis sebelum istilahnya diseragamkan, dan mengganti nama tabel atau endpoint hanya demi keseragaman kata bukan perubahan yang sepadan risikonya. Yang berlaku: tulisan baru memakai `app`, tulisan lama dibiarkan sampai berkasnya memang perlu disunting karena alasan lain.
+:::
 
 ## Lifecycle
 

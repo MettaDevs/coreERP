@@ -73,7 +73,7 @@ class EnsureNumberSequenceDrafts
                 ['tenant_id' => $tenantId, 'reference_id' => $reference->id],
                 [
                     'profile_code' => $profile->code,
-                    'scope_type' => 'tenant',
+                    'scope_type' => $this->defaultScope($reference),
                     'status' => 'active',
                     'is_continuous' => (bool) $profile->is_continuous,
                     'allow_manual' => (bool) $profile->allow_manual,
@@ -88,5 +88,19 @@ class EnsureNumberSequenceDrafts
                 ],
             );
         });
+    }
+
+    private function defaultScope(NumberSequenceReference $reference): string
+    {
+        // Tenant is the least specific scope and remains the default whenever
+        // the manifest permits it. Transaction references that only allow a
+        // legal entity must materialize that narrower scope from the start.
+        foreach (['tenant', 'legal_entity', 'operating_unit'] as $scope) {
+            if (in_array($scope, $reference->allowed_scopes, true)) {
+                return $scope;
+            }
+        }
+
+        throw new \LogicException('Reference number sequence tidak memiliki scope yang valid: '.$reference->code);
     }
 }

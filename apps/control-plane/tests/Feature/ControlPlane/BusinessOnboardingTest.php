@@ -52,6 +52,11 @@ class BusinessOnboardingTest extends TestCase
         $this->assertDatabaseHas('tenant_memberships', ['system_role' => 'owner', 'status' => 'active']);
         $this->assertDatabaseCount('tenant_app_entitlements', 1);
         $this->assertDatabaseCount('tenant_deployments', 1);
+        $this->assertDatabaseHas('outbox_events', [
+            'tenant_id' => $tenantId,
+            'type' => 'core.tenant.provisioned.v1',
+            'correlation_id' => $tenantId,
+        ]);
         $this->assertDatabaseCount('roles', 1);
         $this->assertDatabaseCount('role_assignments', 1);
         // Role owner menerima seluruh duty app yang menjadi haknya; fixture katalog
