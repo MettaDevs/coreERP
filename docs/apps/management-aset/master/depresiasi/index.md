@@ -42,6 +42,18 @@ Endpointnya `GET`/`PUT /api/v1/group-aset/{id}/buku-penyusutan`.
 
 **Validasi yang penting:** kalau masa manfaat tidak diisi di baris matriks **dan** tidak ada di profilnya, penyimpanan ditolak dengan pesan yang menyebut baris mana. Kalau dibiarkan, kesalahannya baru muncul berbulan-bulan kemudian saat penyusutan gagal dihitung.
 
+**Berapa baris yang diisi menentukan perlakuan asetnya**, dan itu keputusan per group, bukan per aset:
+
+| Isi matriks | Hasil pada aset group itu |
+| --- | --- |
+| Satu baris, `depreciate = false` | Tercatat dengan nilai perolehannya, tidak pernah menyusut. Baris ini tidak perlu profil. |
+| Satu baris ke buku komersial | Satu buku yang menyusut. Ini yang dipasang template starter Indonesia. |
+| Satu baris ke buku fiskal | Satu buku yang menyusut dengan masa manfaat pajak. |
+| Dua baris | Komersial dan fiskal berjalan sendiri-sendiri, masing-masing dengan angkanya. |
+| Kosong | Aset tetap bisa dicatat, tetapi tidak bisa ditempatkan. Ini jaring pengaman, bukan mode. |
+
+Buku hanya dibentuk saat aset diterima. Menambah baris matriks kemudian **tidak berlaku surut** — aset yang sudah ada tetap memakai buku yang dibentuk untuknya dulu.
+
 ## Buku aset
 
 Saat sebuah aset diterima, app membentuk baris `tr_buku_aset` untuk tiap buku yang berlaku bagi group-nya. Isinya:

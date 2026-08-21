@@ -1,10 +1,37 @@
 # Master data
 
-Halaman ini untuk developer. Isinya perilaku yang **dipakai bersama oleh semua master** di modul aset — bukan penjelasan satu per satu.
+Halaman ini untuk developer. Isinya arsitektur dan perilaku yang **dipakai bersama oleh seluruh master data** di modul aset — bukan sekadar penjelasan satu per satu.
 
-Master data adalah daftar pilihan yang dipakai berulang: `group-aset`, `jenis-aset`, `kondisi-aset`, `pabrikan-aset`, `model-aset`, `lokasi-aset`, `tipe-lokasi-aset`, `tipe-atribut`, `profil-penyusutan`, `buku-penyusutan`, tipe pekerjaan maintenance, dan master work order. Daftar lengkapnya ada di `api/routes/api.php` pada array `$masters`.
+Master data adalah daftar pilihan yang dipakai berulang di seluruh alur transaksi: `group-aset`, `jenis-aset`, `kondisi-aset`, `pabrikan-aset`, `model-aset`, `lokasi-aset`, `tipe-lokasi-aset`, `tipe-atribut`, `profil-penyusutan`, `buku-penyusutan`, tipe pekerjaan maintenance, dan master work order. Daftar lengkapnya ada di `api/routes/api.php` pada array `$masters`.
 
-Sebagian punya aturan khusus dan dibahas di halamannya sendiri; sisanya hanya memakai bentuk dasar di halaman ini, tanpa kolom maupun aturan tambahan. Tetapi **tidak punya aturan khusus bukan berarti tidak punya fungsi** — daftar lengkapnya di bawah.
+```mermaid
+graph TD
+    subgraph KLASIFIKASI["Dua Sumbu Klasifikasi Sejajar (Datar)"]
+        GROUP["Group Aset<br><i>Sumbu Finansial: Buku & Pajak</i>"]
+        JENIS["Jenis Aset<br><i>Sumbu Teknis: Atribut & Job</i>"]
+    end
+
+    subgraph KATALOG["Katalog & Fisik"]
+        PABRIKAN["Pabrikan Aset"] -->|1-ke-N| MODEL["Model Aset"]
+        KONDISI["Kondisi Aset"]
+    end
+
+    subgraph LOKASI["Hierarki Lokasi"]
+        TLOKASI["Tipe Lokasi"] --> LOKASI_M["Lokasi Aset (parent_id)"]
+    end
+
+    subgraph MAINTENANCE["Setup Maintenance"]
+        JOB["Jenis Pekerjaan"] --> VAR["Varian"]
+        JOB --> DEF["Default Job"]
+        CHK_VAR["Variabel Checklist"] --> CHK_TMPL["Template Checklist"]
+    end
+
+    KLASIFIKASI --> ASET["Register Aset (t_aset)"]
+    KATALOG --> ASET
+    LOKASI --> ASET
+```
+
+---
 
 ## Fungsi tiap master
 
@@ -15,37 +42,61 @@ Sebagian punya aturan khusus dan dibahas di halamannya sendiri; sisanya hanya me
 | `tipe-atribut` | Hal apa saja yang bisa dicatat sebagai data tambahan | [Jenis aset](/apps/management-aset/master/jenisaset/) |
 | `pabrikan-aset` | Barang ini buatan siapa | [Pabrikan dan model](/apps/management-aset/master/katalog-model/) |
 | `model-aset` | Tipe barang dari pabrikan itu | [Pabrikan dan model](/apps/management-aset/master/katalog-model/) |
-| `kondisi-aset` | Keadaan fisik barang sekarang — baik, rusak ringan, rusak berat. Dipakai menyaring daftar dan menilai apakah barang masih layak dipakai | halaman ini |
-| `tipe-lokasi-aset` | Golongan lokasi: gudang, kantor, area produksi | [Lokasi](/apps/management-aset/master/lokasi/) |
+| `kondisi-aset` | Keadaan fisik barang sekarang (misal: Baik, Rusak Ringan, Rusak Berat) | Halaman ini |
+| `tipe-lokasi-aset` | Golongan tingkatan lokasi: site, gedung, lantai, ruang | [Lokasi](/apps/management-aset/master/lokasi/) |
 | `lokasi-aset` | Di mana barangnya berada, dan siapa yang menanggung biayanya | [Lokasi](/apps/management-aset/master/lokasi/) |
-| `profil-penyusutan` | Cara menghitung penyusutan | [Penyusutan](/apps/management-aset/master/depresiasi/) |
-| `buku-penyusutan` | Untuk keperluan apa penyusutan dihitung | [Penyusutan](/apps/management-aset/master/depresiasi/) |
-| `maintenance-job-types` | Jenis pekerjaan perawatan | [Setup maintenance](/apps/management-aset/master/maintenance/) |
-| `maintenance-job-type-variants` | Turunan pekerjaan, misalnya servis per jarak tempuh | [Setup maintenance](/apps/management-aset/master/maintenance/) |
-| `maintenance-job-type-defaults` | Nilai bawaan saat pekerjaan dibuat | [Setup maintenance](/apps/management-aset/master/maintenance/) |
-| `maintenance-checklist-variables` | Hal yang diukur atau dinilai saat pemeriksaan | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `profil-penyusutan` | Rumus dan frekuensi menghitung penyusutan | [Penyusutan](/apps/management-aset/master/depresiasi/) |
+| `buku-penyusutan` | Untuk keperluan apa penyusutan dihitung (Komersial/Fiskal) | [Penyusutan](/apps/management-aset/master/depresiasi/) |
+| `maintenance-job-types` | Jenis pekerjaan perawatan fisik | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `maintenance-job-type-variants` | Turunan pekerjaan (misal: servis 10.000 km) | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `maintenance-job-type-defaults` | Nilai bawaan jam & alat saat pekerjaan dibuat | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `maintenance-checklist-variables` | Variabel yang diukur atau dinilai saat pemeriksaan | [Setup maintenance](/apps/management-aset/master/maintenance/) |
 | `maintenance-checklist-templates` | Susunan baris pemeriksaan yang dipakai berulang | [Setup maintenance](/apps/management-aset/master/maintenance/) |
-| `tipe-work-order` | Golongan pekerjaan, sekaligus aturan apa yang wajib diisi sebelum boleh ditutup | [Master work order](/apps/management-aset/master/work-order/) |
-| `tingkat-layanan` | Seberapa mendesak penanganannya | [Master work order](/apps/management-aset/master/work-order/) |
-| `trade` | Keahlian apa yang dibutuhkan pekerjaan itu | [Master work order](/apps/management-aset/master/work-order/) |
-| `sebab-kerusakan` | Kenapa pekerjaan itu diperlukan | halaman ini |
-| `tindakan-perbaikan` | Apa yang dilakukan untuk memperbaikinya | halaman ini |
-| `item-checklist-maintenance` | Daftar pemeriksaan dari rancangan lama | [Setup maintenance](/apps/management-aset/master/maintenance/) |
-| `analisa-maintenance` | Kategori analisa dari rancangan lama | [Setup maintenance](/apps/management-aset/master/maintenance/) |
+| `tipe-work-order` | Golongan work order dan batas satu pekerja | [Master work order](/apps/management-aset/master/work-order/) |
+| `tingkat-layanan` | Urgensi penanganan (angka kecil = prioritas tinggi) | [Master work order](/apps/management-aset/master/work-order/) |
+| `trade` | Bidang keahlian yang dibutuhkan (mekanik, elektrik) | [Master work order](/apps/management-aset/master/work-order/) |
+| `sebab-kerusakan` | Akar penyebab kerusakan saat WO ditutup | [Master work order](/apps/management-aset/master/work-order/) |
+| `tindakan-perbaikan` | Tindakan teknis yang dilakukan untuk memperbaiki | [Master work order](/apps/management-aset/master/work-order/) |
+| `fixed-asset-parameters` | Parameter global aset (Layar placeholder informatif) | [Monitoring dan layar kosong](/apps/management-aset/transaction/monitoring/) |
+| `fixed-asset-posting-profiles` | Profil posting COA (Layar placeholder menunggu Finance) | [Monitoring dan layar kosong](/apps/management-aset/transaction/monitoring/) |
 
-### Kenapa sebab dan tindakan jadi master, bukan teks bebas
+---
 
-`sebab-kerusakan`, `tindakan-perbaikan`, dan `trade` dulunya pilihan yang ditulis langsung di UI — atau tidak ada sama sekali, dan teknisi mengetik sendiri.
+## Dua Pola Tata Letak UI di Frontend
 
-Dipindahkan jadi master karena dua alasan: tenant bisa menambah nilainya tanpa menunggu rilis aplikasi, dan **hasil pekerjaan bisa dihitung**. "Aki soak" yang diketik tiga teknisi akan jadi tiga tulisan berbeda; sebagai master, ia satu baris yang bisa dijumlahkan jadi laporan penyebab kerusakan tersering.
+UI master modul aset mengadopsi dua pola komponen tergantung kompleksitas relasi datanya:
 
-Ini pertimbangan yang berlaku umum: kalau sebuah teks bebas kelak ingin dihitung, ia seharusnya master sejak awal.
+```mermaid
+graph TD
+    MASTER["Daftar Master"]
+    MASTER -->|Master Sederhana| SINGLE["MasterPage.tsx<br>Tabel Daftar + Sheet Form"]
+    MASTER -->|Master Berelasi Luas| DETAIL["MasterDetailPage.tsx<br>Split-Pane: List Kiri (20rem) + Detail Kanan (Accordion)"]
 
-## Satu controller untuk semua
+    DETAIL --> G["group-aset (Matriks Buku)"]
+    DETAIL --> J["jenis-aset (Counters, Models, Atribut, Jobs)"]
+    DETAIL --> P["pabrikan-aset (Counters, Models)"]
+    DETAIL --> MJT["maintenance-job-types (Varian, Tipe Aset)"]
+    DETAIL --> MCV["maintenance-checklist-variables (Nilai)"]
+    DETAIL --> MCT["maintenance-checklist-templates (Baris Template)"]
+```
 
-Hampir semua master tidak punya controller sendiri yang berisi logika. Mereka mewarisi `MasterDataController` dan hanya menyebutkan dua hal:
+1. **`MasterPage.tsx`**: Menampilkan tabel data satu layar penuh dengan Sheet drawer untuk penambahan dan pengeditan (dipakai oleh `kondisi-aset`, `tipe-lokasi-aset`, `trade`, `tingkat-layanan`, dll).
+2. **`MasterDetailPage.tsx` & `RecordDetailPane.tsx`**: Menampilkan panel terbagi dua (*split-pane*). Panel kiri berisi daftar record yang dapat di-scroll tanpa batas (*infinite list*), dan panel kanan menampilkan formulir lengkap dengan accordion/sub-tab dinamis untuk mengelola entitas turunan tanpa berpindah halaman.
+
+---
+
+## Arsitektur Backend: Dua Base Controller
+
+### 1. `MasterDataController` — Untuk Master Mandiri
+
+Semua master mandiri tidak menulis ulang logika CRUD atau penomoran. Mereka hanya mewarisi `MasterDataController`:
 
 ```php
+namespace App\Http\Controllers\master;
+
+use App\Http\Controllers\MasterDataController;
+use App\Models\master\Trade;
+
 class TradeController extends MasterDataController
 {
     protected function resource(): string { return 'trade'; }
@@ -53,100 +104,84 @@ class TradeController extends MasterDataController
 }
 ```
 
-Kalau master itu punya induk atau anak, ia menambah `parentMasters()` dan `childMasters()`.
+Bila master memiliki induk atau anak, relasi dinyatakan melalui:
+```php
+protected function parentMasters(): array {
+    return [
+        new MasterParent('lokasi-aset', 'parent_id', 'parent', LokasiAset::class, required: false),
+        new MasterParent('tipe-lokasi-aset', 'tipe_lokasi_id', 'tipe_lokasi', TipeLokasiAset::class, required: false),
+    ];
+}
+```
 
-Artinya: **kalau Anda menemukan bug pada satu master, kemungkinan besar bug itu ada di semua master.** Perbaiki di base controller, jangan di satu turunannya.
+### 2. `MasterLinkController` — Untuk Tabel Penghubung
 
-## Base kedua: tabel penghubung
+Tabel matriks (misal: kaitan jenis aset ke model, kaitan job ke asset type, matriks group ke buku) mewarisi `MasterLinkController`.
 
-Tidak semua yang tersimpan adalah master. Matriks group × buku, kaitan pekerjaan ke jenis aset, dan baris template checklist adalah **tabel penghubung** — mereka disunting di dalam form pemiliknya, bukan berdiri sendiri di navigasi.
-
-Base-nya `MasterLinkController`, dan ia sengaja **bukan** turunan `MasterDataController`. Bedanya:
-
-| | Master | Tabel penghubung |
-| --- | --- | --- |
-| Punya `kode` | Ya | Tidak |
+| Karakteristik | Master Mandiri (`MasterDataController`) | Tabel Penghubung (`MasterLinkController`) |
+| :--- | :--- | :--- |
+| Punya kolom `kode` | Ya (Diterbitkan Core) | Tidak |
 | Minta nomor ke Core | Ya | Tidak |
-| Butuh `Idempotency-Key` | Ya | Tidak |
-| Permission | Milik sendiri | Milik pemiliknya |
-| Cara menyimpan | Per record | Satu `PUT` mengganti seluruh daftar |
+| Header `Idempotency-Key` | Wajib pada `POST` | Tidak (Metode `PUT` sudah idempoten) |
+| Hak akses | Permission resource sendiri | Menggunakan permission milik entitas induk |
+| Cara penyimpanan | Per satu record | Satu `PUT` mengganti seluruh array daftar |
+| Mekanisme Konkurensi | Cek duplikasi unik creation key | Mengunci baris induk (*Pessimistic Lock*) |
 
-Baris penghubung tidak butuh kunci idempotency karena bentuk penyimpanannya sudah idempoten: permintaan yang sama diulang menghasilkan keadaan yang sama, bukan baris tambahan.
+---
 
-Yang perlu diperhatikan: karena ia mengganti seluruh daftar, ia **menghapus lalu menyisipkan ulang** — dan itu harus mengunci baris pemiliknya lebih dulu. Alasannya di [Setup maintenance](/apps/management-aset/master/maintenance/).
+## Lima Endpoint Standar Master
 
-## Bentuk yang sama untuk semua
+Setiap master mandiri mengekspos 5 rute REST yang konsisten:
 
-Setiap master punya kolom yang sama:
+| Metode & Endpoint | Permission | Gunanya |
+| :--- | :--- | :--- |
+| `GET /api/v1/{resource}` | `management-aset.{resource}.read` | Membaca daftar terpaginasi |
+| `POST /api/v1/{resource}` | `management-aset.{resource}.create` | Membuat record baru (wajib `Idempotency-Key`) |
+| `GET /api/v1/{resource}/{id}` | `management-aset.{resource}.read` | Membaca detail satu record |
+| `PATCH /api/v1/{resource}/{id}` | `management-aset.{resource}.update` | Memperbarui kolom record |
+| `DELETE /api/v1/{resource}/{id}` | `management-aset.{resource}.archive` | Soft delete / mengarsipkan record |
 
-| Kolom | Isi |
-| --- | --- |
-| `kode` | Diterbitkan Number Sequence Core. Tidak pernah dibuat app ini, tidak bisa diubah pengguna |
-| `nama` | Wajib, maksimal 150 karakter |
-| `keterangan` | Opsional |
-| `aktif` | Penanda masih boleh dipilih atau tidak |
-| `tenant_id` | Selalu ada, selalu ikut menyaring |
-| `creation_key` | Kunci idempotency |
+Permission berlaku per resource. Memiliki `group-aset.update` tidak memberikan izin mengubah `jenis-aset`.
 
-Ditambah kolom khusus milik master itu sendiri, misalnya `urutan` pada tingkat layanan.
+---
 
-## Lima endpoint, sama untuk semua
+## Aturan Bersama yang Dijaga
 
-| Endpoint | Permission |
-| --- | --- |
-| `GET /api/v1/{resource}` | `.read` |
-| `POST /api/v1/{resource}` | `.create` |
-| `GET /api/v1/{resource}/{id}` | `.read` |
-| `PATCH /api/v1/{resource}/{id}` | `.update` |
-| `DELETE /api/v1/{resource}/{id}` | `.archive` |
+**Kode selalu dari Core.** `POST` meminta nomor ke Number Sequence lewat `NumberSequenceClient`. Jika referensi penomoran belum aktif di Control Plane, permintaan gagal `503 Service Unavailable`.
 
-Permission-nya per resource, bukan satu hak "kelola master". Punya `group-aset.update` tidak memberi akses ke `jenis-aset`. Ini disengaja dan diuji.
+**`POST` wajib membawa `Idempotency-Key`.** Kunci disimpan di `creation_key` dengan batasan `unique(tenant_id, creation_key)` pada database. Kirim ulang kunci yang sama akan mengembalikan record yang sama dengan header `Idempotent-Replayed: true`.
 
-## Aturan yang dijaga, dan alasannya
+**Induk lintas tenant ditolak database.** Foreign key selalu komposit `(tenant_id, parent_id) -> (tenant_id, id)`. Batasan integritas ditegakkan langsung oleh RDBMS, bukan sekadar validasi aplikasi.
 
-**Kode selalu dari Core.** `POST` meminta nomor ke Number Sequence lewat `NumberSequenceClient`. Kalau reference-nya belum diaktifkan admin tenant, permintaan gagal dengan 503 — bukan diam-diam memakai nomor buatan sendiri. Nomor yang tidak bisa dipertanggungjawabkan lebih buruk daripada gagal.
+**Pencegahan Siklus Relasi Hierarki.** Pada master yang menunjuk tabelnya sendiri (seperti `lokasi-aset`), rantai relasi melingkar (A $\rightarrow$ B $\rightarrow$ A) dideteksi dan ditolak oleh method `rejectParentCycle()`.
 
-**`POST` wajib membawa `Idempotency-Key`.** Kunci itu disimpan sebagai `creation_key` dengan batasan unik `(tenant_id, creation_key)` di database. Kirim ulang kunci yang sama, yang kembali adalah record yang sama — bukan record baru dan bukan nomor baru. Kalau dua permintaan dengan kunci sama tiba bersamaan, yang kalah menangkap pelanggaran batasan unik lalu membaca ulang record milik pemenang.
+**Arsip Lunak (*Soft Delete*).** `DELETE` hanya mengisi timestamp `deleted_at`. Record yang sudah direferensikan dokumen transaksi historis tetap utuh dan konsisten, namun tidak lagi muncul pada dropdown pilihan baru.
 
-**Induk harus satu tenant dan belum diarsipkan.** Divalidasi lewat `Rule::exists` yang menyaring `tenant_id` dan `deleted_at`. Lapis keduanya ada di database: foreign key-nya gabungan `(tenant_id, parent_id)` menunjuk `(tenant_id, id)`, jadi anak milik tenant A **secara struktural tidak bisa** menunjuk induk milik tenant B. Database yang menolak, bukan kode aplikasi.
-
-**Induk yang masih punya anak aktif tidak bisa diarsipkan.** Kalau diizinkan, anaknya menunjuk induk yang sudah hilang dari daftar pilihan, dan form yang menampilkannya jadi setengah rusak. Arsipkan anaknya dulu.
-
-**Master yang menunjuk dirinya sendiri tidak boleh membentuk lingkaran.** Lokasi aset bisa berinduk lokasi lain, jadi A → B → A harus ditolak. Diperiksa di `rejectParentCycle`.
-
-**Arsip itu lunak.** `DELETE` mengisi `deleted_at`, tidak menghapus baris. Record yang sudah dipakai transaksi lama tetap bisa dibaca; ia hanya berhenti muncul sebagai pilihan.
-
-## Data awal Indonesia
-
-Tenant baru tidak mulai dari nol. Saat Core mengirim event `core.tenant.provisioned.v1`, app mengisi master dasar dari template Indonesia: kelompok harta fiskal menurut PMK 72/2023, profil penyusutan, buku, tipe lokasi, kondisi, dan setup maintenance.
-
-Sifatnya:
-
-- **Idempoten.** Dicek lewat `(tenant_id, creation_key)`. Event yang dikirim ulang tidak menggandakan apa pun.
-- **Tidak menimpa.** Record yang sudah disesuaikan tenant dibiarkan apa adanya, dan record yang sengaja diarsipkan tidak dihidupkan lagi.
-- **Tetap lewat Core untuk nomor.** Data awal pun kodenya diterbitkan Number Sequence, bukan ditulis langsung.
-
-Kodenya di `api/app/Services/ProvisionIndonesiaStarterData.php`, isinya di `api/config/management_aset.php`.
+---
 
 ## Di mana kodenya
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/MasterDataController.php` | Seluruh perilaku bersama di atas |
-| `api/app/Http/Controllers/MasterLinkController.php` | Base untuk tabel penghubung |
-| `api/app/Http/Controllers/master/` | Turunan per master, biasanya hanya beberapa baris. Contoh yang paling sederhana: `KondisiAsetController`, `TradeController` |
-| `api/app/Http/Controllers/master/TipeAtributController.php`, `TipeAtributNilaiController.php` | Definisi atribut dan pilihan nilainya |
-| `api/app/Models/master/` | Model |
-| `api/app/Support/MasterParent.php`, `MasterChild.php` | Deklarasi hubungan induk dan anak |
-| `api/app/Services/ProvisionIndonesiaStarterData.php` | Data awal |
-| `ui/src/master/MasterPage.tsx`, `MasterForm.tsx` | Layar dan form master — satu komponen dipakai semua master, dibentuk dari konfigurasi di `masters.ts` |
-| `ui/src/master/detail/MasterDetailPage.tsx` | Panel detail dua kolom untuk master yang dibaca dengan membandingkan satu record dengan lainnya |
-| `ui/src/master/` | Panel khusus: `JenisAsetModels`, `JenisAsetAtribut`, `TipeAtributNilai`, `MaintenanceChecklistTemplateLines`, dan sejenisnya |
+| `api/app/Http/Controllers/MasterDataController.php` | Controller dasar seluruh master data |
+| `api/app/Http/Controllers/MasterLinkController.php` | Controller dasar tabel penghubung / matriks |
+| `api/app/Http/Controllers/master/` | Controller spesifik per master |
+| `api/app/Models/master/` | Model Eloquent master |
+| `api/app/Support/MasterParent.php`, `MasterChild.php` | Deklarasi metadata relasi induk-anak |
+| `ui/src/master/MasterPage.tsx`, `MasterForm.tsx` | Layar master standar |
+| `ui/src/master/detail/MasterDetailPage.tsx` | Layar master split-pane dua kolom |
+| `ui/src/master/detail/RecordDetailPane.tsx` | Panel detail kanan ber-accordion |
+| `ui/src/master/DynamicField.tsx` | Renderer kontrol field dinamis |
+
+---
 
 ## Halaman terkait
 
+- [Group aset](/apps/management-aset/master/groupaset/)
 - [Jenis aset dan atribut](/apps/management-aset/master/jenisaset/)
-- [Penyusutan: profil, buku, dan matriks](/apps/management-aset/master/depresiasi/)
+- [Pabrikan dan model](/apps/management-aset/master/katalog-model/)
+- [Lokasi aset](/apps/management-aset/master/lokasi/)
+- [Penyusutan: profil dan buku](/apps/management-aset/master/depresiasi/)
 - [Setup maintenance](/apps/management-aset/master/maintenance/)
-- [Register aset](/apps/management-aset/transaction/register-aset/) — pemakai utama master ini
-- [Number sequence](/dev/14-number-sequences) — cara `kode` diterbitkan
+- [Master work order](/apps/management-aset/master/work-order/)
+- [Number sequence](/dev/14-number-sequences)

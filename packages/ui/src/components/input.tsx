@@ -12,6 +12,7 @@ function Input({
   id,
   label,
   placeholder,
+  required,
   ...props
 }: InputProps) {
   const generatedId = React.useId()
@@ -22,6 +23,7 @@ function Input({
       id={inputId}
       type={type}
       data-slot="input"
+      required={required}
       placeholder={label ? " " : placeholder}
       className={cn(
         "h-9 w-full min-w-0 rounded-md border border-[#d9dfe7] bg-white px-3 py-1 text-base text-[#1f2937] shadow-xs transition-[color,box-shadow] outline-none selection:bg-primary selection:text-primary-foreground file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-[#8a94a6] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:border-input dark:bg-input/30 dark:text-foreground",
@@ -51,7 +53,7 @@ function Input({
           "peer-disabled:opacity-50 peer-aria-invalid:text-destructive"
         )}
       >
-        {label}
+        {label}{required && <span className="text-destructive"> *</span>}
       </label>
     </div>
   )

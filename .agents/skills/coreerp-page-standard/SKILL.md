@@ -30,6 +30,13 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 - Props are what the server actually sends. Do not add optional fields to a props type speculatively — a reader takes `avatar_url?: string | null` as evidence the backend provides it. Either send it from the controller in the same change, or leave it out.
 - Read the controller before trusting a field. If it is absent there, the fallback you wrote is the only branch that will ever run.
 
+## Setelah menyimpan master
+
+- Respons `POST`/`PATCH` yang berhasil harus mengembalikan record lengkap yang baru disimpan, sekurangnya `id`, `kode`, `nama`, dan status. Teruskan record itu ke controller halaman; jangan hanya meneruskan `id` lalu berharap pemuatan ulang daftar mengisi form.
+- Masukkan atau perbarui record hasil respons di state daftar sebelum memulai refresh. Jika panel detail bisa terpasang ketika data daftar masih kosong, ia dapat menginisialisasi state form dari `null`: kode akhirnya terlihat dari props, tetapi nama tetap kosong karena state lokal sudah terlanjur dibuat.
+- Setelah membuat record baru, pilih record tersebut dan buka mode edit otomatis bila record memiliki rincian lanjutan yang perlu diisi setelah identitasnya dibuat—contohnya nilai variable checklist, baris template, model, atau relasi. Pada form `Sheet`, biarkan form tetap terbuka dan pasang ulang dengan record hasil respons agar kode otomatis dan nama ikut tampil. Pengguna tidak perlu menekan `Ubah` untuk kedua kalinya.
+- Setelah `PATCH` pada record yang sedang diedit, pertahankan perilaku halaman yang sudah disepakati (biasanya kembali ke baca). Jangan menampilkan kartu `Belum disimpan` setelah respons sukses; kartu itu hanya untuk draft sebelum `POST` berhasil.
+
 ## Cards and actions
 
 - A directory/list page uses one primary `Card`.
