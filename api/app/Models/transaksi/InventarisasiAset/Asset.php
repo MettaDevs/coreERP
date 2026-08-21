@@ -13,7 +13,7 @@ class Asset extends Model
     protected $table = 'tr_penerimaan_aset';
 
     protected $fillable = [
-        'tenant_id', 'creation_key', 'kode', 'legal_entity_id', 'responsible_org_unit_id',
+        'tenant_id', 'creation_key', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id',
         'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id',
         'parent_asset_id', 'asset_location_id', 'financial_dimension_org_unit_id',
         'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on',

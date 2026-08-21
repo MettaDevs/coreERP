@@ -366,6 +366,7 @@ class AssetLifecycleTest extends TestCase
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
             ->postJson('/api/v1/aset', [
                 'legal_entity_id' => $this->legalEntityId,
+                'nama' => $overrides['nama'] ?? 'Aset lifecycle uji',
                 'group_aset_id' => $group,
                 'jenis_aset_id' => $jenis,
                 'pabrikan_aset_id' => $overrides['pabrikan_aset_id'] ?? null,

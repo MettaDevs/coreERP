@@ -127,17 +127,6 @@ export const MASTERS: MasterConfig[] = [
                 resource: 'lokasi-aset',
                 help: 'Mengisi lokasi saat aset diterima. Hanya nilai awal; lokasi aset dapat diubah setelahnya tanpa menyentuh group.',
             },
-            {
-                name: 'posting_layers',
-                label: 'Lapisan pembukuan',
-                type: 'multiselect',
-                options: [
-                    { value: 'current', label: 'Komersial' },
-                    { value: 'operations', label: 'Operasional' },
-                    { value: 'tax', label: 'Fiskal' },
-                    { value: 'none', label: 'Memorandum' },
-                ],
-            },
         ],
     },
     {
@@ -305,6 +294,7 @@ export const MASTERS: MasterConfig[] = [
         title: 'Sebab kerusakan',
         subtitle: 'Akar sebab yang dapat dipilih saat pekerjaan maintenance ditutup.',
         kodeLabel: 'Kode sebab kerusakan', namaLabel: 'Nama sebab kerusakan', singular: 'sebab kerusakan',
+        extraFields: [{ name: 'minta_keterangan', label: 'Minta keterangan saat dipilih', type: 'boolean', help: 'Aktifkan untuk pilihan seperti “Lainnya”, agar mekanik wajib menjelaskan sebabnya.' }],
     },
     {
         resource: 'tindakan-perbaikan',
@@ -312,6 +302,7 @@ export const MASTERS: MasterConfig[] = [
         title: 'Tindakan perbaikan',
         subtitle: 'Perbaikan yang dikerjakan, dicatat terpisah dari sebabnya agar keduanya dapat dihitung.',
         kodeLabel: 'Kode tindakan perbaikan', namaLabel: 'Nama tindakan perbaikan', singular: 'tindakan perbaikan',
+        extraFields: [{ name: 'minta_keterangan', label: 'Minta keterangan saat dipilih', type: 'boolean', help: 'Aktifkan untuk pilihan seperti “Lainnya”, agar mekanik wajib menjelaskan tindakan yang dilakukan.' }],
     },
     {
         resource: 'tipe-lokasi-aset',

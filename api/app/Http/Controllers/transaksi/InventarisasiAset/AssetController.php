@@ -31,7 +31,10 @@ class AssetController extends Controller
         $data = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $query = app(OrganizationScope::class)->assetQuery(Asset::query()->where('tenant_id', $this->tenantId($request)), $request);
         if (($q = trim((string) ($data['q'] ?? ''))) !== '') {
-            $query->where(fn ($builder) => $builder->whereRaw('LOWER(kode) LIKE ?', ['%'.mb_strtolower($q).'%'])->orWhereRaw('LOWER(serial_number) LIKE ?', ['%'.mb_strtolower($q).'%']));
+            $query->where(fn ($builder) => $builder
+                ->whereRaw('LOWER(kode) LIKE ?', ['%'.mb_strtolower($q).'%'])
+                ->orWhereRaw('LOWER(nama) LIKE ?', ['%'.mb_strtolower($q).'%'])
+                ->orWhereRaw('LOWER(serial_number) LIKE ?', ['%'.mb_strtolower($q).'%']));
         }
 
         return response()->json(['data' => $query->orderByDesc('created_at')->get()->map($this->present(...))->values()]);
@@ -72,6 +75,7 @@ class AssetController extends Controller
                 'tenant_id' => $tenantId,
                 'creation_key' => $key,
                 'kode' => $kode,
+                'nama' => $data['nama'],
                 'legal_entity_id' => $data['legal_entity_id'],
                 'responsible_org_unit_id' => $data['usage_org_unit_id'],
                 'group_aset_id' => $data['group_aset_id'],
@@ -189,13 +193,14 @@ class AssetController extends Controller
 
         $rules = $this->rules($tenantId);
         $editable = [
-            'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'parent_asset_id',
+            'nama', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'parent_asset_id',
             'serial_number', 'model_number', 'placed_in_service_on', 'acquisition_value', 'residual_value',
             'keterangan', 'atribut', 'atribut.*.tipe_atribut_id', 'atribut.*.nilai',
         ];
         $data = $request->validate([
             ...array_intersect_key($rules, array_flip($editable)),
             // Seluruh field bersifat opsional pada koreksi; yang tidak dikirim tidak berubah.
+            'nama' => ['sometimes', ...$rules['nama']],
             'jenis_aset_id' => ['sometimes', ...$rules['jenis_aset_id']],
             'acquisition_value' => ['sometimes', ...$rules['acquisition_value']],
             // Ditolak lebih awal dengan pesan yang menjelaskan alasannya, bukan diabaikan
@@ -245,7 +250,7 @@ class AssetController extends Controller
             }
 
             $lockedAsset->update(array_intersect_key($data, array_flip([
-                'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'parent_asset_id',
+                'nama', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'parent_asset_id',
                 'serial_number', 'model_number', 'placed_in_service_on', 'acquisition_value', 'residual_value', 'keterangan',
             ])));
 
@@ -294,6 +299,7 @@ class AssetController extends Controller
 
         return [
             'legal_entity_id' => ['required', 'ulid'],
+            'nama' => ['required', 'string', 'max:150'],
             // Dua sumbu wajib dan sejajar: group membawa perlakuan finansial,
             // jenis membawa perlakuan teknis. Tidak ada yang menyaring yang lain.
             'group_aset_id' => ['required', 'ulid', $sameTenant('m_group_aset')],
@@ -548,18 +554,23 @@ class AssetController extends Controller
         }
 
         foreach ($rows as $row) {
-            $profile = $this->requireComputableProfile(
+            // Buku yang memang tidak menghitung tidak memerlukan profil. F&O pun tidak
+            // menuntutnya pada buku dengan "Calculate depreciation = No". Tanpa ini,
+            // group yang sengaja tidak disusutkan dan aset di bawah ambang kapitalisasi
+            // sama-sama memaksa tenant mengarang profil yang tidak pernah dipakai.
+            $depreciates = $capitalized && (bool) $row->depreciate;
+            $profile = $depreciates ? $this->requireComputableProfile(
                 $tenantId,
                 $row->depreciation_profile_id,
                 $row->useful_life_periods,
                 $row->convention,
                 checkEffectiveDate: false,
-            );
-            if ($row->alternative_profile_id) {
+            ) : null;
+            if ($depreciates && $row->alternative_profile_id) {
                 $this->requireComputableProfile($tenantId, $row->alternative_profile_id, null, null, checkEffectiveDate: false);
             }
-            $usefulLife = $row->useful_life_periods ?? $profile->useful_life_periods;
-            $convention = $row->convention ?? $profile->convention;
+            $usefulLife = $row->useful_life_periods ?? $profile?->useful_life_periods;
+            $convention = $row->convention ?? $profile?->convention;
             AssetBook::query()->create([
                 'tenant_id' => $tenantId,
                 'asset_id' => $asset->id,
@@ -574,7 +585,7 @@ class AssetController extends Controller
                     $convention,
                     $this->fiscalYear($tenantId, (string) $data['legal_entity_id'], $placedInService, $row->depreciation_profile_id, $convention),
                 )->toDateString(),
-                'depreciate' => $capitalized && (bool) $row->depreciate,
+                'depreciate' => $depreciates,
                 'round_off_depreciation' => $row->round_off_depreciation ?? 0,
                 'acquisition_value' => $data['acquisition_value'],
                 'residual_value' => $data['residual_value'] ?? 0,
@@ -644,12 +655,18 @@ class AssetController extends Controller
                     'group_aset_id' => 'Buku aset lama belum terhubung ke Buku penyusutan. Perbaiki matriks group x book sebelum menempatkan aset.',
                 ]);
             }
+            // Buku yang tidak menghitung tidak punya angka untuk diperiksa. Menuntutnya
+            // punya profil yang berlaku akan menahan aset register-saja dan aset di
+            // bawah ambang kapitalisasi di status `received` selamanya.
+            if (! $book->depreciate) {
+                continue;
+            }
             $this->requireComputableProfile(
                 $tenantId,
                 $book->depreciation_profile_id,
                 $book->useful_life_periods,
                 $book->convention,
-                checkEffectiveDate: (bool) $book->depreciate,
+                checkEffectiveDate: true,
                 effectiveOn: $effectiveOn,
             );
             if ($book->alternative_profile_id) {
@@ -658,7 +675,7 @@ class AssetController extends Controller
                     $book->alternative_profile_id,
                     null,
                     null,
-                    checkEffectiveDate: (bool) $book->depreciate,
+                    checkEffectiveDate: true,
                     effectiveOn: $effectiveOn,
                 );
             }
@@ -778,6 +795,6 @@ class AssetController extends Controller
     /** @return array<string, mixed> */
     private function present(Asset $asset): array
     {
-        return $asset->only(['id', 'kode', 'legal_entity_id', 'responsible_org_unit_id', 'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'parent_asset_id', 'asset_location_id', 'financial_dimension_org_unit_id', 'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on', 'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan']);
+        return $asset->only(['id', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id', 'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'parent_asset_id', 'asset_location_id', 'financial_dimension_org_unit_id', 'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on', 'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan']);
     }
 }

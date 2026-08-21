@@ -57,9 +57,9 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
             },
             {
                 id: 'bawaan',
-                title: 'Bawaan dan pembukuan',
+                title: 'Bawaan',
                 defaultOpen: true,
-                fields: pick('asset_location_id', 'posting_layers'),
+                fields: pick('asset_location_id'),
             },
             { id: 'buku', title: 'Buku penyusutan', books: true, fields: [] },
             { id: 'lain', title: 'Lain-lain', fields: [KETERANGAN, AKTIF] },

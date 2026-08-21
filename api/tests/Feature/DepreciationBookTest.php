@@ -217,6 +217,7 @@ class DepreciationBookTest extends TestCase
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
             ->postJson('/api/v1/aset', [
                 'legal_entity_id' => $this->legalEntityId,
+                'nama' => 'Aset buku penyusutan uji',
                 'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
                 'acquired_on' => '2026-03-20', 'currency_code' => 'IDR',
                 'usage_org_unit_id' => $this->orgUnitId,

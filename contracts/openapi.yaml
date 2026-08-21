@@ -2630,7 +2630,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MasterCreate'
+              $ref: '#/components/schemas/FaultChoiceCreate'
       responses:
         '201':
           description: Sebab kerusakan dibuat
@@ -2661,7 +2661,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MasterPatch'
+              $ref: '#/components/schemas/FaultChoicePatch'
       responses:
         '200':
           description: Sebab kerusakan diubah
@@ -2704,7 +2704,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MasterCreate'
+              $ref: '#/components/schemas/FaultChoiceCreate'
       responses:
         '201':
           description: Tindakan perbaikan dibuat
@@ -2735,7 +2735,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MasterPatch'
+              $ref: '#/components/schemas/FaultChoicePatch'
       responses:
         '200':
           description: Tindakan perbaikan diubah
@@ -2853,7 +2853,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/MaintenanceChecklistVariableValueList'
     put:
       tags:
       - Master data
@@ -2863,14 +2863,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
+              $ref: '#/components/schemas/MaintenanceChecklistVariableValueReplace'
       responses:
         '200':
           description: Nilai variabel disimpan
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/MaintenanceChecklistVariableValueList'
   /api/v1/maintenance-checklist-templates/{id}/lines:
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -2884,7 +2884,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/MaintenanceChecklistTemplateLineList'
     put:
       tags:
       - Master data
@@ -2894,14 +2894,14 @@ paths:
         content:
           application/json:
             schema:
-              type: object
+              $ref: '#/components/schemas/MaintenanceChecklistTemplateLineReplace'
       responses:
         '200':
           description: Baris checklist disimpan
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/MaintenanceChecklistTemplateLineList'
   /api/v1/validasi-status-work-order:
     get:
       tags:
@@ -3205,27 +3205,6 @@ paths:
       responses:
         '201':
           description: Dokumen dibuat
-  /api/v1/pemeliharaan-aset/referensi/job-types:
-    get:
-      tags:
-      - Pemeliharaan aset
-      operationId: listWorkOrderJobTypesForAsset
-      summary: Menampilkan jenis pekerjaan yang boleh dipilih untuk aset
-      parameters:
-      - name: asset_id
-        in: query
-        required: true
-        schema:
-          $ref: '#/components/schemas/Ulid'
-      responses:
-        '200':
-          description: Jenis pekerjaan maintenance yang terkait dengan jenis aset
-        '401':
-          $ref: '#/components/responses/Unauthenticated'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/ValidationError'
   /api/v1/pemeliharaan-aset:
     get:
       tags:
@@ -3275,6 +3254,27 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '503':
           $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/pemeliharaan-aset/referensi/job-types:
+    get:
+      tags:
+      - Pemeliharaan aset
+      operationId: listWorkOrderJobTypesForAsset
+      summary: Menampilkan jenis pekerjaan yang boleh dipilih untuk aset
+      parameters:
+      - name: asset_id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Jenis pekerjaan maintenance yang terkait dengan jenis aset
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/v1/pemeliharaan-aset/saya:
     get:
       tags:
@@ -3435,6 +3435,16 @@ paths:
                   allOf:
                   - $ref: '#/components/schemas/Ulid'
                   nullable: true
+                sebab_kerusakan_keterangan:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  description: Wajib bila sebab kerusakan yang dipilih meminta keterangan.
+                tindakan_perbaikan_keterangan:
+                  type: string
+                  maxLength: 1000
+                  nullable: true
+                  description: Wajib bila tindakan perbaikan yang dipilih meminta keterangan.
       responses:
         '200':
           description: Hasil pelaksanaan tersimpan
@@ -4278,16 +4288,6 @@ components:
           - string
           - 'null'
           format: decimal
-        posting_layers:
-          description: Lapisan pembukuan yang boleh dipakai group ini.
-          type: array
-          items:
-            type: string
-            enum:
-            - current
-            - operations
-            - tax
-            - none
     GroupAset:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -4686,6 +4686,65 @@ components:
             $ref: '#/components/schemas/MaintenanceChecklistVariable'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    MaintenanceChecklistVariableValue:
+      type: object
+      required:
+      - id
+      - line_number
+      - value
+      - result_code
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        line_number:
+          type: number
+          minimum: 1
+        value:
+          type: string
+          maxLength: 255
+        result_code:
+          type: string
+          enum:
+          - pass
+          - fail
+          - none
+          description: '`none` berarti pemeriksaan telah dicatat tetapi belum dapat dinilai lulus atau gagal.'
+    MaintenanceChecklistVariableValueReplace:
+      type: object
+      required:
+      - values
+      properties:
+        values:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - line_number
+            - value
+            - result_code
+            properties:
+              line_number:
+                type: number
+                minimum: 1
+              value:
+                type: string
+                maxLength: 255
+              result_code:
+                type: string
+                enum:
+                - pass
+                - fail
+                - none
+    MaintenanceChecklistVariableValueList:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaintenanceChecklistVariableValue'
     MaintenanceChecklistTemplate:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -4713,6 +4772,128 @@ components:
             $ref: '#/components/schemas/MaintenanceChecklistTemplate'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    MaintenanceChecklistTemplateLine:
+      type: object
+      required:
+      - id
+      - line_number
+      - type
+      - nama
+      - wajib
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        line_number:
+          type: number
+          minimum: 1
+        type:
+          type: string
+          enum:
+          - header
+          - text
+          - measurement
+          - variable
+          - template
+        nama:
+          type: string
+          maxLength: 255
+        instruksi:
+          type:
+          - string
+          - 'null'
+          maxLength: 2000
+        wajib:
+          type: boolean
+        variable_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        nested_template_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        unit_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        unit:
+          type:
+          - string
+          - 'null'
+          maxLength: 40
+        min_value:
+          type:
+          - number
+          - 'null'
+        max_value:
+          type:
+          - number
+          - 'null'
+    MaintenanceChecklistTemplateLineList:
+      type: object
+      required:
+      - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaintenanceChecklistTemplateLine'
+    MaintenanceChecklistTemplateLineReplace:
+      type: object
+      required:
+      - lines
+      properties:
+        lines:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - line_number
+            - type
+            - nama
+            properties:
+              line_number:
+                type: number
+                minimum: 1
+              type:
+                type: string
+                enum:
+                - header
+                - text
+                - measurement
+                - variable
+                - template
+              nama:
+                type: string
+                maxLength: 255
+              instruksi:
+                type:
+                - string
+                - 'null'
+                maxLength: 2000
+              wajib:
+                type: boolean
+              variable_id:
+                oneOf:
+                - $ref: '#/components/schemas/Ulid'
+                - type: 'null'
+              nested_template_id:
+                oneOf:
+                - $ref: '#/components/schemas/Ulid'
+                - type: 'null'
+              unit_id:
+                oneOf:
+                - $ref: '#/components/schemas/Ulid'
+                - type: 'null'
+              min_value:
+                type:
+                - number
+                - 'null'
+              max_value:
+                type:
+                - number
+                - 'null'
     TipeWorkOrder:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -4788,13 +4969,38 @@ components:
             $ref: '#/components/schemas/MasterRecord'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
+    FaultChoice:
+      allOf:
+      - $ref: '#/components/schemas/MasterRecord'
+      - type: object
+        required:
+        - minta_keterangan
+        properties:
+          minta_keterangan:
+            type: boolean
+            description: Jika benar, mekanik wajib mengisi keterangan bebas ketika pilihan ini dipakai.
+    FaultChoiceCreate:
+      allOf:
+      - $ref: '#/components/schemas/MasterCreate'
+      - type: object
+        properties:
+          minta_keterangan:
+            type: boolean
+            default: false
+    FaultChoicePatch:
+      allOf:
+      - $ref: '#/components/schemas/MasterPatch'
+      - type: object
+        properties:
+          minta_keterangan:
+            type: boolean
     SebabKerusakanResponse:
       type: object
       required:
       - data
       properties:
         data:
-          $ref: '#/components/schemas/MasterRecord'
+          $ref: '#/components/schemas/FaultChoice'
     SebabKerusakanList:
       type: object
       required:
@@ -4804,7 +5010,7 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/MasterRecord'
+            $ref: '#/components/schemas/FaultChoice'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
     TindakanPerbaikanResponse:
@@ -4813,7 +5019,7 @@ components:
       - data
       properties:
         data:
-          $ref: '#/components/schemas/MasterRecord'
+          $ref: '#/components/schemas/FaultChoice'
     TindakanPerbaikanList:
       type: object
       required:
@@ -4823,7 +5029,7 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/MasterRecord'
+            $ref: '#/components/schemas/FaultChoice'
         meta:
           $ref: '#/components/schemas/PaginationMeta'
     MaintenanceTransferResponse:

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\transaksi\PemeliharaanAset;
 
 use App\Http\Controllers\Controller;
+use App\Services\MaintenanceChecklistSnapshot;
 use App\Services\NumberSequenceClient;
 use App\Services\NumberSequenceException;
-use App\Services\MaintenanceChecklistSnapshot;
 use App\Support\OrganizationScope;
 use App\Support\WorkOrderStatus;
 use Illuminate\Database\QueryException;
@@ -462,6 +462,12 @@ class PemeliharaanAsetController extends Controller
             ->leftJoin('m_trade as keahlian', function ($join): void {
                 $join->on('keahlian.id', '=', 'job.trade_id')->on('keahlian.tenant_id', '=', 'job.tenant_id');
             })
+            ->leftJoin('m_sebab_kerusakan as sebab', function ($join): void {
+                $join->on('sebab.id', '=', 'job.sebab_kerusakan_id')->on('sebab.tenant_id', '=', 'job.tenant_id');
+            })
+            ->leftJoin('m_tindakan_perbaikan as tindakan', function ($join): void {
+                $join->on('tindakan.id', '=', 'job.tindakan_perbaikan_id')->on('tindakan.tenant_id', '=', 'job.tenant_id');
+            })
             ->where(['job.tenant_id' => $tenant, 'job.pemeliharaan_aset_id' => $workOrderId])
             ->orderBy('job.line_number')
             ->get([
@@ -469,6 +475,8 @@ class PemeliharaanAsetController extends Controller
                 'aset.kode as asset_kode',
                 'pekerjaan.kode as job_type_kode', 'pekerjaan.nama as job_type_nama',
                 'keahlian.nama as trade_nama',
+                'sebab.nama as sebab_kerusakan_nama',
+                'tindakan.nama as tindakan_perbaikan_nama',
             ]);
     }
 

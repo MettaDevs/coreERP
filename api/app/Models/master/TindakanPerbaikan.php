@@ -12,4 +12,13 @@ use App\Models\MasterData;
 class TindakanPerbaikan extends MasterData
 {
     protected $table = 'm_tindakan_perbaikan';
+
+    protected $fillable = [
+        'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif', 'minta_keterangan',
+    ];
+
+    protected function casts(): array
+    {
+        return [...parent::casts(), 'minta_keterangan' => 'boolean'];
+    }
 }

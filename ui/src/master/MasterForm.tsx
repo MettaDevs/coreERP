@@ -34,7 +34,7 @@ export default function MasterForm({
     /** Pesan kegagalan pemuatan pilihan, per kolom foreign key. */
     parentOptionsError: Record<string, string>;
     onClose: () => void;
-    onSaved: () => void;
+    onSaved: (record: MasterRecord, created: boolean) => void;
     /** Bagian tambahan di bawah field, misalnya matriks yang disunting di dalam form ini. */
     extraSection?: ReactNode;
 }) {
@@ -83,7 +83,7 @@ export default function MasterForm({
         setSaving(true);
         setError('');
         try {
-            await api(`/${config.resource}${value ? `/${value.id}` : ''}`, {
+            const saved = await api<{ data: MasterRecord }>(`/${config.resource}${value ? `/${value.id}` : ''}`, {
                 method: value ? 'PATCH' : 'POST',
                 headers: value ? undefined : { 'Idempotency-Key': creationKey.current },
                 body: JSON.stringify({
@@ -98,7 +98,7 @@ export default function MasterForm({
                         .map((field) => [field.name, payloadValue(field, extra[field.name])])),
                 }),
             });
-            onSaved();
+            onSaved(saved.data, !value);
         } catch (caught) {
             setError(errorMessage(caught, 'Data belum dapat disimpan.'));
         } finally {
@@ -146,7 +146,7 @@ export default function MasterForm({
                             <Input id="code" label={config.kodeLabel} value={value?.kode ?? 'Dibuat otomatis saat disimpan'} disabled />
                         </Field>
                         <Field>
-                            <Input id="name" label={`${config.namaLabel} *`} autoFocus required maxLength={150} value={form.nama} onChange={(event) => setForm({ ...form, nama: event.target.value })} />
+                            <Input id="name" label={config.namaLabel} autoFocus required maxLength={150} value={form.nama} onChange={(event) => setForm({ ...form, nama: event.target.value })} />
                         </Field>
                         {/* Induk dirender sejajar: tidak ada yang menyaring pilihan yang lain. */}
                         {parents.map(parentField)}

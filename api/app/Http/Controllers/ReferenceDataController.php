@@ -22,6 +22,7 @@ final class ReferenceDataController extends Controller
     private const UNIT_READERS = [
         'management-aset.perencanaan-aset.read',
         'management-aset.tipe-atribut.read',
+        'management-aset.maintenance-checklist-templates.read',
     ];
 
     public function unitsOfMeasure(Request $request, UnitOfMeasureClient $units): JsonResponse

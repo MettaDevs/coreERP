@@ -34,6 +34,11 @@ Maintenance setup menambah tabel `m_maintenance_job_type`, `m_maintenance_job_ty
 ini tenant-scoped dan memakai foreign key gabungan dengan `tenant_id` untuk mencegah
 referensi lintas tenant.
 
+Baris template bertipe `measurement` menunjuk `unit_id` milik CoreERP dan menyimpan kode
+satuan sebagai snapshot tampilan. Batas minimum/maksimum opsional harus diisi berpasangan;
+saat template disalin, batas tersebut ikut ke checklist work order dan angka di luar rentang
+ditandai gagal.
+
 `m_maintenance_job_type_requirement` sudah dihapus. Skill dan sertifikat adalah kompetensi
 milik Human Resources yang dipasang pada pekerja; job type hanya boleh menyimpan persyaratan
 yang merujuk kompetensi itu, bukan menuliskannya sebagai teks bebas di database aset.
@@ -44,6 +49,10 @@ Work order menambah master `m_tipe_work_order`, `m_tingkat_layanan`, `m_trade`,
 `m_sebab_kerusakan`, dan `m_tindakan_perbaikan`, serta transaksi `tr_pemeliharaan_aset`,
 `tr_pemeliharaan_aset_details`, `tr_pemeliharaan_aset_checklist`, dan
 `tr_pemeliharaan_aset_status_log`.
+
+Master sebab dan tindakan memiliki `minta_keterangan`. Jika aktif, baris pekerjaan wajib
+menyimpan teks bebas pada `sebab_kerusakan_keterangan` atau
+`tindakan_perbaikan_keterangan`; teks tersebut dikosongkan bila pilihan tidak memintanya.
 
 `m_validasi_status_work_order` menyimpan aturan yang harus dipenuhi sebelum work order boleh
 berpindah ke satu status. Ia melekat pada status tujuan, bukan pada tipe work order,
@@ -62,7 +71,7 @@ Seed katalog Indonesia–Asia pada `m_pabrikan_aset` dan `m_model_aset` memakai 
 model menunjuk pabrikan yang sama tenant, sementara `jenis_aset_id` dan `model_number`
 dibiarkan `NULL` agar tenant dapat mengaitkannya kemudian.
 
-Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `asset_location_id`, `capitalization_threshold`, `posting_layers`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
+Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `asset_location_id`, `capitalization_threshold`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
 
 `m_tipe_atribut.data_type` menyimpan tipe dasar `string`, `decimal`, `integer`, `date`, atau `boolean`. Values aktif berada terpisah di `m_tipe_atribut_nilai`; min/max opsional berada pada tipe atribut dan wajib berpasangan untuk angka. `data_type_locked` menjadi benar saat nilai pertama berhasil ditulis ke `tr_aset_atribut` dan tidak dibuka kembali saat nilai aset dikoreksi atau dihapus.
 

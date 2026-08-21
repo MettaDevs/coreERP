@@ -104,6 +104,16 @@ class MasterDataAsetTest extends TestCase
         $this->request($resource, 'get', '/api/v1/'.$resource)->assertOk()->assertJsonPath('meta.total', 0);
     }
 
+    public function test_master_sebab_dapat_meminta_keterangan_saat_dipilih(): void
+    {
+        $id = $this->createRecord('sebab-kerusakan', [
+            'nama' => 'Lainnya',
+            'minta_keterangan' => true,
+        ])->assertCreated()->assertJsonPath('data.minta_keterangan', true)->json('data.id');
+
+        $this->assertDatabaseHas('m_sebab_kerusakan', ['id' => $id, 'minta_keterangan' => true]);
+    }
+
     #[DataProvider('chainedMasters')]
     public function test_master_berantai_wajib_membawa_induk(string $resource, string $parentColumn): void
     {
@@ -335,17 +345,15 @@ class MasterDataAsetTest extends TestCase
             'kelompok_harta_fiskal_id' => $reference,
             'property_type' => 'fixed_asset',
             'capitalization_threshold' => 1000,
-            'posting_layers' => ['current', 'tax'],
         ])->assertCreated();
 
         $created->assertJsonPath('data.kelompok_harta_fiskal_id', $reference);
         $created->assertJsonPath('data.property_type', 'fixed_asset');
         $created->assertJsonPath('data.capitalization_threshold', '1000.00');
-        $created->assertJsonPath('data.posting_layers', ['current', 'tax']);
 
-        $this->request('group-aset', 'patch', '/api/v1/group-aset/'.$created->json('data.id'), ['posting_layers' => ['tax']])
+        $this->request('group-aset', 'patch', '/api/v1/group-aset/'.$created->json('data.id'), ['capitalization_threshold' => 2500])
             ->assertOk()
-            ->assertJsonPath('data.posting_layers', ['tax'])
+            ->assertJsonPath('data.capitalization_threshold', '2500.00')
             // Field lain tidak ikut tergeser saat satu field diubah.
             ->assertJsonPath('data.kelompok_harta_fiskal_id', $reference);
     }
@@ -361,9 +369,11 @@ class MasterDataAsetTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('tipe_harta');
 
-        $this->createRecord('group-aset', ['nama' => 'Salah', 'posting_layers' => ['gudang']])
+        // Lapisan pembukuan pindah ke buku penyusutan; kiriman lama ditolak, bukan
+        // diterima diam-diam, supaya konfigurator tahu tempatnya sudah berubah.
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'posting_layers' => ['current']])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('posting_layers.0');
+            ->assertJsonValidationErrors('posting_layers');
     }
 
     /**

@@ -73,6 +73,8 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $this->assertDatabaseCount('m_maintenance_checklist_template', 1);
         $this->assertDatabaseCount('m_maintenance_checklist_template_line', 4);
         $this->assertDatabaseCount('m_maintenance_job_type_default', 2);
+        $this->assertDatabaseCount('m_sebab_kerusakan', 0);
+        $this->assertDatabaseCount('m_tindakan_perbaikan', 0);
         $this->assertDatabaseHas('m_kelompok_harta_fiskal', [
             'tenant_id' => $tenant,
             'template_key' => 'id:pmk72-2023:kelompok-1:v1',
@@ -108,8 +110,10 @@ class IndonesiaStarterProvisioningTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $fiscalBookId = (string) DB::table('m_buku_penyusutan')
-            ->where(['tenant_id' => $tenant, 'posting_layer' => 'tax'])
+        // Matriks starter memasang buku komersial, bukan fiskal: tenant baru belum tentu
+        // meminta pembukuan pajak, dan buku pertamanya dipakai sebagai dasar pelaporan.
+        $defaultBookId = (string) DB::table('m_buku_penyusutan')
+            ->where(['tenant_id' => $tenant, 'posting_layer' => 'current'])
             ->value('id');
         $profileId = (string) DB::table('m_profil_penyusutan')
             ->where('creation_key', 'profil-penyusutan:starter:id:pmk72-2023:profil:kelompok-1:garis-lurus:v1')
@@ -118,14 +122,14 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $this->call('POST', '/api/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
             ->assertOk();
 
-        $this->assertSame(375, $calls, 'Pengulangan event tidak boleh meminta nomor baru.');
+        $this->assertSame(365, $calls, 'Pengulangan event tidak boleh meminta nomor baru.');
         $this->assertDatabaseCount('m_kelompok_harta_fiskal', 7);
         $this->assertDatabaseCount('m_profil_penyusutan', 10);
         $this->assertDatabaseCount('m_buku_penyusutan', 2);
         $this->assertDatabaseCount('m_group_buku_penyusutan', 1);
         $this->assertDatabaseHas('m_group_buku_penyusutan', [
             'tenant_id' => $tenant,
-            'buku_id' => $fiscalBookId,
+            'buku_id' => $defaultBookId,
             'depreciation_profile_id' => $profileId,
         ]);
         $this->assertDatabaseCount('m_tipe_lokasi_aset', 6);

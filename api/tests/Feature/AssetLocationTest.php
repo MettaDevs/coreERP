@@ -102,7 +102,7 @@ class AssetLocationTest extends TestCase
         $asset = $this->withHeaders($this->contextHeaders($this->tenantId, $assetPermissions))
             ->withHeader('Idempotency-Key', 'terima-1')
             ->postJson('/api/v1/aset', [
-                'legal_entity_id' => $legalEntity, ...$classification,
+                'legal_entity_id' => $legalEntity, 'nama' => 'Aset lokasi uji', ...$classification,
                 'asset_location_id' => $gudang, 'acquired_on' => '2026-08-01',
                 'acquisition_value' => 1000, 'currency_code' => 'IDR',
                 'usage_org_unit_id' => $unitPengguna,

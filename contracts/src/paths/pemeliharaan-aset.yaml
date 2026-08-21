@@ -239,6 +239,16 @@
                 allOf:
                 - $ref: '#/components/schemas/Ulid'
                 nullable: true
+              sebab_kerusakan_keterangan:
+                type: string
+                maxLength: 1000
+                nullable: true
+                description: Wajib bila sebab kerusakan yang dipilih meminta keterangan.
+              tindakan_perbaikan_keterangan:
+                type: string
+                maxLength: 1000
+                nullable: true
+                description: Wajib bila tindakan perbaikan yang dipilih meminta keterangan.
     responses:
       '200':
         description: Hasil pelaksanaan tersimpan

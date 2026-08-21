@@ -922,20 +922,6 @@ return [
                 ['template_key' => 'id:maintenance:trade:hvac:v1', 'name' => 'HVAC', 'description' => 'Pekerjaan tata udara dan pendingin.'],
                 ['template_key' => 'id:maintenance:trade:teknisi-umum:v1', 'name' => 'Teknisi umum', 'description' => 'Pekerjaan teknis umum pada aset.'],
             ],
-            'fault_causes' => [
-                ['template_key' => 'id:maintenance:fault-cause:komponen-aus:v1', 'name' => 'Komponen aus'],
-                ['template_key' => 'id:maintenance:fault-cause:koneksi-longgar:v1', 'name' => 'Koneksi longgar'],
-                ['template_key' => 'id:maintenance:fault-cause:kotor-tersumbat:v1', 'name' => 'Kotor atau tersumbat'],
-                ['template_key' => 'id:maintenance:fault-cause:kesalahan-pengoperasian:v1', 'name' => 'Kesalahan pengoperasian'],
-                ['template_key' => 'id:maintenance:fault-cause:belum-diketahui:v1', 'name' => 'Belum diketahui'],
-            ],
-            'repair_actions' => [
-                ['template_key' => 'id:maintenance:repair-action:bersihkan:v1', 'name' => 'Bersihkan'],
-                ['template_key' => 'id:maintenance:repair-action:kencangkan:v1', 'name' => 'Kencangkan'],
-                ['template_key' => 'id:maintenance:repair-action:setel-ulang:v1', 'name' => 'Setel ulang'],
-                ['template_key' => 'id:maintenance:repair-action:ganti-komponen:v1', 'name' => 'Ganti komponen'],
-                ['template_key' => 'id:maintenance:repair-action:uji-kembali:v1', 'name' => 'Uji kembali'],
-            ],
             'job_types' => [
                 ['template_key' => 'id:maintenance:job-type:inspeksi:v1', 'name' => 'Inspeksi', 'category' => 'preventive', 'description' => 'Pemeriksaan rutin untuk memastikan aset tetap aman digunakan.'],
                 ['template_key' => 'id:maintenance:job-type:kalibrasi:v1', 'name' => 'Kalibrasi', 'category' => 'preventive', 'description' => 'Penyetelan dan pemeriksaan ketepatan alat ukur.'],
@@ -983,29 +969,24 @@ return [
                 ['template_key' => 'id:maintenance:default:preventif:tahunan:v1', 'name' => 'Preventif tahunan', 'job_type_key' => 'id:maintenance:job-type:preventif:v1', 'variant_key' => 'id:maintenance:variant:tahunan:v1', 'checklist_template_key' => 'id:maintenance:template:pemeriksaan-conveyor:v1', 'trade' => 'Teknisi umum', 'hours' => 4],
             ],
             /*
-             * Aturan validasi perpindahan status work order. Seluruh kombinasi status x
-             * aturan disemai supaya layar pengaturan menampilkan matriks yang utuh dan
-             * tenant tinggal menyalakan yang ia butuhkan.
-             *
-             * Hanya satu yang aktif secara bawaan: checklist wajib saat pekerjaan
-             * dinyatakan selesai. Itu batas terendah yang membuat hasil pemeriksaan dapat
-             * dipercaya. Sebab dan tindakan dibiarkan mati karena tidak semua tenant
-             * mencatat analisa kerusakan, dan memaksanya sejak awal hanya membuat orang
-             * mengisi asal supaya pekerjaan bisa ditutup.
-             */
+              * Aturan validasi perpindahan status work order. Seluruh kombinasi status x
+              * aturan disemai dan aktif secara bawaan, supaya tenant langsung mendapat
+              * alur maintenance yang lengkap. Tenant tetap dapat mematikan aturan yang
+              * tidak dipakai dari halaman Syarat penyelesaian.
+              */
             'status_validations' => [
-                ['status' => 'dijadwalkan', 'aturan' => 'checklist_wajib', 'aktif' => false, 'keparahan' => 'informasi'],
-                ['status' => 'dijadwalkan', 'aturan' => 'sebab_kerusakan', 'aktif' => false, 'keparahan' => 'informasi'],
-                ['status' => 'dijadwalkan', 'aturan' => 'tindakan_perbaikan', 'aktif' => false, 'keparahan' => 'informasi'],
-                ['status' => 'dikerjakan', 'aturan' => 'checklist_wajib', 'aktif' => false, 'keparahan' => 'informasi'],
-                ['status' => 'dikerjakan', 'aturan' => 'sebab_kerusakan', 'aktif' => false, 'keparahan' => 'informasi'],
-                ['status' => 'dikerjakan', 'aturan' => 'tindakan_perbaikan', 'aktif' => false, 'keparahan' => 'informasi'],
+                ['status' => 'dijadwalkan', 'aturan' => 'checklist_wajib', 'aktif' => true, 'keparahan' => 'informasi'],
+                ['status' => 'dijadwalkan', 'aturan' => 'sebab_kerusakan', 'aktif' => true, 'keparahan' => 'informasi'],
+                ['status' => 'dijadwalkan', 'aturan' => 'tindakan_perbaikan', 'aktif' => true, 'keparahan' => 'informasi'],
+                ['status' => 'dikerjakan', 'aturan' => 'checklist_wajib', 'aktif' => true, 'keparahan' => 'informasi'],
+                ['status' => 'dikerjakan', 'aturan' => 'sebab_kerusakan', 'aktif' => true, 'keparahan' => 'informasi'],
+                ['status' => 'dikerjakan', 'aturan' => 'tindakan_perbaikan', 'aktif' => true, 'keparahan' => 'informasi'],
                 ['status' => 'selesai', 'aturan' => 'checklist_wajib', 'aktif' => true, 'keparahan' => 'error'],
-                ['status' => 'selesai', 'aturan' => 'sebab_kerusakan', 'aktif' => false, 'keparahan' => 'peringatan'],
-                ['status' => 'selesai', 'aturan' => 'tindakan_perbaikan', 'aktif' => false, 'keparahan' => 'peringatan'],
-                ['status' => 'ditutup', 'aturan' => 'checklist_wajib', 'aktif' => false, 'keparahan' => 'error'],
-                ['status' => 'ditutup', 'aturan' => 'sebab_kerusakan', 'aktif' => false, 'keparahan' => 'error'],
-                ['status' => 'ditutup', 'aturan' => 'tindakan_perbaikan', 'aktif' => false, 'keparahan' => 'error'],
+                ['status' => 'selesai', 'aturan' => 'sebab_kerusakan', 'aktif' => true, 'keparahan' => 'peringatan'],
+                ['status' => 'selesai', 'aturan' => 'tindakan_perbaikan', 'aktif' => true, 'keparahan' => 'peringatan'],
+                ['status' => 'ditutup', 'aturan' => 'checklist_wajib', 'aktif' => true, 'keparahan' => 'error'],
+                ['status' => 'ditutup', 'aturan' => 'sebab_kerusakan', 'aktif' => true, 'keparahan' => 'error'],
+                ['status' => 'ditutup', 'aturan' => 'tindakan_perbaikan', 'aktif' => true, 'keparahan' => 'error'],
             ],
         ],
     ],

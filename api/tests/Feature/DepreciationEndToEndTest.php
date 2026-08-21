@@ -390,6 +390,7 @@ class DepreciationEndToEndTest extends TestCase
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
             ->postJson('/api/v1/aset', [
                 'legal_entity_id' => $this->legalEntityId,
+                'nama' => 'Aset penyusutan ujung ke ujung',
                 'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
                 'acquired_on' => '2026-06-01', 'placed_in_service_on' => $placedInService,
                 'acquisition_value' => $acquisition, 'residual_value' => $residual,

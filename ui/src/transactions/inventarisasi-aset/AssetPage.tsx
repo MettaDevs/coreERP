@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import { CollapsibleSection, CollapsibleSectionGroup } from '@apperp/ui/collapsible-section';
+import { DataTable, type DataTableColumn, type DataTableRowAction } from '@apperp/ui/data-table';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
@@ -10,14 +13,35 @@ import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import DynamicField from '../../master/DynamicField';
 import { FieldConfig, FieldValue, emptyValue, payloadValue } from '../../master/fields';
+import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { AttributeDefinition, toFieldConfig } from './attributes';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null; user_id: string | number | null };
-type Asset = { id: string; kode: string; serial_number: string | null; acquisition_value: string; currency_code: string; lifecycle_state: string };
+type Asset = {
+    id: string;
+    kode: string;
+    nama: string;
+    serial_number: string | null;
+    acquisition_value: string;
+    currency_code: string;
+    lifecycle_state: string;
+    group_aset_id?: string | null;
+    jenis_aset_id?: string | null;
+    asset_location_id?: string | null;
+};
 type AssetDetail = Asset & Record<string, unknown> & {
     atribut: { tipe_atribut_id: string; nama: string; nilai: FieldValue }[];
 };
 type Placement = { id: string; effective_on: string; reason: string | null; receiving_org_unit_id: string | null; usage_org_unit_id: string | null; received_by_user_id: string | null; custodian_user_id: string | null; asset_location_id: string | null };
+
+/** Satu baris matriks group x buku, apa adanya seperti yang dikirim server. */
+type MatrixRow = {
+    buku_id: string;
+    depreciation_profile_id: string | null;
+    useful_life_periods: number | null;
+    convention: string | null;
+    depreciate: boolean | number;
+};
 
 /**
  * Kolom penunjuk master pada penerimaan aset.
@@ -43,6 +67,16 @@ const CLASSIFICATION: FieldConfig[] = [
         required: true,
         help: 'Menentukan atribut tambahan yang harus diisi.',
     },
+    { name: 'kondisi_aset_id', label: 'Kondisi aset', type: 'reference', resource: 'kondisi-aset' },
+];
+
+/**
+ * Pabrikan dan model dipisahkan dari klasifikasi.
+ *
+ * Keduanya menjelaskan unit fisiknya, bukan perlakuannya, dan sering dibiarkan kosong.
+ * Halaman All assets di Dynamics 365 memisahkannya dengan alasan yang sama.
+ */
+const MANUFACTURER: FieldConfig[] = [
     { name: 'pabrikan_aset_id', label: 'Pabrikan', type: 'reference', resource: 'pabrikan-aset' },
     {
         name: 'model_aset_id',
@@ -51,7 +85,6 @@ const CLASSIFICATION: FieldConfig[] = [
         resource: 'model-aset',
         help: 'Katalog model per pabrikan. Kosongkan bila modelnya belum terdaftar.',
     },
-    { name: 'kondisi_aset_id', label: 'Kondisi aset', type: 'reference', resource: 'kondisi-aset' },
 ];
 
 const PLACEMENT: FieldConfig[] = [
@@ -64,34 +97,171 @@ const PLACEMENT: FieldConfig[] = [
     },
 ];
 
-const REFERENCES = [...CLASSIFICATION, ...PLACEMENT];
+const REFERENCES = [...CLASSIFICATION, ...MANUFACTURER, ...PLACEMENT];
 
 /**
  * Yang boleh dikoreksi setelah aset diterima.
  *
  * Group aset tidak ada di sini: buku penyusutan sudah dibentuk dari matriksnya, jadi
- * menggantinya akan membuat buku yang berjalan tidak lagi cocok dengan groupnya. Nilai
- * perolehan dan residu ada di sini, tetapi server menolaknya begitu ada periode
- * penyusutan yang sudah berjalan.
+ * menggantinya akan membuat buku yang berjalan tidak lagi cocok dengan groupnya.
  */
-const EDITABLE = CLASSIFICATION.filter((field) => field.name !== 'group_aset_id');
+const EDITABLE = REFERENCES.filter((field) => field.name !== 'group_aset_id' && field.name !== 'asset_location_id');
+
+/** Nilai awal seluruh isian teks pada form penerimaan. */
+const textDefaults = (context: Context): Record<string, string> => ({
+    nama: '',
+    serial_number: '',
+    model_number: '',
+    acquired_on: '',
+    placed_in_service_on: '',
+    acquisition_value: '',
+    residual_value: '',
+    currency_code: 'IDR',
+    receiving_org_unit_id: context.org_unit_id ?? '',
+    usage_org_unit_id: context.org_unit_id ?? '',
+    received_by_user_id: context.user_id === null ? '' : String(context.user_id),
+    custodian_user_id: '',
+    keterangan: '',
+});
+
+/**
+ * Nilai uang dibaca manusia, bukan mesin.
+ *
+ * Server mengirim desimal sebagai string supaya presisinya tidak hilang di float, dan
+ * bentuk mentahnya — `8500000000.00` — praktis tidak terbaca pada kolom yang rata kanan.
+ * Pemisah ribuan memakai locale Indonesia; nol di belakang koma dibuang karena mayoritas
+ * nilai perolehan bulat dan `,00` hanya menambah panjang tanpa menambah arti.
+ */
+function money(value: string, currency: string): string {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) return `${currency} ${value}`;
+    const formatted = new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+        maximumFractionDigits: 2,
+    }).format(amount);
+
+    return `${currency} ${formatted}`;
+}
+
+const LIFECYCLE: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
+    received: { label: 'Diterima', variant: 'outline' },
+    in_use: { label: 'Digunakan', variant: 'default' },
+    decommissioned: { label: 'Didekomisioning', variant: 'secondary' },
+    disposed: { label: 'Dilepas', variant: 'secondary' },
+};
+
+const CONVENTION_LABEL: Record<string, string> = {
+    full_month: 'bulan perolehan penuh',
+    mid_month_1st: 'tengah bulan (awal bulan)',
+    mid_month_15th: 'tengah bulan (tanggal 15)',
+    mid_quarter: 'tengah kuartal',
+    half_year: 'setengah tahun',
+    half_year_start_of_year: 'setengah tahun (mulai awal tahun)',
+    half_year_next_year: 'setengah tahun (mulai tahun depan)',
+};
+
+/**
+ * Ringkasan buku penyusutan yang akan terbentuk, dibaca dari matriks group x buku.
+ *
+ * Sengaja hanya menampilkan, tidak meminta apa pun. Buku aset tidak pernah diisi tangan:
+ * ia lahir dari matriks saat aset diterima. Yang perlu dilihat petugas hanyalah akibat
+ * dari group yang barusan dipilihnya, sebelum ia menyimpan.
+ *
+ * Kegagalan memuat tidak ditampilkan sebagai kesalahan. Pengguna boleh memiliki akses
+ * mencatat aset tanpa akses melihat konfigurasi group, dan itu tidak boleh membuat
+ * bagian ini berteriak tentang sesuatu yang bukan urusannya.
+ */
+function useGroupBooks(groupId: string) {
+    const [rows, setRows] = useState<MatrixRow[] | null>(null);
+
+    useEffect(() => {
+        if (!groupId) {
+            setRows(null);
+            return;
+        }
+        let cancelled = false;
+        api<{ data: MatrixRow[] }>(`/group-aset/${groupId}/buku-penyusutan`)
+            .then((result) => { if (!cancelled) setRows(result.data); })
+            .catch(() => { if (!cancelled) setRows(null); });
+        return () => { cancelled = true; };
+    }, [groupId]);
+
+    return rows;
+}
+
+function DepreciationPreview({ groupId }: { groupId: string }) {
+    const rows = useGroupBooks(groupId);
+    const { options: books } = useMasterOptions(groupId ? 'buku-penyusutan' : null);
+    const { options: profiles } = useMasterOptions(groupId ? 'profil-penyusutan' : null);
+
+    if (!groupId) {
+        return <p className="text-sm text-muted-foreground">Pilih group aset terlebih dahulu untuk melihat buku yang akan terbentuk.</p>;
+    }
+    if (rows === null) {
+        return <p className="text-sm text-muted-foreground">Konfigurasi buku group ini belum dapat dibaca.</p>;
+    }
+    if (rows.length === 0) {
+        return (
+            <p className="text-sm text-destructive">
+                Group ini belum memiliki baris pada matriks group x buku. Aset masih dapat dicatat, tetapi belum dapat
+                ditempatkan sampai matriksnya diisi.
+            </p>
+        );
+    }
+
+    return (
+        <div className="space-y-2">
+            {rows.map((row) => {
+                const book = books.find((option) => option.id === row.buku_id);
+                const profile = profiles.find((option) => option.id === row.depreciation_profile_id);
+                const life = row.useful_life_periods ?? (profile?.useful_life_periods as number | undefined);
+                const convention = row.convention ? CONVENTION_LABEL[row.convention] ?? row.convention : null;
+                const detail = row.depreciate
+                    ? [profile?.nama, life ? `${life} periode` : null, convention].filter(Boolean).join(' · ')
+                    : 'Tidak disusutkan';
+
+                return (
+                    <div key={row.buku_id} className="flex items-baseline justify-between gap-3 rounded-md border px-3 py-2">
+                        <span className="text-sm font-medium">{book ? book.nama : 'Buku penyusutan'}</span>
+                        <span className="truncate text-sm text-muted-foreground">{detail || 'Aturan diambil dari buku'}</span>
+                    </div>
+                );
+            })}
+            <FieldDescription>
+                Buku dibentuk otomatis saat aset disimpan. Aturannya disalin, jadi perubahan matriks kelak tidak
+                mengubah aset ini.
+            </FieldDescription>
+        </div>
+    );
+}
 
 export default function AssetPage({ context, canUpdate }: { context: Context; canUpdate: boolean }) {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [open, setOpen] = useState(false);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    const [search, setSearch] = useState('');
     const [history, setHistory] = useState<{ asset: Asset; placements: Placement[] } | null>(null);
     const [editing, setEditing] = useState<AssetDetail | null>(null);
     const [references, setReferences] = useState<Record<string, FieldValue>>(() =>
         Object.fromEntries(REFERENCES.map((field) => [field.name, ''])),
     );
+    // Seluruh isian dikendalikan state, bukan dibaca dari FormData saat submit. Bagian
+    // yang terlipat dilepas dari DOM oleh accordion, sehingga isian tak terkendali akan
+    // hilang begitu penggunanya menutup bagiannya.
+    const [values, setValues] = useState<Record<string, string>>(() => textDefaults(context));
     const [parentAssetId, setParentAssetId] = useState('');
     // Atribut diwarisi dari jenis aset, jadi definisinya dibaca ulang tiap jenis berubah.
     const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
     const [attributeValues, setAttributeValues] = useState<Record<string, FieldValue>>({});
     const sheetContentRef = useRef<HTMLDivElement>(null);
+    const editSheetRef = useRef<HTMLDivElement>(null);
     const typeId = String(references.jenis_aset_id ?? '');
+    const groupId = String(references.group_aset_id ?? '');
+
+    const { options: groupOptions } = useMasterOptions('group-aset');
+    const { options: typeOptions } = useMasterOptions('jenis-aset');
+    const { options: locationOptions } = useMasterOptions('lokasi-aset');
 
     const load = () => api<{ data: Asset[] }>('/aset')
         .then((result) => setAssets(result.data))
@@ -124,16 +294,31 @@ export default function AssetPage({ context, canUpdate }: { context: Context; ca
         return () => { cancelled = true; };
     }, [typeId]);
 
+    const nameOf = (options: { id: string; nama: string }[], id: unknown) =>
+        options.find((option) => option.id === String(id ?? ''))?.nama ?? null;
+
     const parentOptions = useMemo(
-        () => assets.map((asset) => ({ id: asset.id, label: `${asset.kode}${asset.serial_number ? ` — ${asset.serial_number}` : ''}` })),
+        () => assets.map((asset) => ({ id: asset.id, label: `${asset.kode} — ${asset.nama}` })),
         [assets],
     );
 
+    const visible = useMemo(() => {
+        const query = search.trim().toLowerCase();
+        if (!query) return assets;
+        return assets.filter((asset) =>
+            asset.kode.toLowerCase().includes(query)
+            || asset.nama.toLowerCase().includes(query)
+            || (asset.serial_number ?? '').toLowerCase().includes(query));
+    }, [assets, search]);
+
     function resetForm() {
         setReferences(Object.fromEntries(REFERENCES.map((field) => [field.name, ''])));
+        setValues(textDefaults(context));
         setParentAssetId('');
         setAttributeValues({});
     }
+
+    const setValue = (name: string, next: string) => setValues((current) => ({ ...current, [name]: next }));
 
     /**
      * Membuka koreksi satu aset. Nilainya dibaca dari detail, bukan dari daftar: daftar
@@ -143,6 +328,14 @@ export default function AssetPage({ context, canUpdate }: { context: Context; ca
         try {
             const detail = (await api<{ data: AssetDetail }>(`/aset/${asset.id}`)).data;
             setReferences(Object.fromEntries(REFERENCES.map((field) => [field.name, String(detail[field.name] ?? '')])));
+            setValues({
+                ...textDefaults(context),
+                nama: detail.nama,
+                serial_number: String(detail.serial_number ?? ''),
+                model_number: String(detail.model_number ?? ''),
+                placed_in_service_on: String(detail.placed_in_service_on ?? '').slice(0, 10),
+                keterangan: String(detail.keterangan ?? ''),
+            });
             setParentAssetId(String(detail.parent_asset_id ?? ''));
             setAttributeValues(Object.fromEntries(detail.atribut.map((row) => [row.tipe_atribut_id, row.nilai ?? ''])));
             setEditing(detail);
@@ -151,24 +344,26 @@ export default function AssetPage({ context, canUpdate }: { context: Context; ca
         }
     }
 
-    async function saveEdit(form: HTMLFormElement) {
+    const attributePayload = () => attributes.map((definition) => ({
+        tipe_atribut_id: definition.tipe_atribut_id,
+        nilai: payloadValue(toFieldConfig(definition), attributeValues[definition.tipe_atribut_id]),
+    }));
+
+    async function saveEdit() {
         if (!editing) return;
-        const values = new FormData(form);
         setSaving(true); setError('');
         try {
             await api(`/aset/${editing.id}`, {
                 method: 'PATCH',
                 body: JSON.stringify({
                     ...Object.fromEntries(EDITABLE.map((field) => [field.name, payloadValue(field, references[field.name])])),
+                    nama: values.nama,
                     parent_asset_id: parentAssetId || null,
-                    serial_number: values.get('serial_number') || null,
-                    model_number: values.get('model_number') || null,
-                    placed_in_service_on: values.get('placed_in_service_on') || null,
-                    keterangan: values.get('keterangan') || null,
-                    atribut: attributes.map((definition) => ({
-                        tipe_atribut_id: definition.tipe_atribut_id,
-                        nilai: payloadValue(toFieldConfig(definition), attributeValues[definition.tipe_atribut_id]),
-                    })),
+                    serial_number: values.serial_number || null,
+                    model_number: values.model_number || null,
+                    placed_in_service_on: values.placed_in_service_on || null,
+                    keterangan: values.keterangan || null,
+                    atribut: attributePayload(),
                 }),
             });
             setEditing(null); resetForm(); await load();
@@ -181,7 +376,7 @@ export default function AssetPage({ context, canUpdate }: { context: Context; ca
         catch (caught) { setError(errorMessage(caught, 'Riwayat aset belum dapat dimuat.')); }
     }
 
-    async function receive(form: HTMLFormElement) {
+    async function receive() {
         if (!context.legal_entity_id) {
             setError('Pilih entitas legal aktif di CoreERP sebelum menerima aset.');
             return;
@@ -191,7 +386,10 @@ export default function AssetPage({ context, canUpdate }: { context: Context; ca
             setError(`Pilih ${missing.label.toLowerCase()} terlebih dahulu.`);
             return;
         }
-        const values = new FormData(form);
+        if (!values.nama || !values.acquired_on || !values.acquisition_value) {
+            setError('Nama aset, tanggal perolehan, dan nilai perolehan wajib diisi.');
+            return;
+        }
         setSaving(true); setError('');
         try {
             await api('/aset', {
@@ -200,135 +398,329 @@ export default function AssetPage({ context, canUpdate }: { context: Context; ca
                     legal_entity_id: context.legal_entity_id,
                     ...Object.fromEntries(REFERENCES.map((field) => [field.name, payloadValue(field, references[field.name])])),
                     parent_asset_id: parentAssetId || null,
-                    acquired_on: values.get('acquired_on'),
+                    nama: values.nama,
+                    acquired_on: values.acquired_on,
                     // Penyusutan dihitung dari tanggal aset mulai digunakan, bukan tanggal
                     // perolehan. Dikosongkan berarti keduanya dianggap sama.
-                    placed_in_service_on: values.get('placed_in_service_on') || null,
-                    acquisition_value: values.get('acquisition_value'),
-                    currency_code: values.get('currency_code'),
-                    serial_number: values.get('serial_number') || null,
-                    model_number: values.get('model_number') || null,
-                    receiving_org_unit_id: values.get('receiving_org_unit_id') || context.org_unit_id,
-                    usage_org_unit_id: values.get('usage_org_unit_id') || context.org_unit_id,
-                    received_by_user_id: values.get('received_by_user_id') || (context.user_id === null ? null : String(context.user_id)),
-                    custodian_user_id: values.get('custodian_user_id') || null,
-                    residual_value: values.get('residual_value') || null,
-                    keterangan: values.get('keterangan') || null,
-                    atribut: attributes.map((definition) => ({
-                        tipe_atribut_id: definition.tipe_atribut_id,
-                        nilai: payloadValue(toFieldConfig(definition), attributeValues[definition.tipe_atribut_id]),
-                    })),
+                    placed_in_service_on: values.placed_in_service_on || null,
+                    acquisition_value: values.acquisition_value,
+                    currency_code: values.currency_code,
+                    serial_number: values.serial_number || null,
+                    model_number: values.model_number || null,
+                    receiving_org_unit_id: values.receiving_org_unit_id || context.org_unit_id,
+                    usage_org_unit_id: values.usage_org_unit_id || context.org_unit_id,
+                    received_by_user_id: values.received_by_user_id || (context.user_id === null ? null : String(context.user_id)),
+                    custodian_user_id: values.custodian_user_id || null,
+                    residual_value: values.residual_value || null,
+                    keterangan: values.keterangan || null,
+                    atribut: attributePayload(),
                 }),
             });
-            setOpen(false); form.reset(); resetForm(); await load();
+            setOpen(false); resetForm(); await load();
         } catch (caught) { setError(errorMessage(caught, 'Aset belum dapat diterima.')); }
         finally { setSaving(false); }
     }
 
-    const referenceField = (field: FieldConfig) => (
+    const referenceField = (field: FieldConfig, portal: typeof sheetContentRef) => (
         <DynamicField
             key={field.name}
             config={field}
             value={references[field.name]}
             onChange={(next) => setReferences((current) => ({ ...current, [field.name]: next }))}
-            portalContainer={sheetContentRef}
+            portalContainer={portal}
         />
     );
 
+    const textField = (name: string, label: string, extra: Record<string, unknown> = {}) => (
+        <Field>
+            <Input
+                label={label}
+                value={values[name] ?? ''}
+                onChange={(event) => setValue(name, event.target.value)}
+                {...extra}
+            />
+        </Field>
+    );
+
+    const attributeFields = (portal: typeof sheetContentRef) => attributes.map((definition) => (
+        <DynamicField
+            key={definition.tipe_atribut_id}
+            config={toFieldConfig(definition)}
+            value={attributeValues[definition.tipe_atribut_id]}
+            onChange={(next) => setAttributeValues((current) => ({ ...current, [definition.tipe_atribut_id]: next }))}
+            portalContainer={portal}
+        />
+    ));
+
+    const parentField = (portal: typeof sheetContentRef) => (
+        <Field>
+            <Select
+                label="Aset induk"
+                items={parentOptions.map((option) => option.label)}
+                value={parentOptions.find((option) => option.id === parentAssetId)?.label}
+                placeholder="Tanpa induk"
+                searchPlaceholder="Cari aset induk"
+                emptyMessage="Aset tidak ditemukan."
+                ariaLabel="Pilih aset induk"
+                portalContainer={portal}
+                onValueChange={(item) => setParentAssetId(parentOptions.find((option) => option.label === item)?.id ?? '')}
+            />
+            <FieldDescription>Isi bila aset ini bagian dari aset lain, misalnya mesin yang terpasang pada satu gedung.</FieldDescription>
+        </Field>
+    );
+
+    const columns: DataTableColumn<Asset>[] = [
+        { id: 'kode', header: 'Kode aset', cell: (asset) => <span className="code">{asset.kode}</span>, sortValue: (asset) => asset.kode, width: 160 },
+        { id: 'nama', header: 'Nama aset', cell: (asset) => asset.nama, sortValue: (asset) => asset.nama, width: 240 },
+        { id: 'serial', header: 'Nomor seri', cell: (asset) => <span className="muted">{asset.serial_number || '—'}</span>, width: 160 },
+        { id: 'group', header: 'Group aset', cell: (asset) => <span className="muted">{nameOf(groupOptions, asset.group_aset_id) ?? '—'}</span>, width: 180 },
+        { id: 'jenis', header: 'Jenis aset', cell: (asset) => <span className="muted">{nameOf(typeOptions, asset.jenis_aset_id) ?? '—'}</span>, width: 180 },
+        { id: 'lokasi', header: 'Lokasi', cell: (asset) => <span className="muted">{nameOf(locationOptions, asset.asset_location_id) ?? '—'}</span>, width: 180 },
+        {
+            id: 'nilai',
+            header: 'Nilai perolehan',
+            cell: (asset) => money(asset.acquisition_value, asset.currency_code),
+            sortValue: (asset) => Number(asset.acquisition_value),
+            align: 'right',
+            width: 170,
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            cell: (asset) => {
+                const state = LIFECYCLE[asset.lifecycle_state] ?? { label: asset.lifecycle_state, variant: 'secondary' as const };
+                return <Badge variant={state.variant}>{state.label}</Badge>;
+            },
+            width: 140,
+        },
+    ];
+
+    const rowActions: DataTableRowAction[] = [{ id: 'history', label: 'Riwayat' }];
+    if (canUpdate) rowActions.unshift({ id: 'edit', label: 'Ubah' });
+
+    const summaryOf = (options: { id: string; nama: string }[], id: unknown) => nameOf(options, id) ?? undefined;
+
     return <Card className="min-h-full rounded-none border-0 shadow-none">
-        <CardHeader className="border-b px-5 py-3"><CardTitle>Register aset</CardTitle><CardAction><Button onClick={() => setOpen(true)}>Terima aset</Button></CardAction></CardHeader>
+        <CardHeader className="min-h-0 border-b px-5 py-3">
+            <CardTitle className="text-base">Inventarisasi aset</CardTitle>
+            <CardAction><Button onClick={() => setOpen(true)}>＋ Terima aset</Button></CardAction>
+        </CardHeader>
         <CardContent className="px-0">
             {error && <div className="px-5 py-3 text-sm text-destructive">{error}</div>}
-            {!assets.length ? <Empty><EmptyHeader><EmptyTitle>Belum ada aset</EmptyTitle><EmptyDescription>Catat penerimaan aset pertama untuk mulai memantau lokasi, pengguna, dan penyusutannya.</EmptyDescription></EmptyHeader></Empty> :
-                <div className="divide-y">{assets.map((asset) => <div key={asset.id} className="flex items-center justify-between px-5 py-3"><div><p className="font-medium">{asset.kode}</p><p className="text-sm text-muted-foreground">{asset.serial_number || 'Tanpa nomor seri'}</p></div><div className="flex items-center gap-3"><span className="text-sm">{asset.currency_code} {asset.acquisition_value}</span>{canUpdate && asset.lifecycle_state !== 'disposed' && <Button variant="outline" size="sm" onClick={() => void edit(asset)}>Ubah</Button>}<Button variant="outline" size="sm" onClick={() => void showHistory(asset)}>Riwayat</Button></div></div>)}</div>}
+            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="space-y-1">
+                    <p className="font-semibold">Register aset</p>
+                    <p className="text-sm text-muted-foreground">{visible.length} aset ditampilkan</p>
+                </div>
+                <Input
+                    className="w-full sm:w-70"
+                    type="search"
+                    placeholder="Cari kode, nama, atau nomor seri"
+                    aria-label="Cari aset"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                />
+            </div>
+            {!visible.length ? (
+                <Empty>
+                    <EmptyHeader>
+                        <EmptyTitle>{assets.length ? 'Tidak ada aset yang cocok' : 'Belum ada aset'}</EmptyTitle>
+                        <EmptyDescription>
+                            {assets.length
+                                ? 'Ubah kata kunci pencarian untuk menemukan aset lain.'
+                                : 'Catat penerimaan aset pertama untuk mulai memantau lokasi, pengguna, dan penyusutannya.'}
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            ) : (
+                <DataTable
+                    columns={columns}
+                    data={visible}
+                    getRowKey={(asset) => asset.id}
+                    getRowLabel={(asset) => asset.kode}
+                    actions={rowActions}
+                    onRowAction={(action, asset) => {
+                        if (action === 'edit' && asset.lifecycle_state !== 'disposed') void edit(asset);
+                        if (action === 'history') void showHistory(asset);
+                    }}
+                />
+            )}
         </CardContent>
+
         <Sheet open={open} onOpenChange={(next) => { setOpen(next); if (!next) resetForm(); }}>
-            <SheetContent ref={sheetContentRef} side="right" className="w-full sm:max-w-xl">
+            <SheetContent ref={sheetContentRef} side="right" className="w-full sm:max-w-2xl">
                 <SheetHeader><SheetTitle>Terima aset</SheetTitle></SheetHeader>
-                <form className="space-y-4 overflow-y-auto p-4" onSubmit={(event) => { event.preventDefault(); void receive(event.currentTarget); }}>
-                    <p className="text-sm font-medium">Klasifikasi</p>
-                    {CLASSIFICATION.map(referenceField)}
-                    <Field>
-                        <Select
-                            label="Aset induk"
-                            items={parentOptions.map((option) => option.label)}
-                            value={parentOptions.find((option) => option.id === parentAssetId)?.label}
-                            placeholder="Tanpa induk"
-                            searchPlaceholder="Cari aset induk"
-                            emptyMessage="Aset tidak ditemukan."
-                            ariaLabel="Pilih aset induk"
-                            portalContainer={sheetContentRef}
-                            onValueChange={(item) => setParentAssetId(parentOptions.find((option) => option.label === item)?.id ?? '')}
-                        />
-                        <FieldDescription>Isi bila aset ini bagian dari aset lain, misalnya mesin yang terpasang pada satu gedung.</FieldDescription>
-                    </Field>
+                <form
+                    className="space-y-4 overflow-y-auto p-4"
+                    onSubmit={(event) => { event.preventDefault(); void receive(); }}
+                >
+                    <CollapsibleSectionGroup defaultValue={['klasifikasi', 'perolehan']}>
+                        <CollapsibleSection
+                            value="klasifikasi"
+                            title="Identitas dan klasifikasi"
+                            summary={summaryOf(groupOptions, references.group_aset_id)}
+                        >
+                            <div className="space-y-4">
+                                {textField('nama', 'Nama aset', { maxLength: 150, required: true })}
+                                {CLASSIFICATION.map((field) => referenceField(field, sheetContentRef))}
+                            </div>
+                        </CollapsibleSection>
 
-                    {attributes.length > 0 && <p className="pt-2 text-sm font-medium">Atribut jenis aset</p>}
-                    {attributes.map((definition) => (
-                        <DynamicField
-                            key={definition.tipe_atribut_id}
-                            config={toFieldConfig(definition)}
-                            value={attributeValues[definition.tipe_atribut_id]}
-                            onChange={(next) => setAttributeValues((current) => ({ ...current, [definition.tipe_atribut_id]: next }))}
-                            portalContainer={sheetContentRef}
-                        />
-                    ))}
+                        <CollapsibleSection
+                            value="pabrikan"
+                            title="Pabrikan dan unit"
+                            summary={values.serial_number || undefined}
+                        >
+                            <div className="space-y-4">
+                                {MANUFACTURER.map((field) => referenceField(field, sheetContentRef))}
+                                {textField('serial_number', 'Nomor seri')}
+                                {textField('model_number', 'Nomor model')}
+                            </div>
+                        </CollapsibleSection>
 
-                    <p className="pt-2 text-sm font-medium">Identitas dan nilai</p>
-                    <Field><Input name="serial_number" label="Nomor seri" /></Field>
-                    <Field><Input name="model_number" label="Nomor model" /></Field>
-                    <Field><Input name="acquired_on" label="Tanggal perolehan" type="date" required /></Field>
-                    <Field>
-                        <Input name="placed_in_service_on" label="Tanggal mulai digunakan" type="date" />
-                        <FieldDescription>Dasar perhitungan awal penyusutan. Kosong berarti sama dengan tanggal perolehan.</FieldDescription>
-                    </Field>
-                    <Field><Input name="acquisition_value" label="Nilai perolehan" type="number" min="0" step="0.01" required /></Field>
-                    <Field><Input name="residual_value" label="Nilai residu" type="number" min="0" step="0.01" /></Field>
-                    <Field><Input name="currency_code" label="Mata uang" defaultValue="IDR" maxLength={3} required /></Field>
+                        {attributes.length > 0 && (
+                            <CollapsibleSection
+                                value="atribut"
+                                title="Atribut jenis aset"
+                                summary={`${attributes.length} atribut`}
+                            >
+                                <div className="space-y-4">{attributeFields(sheetContentRef)}</div>
+                            </CollapsibleSection>
+                        )}
 
-                    <p className="pt-2 text-sm font-medium">Penempatan</p>
-                    {PLACEMENT.map(referenceField)}
-                    <Field><Input name="receiving_org_unit_id" label="ID unit penerima" defaultValue={context.org_unit_id ?? ''} /></Field>
-                    <Field><Input name="usage_org_unit_id" label="ID unit pengguna" defaultValue={context.org_unit_id ?? ''} /></Field>
-                    <Field><Input name="received_by_user_id" label="ID penerima" defaultValue={context.user_id === null ? '' : String(context.user_id)} /></Field>
-                    <Field><Input name="custodian_user_id" label="ID PIC aset" /></Field>
+                        <CollapsibleSection
+                            value="perolehan"
+                            title="Perolehan dan nilai"
+                            summary={values.acquisition_value ? money(values.acquisition_value, values.currency_code) : undefined}
+                        >
+                            <div className="space-y-4">
+                                {textField('acquired_on', 'Tanggal perolehan', { type: 'date', required: true })}
+                                <Field>
+                                    <Input
+                                        label="Tanggal mulai digunakan"
+                                        type="date"
+                                        value={values.placed_in_service_on}
+                                        onChange={(event) => setValue('placed_in_service_on', event.target.value)}
+                                    />
+                                    <FieldDescription>Dasar perhitungan awal penyusutan. Kosong berarti sama dengan tanggal perolehan.</FieldDescription>
+                                </Field>
+                                {textField('acquisition_value', 'Nilai perolehan', { type: 'number', min: '0', step: '0.01', required: true })}
+                                {textField('residual_value', 'Nilai residu', { type: 'number', min: '0', step: '0.01' })}
+                                {textField('currency_code', 'Mata uang', { maxLength: 3, required: true })}
+                            </div>
+                        </CollapsibleSection>
 
-                    <Field>
-                        <p className="pt-2 text-sm font-medium">Konfigurasi penyusutan</p>
-                        <FieldDescription>Buku penyusutan dan profil utama diambil dari matriks group x book. Aset dapat diterima lebih dahulu, tetapi belum dapat ditempatkan sampai matriks memiliki konfigurasi yang lengkap dan berlaku.</FieldDescription>
-                    </Field>
+                        <CollapsibleSection value="penyusutan" title="Penyusutan">
+                            <DepreciationPreview groupId={groupId} />
+                        </CollapsibleSection>
 
-                    <Field><Textarea name="keterangan" rows={3} maxLength={2000} placeholder="Keterangan" /></Field>
+                        <CollapsibleSection
+                            value="penempatan"
+                            title="Penempatan"
+                            summary={summaryOf(locationOptions, references.asset_location_id)}
+                        >
+                            <div className="space-y-4">
+                                {PLACEMENT.map((field) => referenceField(field, sheetContentRef))}
+                                {textField('receiving_org_unit_id', 'ID unit penerima')}
+                                {textField('usage_org_unit_id', 'ID unit pengguna')}
+                                {textField('received_by_user_id', 'ID penerima')}
+                                {textField('custodian_user_id', 'ID PIC aset')}
+                            </div>
+                        </CollapsibleSection>
 
-                    <SheetFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button><Button type="submit" disabled={saving}>{saving ? 'Menyimpan…' : 'Simpan penerimaan'}</Button></SheetFooter>
+                        <CollapsibleSection
+                            value="struktur"
+                            title="Struktur"
+                            summary={parentOptions.find((option) => option.id === parentAssetId)?.label}
+                        >
+                            {parentField(sheetContentRef)}
+                        </CollapsibleSection>
+
+                        <CollapsibleSection value="catatan" title="Keterangan">
+                            <Field>
+                                <Textarea
+                                    rows={3}
+                                    maxLength={2000}
+                                    placeholder="Keterangan"
+                                    value={values.keterangan}
+                                    onChange={(event) => setValue('keterangan', event.target.value)}
+                                />
+                            </Field>
+                        </CollapsibleSection>
+                    </CollapsibleSectionGroup>
+
+                    <SheetFooter>
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button>
+                        <Button type="submit" disabled={saving}>{saving ? 'Menyimpan…' : 'Simpan penerimaan'}</Button>
+                    </SheetFooter>
                 </form>
             </SheetContent>
         </Sheet>
+
         <Sheet open={editing !== null} onOpenChange={(next) => { if (!next) { setEditing(null); resetForm(); } }}>
-            <SheetContent ref={sheetContentRef} side="right" className="w-full sm:max-w-xl">
+            <SheetContent ref={editSheetRef} side="right" className="w-full sm:max-w-2xl">
                 <SheetHeader><SheetTitle>Koreksi aset {editing?.kode}</SheetTitle></SheetHeader>
-                <form className="space-y-4 overflow-y-auto p-4" onSubmit={(event) => { event.preventDefault(); void saveEdit(event.currentTarget); }}>
+                <form
+                    className="space-y-4 overflow-y-auto p-4"
+                    onSubmit={(event) => { event.preventDefault(); void saveEdit(); }}
+                >
                     <p className="text-sm text-muted-foreground">
-                        Group aset tidak dapat diganti di sini karena buku penyusutannya sudah terbentuk dari matriks group.
+                        Group aset dan lokasi tidak dapat diganti di sini. Buku penyusutannya sudah terbentuk dari
+                        matriks group, dan perpindahan lokasi dicatat sebagai penempatan, bukan koreksi.
                     </p>
-                    {EDITABLE.map(referenceField)}
-                    {attributes.length > 0 && <p className="pt-2 text-sm font-medium">Atribut jenis aset</p>}
-                    {attributes.map((definition) => (
-                        <DynamicField
-                            key={definition.tipe_atribut_id}
-                            config={toFieldConfig(definition)}
-                            value={attributeValues[definition.tipe_atribut_id]}
-                            onChange={(next) => setAttributeValues((current) => ({ ...current, [definition.tipe_atribut_id]: next }))}
-                            portalContainer={sheetContentRef}
-                        />
-                    ))}
-                    <Field><Input name="serial_number" label="Nomor seri" defaultValue={String(editing?.serial_number ?? '')} /></Field>
-                    <Field><Input name="model_number" label="Nomor model" defaultValue={String(editing?.model_number ?? '')} /></Field>
-                    <Field>
-                        <Input name="placed_in_service_on" label="Tanggal mulai digunakan" type="date" defaultValue={String(editing?.placed_in_service_on ?? '').slice(0, 10)} />
-                        <FieldDescription>Menggeser awal penyusutan selama buku aset belum punya periode berjalan.</FieldDescription>
-                    </Field>
-                    <Field><Textarea name="keterangan" rows={3} maxLength={2000} placeholder="Keterangan" defaultValue={String(editing?.keterangan ?? '')} /></Field>
+                    <CollapsibleSectionGroup defaultValue={['klasifikasi']}>
+                        <CollapsibleSection value="klasifikasi" title="Identitas dan klasifikasi">
+                            <div className="space-y-4">
+                                {textField('nama', 'Nama aset', { maxLength: 150, required: true })}
+                                {EDITABLE.filter((field) => CLASSIFICATION.some((item) => item.name === field.name))
+                                    .map((field) => referenceField(field, editSheetRef))}
+                            </div>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection value="pabrikan" title="Pabrikan dan unit" summary={values.serial_number || undefined}>
+                            <div className="space-y-4">
+                                {EDITABLE.filter((field) => MANUFACTURER.some((item) => item.name === field.name))
+                                    .map((field) => referenceField(field, editSheetRef))}
+                                {textField('serial_number', 'Nomor seri')}
+                                {textField('model_number', 'Nomor model')}
+                            </div>
+                        </CollapsibleSection>
+
+                        {attributes.length > 0 && (
+                            <CollapsibleSection value="atribut" title="Atribut jenis aset" summary={`${attributes.length} atribut`}>
+                                <div className="space-y-4">{attributeFields(editSheetRef)}</div>
+                            </CollapsibleSection>
+                        )}
+
+                        <CollapsibleSection value="perolehan" title="Perolehan dan nilai">
+                            <Field>
+                                <Input
+                                    label="Tanggal mulai digunakan"
+                                    type="date"
+                                    value={values.placed_in_service_on}
+                                    onChange={(event) => setValue('placed_in_service_on', event.target.value)}
+                                />
+                                <FieldDescription>Menggeser awal penyusutan selama buku aset belum punya periode berjalan.</FieldDescription>
+                            </Field>
+                        </CollapsibleSection>
+
+                        <CollapsibleSection value="struktur" title="Struktur" summary={parentOptions.find((option) => option.id === parentAssetId)?.label}>
+                            {parentField(editSheetRef)}
+                        </CollapsibleSection>
+
+                        <CollapsibleSection value="catatan" title="Keterangan">
+                            <Field>
+                                <Textarea
+                                    rows={3}
+                                    maxLength={2000}
+                                    placeholder="Keterangan"
+                                    value={values.keterangan}
+                                    onChange={(event) => setValue('keterangan', event.target.value)}
+                                />
+                            </Field>
+                        </CollapsibleSection>
+                    </CollapsibleSectionGroup>
+
                     <SheetFooter>
                         <Button type="button" variant="outline" onClick={() => { setEditing(null); resetForm(); }}>Batal</Button>
                         <Button type="submit" disabled={saving}>{saving ? 'Menyimpan…' : 'Simpan koreksi'}</Button>
@@ -336,6 +728,22 @@ export default function AssetPage({ context, canUpdate }: { context: Context; ca
                 </form>
             </SheetContent>
         </Sheet>
-        <Sheet open={history !== null} onOpenChange={(open) => { if (!open) setHistory(null); }}><SheetContent side="right"><SheetHeader><SheetTitle>Riwayat aset {history?.asset.kode}</SheetTitle></SheetHeader><div className="space-y-3 p-4">{history?.placements.map((placement) => <div className="rounded border p-3" key={placement.id}><p className="font-medium">{placement.effective_on}</p><p className="text-sm text-muted-foreground">{placement.reason || 'Penempatan aset'}</p><p className="text-sm">Unit pengguna: {placement.usage_org_unit_id || 'Belum dipilih'}</p><p className="text-sm">PIC: {placement.custodian_user_id || 'Belum dipilih'}</p><p className="text-sm">Lokasi: {placement.asset_location_id || 'Belum dipilih'}</p></div>)}</div></SheetContent></Sheet>
+
+        <Sheet open={history !== null} onOpenChange={(next) => { if (!next) setHistory(null); }}>
+            <SheetContent side="right">
+                <SheetHeader><SheetTitle>Riwayat aset {history?.asset.kode}</SheetTitle></SheetHeader>
+                <div className="space-y-3 overflow-y-auto p-4">
+                    {history?.placements.map((placement) => (
+                        <div className="rounded border p-3" key={placement.id}>
+                            <p className="font-medium">{placement.effective_on}</p>
+                            <p className="text-sm text-muted-foreground">{placement.reason || 'Penempatan aset'}</p>
+                            <p className="text-sm">Unit pengguna: {placement.usage_org_unit_id || 'Belum dipilih'}</p>
+                            <p className="text-sm">PIC: {placement.custodian_user_id || 'Belum dipilih'}</p>
+                            <p className="text-sm">Lokasi: {nameOf(locationOptions, placement.asset_location_id) ?? placement.asset_location_id ?? 'Belum dipilih'}</p>
+                        </div>
+                    ))}
+                </div>
+            </SheetContent>
+        </Sheet>
     </Card>;
 }

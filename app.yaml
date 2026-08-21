@@ -58,33 +58,30 @@ ui:
           label: Profil posting aset
           permission: management-aset.fixed-asset-posting-profiles.read
       maintenance:
-        - id: item-checklist-maintenance
-          label: Item checklist maintenance
-          permission: management-aset.item-checklist-maintenance.read
-        - id: analisa-maintenance
-          label: Analisa maintenance
-          permission: management-aset.analisa-maintenance.read
+        # Urutan ini adalah alur setup awal: dasar pekerjaan, checklist dan
+        # bawaan pekerjaan, lalu aturan work order. Dua master legacy tetap
+        # ditampilkan paling bawah sebagai referensi, di luar alur setup utama.
+        - id: trade
+          label: Bidang keahlian
+          permission: management-aset.trade.read
         - id: maintenance-job-types
-          label: Jenis pekerjaan maintenance
+          label: Jenis pekerjaan
           permission: management-aset.maintenance-job-types.read
-        - id: maintenance-job-type-defaults
-          label: Default jenis pekerjaan maintenance
-          permission: management-aset.maintenance-job-type-defaults.read
         - id: maintenance-checklist-variables
-          label: Variabel checklist maintenance
+          label: Pilihan jawaban checklist
           permission: management-aset.maintenance-checklist-variables.read
         - id: maintenance-checklist-templates
-          label: Template checklist maintenance
+          label: Template checklist
           permission: management-aset.maintenance-checklist-templates.read
+        - id: maintenance-job-type-defaults
+          label: Bawaan pekerjaan
+          permission: management-aset.maintenance-job-type-defaults.read
         - id: tipe-work-order
           label: Tipe work order
           permission: management-aset.tipe-work-order.read
         - id: tingkat-layanan
           label: Tingkat layanan
           permission: management-aset.tingkat-layanan.read
-        - id: trade
-          label: Bidang keahlian
-          permission: management-aset.trade.read
         - id: sebab-kerusakan
           label: Sebab kerusakan
           permission: management-aset.sebab-kerusakan.read
@@ -92,8 +89,14 @@ ui:
           label: Tindakan perbaikan
           permission: management-aset.tindakan-perbaikan.read
         - id: validasi-status-work-order
-          label: Validasi status work order
+          label: Syarat penyelesaian
           permission: management-aset.validasi-status-work-order.read
+        - id: item-checklist-maintenance
+          label: Item checklist maintenance
+          permission: management-aset.item-checklist-maintenance.read
+        - id: analisa-maintenance
+          label: Analisa maintenance
+          permission: management-aset.analisa-maintenance.read
       transaksi:
         - id: perencanaan-aset
           label: Perencanaan aset
@@ -101,8 +104,10 @@ ui:
         - id: permintaan-pembelian-aset
           label: Permintaan pembelian
           permission: management-aset.permintaan-pembelian-aset.read
-        - id: aset
-          label: Register aset
+        # Id view berpindah ke nama prosesnya; permission dan endpoint tetap `aset`
+        # karena keduanya kontrak, bukan label navigasi.
+        - id: inventarisasi-aset
+          label: Inventarisasi aset
           permission: management-aset.aset.read
         - id: mutasi-aset
           label: Mutasi aset

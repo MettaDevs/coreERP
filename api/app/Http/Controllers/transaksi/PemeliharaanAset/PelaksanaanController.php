@@ -224,12 +224,17 @@ class PelaksanaanController extends Controller
                 $tidakBerlaku = filter_var($baris['tidak_berlaku'] ?? false, FILTER_VALIDATE_BOOL);
                 $nilai = $tidakBerlaku ? null : ($baris['nilai'] ?? null);
                 $this->pastikanNilaiSah($tenant, $row, $nilai);
+                $resultCode = $this->resultCode($tenant, $row, $nilai);
+                $catatan = trim((string) ($baris['catatan_teknisi'] ?? ''));
+                if ($resultCode === 'none' && $catatan === '') {
+                    throw ValidationException::withMessages(['baris' => 'Pilih alasan di catatan teknisi saat hasil pemeriksaan Tidak dinilai.']);
+                }
 
                 DB::table('tr_pemeliharaan_aset_checklist')->where(['tenant_id' => $tenant, 'id' => $row->id])->update([
                     'nilai' => $nilai,
-                    'result_code' => $this->resultCode($tenant, $row, $nilai),
+                    'result_code' => $resultCode,
                     'tidak_berlaku' => $tidakBerlaku,
-                    'catatan_teknisi' => $baris['catatan_teknisi'] ?? null,
+                    'catatan_teknisi' => $catatan === '' ? null : $catatan,
                     'diperiksa' => $tidakBerlaku || ($nilai !== null && $nilai !== ''),
                     'diperiksa_oleh_user_id' => $userId,
                     'diperiksa_pada' => now(),
@@ -258,7 +263,12 @@ class PelaksanaanController extends Controller
             'aktual_jam' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
             'sebab_kerusakan_id' => ['nullable', 'ulid', Rule::exists('m_sebab_kerusakan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
             'tindakan_perbaikan_id' => ['nullable', 'ulid', Rule::exists('m_tindakan_perbaikan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'sebab_kerusakan_keterangan' => ['nullable', 'string', 'max:1000'],
+            'tindakan_perbaikan_keterangan' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        $sebabKeterangan = $this->keteranganPilihan($tenant, 'm_sebab_kerusakan', $data['sebab_kerusakan_id'] ?? null, $data['sebab_kerusakan_keterangan'] ?? null, 'sebab_kerusakan_keterangan');
+        $tindakanKeterangan = $this->keteranganPilihan($tenant, 'm_tindakan_perbaikan', $data['tindakan_perbaikan_id'] ?? null, $data['tindakan_perbaikan_keterangan'] ?? null, 'tindakan_perbaikan_keterangan');
 
         DB::table('tr_pemeliharaan_aset_details')->where([
             'tenant_id' => $tenant,
@@ -268,10 +278,26 @@ class PelaksanaanController extends Controller
             'aktual_jam' => $data['aktual_jam'] ?? null,
             'sebab_kerusakan_id' => $data['sebab_kerusakan_id'] ?? null,
             'tindakan_perbaikan_id' => $data['tindakan_perbaikan_id'] ?? null,
+            'sebab_kerusakan_keterangan' => $sebabKeterangan,
+            'tindakan_perbaikan_keterangan' => $tindakanKeterangan,
             'updated_at' => now(),
         ]);
 
         return response()->json(['data' => $this->workOrder($request, $id)]);
+    }
+
+    private function keteranganPilihan(string $tenant, string $table, ?string $id, ?string $value, string $field): ?string
+    {
+        if ($id === null || ! DB::table($table)->where(['tenant_id' => $tenant, 'id' => $id, 'minta_keterangan' => true])->exists()) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+        if ($value === '') {
+            throw ValidationException::withMessages([$field => 'Isi keterangan untuk pilihan ini.']);
+        }
+
+        return $value;
     }
 
     /**
@@ -370,9 +396,9 @@ class PelaksanaanController extends Controller
      * Menyimpulkan hasil tiap baris pekerjaan dari hasil pemeriksaannya.
      *
      * Diturunkan, bukan diketik: kalau teknisi boleh menyatakan "lulus" sementara salah satu
-     * pemeriksaannya berhasil `fail`, kesimpulan itu tidak dapat dipercaya dan tidak ada
-     * gunanya dihitung. Baris tanpa checklist dibiarkan kosong karena memang tidak ada yang
-     * dapat disimpulkan darinya.
+     * pemeriksaannya berhasil `fail` atau belum dapat dinilai, kesimpulan itu tidak dapat
+     * dipercaya. Baris tanpa checklist dibiarkan kosong karena memang tidak ada yang dapat
+     * disimpulkan darinya.
      */
     private function simpulkanHasil(string $tenant, string $workOrderId): void
     {
@@ -392,6 +418,7 @@ class PelaksanaanController extends Controller
             $hasil = match (true) {
                 $berlaku->contains(fn (object $row): bool => $row->result_code === 'fail') => 'gagal',
                 $berlaku->isEmpty() => 'tidak_berlaku',
+                $berlaku->contains(fn (object $row): bool => $row->result_code === 'none') => 'tidak_dinilai',
                 default => 'lulus',
             };
             DB::table('tr_pemeliharaan_aset_details')
@@ -412,10 +439,16 @@ class PelaksanaanController extends Controller
         return [];
     }
 
-    /** Nilai baris `variable` harus salah satu pilihan yang ditetapkan variabelnya. */
+    /** Nilai variabel harus berasal dari pilihannya; pengukuran harus berupa angka. */
     private function pastikanNilaiSah(string $tenant, object $row, ?string $nilai): void
     {
-        if ($row->tipe !== 'variable' || $nilai === null || $nilai === '') {
+        if ($nilai === null || $nilai === '') {
+            return;
+        }
+        if ($row->tipe === 'measurement' && ! is_numeric($nilai)) {
+            throw ValidationException::withMessages(['baris' => 'Nilai untuk pemeriksaan "'.$row->nama.'" harus berupa angka.']);
+        }
+        if ($row->tipe !== 'variable') {
             return;
         }
         $sah = DB::table('m_maintenance_checklist_variable_value as nilai')
@@ -429,10 +462,20 @@ class PelaksanaanController extends Controller
         }
     }
 
-    /** Arti lulus/gagal melekat pada pilihan variabel, bukan pada teksnya. */
+    /** Hasil pilihan melekat pada variabel; rentang pengukuran mengevaluasi angka langsung. */
     private function resultCode(string $tenant, object $row, ?string $nilai): ?string
     {
-        if ($row->tipe !== 'variable' || $nilai === null || $nilai === '') {
+        if ($nilai === null || $nilai === '') {
+            return null;
+        }
+        if ($row->tipe === 'measurement') {
+            if ($row->min_value === null || $row->max_value === null) {
+                return null;
+            }
+
+            return (float) $nilai < (float) $row->min_value || (float) $nilai > (float) $row->max_value ? 'fail' : 'pass';
+        }
+        if ($row->tipe !== 'variable') {
             return null;
         }
 
