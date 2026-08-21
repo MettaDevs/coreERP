@@ -26,6 +26,12 @@ Semuanya mewarisi perilaku di [Master data](/apps/management-aset/master/).
 ::: warning Dua master lama yang namanya mirip
 `item-checklist-maintenance` dan `analisa-maintenance` **bukan** bagian dari susunan di atas. Keduanya master sederhana dari rancangan sebelumnya, tanpa kolom khusus, dan tidak dipakai template checklist maupun tipe pekerjaan.
 
+## Hasil pilihan variabel
+
+Setiap nilai pada variabel checklist membawa satu hasil: `pass`, `fail`, atau `none`. Ini mengikuti *Maintenance checklist variables* di Dynamics 365 F&O. Nilai `none` tampil sebagai **Tidak dinilai**: pemeriksaan telah dicatat, tetapi belum dapat disimpulkan lulus atau gagal.
+
+Teknisi wajib mengisi catatan ketika memilih nilai `none`. Alasannya disimpan bersama hasil pemeriksaan, sehingga pekerjaan tidak tampak lulus hanya karena pemeriksaannya belum bisa dilakukan. Saat work order diselesaikan, satu nilai `fail` menghasilkan `gagal`; tanpa `fail` tetapi ada `none` menghasilkan `tidak_dinilai`; dan hanya pemeriksaan yang lulus menghasilkan `lulus`. Baris yang memang tidak berlaku tetap memakai penanda `tidak_berlaku`, bukan `none`.
+
 Ini penting saat memeriksa cakupan: skenario load test yang memuat kedua nama itu **tidak** menguji setup maintenance. Nama yang kebetulan terdengar mirip bukan cakupan.
 :::
 

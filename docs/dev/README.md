@@ -40,6 +40,7 @@ Target yang dikunci:
 | [18-module-discovery-and-decision-gate.md](18-module-discovery-and-decision-gate.md) | Gate keputusan sebelum membuat app, master, transaksi, workflow, nomor, atau integrasi |
 | [19-transaction-security-chain.md](19-transaction-security-chain.md) | Rantai keamanan satu modul transaksi: empat lapis manifest, lalu security role sampai user |
 | [20-load-and-concurrency-testing.md](20-load-and-concurrency-testing.md) | Gate concurrency wajib sebelum modul dinyatakan selesai: 1000+ VU, 100+ tenant, multi-instance, penguncian endpoint pengganti, dan oracle kebenaran |
+| [21-visual-workflow-engine.md](21-visual-workflow-engine.md) | Visual Workflow Engine: tipe workflow manifest, editor visual, resolusi assignee, inbox persetujuan terpusat, dan callback event v2 |
 
 ## Referensi utama
 

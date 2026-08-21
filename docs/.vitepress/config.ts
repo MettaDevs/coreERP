@@ -166,6 +166,7 @@ export default withMermaid({
             { text: 'Gate penemuan dan keputusan', link: '/dev/18-module-discovery-and-decision-gate' },
             { text: 'Standar module', link: '/dev/02-module-standard' },
             { text: 'Rantai keamanan modul transaksi', link: '/dev/19-transaction-security-chain' },
+            { text: 'Visual workflow engine', link: '/dev/21-visual-workflow-engine' },
             { text: 'API dan integration bridge', link: '/dev/04-api-and-integration' },
             { text: 'Integrasi sistem eksternal', link: '/dev/12-external-module-integration' },
             { text: 'Kustomisasi dan addon', link: '/dev/05-customization-and-addons' },

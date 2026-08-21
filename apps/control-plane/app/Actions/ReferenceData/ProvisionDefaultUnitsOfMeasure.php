@@ -11,7 +11,7 @@ final class ProvisionDefaultUnitsOfMeasure
     {
         DB::transaction(function () use ($tenantId): void {
             $classes = $this->records($tenantId, 'uom_classes', [
-                ['QUANTITY', 'Jumlah'], ['MASS', 'Massa'], ['LENGTH', 'Panjang'], ['AREA', 'Luas'], ['VOLUME', 'Volume'], ['TIME', 'Waktu'], ['ENERGY', 'Energi'],
+                ['QUANTITY', 'Jumlah'], ['MASS', 'Massa'], ['LENGTH', 'Panjang'], ['AREA', 'Luas'], ['VOLUME', 'Volume'], ['TIME', 'Waktu'], ['ENERGY', 'Energi'], ['PRESSURE', 'Tekanan'],
             ]);
             $systems = $this->records($tenantId, 'uom_systems', [['METRIC', 'Metrik'], ['IMPERIAL', 'Imperial'], ['US_CUSTOMARY', 'Amerika Serikat']]);
             $units = [];
@@ -23,6 +23,7 @@ final class ProvisionDefaultUnitsOfMeasure
                 ['L', 'Litre', 'L', 'VOLUME', 'METRIC', 3, 'LTR'], ['ML', 'Millilitre', 'mL', 'VOLUME', 'METRIC', 0, 'MLT'], ['M3', 'Cubic metre', 'm³', 'VOLUME', 'METRIC', 3, 'MTQ'],
                 ['HOUR', 'Hour', 'jam', 'TIME', null, 2, 'HUR'], ['MIN', 'Minute', 'menit', 'TIME', null, 0, 'MIN'], ['DAY', 'Day', 'hari', 'TIME', null, 2, 'DAY'],
                 ['KWH', 'Kilowatt hour', 'kWh', 'ENERGY', 'METRIC', 3, 'KWH'],
+                ['PSI', 'Pound-force per square inch', 'psi', 'PRESSURE', 'US_CUSTOMARY', 2, 'PS'], ['KPA', 'Kilopascal', 'kPa', 'PRESSURE', 'METRIC', 2, 'KPA'],
             ] as [$code, $name, $symbol, $class, $system, $decimals, $externalCode]) {
                 $unit = DB::table('units_of_measure')->where(['tenant_id' => $tenantId, 'code' => $code])->first();
                 if (! $unit) {
@@ -39,7 +40,7 @@ final class ProvisionDefaultUnitsOfMeasure
                     $external->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'scheme' => 'UN/ECE-REC20', 'code' => $externalCode, 'unit_id' => $id, 'created_at' => now(), 'updated_at' => now()]);
                 }
             }
-            foreach ([['LUSIN', 'PCS', 12], ['KG', 'G', 1000], ['KG', 'TON', 0.001], ['M', 'CM', 100], ['KM', 'M', 1000], ['M2', 'HA', 0.0001], ['L', 'ML', 1000], ['M3', 'L', 1000], ['HOUR', 'MIN', 60], ['DAY', 'HOUR', 24]] as [$from, $to, $factor]) {
+            foreach ([['LUSIN', 'PCS', 12], ['KG', 'G', 1000], ['KG', 'TON', 0.001], ['M', 'CM', 100], ['KM', 'M', 1000], ['M2', 'HA', 0.0001], ['L', 'ML', 1000], ['M3', 'L', 1000], ['HOUR', 'MIN', 60], ['DAY', 'HOUR', 24], ['PSI', 'KPA', 6.894757293168]] as [$from, $to, $factor]) {
                 $this->conversion($tenantId, $units[$from], $units[$to], $factor);
                 $this->conversion($tenantId, $units[$to], $units[$from], 1 / $factor);
             }
