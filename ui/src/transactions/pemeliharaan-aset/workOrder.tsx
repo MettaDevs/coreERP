@@ -7,7 +7,7 @@ import { Badge } from '@apperp/ui/badge';
  */
 
 export type Context = { legal_entity_id: string | null; org_unit_id: string | null };
-export type Option = { id: string; kode: string; nama: string };
+export type Option = { id: string; kode: string; nama: string; minta_keterangan?: boolean };
 
 export type JobLine = {
     id?: string;
@@ -23,6 +23,8 @@ export type JobLine = {
     aktual_jam?: number | null;
     sebab_kerusakan_id?: string | null;
     tindakan_perbaikan_id?: string | null;
+    sebab_kerusakan_keterangan?: string | null;
+    tindakan_perbaikan_keterangan?: string | null;
     hasil?: string | null;
     catatan: string;
     asset_kode?: string;
@@ -61,6 +63,8 @@ export type ChecklistRow = {
     nama: string;
     tipe: string;
     satuan: string | null;
+    min_value: string | null;
+    max_value: string | null;
     wajib: boolean;
     instruksi: string | null;
     pilihan: { value: string; result_code: string }[];

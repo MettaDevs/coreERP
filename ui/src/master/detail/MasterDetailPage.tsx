@@ -149,9 +149,21 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
         }
     }
 
-    async function handleSaved(id: string) {
-        setSelectedId(id);
-        setMode('view');
+    async function handleSaved(savedRecord: MasterRecord, created: boolean) {
+        // Masukkan hasil POST/PATCH ke state sebelum memuat ulang daftar. Dengan begitu
+        // panel detail langsung menerima kode dan nama dari respons yang sama, bukan
+        // sempat menerima `record = null` sambil menunggu daftar selesai dimuat.
+        setItems((current) => {
+            const existingIndex = current.findIndex((item) => item.id === savedRecord.id);
+            if (existingIndex === -1) return [savedRecord, ...current];
+
+            return current.map((item, index) => index === existingIndex ? savedRecord : item);
+        });
+        setSelectedId(savedRecord.id);
+        // Record baru langsung tetap disunting karena master maintenance biasanya
+        // memiliki rincian lanjutan (misalnya nilai variable atau baris template).
+        // Setelah PATCH biasa, kembali ke mode baca seperti sebelumnya.
+        setMode(created ? 'edit' : 'view');
         setPage(1);
         await load();
     }
@@ -233,7 +245,7 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
                     onRequestEdit={() => setMode('edit')}
                     onDirtyChange={setDirty}
                     onSavingChange={setSaving}
-                    onSaved={(id) => { void handleSaved(id); }}
+                    onSaved={(savedRecord, created) => { void handleSaved(savedRecord, created); }}
                 />
             </div>
 

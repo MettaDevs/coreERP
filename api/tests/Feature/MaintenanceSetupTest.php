@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Services\ProvisionIndonesiaStarterData;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\Concerns\InteractsWithCoreErpContext;
@@ -15,12 +16,20 @@ class MaintenanceSetupTest extends TestCase
 
     private string $tenantId;
 
+    private string $unitId;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->tenantId = (string) Str::ulid();
+        $this->unitId = (string) Str::ulid();
         $this->configureCoreErpContext();
-        Http::fake(function () {
+        Http::fake(function ($request) {
+            if (str_ends_with($request->url(), '/units-of-measure/resolve')) {
+                return Http::response(['data' => [[
+                    'id' => $this->unitId, 'code' => 'V', 'name' => 'Volt', 'symbol' => 'V', 'decimal_places' => 2,
+                ]]]);
+            }
             static $number = 0;
             $number++;
 
@@ -44,20 +53,22 @@ class MaintenanceSetupTest extends TestCase
             ->putJson('/api/v1/maintenance-checklist-variables/'.$variable.'/values', ['values' => [
                 ['line_number' => 1, 'value' => 'Jernih', 'result_code' => 'pass'],
                 ['line_number' => 2, 'value' => 'Keruh', 'result_code' => 'fail'],
-            ]])->assertOk()->assertJsonCount(2, 'data');
+                ['line_number' => 3, 'value' => 'Belum dapat diperiksa', 'result_code' => 'none'],
+            ]])->assertOk()->assertJsonCount(3, 'data');
 
         $template = $this->postMaster('maintenance-checklist-templates', ['nama' => 'Pemeriksaan genset'])->assertCreated()->json('data.id');
         $this->withContext(['management-aset.maintenance-checklist-templates.read', 'management-aset.maintenance-checklist-templates.update'])
             ->putJson('/api/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
                 ['line_number' => 1, 'type' => 'header', 'nama' => 'Pemeriksaan genset', 'wajib' => true],
-                ['line_number' => 2, 'type' => 'measurement', 'nama' => 'Tegangan', 'unit' => 'V', 'wajib' => true, 'instruksi' => 'Ukur pada terminal utama.'],
+                ['line_number' => 2, 'type' => 'measurement', 'nama' => 'Tegangan', 'unit_id' => $this->unitId, 'min_value' => 210, 'max_value' => 230, 'wajib' => true, 'instruksi' => 'Ukur pada terminal utama.'],
             ]])->assertOk()->assertJsonCount(2, 'data');
 
         // Instruksi dan penanda wajib menentukan apa yang dibaca dan harus diisi teknisi,
         // jadi hilangnya keduanya saat menyimpan tidak boleh lolos diam-diam.
         $this->assertDatabaseHas('m_maintenance_checklist_template_line', [
             'template_id' => $template, 'line_number' => 2,
-            'instruksi' => 'Ukur pada terminal utama.', 'wajib' => true,
+            'instruksi' => 'Ukur pada terminal utama.', 'wajib' => true, 'unit_id' => $this->unitId,
+            'unit' => 'V', 'min_value' => 210, 'max_value' => 230,
         ]);
         // Baris judul tidak pernah diisi teknisi, jadi ia tidak boleh menahan penyelesaian
         // walaupun penyusun template menandainya wajib.
@@ -69,13 +80,43 @@ class MaintenanceSetupTest extends TestCase
         $this->assertDatabaseHas('m_maintenance_job_type_asset_type', ['job_type_id' => $jobType, 'jenis_aset_id' => $jenisAset]);
     }
 
+    public function test_baris_pengukuran_boleh_disimpan_tanpa_satuan(): void
+    {
+        $template = $this->postMaster('maintenance-checklist-templates', ['nama' => 'Pemeriksaan tanpa satuan'])->assertCreated()->json('data.id');
+
+        $this->withContext(['management-aset.maintenance-checklist-templates.read', 'management-aset.maintenance-checklist-templates.update'])
+            ->putJson('/api/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
+                ['line_number' => 1, 'type' => 'measurement', 'nama' => 'Nilai hasil pemeriksaan', 'min_value' => 1, 'max_value' => 5, 'wajib' => true],
+            ]])->assertOk()
+            ->assertJsonPath('data.0.unit_id', null)
+            ->assertJsonPath('data.0.unit', null);
+
+        $this->assertDatabaseHas('m_maintenance_checklist_template_line', [
+            'template_id' => $template, 'line_number' => 1, 'unit_id' => null, 'unit' => null,
+            'min_value' => 1, 'max_value' => 5,
+        ]);
+    }
+
+    public function test_validasi_nama_baris_menunjuk_kolom_dengan_pesan_indonesia(): void
+    {
+        $template = $this->postMaster('maintenance-checklist-templates', ['nama' => 'Template nama wajib'])->assertCreated()->json('data.id');
+
+        $this->withContext(['management-aset.maintenance-checklist-templates.read', 'management-aset.maintenance-checklist-templates.update'])
+            ->putJson('/api/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
+                ['line_number' => 1, 'type' => 'text', 'nama' => '', 'wajib' => false],
+            ]])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('lines.0.nama')
+            ->assertJsonFragment(['lines.0.nama' => ['Nama baris wajib diisi.']]);
+    }
+
     public function test_aturan_validasi_status_disemai_dan_dapat_diubah_tenant(): void
     {
         $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
 
-        // Matriks lengkap disemai supaya layar pengaturan tidak berlubang, tetapi hanya
-        // checklist saat selesai yang aktif secara bawaan.
+        // Matriks lengkap disemai dan seluruh aturannya aktif secara bawaan.
         $this->assertDatabaseCount('m_validasi_status_work_order', 12);
+        $this->assertSame(12, DB::table('m_validasi_status_work_order')->where('aktif', true)->count());
         $this->assertDatabaseHas('m_validasi_status_work_order', [
             'status' => 'selesai', 'aturan' => 'checklist_wajib', 'aktif' => true, 'keparahan' => 'error',
         ]);

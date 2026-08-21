@@ -238,6 +238,7 @@ class DepreciationScaleTest extends TestCase
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
             ->postJson('/api/v1/aset', [
                 'legal_entity_id' => $this->legalEntityId,
+                'nama' => 'Aset skala penyusutan',
                 'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
                 'acquired_on' => '2026-06-01', 'placed_in_service_on' => '2026-06-15',
                 'acquisition_value' => $acquisition, 'residual_value' => $residual,

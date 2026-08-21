@@ -34,7 +34,7 @@ final class ProvisionIndonesiaStarterData
         $classifications = $this->seedClassifications($tenantId, $template['fiscal_classifications']);
         $profiles = $this->seedProfiles($tenantId, $template, $classifications);
         $books = $this->seedBooks($tenantId, $template);
-        $mappings = $this->seedFiscalMappings($tenantId, $classifications, $profiles, $books);
+        $mappings = $this->seedDefaultBookMappings($tenantId, $classifications, $profiles, $books);
         $locationTypes = $this->seedOptionalMasters(
             $tenantId,
             'm_tipe_lokasi_aset',
@@ -297,7 +297,7 @@ final class ProvisionIndonesiaStarterData
                 'tenant_id' => $tenantId,
                 'status' => $item['status'],
                 'aturan' => $item['aturan'],
-                'aktif' => (bool) ($item['aktif'] ?? false),
+                'aktif' => (bool) ($item['aktif'] ?? true),
                 'keparahan' => $item['keparahan'] ?? WorkOrderValidation::ERROR,
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -447,11 +447,23 @@ final class ProvisionIndonesiaStarterData
         return $ids;
     }
 
-    /** @param array<string, string> $classifications @param array<string, string> $profiles @param array<string, string> $books */
-    private function seedFiscalMappings(string $tenantId, array $classifications, array $profiles, array $books): int
+    /**
+     * Memasang satu baris matriks per group agar aset dapat langsung ditempatkan.
+     *
+     * Buku yang dipasang adalah buku komersial, bukan fiskal. Tenant yang belum meminta
+     * pembukuan pajak tidak seharusnya dipaksa menghitungnya, dan buku pertama sebuah
+     * tenant lebih sering dipakai sebagai dasar pelaporan keuangan daripada SPT.
+     *
+     * Masa manfaatnya tetap memakai profil PMK 72 sebagai nilai awal yang wajar; ia
+     * dapat diganti tenant tanpa menyentuh matriks. Buku fiskal tetap dibuat sebagai
+     * master dan menganggur sampai ada baris matriks yang menunjuknya.
+     *
+     * @param  array<string, string>  $classifications  @param array<string, string> $profiles @param array<string, string> $books
+     */
+    private function seedDefaultBookMappings(string $tenantId, array $classifications, array $profiles, array $books): int
     {
-        $fiscalBookId = $books['id:pmk72-2023:buku:fiskal:v1'] ?? null;
-        if (! $fiscalBookId) {
+        $defaultBookId = $books['id:pmk72-2023:buku:komersial:v1'] ?? null;
+        if (! $defaultBookId) {
             return 0;
         }
 
@@ -464,7 +476,7 @@ final class ProvisionIndonesiaStarterData
             ->whereNotNull('kelompok_harta_fiskal_id')
             ->whereNull('deleted_at')
             ->get(['id', 'kelompok_harta_fiskal_id'])
-            ->each(function (object $group) use ($tenantId, $classifications, $profiles, $straightLineProfiles, $fiscalBookId, &$created): void {
+            ->each(function (object $group) use ($tenantId, $classifications, $profiles, $straightLineProfiles, $defaultBookId, &$created): void {
                 $classificationKey = array_search($group->kelompok_harta_fiskal_id, $classifications, true);
                 $profileKey = $classificationKey === false ? null : ($straightLineProfiles->get($classificationKey)['template_key'] ?? null);
                 $profileId = $profileKey ? ($profiles[$profileKey] ?? null) : null;
@@ -473,7 +485,7 @@ final class ProvisionIndonesiaStarterData
                 }
 
                 $exists = DB::table('m_group_buku_penyusutan')
-                    ->where(['tenant_id' => $tenantId, 'group_aset_id' => $group->id, 'buku_id' => $fiscalBookId])
+                    ->where(['tenant_id' => $tenantId, 'group_aset_id' => $group->id, 'buku_id' => $defaultBookId])
                     ->exists();
                 if ($exists) {
                     return;
@@ -483,7 +495,7 @@ final class ProvisionIndonesiaStarterData
                     'id' => (string) Str::ulid(),
                     'tenant_id' => $tenantId,
                     'group_aset_id' => $group->id,
-                    'buku_id' => $fiscalBookId,
+                    'buku_id' => $defaultBookId,
                     'depreciation_profile_id' => $profileId,
                     'alternative_profile_id' => null,
                     'useful_life_periods' => null,

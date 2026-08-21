@@ -37,6 +37,8 @@ final class MaintenanceChecklistSnapshot
             'instruksi' => $line['instruksi'],
             'tipe' => $line['tipe'],
             'satuan' => $line['satuan'],
+            'min_value' => $line['min_value'],
+            'max_value' => $line['max_value'],
             'wajib' => $line['wajib'],
             'sumber' => 'template',
             'sumber_id' => $line['sumber_id'],
@@ -134,6 +136,7 @@ final class MaintenanceChecklistSnapshot
         foreach ($lines as $line) {
             if ($line->type === 'template' && $line->nested_template_id !== null) {
                 $result = [...$result, ...$this->expandTemplate($tenantId, $line->nested_template_id, $visited)];
+
                 continue;
             }
 
@@ -142,6 +145,8 @@ final class MaintenanceChecklistSnapshot
                 'nama' => $line->nama,
                 'instruksi' => $line->instruksi,
                 'satuan' => $line->unit,
+                'min_value' => $line->min_value,
+                'max_value' => $line->max_value,
                 'wajib' => (bool) $line->wajib,
                 'sumber_id' => $line->id,
             ];

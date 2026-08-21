@@ -492,6 +492,7 @@ class AssetAttributeTest extends TestCase
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
             ->postJson('/api/v1/aset', [
                 'legal_entity_id' => (string) Str::ulid(),
+                'nama' => 'Aset atribut uji',
                 'group_aset_id' => $group, 'jenis_aset_id' => $jenisId,
                 'acquired_on' => '2026-03-20', 'acquisition_value' => 1000000,
                 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),

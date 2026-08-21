@@ -22,7 +22,7 @@ return new class extends Migration
             $table->ulid('tenant_id')->index();
             $table->string('status', 30);
             $table->string('aturan', 40);
-            $table->boolean('aktif')->default(false);
+            $table->boolean('aktif')->default(true);
             // `informasi` hanya dicatat, `peringatan` membiarkan transisi berjalan tetapi
             // tersimpan pada jejak status, `error` menolak transisi.
             $table->string('keparahan', 20)->default('error');

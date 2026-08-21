@@ -54,7 +54,7 @@ export default function RecordDetailPane({
     onRequestEdit: () => void;
     onDirtyChange: (dirty: boolean) => void;
     onSavingChange: (saving: boolean) => void;
-    onSaved: (id: string) => void;
+    onSaved: (record: MasterRecord, created: boolean) => void;
 }) {
     const readOnly = mode === 'view';
     const sections = useMemo(() => sectionsFor(config), [config]);
@@ -159,7 +159,10 @@ export default function RecordDetailPane({
                 body: JSON.stringify(payload),
             });
             onDirtyChange(false);
-            onSaved(saved.data.id);
+            // Kirim record lengkap agar induk dapat langsung mengisi daftar dan panel
+            // detail. Mengirim ID saja membuat panel sempat dipasang tanpa record;
+            // state nama lalu terlanjur dimulai kosong walau API sudah mengembalikan nama.
+            onSaved(saved.data, !record);
         } catch (caught) {
             setError(errorMessage(caught, 'Data belum dapat disimpan.'));
         } finally {
@@ -317,7 +320,7 @@ export default function RecordDetailPane({
                     <div className="min-w-64 flex-1" data-field-name="nama" data-readonly={readOnly || undefined}>
                         <Input
                             id="nama"
-                            label={`${config.namaLabel} *`}
+                            label={config.namaLabel}
                             required
                             maxLength={150}
                             readOnly={readOnly}

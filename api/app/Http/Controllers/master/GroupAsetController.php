@@ -52,6 +52,12 @@ class GroupAsetController extends MasterDataController
             // sebenarnya bermaksud menandai barang non-kapitalisasi — maksud yang
             // sekarang hanya terekam benar lewat `property_type`.
             'major_type' => ['prohibited'],
+            // Lapisan pembukuan adalah sifat buku, bukan sifat group; tempatnya di
+            // `m_buku_penyusutan.posting_layer`, sama seperti Book di F&O. Selama ada di
+            // sini kolomnya tidak pernah dibaca untuk apa pun, sehingga konfigurator
+            // mengisinya lalu menyangka sudah mengatur sesuatu. Menolaknya menunjukkan
+            // tempat yang benar, bukan menelan kiriman yang tidak berefek.
+            'posting_layers' => ['prohibited'],
             'property_type' => ['sometimes', 'nullable', Rule::in(GroupAset::PROPERTY_TYPE)],
             // Lokasi bawaan; hanya nilai awal saat aset diterima, bukan lokasi yang berlaku.
             'asset_location_id' => [
@@ -61,8 +67,6 @@ class GroupAsetController extends MasterDataController
                     ->whereNull('deleted_at'),
             ],
             'capitalization_threshold' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'posting_layers' => ['sometimes', 'nullable', 'array'],
-            'posting_layers.*' => [Rule::in(GroupAset::POSTING_LAYERS)],
         ];
     }
 
@@ -75,13 +79,6 @@ class GroupAsetController extends MasterDataController
             }
         }
 
-        if (array_key_exists('posting_layers', $data)) {
-            // Disimpan sebagai daftar dipisah koma; duplikat dibuang supaya dua kiriman
-            // yang bermakna sama tidak tersimpan berbeda dan memicu konflik idempotency.
-            $layers = array_values(array_unique($data['posting_layers'] ?? []));
-            $payload['posting_layers'] = $layers === [] ? null : implode(',', $layers);
-        }
-
         return $payload;
     }
 
@@ -92,7 +89,6 @@ class GroupAsetController extends MasterDataController
             'property_type' => $record->property_type,
             'asset_location_id' => $record->asset_location_id,
             'capitalization_threshold' => $record->capitalization_threshold,
-            'posting_layers' => $record->posting_layers === null ? [] : explode(',', $record->posting_layers),
         ];
     }
 }

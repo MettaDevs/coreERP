@@ -249,6 +249,7 @@ class WorkOrderTest extends TestCase
         $id = (string) Str::ulid();
         DB::table('tr_penerimaan_aset')->insert([
             'id' => $id, 'tenant_id' => $tenant, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $kode,
+            'nama' => 'Aset work order '.$kode,
             'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
             'group_aset_id' => $seed['group'], 'jenis_aset_id' => $seed['jenis'],
             'asset_location_id' => $tenant === $this->tenantId ? $seed['location'] : null,

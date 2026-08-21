@@ -221,6 +221,8 @@ function ChecklistPanel({
                                         {row.wajib && <span className="text-destructive"> *</span>}
                                     </p>
                                     {row.instruksi && <p className="text-sm text-muted-foreground">{row.instruksi}</p>}
+                                    {row.tipe === 'measurement' && row.min_value !== null && row.max_value !== null && <p className="text-sm text-muted-foreground">Rentang lulus: {row.min_value}–{row.max_value}{row.satuan ? ` ${row.satuan}` : ''}.</p>}
+                                    {row.tipe === 'variable' && row.pilihan.some((choice) => choice.result_code === 'none') && <p className="text-sm text-muted-foreground">Jika memilih jawaban Tidak dinilai, isi alasan pada catatan teknisi.</p>}
                                 </div>
                                 {editable && <div className="flex shrink-0 items-center gap-2">
                                     <span className="text-sm text-muted-foreground">Tidak berlaku</span>
@@ -252,7 +254,7 @@ function ChecklistPanel({
                                 /> : <p className="text-sm">Jawaban: {row.nilai ?? 'Belum diisi'}</p>
                             )}
                             {editable ? <Field>
-                                <FieldLabel htmlFor={`catatan-${row.id}`}>Catatan teknisi</FieldLabel>
+                                <FieldLabel htmlFor={`catatan-${row.id}`}>Catatan teknisi{row.pilihan.some((choice) => choice.value === row.nilai && choice.result_code === 'none') ? ' (wajib)' : ''}</FieldLabel>
                                 <Textarea
                                     id={`catatan-${row.id}`}
                                     rows={2}
@@ -327,6 +329,8 @@ export default function WorkOrderDetailPage({
                 dijadwalkan_selesai: job.dijadwalkan_selesai ?? '',
                 sebab_kerusakan_id: job.sebab_kerusakan_id ?? '',
                 tindakan_perbaikan_id: job.tindakan_perbaikan_id ?? '',
+                sebab_kerusakan_keterangan: job.sebab_kerusakan_keterangan ?? '',
+                tindakan_perbaikan_keterangan: job.tindakan_perbaikan_keterangan ?? '',
                 catatan: job.catatan ?? '',
             }));
             await Promise.all(details.map((job) => loadJobTypesForAsset(job.asset_id)));
@@ -355,7 +359,7 @@ export default function WorkOrderDetailPage({
 
     // Referensi hanya dimuat bila pengguna memang dapat menyusun work order.
     useEffect(() => {
-        if (!can('create') && !can('update')) return;
+        if (!can('create') && !can('update') && !can('execute')) return;
         const muat = (path: string, set: (options: Option[]) => void, gagal: string) =>
             api<{ data: Option[] }>(path).then((result) => set(result.data)).catch(() => toast.error(gagal));
         void muat('/tipe-work-order?per_page=100&aktif=true', setTipe, 'Tipe work order belum dapat dimuat.');
@@ -439,6 +443,8 @@ export default function WorkOrderDetailPage({
                     aktual_jam: job.aktual_jam ?? null,
                     sebab_kerusakan_id: job.sebab_kerusakan_id || null,
                     tindakan_perbaikan_id: job.tindakan_perbaikan_id || null,
+                    sebab_kerusakan_keterangan: job.sebab_kerusakan_keterangan || null,
+                    tindakan_perbaikan_keterangan: job.tindakan_perbaikan_keterangan || null,
                 }),
             });
             toast.success('Hasil pekerjaan tersimpan.');
@@ -534,7 +540,7 @@ export default function WorkOrderDetailPage({
     // Simpan tidak pernah muncul untuk permintaan yang pasti ditolak server.
     const editing = mode !== 'view' && dapatDisunting;
     const readOnly = !editing;
-    const canEditExecution = status === 'dikerjakan' || status === 'selesai';
+    const canEditExecution = can('execute') && (status === 'dikerjakan' || status === 'selesai');
     const mintaSunting = () => {
         if (!dapatDisunting || editing || !record.id) return;
         window.location.hash = `#/pemeliharaan-aset/${record.id}/ubah`;
@@ -571,31 +577,51 @@ export default function WorkOrderDetailPage({
         {
             id: 'sebab',
             header: 'Sebab kerusakan',
-            cell: (job) => canEditExecution ? (
-                <Select
-                    items={faultCauses.map((option) => labelDari(option) ?? '')}
-                    value={labelDari(faultCauses.find((option) => option.id === job.sebab_kerusakan_id))}
-                    placeholder="Pilih bila ada"
-                    searchPlaceholder="Cari sebab kerusakan"
-                    ariaLabel={`Sebab kerusakan ${job.asset_kode ?? ''}`}
-                    onValueChange={(value) => updateJob(job.id, { sebab_kerusakan_id: idDari(faultCauses, value) || null })}
-                />
-            ) : (labelDari(faultCauses.find((option) => option.id === job.sebab_kerusakan_id)) ?? 'Belum diisi'),
+            cell: (job) => {
+                const selected = faultCauses.find((option) => option.id === job.sebab_kerusakan_id);
+                return canEditExecution ? (
+                    <div className="flex flex-col gap-2">
+                        <Select
+                            items={faultCauses.map((option) => labelDari(option) ?? '')}
+                            value={labelDari(selected)}
+                            placeholder="Pilih bila ada"
+                            searchPlaceholder="Cari sebab kerusakan"
+                            ariaLabel={`Sebab kerusakan ${job.asset_kode ?? ''}`}
+                            onValueChange={(value) => {
+                                const id = idDari(faultCauses, value) || null;
+                                const mintaKeterangan = faultCauses.find((option) => option.id === id)?.minta_keterangan;
+                                updateJob(job.id, { sebab_kerusakan_id: id, ...(!mintaKeterangan && { sebab_kerusakan_keterangan: null }) });
+                            }}
+                        />
+                        {selected?.minta_keterangan && <Input aria-label={`Keterangan sebab kerusakan ${job.asset_kode ?? ''}`} placeholder="Tulis sebab kerusakan" value={job.sebab_kerusakan_keterangan ?? ''} onChange={(event) => updateJob(job.id, { sebab_kerusakan_keterangan: event.target.value })} />}
+                    </div>
+                ) : <span>{labelDari(selected) ?? job.sebab_kerusakan_nama ?? 'Belum diisi'}{job.sebab_kerusakan_keterangan ? ` — ${job.sebab_kerusakan_keterangan}` : ''}</span>;
+            },
             width: 190,
         },
         {
             id: 'tindakan',
             header: 'Tindakan perbaikan',
-            cell: (job) => canEditExecution ? (
-                <Select
-                    items={repairActions.map((option) => labelDari(option) ?? '')}
-                    value={labelDari(repairActions.find((option) => option.id === job.tindakan_perbaikan_id))}
-                    placeholder="Pilih bila ada"
-                    searchPlaceholder="Cari tindakan perbaikan"
-                    ariaLabel={`Tindakan perbaikan ${job.asset_kode ?? ''}`}
-                    onValueChange={(value) => updateJob(job.id, { tindakan_perbaikan_id: idDari(repairActions, value) || null })}
-                />
-            ) : (labelDari(repairActions.find((option) => option.id === job.tindakan_perbaikan_id)) ?? 'Belum diisi'),
+            cell: (job) => {
+                const selected = repairActions.find((option) => option.id === job.tindakan_perbaikan_id);
+                return canEditExecution ? (
+                    <div className="flex flex-col gap-2">
+                        <Select
+                            items={repairActions.map((option) => labelDari(option) ?? '')}
+                            value={labelDari(selected)}
+                            placeholder="Pilih bila ada"
+                            searchPlaceholder="Cari tindakan perbaikan"
+                            ariaLabel={`Tindakan perbaikan ${job.asset_kode ?? ''}`}
+                            onValueChange={(value) => {
+                                const id = idDari(repairActions, value) || null;
+                                const mintaKeterangan = repairActions.find((option) => option.id === id)?.minta_keterangan;
+                                updateJob(job.id, { tindakan_perbaikan_id: id, ...(!mintaKeterangan && { tindakan_perbaikan_keterangan: null }) });
+                            }}
+                        />
+                        {selected?.minta_keterangan && <Input aria-label={`Keterangan tindakan perbaikan ${job.asset_kode ?? ''}`} placeholder="Tulis tindakan perbaikan" value={job.tindakan_perbaikan_keterangan ?? ''} onChange={(event) => updateJob(job.id, { tindakan_perbaikan_keterangan: event.target.value })} />}
+                    </div>
+                ) : <span>{labelDari(selected) ?? job.tindakan_perbaikan_nama ?? 'Belum diisi'}{job.tindakan_perbaikan_keterangan ? ` — ${job.tindakan_perbaikan_keterangan}` : ''}</span>;
+            },
             width: 200,
         },
         {

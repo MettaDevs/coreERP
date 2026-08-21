@@ -284,6 +284,7 @@ class ModelAsetTest extends TestCase
             'tenant_id' => $this->tenantId,
             'creation_key' => 'asset-'.Str::ulid(),
             'kode' => 'AST'.Str::random(6),
+            'nama' => 'Aset model uji',
             'legal_entity_id' => $legalEntityId,
             'responsible_org_unit_id' => $operatingUnitId,
             'group_aset_id' => $group,

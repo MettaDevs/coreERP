@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\master;
 
 use App\Http\Controllers\Controller;
+use App\Services\UnitOfMeasureClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -106,7 +107,7 @@ final class MaintenanceSetupLinkController extends Controller
             'values' => ['present', 'array', 'max:100'],
             'values.*.line_number' => ['required', 'numeric', 'min:1'],
             'values.*.value' => ['required', 'string', 'max:255'],
-            'values.*.result_code' => ['required', Rule::in(['pass', 'fail'])],
+            'values.*.result_code' => ['required', Rule::in(['pass', 'fail', 'none'])],
         ]);
         DB::transaction(function () use ($tenant, $variableId, $data): void {
             $this->lockRecord('m_maintenance_checklist_variable', $tenant, $variableId);
@@ -145,24 +146,42 @@ final class MaintenanceSetupLinkController extends Controller
             'lines.*.nama' => ['required', 'string', 'max:255'],
             'lines.*.instruksi' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'lines.*.wajib' => ['sometimes', 'boolean'],
-            'lines.*.unit' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'lines.*.unit_id' => ['sometimes', 'nullable', 'ulid'],
+            'lines.*.min_value' => ['sometimes', 'nullable', 'numeric'],
+            'lines.*.max_value' => ['sometimes', 'nullable', 'numeric'],
             'lines.*.variable_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('m_maintenance_checklist_variable', 'id')->where('tenant_id', $tenant)],
             'lines.*.nested_template_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('m_maintenance_checklist_template', 'id')->where('tenant_id', $tenant)],
+        ], [
+            'lines.*.nama.required' => 'Nama baris wajib diisi.',
         ]);
-        DB::transaction(function () use ($tenant, $templateId, $data): void {
+        $unitCodes = $this->measurementUnitCodes($tenant, $data['lines']);
+
+        DB::transaction(function () use ($tenant, $templateId, $data, $unitCodes): void {
             $this->lockRecord('m_maintenance_checklist_template', $tenant, $templateId);
             DB::table('m_maintenance_checklist_template_line')->where(['tenant_id' => $tenant, 'template_id' => $templateId])->delete();
             foreach ($data['lines'] as $line) {
-                if ($line['type'] === 'measurement' && empty($line['unit'])) {
-                    throw ValidationException::withMessages(['lines' => 'Baris pengukuran harus memiliki satuan.']);
+                $min = $line['min_value'] ?? null;
+                $max = $line['max_value'] ?? null;
+                if ($line['type'] === 'measurement' && (($min === null) !== ($max === null))) {
+                    throw ValidationException::withMessages(['lines' => 'Nilai minimum dan maksimum harus diisi bersama atau dikosongkan bersama.']);
+                }
+                if ($line['type'] === 'measurement' && $min !== null && (float) $max < (float) $min) {
+                    throw ValidationException::withMessages(['lines' => 'Nilai maksimum harus sama dengan atau lebih besar dari nilai minimum.']);
                 }
                 if ($line['type'] === 'variable' && empty($line['variable_id'])) {
                     throw ValidationException::withMessages(['lines' => 'Baris variabel harus memilih variabel checklist.']);
                 }
+                if ($line['type'] === 'template' && empty($line['nested_template_id'])) {
+                    throw ValidationException::withMessages(['lines' => 'Baris template harus memilih template checklist.']);
+                }
                 DB::table('m_maintenance_checklist_template_line')->insert([
                     'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'template_id' => $templateId,
                     'line_number' => $line['line_number'], 'type' => $line['type'], 'variable_id' => $line['variable_id'] ?? null,
-                    'nested_template_id' => $line['nested_template_id'] ?? null, 'unit' => $line['unit'] ?? null,
+                    'nested_template_id' => $line['nested_template_id'] ?? null,
+                    'unit_id' => $line['type'] === 'measurement' ? ($line['unit_id'] ?? null) : null,
+                    'unit' => $line['type'] === 'measurement' && ! empty($line['unit_id']) ? ($unitCodes[(string) $line['unit_id']] ?? null) : null,
+                    'min_value' => $line['type'] === 'measurement' ? $min : null,
+                    'max_value' => $line['type'] === 'measurement' ? $max : null,
                     'nama' => trim($line['nama']),
                     'instruksi' => trim((string) ($line['instruksi'] ?? '')) === '' ? null : trim((string) $line['instruksi']),
                     // Baris judul hanya memberi struktur dan tidak pernah diisi teknisi,
@@ -174,6 +193,24 @@ final class MaintenanceSetupLinkController extends Controller
         });
 
         return $this->templateLines($request, $templateId);
+    }
+
+    /** @param list<array<string, mixed>> $lines @return array<string, string> */
+    private function measurementUnitCodes(string $tenant, array $lines): array
+    {
+        $ids = collect($lines)
+            ->filter(fn (array $line): bool => ($line['type'] ?? null) === 'measurement' && ! empty($line['unit_id']))
+            ->pluck('unit_id')->map(fn ($id): string => (string) $id)->unique()->values()->all();
+        if ($ids === []) {
+            return [];
+        }
+
+        try {
+            return collect(app(UnitOfMeasureClient::class)->resolve($tenant, $ids))
+                ->mapWithKeys(fn (array $unit, string $id): array => [$id => $unit['code']])->all();
+        } catch (\RuntimeException) {
+            throw ValidationException::withMessages(['lines' => 'Satuan tidak ditemukan, tidak aktif, atau belum dapat diperiksa.']);
+        }
     }
 
     private function assetTypeTransfer(string $tenant, string $id, string $column): array

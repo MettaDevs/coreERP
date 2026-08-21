@@ -250,6 +250,48 @@ class WorkOrderExecutionTest extends TestCase
         $this->assertDatabaseHas('tr_pemeliharaan_aset_details', ['id' => $jobId, 'hasil' => 'lulus']);
     }
 
+    public function test_pengukuran_di_luar_rentang_template_menjadi_gagal(): void
+    {
+        $workOrder = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $baris = DB::table('tr_pemeliharaan_aset_checklist')
+            ->where('pemeliharaan_aset_detail_id', $jobId)->orderBy('line_number')->get()->keyBy('tipe');
+
+        $this->simpanChecklist($workOrder['id'], $jobId, [
+            ['id' => $baris['measurement']->id, 'nilai' => '40'],
+            ['id' => $baris['variable']->id, 'nilai' => 'Baik'],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('tr_pemeliharaan_aset_checklist', [
+            'id' => $baris['measurement']->id, 'result_code' => 'fail', 'min_value' => 30, 'max_value' => 35,
+        ]);
+    }
+
+    public function test_hasil_tidak_dinilai_mewajibkan_catatan_dan_tidak_menjadi_lulus(): void
+    {
+        DB::table('m_maintenance_checklist_variable_value')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'variable_id' => $this->masters()['variable'],
+            'line_number' => 4, 'value' => 'Belum dapat diperiksa', 'result_code' => 'none',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $workOrder = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $baris = DB::table('tr_pemeliharaan_aset_checklist')
+            ->where('pemeliharaan_aset_detail_id', $jobId)->orderBy('line_number')->get()->keyBy('tipe');
+
+        $this->simpanChecklist($workOrder['id'], $jobId, [
+            ['id' => $baris['measurement']->id, 'nilai' => '32'],
+            ['id' => $baris['variable']->id, 'nilai' => 'Belum dapat diperiksa'],
+        ])->assertUnprocessable()->assertJsonValidationErrors('baris');
+
+        $this->simpanChecklist($workOrder['id'], $jobId, [
+            ['id' => $baris['measurement']->id, 'nilai' => '32'],
+            ['id' => $baris['variable']->id, 'nilai' => 'Belum dapat diperiksa', 'catatan_teknisi' => 'Kendaraan tidak dapat dinyalakan.'],
+        ])->assertOk();
+        $this->pindah($workOrder['id'], 'selesai', 3)->assertOk();
+        $this->assertDatabaseHas('tr_pemeliharaan_aset_details', ['id' => $jobId, 'hasil' => 'tidak_dinilai']);
+    }
+
     public function test_nilai_di_luar_pilihan_variabel_ditolak_dan_yang_sah_menyimpan_result_code(): void
     {
         $workOrder = $this->siapDikerjakan();
@@ -287,6 +329,15 @@ class WorkOrderExecutionTest extends TestCase
             'sebab_kerusakan_id' => $sebab,
             'tindakan_perbaikan_id' => $tindakan,
         ]);
+
+        DB::table('m_sebab_kerusakan')->where('id', $sebab)->update(['aktif' => false, 'deleted_at' => now()]);
+        DB::table('m_tindakan_perbaikan')->where('id', $tindakan)->update(['aktif' => false, 'deleted_at' => now()]);
+
+        $this->withHeaders($this->headers(self::SEMUA, 'montir-1'))
+            ->getJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'])
+            ->assertOk()
+            ->assertJsonPath('data.details.0.sebab_kerusakan_nama', 'Ban aus')
+            ->assertJsonPath('data.details.0.tindakan_perbaikan_nama', 'Ganti ban');
     }
 
     public function test_checklist_hanya_dapat_diisi_saat_pekerjaan_sedang_dikerjakan(): void
@@ -298,6 +349,28 @@ class WorkOrderExecutionTest extends TestCase
 
         $this->simpanChecklist($workOrder['id'], $jobId, [['id' => $baris->id, 'nilai' => '32']])
             ->assertUnprocessable();
+    }
+
+    public function test_pilihan_lainnya_mewajibkan_dan_menyimpan_keterangan(): void
+    {
+        $workOrder = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $sebab = $this->master('m_sebab_kerusakan', 'Lainnya', 'SBKR-LAIN');
+        DB::table('m_sebab_kerusakan')->where('id', $sebab)->update(['minta_keterangan' => true]);
+
+        $request = fn (?string $keterangan) => $this->withHeaders($this->headers(self::SEMUA, 'montir-1'))
+            ->patchJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/execution', [
+                'sebab_kerusakan_id' => $sebab,
+                'sebab_kerusakan_keterangan' => $keterangan,
+            ]);
+
+        $request(null)->assertUnprocessable()->assertJsonValidationErrors('sebab_kerusakan_keterangan');
+        $request('Retak akibat benturan')->assertOk();
+        $this->assertDatabaseHas('tr_pemeliharaan_aset_details', [
+            'id' => $jobId,
+            'sebab_kerusakan_id' => $sebab,
+            'sebab_kerusakan_keterangan' => 'Retak akibat benturan',
+        ]);
     }
 
     public function test_pekerjaan_saya_hanya_menampilkan_baris_milik_pengguna_yang_sedang_berjalan(): void
@@ -420,7 +493,7 @@ class WorkOrderExecutionTest extends TestCase
             ['line_number' => 2, 'type' => 'text', 'nama' => 'Cek rem', 'wajib' => false],
         ]);
         $semai['template'] = $this->template('Perawatan ban', 'TCMA-1', [
-            ['line_number' => 1, 'type' => 'measurement', 'nama' => 'Tekanan ban depan', 'unit' => 'psi', 'wajib' => true, 'instruksi' => 'Ukur saat ban dingin.'],
+            ['line_number' => 1, 'type' => 'measurement', 'nama' => 'Tekanan ban depan', 'unit' => 'psi', 'min_value' => 30, 'max_value' => 35, 'wajib' => true, 'instruksi' => 'Ukur saat ban dingin.'],
             ['line_number' => 2, 'type' => 'variable', 'nama' => 'Kondisi alur ban', 'variable_id' => $semai['variable'], 'wajib' => true],
             ['line_number' => 3, 'type' => 'template', 'nama' => 'Rem dan roda', 'nested_template_id' => $semai['nested'], 'wajib' => false],
         ]);
@@ -435,8 +508,7 @@ class WorkOrderExecutionTest extends TestCase
     private function variabel(): string
     {
         $id = $this->master('m_maintenance_checklist_variable', 'Kondisi alur', 'VCMA-1');
-        // Hanya `pass` dan `fail` yang diterima endpoint nilai variabel, jadi fixture
-        // memakai kosakata yang sama supaya data uji tetap dapat dibuat lewat API.
+        // Hasil nilai variabel mengikuti tiga hasil F&O: `pass`, `fail`, dan `none`.
         foreach ([['Baik', 'pass', 1], ['Aus', 'fail', 2], ['Botak', 'fail', 3]] as [$nilai, $code, $urutan]) {
             DB::table('m_maintenance_checklist_variable_value')->insert([
                 'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'variable_id' => $id,
@@ -456,7 +528,7 @@ class WorkOrderExecutionTest extends TestCase
             DB::table('m_maintenance_checklist_template_line')->insert([
                 'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'template_id' => $id,
                 'line_number' => $line['line_number'], 'type' => $line['type'], 'nama' => $line['nama'],
-                'unit' => $line['unit'] ?? null, 'variable_id' => $line['variable_id'] ?? null,
+                'unit' => $line['unit'] ?? null, 'min_value' => $line['min_value'] ?? null, 'max_value' => $line['max_value'] ?? null, 'variable_id' => $line['variable_id'] ?? null,
                 'instruksi' => $line['instruksi'] ?? null,
                 'nested_template_id' => $line['nested_template_id'] ?? null, 'wajib' => $line['wajib'],
                 'created_at' => now(), 'updated_at' => now(),
@@ -472,6 +544,7 @@ class WorkOrderExecutionTest extends TestCase
         $id = (string) Str::ulid();
         DB::table('tr_penerimaan_aset')->insert([
             'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => 'AST-WO-1',
+            'nama' => 'Aset work order eksekusi',
             'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
             'group_aset_id' => $semai['group'], 'jenis_aset_id' => $semai['jenis'],
             'acquired_on' => '2026-08-01', 'acquisition_value' => 250000000, 'currency_code' => 'IDR',

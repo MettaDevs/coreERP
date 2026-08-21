@@ -111,19 +111,19 @@
   delete: {tags: [Master data], operationId: archiveTrade, responses: {'204': {description: Bidang keahlian diarsipkan}}}
 /api/v1/sebab-kerusakan:
   get: {tags: [Master data], operationId: listSebabKerusakan, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar sebab kerusakan, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanList'}}}}}}
-  post: {tags: [Master data], operationId: createSebabKerusakan, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Sebab kerusakan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanResponse'}}}}}}
+  post: {tags: [Master data], operationId: createSebabKerusakan, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/FaultChoiceCreate'}}}}, responses: {'201': {description: Sebab kerusakan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanResponse'}}}}}}
 /api/v1/sebab-kerusakan/{id}:
   parameters: [$ref: '#/components/parameters/RecordId']
   get: {tags: [Master data], operationId: getSebabKerusakan, responses: {'200': {description: Sebab kerusakan, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanResponse'}}}}}}
-  patch: {tags: [Master data], operationId: updateSebabKerusakan, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Sebab kerusakan diubah, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateSebabKerusakan, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/FaultChoicePatch'}}}}, responses: {'200': {description: Sebab kerusakan diubah, content: {application/json: {schema: {$ref: '#/components/schemas/SebabKerusakanResponse'}}}}}}
   delete: {tags: [Master data], operationId: archiveSebabKerusakan, responses: {'204': {description: Sebab kerusakan diarsipkan}}}
 /api/v1/tindakan-perbaikan:
   get: {tags: [Master data], operationId: listTindakanPerbaikan, parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage'], responses: {'200': {description: Daftar tindakan perbaikan, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanList'}}}}}}
-  post: {tags: [Master data], operationId: createTindakanPerbaikan, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterCreate'}}}}, responses: {'201': {description: Tindakan perbaikan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanResponse'}}}}}}
+  post: {tags: [Master data], operationId: createTindakanPerbaikan, parameters: [$ref: '#/components/parameters/IdempotencyKey'], requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/FaultChoiceCreate'}}}}, responses: {'201': {description: Tindakan perbaikan dibuat, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanResponse'}}}}}}
 /api/v1/tindakan-perbaikan/{id}:
   parameters: [$ref: '#/components/parameters/RecordId']
   get: {tags: [Master data], operationId: getTindakanPerbaikan, responses: {'200': {description: Tindakan perbaikan, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanResponse'}}}}}}
-  patch: {tags: [Master data], operationId: updateTindakanPerbaikan, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MasterPatch'}}}}, responses: {'200': {description: Tindakan perbaikan diubah, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanResponse'}}}}}}
+  patch: {tags: [Master data], operationId: updateTindakanPerbaikan, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/FaultChoicePatch'}}}}, responses: {'200': {description: Tindakan perbaikan diubah, content: {application/json: {schema: {$ref: '#/components/schemas/TindakanPerbaikanResponse'}}}}}}
   delete: {tags: [Master data], operationId: archiveTindakanPerbaikan, responses: {'204': {description: Tindakan perbaikan diarsipkan}}}
 /api/v1/maintenance-job-types/{id}/variants:
   parameters: [$ref: '#/components/parameters/RecordId']
@@ -138,12 +138,12 @@
   put: {tags: [Master data], operationId: replaceJenisAsetMaintenanceJobTypes, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [jenis_aset_ids], properties: {jenis_aset_ids: {type: array, items: {$ref: '#/components/schemas/Ulid'}}}}}}}, responses: {'200': {description: Relasi disimpan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
 /api/v1/maintenance-checklist-variables/{id}/values:
   parameters: [$ref: '#/components/parameters/RecordId']
-  get: {tags: [Master data], operationId: getChecklistVariableValues, responses: {'200': {description: Nilai variabel, content: {application/json: {schema: {type: object}}}}}}
-  put: {tags: [Master data], operationId: replaceChecklistVariableValues, requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'200': {description: Nilai variabel disimpan, content: {application/json: {schema: {type: object}}}}}}
+  get: {tags: [Master data], operationId: getChecklistVariableValues, responses: {'200': {description: Nilai variabel, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistVariableValueList'}}}}}}
+  put: {tags: [Master data], operationId: replaceChecklistVariableValues, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistVariableValueReplace'}}}}, responses: {'200': {description: Nilai variabel disimpan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistVariableValueList'}}}}}}
 /api/v1/maintenance-checklist-templates/{id}/lines:
   parameters: [$ref: '#/components/parameters/RecordId']
-  get: {tags: [Master data], operationId: getChecklistTemplateLines, responses: {'200': {description: Baris checklist, content: {application/json: {schema: {type: object}}}}}}
-  put: {tags: [Master data], operationId: replaceChecklistTemplateLines, requestBody: {required: true, content: {application/json: {schema: {type: object}}}}, responses: {'200': {description: Baris checklist disimpan, content: {application/json: {schema: {type: object}}}}}}
+  get: {tags: [Master data], operationId: getChecklistTemplateLines, responses: {'200': {description: Baris checklist, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistTemplateLineList'}}}}}}
+  put: {tags: [Master data], operationId: replaceChecklistTemplateLines, requestBody: {required: true, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistTemplateLineReplace'}}}}, responses: {'200': {description: Baris checklist disimpan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceChecklistTemplateLineList'}}}}}}
 /api/v1/validasi-status-work-order:
   get:
     tags: [Master data]

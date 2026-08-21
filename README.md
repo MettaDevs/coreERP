@@ -35,6 +35,10 @@ tersedia adalah **Jenis pekerjaan maintenance**, **Default jenis pekerjaan maint
 dapat mengatur varian, skill/sertifikat, serta relasinya dengan jenis aset; dari detail
 variabel dan template, pengguna dapat mengatur pilihan dan baris checklist.
 
+Baris template dapat berupa header, teks, pengukuran, variabel, atau template lain. Untuk
+pengukuran, satuan dipilih dari CoreERP; batas minimum dan maksimum opsional ikut disalin ke
+work order dan menghasilkan gagal bila angka yang diisi berada di luar rentang.
+
 Transaksi maintenance seperti maintenance request, work order, maintenance plan,
 scheduling, dan fault belum termasuk dalam versi ini. Tombol Forecast, Tools, dan Work
 description juga belum ditampilkan karena model bisnisnya belum tersedia.
@@ -45,6 +49,11 @@ jalankan perintah berikut dari container API tanpa mengganti data custom yang su
 ```text
 php artisan management-aset:seed-maintenance --tenant=<tenant_id> --template-key=id:maintenance:starter:v1
 ```
+
+Starter tidak mengisi **Sebab kerusakan** dan **Tindakan perbaikan** karena keduanya
+merupakan kosakata operasional milik tenant. Pada kedua master tersebut, aktifkan
+**Minta keterangan saat dipilih** untuk pilihan seperti **Lainnya**. Saat pilihan itu
+dipakai, mekanik wajib menuliskan rincian pada baris pekerjaan.
 
 Starter juga menyediakan katalog awal Indonesia–Asia untuk layar **Pabrikan dan model**:
 68 pabrikan dan 209 model/seri yang umum dipakai pada kendaraan, alat berat, forklift,
@@ -83,7 +92,6 @@ Sebagian master membawa kolom sendiri di luar `kode`/`nama`/`keterangan`/`aktif`
 | `property_type` | Masuk neraca atau tidak: aset tetap, barang inventaris, atau lainnya. Padanan `Property type` di F&O |
 | `asset_location_id` | Lokasi bawaan saat aset diterima; hanya nilai awal, tidak pernah dibaca ulang |
 | `capitalization_threshold` | Di bawah nilai ini aset tetap dicatat, tetapi bukunya tidak menyusut |
-| `posting_layers` | Lapisan pembukuan yang boleh dipakai group ini |
 
 Sifat harta — berwujud, tidak berwujud, hak guna — sengaja tidak disimpan pada group.
 Klasifikasi itu menentukan akun, dan akun ditentukan posting profile milik Finance, bukan

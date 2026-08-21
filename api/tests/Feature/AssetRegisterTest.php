@@ -36,7 +36,7 @@ class AssetRegisterTest extends TestCase
         $response = $this->withHeaders($this->contextHeaders($this->tenantId, [
             'management-aset.aset.read', 'management-aset.aset.create', 'management-aset.aset.mutate',
         ]))->withHeader('Idempotency-Key', 'receipt-1')->postJson('/api/v1/aset', [
-            'legal_entity_id' => $legalEntity, ...$classification,
+            'legal_entity_id' => $legalEntity, 'nama' => 'Aset uji penerimaan', ...$classification,
             'acquired_on' => '2026-07-28', 'acquisition_value' => 12000000,
             'currency_code' => 'IDR', 'receiving_org_unit_id' => $receivingUnit,
             'usage_org_unit_id' => $usageUnit, 'received_by_user_id' => $receiver,
@@ -80,10 +80,10 @@ class AssetRegisterTest extends TestCase
         // benar-benar berasal dari legal entity dan operating unit.
         $scopeClassification = $this->classification();
         DB::table('tr_penerimaan_aset')->insert([
-            ['id' => $first, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-a', 'kode' => 'AST-SCOPE-A', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => $second, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-b', 'kode' => 'AST-SCOPE-B', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => $crossFirst, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-c', 'kode' => 'AST-SCOPE-C', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
-            ['id' => $crossSecond, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-d', 'kode' => 'AST-SCOPE-D', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => $first, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-a', 'kode' => 'AST-SCOPE-A', 'nama' => 'Aset scope A', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => $second, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-b', 'kode' => 'AST-SCOPE-B', 'nama' => 'Aset scope B', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => $crossFirst, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-c', 'kode' => 'AST-SCOPE-C', 'nama' => 'Aset scope C', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
+            ['id' => $crossSecond, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-d', 'kode' => 'AST-SCOPE-D', 'nama' => 'Aset scope D', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
         ]);
         $scope = ['all' => false, 'scope_grants' => [
             ['legal_entity_id' => $firstLegalEntity, 'operating_unit_ids' => [$firstUnit]],
@@ -129,6 +129,75 @@ class AssetRegisterTest extends TestCase
         $this->assertDatabaseCount('processed_core_events', 1);
     }
 
+    /**
+     * Group yang sengaja tidak disusutkan: buku tetap terbentuk sebagai baris subledger,
+     * tetapi tidak menuntut profil apa pun dan tidak menahan aset di status `received`.
+     */
+    public function test_group_without_depreciation_still_lets_the_asset_be_placed(): void
+    {
+        $classification = $this->classification();
+        $this->configureNonDepreciatingBook($classification['group_aset_id']);
+
+        $assetId = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
+            ->withHeader('Idempotency-Key', 'receipt-register-only')->postJson('/api/v1/aset', [
+                'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset tanpa penyusutan', ...$classification,
+                'acquired_on' => '2026-07-28', 'acquisition_value' => 9000000,
+                'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
+            ])->assertCreated()->json('data.id');
+
+        $this->assertDatabaseHas('tr_buku_aset', [
+            'asset_id' => $assetId, 'depreciate' => false, 'depreciation_profile_id' => null,
+        ]);
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.mutate']))
+            ->postJson('/api/v1/aset/'.$assetId.'/penempatan', [
+                'effective_on' => '2026-08-01', 'reason' => 'Penempatan awal', 'usage_org_unit_id' => (string) Str::ulid(),
+            ])->assertOk();
+    }
+
+    /**
+     * Ambang kapitalisasi memakai jalur yang sama: aset murah tidak menyusut, dan
+     * karenanya juga tidak boleh dituntut punya profil yang berlaku saat ditempatkan.
+     */
+    public function test_asset_below_capitalization_threshold_is_placed_without_a_profile(): void
+    {
+        $classification = $this->classification();
+        $this->configureNonDepreciatingBook($classification['group_aset_id'], depreciate: true);
+        DB::table('m_group_aset')
+            ->where(['tenant_id' => $this->tenantId, 'id' => $classification['group_aset_id']])
+            ->update(['capitalization_threshold' => 1000000]);
+
+        $assetId = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
+            ->withHeader('Idempotency-Key', 'receipt-below-threshold')->postJson('/api/v1/aset', [
+                'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset di bawah ambang', ...$classification,
+                'acquired_on' => '2026-07-28', 'acquisition_value' => 400000,
+                'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
+            ])->assertCreated()->json('data.id');
+
+        $this->assertDatabaseHas('tr_buku_aset', ['asset_id' => $assetId, 'depreciate' => false]);
+
+        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.mutate']))
+            ->postJson('/api/v1/aset/'.$assetId.'/penempatan', [
+                'effective_on' => '2026-08-01', 'reason' => 'Penempatan awal', 'usage_org_unit_id' => (string) Str::ulid(),
+            ])->assertOk();
+    }
+
+    /** Buku tanpa profil yang memang menghitung tetap ditolak; pagar itu tidak ikut dilepas. */
+    public function test_depreciating_book_without_a_profile_still_blocks_placement(): void
+    {
+        $classification = $this->classification();
+        $this->configureNonDepreciatingBook($classification['group_aset_id'], depreciate: true);
+
+        $assetId = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
+            ->withHeader('Idempotency-Key', 'receipt-missing-profile')->postJson('/api/v1/aset', [
+                'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset tanpa profil', ...$classification,
+                'acquired_on' => '2026-07-28', 'acquisition_value' => 9000000,
+                'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
+            ])->assertStatus(422)->json('data.id');
+
+        $this->assertNull($assetId);
+    }
+
     private function receive(): string
     {
         $classification = $this->classification();
@@ -136,7 +205,7 @@ class AssetRegisterTest extends TestCase
 
         return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
             ->withHeader('Idempotency-Key', 'receipt-test')->postJson('/api/v1/aset', [
-                'legal_entity_id' => (string) Str::ulid(), ...$classification,
+                'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset uji', ...$classification,
                 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
             ])->assertCreated()->json('data.id');
     }
@@ -178,6 +247,28 @@ class AssetRegisterTest extends TestCase
             'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'group_aset_id' => $groupId,
             'buku_id' => $book, 'depreciate' => true, 'useful_life_periods' => 12,
             'convention' => 'full_month', 'created_at' => $now, 'updated_at' => $now,
+        ]);
+    }
+
+    /**
+     * Buku tanpa profil sama sekali. `depreciate` dibiarkan dapat dinyalakan supaya test
+     * yang sama dapat menguji dua sisi pagar: buku yang memang tidak menghitung, dan
+     * buku yang menghitung tetapi profilnya belum dipilih.
+     */
+    private function configureNonDepreciatingBook(string $groupId, bool $depreciate = false): void
+    {
+        $now = now();
+        $book = (string) Str::ulid();
+        DB::table('m_buku_penyusutan')->insert([
+            'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-register-'.Str::ulid(),
+            'kode' => 'B'.Str::random(8), 'nama' => 'Buku register', 'aktif' => true,
+            'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => null,
+            'created_at' => $now, 'updated_at' => $now,
+        ]);
+        DB::table('m_group_buku_penyusutan')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'group_aset_id' => $groupId,
+            'buku_id' => $book, 'depreciate' => $depreciate, 'useful_life_periods' => null,
+            'convention' => null, 'created_at' => $now, 'updated_at' => $now,
         ]);
     }
 }

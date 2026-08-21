@@ -536,16 +536,6 @@ GroupAsetFields:
       - string
       - 'null'
       format: decimal
-    posting_layers:
-      description: Lapisan pembukuan yang boleh dipakai group ini.
-      type: array
-      items:
-        type: string
-        enum:
-        - current
-        - operations
-        - tax
-        - none
 GroupAset:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -840,6 +830,38 @@ MaintenanceChecklistVariableList:
   type: object
   required: [data, meta]
   properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistVariable'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenanceChecklistVariableValue:
+  type: object
+  required: [id, line_number, value, result_code]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    line_number: {type: number, minimum: 1}
+    value: {type: string, maxLength: 255}
+    result_code:
+      type: string
+      enum: [pass, fail, none]
+      description: '`none` berarti pemeriksaan telah dicatat tetapi belum dapat dinilai lulus atau gagal.'
+MaintenanceChecklistVariableValueReplace:
+  type: object
+  required: [values]
+  properties:
+    values:
+      type: array
+      maxItems: 100
+      items:
+        type: object
+        required: [line_number, value, result_code]
+        properties:
+          line_number: {type: number, minimum: 1}
+          value: {type: string, maxLength: 255}
+          result_code: {type: string, enum: [pass, fail, none]}
+MaintenanceChecklistVariableValueList:
+  type: object
+  required: [data]
+  properties:
+    data:
+      type: array
+      items: {$ref: '#/components/schemas/MaintenanceChecklistVariableValue'}
 MaintenanceChecklistTemplate:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -853,6 +875,47 @@ MaintenanceChecklistTemplateList:
   type: object
   required: [data, meta]
   properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistTemplate'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+MaintenanceChecklistTemplateLine:
+  type: object
+  required: [id, line_number, type, nama, wajib]
+  properties:
+    id: {$ref: '#/components/schemas/Ulid'}
+    line_number: {type: number, minimum: 1}
+    type: {type: string, enum: [header, text, measurement, variable, template]}
+    nama: {type: string, maxLength: 255}
+    instruksi: {type: [string, 'null'], maxLength: 2000}
+    wajib: {type: boolean}
+    variable_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    nested_template_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    unit_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+    unit: {type: [string, 'null'], maxLength: 40}
+    min_value: {type: [number, 'null']}
+    max_value: {type: [number, 'null']}
+MaintenanceChecklistTemplateLineList:
+  type: object
+  required: [data]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistTemplateLine'}}}
+MaintenanceChecklistTemplateLineReplace:
+  type: object
+  required: [lines]
+  properties:
+    lines:
+      type: array
+      maxItems: 100
+      items:
+        type: object
+        required: [line_number, type, nama]
+        properties:
+          line_number: {type: number, minimum: 1}
+          type: {type: string, enum: [header, text, measurement, variable, template]}
+          nama: {type: string, maxLength: 255}
+          instruksi: {type: [string, 'null'], maxLength: 2000}
+          wajib: {type: boolean}
+          variable_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+          nested_template_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+          unit_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
+          min_value: {type: [number, 'null']}
+          max_value: {type: [number, 'null']}
 TipeWorkOrder:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -890,22 +953,41 @@ TradeList:
   type: object
   required: [data, meta]
   properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+FaultChoice:
+  allOf:
+  - $ref: '#/components/schemas/MasterRecord'
+  - type: object
+    required: [minta_keterangan]
+    properties:
+      minta_keterangan:
+        type: boolean
+        description: Jika benar, mekanik wajib mengisi keterangan bebas ketika pilihan ini dipakai.
+FaultChoiceCreate:
+  allOf:
+  - $ref: '#/components/schemas/MasterCreate'
+  - type: object
+    properties: {minta_keterangan: {type: boolean, default: false}}
+FaultChoicePatch:
+  allOf:
+  - $ref: '#/components/schemas/MasterPatch'
+  - type: object
+    properties: {minta_keterangan: {type: boolean}}
 SebabKerusakanResponse:
   type: object
   required: [data]
-  properties: {data: {$ref: '#/components/schemas/MasterRecord'}}
+  properties: {data: {$ref: '#/components/schemas/FaultChoice'}}
 SebabKerusakanList:
   type: object
   required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/FaultChoice'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
 TindakanPerbaikanResponse:
   type: object
   required: [data]
-  properties: {data: {$ref: '#/components/schemas/MasterRecord'}}
+  properties: {data: {$ref: '#/components/schemas/FaultChoice'}}
 TindakanPerbaikanList:
   type: object
   required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/FaultChoice'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
 MaintenanceTransferResponse:
   type: object
   required: [data]

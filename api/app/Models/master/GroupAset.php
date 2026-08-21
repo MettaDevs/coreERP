@@ -23,15 +23,12 @@ class GroupAset extends MasterData
      */
     public const PROPERTY_TYPE = ['fixed_asset', 'inventory_item', 'other'];
 
-    /** Lapisan pembukuan; `none` berarti buku memorandum yang tidak posting ke GL. */
-    public const POSTING_LAYERS = ['current', 'operations', 'tax', 'none'];
-
     protected $table = 'm_group_aset';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',
         'kelompok_harta_fiskal_id', 'property_type', 'asset_location_id',
-        'capitalization_threshold', 'posting_layers',
+        'capitalization_threshold',
     ];
 
     protected function casts(): array

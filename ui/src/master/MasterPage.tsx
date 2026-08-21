@@ -289,7 +289,13 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
                     parentOptions={parentOptions}
                     parentOptionsError={parentOptionsError}
                     onClose={() => setEditing(undefined)}
-                    onSaved={() => { setEditing(undefined); load(); }}
+                    key={editing?.id ?? 'baru'}
+                    onSaved={(savedRecord, created) => {
+                        // Setelah POST, tetap buka record dengan respons lengkap agar kode
+                        // otomatis dan nama langsung terlihat tanpa membuka form dua kali.
+                        setEditing(created ? savedRecord : undefined);
+                        void load();
+                    }}
                     extraSection={editing ? extraSectionFor(config.resource, editing, can('update')) : undefined}
                 />
             )}
