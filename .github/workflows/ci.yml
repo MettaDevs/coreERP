@@ -19,6 +19,6 @@ permissions:
 
 jobs:
   checks:
-    uses: MettaDevs/app-erp-ci-workflows/.github/workflows/app-checks.yml@8a718213c5568e1f99e8661d18235585d9546168
+    uses: MettaDevs/app-erp-ci-workflows/.github/workflows/app-checks.yml@1a1085e1257fada0e8c9c1f731368360a3fd4d6e
     with:
       profile: ${{ inputs.profile || 'auto' }}
