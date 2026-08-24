@@ -91,6 +91,7 @@ class RegisterAppManifestCommand extends Command
             $request->numberSequenceReferencesPayload(),
             $request->workflowTypesPayload(),
             $request->dataPoliciesPayload(),
+            $request->dependenciesPayload(),
         );
 
         $this->components->info(sprintf(
@@ -131,6 +132,7 @@ class RegisterAppManifestCommand extends Command
             'navigation' => $manifest['ui']['navigation'] ?? null,
             'repository_url' => $this->stringOption('repository-url') ?? ($manifest['repository_url'] ?? null),
             'contract_url' => $this->stringOption('contract-url') ?? ($manifest['contract_url'] ?? null),
+            'dependsOn' => $manifest['dependsOn'] ?? [],
             'security' => $manifest['security'] ?? [],
             'number_sequences' => $manifest['number_sequences'] ?? [],
             'workflow_types' => $manifest['workflow_types'] ?? [],
@@ -177,6 +179,7 @@ class RegisterAppManifestCommand extends Command
         $this->components->twoColumnDetail('<fg=gray>Permission</>', (string) count($security['permissions']));
         $this->components->twoColumnDetail('<fg=gray>Privilege</>', (string) count($security['privileges']));
         $this->components->twoColumnDetail('<fg=gray>Duty</>', (string) count($security['duties']));
+        $this->components->twoColumnDetail('<fg=gray>Dependency</>', (string) count($request->dependenciesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Reference nomor</>', (string) count($request->numberSequenceReferencesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Jenis workflow</>', (string) count($request->workflowTypesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Policy data</>', (string) count($request->dataPoliciesPayload()));

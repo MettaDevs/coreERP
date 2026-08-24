@@ -7,6 +7,7 @@ use App\Models\User;
 use Database\Seeders\ProviderAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 class AppCatalogManagementTest extends TestCase
@@ -157,6 +158,35 @@ class AppCatalogManagementTest extends TestCase
             ->postJson('/api/v1/provider/apps', $manifest)
             ->assertCreated()
             ->assertJsonPath('data.dependsOn.business-partner', '^1.0');
+
+        $this->assertDatabaseHas('app_dependencies', [
+            'app_id' => 'sample-app',
+            'depends_on_app_id' => 'business-partner',
+            'version_range' => '^1.0',
+        ]);
+    }
+
+    public function test_manifest_command_stores_versioned_dependencies(): void
+    {
+        $this->availableApp('business-partner', '1.2.0');
+        $path = tempnam(sys_get_temp_dir(), 'coreerp-manifest-');
+
+        try {
+            $manifest = $this->manifest([
+                'dependsOn' => ['business-partner' => '^1.0'],
+            ]);
+            $manifest['database'] = ['logical_name' => $manifest['database_name']];
+            $manifest['ui'] = ['navigation' => $manifest['navigation']];
+            unset($manifest['database_name'], $manifest['has_ui'], $manifest['navigation']);
+            file_put_contents($path, Yaml::dump($manifest, 8, 2));
+
+            $this->artisan('app:register-manifest', ['path' => $path])
+                ->assertSuccessful();
+        } finally {
+            if (is_string($path) && is_file($path)) {
+                unlink($path);
+            }
+        }
 
         $this->assertDatabaseHas('app_dependencies', [
             'app_id' => 'sample-app',
