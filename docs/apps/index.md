@@ -10,6 +10,8 @@ Halaman di bagian ini bersifat **teknis dan internal** — ditujukan untuk devel
 | --- | --- | --- | --- | --- |
 | [Management Aset](/apps/management-aset/) | `management-aset` | `app-erp-management-aset` | `management_aset` | Release pengembangan `0.1.0` |
 | [Human Resources](/apps/human-resources/) | `human-resources` | `app-erp-hr` | `human_resources` | Release pengembangan `0.1.0` |
+| [Business Partner](/apps/business-partner/) | `business-partner` | `app-erp-business-partner` | `app_erp_business_partner` | Fondasi release pengembangan `0.1.0` |
+| [Procurement](/apps/procurement/) | `procurement` | `app-erp-procurement` | `app_erp_procurement` | Fondasi release pengembangan `0.1.0` |
 | Template app | `change-me` | `app-erp-template` | — | Titik mulai app baru |
 
 ::: warning Nama repository ≠ nama folder
