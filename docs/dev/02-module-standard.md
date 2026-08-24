@@ -158,6 +158,29 @@ Nama key manifest sama persis dengan payload API katalog Core, sehingga `app.yam
 
 Setiap app memiliki owner yang bertanggung jawab atas code review, contract, database, release, rollback, dan incident app tersebut. Core Platform memiliki `core_erp`. Setiap app resmi memiliki database dengan pola `app_erp_<app>`, misalnya `app_erp_procurement` dan `app_erp_management_aset`; addon memakai `addon_<publisher>_<app>`. Setiap database mempunyai database user/secret sendiri. Tidak ada foreign key, Eloquent relation, atau query langsung lintas database.
 
+### Nama tabel
+
+Nama tabel memakai `snake_case` dan menyatakan jenis data, bukan nama layar atau
+nama controller. Setiap tabel app memakai salah satu bentuk berikut:
+
+| Bentuk | Dipakai untuk | Contoh |
+| --- | --- | --- |
+| `m_<resource>` | Master, reference, setup, konfigurasi, atau tabel relasi milik master yang bukan fakta transaksi mandiri. | `m_group_aset`, `m_jenis_aset_atribut` |
+| `tr_<transaction>` | Header atau fakta transaksi mandiri. | `tr_penerimaan_aset` |
+| `tr_<transaction>_details` | Baris/detail yang selalu dimiliki satu header transaksi. Bentuk ini selalu jamak: `_details`, bukan `_detail`. | `tr_perencanaan_aset_details` |
+| `tr_<aggregate>_<record>` | Catatan transaksi turunan yang bukan daftar baris header, misalnya nilai atribut, log, atau fakta operasional lain milik aggregate transaksi. | `tr_aset_atribut` |
+
+`m_` bukan berarti setiap tabelnya adalah master yang mendapat menu, permission,
+atau Number Sequence sendiri. Tabel konfigurasi dan relasi—misalnya
+`m_jenis_aset_atribut`—tetap memakai `m_` bila ia bukan fakta transaksi mandiri.
+Sebaliknya, tabel `tr_` harus menyimpan fakta proses bisnis; jangan memakai `tr_`
+untuk sekadar cache atau data tampilan.
+
+Nama tidak memakai bentuk generik atau ambigu seperti `tbl_aset`, `aset_data`, atau
+`transaction_aset`. Jika suatu tabel baru tidak cocok dengan empat bentuk di atas,
+putusan naming-nya dibuat pada proposal app sebelum migration ditulis; jangan
+menciptakan prefix baru diam-diam.
+
 Di dalam database sendiri, app boleh memakai transaksi, foreign key, dan table desain normal. Semua tabel tenant-scoped membawa `tenant_id`; data dengan konsekuensi hukum/akuntansi membawa `legal_entity_id`; data operasional membawa `org_unit_id` bila ownership terjadi pada operating unit. ID organisasi adalah reference opaque ke Organization service, bukan foreign key lintas database. Lihat [model tenant dan organisasi](01a-tenant-and-org-hierarchy.md).
 
 ## Contract dan dependency

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0" pages="1">
+  <diagram id="cicd-polyrepo" name="CI-CD Polyrepo">
+    <mxGraphModel dx="1900" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="CoreERP CI/CD polyrepo — build once, promote by digest" style="text;html=1;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;" vertex="1" parent="1"><mxGeometry x="300" y="20" width="1000" height="50" as="geometry" /></mxCell>
+
+        <mxCell id="source-zone" value="1. Source dan review" style="swimlane;startSize=36;rounded=1;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontStyle=1;container=1;collapsible=0;" vertex="1" parent="1"><mxGeometry x="40" y="90" width="1520" height="170" as="geometry" /></mxCell>
+        <mxCell id="developer" value="Developer\nshort-lived branch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="source-zone"><mxGeometry x="50" y="60" width="220" height="70" as="geometry" /></mxCell>
+        <mxCell id="forgejo" value="Forgejo LTS\nPR • review • branch protection" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;fontStyle=1;" vertex="1" parent="source-zone"><mxGeometry x="370" y="60" width="260" height="70" as="geometry" /></mxCell>
+        <mxCell id="app-repos" value="Repository app\nAPI • UI • DB • contracts • app.yaml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="source-zone"><mxGeometry x="740" y="60" width="300" height="70" as="geometry" /></mxCell>
+        <mxCell id="release-repo" value="Repository product release\nmanifest kombinasi digest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" vertex="1" parent="source-zone"><mxGeometry x="1150" y="60" width="300" height="70" as="geometry" /></mxCell>
+
+        <mxCell id="runner-zone" value="2. Runner trust zones — host terpisah dari production" style="swimlane;startSize=36;rounded=1;html=1;fillColor=#f5f5f5;strokeColor=#9673a6;fontStyle=1;container=1;collapsible=0;" vertex="1" parent="1"><mxGeometry x="40" y="290" width="1520" height="190" as="geometry" /></mxCell>
+        <mxCell id="check-runner" value="ci-check pool\nPR tanpa release secret\nvalidate • test • contract" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;" vertex="1" parent="runner-zone"><mxGeometry x="90" y="60" width="300" height="90" as="geometry" /></mxCell>
+        <mxCell id="build-runner" value="ci-build pool\nprotected main\nbuild • scan • SBOM • push" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;" vertex="1" parent="runner-zone"><mxGeometry x="610" y="60" width="300" height="90" as="geometry" /></mxCell>
+        <mxCell id="release-runner" value="ci-release pool\nprotected release ref\nverify • sign • promote" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=14;" vertex="1" parent="runner-zone"><mxGeometry x="1130" y="60" width="300" height="90" as="geometry" /></mxCell>
+
+        <mxCell id="artifact-zone" value="3. Artifact dan release truth" style="swimlane;startSize=36;rounded=1;html=1;fillColor=#f5f5f5;strokeColor=#82b366;fontStyle=1;container=1;collapsible=0;" vertex="1" parent="1"><mxGeometry x="40" y="510" width="1520" height="190" as="geometry" /></mxCell>
+        <mxCell id="harbor" value="Harbor OCI registry\nimmutable image digest\nscan • SBOM • signature" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;fontStyle=1;" vertex="1" parent="artifact-zone"><mxGeometry x="90" y="55" width="300" height="105" as="geometry" /></mxCell>
+        <mxCell id="component-manifest" value="Component release manifest\nversi satu app → digest API/UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" vertex="1" parent="artifact-zone"><mxGeometry x="610" y="65" width="300" height="85" as="geometry" /></mxCell>
+        <mxCell id="product-manifest" value="Signed product release manifest\nkombinasi component digest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" vertex="1" parent="artifact-zone"><mxGeometry x="1130" y="65" width="300" height="85" as="geometry" /></mxCell>
+
+        <mxCell id="deploy-zone" value="4. Promotion dan customer delivery" style="swimlane;startSize=36;rounded=1;html=1;fillColor=#f5f5f5;strokeColor=#d79b00;fontStyle=1;container=1;collapsible=0;" vertex="1" parent="1"><mxGeometry x="40" y="730" width="1520" height="250" as="geometry" /></mxCell>
+        <mxCell id="dokploy" value="Dokploy\nexecutor Compose by digest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;fontStyle=1;" vertex="1" parent="deploy-zone"><mxGeometry x="70" y="85" width="230" height="80" as="geometry" /></mxCell>
+        <mxCell id="dev" value="Dev\nsame digest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" vertex="1" parent="deploy-zone"><mxGeometry x="390" y="85" width="190" height="80" as="geometry" /></mxCell>
+        <mxCell id="staging" value="Staging\napproval + same digest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" vertex="1" parent="deploy-zone"><mxGeometry x="660" y="85" width="220" height="80" as="geometry" /></mxCell>
+        <mxCell id="production" value="Production\napproval + same digest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" vertex="1" parent="deploy-zone"><mxGeometry x="960" y="85" width="220" height="80" as="geometry" /></mxCell>
+        <mxCell id="onprem" value="On-prem customer\nsigned offline bundle\nlocal install registry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" vertex="1" parent="deploy-zone"><mxGeometry x="1260" y="75" width="220" height="100" as="geometry" /></mxCell>
+
+        <mxCell id="e-dev-forgejo" value="push / PR" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="developer" target="forgejo"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-app-forgejo" value="reviewed commit" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="forgejo" target="app-repos"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-forgejo-check" value="PR" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="forgejo" target="check-runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-app-build" value="protected main" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="app-repos" target="build-runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-build-harbor" value="push once" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="build-runner" target="harbor"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-harbor-component" value="digest" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="harbor" target="component-manifest"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-component-release" value="update PR" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="component-manifest" target="release-repo"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-release-runner" value="approved release" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="release-repo" target="release-runner"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-release-product" value="sign" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="release-runner" target="product-manifest"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-product-dokploy" value="exact digests" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="product-manifest" target="dokploy"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dokploy-dev" value="auto" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="dokploy" target="dev"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-dev-staging" value="promote" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="dev" target="staging"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-staging-prod" value="promote" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="staging" target="production"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e-product-onprem" value="signed bundle" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="1" source="product-manifest" target="onprem"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="note" value="Scale-out: tambah instance pada pool runner yang sama. Label runner bukan boundary keamanan; tiap trust zone memakai VM dan secret berbeda." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" vertex="1" parent="1"><mxGeometry x="260" y="1010" width="1080" height="55" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
