@@ -18,7 +18,10 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
 {
     use Queueable;
 
-    public int $tries = 3;
+    // Satu prerequisite dapat memakai seluruh timeout deployment-nya untuk
+    // migration dan health check. App turunan menunggu dengan release pendek,
+    // jadi tiga percobaan tidak cukup untuk menjaga urutan dependency.
+    public int $tries = 60;
 
     public int $timeout = 900;
 
@@ -41,6 +44,13 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
 
         $app = CoreApp::query()->where('status', 'available')->findOrFail($this->appId);
         $profile = $this->entitledProfile();
+        if (! $this->dependenciesAreReady()) {
+            // Pekerjaan dependency sudah dijadwalkan lebih dulu oleh onboarding.
+            // Guard ini tetap wajib karena queue bisa menjalankan job paralel.
+            $this->release(30);
+
+            return;
+        }
         $placementQuery = DB::table('app_placements')
             ->where('app_id', $app->id)
             ->where('placement', $this->placement);
@@ -99,7 +109,7 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
 
         $stage = 'validation';
         try {
-            $release = $this->release($app);
+            $release = $this->releaseArtifact($app);
             $process = Process::path($release['deploy_path'])->timeout(600);
             $base = ['docker', 'compose', '--project-name', $release['project'], '--file', $release['compose_file']];
 
@@ -170,8 +180,26 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
         return $deployment->profile;
     }
 
+    private function dependenciesAreReady(): bool
+    {
+        return ! DB::table('app_dependencies as dependencies')
+            ->leftJoin('app_placements as placements', function ($join): void {
+                $join->on('placements.app_id', '=', 'dependencies.depends_on_app_id')
+                    ->where('placements.placement', '=', $this->placement);
+            })
+            ->where('dependencies.app_id', $this->appId)
+            ->where(function ($query): void {
+                $query->whereNull('placements.id')
+                    ->orWhere('placements.artifact_status', '!=', 'placed')
+                    ->orWhere('placements.migration_status', '!=', 'succeeded')
+                    ->orWhere('placements.runtime_status', '!=', 'ready')
+                    ->orWhereNull('placements.ready_at');
+            })
+            ->doesntExist();
+    }
+
     /** @return array{deploy_path:string,compose_file:string,project:string,api_service:string,ui_service:string,db_service:string} */
-    private function release(CoreApp $app): array
+    private function releaseArtifact(CoreApp $app): array
     {
         $release = $app->releases()
             ->where('version', $app->version)

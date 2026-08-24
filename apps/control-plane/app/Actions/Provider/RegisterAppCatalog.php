@@ -9,6 +9,7 @@ use App\Models\NumberSequenceReference;
 use App\Models\Permission;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
+use App\Support\AppDependencyGraph;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -24,6 +25,8 @@ use Illuminate\Validation\ValidationException;
  */
 class RegisterAppCatalog
 {
+    public function __construct(private AppDependencyGraph $dependencyGraph) {}
+
     /**
      * @param  array{id:string,name:string,description:?string,version:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string}  $appData
      * @param  array{
@@ -35,11 +38,18 @@ class RegisterAppCatalog
      * @param  list<array{code:string,name:string,default_prefix:?string,allowed_scopes:list<string>}>  $numberSequenceReferences
      * @param  list<array{code:string,name:string,scope:string,decision_context_schema:array<string,mixed>}>  $workflowTypes
      * @param  list<array{code:string,name:string,protected_permissions:list<string>,requires_legal_entity:bool,requires_operating_unit:bool,allows_descendants:bool}>  $dataPolicies
+     * @param  array<string, string>  $dependencies
      */
-    public function handle(array $appData, array $security, array $numberSequenceReferences = [], array $workflowTypes = [], array $dataPolicies = []): CoreApp
+    public function handle(array $appData, array $security, array $numberSequenceReferences = [], array $workflowTypes = [], array $dataPolicies = [], array $dependencies = []): CoreApp
     {
-        $app = DB::transaction(function () use ($appData, $security, $numberSequenceReferences, $workflowTypes, $dataPolicies): CoreApp {
+        $app = DB::transaction(function () use ($appData, $security, $numberSequenceReferences, $workflowTypes, $dataPolicies, $dependencies): CoreApp {
+            $this->dependencyGraph->assertRegistrable($appData['id'], $appData['version'], $dependencies);
             $app = CoreApp::query()->updateOrCreate(['id' => $appData['id']], $appData);
+            $app->dependencies()->sync(
+                collect($dependencies)
+                    ->map(fn (string $versionRange): array => ['version_range' => $versionRange])
+                    ->all(),
+            );
 
             $this->guardRemovedDuties($app->id, array_column($security['duties'], 'code'));
 
@@ -100,7 +110,7 @@ class RegisterAppCatalog
                     ...($existing ? [] : ['id' => (string) Str::ulid()]),
                     'app_id' => $app->id,
                     'name' => $type['name'],
-                    'scope' => $type['scope'] ?? 'legal_entity',
+                    'scope' => $type['scope'],
                     'decision_context_schema' => json_encode($type['decision_context_schema'], JSON_THROW_ON_ERROR),
                     'updated_at' => now(), 'created_at' => now(),
                 ]);

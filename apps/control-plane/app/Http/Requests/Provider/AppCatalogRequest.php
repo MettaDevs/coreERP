@@ -51,6 +51,12 @@ class AppCatalogRequest extends FormRequest
             'repository_url' => ['nullable', 'url', 'max:2048', 'starts_with:https://'],
             'contract_url' => ['nullable', 'url', 'max:2048', 'starts_with:https://'],
 
+            // Key memakai ID app dan nilainya rentang versi. `[]` diterima untuk
+            // manifest placeholder lama, tetapi daftar ID tanpa rentang ditolak
+            // pada validasi lanjutan di bawah.
+            'dependsOn' => ['nullable', 'array'],
+            'dependsOn.*' => ['required', 'string', 'max:40', 'regex:/^(?:\^)?[0-9]+\.[0-9]+(?:\.[0-9]+)?$/'],
+
             'security' => ['required', 'array'],
 
             'security.entry_points' => ['required', 'array', 'min:1'],
@@ -114,6 +120,17 @@ class AppCatalogRequest extends FormRequest
     {
         return [function (Validator $validator): void {
             $appId = $this->string('id')->toString();
+
+            $dependencies = $this->input('dependsOn', []);
+            if (is_array($dependencies) && $dependencies !== [] && array_is_list($dependencies)) {
+                $validator->errors()->add('dependsOn', 'Dependency harus ditulis sebagai pasangan ID app dan rentang versi.');
+            }
+            foreach (is_array($dependencies) ? array_keys($dependencies) : [] as $dependencyId) {
+                if (! is_string($dependencyId) || ! preg_match('/^[a-z0-9][a-z0-9-]{0,79}$/', $dependencyId)) {
+                    $validator->errors()->add('dependsOn', 'ID dependency harus memakai huruf kecil, angka, atau tanda hubung.');
+                    break;
+                }
+            }
 
             $entryPointCodes = $this->layerCodes($validator, 'security.entry_points', $appId, 'entry point');
             $permissionCodes = $this->layerCodes($validator, 'security.permissions', $appId, 'permission');
@@ -263,7 +280,20 @@ class AppCatalogRequest extends FormRequest
         ];
     }
 
-    /** @return array{rail:list<array{id:string,label:string}>,sidebar:array<string,list<array{id:string,label:string,permission:string>>>}|null */
+    /** @return array<string, string> */
+    public function dependenciesPayload(): array
+    {
+        $dependencies = $this->input('dependsOn', []);
+        if (! is_array($dependencies) || array_is_list($dependencies)) {
+            return [];
+        }
+
+        return collect($dependencies)
+            ->mapWithKeys(fn (mixed $range, mixed $appId): array => [(string) $appId => (string) $range])
+            ->all();
+    }
+
+    /** @return array{rail:list<array{id:string,label:string}>,sidebar:array<string,list<array{id:string,label:string,permission:string}>>}|null */
     private function navigationPayload(): ?array
     {
         if (! $this->has('navigation')) {

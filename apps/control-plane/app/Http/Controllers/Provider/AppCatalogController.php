@@ -28,12 +28,13 @@ class AppCatalogController extends Controller
             $request->numberSequenceReferencesPayload(),
             $request->workflowTypesPayload(),
             $request->dataPoliciesPayload(),
+            $request->dependenciesPayload(),
         );
 
         return response()->json(['data' => $this->present($app)], $app->wasRecentlyCreated ? 201 : 200);
     }
 
-    /** @return array{id:string,name:string,description:?string,version:string,status:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string} */
+    /** @return array{id:string,name:string,description:?string,version:string,status:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,dependsOn:array<string,string>} */
     private function present(CoreApp $app): array
     {
         return [
@@ -47,6 +48,10 @@ class AppCatalogController extends Controller
             'navigation' => $app->navigation,
             'repository_url' => $app->repository_url,
             'contract_url' => $app->contract_url,
+            'dependsOn' => $app->dependencies()
+                ->pluck('app_dependencies.version_range', 'apps.id')
+                ->map(fn (mixed $versionRange): string => (string) $versionRange)
+                ->all(),
         ];
     }
 }

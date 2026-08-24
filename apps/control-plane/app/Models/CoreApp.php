@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -55,5 +56,13 @@ class CoreApp extends Model
     public function releases(): HasMany
     {
         return $this->hasMany(AppRelease::class, 'app_id');
+    }
+
+    /** @return BelongsToMany<CoreApp, $this> */
+    public function dependencies(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'app_dependencies', 'app_id', 'depends_on_app_id')
+            ->withPivot('version_range')
+            ->withTimestamps();
     }
 }

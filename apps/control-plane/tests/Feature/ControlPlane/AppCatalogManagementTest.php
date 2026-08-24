@@ -90,6 +90,35 @@ class AppCatalogManagementTest extends TestCase
         ], $overrides);
     }
 
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function manifestFor(string $appId, array $overrides = []): array
+    {
+        $manifest = $this->manifest();
+        array_walk_recursive($manifest, function (mixed &$value) use ($appId): void {
+            if (is_string($value)) {
+                $value = str_replace('sample-app', $appId, $value);
+            }
+        });
+        $manifest['database_name'] = 'core_'.str_replace('-', '_', $appId);
+
+        return array_replace_recursive($manifest, $overrides);
+    }
+
+    private function availableApp(string $appId, string $version = '1.0.0'): void
+    {
+        CoreApp::query()->create([
+            'id' => $appId,
+            'name' => $appId,
+            'version' => $version,
+            'status' => 'available',
+            'database_name' => 'core_'.str_replace('-', '_', $appId),
+            'has_ui' => false,
+        ]);
+    }
+
     public function test_provider_admin_can_register_an_app(): void
     {
         $this->actingAs($this->providerAdmin())
@@ -116,6 +145,82 @@ class AppCatalogManagementTest extends TestCase
         $this->assertDatabaseHas('workflow_types', [
             'code' => 'sample-app.records-approval',
             'app_id' => 'sample-app',
+        ]);
+    }
+
+    public function test_registration_stores_versioned_dependencies_and_returns_them(): void
+    {
+        $this->availableApp('business-partner', '1.2.0');
+        $manifest = $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]);
+
+        $this->actingAs($this->providerAdmin())
+            ->postJson('/api/v1/provider/apps', $manifest)
+            ->assertCreated()
+            ->assertJsonPath('data.dependsOn.business-partner', '^1.0');
+
+        $this->assertDatabaseHas('app_dependencies', [
+            'app_id' => 'sample-app',
+            'depends_on_app_id' => 'business-partner',
+            'version_range' => '^1.0',
+        ]);
+    }
+
+    public function test_registration_rejects_unknown_incompatible_and_cyclic_dependencies(): void
+    {
+        $provider = $this->providerAdmin();
+
+        $this->actingAs($provider)
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('dependsOn.business-partner');
+
+        $this->availableApp('business-partner', '1.0.0');
+        $this->actingAs($provider)
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^2.0']]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('dependsOn.business-partner');
+
+        $this->actingAs($provider)
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]))
+            ->assertCreated();
+
+        $this->actingAs($provider)
+            ->postJson('/api/v1/provider/apps', $this->manifestFor('business-partner', [
+                'dependsOn' => ['sample-app' => '^1.0'],
+            ]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('dependsOn.sample-app');
+    }
+
+    public function test_registration_rejects_a_version_that_breaks_registered_dependents(): void
+    {
+        $this->availableApp('business-partner', '1.0.0');
+        $provider = $this->providerAdmin();
+        $this->actingAs($provider)
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]))
+            ->assertCreated();
+
+        $this->actingAs($provider)
+            ->postJson('/api/v1/provider/apps', $this->manifestFor('business-partner', ['version' => '2.0.0']))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('version');
+    }
+
+    public function test_registration_removes_dependencies_that_left_the_manifest(): void
+    {
+        $this->availableApp('business-partner');
+        $provider = $this->providerAdmin();
+        $this->actingAs($provider)
+            ->postJson('/api/v1/provider/apps', $this->manifest(['dependsOn' => ['business-partner' => '^1.0']]))
+            ->assertCreated();
+
+        $this->actingAs($provider)
+            ->postJson('/api/v1/provider/apps', $this->manifest())
+            ->assertOk();
+
+        $this->assertDatabaseMissing('app_dependencies', [
+            'app_id' => 'sample-app',
+            'depends_on_app_id' => 'business-partner',
         ]);
     }
 

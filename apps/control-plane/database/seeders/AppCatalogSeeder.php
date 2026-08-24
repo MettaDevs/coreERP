@@ -39,6 +39,9 @@ class AppCatalogSeeder extends Seeder
                     'duties' => $definition['duties'],
                 ],
                 $definition['number_sequences']['references'] ?? [],
+                [],
+                [],
+                $definition['dependsOn'] ?? [],
             );
         }
     }

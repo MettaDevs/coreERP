@@ -275,7 +275,7 @@ bukan karena jumlah repository bertambah.
 - [Menerbitkan app dari repository terpisah](13-publishing-an-app-release.md)
 - [Target pemisahan repository](06-worktree-target.md)
 - [Gate fondasi Core](10-core-foundation-gates.md)
-- [Load dan concurrency testing](15-load-and-concurrency-testing.md)
+- [Load dan concurrency testing](20-load-and-concurrency-testing.md)
 
 ## Referensi implementasi resmi
 
