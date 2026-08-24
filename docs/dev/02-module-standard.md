@@ -44,7 +44,8 @@ version: 1.0.0
 kind: business-app
 requires:
   core: ^1.0
-depends_on: []
+dependsOn:
+  business-partner: ^1.0
 api:
   image: registry.apperp.local/apps/accounting-api:1.0.0
   openapi: contracts/openapi.yaml
@@ -124,10 +125,33 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 | `ui.navigation` | Ya | Menu app muncul di shell Core. Item menu hanya boleh memakai permission `read` milik app yang sama |
 | `security.entry_points` / `permissions` / `privileges` / `duties` | Ya, keempatnya | Duty tersedia untuk disusun admin tenant menjadi security role |
 | `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat admin memberi role ke anggota |
+| `dependsOn` | Tidak, bila app berdiri sendiri | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu. |
 | `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
 
 App tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, app meminta nomor lewat API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`, dengan `idempotency_key` wajib. Detailnya di [Number sequence](14-number-sequences.md).
+
+### Dependency app
+
+`dependsOn` adalah map dari ID app ke rentang versi, bukan daftar nama produk dan
+bukan `docker-compose depends_on`. Bentuk yang diterima saat ini adalah versi
+tepat, misalnya `1.2.3`, atau rentang caret `^1.2` / `^1.2.3`. Untuk app tanpa
+dependency, pakai `{}`. Nilai `[]` lama masih diterima agar manifest placeholder
+tidak rusak, tetapi tidak boleh dipakai untuk mendaftarkan dependency baru.
+
+Saat registrasi katalog, target dependency harus sudah berstatus `available` dan
+versi katalog saat itu harus memenuhi rentang yang dideklarasikan. Core menyimpan
+setiap relasi di `app_dependencies`, menolak self-reference dan cycle transitif,
+serta menolak pembaruan versi yang akan melanggar rentang app lain yang bergantung
+padanya. Katalog tidak menerima dependency yang belum terdaftar karena tidak ada
+urutan instalasi yang dapat diverifikasi untuk target yang belum dikenal.
+
+Saat tenant memilih produk, Core menutup seluruh dependency transitif secara
+otomatis: entitlement prerequisite dibuat bersama entitlement produk pilihan dan
+job placement-nya dijadwalkan lebih dulu. Worker juga menahan app turunan sampai
+semua prerequisite `ready` pada placement yang sama. Ini mekanisme teknis; layar
+penjualan harus menerangkan prerequisite sebagai bagian dari paket, bukan meminta
+pembeli mencari atau membeli app teknis satu per satu.
 
 Contoh manifest utuh yang sudah berjalan ada di `app-erp-management-aset/app.yaml` — 787 baris, dengan blok `security` sepanjang 600 baris. Contoh di atas sengaja dipersingkat.
 
@@ -194,7 +218,7 @@ Di dalam database sendiri, app boleh memakai transaksi, foreign key, dan table d
 | Data | Tidak ada database access lintas app. ID app lain hanya reference opaque. |
 | Jobs | Idempotent, membawa `tenant_id`, memiliki retry/dead-letter policy. |
 | Observability | Log, trace, metric, dan event menyertakan tenant/app/correlation ID. |
-| Compatibility | Manifest mendeklarasikan rentang versi Core dan dependency; dependency cycle ditolak. |
+| Compatibility | `dependsOn` dengan versi tepat atau caret divalidasi saat katalog terdaftar; Core menolak cycle dan perubahan versi yang merusak dependent. `requires.core` belum divalidasi oleh Control Plane. |
 
 Contract adalah batas integrasi, bukan shared domain model. Contract tetap dimiliki repository app penerbit. App consumer memakai versi contract yang dipublish dan menjalankan compatibility check di CI.
 
@@ -260,7 +284,10 @@ Lifecycle tidak dimodelkan sebagai satu status linear karena empat fakta mempuny
 | Installed | Installation registry mencatat artifact dan migration berhasil pada placement/release. |
 | Ready | Placement/runtime health menyatakan release dapat diroute. |
 
-Disable mencabut akses dan menghentikan jobs tanpa memalsukan installation state. Uninstall menghapus placement/artifact setelah dependency kosong; data default diarsipkan dan `purge` memerlukan backup serta approval eksplisit.
+Disable dan uninstall belum memiliki worker. Saat worker itu dibuat, uninstall harus
+menolak app yang masih menjadi dependency app lain, mengarsipkan data default, dan
+memerlukan backup serta approval eksplisit untuk `purge`; jangan menganggap aturan
+masa depan itu sudah berjalan.
 
 ## Jenis app
 

@@ -7,21 +7,22 @@ use App\Actions\ReferenceData\ProvisionDefaultUnitsOfMeasure;
 use App\Jobs\DeployAppPlacement;
 use App\Models\AppDataPolicy;
 use App\Models\Client;
-use App\Models\CoreApp;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\SecurityDuty;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\AppDependencyGraph;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use LogicException;
-use RuntimeException;
 
 class RegisterBusiness
 {
+    public function __construct(private AppDependencyGraph $dependencyGraph) {}
+
     /**
      * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>}  $data
      */
@@ -30,14 +31,7 @@ class RegisterBusiness
         $hashedPassword = Hash::make($data['password']);
 
         return DB::transaction(function () use ($data, $hashedPassword): User {
-            $appIds = CoreApp::query()
-                ->whereIn('id', $data['app_ids'])
-                ->where('status', 'available')
-                ->pluck('id');
-
-            if ($appIds->count() !== count(array_unique($data['app_ids']))) {
-                throw new RuntimeException('One or more selected apps are not available.');
-            }
+            $appIds = $this->dependencyGraph->resolveAvailable($data['app_ids']);
             $slug = $this->uniqueSlug($data['business_name']);
             $user = User::create([
                 'name' => $data['name'],
@@ -65,7 +59,7 @@ class RegisterBusiness
                 'type' => 'core.tenant.provisioned.v1',
                 'correlation_id' => $tenant->id,
                 'legal_entity_id' => null,
-                'payload' => json_encode(['app_ids' => $appIds->values()->all()], JSON_THROW_ON_ERROR),
+                'payload' => json_encode(['app_ids' => $appIds], JSON_THROW_ON_ERROR),
                 'occurred_at' => now(),
                 'created_at' => now(),
                 'updated_at' => now(),

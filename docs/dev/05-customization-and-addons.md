@@ -32,7 +32,7 @@ addons/client-a/loyalty-policy/
 └── contracts/                   # hanya contract publik yang dipakai
 ```
 
-Addon mendeklarasikan `dependsOn`, misalnya `pos: ^1.2`. Ia dapat di-deploy hanya kepada Client A, mempunyai `loyalty_policy_db` sendiri, dan di-upgrade secara independen. Bila client tidak membelinya, addon tidak ada di deployment mereka.
+Addon mendeklarasikan `dependsOn` sebagai map, misalnya `dependsOn: { pos: ^1.2 }`. Ia dapat di-deploy hanya kepada Client A, mempunyai `loyalty_policy_db` sendiri, dan di-upgrade secara independen. Bila client tidak membelinya, addon tidak ada di deployment mereka.
 
 ## Customer-authored extension
 

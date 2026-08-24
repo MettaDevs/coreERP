@@ -3,6 +3,7 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Jobs\DeployAppPlacement;
+use App\Models\CoreApp;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\AppCatalogSeeder;
@@ -76,6 +77,41 @@ class BusinessOnboardingTest extends TestCase
         ])->assertCreated();
 
         Queue::assertPushed(DeployAppPlacement::class, 1);
+    }
+
+    public function test_registration_includes_and_deploys_transitive_app_dependencies_before_the_selected_product(): void
+    {
+        CoreApp::query()->create([
+            'id' => 'business-partner',
+            'name' => 'Data pihak bisnis',
+            'version' => '1.0.0',
+            'status' => 'available',
+            'database_name' => 'app_erp_business_partner',
+            'has_ui' => false,
+        ]);
+        DB::table('app_dependencies')->insert([
+            'app_id' => 'management-aset',
+            'depends_on_app_id' => 'business-partner',
+            'version_range' => '^1.0',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/business-registrations', [
+            'name' => 'Owner Dependency',
+            'business_name' => 'PT Dependency',
+            'app_ids' => ['management-aset'],
+            'email' => 'dependency@metta.test',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
+
+        $tenant = Tenant::query()->where('slug', 'pt-dependency')->firstOrFail();
+        $this->assertDatabaseHas('tenant_app_entitlements', ['tenant_id' => $tenant->id, 'app_id' => 'business-partner']);
+        $this->assertDatabaseHas('tenant_app_entitlements', ['tenant_id' => $tenant->id, 'app_id' => 'management-aset']);
+        Queue::assertPushed(DeployAppPlacement::class, 2);
+        Queue::assertPushed(DeployAppPlacement::class, fn (DeployAppPlacement $job): bool => $job->appId === 'business-partner');
+        Queue::assertPushed(DeployAppPlacement::class, fn (DeployAppPlacement $job): bool => $job->appId === 'management-aset');
     }
 
     public function test_registration_reuses_an_existing_ready_pooled_placement(): void

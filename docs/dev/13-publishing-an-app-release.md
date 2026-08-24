@@ -34,7 +34,7 @@ app-erp-<app-key>/
 
 Registrasi dilakukan oleh service account CI/provider, bukan developer yang mengubah repository CoreERP.
 
-1. **Katalog sekali per app.** CI atau operator provider memanggil `POST /api/v1/provider/apps` dengan metadata dari manifest: ID, nama produk, versi awal, database logis, UI entry, repository URL, URL contract, serta keempat lapis keamanan `security.entry_points`, `security.permissions`, `security.privileges`, dan `security.duties`. Nama key payload sama persis dengan `app.yaml`, jadi CI mengirim isinya apa adanya.
+1. **Katalog sekali per app.** CI atau operator provider memanggil `POST /api/v1/provider/apps` dengan metadata dari manifest: ID, nama produk, versi awal, database logis, URL repository/contract, `dependsOn`, serta keempat lapis keamanan `security.entry_points`, `security.permissions`, `security.privileges`, dan `security.duties`. Untuk dependency, key payload sama persis dengan `app.yaml`: map ID app ke rentang versi. Control Plane menyimpan relasinya, memeriksa target tersedia dan cocok versinya, lalu menolak cycle. Blok manifest lain masih dipetakan oleh CI ke payload katalog yang berlaku; Control Plane belum membaca YAML langsung.
 2. **Release sekali per versi.** Setelah artifact siap, CI memanggil `POST /api/v1/provider/apps/{app}/releases`.
 3. **Placement.** Hanya release yang tercatat dapat dipakai worker placement. Entitlement tetap tidak berarti app sudah terpasang atau siap.
 
@@ -71,9 +71,20 @@ ready      = runtime health berhasil dan app dapat diroute
 
 Launcher hanya menampilkan app ketika entitlement aktif, release yang terdaftar cocok dengan placement, dan placement telah `ready`. Katalog atau entitlement saja tidak membuat app terlihat sebagai terpasang.
 
+Jika pembeli memilih app yang memiliki `dependsOn`, onboarding menambahkan semua
+prerequisite transitif sebagai entitlement teknis dan menjadwalkan placement dalam
+urutan dependency. Job app turunan tidak dapat menandai placement `ready` sebelum
+seluruh prerequisite tersebut `ready` pada placement yang sama. Katalog/marketing
+tetap harus menyajikannya sebagai produk utama beserta bagian yang sudah termasuk,
+bukan sebagai daftar app teknis yang harus dipilih pelanggan.
+
 ## Pekerjaan yang masih bukan otomatis
 
 Upgrade belum dapat didaftarkan melalui endpoint ini: versi release harus sama dengan versi katalog. Upgrade memerlukan compatibility matrix, backup, dan workflow rollback terverifikasi; jangan menyamarkan perubahan versi sebagai instalasi biasa.
+
+Disable dan uninstall juga belum tersedia. `dependsOn` sudah melindungi registrasi,
+onboarding, dan placement, tetapi belum dapat menolak pelepasan app karena belum
+ada operasi pelepasan yang bisa dijalankan.
 
 App juga wajib menyediakan middleware/gateway yang menerima `TenantContext` tepercaya dari CoreERP dan menegakkan tenant serta organization scope pada API-nya. Jangan menerima `tenant_id` bebas dari request browser.
 
