@@ -96,6 +96,8 @@ export default withMermaid({
           items: [
             { text: 'Management Aset', link: '/apps/management-aset/' },
             { text: 'Human Resources', link: '/apps/human-resources/' },
+            { text: 'Business Partner', link: '/apps/business-partner/' },
+            { text: 'Procurement', link: '/apps/procurement/' },
           ],
         },
         {
