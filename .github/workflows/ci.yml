@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Pemeriksaan yang ingin dijalankan
+        required: true
+        default: full
+        type: choice
+        options: [quick, ui, api, full]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: MettaDevs/app-erp-ci-workflows/.github/workflows/app-checks.yml@8a718213c5568e1f99e8661d18235585d9546168
+    with:
+      profile: ${{ inputs.profile || 'auto' }}
