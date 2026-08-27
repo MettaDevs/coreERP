@@ -6,6 +6,7 @@ import {
     KeyRound,
     LayoutDashboard,
     Hash,
+    Map,
     Ruler,
     Package,
     Palette,
@@ -82,6 +83,18 @@ export function AppSidebar() {
                 },
             ],
         },
+        {
+            label: 'Setup Address',
+            icon: Map,
+            href: '/settings/address-setup',
+            children: [
+                {
+                    label: 'Pengaturan',
+                    icon: Map,
+                    href: '/settings/address-setup',
+                },
+            ],
+        },
         ...(props.auth.membership
             ? [
                   {
@@ -135,6 +148,11 @@ export function AppSidebar() {
                                         label: 'Satuan',
                                         icon: Ruler,
                                         href: '/settings/units-of-measure',
+                                    },
+                                    {
+                                        label: 'Setup Address',
+                                        icon: Map,
+                                        href: '/settings/address-setup',
                                     },
                                 ],
                             },

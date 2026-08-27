@@ -53,7 +53,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const { url } = usePage();
     const isWidePage =
         url.startsWith('/settings/access') ||
-        url.startsWith('/settings/organization');
+        url.startsWith('/settings/organization') ||
+        url.startsWith('/settings/address-setup');
 
     return (
         <div className="px-4 py-6">

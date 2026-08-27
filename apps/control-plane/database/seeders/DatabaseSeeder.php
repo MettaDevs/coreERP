@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             ProviderAdminSeeder::class,
             NumberSequenceProfileSeeder::class,
+            IndonesianAddressHierarchySeeder::class,
         ]);
         Tenant::query()->pluck('id')->each(fn (string $tenantId) => app(ProvisionDefaultUnitsOfMeasure::class)->forTenant($tenantId));
     }
