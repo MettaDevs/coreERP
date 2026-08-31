@@ -1,10 +1,13 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { Ban, Check, Copy, Pencil, UserPlus, Users } from 'lucide-react';
+import { Ban, Check, ChevronRight, Copy, Pencil, Save, ShieldCheck, UserCog, UserPlus, Users } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { toast } from 'sonner';
 
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
+import { Avatar, AvatarFallback, AvatarImage } from '@apperp/ui/avatar';
+import { useInitials } from '@/hooks/use-initials';
+import { cn } from '@/lib/utils';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -134,6 +137,9 @@ type Member = {
     name: string;
     email: string;
     system_role: string;
+    platform_role?: string;
+    security_role?: string;
+    avatar_url?: string | null;
     roles: string[];
     assignments: Assignment[];
     can_edit_access: boolean;
@@ -422,10 +428,10 @@ function PolicyScopePanel({
                                         {organization.name}
                                         {organization.classification ===
                                             'legal_entity' && (
-                                            <Badge variant="outline">
-                                                Badan hukum
-                                            </Badge>
-                                        )}
+                                                <Badge variant="outline">
+                                                    Badan hukum
+                                                </Badge>
+                                            )}
                                     </button>
                                 ))
                             )}
@@ -494,8 +500,8 @@ function PolicyScopePanel({
                                     grants.map((scope) => {
                                         const unit = scope.organization_id
                                             ? organizationById.get(
-                                                  scope.organization_id,
-                                              )
+                                                scope.organization_id,
+                                            )
                                             : undefined;
 
                                         return (
@@ -774,26 +780,26 @@ function AssignmentPicker({
                 <FieldLegend>Security role</FieldLegend>
                 {/* Grid bersel ala Business Central: satu baris per role,
                     kolom yang menjelaskan isinya, bukan sekadar daftar centang. */}
-                <div className="overflow-auto rounded-md border">
-                    <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-muted/60">
-                            <tr className="border-b">
-                                <th className="w-10 px-3 py-2" />
-                                <th className="px-3 py-2 text-left font-medium">
+                <div className="overflow-auto rounded-lg border border-border bg-card shadow-2xs">
+                    <table className="w-full text-xs">
+                        <thead className="sticky top-0 bg-muted/80 backdrop-blur-xs z-10">
+                            <tr className="border-b border-border">
+                                <th className="w-10 px-3 py-2 text-center" />
+                                <th className="px-3 py-2 text-left font-bold uppercase tracking-wider text-muted-foreground">
                                     Role
                                 </th>
-                                <th className="px-3 py-2 text-left font-medium">
+                                <th className="px-3 py-2 text-left font-bold uppercase tracking-wider text-muted-foreground">
                                     Tanggung jawab
                                 </th>
-                                <th className="px-3 py-2 text-left font-medium">
+                                <th className="px-3 py-2 text-left font-bold uppercase tracking-wider text-muted-foreground">
                                     Batas data
                                 </th>
-                                <th className="px-3 py-2 text-left font-medium">
+                                <th className="px-3 py-2 text-left font-bold uppercase tracking-wider text-muted-foreground">
                                     Sumber
                                 </th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-border/60">
                             {roles.map((role) => {
                                 const automatic = disabledRoleIds.includes(
                                     role.id,
@@ -805,10 +811,12 @@ function AssignmentPicker({
                                 return (
                                     <tr
                                         key={role.id}
-                                        data-selected={checked ? '' : undefined}
-                                        className="border-b last:border-b-0 hover:bg-accent/30 data-selected:bg-accent/50"
+                                        className={`transition-colors ${checked
+                                                ? 'bg-primary/5 hover:bg-primary/10'
+                                                : 'hover:bg-accent/40'
+                                            }`}
                                     >
-                                        <td className="px-3 py-1.5">
+                                        <td className="px-3 py-2 text-center">
                                             <Checkbox
                                                 checked={checked}
                                                 disabled={automatic}
@@ -816,32 +824,32 @@ function AssignmentPicker({
                                                     onChange(
                                                         value === true
                                                             ? [
-                                                                  ...assignments,
-                                                                  {
-                                                                      role_id:
-                                                                          role.id,
-                                                                      policy_scopes:
-                                                                          [],
-                                                                  },
-                                                              ]
+                                                                ...assignments,
+                                                                {
+                                                                    role_id:
+                                                                        role.id,
+                                                                    policy_scopes:
+                                                                        [],
+                                                                },
+                                                            ]
                                                             : assignments.filter(
-                                                                  (
-                                                                      assignment,
-                                                                  ) =>
-                                                                      assignment.role_id !==
-                                                                      role.id,
-                                                              ),
+                                                                (
+                                                                    assignment,
+                                                                ) =>
+                                                                    assignment.role_id !==
+                                                                    role.id,
+                                                            ),
                                                     )
                                                 }
                                             />
                                         </td>
-                                        <td className="px-3 py-1.5 font-medium">
+                                        <td className="px-3 py-2 font-semibold text-foreground">
                                             {role.name}
                                         </td>
-                                        <td className="px-3 py-1.5 text-muted-foreground">
-                                            {role.duties.length}
+                                        <td className="px-3 py-2 text-muted-foreground">
+                                            {role.duties.length} tanggung jawab
                                         </td>
-                                        <td className="px-3 py-1.5 text-muted-foreground">
+                                        <td className="px-3 py-2 text-muted-foreground">
                                             {checked && !automatic ? (
                                                 <RoleScopeDialog
                                                     role={role}
@@ -863,16 +871,20 @@ function AssignmentPicker({
                                                     }
                                                 />
                                             ) : role.data_policy_codes.length >
-                                              0 ? (
+                                                0 ? (
                                                 `${role.data_policy_codes.length} kebijakan`
                                             ) : (
                                                 'Tidak dibatasi'
                                             )}
                                         </td>
-                                        <td className="px-3 py-1.5 text-muted-foreground">
-                                            {automatic
-                                                ? 'Aturan otomatis'
-                                                : 'Manual'}
+                                        <td className="px-3 py-2 text-muted-foreground">
+                                            {automatic ? (
+                                                <Badge variant="outline" className="text-[10px] font-normal">
+                                                    Aturan otomatis
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-xs">Manual</span>
+                                            )}
                                         </td>
                                     </tr>
                                 );
@@ -1050,10 +1062,10 @@ function ScopeDialog({
                                                 current.map((item) =>
                                                     item.role_id === role.id
                                                         ? {
-                                                              ...item,
-                                                              policy_scopes:
-                                                                  next,
-                                                          }
+                                                            ...item,
+                                                            policy_scopes:
+                                                                next,
+                                                        }
                                                         : item,
                                                 ),
                                             )
@@ -1411,21 +1423,26 @@ function InviteForm({
             }}
         >
             <DialogTrigger asChild>
-                <Button>
-                    <UserPlus />
+                <Button variant="default" className="shadow-xs font-medium text-xs">
+                    <UserPlus className="mr-1.5 size-3.5" />
                     Buat undangan
                 </Button>
             </DialogTrigger>
             <DialogContent ref={contentRef} size="full">
                 <DialogHeader>
-                    <DialogTitle>Kode undangan</DialogTitle>
-                    <DialogDescription>
-                        Kode yang sudah terbit dapat diubah di tempat dan
-                        disimpan per baris; kodenya tidak berganti. Setiap baris
-                        baru menghasilkan satu kode yang berlaku sampai dicabut,
-                        dan pemakainya menerima role serta batas data pada baris
-                        itu.
-                    </DialogDescription>
+                    <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                            <UserPlus className="size-5" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-base font-bold text-foreground">
+                                Kelola & Buat Kode Undangan
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                                Kode yang sudah terbit dapat diubah di tempat dan disimpan per baris; kodenya tidak berganti. Setiap baris baru menghasilkan satu kode yang berlaku sampai dicabut.
+                            </DialogDescription>
+                        </div>
+                    </div>
                 </DialogHeader>
                 <form
                     className="contents"
@@ -1444,7 +1461,7 @@ function InviteForm({
                         });
                     }}
                 >
-                    <DialogBody>
+                    <DialogBody className="space-y-4 py-4">
                         <DataTable
                             columns={columns}
                             data={[...issuedRows, ...form.data.codes]}
@@ -1462,11 +1479,6 @@ function InviteForm({
                                 },
                             ]}
                             onRowAction={(action, code) => {
-                                // Duplikat berlaku untuk baris mana pun —
-                                // menyalin kode terbit adalah cara tercepat
-                                // membuat kode serupa. Menghapus hanya untuk
-                                // baris baru; mencabut kode terbit dilakukan
-                                // dari tabel halaman agar ada konfirmasi.
                                 if (action === 'duplicate') {
                                     form.setData('codes', [
                                         ...form.data.codes,
@@ -1504,15 +1516,9 @@ function InviteForm({
                             addRowLabel="Tambah kode undangan"
                             emptyMessage="Belum ada baris."
                         />
-                        <p className="mt-2 text-xs text-muted-foreground">
-                            Perubahan pada baris Aktif disimpan lewat tombol
-                            Simpan perubahan di baris itu, dan hanya berlaku
-                            untuk penukaran berikutnya. Baris Dicabut terkunci
-                            karena kodenya sudah tidak dapat ditukar. Tanggung
-                            jawab terisi otomatis dari role yang dipilih; klik
-                            sel Batas Data untuk mengatur badan hukum dan unit
-                            kerja per role.
-                        </p>
+                        <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs text-muted-foreground leading-relaxed">
+                            💡 <strong>Catatan:</strong> Perubahan pada baris <span className="font-semibold text-foreground">Aktif</span> disimpan lewat tombol <span className="font-semibold text-foreground">Simpan perubahan</span> di baris itu, dan hanya berlaku untuk penukaran berikutnya. Baris <span className="font-semibold text-foreground">Dicabut</span> terkunci karena kodenya sudah tidak dapat ditukar. Tanggung jawab terisi otomatis dari role yang dipilih; klik sel <span className="font-semibold text-foreground">Batas Data</span> untuk mengatur badan hukum dan unit kerja per role.
+                        </div>
                     </DialogBody>
                     <DialogFooter>
                         <DialogAction
@@ -1520,8 +1526,9 @@ function InviteForm({
                             disabled={
                                 form.processing || form.data.codes.length === 0
                             }
+                            className="font-medium shadow-xs px-5"
                         >
-                            Buat {form.data.codes.length} kode
+                            <UserPlus className="mr-1.5 size-3.5" /> Buat {form.data.codes.length} kode
                         </DialogAction>
                         <DialogCancel />
                     </DialogFooter>
@@ -1549,6 +1556,7 @@ function MemberAccessDialog({
     onClose: () => void;
 }) {
     const contentRef = useRef<HTMLDivElement>(null);
+    const getInitials = useInitials();
     const form = useForm({
         system_role: member?.system_role ?? 'user',
         assignments: (member?.assignments ?? [])
@@ -1572,12 +1580,43 @@ function MemberAccessDialog({
         >
             <DialogContent ref={contentRef} size="full">
                 <DialogHeader>
-                    <DialogTitle>Atur akses anggota</DialogTitle>
-                    <DialogDescription>
-                        Role menentukan tindakan; batas data menentukan data
-                        yang dapat dilihat atau diubah.
-                    </DialogDescription>
+                    <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                            <UserCog className="size-5" />
+                        </div>
+                        <div>
+                            <DialogTitle className="text-base font-bold text-foreground">
+                                Atur Akses Anggota
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                                Atur role platform, tanggung jawab security role, dan batas data anggota.
+                            </DialogDescription>
+                        </div>
+                    </div>
+
+                    {member && (
+                        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 p-2.5">
+                            <div className="flex items-center gap-3">
+                                <Avatar className="size-8 border border-border">
+                                    {member.avatar_url && (
+                                        <AvatarImage src={member.avatar_url} alt={member.name} />
+                                    )}
+                                    <AvatarFallback className="bg-primary/10 text-primary font-medium text-xs">
+                                        {getInitials(member.name)}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <p className="text-xs font-semibold text-foreground">{member.name}</p>
+                                    <p className="text-[11px] text-muted-foreground">{member.email}</p>
+                                </div>
+                            </div>
+                            <Badge variant="outline" className="text-[11px] font-medium border-primary/30 text-primary bg-primary/5">
+                                {member.system_role}
+                            </Badge>
+                        </div>
+                    )}
                 </DialogHeader>
+
                 <form
                     className="contents"
                     onSubmit={(event) => {
@@ -1608,7 +1647,7 @@ function MemberAccessDialog({
                                     {member?.system_role === 'owner' && (
                                         <option value="owner">Pemilik</option>
                                     )}
-                                    <option value="user">User</option>
+                                    <option value="user">Anggota</option>
                                     <option value="admin">Admin</option>
                                 </NativeSelect>
                             </Field>
@@ -1630,121 +1669,114 @@ function MemberAccessDialog({
                                     layar atau tindakan tertentu.
                                 </FieldDescription>
                                 <div className="space-y-2 rounded-md border p-3 text-sm">
-                                    {(member?.assignments ?? []).map(
-                                        (assignment) => {
-                                            const role = roles.find(
-                                                (item) =>
-                                                    item.id ===
-                                                    assignment.role_id,
-                                            );
+                                {(member?.assignments ?? []).map(
+                                    (assignment) => {
+                                        const role = roles.find(
+                                            (item) =>
+                                                item.id ===
+                                                assignment.role_id,
+                                        );
 
-                                            return (
-                                                <details
-                                                    key={`${assignment.role_id}-${assignment.source}`}
-                                                >
-                                                    <summary className="cursor-pointer font-medium">
-                                                        {assignment.role_name ??
-                                                            role?.name ??
-                                                            'Role'}
-                                                    </summary>
-                                                    <div className="mt-2 space-y-2 border-l pl-3 text-muted-foreground">
-                                                        {role?.duties.map(
-                                                            (roleDuty) => {
-                                                                const duty =
-                                                                    dutiesByCode.get(
-                                                                        roleDuty.code,
-                                                                    );
-
-                                                                return (
-                                                                    <details
-                                                                        key={
-                                                                            roleDuty.code
-                                                                        }
-                                                                    >
-                                                                        <summary className="cursor-pointer text-foreground">
-                                                                            {
-                                                                                roleDuty.name
-                                                                            }
-                                                                        </summary>
-                                                                        <div className="mt-2 space-y-2 pl-3 text-xs">
-                                                                            {duty?.privileges?.map(
-                                                                                (
-                                                                                    privilege,
-                                                                                ) => (
-                                                                                    <div
-                                                                                        key={
-                                                                                            privilege.code
-                                                                                        }
-                                                                                    >
-                                                                                        <p className="font-medium text-foreground">
-                                                                                            {
-                                                                                                privilege.name
-                                                                                            }
-                                                                                        </p>
-                                                                                        {privilege.permissions.map(
-                                                                                            (
-                                                                                                permission,
-                                                                                            ) => (
-                                                                                                <p
-                                                                                                    key={
-                                                                                                        permission.code
-                                                                                                    }
-                                                                                                >
-                                                                                                    {
-                                                                                                        permission.name
-                                                                                                    }{' '}
-                                                                                                    (
-                                                                                                    {
-                                                                                                        permission.access_level
-                                                                                                    }
-
-                                                                                                    )
-                                                                                                    —
-                                                                                                    titik
-                                                                                                    akses:{' '}
-                                                                                                    {
-                                                                                                        permission.entry_point_code
-                                                                                                    }
-                                                                                                </p>
-                                                                                            ),
-                                                                                        )}
-                                                                                    </div>
-                                                                                ),
-                                                                            )}
-                                                                        </div>
-                                                                    </details>
+                                        return (
+                                            <details
+                                                key={`${assignment.role_id}-${assignment.source}`}
+                                                className="group rounded-md border border-border/60 bg-muted/20 p-2.5 transition-colors [&[open]]:bg-muted/40"
+                                            >
+                                                <summary className="cursor-pointer font-semibold text-xs flex items-center justify-between text-foreground">
+                                                    <span className="flex items-center gap-2">
+                                                        <ShieldCheck className="size-4 text-primary" />
+                                                        {assignment.role_name ?? role?.name ?? 'Role'}
+                                                    </span>
+                                                    <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
+                                                </summary>
+                                                <div className="mt-3 space-y-2 border-t border-border/40 pt-2.5 pl-2 text-muted-foreground">
+                                                    {role?.duties.map(
+                                                        (roleDuty) => {
+                                                            const duty =
+                                                                dutiesByCode.get(
+                                                                    roleDuty.code,
                                                                 );
-                                                            },
-                                                        )}
-                                                        {assignment.policy_scopes.map(
-                                                            (scope) => (
-                                                                <p
-                                                                    key={`${scope.policy_code}-${scope.organization_id}`}
+
+                                                            return (
+                                                                <details
+                                                                    key={
+                                                                        roleDuty.code
+                                                                    }
+                                                                    className="group/duty space-y-1"
                                                                 >
-                                                                    Batas data:{' '}
+                                                                    <summary className="cursor-pointer text-xs font-medium text-foreground flex items-center gap-1.5 hover:text-primary">
+                                                                        <ChevronRight className="size-3.5 text-muted-foreground transition-transform group-open/duty:rotate-90" />
+                                                                        {roleDuty.name}
+                                                                    </summary>
+                                                                    <div className="mt-1.5 space-y-1.5 pl-5 text-[11px]">
+                                                                        {duty?.privileges?.map(
+                                                                            (
+                                                                                privilege,
+                                                                            ) => (
+                                                                                <div
+                                                                                    key={
+                                                                                        privilege.code
+                                                                                    }
+                                                                                    className="rounded bg-background p-2 border border-border/40 space-y-1"
+                                                                                >
+                                                                                    <p className="font-semibold text-foreground">
+                                                                                        {privilege.name}
+                                                                                    </p>
+                                                                                    {privilege.permissions.map(
+                                                                                        (
+                                                                                            permission,
+                                                                                        ) => (
+                                                                                            <p
+                                                                                                key={
+                                                                                                    permission.code
+                                                                                                }
+                                                                                                className="text-muted-foreground"
+                                                                                            >
+                                                                                                • {permission.name}{' '}
+                                                                                                <span className="text-primary font-mono">
+                                                                                                    ({permission.access_level})
+                                                                                                </span>
+                                                                                            </p>
+                                                                                        ),
+                                                                                    )}
+                                                                                </div>
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                </details>
+                                                            );
+                                                        },
+                                                    )}
+                                                    {assignment.policy_scopes.map(
+                                                        (scope) => (
+                                                            <p
+                                                                key={`${scope.policy_code}-${scope.organization_id}`}
+                                                                className="text-xs font-medium text-foreground pt-1"
+                                                            >
+                                                                Batas data:{' '}
+                                                                <span className="text-primary">
                                                                     {dataPolicies.find(
-                                                                        (
-                                                                            policy,
-                                                                        ) =>
+                                                                        (policy) =>
                                                                             policy.code ===
                                                                             scope.policy_code,
                                                                     )?.name ??
                                                                         scope.policy_code}
-                                                                </p>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </details>
-                                            );
-                                        },
-                                    )}
-                                </div>
+                                                                </span>
+                                                            </p>
+                                                        ),
+                                                    )}
+                                                </div>
+                                            </details>
+                                        );
+                                    },
+                                )}
+                            </div>
                             </FieldSet>
                         </FieldGroup>
                     </DialogBody>
                     <DialogFooter>
                         <DialogAction type="submit" disabled={form.processing}>
-                            Simpan akses
+                            <Save className="mr-1.5 size-3.5" /> Simpan akses
                         </DialogAction>
                         <DialogCancel />
                     </DialogFooter>
@@ -1763,30 +1795,44 @@ export default function Access({
     dataPolicies,
     organizations,
     hierarchies,
-    invitations,
-    newInvitationCodes,
+    invitations = [],
+    newInvitationCodes = [],
 }: Props) {
-    const section = new URLSearchParams(usePage().url.split('?')[1]).get(
-        'section',
-    );
-    // Penyusunan role sendiri pindah ke Konfigurasi keamanan; halaman ini
-    // hanya mengurus siapa memegang role apa.
+    const url = usePage().url;
+    const queryString = url.includes('?') ? url.split('?')[1] : '';
+    const section = new URLSearchParams(queryString).get('section');
     const activeSection = section === 'invitations' ? section : 'members';
     const [editingMember, setEditingMember] = useState<Member | null>(null);
+    const getInitials = useInitials();
     const copy = (code: string) => {
         void navigator.clipboard.writeText(code);
         toast('Kode disalin');
     };
+
+    const platformRoleLabel: Record<string, string> = {
+        owner: 'Pemilik',
+        admin: 'Admin',
+        user: 'Anggota',
+    };
+
     const memberColumns: DataTableColumn<Member>[] = [
         {
-            id: 'name',
+            id: 'identity',
             header: 'Identity',
             cell: (member) => (
-                <div>
-                    <p className="font-medium">{member.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                        {member.email}
-                    </p>
+                <div className="flex items-center gap-3 py-0.5">
+                    <Avatar size="default">
+                        {member.avatar_url ? (
+                            <AvatarImage src={member.avatar_url} alt={member.name} />
+                        ) : null}
+                        <AvatarFallback className="bg-primary/10 text-primary font-medium text-xs">
+                            {getInitials(member.name)}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col min-w-0">
+                        <span className="font-medium text-foreground truncate text-sm">{member.name}</span>
+                        <span className="text-xs text-muted-foreground truncate">{member.email}</span>
+                    </div>
                 </div>
             ),
             sortValue: (member) => member.name,
@@ -1794,10 +1840,15 @@ export default function Access({
         {
             id: 'platform-role',
             header: 'Role platform',
-            cell: (member) => <Badge>{member.system_role}</Badge>,
+            cell: (member) => (
+                <Badge>
+                    {platformRoleLabel[member.system_role] ??
+                        member.system_role}
+                </Badge>
+            ),
         },
         {
-            id: 'roles',
+            id: 'security-role',
             header: 'Security role',
             cell: (member) => member.roles.join(', ') || '—',
         },
@@ -1805,6 +1856,7 @@ export default function Access({
             id: 'actions',
             header: 'Aksi',
             align: 'right',
+            width: 140,
             cell: (member) =>
                 canManage && member.can_edit_access ? (
                     <Button
@@ -1823,7 +1875,6 @@ export default function Access({
         {
             id: 'label',
             header: 'Keterangan',
-            width: 240,
             cell: (invitation) =>
                 invitation.label || (
                     <span className="text-muted-foreground">
@@ -1835,6 +1886,7 @@ export default function Access({
         {
             id: 'status',
             header: 'Status',
+            width: 120,
             cell: (invitation) => (
                 <Badge
                     variant={invitation.revoked_at ? 'secondary' : 'default'}
@@ -1847,20 +1899,21 @@ export default function Access({
             id: 'access',
             header: 'Akses',
             cell: (invitation) =>
-                `${invitation.system_role} · sesuai batas data role`,
+                `${platformRoleLabel[invitation.system_role] ?? invitation.system_role} · sesuai batas data role`,
         },
         {
             id: 'roles',
             header: 'Security role',
-            cell: (invitation) => invitation.roles.join(', ') || '—',
+            cell: (invitation) => (invitation.roles ?? []).join(', ') || '—',
         },
         {
             id: 'actions',
             header: 'Aksi',
             align: 'right',
+            width: 240,
             cell: (invitation) =>
                 canManage && !invitation.revoked_at ? (
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-center justify-end gap-2 shrink-0 whitespace-nowrap">
                         {invitation.code ? (
                             <Button
                                 size="sm"
@@ -1916,6 +1969,7 @@ export default function Access({
                     title="Identity & access"
                     description={`Kelola anggota dan tanggung jawab bisnis untuk ${tenant.name}.`}
                 />
+
                 {newInvitationCodes.length > 0 && (
                     <Alert>
                         <Check />
@@ -1958,10 +2012,11 @@ export default function Access({
                         </AlertDescription>
                     </Alert>
                 )}
+
                 {activeSection === 'members' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Anggota</CardTitle>
+                            <CardTitle>Daftar anggota</CardTitle>
                             <CardDescription>
                                 Orang yang dapat masuk ke bisnis ini.
                             </CardDescription>
@@ -1975,6 +2030,7 @@ export default function Access({
                         </CardContent>
                     </Card>
                 )}
+
                 {activeSection === 'invitations' && (
                     <Card>
                         <CardHeader>
