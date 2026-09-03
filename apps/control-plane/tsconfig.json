@@ -108,7 +108,9 @@
         // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
         "skipLibCheck": true /* Skip type checking all .d.ts files. */,
         "paths": {
-            "@/*": ["./resources/js/*"]
+            "@/*": ["./resources/js/*"],
+            "@apperp/ui/*": ["./node_modules/@apperp/ui/dist/components/*"],
+            "@apperp/ui/theme": ["./node_modules/@apperp/ui/dist/theme"]
         },
         "jsx": "react-jsx"
     },

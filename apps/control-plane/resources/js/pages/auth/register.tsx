@@ -1,6 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import { Building2, KeyRound, Package } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ChangeEvent } from 'react';
 
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -65,7 +65,7 @@ export default function Register({ passwordRules, apps }: Props) {
             <Head title="Pendaftaran bisnis" />
             <Tabs
                 value={step}
-                onValueChange={(value) => setStep(value as Step)}
+                onValueChange={(value: string) => setStep(value as Step)}
             >
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="business">1. Bisnis</TabsTrigger>
@@ -94,7 +94,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                     <Input
                                         label="Nama pemilik"
                                         value={form.data.name}
-                                        onChange={(event) =>
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
                                             form.setData(
                                                 'name',
                                                 event.target.value,
@@ -114,7 +114,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                     <Input
                                         label="Nama bisnis"
                                         value={form.data.business_name}
-                                        onChange={(event) =>
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
                                             form.setData(
                                                 'business_name',
                                                 event.target.value,
@@ -136,7 +136,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                         label="Email pemilik"
                                         type="email"
                                         value={form.data.email}
-                                        onChange={(event) =>
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
                                             form.setData(
                                                 'email',
                                                 event.target.value,
@@ -185,7 +185,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                     spacing={2}
                                     className="grid w-full gap-3 md:grid-cols-2"
                                     value={form.data.app_ids}
-                                    onValueChange={(values) =>
+                                    onValueChange={(values: string[]) =>
                                         form.setData('app_ids', values)
                                     }
                                 >
@@ -256,7 +256,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                     <PasswordInput
                                         label="Kata sandi"
                                         value={form.data.password}
-                                        onChange={(event) =>
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
                                             form.setData(
                                                 'password',
                                                 event.target.value,
@@ -280,7 +280,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                     <PasswordInput
                                         label="Konfirmasi kata sandi"
                                         value={form.data.password_confirmation}
-                                        onChange={(event) =>
+                                        onChange={(event: ChangeEvent<HTMLInputElement>) =>
                                             form.setData(
                                                 'password_confirmation',
                                                 event.target.value,
