@@ -28,17 +28,22 @@ use Inertia\Response;
 
 final class AddressSetupController extends Controller
 {
-    /** Main page — load all reference data strictly scoped to active hierarchy context */
-    public function index(Request $request, TimezoneResolverService $timezoneResolver): JsonResponse|Response
+    public function __construct(
+        protected TimezoneResolverService $timezoneResolver
+    ) {}
+
+    public function index(Request $request): JsonResponse|Response
     {
         $section  = $request->query('section', 'countries');
-        $country  = $request->query('country', 'ID');
+        $country  = $request->query('country', 'IDN');
+        if ($country === 'ID') {
+            $country = 'IDN';
+        }
         $province = $request->query('province_id', '');
         $regency  = $request->query('regency_id', '');
         $district = $request->query('district_id', '');
         $village  = $request->query('village_id', '');
 
-        // Auto-align hierarchy filters if a specific record was just saved or requested
         $selectedId = session('saved_id') ?: $request->query('selected_id', '');
         $savedSection = session('saved_section') ?: $section;
 
@@ -153,45 +158,72 @@ final class AddressSetupController extends Controller
             }
         }
 
-        // 1. Countries — Load all active countries
         $countries = Country::where('active', true)->orderBy('name')->get();
         if ($countries->isEmpty()) {
             $countries = Country::orderBy('name')->get();
         }
 
-        // 2. Strict Contextual Grid Lists
         $provinces = Province::when($country, fn ($q) => $q->where('country_code', $country))
             ->orderBy('name')
             ->get();
 
-        // Regencies: ONLY children of selected province (or country if province is "Semua")
         $regencies = $province
             ? Regency::with('province')->where('province_id', $province)->orderBy('name')->get()
             : ($country ? Regency::with('province')->whereHas('province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->get() : collect());
 
-        // Districts: ONLY children of selected regency (or province if regency is "Semua")
         $districts = $regency
             ? District::with('regency.province')->where('regency_id', $regency)->orderBy('name')->get()
             : ($province ? District::with('regency.province')->whereHas('regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->get()
                 : ($country ? District::with('regency.province')->whereHas('regency.province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->limit(500)->get() : collect()));
 
-        // Villages: load strictly for active district/regency
         $villages = $district
             ? Village::with('district.regency.province')->where('district_id', $district)->orderBy('name')->get()
-            : ($regency ? Village::with('district.regency.province')->whereHas('district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(200)->get() : collect());
+            : ($regency
+                ? Village::with('district.regency.province')->whereHas('district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
+                : ($province
+                    ? Village::with('district.regency.province')->whereHas('district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
+                    : ($country ? Village::with('district.regency.province')->whereHas('district.regency.province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->limit(300)->get() : collect())));
 
         $streets = $village
             ? Street::where('village_id', $village)->orderBy('rt')->orderBy('rw')->get()
-            : collect();
+            : ($district
+                ? Street::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
+                : ($regency
+                    ? Street::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
+                    : ($province
+                        ? Street::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
+                        : Street::orderBy('name')->limit(300)->get())));
+
         $groupOfHouses = $village
             ? GroupOfHouses::where('village_id', $village)->orderBy('name')->get()
-            : collect();
+            : ($district
+                ? GroupOfHouses::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
+                : ($regency
+                    ? GroupOfHouses::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
+                    : ($province
+                        ? GroupOfHouses::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
+                        : GroupOfHouses::orderBy('name')->limit(300)->get())));
+
         $landPlots = $village
             ? LandPlot::where('village_id', $village)->orderBy('plot_number')->get()
-            : collect();
+            : ($district
+                ? LandPlot::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('plot_number')->limit(300)->get()
+                : ($regency
+                    ? LandPlot::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('plot_number')->limit(300)->get()
+                    : ($province
+                        ? LandPlot::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('plot_number')->limit(300)->get()
+                        : LandPlot::orderBy('plot_number')->limit(300)->get())));
+
         $buildings = $village
             ? Building::where('village_id', $village)->orderBy('name')->get()
-            : collect();
+            : ($district
+                ? Building::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
+                : ($regency
+                    ? Building::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
+                    : ($province
+                        ? Building::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
+                        : Building::orderBy('name')->limit(300)->get())));
+
         $postalCodes = PostalCode::with(['country', 'province', 'regency', 'district', 'village'])
             ->when($country, fn ($q) => $q->where('country_code', $country))
             ->when($province, fn ($q) => $q->where('province_id', $province))
@@ -203,13 +235,11 @@ final class AddressSetupController extends Controller
             ->get();
         $parameters = DB::table('ref_address_parameters')->get();
 
-        // 3. Dropdown choices strictly cascading
         $dropdownProvinces = $country ? Province::where('country_code', $country)->orderBy('name')->get() : Province::orderBy('name')->get();
         $dropdownRegencies = $province ? Regency::where('province_id', $province)->orderBy('name')->get() : ($country ? Regency::whereHas('province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->get() : collect());
         $dropdownDistricts = $regency ? District::where('regency_id', $regency)->orderBy('name')->get() : ($province ? District::whereHas('regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->get() : collect());
-        $dropdownVillages  = $district ? Village::where('district_id', $district)->orderBy('name')->get() : ($regency ? Village::whereHas('district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(500)->get() : collect());
+        $dropdownVillages  = $district ? Village::where('district_id', $district)->orderBy('name')->get() : ($regency ? Village::whereHas('district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(500)->get() : ($province ? Village::whereHas('district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(500)->get() : collect()));
 
-        // 4. Context Breadcrumbs
         $currentCountry  = Country::where('code', $country)->first();
         $currentProvince = $province ? Province::find($province) : null;
         $currentRegency  = $regency ? Regency::find($regency) : null;
@@ -217,7 +247,7 @@ final class AddressSetupController extends Controller
 
         $activeDivisionType = $village ? 'village' : ($district ? 'district' : ($regency ? 'regency' : ($province ? 'province' : 'country')));
         $activeDivisionId   = $village ?: ($district ?: ($regency ?: ($province ?: $country)));
-        $activeTimezone     = $activeDivisionId ? $timezoneResolver->resolve($activeDivisionType, $activeDivisionId) : null;
+        $activeTimezone     = $activeDivisionId ? $this->timezoneResolver->resolve($activeDivisionType, $activeDivisionId) : null;
 
         $hierarchyLevels = CountryHierarchyLevel::where('country_code', $country)->orderBy('level')->get();
 
@@ -253,7 +283,6 @@ final class AddressSetupController extends Controller
         ]);
     }
 
-    // ========== COUNTRY ==========
     public function storeCountry(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -264,9 +293,27 @@ final class AddressSetupController extends Controller
             'timezone'   => 'nullable|string|max:50',
             'active'     => 'boolean',
         ]);
+
+        if (empty($data['timezone'])) {
+            $data['timezone'] = $this->timezoneResolver->inferCountryTimezone($data['code']) ?? 'UTC';
+        }
+
         DB::table('ref_countries')->updateOrInsert(['code' => $data['code']], array_merge($data, [
             'created_at' => now(), 'updated_at' => now(),
         ]));
+
+        DB::table('ref_administrative_division_timezones')->updateOrInsert(
+            ['division_type' => 'country', 'division_id' => $data['code']],
+            [
+                'id'         => (string) Str::ulid(),
+                'timezone'   => $data['timezone'],
+                'is_default' => true,
+                'status'     => 'active',
+                'updated_at' => now(),
+            ]
+        );
+        \Illuminate\Support\Facades\Cache::forget("timezone:division:country:{$data['code']}");
+
         return back();
     }
 
@@ -276,53 +323,11 @@ final class AddressSetupController extends Controller
             return back()->withErrors(['error' => 'Data negara tidak dapat dihapus karena masih memiliki child data provinsi.']);
         }
         DB::table('ref_countries')->where('code', $code)->delete();
+        DB::table('ref_administrative_division_timezones')->where('division_type', 'country')->where('division_id', $code)->delete();
+        \Illuminate\Support\Facades\Cache::forget("timezone:division:country:{$code}");
         return back();
     }
 
-    /**
-     * Resolve official timezone strictly compliant with Kemendagri and regional standards.
-     */
-    private function resolveOfficialTimezone(string $countryCode, string $codeOrName): string
-    {
-        if ($countryCode === 'MY') {
-            return 'Asia/Kuala_Lumpur';
-        }
-        if ($countryCode === 'SG') {
-            return 'Asia/Singapore';
-        }
-        if ($countryCode !== 'ID') {
-            return 'UTC';
-        }
-
-        $c = trim($codeOrName);
-        $upper = strtoupper($c);
-
-        // WIT: Maluku (81), Maluku Utara (82), Papua (91), Papua Barat (92), Papua Selatan (93), Papua Tengah (94), Papua Pegunungan (95), Papua Barat Daya (96)
-        if (in_array($c, ['81', '82', '91', '92', '93', '94', '95', '96'])
-            || str_contains($upper, 'PAPUA')
-            || str_contains($upper, 'MALUKU')) {
-            return 'Asia/Jayapura';
-        }
-
-        // WITA: Bali (51), NTB (52), NTT (53), Kalsel (63), Kaltim (64), Kaltara (65), Sulut (71), Sulteng (72), Sulsel (73), Sultra (74), Gorontalo (75), Sulbar (76)
-        if (in_array($c, ['51', '52', '53', '63', '64', '65', '71', '72', '73', '74', '75', '76'])
-            || str_contains($upper, 'BALI')
-            || str_contains($upper, 'NUSA TENGGARA')
-            || str_contains($upper, 'NTB')
-            || str_contains($upper, 'NTT')
-            || str_contains($upper, 'SULAWESI')
-            || str_contains($upper, 'GORONTALO')
-            || str_contains($upper, 'KALIMANTAN SELATAN')
-            || str_contains($upper, 'KALIMANTAN TIMUR')
-            || str_contains($upper, 'KALIMANTAN UTARA')) {
-            return 'Asia/Makassar';
-        }
-
-        // WIB: All remaining Indonesian provinces (Java, Sumatra, West/Central Kalimantan)
-        return 'Asia/Jakarta';
-    }
-
-    // ========== PROVINCE ==========
     public function storeProvince(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -340,7 +345,9 @@ final class AddressSetupController extends Controller
             'active'          => 'boolean',
         ]);
 
-        $data['timezone'] = $this->resolveOfficialTimezone($data['country_code'], $data['code'] . ' ' . $data['name']);
+        if (empty($data['timezone'])) {
+            $data['timezone'] = $this->timezoneResolver->inferProvinceTimezone($data['country_code'], $data['code'], $data['name']) ?? 'UTC';
+        }
 
         $existing = (!empty($data['id']) ? Province::find($data['id']) : null)
             ?: Province::where('country_code', $data['country_code'])->where('code', $data['code'])->first();
@@ -350,34 +357,47 @@ final class AddressSetupController extends Controller
                 ->where('id', '!=', $existing->id)
                 ->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])
                 ->exists()) {
-                return back()->withErrors(['name' => 'Nama provinsi sudah ada di negara ini.']);
+                return back()->withErrors(['name' => 'State/province name already exists in this country.']);
             }
             $existing->update($data);
             $savedId = $existing->id;
         } else {
             if (Province::where('country_code', $data['country_code'])->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->exists()) {
-                return back()->withErrors(['name' => 'Nama provinsi sudah ada di negara ini.']);
+                return back()->withErrors(['name' => 'State/province name already exists in this country.']);
             }
             $saved = Province::create(array_merge($data, ['id' => (string) Str::ulid()]));
             $savedId = $saved->id;
         }
+
+        DB::table('ref_administrative_division_timezones')->updateOrInsert(
+            ['division_type' => 'province', 'division_id' => $savedId],
+            [
+                'id'         => (string) Str::ulid(),
+                'timezone'   => $data['timezone'],
+                'is_default' => true,
+                'status'     => 'active',
+                'updated_at' => now(),
+            ]
+        );
+        \Illuminate\Support\Facades\Cache::forget("timezone:division:province:{$savedId}");
+
         return back()->with([
             'saved_id'      => $savedId,
             'saved_section' => 'provinces',
-            'status'        => 'Data berhasil disimpan.',
+            'status'        => 'Record saved successfully.',
         ]);
     }
 
     public function destroyProvince(string $id): RedirectResponse
     {
         if (Regency::where('province_id', $id)->exists()) {
-            return back()->withErrors(['error' => 'Data tidak dapat dihapus karena masih memiliki data turunan.']);
+            return back()->withErrors(['error' => 'Cannot delete record because it contains child records.']);
         }
         Province::findOrFail($id)->delete();
-        return back()->with('status', 'Data berhasil dihapus.');
+        return back()->with('status', 'Record deleted successfully.');
     }
 
-    // ========== REGENCY ==========
+    /** Regencies / Counties */
     public function storeRegency(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -386,11 +406,15 @@ final class AddressSetupController extends Controller
             'code'           => 'required|string|max:20',
             'name'           => 'required|string|max:150',
             'description'    => 'nullable|string|max:500',
-            'type'           => 'required|string|in:kabupaten,kota,daerah,daerah_khas',
+            'type'           => 'nullable|string|max:50',
             'it_county_code' => 'nullable|string|max:50',
             'es_county_code' => 'nullable|string|max:50',
             'active'         => 'boolean',
         ]);
+
+        if (empty($data['type'])) {
+            $data['type'] = 'county';
+        }
 
         $cleanCode = str_replace('.', '', $data['code']);
         $data['code'] = $cleanCode;
@@ -403,13 +427,13 @@ final class AddressSetupController extends Controller
                 ->where('id', '!=', $existing->id)
                 ->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])
                 ->exists()) {
-                return back()->withErrors(['name' => 'Nama kabupaten/kota sudah ada di provinsi ini.']);
+                return back()->withErrors(['name' => 'County/city name already exists in this state/province.']);
             }
             $existing->update($data);
             $savedId = $existing->id;
         } else {
             if (Regency::where('province_id', $data['province_id'])->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->exists()) {
-                return back()->withErrors(['name' => 'Nama kabupaten/kota sudah ada di provinsi ini.']);
+                return back()->withErrors(['name' => 'County/city name already exists in this state/province.']);
             }
             $saved = Regency::create(array_merge($data, ['id' => (string) Str::ulid()]));
             $savedId = $saved->id;
@@ -417,20 +441,20 @@ final class AddressSetupController extends Controller
         return back()->with([
             'saved_id'      => $savedId,
             'saved_section' => 'regencies',
-            'status'        => 'Data berhasil disimpan.',
+            'status'        => 'Record saved successfully.',
         ]);
     }
 
     public function destroyRegency(string $id): RedirectResponse
     {
         if (District::where('regency_id', $id)->exists()) {
-            return back()->withErrors(['error' => 'Data tidak dapat dihapus karena masih memiliki data turunan.']);
+            return back()->withErrors(['error' => 'Cannot delete record because it contains child records.']);
         }
         Regency::findOrFail($id)->delete();
-        return back()->with('status', 'Data berhasil dihapus.');
+        return back()->with('status', 'Record deleted successfully.');
     }
 
-    // ========== DISTRICT ==========
+    /** Districts */
     public function storeDistrict(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -444,7 +468,7 @@ final class AddressSetupController extends Controller
         // Validate parent chain: regency must belong to a valid province
         $regency = Regency::with('province')->find($data['regency_id']);
         if (! $regency || ! $regency->province) {
-            return back()->withErrors(['regency_id' => 'Kabupaten/Kota tidak valid atau tidak memiliki provinsi induk.']);
+            return back()->withErrors(['regency_id' => 'Invalid county/city parent reference.']);
         }
 
         $cleanCode = str_replace('.', '', $data['code']);
@@ -458,13 +482,13 @@ final class AddressSetupController extends Controller
                 ->where('id', '!=', $existing->id)
                 ->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])
                 ->exists()) {
-                return back()->withErrors(['name' => 'Nama kecamatan sudah ada di kabupaten/kota ini.']);
+                return back()->withErrors(['name' => 'District name already exists in this county/city.']);
             }
             $existing->update($data);
             $savedId = $existing->id;
         } else {
             if (District::where('regency_id', $data['regency_id'])->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->exists()) {
-                return back()->withErrors(['name' => 'Nama kecamatan sudah ada di kabupaten/kota ini.']);
+                return back()->withErrors(['name' => 'District name already exists in this county/city.']);
             }
             $saved = District::create(array_merge($data, ['id' => (string) Str::ulid()]));
             $savedId = $saved->id;
@@ -472,20 +496,20 @@ final class AddressSetupController extends Controller
         return back()->with([
             'saved_id'      => $savedId,
             'saved_section' => 'districts',
-            'status'        => 'Data berhasil disimpan.',
+            'status'        => 'Record saved successfully.',
         ]);
     }
 
     public function destroyDistrict(string $id): RedirectResponse
     {
         if (Village::where('district_id', $id)->exists()) {
-            return back()->withErrors(['error' => 'Data tidak dapat dihapus karena masih memiliki data turunan.']);
+            return back()->withErrors(['error' => 'Cannot delete record because it contains child records.']);
         }
         District::findOrFail($id)->delete();
-        return back()->with('status', 'Data berhasil dihapus.');
+        return back()->with('status', 'Record deleted successfully.');
     }
 
-    // ========== VILLAGE ==========
+    /** Villages */
     public function storeVillage(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -493,15 +517,19 @@ final class AddressSetupController extends Controller
             'district_id' => 'required|string|exists:ref_districts,id',
             'code'        => 'required|string|max:30',
             'name'        => 'required|string|max:150',
-            'type'        => 'required|string|in:kelurahan,desa,bandar,kampung,mukim',
-            'postal_code' => 'nullable|string|max:10',
+            'type'        => 'nullable|string|max:50',
+            'postal_code' => 'nullable|string|max:20',
             'active'      => 'boolean',
         ]);
+
+        if (empty($data['type'])) {
+            $data['type'] = 'village';
+        }
 
         // Validate parent chain: district must belong to a valid regency and province
         $district = District::with('regency.province')->find($data['district_id']);
         if (! $district || ! $district->regency || ! $district->regency->province) {
-            return back()->withErrors(['district_id' => 'Kecamatan tidak valid atau tidak memiliki kabupaten/provinsi induk.']);
+            return back()->withErrors(['district_id' => 'Invalid district parent reference.']);
         }
         $countryCode = $district->regency->province->country_code ?? 'ID';
 
@@ -509,8 +537,8 @@ final class AddressSetupController extends Controller
         $displayCode = 'V-' . $cleanCode;
         $data['display_code'] = $displayCode;
 
-        if (! empty($data['postal_code']) && $countryCode === 'ID' && ! preg_match('/^[0-9]{5}$/', $data['postal_code'])) {
-            return back()->withErrors(['postal_code' => 'Kode pos Indonesia harus berupa 5 digit angka.']);
+        if (! empty($data['postal_code']) && ! preg_match('/^[A-Za-z0-9\s\-]{3,10}$/', $data['postal_code'])) {
+            return back()->withErrors(['postal_code' => 'Please enter a valid postal code format.']);
         }
 
         $existing = (!empty($data['id']) ? Village::find($data['id']) : null)
@@ -521,13 +549,13 @@ final class AddressSetupController extends Controller
                 ->where('id', '!=', $existing->id)
                 ->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])
                 ->exists()) {
-                return back()->withErrors(['name' => 'Nama desa/kelurahan sudah ada di kecamatan ini.']);
+                return back()->withErrors(['name' => 'Village name already exists in this district.']);
             }
             $existing->update($data);
             $id = $existing->id;
         } else {
             if (Village::where('district_id', $data['district_id'])->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->exists()) {
-                return back()->withErrors(['name' => 'Nama desa/kelurahan sudah ada di kecamatan ini.']);
+                return back()->withErrors(['name' => 'Village name already exists in this district.']);
             }
             $created = Village::create(array_merge($data, ['code' => $cleanCode]));
             $id = $created->id;
@@ -583,7 +611,7 @@ final class AddressSetupController extends Controller
         return back()->with('status', 'Data berhasil dihapus.');
     }
 
-    // ========== STREET (RT/RW) ==========
+    /** Streets */
     public function storeStreet(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -628,7 +656,7 @@ final class AddressSetupController extends Controller
         return back();
     }
 
-    // ========== BUILDING (Gedung/Unit/Lantai) ==========
+    /** Buildings */
     public function storeBuilding(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -668,7 +696,7 @@ final class AddressSetupController extends Controller
         return back();
     }
 
-    // ========== POSTAL CODE ==========
+    /** Postal Codes */
     public function storePostalCode(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -734,13 +762,13 @@ final class AddressSetupController extends Controller
             GroupOfHouses::where('postal_code', $pc->postal_code)->where('village_id', $pc->village_id)->exists() ||
             LandPlot::where('postal_code', $pc->postal_code)->where('village_id', $pc->village_id)->exists()
         ) {
-            return back()->withErrors(['error' => 'Kode pos sedang digunakan oleh alamat dan tidak dapat dihapus.']);
+            return back()->withErrors(['error' => 'Postal code is in use by address records and cannot be deleted.']);
         }
         $pc->delete();
         return back();
     }
 
-    // ========== GROUP OF HOUSES ==========
+    /** Group of Houses */
     public function storeGroupOfHouses(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -768,7 +796,7 @@ final class AddressSetupController extends Controller
             GroupOfHouses::where('id', $id)->update($data);
         } else {
             if (GroupOfHouses::where('village_id', $data['village_id'])->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->exists()) {
-                return back()->withErrors(['name' => 'Nama group of houses sudah ada di desa/kelurahan ini.']);
+                return back()->withErrors(['name' => 'Group of houses name already exists in this village.']);
             }
             GroupOfHouses::create(array_merge($data, ['id' => (string) Str::ulid()]));
         }
@@ -778,13 +806,13 @@ final class AddressSetupController extends Controller
     public function destroyGroupOfHouses(string $id): RedirectResponse
     {
         if (LandPlot::where('group_of_houses_id', $id)->exists()) {
-            return back()->withErrors(['error' => 'Group of houses tidak dapat dihapus karena masih memiliki data land plots.']);
+            return back()->withErrors(['error' => 'Cannot delete group of houses because it contains land plots.']);
         }
         GroupOfHouses::findOrFail($id)->delete();
         return back();
     }
 
-    // ========== LAND PLOTS ==========
+    /** Land Plots */
     public function storeLandPlot(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -814,7 +842,7 @@ final class AddressSetupController extends Controller
             LandPlot::where('id', $id)->update($data);
         } else {
             if (LandPlot::where('village_id', $data['village_id'])->where('plot_number', $data['plot_number'])->exists()) {
-                return back()->withErrors(['plot_number' => 'Nomor plot sudah ada di desa/kelurahan ini.']);
+                return back()->withErrors(['plot_number' => 'Plot number already exists in this village.']);
             }
             LandPlot::create(array_merge($data, ['id' => (string) Str::ulid()]));
         }
@@ -827,7 +855,7 @@ final class AddressSetupController extends Controller
         return back();
     }
 
-    // ========== PARAMETERS ==========
+    /** Address Parameters */
     public function storeParameters(Request $request): RedirectResponse
     {
         $data = $request->validate([
@@ -848,7 +876,7 @@ final class AddressSetupController extends Controller
             if (! empty($matches[1])) {
                 foreach ($matches[1] as $var) {
                     if (! in_array($var, $allowedVariables, true)) {
-                        return back()->withErrors(['address_format' => "Variable tidak valid: {{$var}}"]);
+                        return back()->withErrors(['address_format' => "Invalid template variable: {{$var}}"]);
                     }
                 }
             }
@@ -861,7 +889,7 @@ final class AddressSetupController extends Controller
         return back();
     }
 
-    // ========== HIERARCHY LOOKUPS (BOTTOM-UP & TOP-DOWN) ==========
+    /** Hierarchy Lookups */
     public function lookupBottomUp(Request $request, TimezoneResolverService $timezoneResolver): JsonResponse
     {
         $id = $request->query('id');
@@ -870,7 +898,7 @@ final class AddressSetupController extends Controller
         if ($type === 'village' || $type === 'villages') {
             $village = Village::with('district.regency.province.country')->find($id);
             if (! $village) {
-                return response()->json(['message' => 'Wilayah desa/kelurahan tidak ditemukan'], 404);
+                return response()->json(['message' => 'Village not found'], 404);
             }
             $tzData = $timezoneResolver->resolve('village', $village->id);
 
@@ -889,7 +917,7 @@ final class AddressSetupController extends Controller
                     'village'  => $village->name,
                 ],
                 'formatted' => sprintf('%s > %s > %s > %s > %s',
-                    $village->district?->regency?->province?->country?->name ?? 'Indonesia',
+                    $village->district?->regency?->province?->country?->name ?? 'Country',
                     $village->district?->regency?->province?->name ?? '-',
                     $village->district?->regency?->name ?? '-',
                     $village->district?->name ?? '-',
@@ -901,7 +929,7 @@ final class AddressSetupController extends Controller
         if ($type === 'district' || $type === 'districts') {
             $district = District::with('regency.province.country')->find($id);
             if (! $district) {
-                return response()->json(['message' => 'Kecamatan tidak ditemukan'], 404);
+                return response()->json(['message' => 'District not found'], 404);
             }
             $tzData = $timezoneResolver->resolve('district', $district->id);
 
@@ -918,7 +946,7 @@ final class AddressSetupController extends Controller
                     'district' => $district->name,
                 ],
                 'formatted' => sprintf('%s > %s > %s > %s',
-                    $district->regency?->province?->country?->name ?? 'Indonesia',
+                    $district->regency?->province?->country?->name ?? 'Country',
                     $district->regency?->province?->name ?? '-',
                     $district->regency?->name ?? '-',
                     $district->name
@@ -929,7 +957,7 @@ final class AddressSetupController extends Controller
         if ($type === 'regency' || $type === 'regencies' || $type === 'regencie') {
             $regency = Regency::with('province.country')->find($id);
             if (! $regency) {
-                return response()->json(['message' => 'Kabupaten/Kota tidak ditemukan'], 404);
+                return response()->json(['message' => 'County/City not found'], 404);
             }
             $tzData = $timezoneResolver->resolve('regency', $regency->id);
 
@@ -1113,17 +1141,58 @@ final class AddressSetupController extends Controller
         ]);
     }
 
-    // ========== TIMEZONE RESOLVER API ==========
+    /** Timezone Resolution */
     public function resolveTimezone(Request $request, TimezoneResolverService $timezoneResolver): JsonResponse
     {
-        $divisionType = $request->query('division_type', 'province');
+        $divisionType = $request->query('division_type');
         $divisionId   = $request->query('division_id');
 
-        if (! $divisionId) {
-            return response()->json(['message' => 'division_id wajib diisi'], 400);
+        $countryCode = $request->query('country_code') ?: $request->query('country_id');
+        $provinceId  = $request->query('province_id');
+        $regencyId   = $request->query('regency_id');
+        $districtId  = $request->query('district_id');
+        $villageId   = $request->query('village_id');
+
+        if (! $divisionType || ! $divisionId) {
+            if ($villageId) {
+                $divisionType = 'village';
+                $divisionId   = $villageId;
+            } elseif ($districtId) {
+                $divisionType = 'district';
+                $divisionId   = $districtId;
+            } elseif ($regencyId) {
+                $divisionType = 'regency';
+                $divisionId   = $regencyId;
+            } elseif ($provinceId) {
+                $divisionType = 'province';
+                $divisionId   = $provinceId;
+            } elseif ($countryCode) {
+                $divisionType = 'country';
+                $divisionId   = $countryCode;
+            }
         }
 
-        $result = $timezoneResolver->resolve($divisionType, $divisionId);
+        if (! $divisionId) {
+            return response()->json(['message' => 'division_id atau country_code wajib diisi'], 400);
+        }
+
+        $result = $timezoneResolver->resolve($divisionType ?: 'country', $divisionId);
+        
+        // Fetch available timezones for the country
+        $targetCountry = $countryCode;
+        if (! $targetCountry && $divisionType === 'country') {
+            $targetCountry = $divisionId;
+        } elseif (! $targetCountry && $divisionType === 'province') {
+            $targetCountry = Province::where('id', $divisionId)->value('country_code');
+        }
+
+        $availableTzs = [];
+        if ($targetCountry) {
+            $availableTzs = \App\Models\ReferenceData\AddressHierarchy\TimeZone::where('country_code', $targetCountry)
+                ->where('active', true)
+                ->get(['iana_name', 'display_name', 'utc_offset', 'is_default']);
+        }
+
         if (! $result) {
             return response()->json([
                 'timezone'             => null,
@@ -1133,13 +1202,16 @@ final class AddressSetupController extends Controller
                 'source_division_id'   => null,
                 'source_division_type' => null,
                 'source_division_name' => null,
+                'available_timezones'  => $availableTzs,
             ], 200);
         }
+
+        $result['available_timezones'] = $availableTzs;
 
         return response()->json($result);
     }
 
-    // ========== CONTEXT-SCOPED ADMINISTRATIVE DIVISIONS API ==========
+    /** Administrative Divisions */
     public function getDivisions(Request $request): JsonResponse
     {
         $countryId = $request->query('country_id', 'ID');
@@ -1166,7 +1238,7 @@ final class AddressSetupController extends Controller
         return response()->json($query->orderBy('code')->get());
     }
 
-    // ========== SERVER-SIDE PAGINATED VILLAGES API ==========
+    /** Paginated Villages */
     public function getVillagesPaginated(Request $request): JsonResponse
     {
         $districtId = $request->query('district_id');
@@ -1204,7 +1276,7 @@ final class AddressSetupController extends Controller
         return response()->json($paginated);
     }
 
-    // ========== EXTERNAL CODES API ==========
+    /** External Codes */
     public function getExternalCodes(Request $request): JsonResponse
     {
         $divisionId = $request->query('division_id');
@@ -1244,7 +1316,7 @@ final class AddressSetupController extends Controller
         return response()->json(['message' => 'External code deleted']);
     }
 
-    // ========== TRANSLATIONS API ==========
+    /** Translations */
     public function getTranslations(Request $request): JsonResponse
     {
         $divisionId = $request->query('division_id');

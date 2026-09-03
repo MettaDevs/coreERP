@@ -13,14 +13,31 @@ class IndonesianAddressHierarchySeeder extends Seeder
         $now = now();
 
         // ===== COUNTRIES =====
-        DB::table('ref_countries')->updateOrInsert(
-            ['code' => 'ID'],
-            ['iso3' => 'IDN', 'name' => 'Indonesia', 'phone_code' => '+62', 'timezone' => 'Asia/Jakarta', 'active' => true, 'created_at' => $now, 'updated_at' => $now]
-        );
-        DB::table('ref_countries')->updateOrInsert(
-            ['code' => 'MY'],
-            ['iso3' => 'MYS', 'name' => 'Malaysia', 'phone_code' => '+60', 'timezone' => 'Asia/Kuala_Lumpur', 'active' => true, 'created_at' => $now, 'updated_at' => $now]
-        );
+        $countries = [
+            ['code' => 'ID', 'iso3' => 'IDN', 'name' => 'Indonesia', 'phone_code' => '+62', 'timezone' => 'Asia/Jakarta'],
+            ['code' => 'MY', 'iso3' => 'MYS', 'name' => 'Malaysia', 'phone_code' => '+60', 'timezone' => 'Asia/Kuala_Lumpur'],
+            ['code' => 'SG', 'iso3' => 'SGP', 'name' => 'Singapore', 'phone_code' => '+65', 'timezone' => 'Asia/Singapore'],
+            ['code' => 'TH', 'iso3' => 'THA', 'name' => 'Thailand', 'phone_code' => '+66', 'timezone' => 'Asia/Bangkok'],
+            ['code' => 'VN', 'iso3' => 'VNM', 'name' => 'Vietnam', 'phone_code' => '+84', 'timezone' => 'Asia/Ho_Chi_Minh'],
+            ['code' => 'PH', 'iso3' => 'PHL', 'name' => 'Philippines', 'phone_code' => '+63', 'timezone' => 'Asia/Manila'],
+            ['code' => 'BN', 'iso3' => 'BRN', 'name' => 'Brunei Darussalam', 'phone_code' => '+673', 'timezone' => 'Asia/Brunei'],
+            ['code' => 'KH', 'iso3' => 'KHM', 'name' => 'Cambodia', 'phone_code' => '+855', 'timezone' => 'Asia/Phnom_Penh'],
+            ['code' => 'LA', 'iso3' => 'LAO', 'name' => 'Laos', 'phone_code' => '+856', 'timezone' => 'Asia/Vientiane'],
+            ['code' => 'MM', 'iso3' => 'MMR', 'name' => 'Myanmar', 'phone_code' => '+95', 'timezone' => 'Asia/Yangon'],
+            ['code' => 'TL', 'iso3' => 'TLS', 'name' => 'Timor-Leste', 'phone_code' => '+670', 'timezone' => 'Asia/Dili'],
+        ];
+
+        foreach ($countries as $c) {
+            DB::table('ref_countries')->updateOrInsert(
+                ['code' => $c['code']],
+                array_merge($c, ['active' => true, 'created_at' => $now, 'updated_at' => $now])
+            );
+
+            DB::table('ref_administrative_division_timezones')->updateOrInsert(
+                ['division_type' => 'country', 'division_id' => $c['code']],
+                ['id' => (string) Str::ulid(), 'timezone' => $c['timezone'], 'is_default' => true, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now]
+            );
+        }
 
         // ===== ADDRESS PARAMETERS =====
         DB::table('ref_address_parameters')->updateOrInsert(
@@ -56,16 +73,6 @@ class IndonesianAddressHierarchySeeder extends Seeder
             ]
         );
 
-        // ===== COUNTRY DEFAULT TIMEZONES =====
-        DB::table('ref_administrative_division_timezones')->updateOrInsert(
-            ['division_type' => 'country', 'division_id' => 'ID', 'timezone' => 'Asia/Jakarta'],
-            ['id' => (string) Str::ulid(), 'is_default' => true, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now]
-        );
-        DB::table('ref_administrative_division_timezones')->updateOrInsert(
-            ['division_type' => 'country', 'division_id' => 'MY', 'timezone' => 'Asia/Kuala_Lumpur'],
-            ['id' => (string) Str::ulid(), 'is_default' => true, 'status' => 'active', 'created_at' => $now, 'updated_at' => $now]
-        );
-
         // ===== COUNTRY HIERARCHY LEVEL LABELS =====
         $this->seedHierarchyLevels($now);
 
@@ -88,7 +95,18 @@ class IndonesianAddressHierarchySeeder extends Seeder
             ['country_code' => 'MY', 'level' => 2, 'level_code' => 'regency',  'level_name' => 'Daerah / District', 'description' => 'Tingkat 2: Daerah / District'],
             ['country_code' => 'MY', 'level' => 3, 'level_code' => 'district', 'level_name' => 'Mukim / Sub-district', 'description' => 'Tingkat 3: Mukim / Sub-district'],
             ['country_code' => 'MY', 'level' => 4, 'level_code' => 'village',  'level_name' => 'Bandar / Kampung', 'description' => 'Tingkat 4: Bandar / Kampung'],
-            ['country_code' => 'MY', 'level' => 5, 'level_code' => 'street',   'level_name' => 'Jalan / Lorong', 'description' => 'Tingkat 5: Jalan / Lorong'],
+            // Singapore
+            ['country_code' => 'SG', 'level' => 1, 'level_code' => 'province', 'level_name' => 'Region / District', 'description' => 'Tingkat 1: Region / District'],
+            ['country_code' => 'SG', 'level' => 2, 'level_code' => 'regency',  'level_name' => 'Planning Area', 'description' => 'Tingkat 2: Planning Area'],
+            ['country_code' => 'SG', 'level' => 3, 'level_code' => 'district', 'level_name' => 'Subzone', 'description' => 'Tingkat 3: Subzone'],
+            ['country_code' => 'SG', 'level' => 4, 'level_code' => 'village',  'level_name' => 'Neighborhood / Estate', 'description' => 'Tingkat 4: Estate'],
+            ['country_code' => 'SG', 'level' => 5, 'level_code' => 'street',   'level_name' => 'Street / Avenue', 'description' => 'Tingkat 5: Street'],
+
+            // Brunei
+            ['country_code' => 'BN', 'level' => 1, 'level_code' => 'province', 'level_name' => 'Daerah', 'description' => 'Tingkat 1: Daerah'],
+            ['country_code' => 'BN', 'level' => 2, 'level_code' => 'regency',  'level_name' => 'Mukim', 'description' => 'Tingkat 2: Mukim'],
+            ['country_code' => 'BN', 'level' => 3, 'level_code' => 'district', 'level_name' => 'Kampong', 'description' => 'Tingkat 3: Kampong'],
+
             ['country_code' => 'ID', 'level' => 6, 'level_code' => 'building', 'level_name' => 'Gedung / Unit / Lantai', 'description' => 'Tingkat 6: Gedung, Blok, Unit, Lantai'],
         ];
 

@@ -33,4 +33,9 @@ class Country extends Model
     {
         return $this->hasMany(Province::class, 'country_code', 'code');
     }
+
+    public function timezones(): HasMany
+    {
+        return $this->hasMany(TimeZone::class, 'country_code', 'code');
+    }
 }
