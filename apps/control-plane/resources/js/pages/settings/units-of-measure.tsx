@@ -1,8 +1,17 @@
 import { Head, router } from '@inertiajs/react';
-import { CircleHelp, Plus, Save } from 'lucide-react';
+import { ChevronDown, CircleHelp, Plus, Save } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@apperp/ui/collapsible';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import {
@@ -47,6 +56,7 @@ export default function UnitsOfMeasure({
     units,
     conversions,
 }: Props) {
+    const [isUnitsListOpen, setIsUnitsListOpen] = useState(true);
     const [classCode, setClassCode] = useState('');
     const [className, setClassName] = useState('');
     const [systemCode, setSystemCode] = useState('');
@@ -357,127 +367,162 @@ export default function UnitsOfMeasure({
                             beberapa barang, akan diatur oleh PIM/Inventory saat
                             tersedia.
                         </p>
-                        <section className="mt-6">
-                            <h2 className="text-base font-semibold">
-                                Konversi yang tersedia
-                            </h2>
-                            {conversions.length === 0 ? (
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Belum ada konversi umum.
-                                </p>
-                            ) : (
-                                <div className="mt-3 overflow-x-auto">
+
+                        <CollapsibleSectionGroup defaultValue={[]} className="mt-6">
+                            <CollapsibleSection
+                                value="conversions"
+                                title="Konversi yang tersedia"
+                                summary={`${conversions.length} konversi`}
+                            >
+                                {conversions.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        Belum ada konversi umum.
+                                    </p>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>
+                                                        Dari satuan
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Ke satuan
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        <Tooltip clickToPin>
+                                                            <TooltipTrigger
+                                                                asChild
+                                                            >
+                                                                <button
+                                                                    type="button"
+                                                                    className="inline-flex items-center gap-1"
+                                                                    aria-label="Penjelasan faktor konversi"
+                                                                >
+                                                                    Faktor
+                                                                    konversi{' '}
+                                                                    <CircleHelp className="size-3.5" />
+                                                                </button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent className="max-w-72">
+                                                                <p>
+                                                                    Rumus:
+                                                                    hasil =
+                                                                    nilai asal
+                                                                    × faktor
+                                                                    konversi +
+                                                                    pergeseran.
+                                                                </p>
+                                                                <p className="mt-1">
+                                                                    Contoh: 2
+                                                                    kg × 1000 =
+                                                                    2000 g.
+                                                                </p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Pergeseran
+                                                    </TableHead>
+                                                    <TableHead>
+                                                        Pembulatan
+                                                    </TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {conversions.map((item) => (
+                                                    <TableRow key={item.id}>
+                                                        <TableCell>
+                                                            {unitNameById.get(
+                                                                item.from_unit_id,
+                                                            ) ??
+                                                                'Satuan tidak tersedia'}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {unitNameById.get(
+                                                                item.to_unit_id,
+                                                            ) ??
+                                                                'Satuan tidak tersedia'}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {item.factor}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {item.offset}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {item.rounding_scale ??
+                                                                'Tidak dibulatkan'}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                )}
+                            </CollapsibleSection>
+                        </CollapsibleSectionGroup>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <Collapsible
+                        open={isUnitsListOpen}
+                        onOpenChange={setIsUnitsListOpen}
+                        className="group"
+                    >
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Daftar satuan</CardTitle>
+                            <CollapsibleTrigger asChild>
+                                <button
+                                    type="button"
+                                    aria-label="Buka atau tutup daftar satuan"
+                                    className="p-1 rounded-md hover:bg-muted cursor-pointer"
+                                >
+                                    <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                                </button>
+                            </CollapsibleTrigger>
+                        </CardHeader>
+                        <CollapsibleContent>
+                            <CardContent>
+                                <div className="overflow-x-auto">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>
-                                                    Dari satuan
-                                                </TableHead>
-                                                <TableHead>Ke satuan</TableHead>
-                                                <TableHead>
-                                                    <Tooltip clickToPin>
-                                                        <TooltipTrigger asChild>
-                                                            <button
-                                                                type="button"
-                                                                className="inline-flex items-center gap-1"
-                                                                aria-label="Penjelasan faktor konversi"
-                                                            >
-                                                                Faktor konversi{' '}
-                                                                <CircleHelp className="size-3.5" />
-                                                            </button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent className="max-w-72">
-                                                            <p>
-                                                                Rumus: hasil =
-                                                                nilai asal ×
-                                                                faktor konversi
-                                                                + pergeseran.
-                                                            </p>
-                                                            <p className="mt-1">
-                                                                Contoh: 2 kg ×
-                                                                1000 = 2000 g.
-                                                            </p>
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TableHead>
-                                                <TableHead>
-                                                    Pergeseran
-                                                </TableHead>
-                                                <TableHead>
-                                                    Pembulatan
-                                                </TableHead>
+                                                <TableHead>Kode</TableHead>
+                                                <TableHead>Nama</TableHead>
+                                                <TableHead>Kelas</TableHead>
+                                                <TableHead>Simbol</TableHead>
+                                                <TableHead>Desimal</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {conversions.map((item) => (
+                                            {units.map((item) => (
                                                 <TableRow key={item.id}>
                                                     <TableCell>
-                                                        {unitNameById.get(
-                                                            item.from_unit_id,
-                                                        ) ??
-                                                            'Satuan tidak tersedia'}
+                                                        {item.code}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {unitNameById.get(
-                                                            item.to_unit_id,
-                                                        ) ??
-                                                            'Satuan tidak tersedia'}
+                                                        {item.name}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {item.factor}
+                                                        {classNameById.get(
+                                                            item.uom_class_id,
+                                                        )}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {item.offset}
+                                                        {item.symbol ?? '—'}
                                                     </TableCell>
                                                     <TableCell>
-                                                        {item.rounding_scale ??
-                                                            'Tidak dibulatkan'}
+                                                        {item.decimal_places}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
                                     </Table>
                                 </div>
-                            )}
-                        </section>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Daftar satuan</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Kode</TableHead>
-                                    <TableHead>Nama</TableHead>
-                                    <TableHead>Kelas</TableHead>
-                                    <TableHead>Simbol</TableHead>
-                                    <TableHead>Desimal</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {units.map((item) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell>{item.code}</TableCell>
-                                        <TableCell>{item.name}</TableCell>
-                                        <TableCell>
-                                            {classNameById.get(
-                                                item.uom_class_id,
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {item.symbol ?? '—'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {item.decimal_places}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
+                            </CardContent>
+                        </CollapsibleContent>
+                    </Collapsible>
                 </Card>
             </main>
         </>
