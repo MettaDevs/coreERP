@@ -339,6 +339,26 @@ export default function AddressSetup({
         }
     );
 
+    // Sync paramState whenever filterCountry or parameters prop updates
+    useEffect(() => {
+        const found = parameters?.find((p) => p.country_code === filterCountry);
+        if (found) {
+            setParamState(found);
+        } else {
+            setParamState({
+                country_code: filterCountry,
+                use_province: true,
+                use_regency: true,
+                use_district: true,
+                use_village: true,
+                use_rt_rw: true,
+                use_postal_code: true,
+                use_building: true,
+                address_format: '{street}, {village}, {district}, {regency}, {province} {postal_code}, {country}',
+            });
+        }
+    }, [filterCountry, parameters]);
+
     // Show toast helper
     const showToast = (text: string, type: 'success' | 'error' = 'success') => {
         setToastMessage({ text, type });
@@ -522,18 +542,6 @@ export default function AddressSetup({
     // Handle New Record
     const handleNew = () => {
         if (activeSection === 'parameters' || activeSection === 'addressFormat') {
-            setParamState({
-                country_code: filterCountry,
-                use_province: true,
-                use_regency: true,
-                use_district: true,
-                use_village: true,
-                use_rt_rw: true,
-                use_postal_code: true,
-                use_building: true,
-                address_format: '{street}, {village}, {district}, {regency}, {province} {postal_code}, {country}',
-            });
-            showToast('Form reset to default configuration.', 'success');
             return;
         }
 
@@ -551,7 +559,7 @@ export default function AddressSetup({
             blank.iso3 = '';
             blank.name = '';
             blank.phone_code = '';
-            blank.timezone = '';
+            blank.timezone = 'Asia/Jakarta';
             blank.active = true;
         } else if (activeSection === 'provinces') {
             blank.country_code = filterCountry;
@@ -899,24 +907,24 @@ export default function AddressSetup({
                 {/* PAGE HEADER */}
                 <AddressPageHeader title={pageHeaderTitle} />
 
-                {/* TOOLBAR (Screenshot 2: identical 6 buttons applied to all sidebar items) */}
+                {/* TOOLBAR */}
                 <AddressToolbar
                     onNew={handleNew}
                     onDelete={handleDelete}
                     onSave={handleSave}
-                    onExternalCodes={openExternalCodesModal}
-                    onTranslations={openTranslationsModal}
+                    onExternalCodes={['parameters', 'addressFormat'].includes(activeSection) ? undefined : openExternalCodesModal}
+                    onTranslations={['parameters', 'addressFormat'].includes(activeSection) ? undefined : openTranslationsModal}
                     onFilterToggle={handleToggleFilter}
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
                     isNew={isNew}
                     isSaving={isSaving}
                     isDeleting={isDeleting}
-                    canDelete={Boolean(selectedId) && !isNew && activeSection !== 'parameters' && activeSection !== 'addressFormat'}
-                    canManageRelations={Boolean(selectedId) && !isNew && activeSection !== 'parameters' && activeSection !== 'addressFormat'}
-                    showTranslations={true}
-                    showNew={true}
-                    showDelete={true}
+                    canDelete={Boolean(selectedId) && !isNew && !['parameters', 'addressFormat'].includes(activeSection)}
+                    canManageRelations={Boolean(selectedId) && !isNew && !['parameters', 'addressFormat'].includes(activeSection)}
+                    showTranslations={!['parameters', 'addressFormat'].includes(activeSection)}
+                    showNew={!['parameters', 'addressFormat'].includes(activeSection)}
+                    showDelete={!['parameters', 'addressFormat'].includes(activeSection)}
                     showSave={true}
                     showSearch={false}
                 />
@@ -1327,10 +1335,11 @@ export default function AddressSetup({
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Time zone">
-                                                    <AddressInput
-                                                        value={form.timezone || detectTimezone(form.code, form.name)}
+                                                    <AddressSelect
+                                                        value={form.timezone || (form.code ? detectTimezone(form.code, form.name || '') : 'Asia/Jakarta')}
                                                         onChange={(val) => updateFormField('timezone', val)}
-                                                        placeholder="Asia/Jakarta"
+                                                        options={allTimezoneOptions}
+                                                        placeholder="Select time zone"
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Active">
