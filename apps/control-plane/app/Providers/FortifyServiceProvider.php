@@ -3,18 +3,21 @@
 namespace App\Providers;
 
 /* @chisel-registration */
-
 use App\Actions\Fortify\CreateNewUser;
 /* @end-chisel-registration */
 use App\Actions\Fortify\ResetUserPassword;
 use App\Models\CoreApp;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse as FailedPasswordResetLinkRequestResponseContract;
+use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse as SuccessfulPasswordResetLinkRequestResponseContract;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
@@ -25,7 +28,37 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(RegisterResponseContract::class, function () {
+            return new class implements RegisterResponseContract
+            {
+                public function toResponse($request)
+                {
+                    Auth::guard('web')->logout();
+
+                    return redirect()->route('login')->with('status', 'Pendaftaran bisnis berhasil! Silakan masuk ke akun Anda.');
+                }
+            };
+        });
+
+        $this->app->singleton(SuccessfulPasswordResetLinkRequestResponseContract::class, function () {
+            return new class implements SuccessfulPasswordResetLinkRequestResponseContract
+            {
+                public function toResponse($request)
+                {
+                    return back()->with('status', 'Jika alamat email Anda terdaftar, kami telah mengirimkan tautan reset kata sandi.');
+                }
+            };
+        });
+
+        $this->app->singleton(FailedPasswordResetLinkRequestResponseContract::class, function () {
+            return new class implements FailedPasswordResetLinkRequestResponseContract
+            {
+                public function toResponse($request)
+                {
+                    return back()->with('status', 'Jika alamat email Anda terdaftar, kami telah mengirimkan tautan reset kata sandi.');
+                }
+            };
+        });
     }
 
     /**

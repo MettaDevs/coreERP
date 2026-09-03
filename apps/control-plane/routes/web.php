@@ -20,6 +20,7 @@ use App\Http\Controllers\ReferenceData\UnitOfMeasureController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
 use App\Models\CoreApp;
+use App\Models\User;
 use App\Support\AppContextToken;
 use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
@@ -27,6 +28,7 @@ use App\Support\LaunchableAppCatalog;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
@@ -70,6 +72,24 @@ Route::get('api/v1/control/apps', fn () => response()->json([
 ]))->name('api.control.apps.index');
 
 Route::middleware('guest')->group(function () {
+    Route::post('check-email', function (Request $request) {
+        $email = $request->input('email', $request->json('email'));
+
+        if (blank($email) || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json([
+                'exists' => false,
+            ]);
+        }
+
+        $exists = User::query()
+            ->where('email', Str::lower(trim((string) $email)))
+            ->exists();
+
+        return response()->json([
+            'exists' => $exists,
+        ]);
+    })->middleware('throttle:60,1')->name('check-email');
+
     Route::get('join', fn () => Inertia::render('auth/join', [
         'passwordRules' => Password::defaults()->toPasswordRulesString(),
     ]))->name('join');

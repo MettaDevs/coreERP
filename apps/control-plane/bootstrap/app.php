@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias(['internal-app' => AuthenticateAppService::class]);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        $middleware->validateCsrfTokens(except: ['check-email']);
 
         $middleware->web(append: [
             HandleAppearance::class,
