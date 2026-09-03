@@ -2,39 +2,20 @@ import { Head, router } from '@inertiajs/react';
 import {
     ArrowUpDown,
     Check,
-    ChevronRight,
-    Copy,
-    Filter,
-    Globe,
     Loader2,
-    MapPin,
-    MoreVertical,
     RotateCcw,
     Search,
     X,
 } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@apperp/ui/button';
-import { Input } from '@apperp/ui/input';
-import { Label } from '@apperp/ui/label';
 
 import type {
-    Country,
-    Province,
-    Regency,
-    District,
-    Village,
-    Street,
-    GroupOfHouse,
-    LandPlot,
-    Building,
-    PostalCode,
-    Parameter,
-    HierarchyLevel,
     ExternalCode,
-    TranslationItem,
-    Section,
+    Parameter,
     Props,
+    Section,
+    TranslationItem,
 } from './types';
 import { TIMEZONE_DROPDOWN_OPTIONS, detectTimezone } from './timezones';
 import { AddressFieldGroup, AddressInput, AddressSelect, AddressToggle } from './components/address-controls';
@@ -55,8 +36,6 @@ export default function AddressSetup({
     buildings,
     postalCodes,
     parameters,
-    hierarchyLevels,
-    activeTimezone,
     dropdowns,
     context,
     filters,
@@ -113,30 +92,36 @@ export default function AddressSetup({
     const activeProvinceName = useMemo(() => {
         if (!filterProvince) return '';
         const provId = filterProvince;
-        const found = ((dropdowns?.provinces ?? provinces) ?? []).find((p: any) => p.id === provId || p.code === provId);
+        const found = ((dropdowns?.provinces ?? provinces) ?? []).find((p: { id?: string; code?: string; name?: string }) => p.id === provId || p.code === provId);
         return found?.name || (context?.province?.name) || '';
     }, [filterProvince, dropdowns?.provinces, provinces, context?.province]);
 
     const activeRegencyName = useMemo(() => {
         if (!filterRegency) return '';
         const regId = filterRegency;
-        const found = ((dropdowns?.regencies ?? regencies) ?? []).find((r: any) => r.id === regId || r.code === regId);
+        const found = ((dropdowns?.regencies ?? regencies) ?? []).find((r: { id?: string; code?: string; name?: string }) => r.id === regId || r.code === regId);
         return found?.name || (context?.regency?.name) || '';
     }, [filterRegency, dropdowns?.regencies, regencies, context?.regency]);
 
     const activeDistrictName = useMemo(() => {
         if (!filterDistrict) return '';
         const distId = filterDistrict;
-        const found = ((dropdowns?.districts ?? districts) ?? []).find((d: any) => d.id === distId || d.code === distId);
+        const found = ((dropdowns?.districts ?? districts) ?? []).find((d: { id?: string; code?: string; name?: string }) => d.id === distId || d.code === distId);
         return found?.name || (context?.district?.name) || '';
     }, [filterDistrict, dropdowns?.districts, districts, context?.district]);
 
     const activeVillageName = useMemo(() => {
         if (!filterVillage) return '';
         const villId = filterVillage;
-        const found = ((dropdowns?.villages ?? villages) ?? []).find((v: any) => v.id === villId || v.code === villId);
+        const found = ((dropdowns?.villages ?? villages) ?? []).find((v: { id?: string; code?: string; name?: string }) => v.id === villId || v.code === villId);
         return found?.name || '';
     }, [filterVillage, dropdowns?.villages, villages]);
+
+    const getCsrfToken = (): string => {
+        if (typeof document === 'undefined') return '';
+        const meta = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]');
+        return meta?.content || '';
+    };
 
     // External Codes State
     const [externalCodesList, setExternalCodesList] = useState<ExternalCode[]>([]);
@@ -196,7 +181,7 @@ export default function AddressSetup({
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content || '',
+                    'X-CSRF-TOKEN': getCsrfToken(),
                 },
                 body: JSON.stringify({
                     division_id: divId,
@@ -226,7 +211,7 @@ export default function AddressSetup({
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content || '',
+                    'X-CSRF-TOKEN': getCsrfToken(),
                 },
             });
             if (res.ok) {
@@ -278,7 +263,7 @@ export default function AddressSetup({
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content || '',
+                    'X-CSRF-TOKEN': getCsrfToken(),
                 },
                 body: JSON.stringify({
                     division_id: divId,
@@ -310,7 +295,7 @@ export default function AddressSetup({
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content || '',
+                    'X-CSRF-TOKEN': getCsrfToken(),
                 },
             });
             if (res.ok) {
