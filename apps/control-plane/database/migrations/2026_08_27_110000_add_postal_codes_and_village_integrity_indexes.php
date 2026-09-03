@@ -10,6 +10,8 @@ return new class extends Migration
     {
         Schema::table('ref_postal_codes', function (Blueprint $table): void {
             $table->unique(['country_code', 'postal_code', 'village_id'], 'uq_postal_codes_country_code_village');
+            $table->index('district_id', 'idx_postal_codes_district_id');
+            $table->index('village_id', 'idx_postal_codes_village_id');
         });
 
         Schema::table('ref_villages', function (Blueprint $table): void {
@@ -22,6 +24,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('ref_postal_codes', function (Blueprint $table): void {
+            $table->dropIndex('idx_postal_codes_district_id');
+            $table->dropIndex('idx_postal_codes_village_id');
             $table->dropUnique('uq_postal_codes_country_code_village');
         });
 
