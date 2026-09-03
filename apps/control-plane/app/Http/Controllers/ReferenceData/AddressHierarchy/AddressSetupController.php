@@ -642,6 +642,7 @@ final class AddressSetupController extends Controller
         $id = $data['id'] ?? $request->input('id');
         $existing = ($id ? Street::find($id) : null)
             ?: Street::where('village_id', $data['village_id'])
+                ->where('name', $data['name'] ?? null)
                 ->where('rt', $data['rt'] ?? null)
                 ->where('rw', $data['rw'] ?? null)
                 ->first();
@@ -738,8 +739,10 @@ final class AddressSetupController extends Controller
         }
 
         // Auto-resolve ancestors if village_id is set
-        if (! empty($data['village_id'])) {
-            $village = Village::with('district.regency.province')->find($data['village_id']);
+        $villageId = ! empty($data['village_id']) ? $data['village_id'] : null;
+        $data['village_id'] = $villageId;
+        if ($villageId) {
+            $village = Village::with('district.regency.province')->find($villageId);
             if ($village) {
                 $data['district_id'] = $village->district_id;
                 $data['regency_id']  = $village->district?->regency_id;
@@ -757,10 +760,21 @@ final class AddressSetupController extends Controller
             $existing->update($data);
             $savedId = $existing->id;
         } else {
-            $existing = PostalCode::where('country_code', $data['country_code'])
-                ->where('postal_code', $data['postal_code'])
-                ->where('village_id', $data['village_id'] ?? null)
-                ->first();
+            $query = PostalCode::where('country_code', $data['country_code'])
+                ->where('postal_code', $data['postal_code']);
+
+            if ($villageId) {
+                $query->where('village_id', $villageId);
+            } else {
+                $query->whereNull('village_id');
+                if (! empty($data['area_name'])) {
+                    $query->where('area_name', $data['area_name']);
+                }
+                if (! empty($data['district_id'])) {
+                    $query->where('district_id', $data['district_id']);
+                }
+            }
+            $existing = $query->first();
             if ($existing) {
                 $existing->update($data);
                 $savedId = $existing->id;
