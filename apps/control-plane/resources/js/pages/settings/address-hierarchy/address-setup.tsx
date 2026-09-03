@@ -109,34 +109,34 @@ export default function AddressSetup({
         return Array.from(set).sort().map((tz) => ({ value: tz, label: tz }));
     }, [provinces, form.timezone]);
 
-    // Resolved parent names for read-only hierarchy display in right-side form
+    // Resolved parent names for read-only hierarchy display in right-side form (empty if user has not chosen territory filter)
     const activeProvinceName = useMemo(() => {
-        const provId = form.province_id || filterProvince;
-        if (!provId) return context?.province?.name || '';
+        if (!filterProvince) return '';
+        const provId = filterProvince;
         const found = ((dropdowns?.provinces ?? provinces) ?? []).find((p: any) => p.id === provId || p.code === provId);
-        return found?.name || form.province?.name || (context?.province?.name) || '';
-    }, [form.province_id, filterProvince, dropdowns?.provinces, provinces, form.province, context?.province]);
+        return found?.name || (context?.province?.name) || '';
+    }, [filterProvince, dropdowns?.provinces, provinces, context?.province]);
 
     const activeRegencyName = useMemo(() => {
-        const regId = form.regency_id || filterRegency;
-        if (!regId) return context?.regency?.name || '';
+        if (!filterRegency) return '';
+        const regId = filterRegency;
         const found = ((dropdowns?.regencies ?? regencies) ?? []).find((r: any) => r.id === regId || r.code === regId);
-        return found?.name || form.regency?.name || (context?.regency?.name) || '';
-    }, [form.regency_id, filterRegency, dropdowns?.regencies, regencies, form.regency, context?.regency]);
+        return found?.name || (context?.regency?.name) || '';
+    }, [filterRegency, dropdowns?.regencies, regencies, context?.regency]);
 
     const activeDistrictName = useMemo(() => {
-        const distId = form.district_id || filterDistrict;
-        if (!distId) return context?.district?.name || '';
+        if (!filterDistrict) return '';
+        const distId = filterDistrict;
         const found = ((dropdowns?.districts ?? districts) ?? []).find((d: any) => d.id === distId || d.code === distId);
-        return found?.name || form.district?.name || (context?.district?.name) || '';
-    }, [form.district_id, filterDistrict, dropdowns?.districts, districts, form.district, context?.district]);
+        return found?.name || (context?.district?.name) || '';
+    }, [filterDistrict, dropdowns?.districts, districts, context?.district]);
 
     const activeVillageName = useMemo(() => {
-        const villId = form.village_id || filterVillage;
-        if (!villId) return '';
+        if (!filterVillage) return '';
+        const villId = filterVillage;
         const found = ((dropdowns?.villages ?? villages) ?? []).find((v: any) => v.id === villId || v.code === villId);
-        return found?.name || form.village?.name || '';
-    }, [form.village_id, filterVillage, dropdowns?.villages, villages, form.village]);
+        return found?.name || '';
+    }, [filterVillage, dropdowns?.villages, villages]);
 
     // External Codes State
     const [externalCodesList, setExternalCodesList] = useState<ExternalCode[]>([]);
@@ -146,9 +146,25 @@ export default function AddressSetup({
     const [translationsList, setTranslationsList] = useState<TranslationItem[]>([]);
     const [isLoadingTrans, setIsLoadingTrans] = useState<boolean>(false);
 
+    // Helper to get active entity identifier and label
+    const getActiveEntityId = () => {
+        if (activeSection === 'countries') {
+            return form.code || form.iso3 || selectedId || filterCountry || '';
+        }
+        return form.id || selectedId || form.code || '';
+    };
+
+    const getActiveEntityLabel = () => {
+        return form.name || form.description || form.code || form.plot_number || selectedId || '';
+    };
+
     // Fetch External Codes (Available on all sections)
     const openExternalCodesModal = async () => {
-        const divId = form.code || form.id || selectedId || filterCountry;
+        if (isNew) {
+            showToast('Please save this record first before managing external codes.', 'error');
+            return;
+        }
+        const divId = getActiveEntityId();
         if (!divId) {
             showToast('Please select a record first.', 'error');
             return;
@@ -169,7 +185,11 @@ export default function AddressSetup({
     };
 
     const handleSaveExternalCode = async (system: string, code: string, desc: string) => {
-        const divId = form.code || form.id || selectedId;
+        const divId = getActiveEntityId();
+        if (!divId) {
+            showToast('Please select a record first.', 'error');
+            return;
+        }
         try {
             const res = await fetch('/settings/address-setup/external-codes', {
                 method: 'POST',
@@ -212,6 +232,8 @@ export default function AddressSetup({
             if (res.ok) {
                 setExternalCodesList((prev) => prev.filter((x) => x.id !== id));
                 showToast('External code mapping deleted.', 'success');
+            } else {
+                showToast('Failed to delete external code.', 'error');
             }
         } catch {
             showToast('Failed to delete external code.', 'error');
@@ -220,7 +242,11 @@ export default function AddressSetup({
 
     // Fetch Translations
     const openTranslationsModal = async () => {
-        const divId = form.code || form.id || selectedId || filterCountry;
+        if (isNew) {
+            showToast('Please save this record first before managing translations.', 'error');
+            return;
+        }
+        const divId = getActiveEntityId();
         if (!divId) {
             showToast('Please select a record first.', 'error');
             return;
@@ -241,7 +267,11 @@ export default function AddressSetup({
     };
 
     const handleSaveTranslation = async (locale: string, name: string, desc: string) => {
-        const divId = form.code || form.id || selectedId;
+        const divId = getActiveEntityId();
+        if (!divId) {
+            showToast('Please select a record first.', 'error');
+            return;
+        }
         try {
             const res = await fetch('/settings/address-setup/translations', {
                 method: 'POST',
@@ -264,7 +294,9 @@ export default function AddressSetup({
                 }
                 showToast('Translation saved.', 'success');
             } else {
-                showToast('Failed to save translation.', 'error');
+                const errData = await res.json().catch(() => ({}));
+                const msg = errData?.message || Object.values(errData?.errors || {})[0] || 'Failed to save translation.';
+                showToast(String(msg), 'error');
             }
         } catch {
             showToast('Network error while saving translation.', 'error');
@@ -284,6 +316,8 @@ export default function AddressSetup({
             if (res.ok) {
                 setTranslationsList((prev) => prev.filter((x) => x.id !== id));
                 showToast('Translation deleted.', 'success');
+            } else {
+                showToast('Failed to delete translation.', 'error');
             }
         } catch {
             showToast('Failed to delete translation.', 'error');
@@ -374,8 +408,9 @@ export default function AddressSetup({
         if (isNew) return;
 
         if (filteredDataset.length > 0) {
-            const currentItem = selectedId
-                ? (filteredDataset.find((item: any) => (item.id === selectedId || item.code === selectedId)) as any)
+            const targetId = flash?.saved_id || selectedId;
+            const currentItem = targetId
+                ? (filteredDataset.find((item: any) => (item.id === targetId || item.code === targetId)) as any)
                 : null;
 
             if (currentItem) {
@@ -408,7 +443,7 @@ export default function AddressSetup({
                 active: true,
             });
         }
-    }, [filteredDataset, selectedId, isNew, filterCountry, filterProvince, filterRegency, filterDistrict, filterVillage]);
+    }, [filteredDataset, selectedId, isNew, filterCountry, filterProvince, filterRegency, filterDistrict, filterVillage, flash]);
 
     // Execute server filter reload with strict section-scoping
     const executeFilter = (overrides: Record<string, any> = {}) => {
@@ -501,53 +536,140 @@ export default function AddressSetup({
             showToast('Form reset to default configuration.', 'success');
             return;
         }
+
         setIsNew(true);
         setSelectedId(null);
         const blank: Record<string, any> = { active: true };
-        blank.country_code = filterCountry;
 
-        const firstItem = (filteredDataset[0] || {}) as any;
-        const activeProvId = filterProvince || firstItem.province_id || (provinces?.[0]?.id ?? '');
-        const activeRegId = filterRegency || firstItem.regency_id || (regencies?.[0]?.id ?? '');
-        const activeDistId = filterDistrict || firstItem.district_id || (districts?.[0]?.id ?? '');
-        const activeVillId = filterVillage || firstItem.village_id || (villages?.[0]?.id ?? '');
+        const activeProvId = filterProvince || '';
+        const activeRegId = filterRegency || '';
+        const activeDistId = filterDistrict || '';
+        const activeVillId = filterVillage || '';
 
-        if (activeSection === 'provinces') {
+        if (activeSection === 'countries') {
+            blank.code = '';
+            blank.iso3 = '';
+            blank.name = '';
+            blank.phone_code = '';
+            blank.timezone = '';
+            blank.active = true;
+        } else if (activeSection === 'provinces') {
             blank.country_code = filterCountry;
+            blank.code = '';
+            blank.state_code = '';
+            blank.name = '';
+            blank.description = '';
             blank.default_state = false;
             blank.union_territory = false;
             blank.timezone = detectTimezone(filterCountry, '');
+            blank.active = true;
         } else if (activeSection === 'regencies') {
             blank.country_code = filterCountry;
             blank.province_id = activeProvId;
+            blank.code = '';
+            blank.name = '';
+            blank.description = '';
             blank.type = 'kabupaten';
+            blank.active = true;
         } else if (activeSection === 'cities') {
             blank.country_code = filterCountry;
             blank.province_id = activeProvId;
+            blank.code = '';
+            blank.name = '';
+            blank.description = '';
             blank.type = 'kota';
+            blank.active = true;
         } else if (activeSection === 'districts') {
             blank.country_code = filterCountry;
             blank.province_id = activeProvId;
             blank.regency_id = activeRegId;
-        } else if (['villages', 'streets', 'groupOfHouses', 'landPlots', 'buildings'].includes(activeSection)) {
+            blank.code = '';
+            blank.name = '';
+            blank.active = true;
+        } else if (activeSection === 'villages') {
+            blank.country_code = filterCountry;
+            blank.province_id = activeProvId;
+            blank.regency_id = activeRegId;
+            blank.district_id = activeDistId;
+            blank.code = '';
+            blank.name = '';
+            blank.postal_code = '';
+            blank.type = 'kelurahan';
+            blank.active = true;
+        } else if (activeSection === 'streets') {
             blank.country_code = filterCountry;
             blank.province_id = activeProvId;
             blank.regency_id = activeRegId;
             blank.district_id = activeDistId;
             blank.village_id = activeVillId;
+            blank.name = '';
+            blank.rt = '';
+            blank.rw = '';
+            blank.postal_code = '';
+            blank.active = true;
+        } else if (activeSection === 'buildings') {
+            blank.country_code = filterCountry;
+            blank.province_id = activeProvId;
+            blank.regency_id = activeRegId;
+            blank.district_id = activeDistId;
+            blank.village_id = activeVillId;
+            blank.name = '';
+            blank.block = '';
+            blank.unit = '';
+            blank.floor = '';
+            blank.postal_code = '';
+            blank.active = true;
+        } else if (activeSection === 'groupOfHouses') {
+            blank.country_code = filterCountry;
+            blank.province_id = activeProvId;
+            blank.regency_id = activeRegId;
+            blank.district_id = activeDistId;
+            blank.village_id = activeVillId;
+            blank.code = '';
+            blank.name = '';
+            blank.postal_code = '';
+            blank.status = 'active';
+            blank.active = true;
+        } else if (activeSection === 'landPlots') {
+            blank.country_code = filterCountry;
+            blank.province_id = activeProvId;
+            blank.regency_id = activeRegId;
+            blank.district_id = activeDistId;
+            blank.village_id = activeVillId;
+            blank.plot_number = '';
+            blank.name = '';
+            blank.postal_code = '';
+            blank.status = 'active';
+            blank.active = true;
         } else if (activeSection === 'postalCodes') {
             blank.country_code = filterCountry;
             blank.province_id = activeProvId;
             blank.regency_id = activeRegId;
             blank.district_id = activeDistId;
+            blank.village_id = activeVillId;
+            blank.postal_code = '';
+            blank.area_name = '';
+            blank.active = true;
         }
+
         setForm(blank);
     };
 
-    // Handle Delete Record
+    // Handle Delete Record / Discard New
     const handleDelete = () => {
         if (activeSection === 'parameters' || activeSection === 'addressFormat') {
             showToast('System configuration parameters cannot be deleted.', 'error');
+            return;
+        }
+        if (isNew) {
+            setIsNew(false);
+            const first = filteredDataset[0] as any;
+            if (first) {
+                const newId = first.id || first.code;
+                setSelectedId(newId);
+                setForm({ ...first });
+            }
+            showToast('Creation discarded.', 'success');
             return;
         }
         if (!selectedId) return;
@@ -635,6 +757,12 @@ export default function AddressSetup({
             if (!payload.state_code && payload.code) payload.state_code = payload.code;
             if (!payload.name && payload.description) payload.name = payload.description;
             if (!payload.description && payload.name) payload.description = payload.name;
+            if (!payload.timezone) payload.timezone = detectTimezone(filterCountry, payload.name || payload.code || '');
+        }
+
+        if (activeSection === 'regencies' || activeSection === 'cities') {
+            if (!payload.name && payload.description) payload.name = payload.description;
+            if (!payload.description && payload.name) payload.description = payload.name;
         }
 
         if (!isNew && selectedId) {
@@ -648,28 +776,50 @@ export default function AddressSetup({
         // Guarantee parent references if creating new
         if (isNew) {
             if (!payload.country_code && filterCountry) payload.country_code = filterCountry;
-            if (!payload.province_id && filterProvince) payload.province_id = filterProvince;
-            if (!payload.regency_id && filterRegency) payload.regency_id = filterRegency;
-            if (!payload.district_id && filterDistrict) payload.district_id = filterDistrict;
-            if (!payload.village_id && filterVillage) payload.village_id = filterVillage;
+            if (!payload.province_id && (form.province_id || filterProvince)) payload.province_id = form.province_id || filterProvince;
+            if (!payload.regency_id && (form.regency_id || filterRegency)) payload.regency_id = form.regency_id || filterRegency;
+            if (!payload.district_id && (form.district_id || filterDistrict)) payload.district_id = form.district_id || filterDistrict;
+            if (!payload.village_id && (form.village_id || filterVillage)) payload.village_id = form.village_id || filterVillage;
+
+            if ((activeSection === 'regencies' || activeSection === 'cities') && !payload.province_id) {
+                setIsSaving(false);
+                showToast('Please select a state/province in the filter before creating a new county/city.', 'error');
+                return;
+            }
+            if (activeSection === 'districts' && !payload.regency_id) {
+                setIsSaving(false);
+                showToast('Please select a county/city in the filter before creating a new district.', 'error');
+                return;
+            }
+            if (activeSection === 'villages' && !payload.district_id) {
+                setIsSaving(false);
+                showToast('Please select a district in the filter before creating a new village.', 'error');
+                return;
+            }
         }
 
         // Guarantee active flag
         if (payload.active === undefined) payload.active = '1';
 
-        // Guarantee type for regencies / cities
+        // Guarantee type for regencies / cities / villages
         if (activeSection === 'regencies' && !payload.type) {
             payload.type = 'kabupaten';
         } else if (activeSection === 'cities' && !payload.type) {
             payload.type = 'kota';
+        } else if (activeSection === 'villages' && !payload.type) {
+            payload.type = 'kelurahan';
         }
 
         router.post(targetUrl, payload, {
             preserveState: true,
             preserveScroll: true,
-            onSuccess: () => {
+            onSuccess: (page: any) => {
                 setIsSaving(false);
                 setIsNew(false);
+                const newlySavedId = page?.props?.flash?.saved_id || payload.id || payload.code;
+                if (newlySavedId) {
+                    setSelectedId(newlySavedId);
+                }
                 showToast('Record successfully saved.', 'success');
             },
             onError: (errs) => {
@@ -762,7 +912,8 @@ export default function AddressSetup({
                     isNew={isNew}
                     isSaving={isSaving}
                     isDeleting={isDeleting}
-                    canDelete={Boolean(selectedId) || isNew || activeSection === 'parameters' || activeSection === 'addressFormat'}
+                    canDelete={Boolean(selectedId) && !isNew && activeSection !== 'parameters' && activeSection !== 'addressFormat'}
+                    canManageRelations={Boolean(selectedId) && !isNew && activeSection !== 'parameters' && activeSection !== 'addressFormat'}
                     showTranslations={true}
                     showNew={true}
                     showDelete={true}
@@ -1655,8 +1806,8 @@ export default function AddressSetup({
             <ExternalCodesModal
                 open={activeModal === 'externalCodes'}
                 onOpenChange={(open) => !open && setActiveModal(null)}
-                entityLabel={form.name || form.code || selectedId || ''}
-                entityId={selectedId || form.code || ''}
+                entityLabel={getActiveEntityLabel()}
+                entityId={getActiveEntityId()}
                 list={externalCodesList}
                 isLoading={isLoadingExtCodes}
                 onDelete={handleDeleteExternalCode}
@@ -1666,8 +1817,8 @@ export default function AddressSetup({
             <TranslationsModal
                 open={activeModal === 'translations'}
                 onOpenChange={(open) => !open && setActiveModal(null)}
-                entityLabel={form.name || form.code || selectedId || ''}
-                defaultName={form.name || ''}
+                entityLabel={getActiveEntityLabel()}
+                defaultName={form.name || form.description || ''}
                 list={translationsList}
                 isLoading={isLoadingTrans}
                 onDelete={handleDeleteTranslation}

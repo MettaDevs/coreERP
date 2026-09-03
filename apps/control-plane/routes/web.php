@@ -182,10 +182,10 @@ Route::middleware(['auth'])->group(function () {
     // External Codes & Translations
     Route::get('settings/address-setup/external-codes', [AddressSetupController::class, 'getExternalCodes'])->name('address-setup.external-codes.index');
     Route::post('settings/address-setup/external-codes', [AddressSetupController::class, 'storeExternalCode'])->name('address-setup.external-codes.store');
-    Route::delete('settings/address-setup/external-codes/{externalCode}', [AddressSetupController::class, 'destroyExternalCode'])->name('address-setup.external-codes.destroy');
+    Route::delete('settings/address-setup/external-codes/{id}', [AddressSetupController::class, 'destroyExternalCode'])->name('address-setup.external-codes.destroy');
     Route::get('settings/address-setup/translations', [AddressSetupController::class, 'getTranslations'])->name('address-setup.translations.index');
     Route::post('settings/address-setup/translations', [AddressSetupController::class, 'storeTranslation'])->name('address-setup.translations.store');
-    Route::delete('settings/address-setup/translations/{translation}', [AddressSetupController::class, 'destroyTranslation'])->name('address-setup.translations.destroy');
+    Route::delete('settings/address-setup/translations/{id}', [AddressSetupController::class, 'destroyTranslation'])->name('address-setup.translations.destroy');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
     Route::get('settings/workflows/{workflow}/edit', [WorkflowConfigurationController::class, 'edit'])->name('workflows.edit');

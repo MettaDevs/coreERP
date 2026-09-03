@@ -20,9 +20,11 @@ export function AddressToolbar({
     onFilterToggle,
     searchTerm = '',
     onSearchChange,
-    isSaving,
-    isDeleting,
-    canDelete,
+    isNew = false,
+    isSaving = false,
+    isDeleting = false,
+    canDelete = false,
+    canManageRelations = false,
     showTranslations = true,
     showNew = true,
     showDelete = true,
@@ -41,6 +43,7 @@ export function AddressToolbar({
     isSaving?: boolean;
     isDeleting?: boolean;
     canDelete?: boolean;
+    canManageRelations?: boolean;
     showTranslations?: boolean;
     showNew?: boolean;
     showDelete?: boolean;
@@ -55,6 +58,7 @@ export function AddressToolbar({
                         variant="ghost"
                         size="sm"
                         onClick={onNew}
+                        disabled={isSaving || isDeleting}
                         className="h-8 px-2.5 text-xs text-[#0078d4] hover:bg-[#f3f2f1] hover:text-[#0078d4] font-normal gap-1.5 cursor-pointer rounded-md"
                     >
                         <Plus className="size-3.5 text-[#0078d4] stroke-[2.5]" />
@@ -67,11 +71,20 @@ export function AddressToolbar({
                         variant="ghost"
                         size="sm"
                         onClick={onDelete}
-                        disabled={!canDelete || isDeleting}
+                        disabled={(!canDelete && !isNew) || isDeleting}
                         className="h-8 px-2.5 text-xs text-[#0078d4] hover:bg-[#f3f2f1] hover:text-[#0078d4] font-normal gap-1.5 cursor-pointer disabled:opacity-40 rounded-md"
                     >
-                        <Trash2 className="size-3.5 text-[#0078d4]" />
-                        <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                        {isNew ? (
+                            <>
+                                <X className="size-3.5 text-[#0078d4]" />
+                                <span>Discard</span>
+                            </>
+                        ) : (
+                            <>
+                                <Trash2 className="size-3.5 text-[#0078d4]" />
+                                <span>{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                            </>
+                        )}
                     </Button>
                 )}
 
@@ -93,7 +106,7 @@ export function AddressToolbar({
                         variant="ghost"
                         size="sm"
                         onClick={onExternalCodes}
-                        disabled={!canDelete}
+                        disabled={!canManageRelations}
                         className="h-8 px-2.5 text-xs text-[#0078d4] hover:bg-[#f3f2f1] hover:text-[#0078d4] font-normal gap-1.5 cursor-pointer disabled:opacity-40 rounded-md"
                     >
                         <ExternalLink className="size-3.5 text-[#0078d4]" />
@@ -106,7 +119,7 @@ export function AddressToolbar({
                         variant="ghost"
                         size="sm"
                         onClick={onTranslations}
-                        disabled={!canDelete}
+                        disabled={!canManageRelations}
                         className="h-8 px-2.5 text-xs text-[#0078d4] hover:bg-[#f3f2f1] hover:text-[#0078d4] font-normal gap-1.5 cursor-pointer disabled:opacity-40 rounded-md"
                     >
                         <Languages className="size-3.5 text-[#0078d4]" />

@@ -314,7 +314,11 @@ final class AddressSetupController extends Controller
         );
         \Illuminate\Support\Facades\Cache::forget("timezone:division:country:{$data['code']}");
 
-        return back();
+        return back()->with([
+            'saved_id'      => $data['code'],
+            'saved_section' => 'countries',
+            'status'        => 'Record saved successfully.',
+        ]);
     }
 
     public function destroyCountry(string $code): RedirectResponse
@@ -635,7 +639,7 @@ final class AddressSetupController extends Controller
             $data['override_postal_code'] = false;
         }
 
-        $id = $request->input('id');
+        $id = $data['id'] ?? $request->input('id');
         $existing = ($id ? Street::find($id) : null)
             ?: Street::where('village_id', $data['village_id'])
                 ->where('rt', $data['rt'] ?? null)
@@ -644,10 +648,17 @@ final class AddressSetupController extends Controller
 
         if ($existing) {
             $existing->update($data);
+            $savedId = $existing->id;
         } else {
-            Street::create(array_merge($data, ['id' => (string) Str::ulid()]));
+            $created = Street::create(array_merge($data, ['id' => (string) Str::ulid()]));
+            $savedId = $created->id;
         }
-        return back();
+
+        return back()->with([
+            'saved_id'      => $savedId,
+            'saved_section' => 'streets',
+            'status'        => 'Record saved successfully.',
+        ]);
     }
 
     public function destroyStreet(string $id): RedirectResponse
@@ -660,6 +671,7 @@ final class AddressSetupController extends Controller
     public function storeBuilding(Request $request): RedirectResponse
     {
         $data = $request->validate([
+            'id'                   => 'nullable|string|exists:ref_buildings,id',
             'village_id'           => 'required|string|exists:ref_villages,id',
             'street_id'            => 'nullable|string|exists:ref_streets,id',
             'name'                 => 'required|string|max:200',
@@ -681,13 +693,20 @@ final class AddressSetupController extends Controller
             $data['override_postal_code'] = false;
         }
 
-        $id = $data['id'] ?? null;
-        if ($id) {
-            Building::findOrFail($id)->update($data);
+        $id = $data['id'] ?? $request->input('id');
+        if ($id && $existing = Building::find($id)) {
+            $existing->update($data);
+            $savedId = $existing->id;
         } else {
-            Building::create(array_merge($data, ['id' => (string) Str::ulid()]));
+            $created = Building::create(array_merge($data, ['id' => (string) Str::ulid()]));
+            $savedId = $created->id;
         }
-        return back();
+
+        return back()->with([
+            'saved_id'      => $savedId,
+            'saved_section' => 'buildings',
+            'status'        => 'Record saved successfully.',
+        ]);
     }
 
     public function destroyBuilding(string $id): RedirectResponse
@@ -700,6 +719,7 @@ final class AddressSetupController extends Controller
     public function storePostalCode(Request $request): RedirectResponse
     {
         $data = $request->validate([
+            'id'               => 'nullable|string|exists:ref_postal_codes,id',
             'country_code'     => 'required|string|max:3|exists:ref_countries,code',
             'postal_code'      => 'required|string|max:10',
             'province_id'      => 'nullable|string|exists:ref_provinces,id',
@@ -732,9 +752,10 @@ final class AddressSetupController extends Controller
             }
         }
 
-        $id = $request->input('id');
-        if ($id && PostalCode::where('id', $id)->exists()) {
-            PostalCode::where('id', $id)->update($data);
+        $id = $data['id'] ?? $request->input('id');
+        if ($id && $existing = PostalCode::find($id)) {
+            $existing->update($data);
+            $savedId = $existing->id;
         } else {
             $existing = PostalCode::where('country_code', $data['country_code'])
                 ->where('postal_code', $data['postal_code'])
@@ -742,15 +763,22 @@ final class AddressSetupController extends Controller
                 ->first();
             if ($existing) {
                 $existing->update($data);
+                $savedId = $existing->id;
             } else {
-                PostalCode::create(array_merge($data, [
+                $created = PostalCode::create(array_merge($data, [
                     'id'     => (string) Str::ulid(),
                     'source' => $data['source'] ?? 'POS_INDONESIA',
                     'status' => $data['status'] ?? 'active',
                 ]));
+                $savedId = $created->id;
             }
         }
-        return back();
+
+        return back()->with([
+            'saved_id'      => $savedId,
+            'saved_section' => 'postalCodes',
+            'status'        => 'Record saved successfully.',
+        ]);
     }
 
     public function destroyPostalCode(string $id): RedirectResponse
@@ -772,6 +800,7 @@ final class AddressSetupController extends Controller
     public function storeGroupOfHouses(Request $request): RedirectResponse
     {
         $data = $request->validate([
+            'id'                   => 'nullable|string|exists:ref_group_of_houses,id',
             'village_id'           => 'required|string|exists:ref_villages,id',
             'code'                 => 'nullable|string|max:30',
             'name'                 => 'required|string|max:200',
@@ -791,16 +820,23 @@ final class AddressSetupController extends Controller
             $data['override_postal_code'] = false;
         }
 
-        $id = $request->input('id');
-        if ($id && GroupOfHouses::where('id', $id)->exists()) {
-            GroupOfHouses::where('id', $id)->update($data);
+        $id = $data['id'] ?? $request->input('id');
+        if ($id && $existing = GroupOfHouses::find($id)) {
+            $existing->update($data);
+            $savedId = $existing->id;
         } else {
             if (GroupOfHouses::where('village_id', $data['village_id'])->whereRaw('LOWER(name) = ?', [strtolower($data['name'])])->exists()) {
                 return back()->withErrors(['name' => 'Group of houses name already exists in this village.']);
             }
-            GroupOfHouses::create(array_merge($data, ['id' => (string) Str::ulid()]));
+            $created = GroupOfHouses::create(array_merge($data, ['id' => (string) Str::ulid()]));
+            $savedId = $created->id;
         }
-        return back();
+
+        return back()->with([
+            'saved_id'      => $savedId,
+            'saved_section' => 'groupOfHouses',
+            'status'        => 'Record saved successfully.',
+        ]);
     }
 
     public function destroyGroupOfHouses(string $id): RedirectResponse
@@ -816,6 +852,7 @@ final class AddressSetupController extends Controller
     public function storeLandPlot(Request $request): RedirectResponse
     {
         $data = $request->validate([
+            'id'                   => 'nullable|string|exists:ref_land_plots,id',
             'village_id'           => 'required|string|exists:ref_villages,id',
             'street_id'            => 'nullable|string|exists:ref_streets,id',
             'group_of_houses_id'   => 'nullable|string|exists:ref_group_of_houses,id',
@@ -837,16 +874,23 @@ final class AddressSetupController extends Controller
             $data['override_postal_code'] = false;
         }
 
-        $id = $request->input('id');
-        if ($id && LandPlot::where('id', $id)->exists()) {
-            LandPlot::where('id', $id)->update($data);
+        $id = $data['id'] ?? $request->input('id');
+        if ($id && $existing = LandPlot::find($id)) {
+            $existing->update($data);
+            $savedId = $existing->id;
         } else {
             if (LandPlot::where('village_id', $data['village_id'])->where('plot_number', $data['plot_number'])->exists()) {
                 return back()->withErrors(['plot_number' => 'Plot number already exists in this village.']);
             }
-            LandPlot::create(array_merge($data, ['id' => (string) Str::ulid()]));
+            $created = LandPlot::create(array_merge($data, ['id' => (string) Str::ulid()]));
+            $savedId = $created->id;
         }
-        return back();
+
+        return back()->with([
+            'saved_id'      => $savedId,
+            'saved_section' => 'landPlots',
+            'status'        => 'Record saved successfully.',
+        ]);
     }
 
     public function destroyLandPlot(string $id): RedirectResponse
@@ -1291,7 +1335,7 @@ final class AddressSetupController extends Controller
     public function storeExternalCode(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'division_id'   => 'required|string',
+            'division_id'   => 'required|string|max:50',
             'system'        => 'required|string|max:50',
             'external_code' => 'required|string|max:100',
             'description'   => 'nullable|string|max:255',
@@ -1331,7 +1375,7 @@ final class AddressSetupController extends Controller
     public function storeTranslation(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'division_id' => 'required|string',
+            'division_id' => 'required|string|max:50',
             'locale'      => 'required|string|max:10',
             'name'        => 'required|string|max:255',
             'description' => 'nullable|string',
