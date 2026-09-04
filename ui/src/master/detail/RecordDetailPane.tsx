@@ -62,7 +62,8 @@ export default function RecordDetailPane({
 
     const [nama, setNama] = useState(() => record?.nama ?? '');
     const [values, setValues] = useState<Record<string, FieldValue>>(() =>
-        Object.fromEntries(allFields.map((field) => [field.name, valueFrom(record, field)])));
+        Object.fromEntries(allFields.map((field) => [field.name, valueFrom(record, field)])),
+    );
     const [error, setError] = useState('');
     const creationKey = useRef(newIdempotencyKey());
     const formRef = useRef<HTMLFormElement>(null);
@@ -88,13 +89,22 @@ export default function RecordDetailPane({
         setJenisAsetDetailLoading(true);
         setJenisAsetDetailError('');
         api<{ data: JenisAsetDetail }>(`/jenis-aset/${record.id}/detail`)
-            .then((result) => { if (!cancelled) setJenisAsetDetail(result.data); })
-            .catch((caught) => {
-                if (!cancelled) setJenisAsetDetailError(errorMessage(caught, 'Detail jenis aset belum dapat dimuat.'));
+            .then((result) => {
+                if (!cancelled) setJenisAsetDetail(result.data);
             })
-            .finally(() => { if (!cancelled) setJenisAsetDetailLoading(false); });
+            .catch((caught) => {
+                if (!cancelled)
+                    setJenisAsetDetailError(
+                        errorMessage(caught, 'Detail jenis aset belum dapat dimuat.'),
+                    );
+            })
+            .finally(() => {
+                if (!cancelled) setJenisAsetDetailLoading(false);
+            });
 
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [config.resource, record?.id]);
 
     useEffect(() => {
@@ -110,13 +120,22 @@ export default function RecordDetailPane({
         setPabrikanAsetDetailLoading(true);
         setPabrikanAsetDetailError('');
         api<{ data: PabrikanAsetDetail }>(`/pabrikan-aset/${record.id}/detail`)
-            .then((result) => { if (!cancelled) setPabrikanAsetDetail(result.data); })
-            .catch((caught) => {
-                if (!cancelled) setPabrikanAsetDetailError(errorMessage(caught, 'Detail pabrikan belum dapat dimuat.'));
+            .then((result) => {
+                if (!cancelled) setPabrikanAsetDetail(result.data);
             })
-            .finally(() => { if (!cancelled) setPabrikanAsetDetailLoading(false); });
+            .catch((caught) => {
+                if (!cancelled)
+                    setPabrikanAsetDetailError(
+                        errorMessage(caught, 'Detail pabrikan belum dapat dimuat.'),
+                    );
+            })
+            .finally(() => {
+                if (!cancelled) setPabrikanAsetDetailLoading(false);
+            });
 
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [config.resource, pabrikanAsetDetailVersion, record?.id]);
 
     function markDirty() {
@@ -137,7 +156,9 @@ export default function RecordDetailPane({
      */
     useEffect(() => {
         if (readOnly || !pendingFocus) return;
-        const scope = formRef.current?.querySelector(`[data-field-name="${CSS.escape(pendingFocus)}"]`);
+        const scope = formRef.current?.querySelector(
+            `[data-field-name="${CSS.escape(pendingFocus)}"]`,
+        );
         scope?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea, button')?.focus();
         setPendingFocus(null);
     }, [readOnly, pendingFocus]);
@@ -151,13 +172,17 @@ export default function RecordDetailPane({
             for (const field of allFields) {
                 // Field yang sedang tersembunyi tidak dikirim, supaya mengganti satu pilihan
                 // tidak diam-diam menyimpan nilai milik pilihan sebelumnya.
-                if (isVisible(field, values)) payload[field.name] = payloadValue(field, values[field.name]);
+                if (isVisible(field, values))
+                    payload[field.name] = payloadValue(field, values[field.name]);
             }
-            const saved = await api<{ data: MasterRecord }>(`/${config.resource}${record ? `/${record.id}` : ''}`, {
-                method: record ? 'PATCH' : 'POST',
-                headers: record ? undefined : { 'Idempotency-Key': creationKey.current },
-                body: JSON.stringify(payload),
-            });
+            const saved = await api<{ data: MasterRecord }>(
+                `/${config.resource}${record ? `/${record.id}` : ''}`,
+                {
+                    method: record ? 'PATCH' : 'POST',
+                    headers: record ? undefined : { 'Idempotency-Key': creationKey.current },
+                    body: JSON.stringify(payload),
+                },
+            );
             onDirtyChange(false);
             // Kirim record lengkap agar induk dapat langsung mengisi daftar dan panel
             // detail. Mengirim ID saja membuat panel sempat dipasang tanpa record;
@@ -174,7 +199,9 @@ export default function RecordDetailPane({
         return (
             <div className="flex min-h-0 items-center justify-center p-10">
                 <Empty>
-                    <EmptyDescription>Pilih satu {config.singular} di sebelah kiri.</EmptyDescription>
+                    <EmptyDescription>
+                        Pilih satu {config.singular} di sebelah kiri.
+                    </EmptyDescription>
                 </Empty>
             </div>
         );
@@ -190,19 +217,24 @@ export default function RecordDetailPane({
                         error={pabrikanAsetDetailError}
                     />
                     <div className="grid gap-5 pt-1 sm:grid-cols-2">
-                        {section.fields.filter((field) => isVisible(field, values)).map((field) => (
-                            <DynamicField
-                                key={field.name}
-                                config={field}
-                                value={values[field.name]}
-                                readOnly={readOnly}
-                                onRequestEdit={enterEdit}
-                                onChange={(next) => {
-                                    markDirty();
-                                    setValues((current) => ({ ...current, [field.name]: next }));
-                                }}
-                            />
-                        ))}
+                        {section.fields
+                            .filter((field) => isVisible(field, values))
+                            .map((field) => (
+                                <DynamicField
+                                    key={field.name}
+                                    config={field}
+                                    value={values[field.name]}
+                                    readOnly={readOnly}
+                                    onRequestEdit={enterEdit}
+                                    onChange={(next) => {
+                                        markDirty();
+                                        setValues((current) => ({
+                                            ...current,
+                                            [field.name]: next,
+                                        }));
+                                    }}
+                                />
+                            ))}
                     </div>
                 </div>
             );
@@ -221,14 +253,20 @@ export default function RecordDetailPane({
                     onChanged={() => setPabrikanAsetDetailVersion((current) => current + 1)}
                 />
             ) : (
-                <p className="text-sm text-muted-foreground">Model dapat ditambahkan setelah pabrikan disimpan.</p>
+                <p className="text-sm text-muted-foreground">
+                    Model dapat ditambahkan setelah pabrikan disimpan.
+                </p>
             );
         }
 
         if (section.books) {
-            return record
-                ? <GroupBookMatrix groupId={record.id} canEdit={!readOnly && canEdit} />
-                : <p className="text-sm text-muted-foreground">Buku penyusutan dapat diatur setelah {config.singular} disimpan.</p>;
+            return record ? (
+                <GroupBookMatrix groupId={record.id} canEdit={!readOnly && canEdit} />
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    Buku penyusutan dapat diatur setelah {config.singular} disimpan.
+                </p>
+            );
         }
 
         if (section.counters) {
@@ -236,39 +274,78 @@ export default function RecordDetailPane({
         }
 
         if (section.attributes) {
-            return record
-                ? <JenisAsetAtribut jenisAsetId={record.id} canEdit={!readOnly && canEdit} />
-                : <p className="text-sm text-muted-foreground">Atribut dapat diatur setelah {config.singular} disimpan.</p>;
+            return record ? (
+                <JenisAsetAtribut jenisAsetId={record.id} canEdit={!readOnly && canEdit} />
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    Atribut dapat diatur setelah {config.singular} disimpan.
+                </p>
+            );
         }
 
         if (section.models) {
-            return record
-                ? <JenisAsetModels jenisAsetId={record.id} detail={jenisAsetDetail} loading={jenisAsetDetailLoading} error={jenisAsetDetailError} canEdit={!readOnly && canEdit} />
-                : <p className="text-sm text-muted-foreground">Model dapat diatur setelah jenis aset disimpan.</p>;
+            return record ? (
+                <JenisAsetModels
+                    jenisAsetId={record.id}
+                    detail={jenisAsetDetail}
+                    loading={jenisAsetDetailLoading}
+                    error={jenisAsetDetailError}
+                    canEdit={!readOnly && canEdit}
+                />
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    Model dapat diatur setelah jenis aset disimpan.
+                </p>
+            );
         }
 
         if (section.maintenanceJobType) {
-            return record
-                ? <MaintenanceJobTypeDetails jobTypeId={record.id} canEdit={!readOnly && canEdit} />
-                : <p className="text-sm text-muted-foreground">Rincian maintenance dapat diatur setelah jenis pekerjaan disimpan.</p>;
+            return record ? (
+                <MaintenanceJobTypeDetails jobTypeId={record.id} canEdit={!readOnly && canEdit} />
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    Rincian maintenance dapat diatur setelah jenis pekerjaan disimpan.
+                </p>
+            );
         }
 
         if (section.checklistVariableValues) {
-            return record
-                ? <MaintenanceChecklistVariableValues variableId={record.id} canEdit={!readOnly && canEdit} />
-                : <p className="text-sm text-muted-foreground">Nilai checklist dapat diatur setelah variabel disimpan.</p>;
+            return record ? (
+                <MaintenanceChecklistVariableValues
+                    variableId={record.id}
+                    canEdit={!readOnly && canEdit}
+                />
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    Nilai checklist dapat diatur setelah variabel disimpan.
+                </p>
+            );
         }
 
         if (section.checklistTemplateLines) {
-            return record
-                ? <MaintenanceChecklistTemplateLines templateId={record.id} canEdit={!readOnly && canEdit} />
-                : <p className="text-sm text-muted-foreground">Baris checklist dapat diatur setelah template disimpan.</p>;
+            return record ? (
+                <MaintenanceChecklistTemplateLines
+                    templateId={record.id}
+                    canEdit={!readOnly && canEdit}
+                />
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    Baris checklist dapat diatur setelah template disimpan.
+                </p>
+            );
         }
 
         if (section.maintenanceJobTypes) {
-            return record
-                ? <JenisAsetMaintenanceJobTypes jenisAsetId={record.id} canEdit={!readOnly && canEdit} />
-                : <p className="text-sm text-muted-foreground">Jenis pekerjaan dapat dikaitkan setelah jenis aset disimpan.</p>;
+            return record ? (
+                <JenisAsetMaintenanceJobTypes
+                    jenisAsetId={record.id}
+                    canEdit={!readOnly && canEdit}
+                />
+            ) : (
+                <p className="text-sm text-muted-foreground">
+                    Jenis pekerjaan dapat dikaitkan setelah jenis aset disimpan.
+                </p>
+            );
         }
 
         if (section.placeholder) {
@@ -281,19 +358,21 @@ export default function RecordDetailPane({
 
         return (
             <div className="grid gap-5 pt-1 sm:grid-cols-2">
-                {section.fields.filter((field) => isVisible(field, values)).map((field) => (
-                    <DynamicField
-                        key={field.name}
-                        config={field}
-                        value={values[field.name]}
-                        readOnly={readOnly}
-                        onRequestEdit={enterEdit}
-                        onChange={(next) => {
-                            markDirty();
-                            setValues((current) => ({ ...current, [field.name]: next }));
-                        }}
-                    />
-                ))}
+                {section.fields
+                    .filter((field) => isVisible(field, values))
+                    .map((field) => (
+                        <DynamicField
+                            key={field.name}
+                            config={field}
+                            value={values[field.name]}
+                            readOnly={readOnly}
+                            onRequestEdit={enterEdit}
+                            onChange={(next) => {
+                                markDirty();
+                                setValues((current) => ({ ...current, [field.name]: next }));
+                            }}
+                        />
+                    ))}
             </div>
         );
     }
@@ -317,7 +396,11 @@ export default function RecordDetailPane({
                             disabled
                         />
                     </div>
-                    <div className="min-w-64 flex-1" data-field-name="nama" data-readonly={readOnly || undefined}>
+                    <div
+                        className="min-w-64 flex-1"
+                        data-field-name="nama"
+                        data-readonly={readOnly || undefined}
+                    >
                         <Input
                             id="nama"
                             label={config.namaLabel}
@@ -326,7 +409,10 @@ export default function RecordDetailPane({
                             readOnly={readOnly}
                             onFocus={readOnly ? () => enterEdit('nama') : undefined}
                             value={nama}
-                            onChange={(event) => { markDirty(); setNama(event.target.value); }}
+                            onChange={(event) => {
+                                markDirty();
+                                setNama(event.target.value);
+                            }}
                         />
                     </div>
                     <Badge variant={values.aktif ? 'default' : 'secondary'}>
@@ -339,11 +425,16 @@ export default function RecordDetailPane({
                 {(config.parents?.length ?? 0) > 0 && (
                     <Field data-invalid="true" className="mb-4">
                         <FieldError>
-                            Master ini memiliki induk, dan panel detail belum merendernya. Pakai tampilan daftar sampai dukungan induk ditambahkan.
+                            Master ini memiliki induk, dan panel detail belum merendernya. Pakai
+                            tampilan daftar sampai dukungan induk ditambahkan.
                         </FieldError>
                     </Field>
                 )}
-                <CollapsibleSectionGroup defaultValue={sections.filter((section) => section.defaultOpen).map((section) => section.id)}>
+                <CollapsibleSectionGroup
+                    defaultValue={sections
+                        .filter((section) => section.defaultOpen)
+                        .map((section) => section.id)}
+                >
                     {sections.map((section) => (
                         <CollapsibleSection
                             key={section.id}

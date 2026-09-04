@@ -71,7 +71,13 @@ const emptyRow = (bukuId: string): Row => ({
  * manfaat dan perlakuan periode pertama. Karena itu satu group dapat
  * menyusut komersial dan fiskal sekaligus dengan aturan yang berbeda.
  */
-export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string; canEdit: boolean }) {
+export default function GroupBookMatrix({
+    groupId,
+    canEdit,
+}: {
+    groupId: string;
+    canEdit: boolean;
+}) {
     const [books, setBooks] = useState<Buku[]>([]);
     const [rows, setRows] = useState<Row[]>([]);
     const [error, setError] = useState('');
@@ -85,22 +91,37 @@ export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string;
         Promise.all([
             api<{ data: Buku[] }>('/buku-penyusutan?per_page=100&aktif=true'),
             api<{ data: Record<string, unknown>[] }>(`/group-aset/${groupId}/buku-penyusutan`),
-        ]).then(([bookList, matrix]) => {
-            if (cancelled) return;
-            setBooks(bookList.data);
-            setRows(matrix.data.map((row) => ({
-                buku_id: String(row.buku_id ?? ''),
-                depreciation_profile_id: String(row.depreciation_profile_id ?? ''),
-                alternative_profile_id: String(row.alternative_profile_id ?? ''),
-                useful_life_periods: row.useful_life_periods === null || row.useful_life_periods === undefined ? '' : String(row.useful_life_periods),
-                convention: String(row.convention ?? ''),
-                depreciate: Boolean(row.depreciate ?? true),
-                round_off_depreciation: row.round_off_depreciation === null || row.round_off_depreciation === undefined ? '' : String(row.round_off_depreciation),
-            })));
-        }).catch((caught) => {
-            if (!cancelled) setError(errorMessage(caught, 'Matriks buku penyusutan belum dapat dimuat.'));
-        });
-        return () => { cancelled = true; };
+        ])
+            .then(([bookList, matrix]) => {
+                if (cancelled) return;
+                setBooks(bookList.data);
+                setRows(
+                    matrix.data.map((row) => ({
+                        buku_id: String(row.buku_id ?? ''),
+                        depreciation_profile_id: String(row.depreciation_profile_id ?? ''),
+                        alternative_profile_id: String(row.alternative_profile_id ?? ''),
+                        useful_life_periods:
+                            row.useful_life_periods === null ||
+                            row.useful_life_periods === undefined
+                                ? ''
+                                : String(row.useful_life_periods),
+                        convention: String(row.convention ?? ''),
+                        depreciate: Boolean(row.depreciate ?? true),
+                        round_off_depreciation:
+                            row.round_off_depreciation === null ||
+                            row.round_off_depreciation === undefined
+                                ? ''
+                                : String(row.round_off_depreciation),
+                    })),
+                );
+            })
+            .catch((caught) => {
+                if (!cancelled)
+                    setError(errorMessage(caught, 'Matriks buku penyusutan belum dapat dimuat.'));
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [groupId]);
 
     const label = (id: string) => {
@@ -124,10 +145,14 @@ export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string;
                         buku_id: row.buku_id,
                         depreciation_profile_id: row.depreciation_profile_id || null,
                         alternative_profile_id: row.alternative_profile_id || null,
-                        useful_life_periods: row.useful_life_periods === '' ? null : Number(row.useful_life_periods),
+                        useful_life_periods:
+                            row.useful_life_periods === '' ? null : Number(row.useful_life_periods),
                         convention: row.convention || null,
                         depreciate: row.depreciate,
-                        round_off_depreciation: row.round_off_depreciation === '' ? null : Number(row.round_off_depreciation),
+                        round_off_depreciation:
+                            row.round_off_depreciation === ''
+                                ? null
+                                : Number(row.round_off_depreciation),
                     })),
                 }),
             });
@@ -144,22 +169,32 @@ export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string;
             <div>
                 <p className="font-semibold">Buku penyusutan</p>
                 <p className="text-sm text-muted-foreground">
-                    Aset dari group ini akan mendapat satu buku untuk tiap baris di bawah. Buku komersial dan fiskal boleh memakai metode, masa manfaat, dan tanggal berlaku yang berbeda.
+                    Aset dari group ini akan mendapat satu buku untuk tiap baris di bawah. Buku
+                    komersial dan fiskal boleh memakai metode, masa manfaat, dan tanggal berlaku
+                    yang berbeda.
                 </p>
             </div>
 
             {rows.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                    Belum ada buku. Aset dari group ini belum dapat ditempatkan sampai matriks memiliki buku dan profil yang bisa dihitung.
+                    Belum ada buku. Aset dari group ini belum dapat ditempatkan sampai matriks
+                    memiliki buku dan profil yang bisa dihitung.
                 </p>
             )}
 
             {rows.map((row, index) => (
                 <div key={row.buku_id} className="space-y-3 rounded-md border p-3">
                     <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium">{label(row.buku_id) || 'Buku tidak dikenal'}</span>
+                        <span className="font-medium">
+                            {label(row.buku_id) || 'Buku tidak dikenal'}
+                        </span>
                         {canEdit && (
-                            <Button variant="outline" size="sm" type="button" onClick={() => setRows(rows.filter((_, i) => i !== index))}>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                onClick={() => setRows(rows.filter((_, i) => i !== index))}
+                            >
                                 Hapus
                             </Button>
                         )}
@@ -169,30 +204,56 @@ export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string;
                             <Select
                                 label="Profil utama untuk group ini"
                                 items={profiles.options.map(optionLabel)}
-                                value={profiles.options.filter((item) => item.id === row.depreciation_profile_id).map(optionLabel)[0]}
+                                value={
+                                    profiles.options
+                                        .filter((item) => item.id === row.depreciation_profile_id)
+                                        .map(optionLabel)[0]
+                                }
                                 placeholder="Ikuti profil utama buku"
                                 searchPlaceholder="Cari profil penyusutan"
                                 emptyMessage="Profil penyusutan tidak ditemukan."
                                 ariaLabel="Pilih profil utama untuk group ini"
                                 portalContainer={containerRef}
-                                onValueChange={(item) => patch(index, { depreciation_profile_id: profiles.options.find((option) => optionLabel(option) === item)?.id ?? '' })}
+                                onValueChange={(item) =>
+                                    patch(index, {
+                                        depreciation_profile_id:
+                                            profiles.options.find(
+                                                (option) => optionLabel(option) === item,
+                                            )?.id ?? '',
+                                    })
+                                }
                             />
-                            <FieldDescription>{profiles.error || 'Kosong berarti memakai profil utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}</FieldDescription>
+                            <FieldDescription>
+                                {profiles.error ||
+                                    'Kosong berarti memakai profil utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
+                            </FieldDescription>
                         </Field>
                         <Field>
                             <Select
                                 label="Profil pengganti (opsional)"
                                 items={profiles.options.map(optionLabel)}
-                                value={profiles.options.filter((item) => item.id === row.alternative_profile_id).map(optionLabel)[0]}
+                                value={
+                                    profiles.options
+                                        .filter((item) => item.id === row.alternative_profile_id)
+                                        .map(optionLabel)[0]
+                                }
                                 placeholder="Tanpa pengganti"
                                 searchPlaceholder="Cari profil pengganti"
                                 emptyMessage="Profil penyusutan tidak ditemukan."
                                 ariaLabel="Pilih profil pengganti"
                                 portalContainer={containerRef}
-                                onValueChange={(item) => patch(index, { alternative_profile_id: profiles.options.find((option) => optionLabel(option) === item)?.id ?? '' })}
+                                onValueChange={(item) =>
+                                    patch(index, {
+                                        alternative_profile_id:
+                                            profiles.options.find(
+                                                (option) => optionLabel(option) === item,
+                                            )?.id ?? '',
+                                    })
+                                }
                             />
                             <FieldDescription>
-                                Dipakai begitu saldo menurun menghasilkan angka lebih kecil daripada garis lurus sisa umur, agar aset tetap habis di akhir masa manfaat.
+                                Dipakai begitu saldo menurun menghasilkan angka lebih kecil daripada
+                                garis lurus sisa umur, agar aset tetap habis di akhir masa manfaat.
                             </FieldDescription>
                         </Field>
                         <Field>
@@ -203,12 +264,16 @@ export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string;
                                 min={1}
                                 disabled={!canEdit}
                                 value={row.useful_life_periods}
-                                onChange={(event) => patch(index, { useful_life_periods: event.target.value })}
+                                onChange={(event) =>
+                                    patch(index, { useful_life_periods: event.target.value })
+                                }
                             />
                             <FieldDescription>
                                 {serviceLifeHint(
                                     row.useful_life_periods,
-                                    profiles.options.find((option) => option.id === row.depreciation_profile_id)?.frequency,
+                                    profiles.options.find(
+                                        (option) => option.id === row.depreciation_profile_id,
+                                    )?.frequency,
                                 ) ?? 'Kosong berarti memakai masa manfaat pada profil penyusutan.'}
                             </FieldDescription>
                         </Field>
@@ -216,15 +281,24 @@ export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string;
                             <Select
                                 label="Perlakuan periode pertama"
                                 items={CONVENTIONS.map((item) => item.label)}
-                                value={CONVENTIONS.find((item) => item.value === row.convention)?.label}
+                                value={
+                                    CONVENTIONS.find((item) => item.value === row.convention)?.label
+                                }
                                 placeholder="Pilih perlakuan"
                                 searchPlaceholder="Cari perlakuan"
                                 emptyMessage="Perlakuan tidak ditemukan."
                                 ariaLabel="Pilih perlakuan periode pertama"
                                 portalContainer={containerRef}
-                                onValueChange={(item) => patch(index, { convention: CONVENTIONS.find((c) => c.label === item)?.value ?? '' })}
+                                onValueChange={(item) =>
+                                    patch(index, {
+                                        convention:
+                                            CONVENTIONS.find((c) => c.label === item)?.value ?? '',
+                                    })
+                                }
                             />
-                            <FieldDescription>Dihitung dari tanggal aset mulai digunakan.</FieldDescription>
+                            <FieldDescription>
+                                Dihitung dari tanggal aset mulai digunakan.
+                            </FieldDescription>
                         </Field>
                         <Field>
                             <Input
@@ -235,13 +309,24 @@ export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string;
                                 step={0.01}
                                 disabled={!canEdit}
                                 value={row.round_off_depreciation}
-                                onChange={(event) => patch(index, { round_off_depreciation: event.target.value })}
+                                onChange={(event) =>
+                                    patch(index, { round_off_depreciation: event.target.value })
+                                }
                             />
-                            <FieldDescription>Kosong mengikuti Book. Periode terakhir tidak dibulatkan.</FieldDescription>
+                            <FieldDescription>
+                                Kosong mengikuti Book. Periode terakhir tidak dibulatkan.
+                            </FieldDescription>
                         </Field>
                         <Field orientation="horizontal">
-                            <Switch id={`depreciate-${row.buku_id}`} disabled={!canEdit} checked={row.depreciate} onCheckedChange={(checked) => patch(index, { depreciate: checked })} />
-                            <FieldLabel htmlFor={`depreciate-${row.buku_id}`}>Hitung penyusutan</FieldLabel>
+                            <Switch
+                                id={`depreciate-${row.buku_id}`}
+                                disabled={!canEdit}
+                                checked={row.depreciate}
+                                onCheckedChange={(checked) => patch(index, { depreciate: checked })}
+                            />
+                            <FieldLabel htmlFor={`depreciate-${row.buku_id}`}>
+                                Hitung penyusutan
+                            </FieldLabel>
                         </Field>
                     </div>
                 </div>
@@ -257,7 +342,9 @@ export default function GroupBookMatrix({ groupId, canEdit }: { groupId: string;
                         ariaLabel="Tambah buku penyusutan"
                         portalContainer={containerRef}
                         onValueChange={(item) => {
-                            const book = unused.find((candidate) => `${candidate.kode} — ${candidate.nama}` === item);
+                            const book = unused.find(
+                                (candidate) => `${candidate.kode} — ${candidate.nama}` === item,
+                            );
                             if (book) setRows([...rows, emptyRow(book.id)]);
                         }}
                     />

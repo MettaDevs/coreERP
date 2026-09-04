@@ -40,12 +40,18 @@ export type DetailSection = {
  * detail berjalan lewat satu jalur render, termasuk perlakuan mode bacanya.
  */
 const KETERANGAN: FieldConfig = { name: 'keterangan', label: 'Keterangan', type: 'textarea' };
-const AKTIF: FieldConfig = { name: 'aktif', label: 'Data aktif dan dapat dipilih', type: 'boolean' };
+const AKTIF: FieldConfig = {
+    name: 'aktif',
+    label: 'Data aktif dan dapat dipilih',
+    type: 'boolean',
+};
 
 export function sectionsFor(config: MasterConfig): DetailSection[] {
     const byName = new Map((config.extraFields ?? []).map((field) => [field.name, field]));
     const pick = (...names: string[]) =>
-        names.map((name) => byName.get(name)).filter((field): field is FieldConfig => Boolean(field));
+        names
+            .map((name) => byName.get(name))
+            .filter((field): field is FieldConfig => Boolean(field));
 
     if (config.resource === 'group-aset') {
         return [
@@ -53,7 +59,11 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 id: 'umum',
                 title: 'Umum',
                 defaultOpen: true,
-                fields: pick('kelompok_harta_fiskal_id', 'property_type', 'capitalization_threshold'),
+                fields: pick(
+                    'kelompok_harta_fiskal_id',
+                    'property_type',
+                    'capitalization_threshold',
+                ),
             },
             {
                 id: 'bawaan',
@@ -79,7 +89,8 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 id: 'counter-aset',
                 title: 'Counter aset',
                 fields: [],
-                placeholder: 'Counter aset (misalnya jam pakai atau suhu) belum dapat dipasang di sini. Fitur ini menyusul setelah master counter aset dan relasinya ke jenis aset dibangun.',
+                placeholder:
+                    'Counter aset (misalnya jam pakai atau suhu) belum dapat dipasang di sini. Fitur ini menyusul setelah master counter aset dan relasinya ke jenis aset dibangun.',
             },
             { id: 'atribut', title: 'Tipe atribut', attributes: true, fields: [] },
             { id: 'models', title: 'Pabrikan dan model', models: true, fields: [] },
@@ -87,7 +98,8 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 id: 'kondisi-aset',
                 title: 'Kondisi aset',
                 fields: [],
-                placeholder: 'Templat kondisi belum dapat dibatasi per jenis aset di sini. Kondisi aset yang ada masih berlaku untuk seluruh jenis; pembatasan per jenis menyusul saat relasinya dibangun.',
+                placeholder:
+                    'Templat kondisi belum dapat dibatasi per jenis aset di sini. Kondisi aset yang ada masih berlaku untuk seluruh jenis; pembatasan per jenis menyusul saat relasinya dibangun.',
             },
             { id: 'lain', title: 'Lain-lain', fields: [KETERANGAN, AKTIF] },
         ];
@@ -95,8 +107,19 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
 
     if (config.resource === 'maintenance-job-types') {
         return [
-            { id: 'details', title: 'Details', defaultOpen: true, maintenanceJobType: true, fields: [] },
-            { id: 'general', title: 'General', defaultOpen: true, fields: pick('category_code', 'maintenance_downtime_activities') },
+            {
+                id: 'details',
+                title: 'Details',
+                defaultOpen: true,
+                maintenanceJobType: true,
+                fields: [],
+            },
+            {
+                id: 'general',
+                title: 'General',
+                defaultOpen: true,
+                fields: pick('category_code', 'maintenance_downtime_activities'),
+            },
             { id: 'description', title: 'Description', defaultOpen: true, fields: [KETERANGAN] },
             { id: 'status', title: 'Status', fields: [AKTIF] },
         ];
@@ -104,14 +127,26 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
 
     if (config.resource === 'maintenance-checklist-variables') {
         return [
-            { id: 'values', title: 'General', defaultOpen: true, checklistVariableValues: true, fields: [] },
+            {
+                id: 'values',
+                title: 'General',
+                defaultOpen: true,
+                checklistVariableValues: true,
+                fields: [],
+            },
             { id: 'status', title: 'Status', fields: [KETERANGAN, AKTIF] },
         ];
     }
 
     if (config.resource === 'maintenance-checklist-templates') {
         return [
-            { id: 'lines', title: 'Maintenance checklist lines', defaultOpen: true, checklistTemplateLines: true, fields: [] },
+            {
+                id: 'lines',
+                title: 'Maintenance checklist lines',
+                defaultOpen: true,
+                checklistTemplateLines: true,
+                fields: [],
+            },
             { id: 'status', title: 'Status', fields: [KETERANGAN, AKTIF] },
         ];
     }
@@ -150,7 +185,10 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
  * Field `reference` sengaja dilewati: labelnya milik master lain dan baru diketahui
  * setelah pilihannya dimuat, jadi meringkasnya di sini akan menampilkan ULID mentah.
  */
-export function summaryFor(section: DetailSection, values: Record<string, FieldValue>): string | null {
+export function summaryFor(
+    section: DetailSection,
+    values: Record<string, FieldValue>,
+): string | null {
     const parts: string[] = [];
 
     for (const field of section.fields) {
@@ -161,9 +199,14 @@ export function summaryFor(section: DetailSection, values: Record<string, FieldV
             const label = field.options?.find((option) => option.value === value)?.label;
             if (label) parts.push(label);
         } else if (field.type === 'multiselect' && Array.isArray(value) && value.length > 0) {
-            parts.push(value
-                .map((item) => field.options?.find((option) => option.value === item)?.label ?? item)
-                .join(', '));
+            parts.push(
+                value
+                    .map(
+                        (item) =>
+                            field.options?.find((option) => option.value === item)?.label ?? item,
+                    )
+                    .join(', '),
+            );
         } else if (field.type === 'boolean') {
             parts.push(value ? 'Aktif' : 'Tidak aktif');
         } else if (field.type === 'number' || field.type === 'text' || field.type === 'date') {

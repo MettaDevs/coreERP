@@ -58,17 +58,23 @@ export default function ModelAsetFormSheet({
             .then((result) => {
                 if (cancelled) return;
                 const options = result.data.map(({ id, kode, nama }) => ({ id, kode, nama }));
-                if (value?.jenis_aset && !options.some((option) => option.id === value.jenis_aset_id)) {
+                if (
+                    value?.jenis_aset &&
+                    !options.some((option) => option.id === value.jenis_aset_id)
+                ) {
                     options.unshift(value.jenis_aset);
                 }
                 setJenisOptions(options);
                 setJenisError('');
             })
             .catch((caught) => {
-                if (!cancelled) setJenisError(errorMessage(caught, 'Pilihan jenis aset belum dapat dimuat.'));
+                if (!cancelled)
+                    setJenisError(errorMessage(caught, 'Pilihan jenis aset belum dapat dimuat.'));
             });
 
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [canReadJenis, value?.id, value?.jenis_aset_id]);
 
     const jenisLabel = useMemo(() => {
@@ -104,7 +110,11 @@ export default function ModelAsetFormSheet({
 
     return (
         <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent ref={sheetContentRef} side="right" className="w-full gap-0 p-0 sm:max-w-xl">
+            <SheetContent
+                ref={sheetContentRef}
+                side="right"
+                className="w-full gap-0 p-0 sm:max-w-xl"
+            >
                 <SheetHeader className="border-b px-6 py-5 pr-12">
                     <SheetTitle>{value ? 'Ubah model' : 'Tambah model'}</SheetTitle>
                 </SheetHeader>
@@ -112,47 +122,86 @@ export default function ModelAsetFormSheet({
                     <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                         <FieldGroup>
                             <Field>
-                                <Input label="Pabrikan" value={`${manufacturer.kode} — ${manufacturer.nama}`} disabled />
+                                <Input
+                                    label="Pabrikan"
+                                    value={`${manufacturer.kode} — ${manufacturer.nama}`}
+                                    disabled
+                                />
                             </Field>
                             <Field>
-                                <Input label="Model" autoFocus required maxLength={150} value={nama} onChange={(event) => setNama(event.target.value)} />
+                                <Input
+                                    label="Model"
+                                    autoFocus
+                                    required
+                                    maxLength={150}
+                                    value={nama}
+                                    onChange={(event) => setNama(event.target.value)}
+                                />
                             </Field>
                             {canReadJenis ? (
                                 <Field data-invalid={Boolean(jenisError)}>
                                     <Select
                                         label="Jenis aset"
-                                        items={['Tidak ditentukan', ...jenisOptions.map(optionLabel)]}
+                                        items={[
+                                            'Tidak ditentukan',
+                                            ...jenisOptions.map(optionLabel),
+                                        ]}
                                         value={jenisLabel}
                                         placeholder="Pilih jenis aset"
                                         searchPlaceholder="Cari jenis aset"
                                         emptyMessage="Jenis aset tidak ditemukan."
                                         ariaLabel="Pilih jenis aset"
                                         portalContainer={sheetContentRef}
-                                        onValueChange={(item) => setJenisAsetId(item === 'Tidak ditentukan'
-                                            ? ''
-                                            : jenisOptions.find((option) => optionLabel(option) === item)?.id ?? '')}
+                                        onValueChange={(item) =>
+                                            setJenisAsetId(
+                                                item === 'Tidak ditentukan'
+                                                    ? ''
+                                                    : (jenisOptions.find(
+                                                          (option) => optionLabel(option) === item,
+                                                      )?.id ?? ''),
+                                            )
+                                        }
                                     />
-                                    {jenisError && <FieldDescription>{jenisError}</FieldDescription>}
+                                    {jenisError && (
+                                        <FieldDescription>{jenisError}</FieldDescription>
+                                    )}
                                 </Field>
                             ) : (
                                 <Field>
                                     <FieldLabel>Jenis aset</FieldLabel>
-                                    <FieldDescription>Jenis aset tidak ditampilkan karena Anda belum memiliki akses untuk membacanya.</FieldDescription>
+                                    <FieldDescription>
+                                        Jenis aset tidak ditampilkan karena Anda belum memiliki
+                                        akses untuk membacanya.
+                                    </FieldDescription>
                                 </Field>
                             )}
                             <Field>
                                 <FieldLabel htmlFor="model-description">Keterangan</FieldLabel>
-                                <Textarea id="model-description" rows={4} maxLength={2000} value={keterangan} onChange={(event) => setKeterangan(event.target.value)} />
+                                <Textarea
+                                    id="model-description"
+                                    rows={4}
+                                    maxLength={2000}
+                                    value={keterangan}
+                                    onChange={(event) => setKeterangan(event.target.value)}
+                                />
                             </Field>
                             <Field orientation="horizontal">
-                                <Switch id="model-active" checked={aktif} onCheckedChange={setAktif} />
-                                <FieldLabel htmlFor="model-active">Data aktif dan dapat dipilih</FieldLabel>
+                                <Switch
+                                    id="model-active"
+                                    checked={aktif}
+                                    onCheckedChange={setAktif}
+                                />
+                                <FieldLabel htmlFor="model-active">
+                                    Data aktif dan dapat dipilih
+                                </FieldLabel>
                             </Field>
                             {error && <FieldError>{error}</FieldError>}
                         </FieldGroup>
                     </div>
                     <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                        <Button variant="outline" type="button" onClick={onClose}>Batal</Button>
+                        <Button variant="outline" type="button" onClick={onClose}>
+                            Batal
+                        </Button>
                         <Button disabled={saving}>{saving ? 'Menyimpan…' : 'Simpan'}</Button>
                     </SheetFooter>
                 </form>

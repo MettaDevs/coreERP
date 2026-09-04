@@ -14,7 +14,9 @@ import WorkOrderListPage from './WorkOrderListPage';
  * ```
  */
 export default function WorkOrderPage({
-    context, permissions, segments,
+    context,
+    permissions,
+    segments,
 }: {
     context: Context;
     permissions: string[];

@@ -12,7 +12,14 @@ import {
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { api, errorMessage } from '../../api';
-import { MasterAction, MasterConfig, MasterRecord, MasterResource, Permission, permission } from '../masters';
+import {
+    MasterAction,
+    MasterConfig,
+    MasterRecord,
+    MasterResource,
+    Permission,
+    permission,
+} from '../masters';
 import RecordDetailPane, { DetailMode } from './RecordDetailPane';
 import RecordListPane from './RecordListPane';
 
@@ -22,14 +29,24 @@ import RecordListPane from './RecordListPane';
  * yang dihapus adalah daftar ini beserta `MasterPage`.
  */
 export const DETAIL_LAYOUT_RESOURCES: MasterResource[] = [
-    'group-aset', 'jenis-aset', 'pabrikan-aset', 'maintenance-job-types',
-    'maintenance-checklist-variables', 'maintenance-checklist-templates',
+    'group-aset',
+    'jenis-aset',
+    'pabrikan-aset',
+    'maintenance-job-types',
+    'maintenance-checklist-variables',
+    'maintenance-checklist-templates',
 ];
 
 const FORM_ID = 'master-detail-form';
 const PER_PAGE = 20;
 
-export default function MasterDetailPage({ config, permissions }: { config: MasterConfig; permissions: Permission[] }) {
+export default function MasterDetailPage({
+    config,
+    permissions,
+}: {
+    config: MasterConfig;
+    permissions: Permission[];
+}) {
     const can = (action: MasterAction) => permissions.includes(permission(config.resource, action));
 
     const [items, setItems] = useState<MasterRecord[]>([]);
@@ -63,13 +80,16 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const list = await api<{ data: MasterRecord[]; meta: { current_page: number; last_page: number; total: number } }>(
-                `/${config.resource}?${query}`,
-            );
+            const list = await api<{
+                data: MasterRecord[];
+                meta: { current_page: number; last_page: number; total: number };
+            }>(`/${config.resource}?${query}`);
             // Halaman pertama mengganti; halaman berikutnya menambah. Daftar yang hanya
             // tumbuh membuat record yang sedang dipilih tidak mungkin hilang dari bawah
             // kaki pengguna saat ia menggulir.
-            setItems((current) => (list.meta.current_page === 1 ? list.data : [...current, ...list.data]));
+            setItems((current) =>
+                list.meta.current_page === 1 ? list.data : [...current, ...list.data],
+            );
             setTotal(list.meta.total);
             setLastPage(list.meta.last_page);
             setError('');
@@ -82,12 +102,16 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
     }, [config.resource, query]);
 
     useEffect(() => {
-        const timer = window.setTimeout(() => { void load(); }, 250);
+        const timer = window.setTimeout(() => {
+            void load();
+        }, 250);
 
         return () => window.clearTimeout(timer);
     }, [load]);
 
-    useEffect(() => { setPage(1); }, [search, activeFilter]);
+    useEffect(() => {
+        setPage(1);
+    }, [search, activeFilter]);
 
     // Pilihan awal jatuh ke record pertama supaya panel detail tidak menyambut dengan layar
     // kosong. Tidak pernah menimpa pilihan yang sudah ada.
@@ -157,7 +181,7 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
             const existingIndex = current.findIndex((item) => item.id === savedRecord.id);
             if (existingIndex === -1) return [savedRecord, ...current];
 
-            return current.map((item, index) => index === existingIndex ? savedRecord : item);
+            return current.map((item, index) => (index === existingIndex ? savedRecord : item));
         });
         setSelectedId(savedRecord.id);
         // Record baru langsung tetap disunting karena master maintenance biasanya
@@ -185,29 +209,53 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
                         <Button type="submit" form={FORM_ID} disabled={saving}>
                             {saving ? 'Menyimpan…' : 'Simpan'}
                         </Button>
-                        <Button variant="outline" type="button" onClick={cancelEditing}>Batal</Button>
+                        <Button variant="outline" type="button" onClick={cancelEditing}>
+                            Batal
+                        </Button>
                     </>
                 ) : (
                     <>
                         {can('update') && (
-                            <ActionButton action="edit" type="button" disabled={!selected} onClick={() => setMode('edit')}>
+                            <ActionButton
+                                action="edit"
+                                type="button"
+                                disabled={!selected}
+                                onClick={() => setMode('edit')}
+                            >
                                 Ubah
                             </ActionButton>
                         )}
                         {can('create') && (
-                            <ActionButton action="create" type="button" onClick={() => { setSelectedId(null); setMode('create'); }}>
+                            <ActionButton
+                                action="create"
+                                type="button"
+                                onClick={() => {
+                                    setSelectedId(null);
+                                    setMode('create');
+                                }}
+                            >
                                 Tambah {config.singular}
                             </ActionButton>
                         )}
                         {/* Ubah status sengaja netral: ia bolak-balik dan tidak merusak apa pun,
                             jadi tidak pantas bersaing perhatian dengan aksi yang berkonsekuensi. */}
                         {can('update') && (
-                            <Button variant="outline" type="button" disabled={!selected} onClick={() => void toggleStatus()}>
+                            <Button
+                                variant="outline"
+                                type="button"
+                                disabled={!selected}
+                                onClick={() => void toggleStatus()}
+                            >
                                 Ubah status
                             </Button>
                         )}
                         {can('archive') && (
-                            <ActionButton action="archive" type="button" disabled={!selected} onClick={() => setArchiving(true)}>
+                            <ActionButton
+                                action="archive"
+                                type="button"
+                                disabled={!selected}
+                                onClick={() => setArchiving(true)}
+                            >
                                 Arsipkan
                             </ActionButton>
                         )}
@@ -231,7 +279,9 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
                     creating={mode === 'create'}
                     onSelect={requestSelect}
                     onLoadMore={loadMore}
-                    onRetry={() => { void load(); }}
+                    onRetry={() => {
+                        void load();
+                    }}
                 />
 
                 <RecordDetailPane
@@ -245,16 +295,22 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
                     onRequestEdit={() => setMode('edit')}
                     onDirtyChange={setDirty}
                     onSavingChange={setSaving}
-                    onSaved={(savedRecord, created) => { void handleSaved(savedRecord, created); }}
+                    onSaved={(savedRecord, created) => {
+                        void handleSaved(savedRecord, created);
+                    }}
                 />
             </div>
 
-            <AlertDialog open={pendingSelect !== undefined} onOpenChange={(open) => !open && setPendingSelect(undefined)}>
+            <AlertDialog
+                open={pendingSelect !== undefined}
+                onOpenChange={(open) => !open && setPendingSelect(undefined)}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Perubahan belum disimpan</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Pindah ke {config.singular} lain akan membuang perubahan yang belum Anda simpan.
+                            Pindah ke {config.singular} lain akan membuang perubahan yang belum Anda
+                            simpan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -271,12 +327,15 @@ export default function MasterDetailPage({ config, permissions }: { config: Mast
                     <AlertDialogHeader>
                         <AlertDialogTitle>Arsipkan {selected?.nama}?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Data ini tidak lagi tampil pada daftar pilihan. Record yang sudah memakainya tidak berubah.
+                            Data ini tidak lagi tampil pada daftar pilihan. Record yang sudah
+                            memakainya tidak berubah.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void archive()}>Arsipkan</AlertDialogAction>
+                        <AlertDialogAction onClick={() => void archive()}>
+                            Arsipkan
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

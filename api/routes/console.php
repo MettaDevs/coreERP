@@ -7,6 +7,7 @@ Artisan::command('management-aset:seed-maintenance {tenant? : ULID tenant tujuan
     $tenantId = (string) ($this->option('tenant') ?: $this->argument('tenant'));
     if ($tenantId === '') {
         $this->error('Tenant wajib diisi melalui --tenant=<tenant_id>.');
+
         return;
     }
     $result = $provisioner->maintenanceForTenant($tenantId, (string) $this->option('template-key'));

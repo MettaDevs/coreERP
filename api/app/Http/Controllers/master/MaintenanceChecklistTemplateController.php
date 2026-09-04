@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\master;
 
 use App\Http\Controllers\MasterDataController;
-use App\Models\MasterData;
 use App\Models\master\MaintenanceChecklistTemplate;
+use App\Models\MasterData;
 use App\Support\MasterChild;
 
 class MaintenanceChecklistTemplateController extends MasterDataController

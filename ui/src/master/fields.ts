@@ -10,7 +10,15 @@ export type FieldOption = { value: string; label: string };
 export type FieldConfig = {
     name: string;
     label: string;
-    type: 'text' | 'textarea' | 'number' | 'boolean' | 'date' | 'select' | 'multiselect' | 'reference';
+    type:
+        | 'text'
+        | 'textarea'
+        | 'number'
+        | 'boolean'
+        | 'date'
+        | 'select'
+        | 'multiselect'
+        | 'reference';
     required?: boolean;
     options?: FieldOption[];
     /**

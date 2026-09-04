@@ -54,8 +54,7 @@ class JenisAsetModelController extends Controller
                 ->whereNull('deleted_at')
                 ->lockForUpdate()
                 ->get(['id', 'jenis_aset_id']);
-            $conflict = $models->first(fn (object $model): bool =>
-                $model->jenis_aset_id !== null && $model->jenis_aset_id !== $jenisAsetId);
+            $conflict = $models->first(fn (object $model): bool => $model->jenis_aset_id !== null && $model->jenis_aset_id !== $jenisAsetId);
             if ($conflict) {
                 throw ValidationException::withMessages([
                     'model_ids' => 'Salah satu model sudah dikaitkan dengan jenis aset lain.',

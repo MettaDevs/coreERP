@@ -21,10 +21,18 @@ const BELUM_TERSEDIA = ['Counter', 'Templat kondisi', 'Baris setup', 'Pabrikan']
  */
 export default function JenisAsetCounters({ detail }: { detail: JenisAsetDetail | null }) {
     const boxes: { key: string; label: string; count: number | null }[] = [
-        { key: 'atribut', label: 'Tipe atribut', count: detail?.atribut_count ?? null },
+        {
+            key: 'atribut',
+            label: 'Tipe atribut',
+            count: detail?.atribut_count ?? null,
+        },
         { key: 'model', label: 'Model aset', count: detail?.model_count ?? null },
         { key: 'aset', label: 'Aset', count: detail?.asset_count ?? null },
-        { key: 'maintenance', label: 'Jenis pekerjaan', count: detail?.maintenance_job_type_count ?? null },
+        {
+            key: 'maintenance',
+            label: 'Jenis pekerjaan',
+            count: detail?.maintenance_job_type_count ?? null,
+        },
         ...BELUM_TERSEDIA.map((label) => ({ key: label, label, count: null })),
     ];
 

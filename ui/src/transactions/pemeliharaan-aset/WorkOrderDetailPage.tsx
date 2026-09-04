@@ -34,7 +34,18 @@ import {
 type Mode = 'view' | 'edit' | 'create';
 
 function JobRow({
-    job, index, canRemove, readOnly, onRequestEdit, assets, assetItems, jobTypes, trades, onAssetSearch, onChange, onRemove,
+    job,
+    index,
+    canRemove,
+    readOnly,
+    onRequestEdit,
+    assets,
+    assetItems,
+    jobTypes,
+    trades,
+    onAssetSearch,
+    onChange,
+    onRemove,
 }: {
     job: JobLine;
     index: number;
@@ -76,7 +87,11 @@ function JobRow({
         <div className="space-y-3 rounded-lg border p-3">
             <div className="flex justify-between">
                 <span className="text-sm font-medium">Baris {index + 1}</span>
-                {canRemove && !readOnly && <Button type="button" variant="ghost" size="sm" onClick={onRemove}>Hapus</Button>}
+                {canRemove && !readOnly && (
+                    <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+                        Hapus
+                    </Button>
+                )}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
                 <Field>
@@ -90,12 +105,22 @@ function JobRow({
                             searchPlaceholder="Cari kode atau nama aset"
                             ariaLabel={`Aset baris ${index + 1}`}
                             onSearchChange={onAssetSearch}
-                            onValueChange={(value) => onChange({ asset_id: idDari(assets, value), maintenance_job_type_id: '', variant_id: '' })}
+                            onValueChange={(value) =>
+                                onChange({
+                                    asset_id: idDari(assets, value),
+                                    maintenance_job_type_id: '',
+                                    variant_id: '',
+                                })
+                            }
                         />
                     </EditShield>
                 </Field>
                 <Field>
-                    <EditShield active={readOnly} label="jenis pekerjaan" onActivate={onRequestEdit}>
+                    <EditShield
+                        active={readOnly}
+                        label="jenis pekerjaan"
+                        onActivate={onRequestEdit}
+                    >
                         <Select
                             label="Jenis pekerjaan"
                             required
@@ -104,25 +129,44 @@ function JobRow({
                             placeholder="Pilih jenis pekerjaan"
                             searchPlaceholder="Cari jenis pekerjaan"
                             ariaLabel={`Jenis pekerjaan baris ${index + 1}`}
-                            onValueChange={(value) => onChange({ maintenance_job_type_id: idDari(jobTypes, value), variant_id: '' })}
+                            onValueChange={(value) =>
+                                onChange({
+                                    maintenance_job_type_id: idDari(jobTypes, value),
+                                    variant_id: '',
+                                })
+                            }
                         />
                     </EditShield>
                 </Field>
                 <Field>
-                    <EditShield active={readOnly} label="varian pekerjaan" onActivate={onRequestEdit}>
+                    <EditShield
+                        active={readOnly}
+                        label="varian pekerjaan"
+                        onActivate={onRequestEdit}
+                    >
                         <Select
                             label="Varian pekerjaan"
                             items={variants.map((variant) => labelDari(variant) ?? '')}
                             value={labelDari(pilih(variants, job.variant_id))}
-                            placeholder={job.maintenance_job_type_id ? 'Pilih varian bila diperlukan' : 'Pilih jenis pekerjaan dahulu'}
+                            placeholder={
+                                job.maintenance_job_type_id
+                                    ? 'Pilih varian bila diperlukan'
+                                    : 'Pilih jenis pekerjaan dahulu'
+                            }
                             searchPlaceholder="Cari varian pekerjaan"
                             ariaLabel={`Varian pekerjaan baris ${index + 1}`}
-                            onValueChange={(value) => onChange({ variant_id: idDari(variants, value) })}
+                            onValueChange={(value) =>
+                                onChange({ variant_id: idDari(variants, value) })
+                            }
                         />
                     </EditShield>
                 </Field>
                 <Field>
-                    <EditShield active={readOnly} label="bidang keahlian" onActivate={onRequestEdit}>
+                    <EditShield
+                        active={readOnly}
+                        label="bidang keahlian"
+                        onActivate={onRequestEdit}
+                    >
                         <Select
                             label="Bidang keahlian"
                             items={trades.map((trade) => labelDari(trade) ?? '')}
@@ -186,7 +230,12 @@ function JobRow({
  * ID, tidak ada istilah tabel, dan tidak ada apa pun berbau akuntansi.
  */
 function ChecklistPanel({
-    rows, editable, saving, onClose, onSave, onChange,
+    rows,
+    editable,
+    saving,
+    onClose,
+    onSave,
+    onChange,
 }: {
     rows: ChecklistRow[];
     editable: boolean;
@@ -200,19 +249,26 @@ function ChecklistPanel({
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h3 className="text-base font-semibold">Checklist pemeriksaan</h3>
-                    <p className="text-sm text-muted-foreground">Isi pemeriksaan di halaman ini sebelum pekerjaan dinyatakan selesai.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Isi pemeriksaan di halaman ini sebelum pekerjaan dinyatakan selesai.
+                    </p>
                 </div>
-                <Button type="button" variant="outline" onClick={onClose}>Tutup checklist</Button>
+                <Button type="button" variant="outline" onClick={onClose}>
+                    Tutup checklist
+                </Button>
             </div>
             <div className="mt-4 space-y-4">
                 {!rows.length ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada baris pemeriksaan</EmptyTitle>
-                            <EmptyDescription>Susun checklist dari template sebelum pekerjaan dimulai.</EmptyDescription>
+                            <EmptyDescription>
+                                Susun checklist dari template sebelum pekerjaan dimulai.
+                            </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
-                ) : rows.map((row) => (
+                ) : (
+                    rows.map((row) => (
                         <div key={row.id} className="space-y-2 rounded-lg border p-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -220,54 +276,122 @@ function ChecklistPanel({
                                         {row.nama}
                                         {row.wajib && <span className="text-destructive"> *</span>}
                                     </p>
-                                    {row.instruksi && <p className="text-sm text-muted-foreground">{row.instruksi}</p>}
-                                    {row.tipe === 'measurement' && row.min_value !== null && row.max_value !== null && <p className="text-sm text-muted-foreground">Rentang lulus: {row.min_value}–{row.max_value}{row.satuan ? ` ${row.satuan}` : ''}.</p>}
-                                    {row.tipe === 'variable' && row.pilihan.some((choice) => choice.result_code === 'none') && <p className="text-sm text-muted-foreground">Jika memilih jawaban Tidak dinilai, isi alasan pada catatan teknisi.</p>}
+                                    {row.instruksi && (
+                                        <p className="text-sm text-muted-foreground">
+                                            {row.instruksi}
+                                        </p>
+                                    )}
+                                    {row.tipe === 'measurement' &&
+                                        row.min_value !== null &&
+                                        row.max_value !== null && (
+                                            <p className="text-sm text-muted-foreground">
+                                                Rentang lulus: {row.min_value}–{row.max_value}
+                                                {row.satuan ? ` ${row.satuan}` : ''}.
+                                            </p>
+                                        )}
+                                    {row.tipe === 'variable' &&
+                                        row.pilihan.some(
+                                            (choice) => choice.result_code === 'none',
+                                        ) && (
+                                            <p className="text-sm text-muted-foreground">
+                                                Jika memilih jawaban Tidak dinilai, isi alasan pada
+                                                catatan teknisi.
+                                            </p>
+                                        )}
                                 </div>
-                                {editable && <div className="flex shrink-0 items-center gap-2">
-                                    <span className="text-sm text-muted-foreground">Tidak berlaku</span>
-                                    <Switch
-                                        checked={row.tidak_berlaku}
-                                        onCheckedChange={(checked) => onChange(row.id, { tidak_berlaku: checked, nilai: checked ? null : row.nilai })}
-                                    />
-                                </div>}
+                                {editable && (
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        <span className="text-sm text-muted-foreground">
+                                            Tidak berlaku
+                                        </span>
+                                        <Switch
+                                            checked={row.tidak_berlaku}
+                                            onCheckedChange={(checked) =>
+                                                onChange(row.id, {
+                                                    tidak_berlaku: checked,
+                                                    nilai: checked ? null : row.nilai,
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                )}
                             </div>
                             {row.tipe === 'header' ? null : row.tidak_berlaku ? (
-                                <p className="text-sm text-muted-foreground">Pemeriksaan ini ditandai tidak berlaku untuk aset ini.</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Pemeriksaan ini ditandai tidak berlaku untuk aset ini.
+                                </p>
                             ) : row.tipe === 'variable' ? (
-                                editable ? <Select
-                                    label="Jawaban"
-                                    items={row.pilihan.map((choice) => choice.value)}
-                                     value={row.nilai}
-                                     placeholder="Pilih jawaban"
-                                     searchPlaceholder="Cari jawaban"
-                                     ariaLabel={`Jawaban ${row.nama}`}
-                                     onValueChange={(value) => onChange(row.id, { nilai: value })}
-                                /> : <p className="text-sm">Jawaban: {row.nilai ?? 'Belum diisi'}</p>
-                            ) : (
-                                editable ? <Input
-                                    label={row.tipe === 'measurement' ? `Nilai${row.satuan ? ` (${row.satuan})` : ''}` : 'Jawaban'}
+                                editable ? (
+                                    <Select
+                                        label="Jawaban"
+                                        items={row.pilihan.map((choice) => choice.value)}
+                                        value={row.nilai}
+                                        placeholder="Pilih jawaban"
+                                        searchPlaceholder="Cari jawaban"
+                                        ariaLabel={`Jawaban ${row.nama}`}
+                                        onValueChange={(value) =>
+                                            onChange(row.id, { nilai: value })
+                                        }
+                                    />
+                                ) : (
+                                    <p className="text-sm">Jawaban: {row.nilai ?? 'Belum diisi'}</p>
+                                )
+                            ) : editable ? (
+                                <Input
+                                    label={
+                                        row.tipe === 'measurement'
+                                            ? `Nilai${row.satuan ? ` (${row.satuan})` : ''}`
+                                            : 'Jawaban'
+                                    }
                                     type={row.tipe === 'measurement' ? 'number' : 'text'}
                                     step="any"
                                     value={row.nilai ?? ''}
-                                    onChange={(event) => onChange(row.id, { nilai: event.target.value })}
-                                /> : <p className="text-sm">Jawaban: {row.nilai ?? 'Belum diisi'}</p>
-                            )}
-                            {editable ? <Field>
-                                <FieldLabel htmlFor={`catatan-${row.id}`}>Catatan teknisi{row.pilihan.some((choice) => choice.value === row.nilai && choice.result_code === 'none') ? ' (wajib)' : ''}</FieldLabel>
-                                <Textarea
-                                    id={`catatan-${row.id}`}
-                                    rows={2}
-                                    value={row.catatan_teknisi ?? ''}
-                                    onChange={(event) => onChange(row.id, { catatan_teknisi: event.target.value })}
+                                    onChange={(event) =>
+                                        onChange(row.id, { nilai: event.target.value })
+                                    }
                                 />
-                            </Field> : row.catatan_teknisi && <p className="text-sm text-muted-foreground">Catatan teknisi: {row.catatan_teknisi}</p>}
+                            ) : (
+                                <p className="text-sm">Jawaban: {row.nilai ?? 'Belum diisi'}</p>
+                            )}
+                            {editable ? (
+                                <Field>
+                                    <FieldLabel htmlFor={`catatan-${row.id}`}>
+                                        Catatan teknisi
+                                        {row.pilihan.some(
+                                            (choice) =>
+                                                choice.value === row.nilai &&
+                                                choice.result_code === 'none',
+                                        )
+                                            ? ' (wajib)'
+                                            : ''}
+                                    </FieldLabel>
+                                    <Textarea
+                                        id={`catatan-${row.id}`}
+                                        rows={2}
+                                        value={row.catatan_teknisi ?? ''}
+                                        onChange={(event) =>
+                                            onChange(row.id, {
+                                                catatan_teknisi: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </Field>
+                            ) : (
+                                row.catatan_teknisi && (
+                                    <p className="text-sm text-muted-foreground">
+                                        Catatan teknisi: {row.catatan_teknisi}
+                                    </p>
+                                )
+                            )}
                         </div>
-                    ))}
+                    ))
+                )}
             </div>
             <div className="mt-4 flex justify-end gap-2 border-t pt-4">
                 {editable && rows.length > 0 && (
-                    <Button type="button" disabled={saving} onClick={onSave}>{saving ? 'Menyimpan…' : 'Simpan hasil'}</Button>
+                    <Button type="button" disabled={saving} onClick={onSave}>
+                        {saving ? 'Menyimpan…' : 'Simpan hasil'}
+                    </Button>
                 )}
             </div>
         </div>
@@ -283,7 +407,11 @@ function ChecklistPanel({
  * alih-alih melompat keluar dari aplikasi.
  */
 export default function WorkOrderDetailPage({
-    context, permissions, workOrderId, mode, checklistJobId,
+    context,
+    permissions,
+    workOrderId,
+    mode,
+    checklistJobId,
 }: {
     context: Context;
     permissions: string[];
@@ -293,7 +421,9 @@ export default function WorkOrderDetailPage({
     checklistJobId?: string;
 }) {
     const can = izin(permissions);
-    const [record, setRecord] = useState<EditableWorkOrder | undefined>(mode === 'create' ? emptyWorkOrder() : undefined);
+    const [record, setRecord] = useState<EditableWorkOrder | undefined>(
+        mode === 'create' ? emptyWorkOrder() : undefined,
+    );
     const [tipe, setTipe] = useState<Option[]>([]);
     const [layanan, setLayanan] = useState<Option[]>([]);
     const [assets, setAssets] = useState<Option[]>([]);
@@ -308,43 +438,48 @@ export default function WorkOrderDetailPage({
     const loadJobTypesForAsset = useCallback(async (assetId: string) => {
         if (!assetId) return;
         try {
-            const result = await api<{ data: Option[] }>(`/pemeliharaan-aset/referensi/job-types?asset_id=${encodeURIComponent(assetId)}`);
+            const result = await api<{ data: Option[] }>(
+                `/pemeliharaan-aset/referensi/job-types?asset_id=${encodeURIComponent(assetId)}`,
+            );
             setJobTypesByAsset((current) => ({ ...current, [assetId]: result.data }));
         } catch {
             toast.error('Jenis pekerjaan untuk aset belum dapat dimuat.');
         }
     }, []);
 
-    const load = useCallback(async (id: string) => {
-        try {
-            const result = await api<{ data: WorkOrder }>(`/pemeliharaan-aset/${id}`);
-            const details = (result.data.details ?? []).map((job, index) => ({
-                ...job,
-                line_number: job.line_number ?? index + 1,
-                trade_id: job.trade_id ?? '',
-                variant_id: job.variant_id ?? '',
-                ditugaskan_ke_user_id: job.ditugaskan_ke_user_id ?? '',
-                estimasi_jam: job.estimasi_jam ? String(job.estimasi_jam) : '',
-                dijadwalkan_mulai: job.dijadwalkan_mulai ?? '',
-                dijadwalkan_selesai: job.dijadwalkan_selesai ?? '',
-                sebab_kerusakan_id: job.sebab_kerusakan_id ?? '',
-                tindakan_perbaikan_id: job.tindakan_perbaikan_id ?? '',
-                sebab_kerusakan_keterangan: job.sebab_kerusakan_keterangan ?? '',
-                tindakan_perbaikan_keterangan: job.tindakan_perbaikan_keterangan ?? '',
-                catatan: job.catatan ?? '',
-            }));
-            await Promise.all(details.map((job) => loadJobTypesForAsset(job.asset_id)));
-            setRecord({
-                ...result.data,
-                tingkat_layanan_id: result.data.tingkat_layanan_id ?? '',
-                diharapkan_mulai: result.data.diharapkan_mulai ?? '',
-                diharapkan_selesai: result.data.diharapkan_selesai ?? '',
-                details,
-            });
-        } catch (caught) {
-            toast.error(errorMessage(caught, 'Work order belum dapat dibuka.'));
-        }
-    }, [loadJobTypesForAsset]);
+    const load = useCallback(
+        async (id: string) => {
+            try {
+                const result = await api<{ data: WorkOrder }>(`/pemeliharaan-aset/${id}`);
+                const details = (result.data.details ?? []).map((job, index) => ({
+                    ...job,
+                    line_number: job.line_number ?? index + 1,
+                    trade_id: job.trade_id ?? '',
+                    variant_id: job.variant_id ?? '',
+                    ditugaskan_ke_user_id: job.ditugaskan_ke_user_id ?? '',
+                    estimasi_jam: job.estimasi_jam ? String(job.estimasi_jam) : '',
+                    dijadwalkan_mulai: job.dijadwalkan_mulai ?? '',
+                    dijadwalkan_selesai: job.dijadwalkan_selesai ?? '',
+                    sebab_kerusakan_id: job.sebab_kerusakan_id ?? '',
+                    tindakan_perbaikan_id: job.tindakan_perbaikan_id ?? '',
+                    sebab_kerusakan_keterangan: job.sebab_kerusakan_keterangan ?? '',
+                    tindakan_perbaikan_keterangan: job.tindakan_perbaikan_keterangan ?? '',
+                    catatan: job.catatan ?? '',
+                }));
+                await Promise.all(details.map((job) => loadJobTypesForAsset(job.asset_id)));
+                setRecord({
+                    ...result.data,
+                    tingkat_layanan_id: result.data.tingkat_layanan_id ?? '',
+                    diharapkan_mulai: result.data.diharapkan_mulai ?? '',
+                    diharapkan_selesai: result.data.diharapkan_selesai ?? '',
+                    details,
+                });
+            } catch (caught) {
+                toast.error(errorMessage(caught, 'Work order belum dapat dibuka.'));
+            }
+        },
+        [loadJobTypesForAsset],
+    );
 
     // `mode` ikut jadi pemicu supaya kembali ke mode baca berarti membaca ulang dari
     // server. Itulah yang membuang suntingan yang batal: tidak ada salinan lama yang
@@ -361,12 +496,34 @@ export default function WorkOrderDetailPage({
     useEffect(() => {
         if (!can('create') && !can('update') && !can('execute')) return;
         const muat = (path: string, set: (options: Option[]) => void, gagal: string) =>
-            api<{ data: Option[] }>(path).then((result) => set(result.data)).catch(() => toast.error(gagal));
-        void muat('/tipe-work-order?per_page=100&aktif=true', setTipe, 'Tipe work order belum dapat dimuat.');
-        void muat('/tingkat-layanan?per_page=100&aktif=true', setLayanan, 'Tingkat layanan belum dapat dimuat.');
-        void muat('/trade?per_page=100&aktif=true', setTrades, 'Bidang keahlian belum dapat dimuat.');
-        void muat('/sebab-kerusakan?per_page=100&aktif=true', setFaultCauses, 'Sebab kerusakan belum dapat dimuat.');
-        void muat('/tindakan-perbaikan?per_page=100&aktif=true', setRepairActions, 'Tindakan perbaikan belum dapat dimuat.');
+            api<{ data: Option[] }>(path)
+                .then((result) => set(result.data))
+                .catch(() => toast.error(gagal));
+        void muat(
+            '/tipe-work-order?per_page=100&aktif=true',
+            setTipe,
+            'Tipe work order belum dapat dimuat.',
+        );
+        void muat(
+            '/tingkat-layanan?per_page=100&aktif=true',
+            setLayanan,
+            'Tingkat layanan belum dapat dimuat.',
+        );
+        void muat(
+            '/trade?per_page=100&aktif=true',
+            setTrades,
+            'Bidang keahlian belum dapat dimuat.',
+        );
+        void muat(
+            '/sebab-kerusakan?per_page=100&aktif=true',
+            setFaultCauses,
+            'Sebab kerusakan belum dapat dimuat.',
+        );
+        void muat(
+            '/tindakan-perbaikan?per_page=100&aktif=true',
+            setRepairActions,
+            'Tindakan perbaikan belum dapat dimuat.',
+        );
         // Register aset dikembalikan utuh oleh `/aset` tanpa parameter pencarian, jadi
         // penyaringan dilakukan di sini. Mengirim `q` ke server hanya akan diabaikan diam-diam
         // dan membuat kotak pencarian terlihat bekerja padahal tidak.
@@ -381,21 +538,31 @@ export default function WorkOrderDetailPage({
             return;
         }
         let dibatalkan = false;
-        api<{ data: ChecklistRow[] }>(`/pemeliharaan-aset/${workOrderId}/jobs/${checklistJobId}/checklist`)
-            .then((result) => { if (!dibatalkan) setChecklist(result.data); })
+        api<{ data: ChecklistRow[] }>(
+            `/pemeliharaan-aset/${workOrderId}/jobs/${checklistJobId}/checklist`,
+        )
+            .then((result) => {
+                if (!dibatalkan) setChecklist(result.data);
+            })
             .catch((caught) => toast.error(errorMessage(caught, 'Checklist belum dapat dibuka.')));
 
-        return () => { dibatalkan = true; };
+        return () => {
+            dibatalkan = true;
+        };
     }, [workOrderId, checklistJobId]);
 
     const assetQuery = assetSearch.trim().toLowerCase();
-    const assetTersaring = assetQuery === ''
-        ? assets
-        : assets.filter((asset) => `${asset.kode} ${asset.nama ?? ''}`.toLowerCase().includes(assetQuery));
+    const assetTersaring =
+        assetQuery === ''
+            ? assets
+            : assets.filter((asset) =>
+                  `${asset.kode} ${asset.nama ?? ''}`.toLowerCase().includes(assetQuery),
+              );
 
     const pindahStatus = async (ke: string, label: string) => {
         if (!record?.id || !record.kode) return;
-        const alasan = ke === 'dibatalkan' ? window.prompt(`Alasan membatalkan ${record.kode}?`) : null;
+        const alasan =
+            ke === 'dibatalkan' ? window.prompt(`Alasan membatalkan ${record.kode}?`) : null;
         if (ke === 'dibatalkan' && !alasan?.trim()) return;
         try {
             await api(`/pemeliharaan-aset/${record.id}/status`, {
@@ -546,31 +713,84 @@ export default function WorkOrderDetailPage({
         window.location.hash = `#/pemeliharaan-aset/${record.id}/ubah`;
     };
 
-    const updateJob = (jobId: string | undefined, change: Partial<JobLine>) => setRecord((current) => current && ({
-        ...current,
-        details: current.details.map((job) => job.id === jobId ? { ...job, ...change } : job),
-    }));
+    const updateJob = (jobId: string | undefined, change: Partial<JobLine>) =>
+        setRecord(
+            (current) =>
+                current && {
+                    ...current,
+                    details: current.details.map((job) =>
+                        job.id === jobId ? { ...job, ...change } : job,
+                    ),
+                },
+        );
 
     const jobColumns: DataTableColumn<JobLine>[] = [
-        { id: 'baris', header: 'Baris', cell: (job) => job.line_number ?? '—', sortValue: (job) => job.line_number ?? 0, align: 'center', width: 70 },
-        { id: 'aset', header: 'Aset', cell: (job) => <span className="font-medium text-primary">{job.asset_kode ?? '—'}</span>, sortValue: (job) => job.asset_kode ?? '', width: 150 },
-        { id: 'pekerjaan', header: 'Jenis pekerjaan', cell: (job) => job.job_type_nama ?? '—', sortValue: (job) => job.job_type_nama ?? '', width: 190 },
-        { id: 'varian', header: 'Varian', cell: (job) => job.variant_nama ?? '—', sortValue: (job) => job.variant_nama ?? '', width: 150 },
-        { id: 'bidang', header: 'Bidang keahlian', cell: (job) => job.trade_nama ?? '—', sortValue: (job) => job.trade_nama ?? '', width: 170 },
-        { id: 'mulai', header: 'Mulai terjadwal', cell: (job) => job.dijadwalkan_mulai ?? '—', sortValue: (job) => job.dijadwalkan_mulai ?? '', width: 170 },
+        {
+            id: 'baris',
+            header: 'Baris',
+            cell: (job) => job.line_number ?? '—',
+            sortValue: (job) => job.line_number ?? 0,
+            align: 'center',
+            width: 70,
+        },
+        {
+            id: 'aset',
+            header: 'Aset',
+            cell: (job) => (
+                <span className="font-medium text-primary">{job.asset_kode ?? '—'}</span>
+            ),
+            sortValue: (job) => job.asset_kode ?? '',
+            width: 150,
+        },
+        {
+            id: 'pekerjaan',
+            header: 'Jenis pekerjaan',
+            cell: (job) => job.job_type_nama ?? '—',
+            sortValue: (job) => job.job_type_nama ?? '',
+            width: 190,
+        },
+        {
+            id: 'varian',
+            header: 'Varian',
+            cell: (job) => job.variant_nama ?? '—',
+            sortValue: (job) => job.variant_nama ?? '',
+            width: 150,
+        },
+        {
+            id: 'bidang',
+            header: 'Bidang keahlian',
+            cell: (job) => job.trade_nama ?? '—',
+            sortValue: (job) => job.trade_nama ?? '',
+            width: 170,
+        },
+        {
+            id: 'mulai',
+            header: 'Mulai terjadwal',
+            cell: (job) => job.dijadwalkan_mulai ?? '—',
+            sortValue: (job) => job.dijadwalkan_mulai ?? '',
+            width: 170,
+        },
         {
             id: 'aktual',
             header: 'Jam aktual',
-            cell: (job) => canEditExecution ? (
-                <Input
-                    aria-label={`Jam aktual ${job.asset_kode ?? ''}`}
-                    type="number"
-                    min="0"
-                    step="0.25"
-                    value={job.aktual_jam ?? ''}
-                    onChange={(event) => updateJob(job.id, { aktual_jam: event.target.value === '' ? null : Number(event.target.value) })}
-                />
-            ) : (job.aktual_jam ?? '—'),
+            cell: (job) =>
+                canEditExecution ? (
+                    <Input
+                        aria-label={`Jam aktual ${job.asset_kode ?? ''}`}
+                        type="number"
+                        min="0"
+                        step="0.25"
+                        value={job.aktual_jam ?? ''}
+                        onChange={(event) =>
+                            updateJob(job.id, {
+                                aktual_jam:
+                                    event.target.value === '' ? null : Number(event.target.value),
+                            })
+                        }
+                    />
+                ) : (
+                    (job.aktual_jam ?? '—')
+                ),
             sortValue: (job) => job.aktual_jam ?? 0,
             width: 130,
         },
@@ -589,13 +809,36 @@ export default function WorkOrderDetailPage({
                             ariaLabel={`Sebab kerusakan ${job.asset_kode ?? ''}`}
                             onValueChange={(value) => {
                                 const id = idDari(faultCauses, value) || null;
-                                const mintaKeterangan = faultCauses.find((option) => option.id === id)?.minta_keterangan;
-                                updateJob(job.id, { sebab_kerusakan_id: id, ...(!mintaKeterangan && { sebab_kerusakan_keterangan: null }) });
+                                const mintaKeterangan = faultCauses.find(
+                                    (option) => option.id === id,
+                                )?.minta_keterangan;
+                                updateJob(job.id, {
+                                    sebab_kerusakan_id: id,
+                                    ...(!mintaKeterangan && { sebab_kerusakan_keterangan: null }),
+                                });
                             }}
                         />
-                        {selected?.minta_keterangan && <Input aria-label={`Keterangan sebab kerusakan ${job.asset_kode ?? ''}`} placeholder="Tulis sebab kerusakan" value={job.sebab_kerusakan_keterangan ?? ''} onChange={(event) => updateJob(job.id, { sebab_kerusakan_keterangan: event.target.value })} />}
+                        {selected?.minta_keterangan && (
+                            <Input
+                                aria-label={`Keterangan sebab kerusakan ${job.asset_kode ?? ''}`}
+                                placeholder="Tulis sebab kerusakan"
+                                value={job.sebab_kerusakan_keterangan ?? ''}
+                                onChange={(event) =>
+                                    updateJob(job.id, {
+                                        sebab_kerusakan_keterangan: event.target.value,
+                                    })
+                                }
+                            />
+                        )}
                     </div>
-                ) : <span>{labelDari(selected) ?? job.sebab_kerusakan_nama ?? 'Belum diisi'}{job.sebab_kerusakan_keterangan ? ` — ${job.sebab_kerusakan_keterangan}` : ''}</span>;
+                ) : (
+                    <span>
+                        {labelDari(selected) ?? job.sebab_kerusakan_nama ?? 'Belum diisi'}
+                        {job.sebab_kerusakan_keterangan
+                            ? ` — ${job.sebab_kerusakan_keterangan}`
+                            : ''}
+                    </span>
+                );
             },
             width: 190,
         },
@@ -603,7 +846,9 @@ export default function WorkOrderDetailPage({
             id: 'tindakan',
             header: 'Tindakan perbaikan',
             cell: (job) => {
-                const selected = repairActions.find((option) => option.id === job.tindakan_perbaikan_id);
+                const selected = repairActions.find(
+                    (option) => option.id === job.tindakan_perbaikan_id,
+                );
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
                         <Select
@@ -614,13 +859,38 @@ export default function WorkOrderDetailPage({
                             ariaLabel={`Tindakan perbaikan ${job.asset_kode ?? ''}`}
                             onValueChange={(value) => {
                                 const id = idDari(repairActions, value) || null;
-                                const mintaKeterangan = repairActions.find((option) => option.id === id)?.minta_keterangan;
-                                updateJob(job.id, { tindakan_perbaikan_id: id, ...(!mintaKeterangan && { tindakan_perbaikan_keterangan: null }) });
+                                const mintaKeterangan = repairActions.find(
+                                    (option) => option.id === id,
+                                )?.minta_keterangan;
+                                updateJob(job.id, {
+                                    tindakan_perbaikan_id: id,
+                                    ...(!mintaKeterangan && {
+                                        tindakan_perbaikan_keterangan: null,
+                                    }),
+                                });
                             }}
                         />
-                        {selected?.minta_keterangan && <Input aria-label={`Keterangan tindakan perbaikan ${job.asset_kode ?? ''}`} placeholder="Tulis tindakan perbaikan" value={job.tindakan_perbaikan_keterangan ?? ''} onChange={(event) => updateJob(job.id, { tindakan_perbaikan_keterangan: event.target.value })} />}
+                        {selected?.minta_keterangan && (
+                            <Input
+                                aria-label={`Keterangan tindakan perbaikan ${job.asset_kode ?? ''}`}
+                                placeholder="Tulis tindakan perbaikan"
+                                value={job.tindakan_perbaikan_keterangan ?? ''}
+                                onChange={(event) =>
+                                    updateJob(job.id, {
+                                        tindakan_perbaikan_keterangan: event.target.value,
+                                    })
+                                }
+                            />
+                        )}
                     </div>
-                ) : <span>{labelDari(selected) ?? job.tindakan_perbaikan_nama ?? 'Belum diisi'}{job.tindakan_perbaikan_keterangan ? ` — ${job.tindakan_perbaikan_keterangan}` : ''}</span>;
+                ) : (
+                    <span>
+                        {labelDari(selected) ?? job.tindakan_perbaikan_nama ?? 'Belum diisi'}
+                        {job.tindakan_perbaikan_keterangan
+                            ? ` — ${job.tindakan_perbaikan_keterangan}`
+                            : ''}
+                    </span>
+                );
             },
             width: 200,
         },
@@ -630,7 +900,16 @@ export default function WorkOrderDetailPage({
             cell: (job) => (
                 <div className="flex items-center gap-2">
                     <span>{job.hasil ?? 'Belum dihitung'}</span>
-                    {canEditExecution && <Button type="button" size="sm" disabled={saving} onClick={() => void simpanPelaksanaan(job)}>Simpan</Button>}
+                    {canEditExecution && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            disabled={saving}
+                            onClick={() => void simpanPelaksanaan(job)}
+                        >
+                            Simpan
+                        </Button>
+                    )}
                 </div>
             ),
             width: 190,
@@ -659,54 +938,95 @@ export default function WorkOrderDetailPage({
                 ) : (
                     <>
                         {dapatDisunting && record.id && (
-                            <ActionButton action="edit" type="button" onClick={mintaSunting}>Ubah</ActionButton>
+                            <ActionButton action="edit" type="button" onClick={mintaSunting}>
+                                Ubah
+                            </ActionButton>
                         )}
-                        {record.id && status && (TRANSISI[status] ?? [])
-                            .filter((transisi) => can(transisi.izin))
-                            .map((transisi) => (
-                                <Button
-                                    key={transisi.ke}
-                                    type="button"
-                                    variant={transisi.ke === 'dibatalkan' ? 'destructive' : 'default'}
-                                    onClick={() => void pindahStatus(transisi.ke, transisi.label)}
-                                >
-                                    {transisi.label}
-                                </Button>
-                            ))}
-                        <Button type="button" variant="outline" onClick={bukaDaftar}>Kembali ke daftar</Button>
+                        {record.id &&
+                            status &&
+                            (TRANSISI[status] ?? [])
+                                .filter((transisi) => can(transisi.izin))
+                                .map((transisi) => (
+                                    <Button
+                                        key={transisi.ke}
+                                        type="button"
+                                        variant={
+                                            transisi.ke === 'dibatalkan' ? 'destructive' : 'default'
+                                        }
+                                        onClick={() =>
+                                            void pindahStatus(transisi.ke, transisi.label)
+                                        }
+                                    >
+                                        {transisi.label}
+                                    </Button>
+                                ))}
+                        <Button type="button" variant="outline" onClick={bukaDaftar}>
+                            Kembali ke daftar
+                        </Button>
                     </>
                 )}
             </RecordActionBar>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-4 p-5">
-                    <p className="text-sm text-muted-foreground">Entitas legal dan unit penanggung jawab mengikuti konteks aktif Anda.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Entitas legal dan unit penanggung jawab mengikuti konteks aktif Anda.
+                    </p>
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Field>
-                            <EditShield active={readOnly} label="tipe work order" onActivate={mintaSunting}>
+                            <EditShield
+                                active={readOnly}
+                                label="tipe work order"
+                                onActivate={mintaSunting}
+                            >
                                 <Select
                                     label="Tipe work order"
                                     required
                                     items={tipe.map((option) => labelDari(option) ?? '')}
-                                    value={labelDari(tipe.find((option) => option.id === record.tipe_work_order_id))}
+                                    value={labelDari(
+                                        tipe.find(
+                                            (option) => option.id === record.tipe_work_order_id,
+                                        ),
+                                    )}
                                     placeholder="Pilih tipe work order"
                                     searchPlaceholder="Cari tipe work order"
                                     ariaLabel="Tipe work order"
-                                    onValueChange={(value) => setRecord({ ...record, tipe_work_order_id: idDari(tipe, value) })}
+                                    onValueChange={(value) =>
+                                        setRecord({
+                                            ...record,
+                                            tipe_work_order_id: idDari(tipe, value),
+                                        })
+                                    }
                                 />
                             </EditShield>
-                            <FieldDescription>Tipe menentukan apa yang wajib diisi sebelum pekerjaan boleh dinyatakan selesai.</FieldDescription>
+                            <FieldDescription>
+                                Tipe menentukan apa yang wajib diisi sebelum pekerjaan boleh
+                                dinyatakan selesai.
+                            </FieldDescription>
                         </Field>
                         <Field>
-                            <EditShield active={readOnly} label="tingkat layanan" onActivate={mintaSunting}>
+                            <EditShield
+                                active={readOnly}
+                                label="tingkat layanan"
+                                onActivate={mintaSunting}
+                            >
                                 <Select
                                     label="Tingkat layanan"
                                     items={layanan.map((option) => labelDari(option) ?? '')}
-                                    value={labelDari(layanan.find((option) => option.id === record.tingkat_layanan_id))}
+                                    value={labelDari(
+                                        layanan.find(
+                                            (option) => option.id === record.tingkat_layanan_id,
+                                        ),
+                                    )}
                                     placeholder="Pilih tingkat layanan"
                                     searchPlaceholder="Cari tingkat layanan"
                                     ariaLabel="Tingkat layanan"
-                                    onValueChange={(value) => setRecord({ ...record, tingkat_layanan_id: idDari(layanan, value) })}
+                                    onValueChange={(value) =>
+                                        setRecord({
+                                            ...record,
+                                            tingkat_layanan_id: idDari(layanan, value),
+                                        })
+                                    }
                                 />
                             </EditShield>
                         </Field>
@@ -716,10 +1036,16 @@ export default function WorkOrderDetailPage({
                                 type="datetime-local"
                                 readOnly={readOnly}
                                 onFocus={readOnly ? mintaSunting : undefined}
-                                value={record.diharapkan_mulai?.replace(' ', 'T').slice(0, 16) ?? ''}
-                                onChange={(event) => setRecord({ ...record, diharapkan_mulai: event.target.value })}
+                                value={
+                                    record.diharapkan_mulai?.replace(' ', 'T').slice(0, 16) ?? ''
+                                }
+                                onChange={(event) =>
+                                    setRecord({ ...record, diharapkan_mulai: event.target.value })
+                                }
                             />
-                            <FieldDescription>Batas waktu yang diharapkan untuk memulai pekerjaan.</FieldDescription>
+                            <FieldDescription>
+                                Batas waktu yang diharapkan untuk memulai pekerjaan.
+                            </FieldDescription>
                         </Field>
                         <Field>
                             <Input
@@ -727,10 +1053,16 @@ export default function WorkOrderDetailPage({
                                 type="datetime-local"
                                 readOnly={readOnly}
                                 onFocus={readOnly ? mintaSunting : undefined}
-                                value={record.diharapkan_selesai?.replace(' ', 'T').slice(0, 16) ?? ''}
-                                onChange={(event) => setRecord({ ...record, diharapkan_selesai: event.target.value })}
+                                value={
+                                    record.diharapkan_selesai?.replace(' ', 'T').slice(0, 16) ?? ''
+                                }
+                                onChange={(event) =>
+                                    setRecord({ ...record, diharapkan_selesai: event.target.value })
+                                }
                             />
-                            <FieldDescription>Batas waktu yang diharapkan untuk menyelesaikan pekerjaan.</FieldDescription>
+                            <FieldDescription>
+                                Batas waktu yang diharapkan untuk menyelesaikan pekerjaan.
+                            </FieldDescription>
                         </Field>
                         <Field>
                             <Input
@@ -738,10 +1070,16 @@ export default function WorkOrderDetailPage({
                                 type="datetime-local"
                                 readOnly={readOnly}
                                 onFocus={readOnly ? mintaSunting : undefined}
-                                value={record.dijadwalkan_mulai?.replace(' ', 'T').slice(0, 16) ?? ''}
-                                onChange={(event) => setRecord({ ...record, dijadwalkan_mulai: event.target.value })}
+                                value={
+                                    record.dijadwalkan_mulai?.replace(' ', 'T').slice(0, 16) ?? ''
+                                }
+                                onChange={(event) =>
+                                    setRecord({ ...record, dijadwalkan_mulai: event.target.value })
+                                }
                             />
-                            <FieldDescription>Harus diisi sebelum work order dapat dijadwalkan.</FieldDescription>
+                            <FieldDescription>
+                                Harus diisi sebelum work order dapat dijadwalkan.
+                            </FieldDescription>
                         </Field>
                         <Field>
                             <Input
@@ -749,8 +1087,15 @@ export default function WorkOrderDetailPage({
                                 type="datetime-local"
                                 readOnly={readOnly}
                                 onFocus={readOnly ? mintaSunting : undefined}
-                                value={record.dijadwalkan_selesai?.replace(' ', 'T').slice(0, 16) ?? ''}
-                                onChange={(event) => setRecord({ ...record, dijadwalkan_selesai: event.target.value })}
+                                value={
+                                    record.dijadwalkan_selesai?.replace(' ', 'T').slice(0, 16) ?? ''
+                                }
+                                onChange={(event) =>
+                                    setRecord({
+                                        ...record,
+                                        dijadwalkan_selesai: event.target.value,
+                                    })
+                                }
                             />
                         </Field>
                     </div>
@@ -762,7 +1107,9 @@ export default function WorkOrderDetailPage({
                             readOnly={readOnly}
                             onFocus={readOnly ? mintaSunting : undefined}
                             value={record.keterangan ?? ''}
-                            onChange={(event) => setRecord({ ...record, keterangan: event.target.value })}
+                            onChange={(event) =>
+                                setRecord({ ...record, keterangan: event.target.value })
+                            }
                         />
                     </Field>
                     <div className="space-y-3">
@@ -773,7 +1120,12 @@ export default function WorkOrderDetailPage({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setRecord({ ...record, details: [...record.details, emptyJob()] })}
+                                    onClick={() =>
+                                        setRecord({
+                                            ...record,
+                                            details: [...record.details, emptyJob()],
+                                        })
+                                    }
                                 >
                                     Tambah baris
                                 </Button>
@@ -787,7 +1139,8 @@ export default function WorkOrderDetailPage({
                                 getRowLabel={(job) => job.asset_kode ?? 'baris pekerjaan'}
                                 actions={[{ id: 'checklist', label: 'Buka checklist' }]}
                                 onRowAction={(action, job) => {
-                                    if (action === 'checklist' && record.id) bukaChecklistJob(record.id, String(job.id));
+                                    if (action === 'checklist' && record.id)
+                                        bukaChecklistJob(record.id, String(job.id));
                                 }}
                             />
                         ) : (
@@ -805,30 +1158,49 @@ export default function WorkOrderDetailPage({
                                     trades={trades}
                                     onAssetSearch={setAssetSearch}
                                     onChange={(change) => {
-                                        if ('asset_id' in change && change.asset_id) void loadJobTypesForAsset(change.asset_id);
+                                        if ('asset_id' in change && change.asset_id)
+                                            void loadJobTypesForAsset(change.asset_id);
                                         setRecord({
                                             ...record,
-                                            details: record.details.map((current, position) => position === index ? { ...current, ...change } : current),
+                                            details: record.details.map((current, position) =>
+                                                position === index
+                                                    ? { ...current, ...change }
+                                                    : current,
+                                            ),
                                         });
                                     }}
-                                    onRemove={() => setRecord({
-                                        ...record,
-                                        details: record.details.filter((_, position) => position !== index),
-                                    })}
+                                    onRemove={() =>
+                                        setRecord({
+                                            ...record,
+                                            details: record.details.filter(
+                                                (_, position) => position !== index,
+                                            ),
+                                        })
+                                    }
                                 />
                             ))
                         )}
                     </div>
                 </div>
 
-                {checklist && <ChecklistPanel
-                    rows={checklist}
-                    editable={status === 'dikerjakan'}
-                    saving={saving}
-                    onClose={() => { if (workOrderId) bukaWorkOrder(workOrderId); }}
-                    onSave={() => void simpanChecklist()}
-                    onChange={(id, change) => setChecklist((current) => current?.map((row) => row.id === id ? { ...row, ...change } : row))}
-                />}
+                {checklist && (
+                    <ChecklistPanel
+                        rows={checklist}
+                        editable={status === 'dikerjakan'}
+                        saving={saving}
+                        onClose={() => {
+                            if (workOrderId) bukaWorkOrder(workOrderId);
+                        }}
+                        onSave={() => void simpanChecklist()}
+                        onChange={(id, change) =>
+                            setChecklist((current) =>
+                                current?.map((row) =>
+                                    row.id === id ? { ...row, ...change } : row,
+                                ),
+                            )
+                        }
+                    />
+                )}
             </div>
         </div>
     );

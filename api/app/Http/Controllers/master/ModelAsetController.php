@@ -4,6 +4,7 @@ namespace App\Http\Controllers\master;
 
 use App\Http\Controllers\MasterDataController;
 use App\Models\master\ModelAset;
+use App\Models\MasterData;
 use App\Support\MasterChild;
 use App\Support\MasterParent;
 use App\Support\OrganizationScope;
@@ -78,7 +79,7 @@ class ModelAsetController extends MasterDataController
         ]);
     }
 
-    protected function extraPresent(\App\Models\MasterData $record): array
+    protected function extraPresent(MasterData $record): array
     {
         return [
             'asset_count' => $record->getAttribute('asset_count') === null

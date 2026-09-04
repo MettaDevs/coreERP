@@ -74,7 +74,10 @@ export type ChecklistRow = {
 };
 
 /** Label dan warna status. */
-export const STATUS: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }> = {
+export const STATUS: Record<
+    string,
+    { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }
+> = {
     draft: { label: 'Draf', variant: 'outline' },
     dijadwalkan: { label: 'Dijadwalkan', variant: 'secondary' },
     dikerjakan: { label: 'Dikerjakan', variant: 'default' },
@@ -109,14 +112,26 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 export const emptyJob = (): JobLine => ({
-    asset_id: '', maintenance_job_type_id: '', variant_id: '', trade_id: '',
-    ditugaskan_ke_user_id: '', estimasi_jam: '', dijadwalkan_mulai: '', dijadwalkan_selesai: '', catatan: '',
+    asset_id: '',
+    maintenance_job_type_id: '',
+    variant_id: '',
+    trade_id: '',
+    ditugaskan_ke_user_id: '',
+    estimasi_jam: '',
+    dijadwalkan_mulai: '',
+    dijadwalkan_selesai: '',
+    catatan: '',
 });
 
 export const emptyWorkOrder = (): EditableWorkOrder => ({
-    keterangan: '', tipe_work_order_id: '', tingkat_layanan_id: '',
-    diharapkan_mulai: '', diharapkan_selesai: '',
-    dijadwalkan_mulai: '', dijadwalkan_selesai: '', details: [emptyJob()],
+    keterangan: '',
+    tipe_work_order_id: '',
+    tingkat_layanan_id: '',
+    diharapkan_mulai: '',
+    diharapkan_selesai: '',
+    dijadwalkan_mulai: '',
+    dijadwalkan_selesai: '',
+    details: [emptyJob()],
 });
 
 // Select memilih berdasarkan label, jadi id dibolak-balik ke nama di dua tempat ini.
@@ -124,8 +139,8 @@ export const labelDari = (option?: Option) => (option ? `${option.kode} · ${opt
 export const idDari = (options: Option[], label: string | null) =>
     options.find((option) => `${option.kode} · ${option.nama}` === label)?.id ?? '';
 
-export const izin = (permissions: string[]) =>
-    (action: string) => permissions.includes(`management-aset.pemeliharaan-aset.${action}`);
+export const izin = (permissions: string[]) => (action: string) =>
+    permissions.includes(`management-aset.pemeliharaan-aset.${action}`);
 
 /**
  * Rincian punya alamatnya sendiri, sama seperti di daftar mana pun yang membuka record
@@ -133,10 +148,18 @@ export const izin = (permissions: string[]) =>
  * disalin ke rekan kerja semuanya mendarat di work order yang sama, bukan di daftar.
  */
 export const RESOURCE = 'pemeliharaan-aset';
-export const bukaDaftar = () => { window.location.hash = `#/${RESOURCE}`; };
-export const bukaWorkOrder = (id: string) => { window.location.hash = `#/${RESOURCE}/${id}`; };
-export const bukaWorkOrderUbah = (id: string) => { window.location.hash = `#/${RESOURCE}/${id}/ubah`; };
-export const bukaWorkOrderBaru = () => { window.location.hash = `#/${RESOURCE}/baru`; };
+export const bukaDaftar = () => {
+    window.location.hash = `#/${RESOURCE}`;
+};
+export const bukaWorkOrder = (id: string) => {
+    window.location.hash = `#/${RESOURCE}/${id}`;
+};
+export const bukaWorkOrderUbah = (id: string) => {
+    window.location.hash = `#/${RESOURCE}/${id}/ubah`;
+};
+export const bukaWorkOrderBaru = () => {
+    window.location.hash = `#/${RESOURCE}/baru`;
+};
 export const bukaChecklistJob = (workOrderId: string, jobId: string) => {
     window.location.hash = `#/${RESOURCE}/${workOrderId}/checklist/${jobId}`;
 };

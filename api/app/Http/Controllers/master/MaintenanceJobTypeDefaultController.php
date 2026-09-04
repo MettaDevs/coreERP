@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\master;
 
 use App\Http\Controllers\MasterDataController;
-use App\Models\MasterData;
 use App\Models\master\MaintenanceJobTypeDefault;
+use App\Models\MasterData;
+use App\Services\NumberSequenceClient;
 use App\Support\MasterParent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,7 +66,9 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
     {
         $payload = [];
         foreach (['trade', 'functional_location_id', 'jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'asset_id', 'hours', 'items_count', 'expenses_count', 'fees_count'] as $key) {
-            if (! array_key_exists($key, $data)) continue;
+            if (! array_key_exists($key, $data)) {
+                continue;
+            }
             $payload[$key] = is_string($data[$key]) && trim($data[$key]) === '' ? null : $data[$key];
         }
 
@@ -96,7 +99,7 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
         $data = $request->validate(['nama' => ['required', 'string', 'max:150']]);
         $creationKey = (string) $request->header('Idempotency-Key');
         validator(['key' => $creationKey], ['key' => ['required', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
-        $numbers = app(\App\Services\NumberSequenceClient::class);
+        $numbers = app(NumberSequenceClient::class);
         $code = $numbers->issue('management-aset.maintenance-job-type-defaults', $tenantId, 'maintenance-job-type-defaults:'.$creationKey);
         $copy = $source->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
         $copy->fill(['tenant_id' => $tenantId, 'creation_key' => $creationKey, 'kode' => $code, 'nama' => trim($data['nama'])]);

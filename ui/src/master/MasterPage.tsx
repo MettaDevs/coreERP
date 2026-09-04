@@ -42,7 +42,13 @@ function extraSectionFor(resource: string, record: MasterRecord, canEdit: boolea
     return undefined;
 }
 
-export default function MasterPage({ config, permissions }: { config: MasterConfig; permissions: Permission[] }) {
+export default function MasterPage({
+    config,
+    permissions,
+}: {
+    config: MasterConfig;
+    permissions: Permission[];
+}) {
     const parents = useMemo(() => config.parents ?? [], [config.parents]);
     const can = (action: MasterAction) => permissions.includes(permission(config.resource, action));
     const [items, setItems] = useState<MasterRecord[]>([]);
@@ -75,7 +81,9 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
         setLoading(true);
         setError('');
         try {
-            const list = await api<{ data: MasterRecord[]; meta: ListMeta }>(`/${config.resource}?${query}`);
+            const list = await api<{ data: MasterRecord[]; meta: ListMeta }>(
+                `/${config.resource}?${query}`,
+            );
             setItems(list.data);
             setMeta(list.meta);
         } catch (caught) {
@@ -108,11 +116,17 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
                     }));
                 });
         }
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [parents]);
 
-    useEffect(() => { setPage(1); }, [search, activeFilter, parentFilter]);
-    useEffect(() => { setSelectedIds([]); }, [config.resource, query]);
+    useEffect(() => {
+        setPage(1);
+    }, [search, activeFilter, parentFilter]);
+    useEffect(() => {
+        setSelectedIds([]);
+    }, [config.resource, query]);
     useEffect(() => {
         const timer = window.setTimeout(load, 250);
         return () => window.clearTimeout(timer);
@@ -131,7 +145,12 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
     }
 
     async function archive(item: MasterRecord) {
-        if (!window.confirm(`Arsipkan ${item.nama}? Data ini tidak lagi tampil pada daftar pilihan.`)) return;
+        if (
+            !window.confirm(
+                `Arsipkan ${item.nama}? Data ini tidak lagi tampil pada daftar pilihan.`,
+            )
+        )
+            return;
         try {
             await api(`/${config.resource}/${item.id}`, { method: 'DELETE' });
             load();
@@ -141,14 +160,20 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
     }
 
     async function changeSelected(aktif: boolean) {
-        const selected = items.filter((item) => selectedIds.includes(item.id) && item.aktif !== aktif);
+        const selected = items.filter(
+            (item) => selectedIds.includes(item.id) && item.aktif !== aktif,
+        );
         if (!selected.length) return;
         const action = aktif ? 'Aktifkan' : 'Nonaktifkan';
         if (!window.confirm(`${action} ${selected.length} data terpilih?`)) return;
-        const results = await Promise.allSettled(selected.map((item) => api(`/${config.resource}/${item.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ aktif }),
-        })));
+        const results = await Promise.allSettled(
+            selected.map((item) =>
+                api(`/${config.resource}/${item.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ aktif }),
+                }),
+            ),
+        );
         const failed = results.filter((result) => result.status === 'rejected').length;
         setSelectedIds([]);
         if (failed) setError(`${failed} data belum dapat diubah.`);
@@ -157,8 +182,16 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
 
     async function archiveSelected() {
         const selected = items.filter((item) => selectedIds.includes(item.id));
-        if (!selected.length || !window.confirm(`Arsipkan ${selected.length} data terpilih? Data ini tidak lagi tampil pada daftar pilihan.`)) return;
-        const results = await Promise.allSettled(selected.map((item) => api(`/${config.resource}/${item.id}`, { method: 'DELETE' })));
+        if (
+            !selected.length ||
+            !window.confirm(
+                `Arsipkan ${selected.length} data terpilih? Data ini tidak lagi tampil pada daftar pilihan.`,
+            )
+        )
+            return;
+        const results = await Promise.allSettled(
+            selected.map((item) => api(`/${config.resource}/${item.id}`, { method: 'DELETE' })),
+        );
         const failed = results.filter((result) => result.status === 'rejected').length;
         setSelectedIds([]);
         if (failed) setError(`${failed} data belum dapat diarsipkan.`);
@@ -166,17 +199,56 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
     }
 
     const typeLabel: Record<string, string> = {
-        string: 'Teks', decimal: 'Desimal', integer: 'Bilangan bulat', date: 'Tanggal', boolean: 'Ya/tidak',
+        string: 'Teks',
+        decimal: 'Desimal',
+        integer: 'Bilangan bulat',
+        date: 'Tanggal',
+        boolean: 'Ya/tidak',
     };
-    const attributeColumns: DataTableColumn<MasterRecord>[] = config.resource === 'tipe-atribut' ? [
-        { id: 'data_type', header: 'Tipe data', cell: (item) => typeLabel[String(item.data_type)] ?? String(item.data_type), width: 150 },
-        { id: 'satuan', header: 'Satuan', cell: (item) => <span className="muted">{String(item.satuan ?? '—')}</span>, width: 110 },
-        { id: 'values', header: 'Values', cell: (item) => Number(item.values_count ?? 0), width: 90 },
-        { id: 'asset-types', header: 'Jenis aset', cell: (item) => Number(item.asset_types_count ?? 0), width: 110 },
-    ] : [];
+    const attributeColumns: DataTableColumn<MasterRecord>[] =
+        config.resource === 'tipe-atribut'
+            ? [
+                  {
+                      id: 'data_type',
+                      header: 'Tipe data',
+                      cell: (item) => typeLabel[String(item.data_type)] ?? String(item.data_type),
+                      width: 150,
+                  },
+                  {
+                      id: 'satuan',
+                      header: 'Satuan',
+                      cell: (item) => <span className="muted">{String(item.satuan ?? '—')}</span>,
+                      width: 110,
+                  },
+                  {
+                      id: 'values',
+                      header: 'Values',
+                      cell: (item) => Number(item.values_count ?? 0),
+                      width: 90,
+                  },
+                  {
+                      id: 'asset-types',
+                      header: 'Jenis aset',
+                      cell: (item) => Number(item.asset_types_count ?? 0),
+                      width: 110,
+                  },
+              ]
+            : [];
     const columns: DataTableColumn<MasterRecord>[] = [
-        { id: 'kode', header: config.kodeLabel, cell: (item) => <span className="code">{item.kode}</span>, sortValue: (item) => item.kode, width: 170 },
-        { id: 'nama', header: config.namaLabel, cell: (item) => <span className="name">{item.nama}</span>, sortValue: (item) => item.nama, width: 260 },
+        {
+            id: 'kode',
+            header: config.kodeLabel,
+            cell: (item) => <span className="code">{item.kode}</span>,
+            sortValue: (item) => item.kode,
+            width: 170,
+        },
+        {
+            id: 'nama',
+            header: config.namaLabel,
+            cell: (item) => <span className="name">{item.nama}</span>,
+            sortValue: (item) => item.nama,
+            width: 260,
+        },
         ...parents.map((parent) => ({
             id: `parent-${parent.field}`,
             header: parent.label,
@@ -187,46 +259,102 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
             width: 220,
         })),
         ...attributeColumns,
-        { id: 'keterangan', header: 'Keterangan', cell: (item) => <span className="muted">{item.keterangan || '—'}</span>, width: 260 },
-        { id: 'status', header: 'Status', cell: (item) => <Badge variant={item.aktif ? 'default' : 'secondary'}>{item.aktif ? 'Aktif' : 'Tidak aktif'}</Badge>, width: 120 },
+        {
+            id: 'keterangan',
+            header: 'Keterangan',
+            cell: (item) => <span className="muted">{item.keterangan || '—'}</span>,
+            width: 260,
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            cell: (item) => (
+                <Badge variant={item.aktif ? 'default' : 'secondary'}>
+                    {item.aktif ? 'Aktif' : 'Tidak aktif'}
+                </Badge>
+            ),
+            width: 120,
+        },
     ];
     const rowActions: DataTableRowAction[] = [];
-    if (can('update')) rowActions.push({ id: 'edit', label: 'Ubah' }, { id: 'toggle', label: 'Ubah status' });
-    if (can('archive')) rowActions.push({ id: 'archive', label: 'Arsipkan', destructive: true, separatorBefore: rowActions.length > 0 });
+    if (can('update'))
+        rowActions.push({ id: 'edit', label: 'Ubah' }, { id: 'toggle', label: 'Ubah status' });
+    if (can('archive'))
+        rowActions.push({
+            id: 'archive',
+            label: 'Arsipkan',
+            destructive: true,
+            separatorBefore: rowActions.length > 0,
+        });
 
     return (
         <div>
-            <Card aria-labelledby="list-title" className="min-h-full rounded-none border-0 shadow-none">
+            <Card
+                aria-labelledby="list-title"
+                className="min-h-full rounded-none border-0 shadow-none"
+            >
                 <CardHeader className="min-h-0 border-b px-5 py-3">
-                    <CardTitle id="list-title" className="text-base">{config.title}</CardTitle>
-                    {can('create') && <CardAction><Button onClick={() => setEditing(null)}>＋ Tambah {config.singular}</Button></CardAction>}
+                    <CardTitle id="list-title" className="text-base">
+                        {config.title}
+                    </CardTitle>
+                    {can('create') && (
+                        <CardAction>
+                            <Button onClick={() => setEditing(null)}>
+                                ＋ Tambah {config.singular}
+                            </Button>
+                        </CardAction>
+                    )}
                 </CardHeader>
 
                 <CardContent className="px-0">
                     <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
                         <div className="space-y-1">
                             <p className="font-semibold">Daftar {config.singular}</p>
-                            <p className="text-sm text-muted-foreground">{meta.total} data ditemukan</p>
+                            <p className="text-sm text-muted-foreground">
+                                {meta.total} data ditemukan
+                            </p>
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                            <Input className="w-full sm:w-70" type="search" placeholder="Cari kode atau nama" aria-label={`Cari ${config.singular}`} value={search} onChange={(event) => setSearch(event.target.value)} />
+                            <Input
+                                className="w-full sm:w-70"
+                                type="search"
+                                placeholder="Cari kode atau nama"
+                                aria-label={`Cari ${config.singular}`}
+                                value={search}
+                                onChange={(event) => setSearch(event.target.value)}
+                            />
                             {parents.map((parent) => {
                                 const options = parentOptions[parent.field] ?? [];
-                                const selected = options.find((option) => option.id === parentFilter[parent.field]);
+                                const selected = options.find(
+                                    (option) => option.id === parentFilter[parent.field],
+                                );
                                 return (
                                     <div key={parent.field} className="w-full sm:w-52">
                                         <Select
-                                            items={[allLabel(parent.label), ...options.map(optionLabel)]}
-                                            value={selected ? optionLabel(selected) : allLabel(parent.label)}
+                                            items={[
+                                                allLabel(parent.label),
+                                                ...options.map(optionLabel),
+                                            ]}
+                                            value={
+                                                selected
+                                                    ? optionLabel(selected)
+                                                    : allLabel(parent.label)
+                                            }
                                             searchPlaceholder={`Cari ${parent.label.toLowerCase()}`}
                                             emptyMessage={`${parent.label} tidak ditemukan.`}
                                             ariaLabel={`Saring berdasarkan ${parent.label.toLowerCase()}`}
-                                            onValueChange={(item) => setParentFilter((current) => ({
-                                                ...current,
-                                                [parent.field]: item === allLabel(parent.label)
-                                                    ? 'semua'
-                                                    : options.find((option) => optionLabel(option) === item)?.id ?? 'semua',
-                                            }))}
+                                            onValueChange={(item) =>
+                                                setParentFilter((current) => ({
+                                                    ...current,
+                                                    [parent.field]:
+                                                        item === allLabel(parent.label)
+                                                            ? 'semua'
+                                                            : (options.find(
+                                                                  (option) =>
+                                                                      optionLabel(option) === item,
+                                                              )?.id ?? 'semua'),
+                                                }))
+                                            }
                                         />
                                     </div>
                                 );
@@ -234,11 +362,25 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
                             <div className="w-full sm:w-44">
                                 <Select
                                     items={['Semua status', 'Aktif', 'Tidak aktif']}
-                                    value={activeFilter === 'true' ? 'Aktif' : activeFilter === 'false' ? 'Tidak aktif' : 'Semua status'}
+                                    value={
+                                        activeFilter === 'true'
+                                            ? 'Aktif'
+                                            : activeFilter === 'false'
+                                              ? 'Tidak aktif'
+                                              : 'Semua status'
+                                    }
                                     searchPlaceholder="Cari status"
                                     emptyMessage="Status tidak ditemukan."
                                     ariaLabel="Saring berdasarkan status"
-                                    onValueChange={(item) => setActiveFilter(item === 'Aktif' ? 'true' : item === 'Tidak aktif' ? 'false' : 'semua')}
+                                    onValueChange={(item) =>
+                                        setActiveFilter(
+                                            item === 'Aktif'
+                                                ? 'true'
+                                                : item === 'Tidak aktif'
+                                                  ? 'false'
+                                                  : 'semua',
+                                        )
+                                    }
                                 />
                             </div>
                         </div>
@@ -247,17 +389,51 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/40 px-5 py-2 text-sm">
                             <span>{selectedIds.length} data dipilih</span>
                             <div className="flex gap-2">
-                                {can('update') && <Button variant="outline" size="sm" onClick={() => changeSelected(false)}>Nonaktifkan</Button>}
-                                {can('archive') && <Button variant="destructive" size="sm" onClick={archiveSelected}>Arsipkan</Button>}
+                                {can('update') && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => changeSelected(false)}
+                                    >
+                                        Nonaktifkan
+                                    </Button>
+                                )}
+                                {can('archive') && (
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={archiveSelected}
+                                    >
+                                        Arsipkan
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     )}
                     {error ? (
-                        <Empty><EmptyHeader><EmptyTitle>Data belum dapat ditampilkan</EmptyTitle><EmptyDescription>{error}</EmptyDescription></EmptyHeader><Button variant="outline" onClick={load}>Coba lagi</Button></Empty>
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>Data belum dapat ditampilkan</EmptyTitle>
+                                <EmptyDescription>{error}</EmptyDescription>
+                            </EmptyHeader>
+                            <Button variant="outline" onClick={load}>
+                                Coba lagi
+                            </Button>
+                        </Empty>
                     ) : loading ? (
-                        <Empty><EmptyDescription>Memuat {config.singular}…</EmptyDescription></Empty>
+                        <Empty>
+                            <EmptyDescription>Memuat {config.singular}…</EmptyDescription>
+                        </Empty>
                     ) : items.length === 0 ? (
-                        <Empty><EmptyHeader><EmptyTitle>Belum ada {config.singular}</EmptyTitle><EmptyDescription>Tambahkan data pertama agar pilihan pada bagian lain sudah tersedia.</EmptyDescription></EmptyHeader></Empty>
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>Belum ada {config.singular}</EmptyTitle>
+                                <EmptyDescription>
+                                    Tambahkan data pertama agar pilihan pada bagian lain sudah
+                                    tersedia.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
                     ) : (
                         <DataTable
                             columns={columns}
@@ -274,10 +450,27 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
                     )}
                 </CardContent>
                 {meta.last_page > 1 && (
-                    <CardFooter className="justify-end gap-3 border-t text-sm text-muted-foreground" aria-label={`Halaman daftar ${config.singular}`}>
-                        <Button variant="outline" disabled={meta.current_page <= 1} onClick={() => setPage((current) => current - 1)}>Sebelumnya</Button>
-                        <span>Halaman {meta.current_page} dari {meta.last_page}</span>
-                        <Button variant="outline" disabled={meta.current_page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Berikutnya</Button>
+                    <CardFooter
+                        className="justify-end gap-3 border-t text-sm text-muted-foreground"
+                        aria-label={`Halaman daftar ${config.singular}`}
+                    >
+                        <Button
+                            variant="outline"
+                            disabled={meta.current_page <= 1}
+                            onClick={() => setPage((current) => current - 1)}
+                        >
+                            Sebelumnya
+                        </Button>
+                        <span>
+                            Halaman {meta.current_page} dari {meta.last_page}
+                        </span>
+                        <Button
+                            variant="outline"
+                            disabled={meta.current_page >= meta.last_page}
+                            onClick={() => setPage((current) => current + 1)}
+                        >
+                            Berikutnya
+                        </Button>
                     </CardFooter>
                 )}
             </Card>
@@ -296,7 +489,11 @@ export default function MasterPage({ config, permissions }: { config: MasterConf
                         setEditing(created ? savedRecord : undefined);
                         void load();
                     }}
-                    extraSection={editing ? extraSectionFor(config.resource, editing, can('update')) : undefined}
+                    extraSection={
+                        editing
+                            ? extraSectionFor(config.resource, editing, can('update'))
+                            : undefined
+                    }
                 />
             )}
         </div>

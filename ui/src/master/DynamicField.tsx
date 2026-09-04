@@ -84,12 +84,19 @@ export default function DynamicField({
                             required={config.required}
                             items={reference.options.map(optionLabel)}
                             value={selected ? optionLabel(selected) : undefined}
-                            placeholder={config.placeholder ?? `Pilih ${config.label.toLowerCase()}`}
+                            placeholder={
+                                config.placeholder ?? `Pilih ${config.label.toLowerCase()}`
+                            }
                             searchPlaceholder={`Cari ${config.label.toLowerCase()}`}
                             emptyMessage={`${config.label} tidak ditemukan.`}
                             ariaLabel={`Pilih ${config.label.toLowerCase()}`}
                             portalContainer={portalContainer}
-                            onValueChange={(item) => onChange(reference.options.find((option) => optionLabel(option) === item)?.id ?? '')}
+                            onValueChange={(item) =>
+                                onChange(
+                                    reference.options.find((option) => optionLabel(option) === item)
+                                        ?.id ?? '',
+                                )
+                            }
                         />
                     </EditShield>,
                     config.help,
@@ -107,7 +114,11 @@ export default function DynamicField({
                 {wrapHint(
                     <div className="flex items-center gap-2">
                         <EditShield active={readOnly} label={config.label} onActivate={requestEdit}>
-                            <Switch id={config.name} checked={Boolean(value)} onCheckedChange={onChange} />
+                            <Switch
+                                id={config.name}
+                                checked={Boolean(value)}
+                                onCheckedChange={onChange}
+                            />
                         </EditShield>
                         <FieldLabel htmlFor={config.name}>{config.label}</FieldLabel>
                     </div>,
@@ -130,12 +141,18 @@ export default function DynamicField({
                             required={config.required}
                             items={options.map((option) => option.label)}
                             value={selected ? selected.label : undefined}
-                            placeholder={config.placeholder ?? `Pilih ${config.label.toLowerCase()}`}
+                            placeholder={
+                                config.placeholder ?? `Pilih ${config.label.toLowerCase()}`
+                            }
                             searchPlaceholder={`Cari ${config.label.toLowerCase()}`}
                             emptyMessage={`${config.label} tidak ditemukan.`}
                             ariaLabel={`Pilih ${config.label.toLowerCase()}`}
                             portalContainer={portalContainer}
-                            onValueChange={(item) => onChange(options.find((option) => option.label === item)?.value ?? '')}
+                            onValueChange={(item) =>
+                                onChange(
+                                    options.find((option) => option.label === item)?.value ?? '',
+                                )
+                            }
                         />
                     </EditShield>,
                     config.help,
@@ -157,13 +174,22 @@ export default function DynamicField({
                     <EditShield active={readOnly} label={config.label} onActivate={requestEdit}>
                         <div className="flex flex-wrap gap-3">
                             {options.map((option) => (
-                                <label key={option.value} className="flex items-center gap-2 text-sm">
+                                <label
+                                    key={option.value}
+                                    className="flex items-center gap-2 text-sm"
+                                >
                                     <Switch
                                         id={`${config.name}-${option.value}`}
                                         checked={chosen.includes(option.value)}
-                                        onCheckedChange={(checked) => onChange(checked
-                                            ? [...chosen, option.value]
-                                            : chosen.filter((item) => item !== option.value))}
+                                        onCheckedChange={(checked) =>
+                                            onChange(
+                                                checked
+                                                    ? [...chosen, option.value]
+                                                    : chosen.filter(
+                                                          (item) => item !== option.value,
+                                                      ),
+                                            )
+                                        }
                                     />
                                     {option.label}
                                 </label>
@@ -206,7 +232,13 @@ export default function DynamicField({
                 <Input
                     id={config.name}
                     label={config.suffix ? `${inputLabel} (${config.suffix})` : inputLabel}
-                    type={config.type === 'number' ? 'number' : config.type === 'date' ? 'date' : 'text'}
+                    type={
+                        config.type === 'number'
+                            ? 'number'
+                            : config.type === 'date'
+                              ? 'date'
+                              : 'text'
+                    }
                     required={config.required}
                     min={config.min}
                     max={config.max}

@@ -51,12 +51,21 @@ export default function App() {
     const [contextReady, setContextReady] = useState(false);
     const [contextToken, setAppContextToken] = useState('');
     const [contextError, setContextError] = useState('');
-    const [assetContext, setAssetContext] = useState({ legal_entity_id: null as string | null, org_unit_id: null as string | null, user_id: null as string | number | null });
+    const [assetContext, setAssetContext] = useState({
+        legal_entity_id: null as string | null,
+        org_unit_id: null as string | null,
+        user_id: null as string | number | null,
+    });
     const { resource: hashResource, segments } = useHashRoute();
 
     // Hanya master yang boleh dilihat pengguna ini yang muncul pada navigasi.
     const visible = useMemo(
-        () => MASTERS.filter((master) => master.showInNavigation !== false && permissions.includes(permission(master.resource, 'read'))),
+        () =>
+            MASTERS.filter(
+                (master) =>
+                    master.showInNavigation !== false &&
+                    permissions.includes(permission(master.resource, 'read')),
+            ),
         [permissions],
     );
     const active = visible.find((master) => master.resource === hashResource) ?? visible[0];
@@ -65,7 +74,8 @@ export default function App() {
         const parentOrigin = document.referrer ? new URL(document.referrer).origin : '';
         const receiveContext = (event: MessageEvent) => {
             if (event.source !== window.parent || event.origin !== parentOrigin) return;
-            if (event.data?.type !== 'coreerp.context' || event.data?.appId !== 'management-aset') return;
+            if (event.data?.type !== 'coreerp.context' || event.data?.appId !== 'management-aset')
+                return;
             applyCoreErpTheme(event.data.theme as CoreErpTheme);
             setContextToken(event.data.token);
             setAppContextToken(event.data.token);
@@ -83,15 +93,34 @@ export default function App() {
 
     useEffect(() => {
         if (!contextToken) return;
-        api<{ data: { permissions: Permission[]; legal_entity_id: string | null; org_unit_id: string | null; user_id: string | number | null } }>('/context')
-            .then((context) => { setPermissions(context.data.permissions); setAssetContext(context.data); setContextError(''); })
-            .catch((caught) => setContextError(errorMessage(caught, 'Hak akses belum dapat dibaca.')));
+        api<{
+            data: {
+                permissions: Permission[];
+                legal_entity_id: string | null;
+                org_unit_id: string | null;
+                user_id: string | number | null;
+            };
+        }>('/context')
+            .then((context) => {
+                setPermissions(context.data.permissions);
+                setAssetContext(context.data);
+                setContextError('');
+            })
+            .catch((caught) =>
+                setContextError(errorMessage(caught, 'Hak akses belum dapat dibaca.')),
+            );
     }, [contextToken]);
 
     if (!contextReady) {
         return (
             <main>
-                <Card><CardContent><Empty><EmptyDescription>Menyiapkan akses aplikasi…</EmptyDescription></Empty></CardContent></Card>
+                <Card>
+                    <CardContent>
+                        <Empty>
+                            <EmptyDescription>Menyiapkan akses aplikasi…</EmptyDescription>
+                        </Empty>
+                    </CardContent>
+                </Card>
             </main>
         );
     }
@@ -99,36 +128,141 @@ export default function App() {
     if (contextError) {
         return (
             <main>
-                <Card><CardContent><Empty><EmptyHeader><EmptyTitle>Aplikasi belum dapat dibuka</EmptyTitle><EmptyDescription>{contextError}</EmptyDescription></EmptyHeader></Empty></CardContent></Card>
+                <Card>
+                    <CardContent>
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>Aplikasi belum dapat dibuka</EmptyTitle>
+                                <EmptyDescription>{contextError}</EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    </CardContent>
+                </Card>
             </main>
         );
     }
 
     // Id view mengikuti nama prosesnya; permission tetap `aset` karena ia kontrak.
-    if (hashResource === 'inventarisasi-aset' && permissions.includes('management-aset.aset.read')) {
-        return <main><AssetPage context={assetContext} canUpdate={permissions.includes('management-aset.aset.update')} /></main>;
+    if (
+        hashResource === 'inventarisasi-aset' &&
+        permissions.includes('management-aset.aset.read')
+    ) {
+        return (
+            <main>
+                <AssetPage
+                    context={assetContext}
+                    canUpdate={permissions.includes('management-aset.aset.update')}
+                />
+            </main>
+        );
     }
-    if (hashResource === 'penyusutan' && permissions.includes('management-aset.penyusutan.read')) return <main><DepreciationPage canCreate={permissions.includes('management-aset.penyusutan.create')} canFinalize={permissions.includes('management-aset.penyusutan.finalize')} canCorrect={permissions.includes('management-aset.penyusutan.correct')} /></main>;
-    if (hashResource === 'fixed-asset-parameters' && permissions.includes('management-aset.fixed-asset-parameters.read')) return <main><FixedAssetSetupPlaceholderPage kind="parameters" /></main>;
-    if (hashResource === 'fixed-asset-posting-profiles' && permissions.includes('management-aset.fixed-asset-posting-profiles.read')) return <main><FixedAssetSetupPlaceholderPage kind="posting-profiles" /></main>;
+    if (hashResource === 'penyusutan' && permissions.includes('management-aset.penyusutan.read'))
+        return (
+            <main>
+                <DepreciationPage
+                    canCreate={permissions.includes('management-aset.penyusutan.create')}
+                    canFinalize={permissions.includes('management-aset.penyusutan.finalize')}
+                    canCorrect={permissions.includes('management-aset.penyusutan.correct')}
+                />
+            </main>
+        );
+    if (
+        hashResource === 'fixed-asset-parameters' &&
+        permissions.includes('management-aset.fixed-asset-parameters.read')
+    )
+        return (
+            <main>
+                <FixedAssetSetupPlaceholderPage kind="parameters" />
+            </main>
+        );
+    if (
+        hashResource === 'fixed-asset-posting-profiles' &&
+        permissions.includes('management-aset.fixed-asset-posting-profiles.read')
+    )
+        return (
+            <main>
+                <FixedAssetSetupPlaceholderPage kind="posting-profiles" />
+            </main>
+        );
 
-    if (hashResource === 'mutasi-aset' && permissions.includes('management-aset.mutasi-aset.read')) return <main><MutationPage /></main>;
-    if (hashResource === 'monitoring-aset' && permissions.includes('management-aset.monitoring-aset.read')) return <main><MonitoringPage /></main>;
-    if (hashResource === 'perencanaan-aset' && permissions.includes('management-aset.perencanaan-aset.read')) return <main><PlanningPage context={assetContext} permissions={permissions} /></main>;
-    if (hashResource === 'validasi-status-work-order' && permissions.includes('management-aset.validasi-status-work-order.read')) return <main><StatusValidationPage permissions={permissions} /></main>;
+    if (hashResource === 'mutasi-aset' && permissions.includes('management-aset.mutasi-aset.read'))
+        return (
+            <main>
+                <MutationPage />
+            </main>
+        );
+    if (
+        hashResource === 'monitoring-aset' &&
+        permissions.includes('management-aset.monitoring-aset.read')
+    )
+        return (
+            <main>
+                <MonitoringPage />
+            </main>
+        );
+    if (
+        hashResource === 'perencanaan-aset' &&
+        permissions.includes('management-aset.perencanaan-aset.read')
+    )
+        return (
+            <main>
+                <PlanningPage context={assetContext} permissions={permissions} />
+            </main>
+        );
+    if (
+        hashResource === 'validasi-status-work-order' &&
+        permissions.includes('management-aset.validasi-status-work-order.read')
+    )
+        return (
+            <main>
+                <StatusValidationPage permissions={permissions} />
+            </main>
+        );
     // Pemeliharaan aset tidak lagi memakai halaman dokumen siklus generik: ia kini work
     // order dengan baris pekerjaan, checklist, penugasan, dan status pengerjaan sendiri.
-    if (hashResource === 'pemeliharaan-aset' && permissions.includes('management-aset.pemeliharaan-aset.read')) return <main data-layout="full-height" className="h-full min-h-0 overflow-hidden"><WorkOrderPage context={assetContext} permissions={permissions} segments={segments} /></main>;
+    if (
+        hashResource === 'pemeliharaan-aset' &&
+        permissions.includes('management-aset.pemeliharaan-aset.read')
+    )
+        return (
+            <main data-layout="full-height" className="h-full min-h-0 overflow-hidden">
+                <WorkOrderPage
+                    context={assetContext}
+                    permissions={permissions}
+                    segments={segments}
+                />
+            </main>
+        );
     const lifecycle = Object.fromEntries(
-        [permintaanPembelianAset, dekomisioningAset, penjualanAset, pemusnahanAset]
-            .map((config) => [config.resource, config]),
+        [permintaanPembelianAset, dekomisioningAset, penjualanAset, pemusnahanAset].map(
+            (config) => [config.resource, config],
+        ),
     );
-    if (lifecycle[hashResource] && permissions.includes(`management-aset.${hashResource}.read` as Permission)) return <main><LifecycleDocumentPage context={assetContext} config={lifecycle[hashResource]} /></main>;
+    if (
+        lifecycle[hashResource] &&
+        permissions.includes(`management-aset.${hashResource}.read` as Permission)
+    )
+        return (
+            <main>
+                <LifecycleDocumentPage context={assetContext} config={lifecycle[hashResource]} />
+            </main>
+        );
 
     if (!active) {
         return (
             <main>
-                <Card><CardContent><Empty><EmptyHeader><EmptyTitle>Belum ada data yang dapat dibuka</EmptyTitle><EmptyDescription>Minta administrator memberi Anda akses master data.</EmptyDescription></EmptyHeader></Empty></CardContent></Card>
+                <Card>
+                    <CardContent>
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>Belum ada data yang dapat dibuka</EmptyTitle>
+                                <EmptyDescription>
+                                    Minta administrator memberi Anda akses master data.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    </CardContent>
+                </Card>
             </main>
         );
     }

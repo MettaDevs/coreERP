@@ -4,6 +4,7 @@ namespace App\Http\Controllers\master;
 
 use App\Http\Controllers\Controller;
 use App\Support\OrganizationScope;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -118,7 +119,7 @@ class JenisAsetDetailController extends Controller
      * `MasterDataController::unarchivedChild()` supaya tabel yang belum mengenal soft
      * delete tidak membuat kueri ini gagal.
      */
-    private function unarchived(string $table): \Illuminate\Database\Query\Builder
+    private function unarchived(string $table): Builder
     {
         $query = DB::table($table);
         if (Schema::hasColumn($table, 'deleted_at')) {

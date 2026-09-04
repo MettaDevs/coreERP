@@ -10,7 +10,13 @@ type Row = { nilai: string };
  * Values untuk atribut teks. Daftar kosong berarti teks bebas; daftar berisi berarti
  * pengguna memilih dari dropdown.
  */
-export default function TipeAtributNilai({ tipeAtributId, canEdit }: { tipeAtributId: string; canEdit: boolean }) {
+export default function TipeAtributNilai({
+    tipeAtributId,
+    canEdit,
+}: {
+    tipeAtributId: string;
+    canEdit: boolean;
+}) {
     const [rows, setRows] = useState<Row[]>([]);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
@@ -20,9 +26,16 @@ export default function TipeAtributNilai({ tipeAtributId, canEdit }: { tipeAtrib
     useEffect(() => {
         let cancelled = false;
         api<{ data: { nilai: string }[] }>(`/tipe-atribut/${tipeAtributId}/nilai`)
-            .then((result) => { if (!cancelled) setRows(result.data.map((row) => ({ nilai: String(row.nilai ?? '') }))); })
-            .catch((caught) => { if (!cancelled) setError(errorMessage(caught, 'Pilihan nilai belum dapat dimuat.')); });
-        return () => { cancelled = true; };
+            .then((result) => {
+                if (!cancelled)
+                    setRows(result.data.map((row) => ({ nilai: String(row.nilai ?? '') })));
+            })
+            .catch((caught) => {
+                if (!cancelled) setError(errorMessage(caught, 'Pilihan nilai belum dapat dimuat.'));
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [tipeAtributId]);
 
     async function save() {
@@ -53,7 +66,8 @@ export default function TipeAtributNilai({ tipeAtributId, canEdit }: { tipeAtrib
             <div>
                 <p className="font-semibold">Pilihan nilai</p>
                 <p className="text-sm text-muted-foreground">
-                    Tanpa pilihan, pengguna dapat mengetik bebas. Menambahkan pilihan pertama mengubah isian aset menjadi dropdown.
+                    Tanpa pilihan, pengguna dapat mengetik bebas. Menambahkan pilihan pertama
+                    mengubah isian aset menjadi dropdown.
                 </p>
             </div>
 
@@ -72,11 +86,22 @@ export default function TipeAtributNilai({ tipeAtributId, canEdit }: { tipeAtrib
                             maxLength={150}
                             disabled={!canEdit}
                             value={row.nilai}
-                            onChange={(event) => setRows((current) => current.map((item, i) => (i === index ? { nilai: event.target.value } : item)))}
+                            onChange={(event) =>
+                                setRows((current) =>
+                                    current.map((item, i) =>
+                                        i === index ? { nilai: event.target.value } : item,
+                                    ),
+                                )
+                            }
                         />
                     </Field>
                     {canEdit && (
-                        <Button variant="outline" size="sm" type="button" onClick={() => setRows(rows.filter((_, i) => i !== index))}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            onClick={() => setRows(rows.filter((_, i) => i !== index))}
+                        >
                             Hapus
                         </Button>
                     )}
@@ -88,7 +113,11 @@ export default function TipeAtributNilai({ tipeAtributId, canEdit }: { tipeAtrib
 
             {canEdit && (
                 <div className="flex gap-2">
-                    <Button variant="outline" type="button" onClick={() => setRows([...rows, { nilai: '' }])}>
+                    <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => setRows([...rows, { nilai: '' }])}
+                    >
                         Tambah pilihan
                     </Button>
                     <Button type="button" disabled={saving} onClick={() => void save()}>

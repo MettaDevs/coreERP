@@ -11,9 +11,15 @@ export default function PabrikanAsetCounters({
     loading: boolean;
     error: string;
 }) {
-    if (loading) return <p className="text-sm text-muted-foreground">Memuat jumlah model dan aset…</p>;
+    if (loading)
+        return <p className="text-sm text-muted-foreground">Memuat jumlah model dan aset…</p>;
     if (error) return <p className="text-sm text-destructive">{error}</p>;
-    if (!detail) return <Empty><EmptyDescription>Jumlah turunan belum tersedia.</EmptyDescription></Empty>;
+    if (!detail)
+        return (
+            <Empty>
+                <EmptyDescription>Jumlah turunan belum tersedia.</EmptyDescription>
+            </Empty>
+        );
 
     return (
         <div className="grid gap-4 pt-1 sm:grid-cols-2">

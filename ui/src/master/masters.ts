@@ -148,8 +148,19 @@ export const MASTERS: MasterConfig[] = [
         namaLabel: 'Nama model aset',
         singular: 'model aset',
         parents: [
-            { resource: 'pabrikan-aset', field: 'pabrikan_aset_id', summaryKey: 'pabrikan_aset', label: 'Pabrikan aset' },
-            { resource: 'jenis-aset', field: 'jenis_aset_id', summaryKey: 'jenis_aset', label: 'Jenis aset', required: false },
+            {
+                resource: 'pabrikan-aset',
+                field: 'pabrikan_aset_id',
+                summaryKey: 'pabrikan_aset',
+                label: 'Pabrikan aset',
+            },
+            {
+                resource: 'jenis-aset',
+                field: 'jenis_aset_id',
+                summaryKey: 'jenis_aset',
+                label: 'Jenis aset',
+                required: false,
+            },
         ],
     },
     {
@@ -192,13 +203,17 @@ export const MASTERS: MasterConfig[] = [
         resource: 'maintenance-job-types',
         nav: 'Jenis pekerjaan maintenance',
         title: 'Jenis pekerjaan maintenance',
-        subtitle: 'Atur pekerjaan, varian, persyaratan, dan jenis aset yang menggunakan maintenance.',
+        subtitle:
+            'Atur pekerjaan, varian, persyaratan, dan jenis aset yang menggunakan maintenance.',
         kodeLabel: 'Kode jenis pekerjaan',
         namaLabel: 'Nama jenis pekerjaan',
         singular: 'jenis pekerjaan maintenance',
         extraFields: [
             {
-                name: 'category_code', label: 'Kategori pekerjaan', type: 'select', required: true,
+                name: 'category_code',
+                label: 'Kategori pekerjaan',
+                type: 'select',
+                required: true,
                 options: [
                     { value: 'preventive', label: 'Preventif' },
                     { value: 'corrective', label: 'Korektif' },
@@ -206,33 +221,91 @@ export const MASTERS: MasterConfig[] = [
                     { value: 'condition_assessment', label: 'Pemeriksaan kondisi' },
                 ],
             },
-            { name: 'maintenance_downtime_activities', label: 'Aktivitas downtime maintenance', type: 'boolean' },
+            {
+                name: 'maintenance_downtime_activities',
+                label: 'Aktivitas downtime maintenance',
+                type: 'boolean',
+            },
         ],
     },
     {
         resource: 'maintenance-job-type-variants',
-        nav: 'Varian job type', showInNavigation: false,
+        nav: 'Varian job type',
+        showInNavigation: false,
         title: 'Varian jenis pekerjaan maintenance',
         subtitle: 'Pilihan interval atau varian dari jenis pekerjaan maintenance.',
-        kodeLabel: 'Kode varian', namaLabel: 'Nama varian', singular: 'varian job type',
-        parents: [{ resource: 'maintenance-job-types', field: 'maintenance_job_type_id', summaryKey: 'maintenance_job_type', label: 'Jenis pekerjaan maintenance' }],
+        kodeLabel: 'Kode varian',
+        namaLabel: 'Nama varian',
+        singular: 'varian job type',
+        parents: [
+            {
+                resource: 'maintenance-job-types',
+                field: 'maintenance_job_type_id',
+                summaryKey: 'maintenance_job_type',
+                label: 'Jenis pekerjaan maintenance',
+            },
+        ],
     },
     {
         resource: 'maintenance-job-type-defaults',
         nav: 'Default job type',
         title: 'Default jenis pekerjaan maintenance',
         subtitle: 'Nilai bawaan yang dapat dipakai saat menyiapkan pekerjaan maintenance.',
-        kodeLabel: 'Kode default', namaLabel: 'Nama default', singular: 'default job type',
+        kodeLabel: 'Kode default',
+        namaLabel: 'Nama default',
+        singular: 'default job type',
         parents: [
-            { resource: 'maintenance-job-types', field: 'maintenance_job_type_id', summaryKey: 'maintenance_job_type', label: 'Jenis pekerjaan maintenance' },
-            { resource: 'maintenance-job-type-variants', field: 'variant_id', summaryKey: 'variant', label: 'Varian job type', required: false },
-            { resource: 'maintenance-checklist-templates', field: 'checklist_template_id', summaryKey: 'checklist_template', label: 'Template checklist', required: false },
+            {
+                resource: 'maintenance-job-types',
+                field: 'maintenance_job_type_id',
+                summaryKey: 'maintenance_job_type',
+                label: 'Jenis pekerjaan maintenance',
+            },
+            {
+                resource: 'maintenance-job-type-variants',
+                field: 'variant_id',
+                summaryKey: 'variant',
+                label: 'Varian job type',
+                required: false,
+            },
+            {
+                resource: 'maintenance-checklist-templates',
+                field: 'checklist_template_id',
+                summaryKey: 'checklist_template',
+                label: 'Template checklist',
+                required: false,
+            },
         ],
         extraFields: [
-            { name: 'trade', label: 'Trade', type: 'select', options: [{ value: 'Mekanik', label: 'Mekanik' }, { value: 'Elektrik', label: 'Elektrik' }, { value: 'HVAC', label: 'HVAC' }, { value: 'Teknisi umum', label: 'Teknisi umum' }] },
-            { name: 'functional_location_id', label: 'Functional location', type: 'reference', resource: 'lokasi-aset' },
-            { name: 'jenis_aset_id', label: 'Jenis aset', type: 'reference', resource: 'jenis-aset' },
-            { name: 'pabrikan_aset_id', label: 'Pabrikan', type: 'reference', resource: 'pabrikan-aset' },
+            {
+                name: 'trade',
+                label: 'Trade',
+                type: 'select',
+                options: [
+                    { value: 'Mekanik', label: 'Mekanik' },
+                    { value: 'Elektrik', label: 'Elektrik' },
+                    { value: 'HVAC', label: 'HVAC' },
+                    { value: 'Teknisi umum', label: 'Teknisi umum' },
+                ],
+            },
+            {
+                name: 'functional_location_id',
+                label: 'Functional location',
+                type: 'reference',
+                resource: 'lokasi-aset',
+            },
+            {
+                name: 'jenis_aset_id',
+                label: 'Jenis aset',
+                type: 'reference',
+                resource: 'jenis-aset',
+            },
+            {
+                name: 'pabrikan_aset_id',
+                label: 'Pabrikan',
+                type: 'reference',
+                resource: 'pabrikan-aset',
+            },
             { name: 'model_aset_id', label: 'Model', type: 'reference', resource: 'model-aset' },
             { name: 'asset_id', label: 'Aset', type: 'reference', resource: 'aset' },
             { name: 'hours', label: 'Jam kerja', type: 'number', min: 0, step: 0.01 },
@@ -246,24 +319,33 @@ export const MASTERS: MasterConfig[] = [
         nav: 'Variabel checklist',
         title: 'Variabel checklist maintenance',
         subtitle: 'Buat pilihan nilai yang dapat dipakai pada baris checklist.',
-        kodeLabel: 'Kode variabel', namaLabel: 'Nama variabel', singular: 'variabel checklist',
+        kodeLabel: 'Kode variabel',
+        namaLabel: 'Nama variabel',
+        singular: 'variabel checklist',
     },
     {
         resource: 'maintenance-checklist-templates',
         nav: 'Template checklist',
         title: 'Template checklist maintenance',
         subtitle: 'Susun baris pemeriksaan yang akan diisi saat maintenance.',
-        kodeLabel: 'Kode template', namaLabel: 'Nama template', singular: 'template checklist',
+        kodeLabel: 'Kode template',
+        namaLabel: 'Nama template',
+        singular: 'template checklist',
     },
     {
         resource: 'tipe-work-order',
         nav: 'Tipe work order',
         title: 'Tipe work order',
-        subtitle: 'Tipe pekerjaan dan batasan penugasannya. Aturan isi data diatur pada validasi status work order.',
-        kodeLabel: 'Kode tipe work order', namaLabel: 'Nama tipe work order', singular: 'tipe work order',
+        subtitle:
+            'Tipe pekerjaan dan batasan penugasannya. Aturan isi data diatur pada validasi status work order.',
+        kodeLabel: 'Kode tipe work order',
+        namaLabel: 'Nama tipe work order',
+        singular: 'tipe work order',
         extraFields: [
             {
-                name: 'satu_pekerja', label: 'Hanya satu pelaksana', type: 'boolean',
+                name: 'satu_pekerja',
+                label: 'Hanya satu pelaksana',
+                type: 'boolean',
                 help: 'Seluruh baris pekerjaan pada work order tipe ini harus ditugaskan ke orang yang sama.',
             },
         ],
@@ -273,10 +355,16 @@ export const MASTERS: MasterConfig[] = [
         nav: 'Tingkat layanan',
         title: 'Tingkat layanan',
         subtitle: 'Urgensi penanganan yang dapat dipilih pada work order.',
-        kodeLabel: 'Kode tingkat layanan', namaLabel: 'Nama tingkat layanan', singular: 'tingkat layanan',
+        kodeLabel: 'Kode tingkat layanan',
+        namaLabel: 'Nama tingkat layanan',
+        singular: 'tingkat layanan',
         extraFields: [
             {
-                name: 'urutan', label: 'Urutan urgensi', type: 'number', min: 0, step: 1,
+                name: 'urutan',
+                label: 'Urutan urgensi',
+                type: 'number',
+                min: 0,
+                step: 1,
                 help: 'Angka lebih kecil berarti lebih mendesak. Hanya mengurutkan daftar; tidak menghitung tenggat.',
             },
         ],
@@ -285,30 +373,53 @@ export const MASTERS: MasterConfig[] = [
         resource: 'trade',
         nav: 'Bidang keahlian',
         title: 'Bidang keahlian',
-        subtitle: 'Keahlian yang dibutuhkan sebuah pekerjaan, misalnya mekanik, elektrik, atau HVAC.',
-        kodeLabel: 'Kode bidang keahlian', namaLabel: 'Nama bidang keahlian', singular: 'bidang keahlian',
+        subtitle:
+            'Keahlian yang dibutuhkan sebuah pekerjaan, misalnya mekanik, elektrik, atau HVAC.',
+        kodeLabel: 'Kode bidang keahlian',
+        namaLabel: 'Nama bidang keahlian',
+        singular: 'bidang keahlian',
     },
     {
         resource: 'sebab-kerusakan',
         nav: 'Sebab kerusakan',
         title: 'Sebab kerusakan',
         subtitle: 'Akar sebab yang dapat dipilih saat pekerjaan maintenance ditutup.',
-        kodeLabel: 'Kode sebab kerusakan', namaLabel: 'Nama sebab kerusakan', singular: 'sebab kerusakan',
-        extraFields: [{ name: 'minta_keterangan', label: 'Minta keterangan saat dipilih', type: 'boolean', help: 'Aktifkan untuk pilihan seperti “Lainnya”, agar mekanik wajib menjelaskan sebabnya.' }],
+        kodeLabel: 'Kode sebab kerusakan',
+        namaLabel: 'Nama sebab kerusakan',
+        singular: 'sebab kerusakan',
+        extraFields: [
+            {
+                name: 'minta_keterangan',
+                label: 'Minta keterangan saat dipilih',
+                type: 'boolean',
+                help: 'Aktifkan untuk pilihan seperti “Lainnya”, agar mekanik wajib menjelaskan sebabnya.',
+            },
+        ],
     },
     {
         resource: 'tindakan-perbaikan',
         nav: 'Tindakan perbaikan',
         title: 'Tindakan perbaikan',
-        subtitle: 'Perbaikan yang dikerjakan, dicatat terpisah dari sebabnya agar keduanya dapat dihitung.',
-        kodeLabel: 'Kode tindakan perbaikan', namaLabel: 'Nama tindakan perbaikan', singular: 'tindakan perbaikan',
-        extraFields: [{ name: 'minta_keterangan', label: 'Minta keterangan saat dipilih', type: 'boolean', help: 'Aktifkan untuk pilihan seperti “Lainnya”, agar mekanik wajib menjelaskan tindakan yang dilakukan.' }],
+        subtitle:
+            'Perbaikan yang dikerjakan, dicatat terpisah dari sebabnya agar keduanya dapat dihitung.',
+        kodeLabel: 'Kode tindakan perbaikan',
+        namaLabel: 'Nama tindakan perbaikan',
+        singular: 'tindakan perbaikan',
+        extraFields: [
+            {
+                name: 'minta_keterangan',
+                label: 'Minta keterangan saat dipilih',
+                type: 'boolean',
+                help: 'Aktifkan untuk pilihan seperti “Lainnya”, agar mekanik wajib menjelaskan tindakan yang dilakukan.',
+            },
+        ],
     },
     {
         resource: 'tipe-lokasi-aset',
         nav: 'Tipe lokasi aset',
         title: 'Tipe lokasi aset',
-        subtitle: 'Tingkatan lokasi yang dipakai tenant, misalnya site, gedung, lantai, atau ruangan.',
+        subtitle:
+            'Tingkatan lokasi yang dipakai tenant, misalnya site, gedung, lantai, atau ruangan.',
         kodeLabel: 'Kode tipe lokasi aset',
         namaLabel: 'Nama tipe lokasi aset',
         singular: 'tipe lokasi aset',
@@ -322,15 +433,28 @@ export const MASTERS: MasterConfig[] = [
         namaLabel: 'Nama lokasi aset',
         singular: 'lokasi aset',
         parents: [
-            { resource: 'lokasi-aset', field: 'parent_id', summaryKey: 'parent', label: 'Lokasi induk', required: false },
-            { resource: 'tipe-lokasi-aset', field: 'tipe_lokasi_id', summaryKey: 'tipe_lokasi', label: 'Tipe lokasi', required: false },
+            {
+                resource: 'lokasi-aset',
+                field: 'parent_id',
+                summaryKey: 'parent',
+                label: 'Lokasi induk',
+                required: false,
+            },
+            {
+                resource: 'tipe-lokasi-aset',
+                field: 'tipe_lokasi_id',
+                summaryKey: 'tipe_lokasi',
+                label: 'Tipe lokasi',
+                required: false,
+            },
         ],
     },
     {
         resource: 'tipe-atribut',
         nav: 'Tipe atribut',
         title: 'Tipe atribut',
-        subtitle: 'Ciri tambahan aset yang dapat dipasang pada jenis aset, tanpa menambah tingkat klasifikasi.',
+        subtitle:
+            'Ciri tambahan aset yang dapat dipasang pada jenis aset, tanpa menambah tingkat klasifikasi.',
         kodeLabel: 'Kode tipe atribut',
         namaLabel: 'Nama tipe atribut',
         singular: 'tipe atribut',
@@ -490,7 +614,10 @@ export const MASTERS: MasterConfig[] = [
                 type: 'number',
                 required: true,
                 min: 1,
-                visibleWhen: (form) => ['straight_line', 'straight_line_life_remaining', 'reducing_balance'].includes(String(form.method)),
+                visibleWhen: (form) =>
+                    ['straight_line', 'straight_line_life_remaining', 'reducing_balance'].includes(
+                        String(form.method),
+                    ),
             },
             {
                 name: 'rate_percent',
@@ -510,16 +637,21 @@ export const MASTERS: MasterConfig[] = [
                 placeholder: '1000000, 900000, 800000',
                 help: 'Nilai penyusutan tiap periode, dipisah koma atau baris baru.',
                 visibleWhen: (form) => form.method === 'manual',
-                fromRecord: (raw) => Array.isArray(raw)
-                    ? raw.map((row) => String((row as { amount?: unknown }).amount ?? '')).join(', ')
-                    : '',
+                fromRecord: (raw) =>
+                    Array.isArray(raw)
+                        ? raw
+                              .map((row) => String((row as { amount?: unknown }).amount ?? ''))
+                              .join(', ')
+                        : '',
                 toPayload: (value: FieldValue) => {
                     const amounts = String(value ?? '')
                         .split(/[\n,]/)
                         .map((part) => part.trim())
                         .filter((part) => part !== '');
 
-                    return amounts.length ? amounts.map((amount) => ({ amount: Number(amount) })) : null;
+                    return amounts.length
+                        ? amounts.map((amount) => ({ amount: Number(amount) }))
+                        : null;
                 },
             },
             // Konvensi sengaja tidak ada di sini. Perlakuan periode pertama diambil dari
@@ -531,7 +663,10 @@ export const MASTERS: MasterConfig[] = [
     },
 ];
 
-export function parentSummaryOf(record: MasterRecord, parent: MasterParentConfig): ParentSummary | null {
+export function parentSummaryOf(
+    record: MasterRecord,
+    parent: MasterParentConfig,
+): ParentSummary | null {
     const summary = record[parent.summaryKey];
 
     return summary && typeof summary === 'object' ? (summary as ParentSummary) : null;

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\master;
 
 use App\Http\Controllers\MasterDataController;
 use App\Models\master\MaintenanceJobTypeVariant;
-use App\Models\master\MaintenanceJobType;
 use App\Support\MasterChild;
 use App\Support\MasterParent;
 

@@ -6,10 +6,16 @@ import { api } from '../api';
  * apa adanya, karena sebagian form perlu menurunkan sesuatu dari record yang dipilih —
  * misalnya frekuensi periode sebuah profil penyusutan — tanpa memuat ulang recordnya.
  */
-export type MasterOption = { id: string; kode: string; nama: string; display_label?: string } & Record<string, unknown>;
+export type MasterOption = {
+    id: string;
+    kode: string;
+    nama: string;
+    display_label?: string;
+} & Record<string, unknown>;
 
 /** Satu bentuk label untuk seluruh pilihan master, agar tidak ada varian pemisah. */
-export const optionLabel = (option: MasterOption) => option.display_label ?? `${option.kode} — ${option.nama}`;
+export const optionLabel = (option: MasterOption) =>
+    option.display_label ?? `${option.kode} — ${option.nama}`;
 
 /**
  * Memuat pilihan satu master untuk dipakai sebagai isi dropdown foreign key.
@@ -41,9 +47,13 @@ export function useMasterOptions(resource: string | null | undefined) {
             .catch(() => {
                 if (cancelled) return;
                 setOptions([]);
-                setError(`Pilihan belum dapat dimuat. Anda memerlukan akses lihat pada ${resource}.`);
+                setError(
+                    `Pilihan belum dapat dimuat. Anda memerlukan akses lihat pada ${resource}.`,
+                );
             });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [resource]);
 
     return { options, error };

@@ -57,9 +57,12 @@ export default function RecordListPane({
     useEffect(() => {
         const sentinel = sentinelRef.current;
         if (!sentinel || !hasMore || loading) return;
-        const observer = new IntersectionObserver((entries) => {
-            if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
-        }, { rootMargin: '120px' });
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
+            },
+            { rootMargin: '120px' },
+        );
         observer.observe(sentinel);
 
         return () => observer.disconnect();
@@ -77,19 +80,33 @@ export default function RecordListPane({
                 />
                 <Select
                     items={STATUS_ITEMS}
-                    value={activeFilter === 'true' ? 'Aktif' : activeFilter === 'false' ? 'Tidak aktif' : 'Semua status'}
+                    value={
+                        activeFilter === 'true'
+                            ? 'Aktif'
+                            : activeFilter === 'false'
+                              ? 'Tidak aktif'
+                              : 'Semua status'
+                    }
                     searchPlaceholder="Cari status"
                     emptyMessage="Status tidak ditemukan."
                     ariaLabel="Saring berdasarkan status"
-                    onValueChange={(item) => onActiveFilterChange(item === 'Aktif' ? 'true' : item === 'Tidak aktif' ? 'false' : 'semua')}
+                    onValueChange={(item) =>
+                        onActiveFilterChange(
+                            item === 'Aktif' ? 'true' : item === 'Tidak aktif' ? 'false' : 'semua',
+                        )
+                    }
                 />
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 {creating && (
                     <div className="border-b border-l-2 border-l-primary bg-primary/10 px-4 py-2.5">
-                        <span className="block text-base leading-tight font-semibold text-muted-foreground">Belum disimpan</span>
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{config.title} baru</span>
+                        <span className="block text-base leading-tight font-semibold text-muted-foreground">
+                            Belum disimpan
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            {config.title} baru
+                        </span>
                     </div>
                 )}
 
@@ -99,13 +116,17 @@ export default function RecordListPane({
                             <EmptyTitle>Data belum dapat ditampilkan</EmptyTitle>
                             <EmptyDescription>{error}</EmptyDescription>
                         </EmptyHeader>
-                        <Button variant="outline" onClick={onRetry}>Coba lagi</Button>
+                        <Button variant="outline" onClick={onRetry}>
+                            Coba lagi
+                        </Button>
                     </Empty>
                 ) : items.length === 0 && !loading && !creating ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada {config.singular}</EmptyTitle>
-                            <EmptyDescription>Tambahkan data pertama agar pilihan pada bagian lain sudah tersedia.</EmptyDescription>
+                            <EmptyDescription>
+                                Tambahkan data pertama agar pilihan pada bagian lain sudah tersedia.
+                            </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
                 ) : (
@@ -119,12 +140,17 @@ export default function RecordListPane({
                                 aria-pressed={selected}
                                 onClick={() => onSelect(item.id)}
                                 className={`w-full border-b px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset focus-visible:outline-none ${
-                                    selected ? 'border-l-2 border-l-primary bg-primary/10' : 'border-l-2 border-l-transparent'
+                                    selected
+                                        ? 'border-l-2 border-l-primary bg-primary/10'
+                                        : 'border-l-2 border-l-transparent'
                                 }`}
                             >
-                                <span className="block truncate text-base leading-tight font-semibold">{item.kode}</span>
+                                <span className="block truncate text-base leading-tight font-semibold">
+                                    {item.kode}
+                                </span>
                                 <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                                    {item.nama}{item.aktif ? '' : ' · Tidak aktif'}
+                                    {item.nama}
+                                    {item.aktif ? '' : ' · Tidak aktif'}
                                 </span>
                             </button>
                         );

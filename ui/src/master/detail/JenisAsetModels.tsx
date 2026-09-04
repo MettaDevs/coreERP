@@ -10,7 +10,8 @@ function itemOf(model: JenisAsetModelSummary): TransferListItem {
     return {
         id: model.id,
         label: model.model,
-        description: [model.manufacturer, model.model_number].filter(Boolean).join(' - ') || undefined,
+        description:
+            [model.manufacturer, model.model_number].filter(Boolean).join(' - ') || undefined,
     };
 }
 
@@ -57,22 +58,32 @@ export default function JenisAsetModels({
         }
     }
 
-    if (loading) return <p className="text-sm text-muted-foreground">Memuat daftar pabrikan dan model...</p>;
+    if (loading)
+        return <p className="text-sm text-muted-foreground">Memuat daftar pabrikan dan model...</p>;
     if (error) return <p className="text-sm text-destructive">{error}</p>;
     if (!detail || detail.models === null || detail.available_models === null) {
-        return <Empty><EmptyDescription>Daftar pabrikan dan model belum tersedia.</EmptyDescription></Empty>;
+        return (
+            <Empty>
+                <EmptyDescription>Daftar pabrikan dan model belum tersedia.</EmptyDescription>
+            </Empty>
+        );
     }
 
     if (canEdit) {
         return (
             <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                    Pilih model yang boleh dipakai untuk jenis aset ini. Model dan pabrikan tetap dikelola di master masing-masing.
+                    Pilih model yang boleh dipakai untuk jenis aset ini. Model dan pabrikan tetap
+                    dikelola di master masing-masing.
                 </p>
                 <TransferList
                     remaining={remaining}
                     selected={selected}
-                    onChange={(next) => { setRemaining(next.remaining); setSelected(next.selected); setSaved(false); }}
+                    onChange={(next) => {
+                        setRemaining(next.remaining);
+                        setSelected(next.selected);
+                        setSaved(false);
+                    }}
                     remainingTitle="Model tersedia"
                     selectedTitle="Model terpasang"
                     disabled={saving}
@@ -80,7 +91,9 @@ export default function JenisAsetModels({
                     selectedEmptyLabel="Belum ada model yang dipasang."
                 />
                 {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-                {saved && <p className="text-sm text-muted-foreground">Pabrikan dan model tersimpan.</p>}
+                {saved && (
+                    <p className="text-sm text-muted-foreground">Pabrikan dan model tersimpan.</p>
+                )}
                 <Button type="button" disabled={saving} onClick={() => void save()}>
                     {saving ? 'Menyimpan...' : 'Simpan pabrikan dan model'}
                 </Button>
@@ -89,7 +102,13 @@ export default function JenisAsetModels({
     }
 
     if (detail.models.length === 0) {
-        return <Empty><EmptyDescription>Belum ada model yang dikaitkan dengan jenis aset ini.</EmptyDescription></Empty>;
+        return (
+            <Empty>
+                <EmptyDescription>
+                    Belum ada model yang dikaitkan dengan jenis aset ini.
+                </EmptyDescription>
+            </Empty>
+        );
     }
 
     return (
@@ -109,7 +128,9 @@ export default function JenisAsetModels({
                             <TableCell>
                                 <div className="font-medium">{item.model}</div>
                                 {item.model_number && (
-                                    <div className="text-xs text-muted-foreground">{item.model_number}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        {item.model_number}
+                                    </div>
                                 )}
                             </TableCell>
                             <TableCell>{item.description ?? '-'}</TableCell>

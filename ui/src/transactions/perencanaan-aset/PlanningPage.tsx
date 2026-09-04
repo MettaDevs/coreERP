@@ -81,7 +81,11 @@ function AssetDetailRow({
         <div className="space-y-3 rounded-lg border p-3">
             <div className="flex justify-between">
                 <span className="text-sm font-medium">Baris {index + 1}</span>
-                {canRemove && <Button type="button" variant="ghost" size="sm" onClick={onRemove}>Hapus</Button>}
+                {canRemove && (
+                    <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+                        Hapus
+                    </Button>
+                )}
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_8rem]">
                 <Field>
@@ -95,7 +99,11 @@ function AssetDetailRow({
                         ariaLabel={`Jenis aset baris ${index + 1}`}
                         portalContainer={portalContainer}
                         onSearchChange={onTypeSearch}
-                        onValueChange={(value) => onChange({ jenis_aset_id: types.find((type) => type.nama === value)?.id ?? '' })}
+                        onValueChange={(value) =>
+                            onChange({
+                                jenis_aset_id: types.find((type) => type.nama === value)?.id ?? '',
+                            })
+                        }
                     />
                 </Field>
                 <Field>
@@ -108,25 +116,55 @@ function AssetDetailRow({
                         searchPlaceholder="Cari satuan"
                         ariaLabel={`Satuan baris ${index + 1}`}
                         portalContainer={portalContainer}
-                        onValueChange={(value) => onChange({ satuan_id: units.find((unit) => unit.nama === value)?.id ?? '' })}
+                        onValueChange={(value) =>
+                            onChange({
+                                satuan_id: units.find((unit) => unit.nama === value)?.id ?? '',
+                            })
+                        }
                     />
                 </Field>
                 <Field>
-                    <Input label="Jumlah" type="number" min="0.0001" step="0.0001" value={detail.quantity} onChange={(event) => onChange({ quantity: event.target.value })} />
+                    <Input
+                        label="Jumlah"
+                        type="number"
+                        min="0.0001"
+                        step="0.0001"
+                        value={detail.quantity}
+                        onChange={(event) => onChange({ quantity: event.target.value })}
+                    />
                 </Field>
             </div>
             <Field>
-                <Input label="Spesifikasi yang diminta" value={detail.requested_specification} onChange={(event) => onChange({ requested_specification: event.target.value })} required />
+                <Input
+                    label="Spesifikasi yang diminta"
+                    value={detail.requested_specification}
+                    onChange={(event) => onChange({ requested_specification: event.target.value })}
+                    required
+                />
             </Field>
             <Field>
-                <Input label="Perkiraan harga satuan" type="number" min="0" step="0.01" value={detail.estimated_unit_price} onChange={(event) => onChange({ estimated_unit_price: event.target.value })} />
+                <Input
+                    label="Perkiraan harga satuan"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={detail.estimated_unit_price}
+                    onChange={(event) => onChange({ estimated_unit_price: event.target.value })}
+                />
             </Field>
         </div>
     );
 }
 
-export default function PlanningPage({ context, permissions }: { context: Context; permissions: Permission[] }) {
-    const can = (action: string) => permissions.includes(`management-aset.perencanaan-aset.${action}`);
+export default function PlanningPage({
+    context,
+    permissions,
+}: {
+    context: Context;
+    permissions: Permission[];
+}) {
+    const can = (action: string) =>
+        permissions.includes(`management-aset.perencanaan-aset.${action}`);
     const [plans, setPlans] = useState<Plan[]>([]);
     const [types, setTypes] = useState<AssetType[]>([]);
     const [units, setUnits] = useState<AssetType[]>([]);
@@ -144,7 +182,9 @@ export default function PlanningPage({ context, permissions }: { context: Contex
         }
     };
 
-    useEffect(() => { void load(); }, []);
+    useEffect(() => {
+        void load();
+    }, []);
     useEffect(() => {
         if (!can('create') && !can('update')) return;
         api<{ data: AssetType[] }>('/reference-data/units-of-measure')
@@ -154,7 +194,9 @@ export default function PlanningPage({ context, permissions }: { context: Contex
     useEffect(() => {
         if (!can('create') && !can('update')) return;
         const timer = window.setTimeout(() => {
-            api<{ data: AssetType[] }>(`/jenis-aset?per_page=20&aktif=true&q=${encodeURIComponent(typeSearch)}`)
+            api<{ data: AssetType[] }>(
+                `/jenis-aset?per_page=20&aktif=true&q=${encodeURIComponent(typeSearch)}`,
+            )
                 .then((result) => setTypes(result.data))
                 .catch(() => toast.error('Jenis aset belum dapat dimuat.'));
         }, 250);
@@ -163,7 +205,9 @@ export default function PlanningPage({ context, permissions }: { context: Contex
 
     const openEdit = async (id: string) => {
         try {
-            const result = await api<{ data: Plan & { details: Detail[] } }>(`/perencanaan-aset/${id}`);
+            const result = await api<{ data: Plan & { details: Detail[] } }>(
+                `/perencanaan-aset/${id}`,
+            );
             setEditing({
                 ...result.data,
                 details: result.data.details.map((detail) => ({
@@ -191,10 +235,15 @@ export default function PlanningPage({ context, permissions }: { context: Contex
     };
 
     const updateDetail = (index: number, change: Partial<Detail>) => {
-        setEditing((current) => current && ({
-            ...current,
-            details: current.details.map((detail, position) => position === index ? { ...detail, ...change } : detail),
-        }));
+        setEditing(
+            (current) =>
+                current && {
+                    ...current,
+                    details: current.details.map((detail, position) =>
+                        position === index ? { ...detail, ...change } : detail,
+                    ),
+                },
+        );
     };
 
     const save = async () => {
@@ -202,7 +251,14 @@ export default function PlanningPage({ context, permissions }: { context: Contex
             toast.error('Pilih entitas legal dan unit kerja aktif sebelum membuat rencana.');
             return;
         }
-        if (!editing.details.every((detail) => detail.jenis_aset_id && detail.satuan_id && detail.requested_specification.trim())) {
+        if (
+            !editing.details.every(
+                (detail) =>
+                    detail.jenis_aset_id &&
+                    detail.satuan_id &&
+                    detail.requested_specification.trim(),
+            )
+        ) {
             toast.error('Pilih jenis aset, satuan, dan isi spesifikasi pada setiap rincian.');
             return;
         }
@@ -252,7 +308,9 @@ export default function PlanningPage({ context, permissions }: { context: Contex
                 <CardTitle>Perencanaan aset</CardTitle>
                 {can('create') && (
                     <CardAction>
-                        <Button onClick={() => setEditing(emptyPlan() as never)}>Tambah rencana</Button>
+                        <Button onClick={() => setEditing(emptyPlan() as never)}>
+                            Tambah rencana
+                        </Button>
                     </CardAction>
                 )}
             </CardHeader>
@@ -261,21 +319,50 @@ export default function PlanningPage({ context, permissions }: { context: Contex
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada rencana aset</EmptyTitle>
-                            <EmptyDescription>Rencana dibuat dari jenis aset. Spesifikasi dicatat pada rincian rencana, bukan pada master.</EmptyDescription>
+                            <EmptyDescription>
+                                Rencana dibuat dari jenis aset. Spesifikasi dicatat pada rincian
+                                rencana, bukan pada master.
+                            </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
                 ) : (
                     <div className="divide-y">
                         {plans.map((plan) => (
-                            <div key={plan.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+                            <div
+                                key={plan.id}
+                                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+                            >
                                 <div>
                                     <p className="font-medium">{plan.kode}</p>
-                                    <p className="text-sm text-muted-foreground">{plan.planned_on} · {plan.planning_type === 'regular' ? 'Reguler' : 'Tambahan'} · Rp {Number(plan.total_estimated_value).toLocaleString('id-ID')}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {plan.planned_on} ·{' '}
+                                        {plan.planning_type === 'regular' ? 'Reguler' : 'Tambahan'}{' '}
+                                        · Rp{' '}
+                                        {Number(plan.total_estimated_value).toLocaleString('id-ID')}
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <Badge variant="secondary">{plan.status === 'draft' ? 'Draf' : plan.status}</Badge>
-                                    {can('update') && <Button variant="outline" size="sm" onClick={() => void openEdit(plan.id)}>Ubah</Button>}
-                                    {can('archive') && <Button variant="destructive" size="sm" onClick={() => void archive(plan)}>Arsipkan</Button>}
+                                    <Badge variant="secondary">
+                                        {plan.status === 'draft' ? 'Draf' : plan.status}
+                                    </Badge>
+                                    {can('update') && (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => void openEdit(plan.id)}
+                                        >
+                                            Ubah
+                                        </Button>
+                                    )}
+                                    {can('archive') && (
+                                        <Button
+                                            variant="destructive"
+                                            size="sm"
+                                            onClick={() => void archive(plan)}
+                                        >
+                                            Arsipkan
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -283,28 +370,122 @@ export default function PlanningPage({ context, permissions }: { context: Contex
                 )}
             </CardContent>
 
-            <Sheet open={editing !== undefined} onOpenChange={(open) => !open && setEditing(undefined)}>
-                <SheetContent ref={sheetContentRef} side="right" className="overflow-y-auto sm:max-w-5xl">
+            <Sheet
+                open={editing !== undefined}
+                onOpenChange={(open) => !open && setEditing(undefined)}
+            >
+                <SheetContent
+                    ref={sheetContentRef}
+                    side="right"
+                    className="overflow-y-auto sm:max-w-5xl"
+                >
                     <SheetHeader>
-                        <SheetTitle>{editing && 'id' in editing ? 'Ubah perencanaan aset' : 'Buat perencanaan aset'}</SheetTitle>
+                        <SheetTitle>
+                            {editing && 'id' in editing
+                                ? 'Ubah perencanaan aset'
+                                : 'Buat perencanaan aset'}
+                        </SheetTitle>
                     </SheetHeader>
                     {editing && (
                         <div className="space-y-4 p-4">
-                            <p className="text-sm text-muted-foreground">Unit perencanaan dan penanggung jawab mengikuti konteks aktif Anda.</p>
+                            <p className="text-sm text-muted-foreground">
+                                Unit perencanaan dan penanggung jawab mengikuti konteks aktif Anda.
+                            </p>
                             <div className="grid gap-4 sm:grid-cols-2">
-                                <Field><Input label="Tanggal perencanaan" type="date" value={editing.planned_on} onChange={(event) => setEditing({ ...editing, planned_on: event.target.value, planning_year: Number(event.target.value.slice(0, 4)) })} required /></Field>
-                                <Field><Input label="Tahun perencanaan" type="number" value={editing.planning_year} onChange={(event) => setEditing({ ...editing, planning_year: Number(event.target.value) })} required /></Field>
-                                <Field><Select label="Jenis perencanaan" required items={['Reguler', 'Tambahan']} value={editing.planning_type === 'regular' ? 'Reguler' : 'Tambahan'} searchPlaceholder="Cari jenis perencanaan" ariaLabel="Jenis perencanaan" portalContainer={sheetContentRef} onValueChange={(value) => setEditing({ ...editing, planning_type: value === 'Tambahan' ? 'additional' : 'regular' })} /></Field>
-                                <Field><Input label="Sumber dana" value={editing.funding_source ?? ''} onChange={(event) => setEditing({ ...editing, funding_source: event.target.value })} /></Field>
+                                <Field>
+                                    <Input
+                                        label="Tanggal perencanaan"
+                                        type="date"
+                                        value={editing.planned_on}
+                                        onChange={(event) =>
+                                            setEditing({
+                                                ...editing,
+                                                planned_on: event.target.value,
+                                                planning_year: Number(
+                                                    event.target.value.slice(0, 4),
+                                                ),
+                                            })
+                                        }
+                                        required
+                                    />
+                                </Field>
+                                <Field>
+                                    <Input
+                                        label="Tahun perencanaan"
+                                        type="number"
+                                        value={editing.planning_year}
+                                        onChange={(event) =>
+                                            setEditing({
+                                                ...editing,
+                                                planning_year: Number(event.target.value),
+                                            })
+                                        }
+                                        required
+                                    />
+                                </Field>
+                                <Field>
+                                    <Select
+                                        label="Jenis perencanaan"
+                                        required
+                                        items={['Reguler', 'Tambahan']}
+                                        value={
+                                            editing.planning_type === 'regular'
+                                                ? 'Reguler'
+                                                : 'Tambahan'
+                                        }
+                                        searchPlaceholder="Cari jenis perencanaan"
+                                        ariaLabel="Jenis perencanaan"
+                                        portalContainer={sheetContentRef}
+                                        onValueChange={(value) =>
+                                            setEditing({
+                                                ...editing,
+                                                planning_type:
+                                                    value === 'Tambahan' ? 'additional' : 'regular',
+                                            })
+                                        }
+                                    />
+                                </Field>
+                                <Field>
+                                    <Input
+                                        label="Sumber dana"
+                                        value={editing.funding_source ?? ''}
+                                        onChange={(event) =>
+                                            setEditing({
+                                                ...editing,
+                                                funding_source: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </Field>
                             </div>
                             <Field>
                                 <FieldLabel htmlFor="planning-description">Keterangan</FieldLabel>
-                                <Textarea id="planning-description" rows={6} className="min-h-36 resize-y" value={editing.description ?? ''} onChange={(event) => setEditing({ ...editing, description: event.target.value })} />
+                                <Textarea
+                                    id="planning-description"
+                                    rows={6}
+                                    className="min-h-36 resize-y"
+                                    value={editing.description ?? ''}
+                                    onChange={(event) =>
+                                        setEditing({ ...editing, description: event.target.value })
+                                    }
+                                />
                             </Field>
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <h3 className="font-medium">Rincian aset</h3>
-                                    <Button type="button" variant="outline" size="sm" onClick={() => setEditing({ ...editing, details: [...editing.details, emptyDetail()] })}>Tambah baris</Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            setEditing({
+                                                ...editing,
+                                                details: [...editing.details, emptyDetail()],
+                                            })
+                                        }
+                                    >
+                                        Tambah baris
+                                    </Button>
                                 </div>
                                 {editing.details.map((detail, index) => (
                                     <AssetDetailRow
@@ -317,13 +498,28 @@ export default function PlanningPage({ context, permissions }: { context: Contex
                                         portalContainer={sheetContentRef}
                                         onTypeSearch={setTypeSearch}
                                         onChange={(change) => updateDetail(index, change)}
-                                        onRemove={() => setEditing({ ...editing, details: editing.details.filter((_, position) => position !== index) })}
+                                        onRemove={() =>
+                                            setEditing({
+                                                ...editing,
+                                                details: editing.details.filter(
+                                                    (_, position) => position !== index,
+                                                ),
+                                            })
+                                        }
                                     />
                                 ))}
                             </div>
                             <SheetFooter>
-                                <Button type="button" variant="outline" onClick={() => setEditing(undefined)}>Batal</Button>
-                                <Button type="button" disabled={saving} onClick={() => void save()}>{saving ? 'Menyimpan…' : 'Simpan'}</Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setEditing(undefined)}
+                                >
+                                    Batal
+                                </Button>
+                                <Button type="button" disabled={saving} onClick={() => void save()}>
+                                    {saving ? 'Menyimpan…' : 'Simpan'}
+                                </Button>
                             </SheetFooter>
                         </div>
                     )}

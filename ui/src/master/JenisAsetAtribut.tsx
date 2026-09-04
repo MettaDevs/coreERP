@@ -20,7 +20,13 @@ type Row = { tipe_atribut_id: string; wajib: boolean };
  * pada jenis lain) sehingga tidak muat pada `TransferList` yang generik, dan disunting
  * lewat daftar terpisah di bawahnya.
  */
-export default function JenisAsetAtribut({ jenisAsetId, canEdit }: { jenisAsetId: string; canEdit: boolean }) {
+export default function JenisAsetAtribut({
+    jenisAsetId,
+    canEdit,
+}: {
+    jenisAsetId: string;
+    canEdit: boolean;
+}) {
     const [types, setTypes] = useState<MasterOption[]>([]);
     const [rows, setRows] = useState<Row[]>([]);
     const [error, setError] = useState('');
@@ -32,17 +38,24 @@ export default function JenisAsetAtribut({ jenisAsetId, canEdit }: { jenisAsetId
         Promise.all([
             api<{ data: MasterOption[] }>('/tipe-atribut?per_page=100&aktif=true'),
             api<{ data: Record<string, unknown>[] }>(`/jenis-aset/${jenisAsetId}/atribut`),
-        ]).then(([typeList, assigned]) => {
-            if (cancelled) return;
-            setTypes(typeList.data);
-            setRows(assigned.data.map((row) => ({
-                tipe_atribut_id: String(row.tipe_atribut_id ?? ''),
-                wajib: Boolean(row.wajib),
-            })));
-        }).catch((caught) => {
-            if (!cancelled) setError(errorMessage(caught, 'Atribut jenis aset belum dapat dimuat.'));
-        });
-        return () => { cancelled = true; };
+        ])
+            .then(([typeList, assigned]) => {
+                if (cancelled) return;
+                setTypes(typeList.data);
+                setRows(
+                    assigned.data.map((row) => ({
+                        tipe_atribut_id: String(row.tipe_atribut_id ?? ''),
+                        wajib: Boolean(row.wajib),
+                    })),
+                );
+            })
+            .catch((caught) => {
+                if (!cancelled)
+                    setError(errorMessage(caught, 'Atribut jenis aset belum dapat dimuat.'));
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [jenisAsetId]);
 
     /**
@@ -53,16 +66,23 @@ export default function JenisAsetAtribut({ jenisAsetId, canEdit }: { jenisAsetId
     const itemOf = (type: MasterOption): TransferListItem => {
         const satuan = typeof type.satuan === 'string' ? type.satuan.trim() : '';
         const labels: Record<string, string> = {
-            string: 'Teks', decimal: 'Desimal', integer: 'Bilangan bulat', date: 'Tanggal', boolean: 'Ya/tidak',
+            string: 'Teks',
+            decimal: 'Desimal',
+            integer: 'Bilangan bulat',
+            date: 'Tanggal',
+            boolean: 'Ya/tidak',
         };
         const dataType = String(type.data_type ?? '');
         const values = Number(type.values_count ?? 0);
-        const inputMode = dataType === 'string' ? (values > 0 ? `${values} pilihan` : 'Teks bebas') : '';
+        const inputMode =
+            dataType === 'string' ? (values > 0 ? `${values} pilihan` : 'Teks bebas') : '';
 
         return {
             id: type.id,
             label: type.nama,
-            description: [labels[dataType] ?? dataType, satuan, inputMode].filter(Boolean).join(' · ') || undefined,
+            description:
+                [labels[dataType] ?? dataType, satuan, inputMode].filter(Boolean).join(' · ') ||
+                undefined,
         };
     };
     const unknown = (id: string): TransferListItem => ({ id, label: 'Tipe atribut tidak dikenal' });
@@ -79,8 +99,15 @@ export default function JenisAsetAtribut({ jenisAsetId, canEdit }: { jenisAsetId
     function applyTransfer(next: { selected: TransferListItem[] }) {
         // Baris yang sudah ada mempertahankan `wajib`-nya; baris baru dari sisi kanan
         // mulai sebagai opsional, sama seperti default sebelumnya.
-        setRows(next.selected.map((item) =>
-            rows.find((row) => row.tipe_atribut_id === item.id) ?? { tipe_atribut_id: item.id, wajib: false }));
+        setRows(
+            next.selected.map(
+                (item) =>
+                    rows.find((row) => row.tipe_atribut_id === item.id) ?? {
+                        tipe_atribut_id: item.id,
+                        wajib: false,
+                    },
+            ),
+        );
     }
 
     async function save() {
@@ -105,7 +132,8 @@ export default function JenisAsetAtribut({ jenisAsetId, canEdit }: { jenisAsetId
     return (
         <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-                Aset yang memakai jenis ini akan diminta mengisi atribut yang terpasang di sebelah kanan saat diterima.
+                Aset yang memakai jenis ini akan diminta mengisi atribut yang terpasang di sebelah
+                kanan saat diterima.
             </p>
 
             <TransferList
@@ -128,9 +156,17 @@ export default function JenisAsetAtribut({ jenisAsetId, canEdit }: { jenisAsetId
                                 id={`wajib-${row.tipe_atribut_id}`}
                                 disabled={!canEdit}
                                 checked={row.wajib}
-                                onCheckedChange={(checked) => setRows((current) => current.map((item, i) => (i === index ? { ...item, wajib: checked } : item)))}
+                                onCheckedChange={(checked) =>
+                                    setRows((current) =>
+                                        current.map((item, i) =>
+                                            i === index ? { ...item, wajib: checked } : item,
+                                        ),
+                                    )
+                                }
                             />
-                            <FieldLabel htmlFor={`wajib-${row.tipe_atribut_id}`}>{itemById(row.tipe_atribut_id).label}</FieldLabel>
+                            <FieldLabel htmlFor={`wajib-${row.tipe_atribut_id}`}>
+                                {itemById(row.tipe_atribut_id).label}
+                            </FieldLabel>
                         </Field>
                     ))}
                 </div>

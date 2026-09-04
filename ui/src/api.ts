@@ -3,7 +3,10 @@ let contextToken = '';
 export type ApiValidationErrors = Record<string, string[]>;
 
 export class ApiError extends Error {
-    constructor(message: string, public readonly validationErrors: ApiValidationErrors = {}) {
+    constructor(
+        message: string,
+        public readonly validationErrors: ApiValidationErrors = {},
+    ) {
         super(message);
         this.name = 'ApiError';
     }
@@ -12,13 +15,17 @@ export class ApiError extends Error {
 function normalizeValidationErrors(value: unknown): ApiValidationErrors {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
 
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).flatMap(([field, messages]) => {
-        const normalized = Array.isArray(messages)
-            ? messages.filter((message): message is string => typeof message === 'string')
-            : typeof messages === 'string' ? [messages] : [];
+    return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).flatMap(([field, messages]) => {
+            const normalized = Array.isArray(messages)
+                ? messages.filter((message): message is string => typeof message === 'string')
+                : typeof messages === 'string'
+                  ? [messages]
+                  : [];
 
-        return normalized.length > 0 ? [[field, normalized]] : [];
-    }));
+            return normalized.length > 0 ? [[field, normalized]] : [];
+        }),
+    );
 }
 
 /** Token konteks hanya berasal dari Web Shell; UI tidak pernah menyusun tenant sendiri. */
@@ -78,13 +85,20 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
         },
     });
     if (!response.ok) {
-        const body = await response.json().catch(() => null) as {
+        const body = (await response.json().catch(() => null)) as {
             message?: unknown;
             errors?: unknown;
             error?: { message?: unknown; errors?: unknown; details?: { errors?: unknown } };
         } | null;
-        const validationErrors = normalizeValidationErrors(body?.errors ?? body?.error?.errors ?? body?.error?.details?.errors);
-        const message = typeof body?.error?.message === 'string' ? body.error.message : typeof body?.message === 'string' ? body.message : 'Permintaan belum berhasil.';
+        const validationErrors = normalizeValidationErrors(
+            body?.errors ?? body?.error?.errors ?? body?.error?.details?.errors,
+        );
+        const message =
+            typeof body?.error?.message === 'string'
+                ? body.error.message
+                : typeof body?.message === 'string'
+                  ? body.message
+                  : 'Permintaan belum berhasil.';
         throw new ApiError(message, validationErrors);
     }
     return response.status === 204 ? (undefined as T) : response.json();

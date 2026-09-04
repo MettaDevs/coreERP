@@ -59,7 +59,9 @@ export default function PabrikanModels({
         });
 
         try {
-            const result = await api<{ data: PabrikanModelRecord[]; meta: ListMeta }>(`/model-aset?${params}`);
+            const result = await api<{ data: PabrikanModelRecord[]; meta: ListMeta }>(
+                `/model-aset?${params}`,
+            );
             setItems(result.data);
             setMeta(result.meta);
         } catch (caught) {
@@ -90,7 +92,13 @@ export default function PabrikanModels({
     }
 
     if (!canReadModels) {
-        return <Empty><EmptyDescription>Daftar model belum tersedia karena Anda belum memiliki akses untuk membacanya.</EmptyDescription></Empty>;
+        return (
+            <Empty>
+                <EmptyDescription>
+                    Daftar model belum tersedia karena Anda belum memiliki akses untuk membacanya.
+                </EmptyDescription>
+            </Empty>
+        );
     }
 
     const optionLabel = (option: ParentSummary) => `${option.kode} — ${option.nama}`;
@@ -101,36 +109,57 @@ export default function PabrikanModels({
             cell: (item) => (
                 <div>
                     <span className="font-medium">{item.nama}</span>
-                    {!item.aktif && <Badge className="ml-2" variant="secondary">Tidak aktif</Badge>}
+                    {!item.aktif && (
+                        <Badge className="ml-2" variant="secondary">
+                            Tidak aktif
+                        </Badge>
+                    )}
                 </div>
             ),
             sortValue: (item) => item.nama,
             width: 220,
         },
-        { id: 'description', header: 'Keterangan', cell: (item) => <span className="text-muted-foreground">{item.keterangan || '–'}</span>, width: 260 },
+        {
+            id: 'description',
+            header: 'Keterangan',
+            cell: (item) => <span className="text-muted-foreground">{item.keterangan || '–'}</span>,
+            width: 260,
+        },
         {
             id: 'asset-type',
             header: 'Jenis aset',
-            cell: (item) => <span className="text-muted-foreground">{item.jenis_aset ? optionLabel(item.jenis_aset) : '–'}</span>,
+            cell: (item) => (
+                <span className="text-muted-foreground">
+                    {item.jenis_aset ? optionLabel(item.jenis_aset) : '–'}
+                </span>
+            ),
             width: 220,
         },
         {
             id: 'assets',
             header: 'Aset',
-            cell: (item) => canReadAssets ? (item.asset_count ?? '–') : '–',
+            cell: (item) => (canReadAssets ? (item.asset_count ?? '–') : '–'),
             width: 90,
         },
     ];
     const actions: DataTableRowAction[] = [];
     if (canUpdate) actions.push({ id: 'edit', label: 'Ubah' });
-    if (canArchive) actions.push({ id: 'archive', label: 'Arsipkan', destructive: true, separatorBefore: actions.length > 0 });
+    if (canArchive)
+        actions.push({
+            id: 'archive',
+            label: 'Arsipkan',
+            destructive: true,
+            separatorBefore: actions.length > 0,
+        });
 
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <p className="font-semibold">Model</p>
-                    <p className="text-sm text-muted-foreground">{meta.total} model ditemukan untuk pabrikan ini.</p>
+                    <p className="text-sm text-muted-foreground">
+                        {meta.total} model ditemukan untuk pabrikan ini.
+                    </p>
                 </div>
                 {canCreate && (
                     <ActionButton action="create" type="button" onClick={() => setEditing(null)}>
@@ -140,14 +169,26 @@ export default function PabrikanModels({
             </div>
             {error ? (
                 <Empty>
-                    <EmptyHeader><EmptyTitle>Model belum dapat ditampilkan</EmptyTitle><EmptyDescription>{error}</EmptyDescription></EmptyHeader>
-                    <Button variant="outline" onClick={() => void load()}>Coba lagi</Button>
+                    <EmptyHeader>
+                        <EmptyTitle>Model belum dapat ditampilkan</EmptyTitle>
+                        <EmptyDescription>{error}</EmptyDescription>
+                    </EmptyHeader>
+                    <Button variant="outline" onClick={() => void load()}>
+                        Coba lagi
+                    </Button>
                 </Empty>
             ) : loading ? (
-                <Empty><EmptyDescription>Memuat model…</EmptyDescription></Empty>
+                <Empty>
+                    <EmptyDescription>Memuat model…</EmptyDescription>
+                </Empty>
             ) : items.length === 0 ? (
                 <Empty>
-                    <EmptyHeader><EmptyTitle>Belum ada model</EmptyTitle><EmptyDescription>Tambahkan model pertama untuk pabrikan ini.</EmptyDescription></EmptyHeader>
+                    <EmptyHeader>
+                        <EmptyTitle>Belum ada model</EmptyTitle>
+                        <EmptyDescription>
+                            Tambahkan model pertama untuk pabrikan ini.
+                        </EmptyDescription>
+                    </EmptyHeader>
                 </Empty>
             ) : (
                 <DataTable
@@ -164,9 +205,25 @@ export default function PabrikanModels({
             )}
             {meta.last_page > 1 && (
                 <div className="flex items-center justify-end gap-3 text-sm text-muted-foreground">
-                    <Button variant="outline" size="sm" disabled={meta.current_page <= 1} onClick={() => setPage((current) => current - 1)}>Sebelumnya</Button>
-                    <span>Halaman {meta.current_page} dari {meta.last_page}</span>
-                    <Button variant="outline" size="sm" disabled={meta.current_page >= meta.last_page} onClick={() => setPage((current) => current + 1)}>Berikutnya</Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={meta.current_page <= 1}
+                        onClick={() => setPage((current) => current - 1)}
+                    >
+                        Sebelumnya
+                    </Button>
+                    <span>
+                        Halaman {meta.current_page} dari {meta.last_page}
+                    </span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={meta.current_page >= meta.last_page}
+                        onClick={() => setPage((current) => current + 1)}
+                    >
+                        Berikutnya
+                    </Button>
                 </div>
             )}
 
@@ -185,15 +242,23 @@ export default function PabrikanModels({
                 />
             )}
 
-            <AlertDialog open={archiving !== null} onOpenChange={(open) => !open && setArchiving(null)}>
+            <AlertDialog
+                open={archiving !== null}
+                onOpenChange={(open) => !open && setArchiving(null)}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Arsipkan {archiving?.nama}?</AlertDialogTitle>
-                        <AlertDialogDescription>Model ini tidak lagi tampil pada daftar pilihan. Aset yang sudah memakainya tidak berubah.</AlertDialogDescription>
+                        <AlertDialogDescription>
+                            Model ini tidak lagi tampil pada daftar pilihan. Aset yang sudah
+                            memakainya tidak berubah.
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void archive()}>Arsipkan</AlertDialogAction>
+                        <AlertDialogAction onClick={() => void archive()}>
+                            Arsipkan
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

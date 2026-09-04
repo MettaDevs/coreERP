@@ -51,10 +51,14 @@ export default function StatusValidationPage({ permissions }: { permissions: str
         }
     };
 
-    useEffect(() => { void load(); }, []);
+    useEffect(() => {
+        void load();
+    }, []);
 
     const ubah = (id: string, perubahan: Partial<Aturan>) =>
-        setAturan((current) => current.map((baris) => baris.id === id ? { ...baris, ...perubahan } : baris));
+        setAturan((current) =>
+            current.map((baris) => (baris.id === id ? { ...baris, ...perubahan } : baris)),
+        );
 
     const simpan = async () => {
         setSaving(true);
@@ -63,8 +67,10 @@ export default function StatusValidationPage({ permissions }: { permissions: str
                 method: 'PUT',
                 body: JSON.stringify({
                     aturan: aturan.map((baris) => ({
-                        status: baris.status, aturan: baris.aturan,
-                        aktif: baris.aktif, keparahan: baris.keparahan,
+                        status: baris.status,
+                        aturan: baris.aturan,
+                        aktif: baris.aktif,
+                        keparahan: baris.keparahan,
                     })),
                 }),
             });
@@ -89,71 +95,106 @@ export default function StatusValidationPage({ permissions }: { permissions: str
                 <CardTitle>Validasi status work order</CardTitle>
                 {canUpdate && (
                     <CardAction>
-                        <Button disabled={saving} onClick={() => void simpan()}>{saving ? 'Menyimpan…' : 'Simpan'}</Button>
+                        <Button disabled={saving} onClick={() => void simpan()}>
+                            {saving ? 'Menyimpan…' : 'Simpan'}
+                        </Button>
                     </CardAction>
                 )}
             </CardHeader>
             <CardContent className="space-y-6 px-5 py-4">
                 <p className="text-sm text-muted-foreground">
-                    Aturan melekat pada status tujuan, sehingga pemeriksaan yang sama dapat longgar saat
-                    pekerjaan dijadwalkan dan ketat saat dinyatakan selesai.
+                    Aturan melekat pada status tujuan, sehingga pemeriksaan yang sama dapat longgar
+                    saat pekerjaan dijadwalkan dan ketat saat dinyatakan selesai.
                 </p>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 {perStatus.length === 0 ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada aturan validasi</EmptyTitle>
-                            <EmptyDescription>Aturan disiapkan saat tenant dikonfigurasi. Hubungi admin bila daftar ini kosong.</EmptyDescription>
+                            <EmptyDescription>
+                                Aturan disiapkan saat tenant dikonfigurasi. Hubungi admin bila
+                                daftar ini kosong.
+                            </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
-                ) : perStatus.map((kelompok) => (
-                    <section key={kelompok.status} className="space-y-2">
-                        <h3 className="font-semibold">Sebelum berpindah ke {STATUS[kelompok.status]}</h3>
-                        <div className="overflow-x-auto rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Yang diperiksa</TableHead>
-                                        <TableHead className="w-32">Diperiksa</TableHead>
-                                        <TableHead className="w-72">Bila belum terpenuhi</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {kelompok.baris.map((baris) => (
-                                        <TableRow key={baris.id}>
-                                            <TableCell>{ATURAN[baris.aturan] ?? baris.aturan}</TableCell>
-                                            <TableCell>
-                                                <Switch
-                                                    aria-label={`Periksa ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
-                                                    checked={baris.aktif}
-                                                    disabled={!canUpdate}
-                                                    onCheckedChange={(checked) => ubah(baris.id, { aktif: checked })}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                {!baris.aktif ? (
-                                                    <span className="text-sm text-muted-foreground">Tidak diperiksa</span>
-                                                ) : canUpdate ? (
-                                                    <Select
-                                                        items={KEPARAHAN.map((item) => item.label)}
-                                                        value={KEPARAHAN.find((item) => item.kode === baris.keparahan)?.label ?? null}
-                                                        ariaLabel={`Keparahan ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
-                                                        onValueChange={(value) => {
-                                                            const dipilih = KEPARAHAN.find((item) => item.label === value);
-                                                            if (dipilih) ubah(baris.id, { keparahan: dipilih.kode });
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <span className="text-sm">{KEPARAHAN.find((item) => item.kode === baris.keparahan)?.label ?? baris.keparahan}</span>
-                                                )}
-                                            </TableCell>
+                ) : (
+                    perStatus.map((kelompok) => (
+                        <section key={kelompok.status} className="space-y-2">
+                            <h3 className="font-semibold">
+                                Sebelum berpindah ke {STATUS[kelompok.status]}
+                            </h3>
+                            <div className="overflow-x-auto rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Yang diperiksa</TableHead>
+                                            <TableHead className="w-32">Diperiksa</TableHead>
+                                            <TableHead className="w-72">
+                                                Bila belum terpenuhi
+                                            </TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </section>
-                ))}
+                                    </TableHeader>
+                                    <TableBody>
+                                        {kelompok.baris.map((baris) => (
+                                            <TableRow key={baris.id}>
+                                                <TableCell>
+                                                    {ATURAN[baris.aturan] ?? baris.aturan}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Switch
+                                                        aria-label={`Periksa ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
+                                                        checked={baris.aktif}
+                                                        disabled={!canUpdate}
+                                                        onCheckedChange={(checked) =>
+                                                            ubah(baris.id, { aktif: checked })
+                                                        }
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    {!baris.aktif ? (
+                                                        <span className="text-sm text-muted-foreground">
+                                                            Tidak diperiksa
+                                                        </span>
+                                                    ) : canUpdate ? (
+                                                        <Select
+                                                            items={KEPARAHAN.map(
+                                                                (item) => item.label,
+                                                            )}
+                                                            value={
+                                                                KEPARAHAN.find(
+                                                                    (item) =>
+                                                                        item.kode ===
+                                                                        baris.keparahan,
+                                                                )?.label ?? null
+                                                            }
+                                                            ariaLabel={`Keparahan ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
+                                                            onValueChange={(value) => {
+                                                                const dipilih = KEPARAHAN.find(
+                                                                    (item) => item.label === value,
+                                                                );
+                                                                if (dipilih)
+                                                                    ubah(baris.id, {
+                                                                        keparahan: dipilih.kode,
+                                                                    });
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-sm">
+                                                            {KEPARAHAN.find(
+                                                                (item) =>
+                                                                    item.kode === baris.keparahan,
+                                                            )?.label ?? baris.keparahan}
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </section>
+                    ))
+                )}
             </CardContent>
         </Card>
     );
