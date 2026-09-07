@@ -231,28 +231,20 @@ query biasa. Angka yang benar-benar melintasi tenant hanyalah metering milik ven
 di control plane tanpa menyentuh data bisnis. Jangan merancang federasi database untuk kebutuhan yang
 tidak ada.
 
-#### Retensi menentukan apakah data boleh dihapus
+#### Data tidak pernah dihapus fisik
 
-Tidak semua modul boleh menghapus datanya saat dicabut. Rekam medis elektronik wajib disimpan paling
-singkat 25 tahun sejak kunjungan terakhir menurut Permenkes 24/2022, dan banyak fasilitas memilih tidak
+Semua penghapusan adalah penghapusan lunak, termasuk saat modul dicabut. Diputuskan 7 September 2026;
+lihat bagian 5.7. Ini bukan hanya penyederhanaan: rekam medis elektronik wajib disimpan paling singkat
+25 tahun sejak kunjungan terakhir menurut Permenkes 24/2022, dan banyak fasilitas memilih tidak
 memusnahkannya sama sekali.
 
-Manifest modul menyatakan retensinya, dan perintah pencabutan membaca deklarasi itu:
+Karena itu **perintah pencabutan tidak punya opsi penghapusan data sama sekali.** Ini lebih aman daripada
+opsi yang ditolak bersyarat: sebuah opsi yang ada tetapi kadang ditolak akan dicoba, dan cepat atau
+lambat ada modul yang lupa menyatakan penguncinya. Opsi yang tidak ada tidak bisa salah dipakai. Bentuk
+ini sama dengan Business Central, yang mencabut ekstensi tanpa menyentuh datanya.
 
-```yaml
-data_retention: legal-hold
-retention:
-  dasar: Permenkes 24/2022
-  minimum: 25 tahun sejak kunjungan terakhir
-  boleh_dihapus: false
-```
-
-Modul dengan `boleh_dihapus: false` **menolak** opsi penghapusan data, bukan sekadar meminta konfirmasi.
-Penolakannya menyebut dasar hukumnya supaya operator tahu ini bukan kesalahan sistem.
-
-Konsekuensi yang mudah terlewat: tenant yang berhenti berlangganan tetap wajib menyimpan rekam medisnya,
-jadi harus ada jalan keluar berupa ekspor lengkap yang bisa dibaca sistem lain, atau serah terima
-database. Itu ditulis di kontrak, bukan diputuskan saat pelanggan sudah pergi.
+Tiga akibat yang harus ditangani, bukan diabaikan. Rinciannya beserta tugasnya ada di bagian 5.7 dan
+pada F0-03.
 
 ### 5.3 Kode Core yang dipanggil modul
 
@@ -311,6 +303,61 @@ CI menghitung dependency dan link module dari `app.yaml`, membangun satu image y
 modul hasil hitungan itu, lalu membuktikan modul lain tidak ikut sebelum bundle ditandatangani.
 Bentuk manifest ini adalah Customer Edition Manifest pada
 [release dan on-prem](../../dev/03-release-and-on-prem.md), yang sampai sekarang belum pernah dibangun.
+
+### 5.7 Empat keputusan yang dijawab pemilik produk
+
+Dijawab 7 September 2026, setelah F0-01 selesai. Ditulis di sini supaya tidak ada task yang menebaknya.
+
+#### Modul dibeli per tenant
+
+Satu baris pemasangan dimiliki satu tenant, bukan satu legal entity. Konsekuensinya perlu disebut karena
+contoh kesehatan mudah salah baca: sebuah grup yang punya apotek **dan** klinik sebagai dua legal entity
+di bawah satu tenant membeli kedua modul sekali, lalu memakai legal entity untuk memisahkan datanya.
+Yang membeli farmasi saja adalah apotek yang berdiri sebagai tenant tersendiri.
+
+Ini menutup pertanyaan tentang kunci pemasangan: `core_module_installations` berkunci `tenant_id` dan
+kode modul, dan tidak perlu dimensi ketiga.
+
+#### Pembaruan on-prem dijalankan admin pelanggan
+
+Tidak ada saluran pembaruan otomatis, dan tidak direncanakan ada. Admin di tempat pelanggan yang
+menjalankannya.
+
+Itu menentukan bentuk yang harus dihasilkan fase 5: **satu perintah**, bukan urutan langkah. Seorang
+admin yang menjalankan tujuh langkah tangan akan melewatkan langkah keempat pada pembaruan kesepuluh, dan
+yang menemukan akibatnya adalah kita, berbulan-bulan kemudian, lewat laporan yang tidak masuk akal.
+Perintah itu juga harus aman diulang: dijalankan dua kali harus memberi hasil yang sama dengan sekali.
+
+#### Data tidak pernah dihapus fisik
+
+Semua penghapusan adalah penghapusan lunak. Ini menyederhanakan pencabutan modul: **perintah pencabutan
+tidak punya opsi hapus data sama sekali**, jadi tidak ada keputusan yang bisa salah diambil operator.
+Ini juga bentuk yang dipakai Business Central, yang mencabut ekstensi tanpa menyentuh datanya.
+
+Tiga akibat yang harus ditangani, bukan diabaikan:
+
+| Akibat | Yang harus dilakukan |
+| --- | --- |
+| Indeks unik ikut menghitung baris terhapus | pakai indeks unik parsial yang hanya mencakup baris hidup, kalau tidak kode yang sama tidak bisa dipakai ulang setelah dihapus |
+| Setiap query harus menyaring baris terhapus | disaring di lapisan model, dan diuji; lupa satu berarti data terhapus muncul lagi di layar |
+| Data tumbuh selamanya | ukuran tabel tenant harus dipantau sejak awal, bukan setelah ada yang lambat |
+
+Satu hal yang tidak selesai dengan penghapusan lunak: **tenant yang berhenti berlangganan**. Datanya
+tetap ada di database kita tanpa batas waktu, dan itu keputusan hukum, bukan keputusan teknis. Yang
+dibutuhkan adalah jalan keluar berupa ekspor lengkap yang bisa dibaca sistem lain atau serah terima
+database, ditulis di kontrak sebelum pelanggan pergi, bukan sesudah.
+
+#### Peninjauan pull request ditegakkan mulai sekarang
+
+Sampai hari ini tidak ada yang meninjau, dan alur yang merah diabaikan berbulan-bulan. Mulai sekarang
+cabang utama dikunci: perubahan masuk lewat pull request, dan pull request tidak bisa digabungkan
+sebelum kedua alur hijau. Ini yang membuat seluruh dokumen ini punya arti — tanpanya, setiap kalimat
+"selesai bila test lulus" hanyalah harapan.
+
+Jumlah persetujuan yang diwajibkan disetel nol, bukan satu. Dengan satu engineer dan tiga magang, mewajibkan
+satu persetujuan berarti pull request pemimpin tim tidak pernah bisa digabungkan, karena penulis tidak
+boleh menyetujui pull request-nya sendiri. Yang ditegakkan mesin adalah pemeriksaan otomatis; peninjauan
+manusia untuk pull request magang tetap dilakukan, tapi ditegakkan orang.
 
 ## 6. Peta fase
 
@@ -441,9 +488,9 @@ fase 2 dan 3 melanggar aturan tertulis, dan peninjau berhak menolaknya.
 
 **Berkas.**
 - `AGENTS.md`
-- `.claude/skills/coreerp-architecture/SKILL.md`
-- `.agents/skills/coreerp-architecture/SKILL.md`
-- `.claude/skills/module-discovery/SKILL.md` dan salinannya di `.agents/`
+- `modules/README.md`
+- `.claude/skills/coreerp-architecture/SKILL.md` dan salinannya di `.agents/`
+- `.github/scripts/check-skill-copies.py` dan `.github/workflows/lint.yml`
 
 **Langkah.**
 1. Jangan menghapus aturan lama. App di repo `app-erp-*` yang belum dipindah masih menjalankannya, dan
@@ -454,38 +501,65 @@ fase 2 dan 3 melanggar aturan tertulis, dan peninjau berhak menolaknya.
    database, maupun token layanan sendiri.
 3. Nyatakan bahwa pull request yang memindahkan app menjadi modul adalah pengecualian sah terhadap aturan
    lama, dan wajib menyebut dokumen keputusan pada badannya.
-4. Dua folder skill berisi salinan yang identik. Ubah keduanya, atau jadikan salah satunya penunjuk ke
-   yang lain, supaya tidak menyimpang diam-diam.
+4. Dua folder skill berisi salinan yang identik. Samakan keduanya, lalu pasang pemeriksaan yang gagal
+   bila keduanya menyimpang lagi. Menyamakannya sekali tanpa pemeriksaan hanya menunda masalahnya.
 
 **Selesai bila.** Membaca berkas panduan kerja dari awal, seorang peninjau dapat menjawab dengan pasti
-apakah sebuah pull request yang menaruh modul di runtime Core melanggar aturan atau tidak.
+apakah sebuah pull request yang menaruh modul di runtime Core melanggar aturan atau tidak; dan sebuah
+penyimpangan yang sengaja dibuat antara dua folder skill membuat alur merah.
 
 **Rujukan.** [keputusan satu runtime](00-keputusan.md).
 
 **Bergantung pada.** Tidak ada.
 
-### F0-03 — Kunci retensi dinyatakan sebelum ada modul yang bisa dicabut
+#### Yang ternyata berbeda dari dugaan task ini
 
-**Kenapa.** Perintah pencabutan modul dibuat pada fase berikutnya. Bila aturan retensi belum ada saat itu
-ditulis, opsi penghapusan data akan tersedia untuk semua modul, termasuk yang menyimpan rekam medis yang
-wajib disimpan 25 tahun.
+**Dua folder skill sudah menyimpang, bukan identik.** Tiga skill berbeda isinya, dan penyimpangannya
+dua arah: `coreerp-page-standard` dan `coreerp-ui` membawa aturan yang hanya ada di `.agents`,
+sementara `frontend-patterns` membawa aturan yang hanya ada di `.claude`. Pada `coreerp-ui` bahkan ada
+dua versi berbeda dari aturan yang sama tentang penanda field wajib. Menimpa satu folder dengan yang
+lain akan membuang aturan yang sah; ketiganya digabungkan, bukan disalin satu arah.
+
+Karena itu langkah 4 tidak cukup dikerjakan sekali. `.github/scripts/check-skill-copies.py` kini
+membandingkan setiap skill yang ada di kedua folder dan gagal bila isinya berbeda, dan ia berjalan di
+alur linter. Sudah dibuktikan bisa gagal.
+
+**`modules/README.md` juga membawa aturan lama** dan tidak disebut task ini. Isinya menyatakan setiap
+modul wajib punya container sendiri — berkas yang justru dibaca pertama kali oleh orang yang akan
+membuat modul pertama.
+
+**`module-discovery` hanya ada di `.agents/`,** dan tidak menyatakan aturan batas modul sama sekali,
+jadi ia tidak perlu diubah.
+
+### F0-03 — Aturan penghapusan lunak ditulis sebelum ada tabel modul
+
+**Kenapa.** Semua penghapusan adalah penghapusan lunak (bagian 5.7). Aturan itu harus berdiri sebelum
+tabel modul pertama dibuat, karena dua akibatnya mengubah bentuk skema dan tidak murah diperbaiki
+belakangan: indeks unik harus parsial, dan setiap query harus menyaring baris terhapus. Modul yang sudah
+terlanjur dibuat dengan indeks unik biasa akan menolak kode yang dipakai ulang setelah dihapus, dan
+gejalanya muncul sebagai keluhan pengguna, bukan sebagai test merah.
 
 **Berkas.**
-- `docs/dev/02-module-standard.md` (blok manifest)
-- `apps/control-plane/app/Http/Requests/Provider/AppCatalogRequest.php`
-- `apps/control-plane/app/Actions/Provider/RegisterAppCatalog.php`
+- `docs/dev/02-module-standard.md` (bagian penghapusan lunak dan indeks unik)
+- `AGENTS.md` (satu kalimat aturan, merujuk ke standar)
 
 **Langkah.**
-1. Tambahkan blok retensi pada manifest sesuai bentuk pada bagian 5.2 dokumen ini.
-2. Validasi manifest menolak modul yang menyimpan data pasien tanpa deklarasi retensi.
-3. Katalog menyimpan deklarasi itu, supaya perintah pencabutan dapat membacanya nanti.
+1. Tulis aturannya di standar modul: setiap tabel modul memiliki penanda terhapus, tidak ada perintah
+   yang menghapus baris secara fisik, dan pencabutan modul tidak menyentuh data.
+2. Nyatakan bentuk indeks uniknya. Indeks unik pada kode bisnis wajib parsial, hanya mencakup baris
+   hidup, supaya kode yang sudah dihapus bisa dipakai ulang. Sertakan satu contoh yang bisa disalin.
+3. Nyatakan bahwa penyaringan baris terhapus terjadi di lapisan model, bukan diulang di tiap query, dan
+   bahwa modul wajib punya satu test yang membuktikan baris terhapus tidak muncul di daftar.
+4. Nyatakan siapa yang memantau pertumbuhan tabel dan sejak kapan. Data yang tidak pernah dihapus tumbuh
+   selamanya; itu diterima dengan sadar, bukan dilupakan.
 
-**Selesai bila.** Manifest tanpa deklarasi retensi ditolak, dan manifest dengan `boleh_dihapus: false`
-tersimpan di katalog.
+**Selesai bila.** Standar modul menjawab tiga pertanyaan tanpa perlu bertanya orang: bagaimana bentuk
+indeks unik pada kolom kode, di mana baris terhapus disaring, dan apa yang terjadi pada data saat modul
+dicabut.
 
-**Rujukan.** [standar app](../../dev/02-module-standard.md).
+**Rujukan.** Bagian 5.2 dan 5.7 dokumen ini, [standar app](../../dev/02-module-standard.md).
 
-**Bergantung pada.** F0-01.
+**Bergantung pada.** Tidak ada.
 
 ### F0-04 — `tsc` masuk ke alur linter
 
@@ -510,6 +584,29 @@ dimasukkan membuat alur merah.
 **Rujukan.** F0-01 pada dokumen ini.
 
 **Bergantung pada.** F0-01.
+
+### F0-05 — Cabang utama dikunci
+
+**Kenapa.** Alur merah diabaikan berbulan-bulan dan tidak ada yang meninjau. Selama penggabungan tidak
+menuntut apa pun, setiap kalimat "selesai bila test lulus" pada dokumen ini hanya harapan. Ini juga yang
+membuat F0-01 mungkin terulang: alur bisa merah lagi tanpa ada yang menahan.
+
+**Berkas.** Tidak ada. Ini setelan repo, bukan kode.
+
+**Langkah.**
+1. Wajibkan perubahan masuk lewat pull request pada cabang utama.
+2. Wajibkan kedua alur hijau sebelum penggabungan: `quality` dari alur linter, serta `ci (8.4)` dan
+   `ci (8.5)` dari alur test.
+3. Setel jumlah persetujuan yang diwajibkan ke nol, dengan alasan yang ditulis pada bagian 5.7.
+4. Jangan mewajibkan setelan ini pada administrator. Pemimpin tim harus tetap bisa keluar sendiri kalau
+   ada alur yang rusak karena hal di luar kodenya.
+
+**Selesai bila.** Sebuah pull request dengan alur merah tidak bisa digabungkan lewat antarmuka GitHub,
+dan mencoba mendorong langsung ke cabang utama ditolak.
+
+**Rujukan.** Bagian 5.7 dokumen ini.
+
+**Bergantung pada.** F0-01. Mengunci cabang sebelum alurnya hijau berarti mengunci semua orang di luar.
 
 ## 8. Fase 1: penjaga batas dan kerangka modul
 
@@ -850,17 +947,18 @@ tenant.
    sudah ada.
 2. Penonaktifan hanya mengubah status dan mengisi `disabled_at`. Data tidak disentuh sama sekali. Menu
    hilang karena shell hanya membaca modul berstatus terpasang.
-3. Pencabutan dengan penghapusan data adalah perintah terpisah dengan opsi eksplisit, dan **ditolak**
-   bila manifest modul menyatakan `boleh_dihapus: false` sesuai F0-03. Penolakannya menyebut dasar
-   hukumnya.
+3. Pencabutan **tidak punya opsi penghapusan data**, sesuai bagian 5.7. Ia mengubah status pemasangan
+   dan berhenti di situ. Kalau nanti ada yang menambahkan opsi itu, ia sedang melanggar keputusan
+   tertulis, bukan menambah fitur.
 4. Menolak mencabut modul yang masih menjadi dependency modul lain yang terpasang pada tenant yang sama.
    Kelas graf dependency yang ada hanya punya penelusuran maju dan berskala katalog; tambahkan
    penelusuran balik yang dipotong dengan catatan pemasangan tenant itu.
 5. Test menjalankan seluruh rangkaian: pasang dua modul, isi data, nonaktifkan satu, buktikan datanya
-   utuh dan modul lain tidak terpengaruh, aktifkan lagi, buktikan data awal tidak dobel, lalu cabut
-   dengan penghapusan data dan buktikan modul lain serta tenant lain tetap utuh.
+   utuh dan modul lain tidak terpengaruh, aktifkan lagi, buktikan data awal tidak dobel, lalu cabut dan
+   buktikan datanya **masih ada** serta modul lain dan tenant lain tetap utuh.
 
-**Selesai bila.** Test rangkaian itu lulus, dan mencoba menghapus data modul berkunci retensi ditolak.
+**Selesai bila.** Test rangkaian itu lulus, dan perintah pencabutan tidak memiliki opsi penghapusan data
+dalam bentuk apa pun.
 
 **Rujukan.** [release dan on-prem](../../dev/03-release-and-on-prem.md), bagian 5.2 dokumen ini.
 

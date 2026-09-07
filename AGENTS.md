@@ -5,7 +5,7 @@
 - Untuk perubahan source atau audit keterbacaan, gunakan skill `code-formatting`: pakai formatter yang sudah ada, pisahkan perubahan format dari perubahan perilaku, dan jangan menambah atau mengubah kebijakan formatter tanpa persetujuan eksplisit.
 - Teks UI untuk end user—termasuk hint, label, dialog, empty state, error, dan status—wajib memakai bahasa sehari-hari yang menjelaskan tindakan atau dampaknya bagi pengguna. Jangan tampilkan istilah internal seperti entitlement, artifact, deployment/installation registry, `TenantContext`, `tenant_id`, atau istilah arsitektur lain kecuali layar memang ditujukan untuk developer/operator teknis.
 - Bantuan konteks UI mengikuti [standar bantuan kontekstual pada halaman dan field](docs/dev/02-module-standard.md#bantuan-kontekstual-pada-halaman-dan-field): setiap field boleh diberi detail opsional, tetapi hanya field yang rumit atau tidak langsung jelas yang perlu help text. Hover sekitar satu detik menampilkan bantuan sementara dan bantuan hilang saat cursor berpindah. Klik label/judul field menampilkan bantuan yang tetap terbuka walau cursor meninggalkan field; klik label/judul itu lagi menutupnya. Pola toggle ini juga harus tersedia lewat focus/keyboard. Jangan menambahkan ikon atau deskripsi pada setiap judul page/card, dan jangan mengulang arti field di header. Teks wajib, validasi, dan error tetap terlihat. Aturan ini mengatur isi dan perilaku; implementasi komponen UI dapat berubah berkala.
-- Setiap module memiliki API, UI, database, migration, contract, dan container sendiri. Dilarang query database lintas module; gunakan REST/OpenAPI atau event/AsyncAPI.
+- Batas antar module bergantung pada bentuknya. App di repo `app-erp-*` memiliki API, UI, database, migration, contract, dan container sendiri, dan dilarang query database lintas app; gunakan REST/OpenAPI atau event/AsyncAPI. Module di bawah `modules/` di dalam repo ini berjalan di runtime Core dan memakai database yang sama. Bacalah bagian **Dua bentuk module yang hidup berdampingan** di bawah sebelum menilai sebuah pull request melanggar aturan atau tidak.
 - Setiap surface yang dipanggil app lain wajib ada di contract: route `internal/v1`, event yang diterbitkan, dan webhook. Permukaan app-ke-Core dikontrakkan pada `apps/control-plane/contracts/openapi-internal.yaml` yang ditulis tangan. Setelah mengubah `routes/api.php`, jalankan `python contracts/check-contract-coverage.py` dari `apps/control-plane` — tidak ada test yang gagal karena contract kurang lengkap, hanya cek ini yang menangkapnya, dan ia juga berjalan di CI. Aturan lengkap ada pada **Contract decision gate** di `.agents/skills/coreerp-architecture/SKILL.md`.
 - Pilih transport dari maknanya: REST untuk perintah/permintaan data, event untuk fakta yang sudah terjadi. Jangan mengontrakkan panggilan REST sebagai channel AsyncAPI atau sebaliknya.
 - Contract lintas app ditulis tangan, bukan hasil generate. Output Scramble (`contracts/openapi.json`) hanya sah untuk endpoint yang consumer-nya cuma UI Control Plane sendiri.
@@ -22,6 +22,36 @@
 
 Rules:
 - Do not ever hardcode a name, like name of a company, name of a person, name  of a BIG MODULE, everything should config on database, ask me if you still didnt clear about this later on the conv
+
+## Dua bentuk module yang hidup berdampingan
+
+Selama pemindahan ke satu runtime, dua bentuk berdiri bersamaan dan aturannya berbeda. Menilai yang satu
+dengan aturan yang lain adalah kesalahan yang paling mudah terjadi di repo ini.
+
+| | App di repo `app-erp-*` | Module di bawah `modules/` |
+| --- | --- | --- |
+| Proses | container sendiri | ikut runtime Core |
+| Database | database sendiri | database tenant yang sama dengan Core |
+| Pemisah tabel | database terpisah | awalan nama tabel, misalnya `aset_` |
+| Memanggil Core | REST `internal/v1` dengan token app | panggilan fungsi biasa di dalam proses |
+| Contract | wajib untuk tiap permukaan yang dipanggil app lain | wajib hanya untuk permukaan yang dipanggil di luar runtime |
+| Token layanan sendiri | ada | tidak ada |
+
+Yang **tetap berlaku pada keduanya**, dan tidak boleh dilonggarkan dengan alasan apa pun:
+
+- Sebuah module tidak boleh menyentuh tabel milik module lain. Pada app itu dijaga database terpisah;
+  pada module itu dijaga test dan analisa statis. Batas yang dijaga mesin dan batas yang dijaga
+  pemeriksaan sama-sama batas, dan pelanggarnya sama-sama ditolak.
+- Setiap tabel module membawa `tenant_id`, dan setiap query menyaringnya.
+- Nama event, envelope, dan aturan versinya tidak berubah.
+
+**Pull request yang memindahkan sebuah app menjadi module adalah pengecualian yang sah** terhadap aturan
+app, bukan pelanggaran. Ia wajib menyebut nomor task pada
+[PRD pemindahan ke satu runtime](docs/todo/satu-runtime/01-prd.md) di badan pull request-nya, supaya
+peninjau tahu ia sedang membaca pekerjaan yang direncanakan.
+
+Aturan app **tidak dihapus** dan tidak boleh dihapus selama masih ada app yang menjalankannya. Setelah
+app terakhir pindah, aturan ini dipindahkan menjadi desain kanonik di `docs/dev` dan bagian ini dibuang.
 
 ## UI overlay dropdowns
 

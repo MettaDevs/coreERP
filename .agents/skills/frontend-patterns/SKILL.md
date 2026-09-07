@@ -27,6 +27,16 @@ Modern frontend patterns for React, Next.js, and performant user interfaces.
 - Prefer field help over repeating the same explanation in a page/card header. Obvious fields need no help text.
 - Hover field help opens after roughly one second and closes when the pointer leaves. Clicking the field label/title toggles a persistent open state; clicking it again closes it. The same toggle must be reachable by keyboard. Required, validation, and error text stays visible instead of being hidden only in a tooltip.
 
+### Bulk creation: table vs card
+
+- Before building any creation surface, ask how many the user typically creates per visit, and how much detail each one carries.
+- Use a **table** (one row per record, cells edited in place) only when both hold: many are created at once **and** each one is short and uniform. Use a **card** form in every other case — one at a time, or many but with branching detail.
+- A table is `DataTable` with `onAddRow` and `actionsPlacement="inline"` inside `DialogContent size="full"`. Editable cells come from `column.cell` returning `Input`, `NativeSelect`, or `MultiSelect`; no new mechanism is needed.
+- Detail too branching for a cell moves into a second-layer dialog, never gets dropped. The cell becomes a button showing a state summary (`Belum diatur`, `2 batas`, `Tidak dibatasi`).
+- When the record's identity is system-generated (code, token, sequence number), give every row a free-text label column. Without it the user cannot tell the rows apart later.
+- Submit the rows as an array in one request and one transaction; keep accepting the single-record shape so published contracts do not break.
+- Canonical rule: `docs/dev/02-module-standard.md`, "Membuat banyak baris sekaligus".
+
 ### Composition Over Inheritance
 
 ```typescript
