@@ -1,7 +1,3 @@
-import { Head } from '@inertiajs/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
-
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -44,7 +40,11 @@ import {
     SheetTitle,
 } from '@apperp/ui/sheet';
 import { Textarea } from '@apperp/ui/textarea';
-import type { BreadcrumbItem } from '@/types/navigation';
+import { Head } from '@inertiajs/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import Heading from '@/components/heading';
+import type { Layout, Report, ReportField } from '@/lib/reports';
 import {
     deleteLayout,
     downloadLayout,
@@ -56,8 +56,7 @@ import {
     formatBytes,
     formatTime,
 } from '@/lib/reports';
-import type { Layout, Report, ReportField } from '@/lib/reports';
-import Heading from '@/components/heading';
+import type { BreadcrumbItem } from '@/types/navigation';
 
 type Props = {
     canManage: boolean;

@@ -1,5 +1,5 @@
-import { Head, router } from '@inertiajs/react';
 import type { CoreErpTheme } from '@apperp/ui/theme';
+import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { useAppearance } from '@/hooks/use-appearance';
 import { addNotification, isAppNotificationMessage } from '@/lib/notifications';

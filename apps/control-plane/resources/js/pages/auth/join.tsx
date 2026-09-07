@@ -1,11 +1,10 @@
-import { Form, Head } from '@inertiajs/react';
-
-import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
 import { Button } from '@apperp/ui/button';
 import { Field, FieldError, FieldGroup } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Spinner } from '@apperp/ui/spinner';
+import { Form, Head } from '@inertiajs/react';
+import PasswordInput from '@/components/password-input';
+import TextLink from '@/components/text-link';
 
 type Props = { passwordRules: string };
 

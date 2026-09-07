@@ -1,9 +1,3 @@
-import { Head, router } from '@inertiajs/react';
-import { Users } from 'lucide-react';
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-
-import Heading from '@/components/heading';
 import { Badge } from '@apperp/ui/badge';
 import { Card, CardContent } from '@apperp/ui/card';
 import { DataTable } from '@apperp/ui/data-table';
@@ -16,6 +10,11 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
+import { Head, router } from '@inertiajs/react';
+import { Users } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { useState } from 'react';
+import Heading from '@/components/heading';
 
 type Identity = {
     id: number;

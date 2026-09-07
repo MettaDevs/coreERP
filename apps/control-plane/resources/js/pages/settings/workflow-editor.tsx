@@ -1,5 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import '@xyflow/react/dist/style.css';
+
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import { Checkbox } from '@apperp/ui/checkbox';
+import { Field } from '@apperp/ui/field';
+import { Input } from '@apperp/ui/input';
+import { NativeSelect } from '@apperp/ui/native-select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Head, Link, router } from '@inertiajs/react';
+import type {
+    Connection,
+    Edge,
+    Node,
+    NodeProps,
+    NodeTypes,
+} from '@xyflow/react';
 import {
     addEdge,
     Background,
@@ -12,51 +28,29 @@ import {
     useEdgesState,
     useNodesState,
 } from '@xyflow/react';
-import type { Connection, Edge, Node, NodeProps, NodeTypes } from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-
 import {
     ArrowLeft,
-    Check,
     CheckCircle2,
     CircleAlert,
-    GitBranch,
     GitCommit,
     GitFork,
     GitPullRequest,
     HelpCircle,
     Info,
-    Layers,
     Lock,
-    Play,
     Plus,
     Save,
-    ShieldCheck,
     UserCheck,
-    Users,
-    Workflow as WorkflowIcon,
 } from 'lucide-react';
-
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
-import { Checkbox } from '@apperp/ui/checkbox';
-import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
-import { Input } from '@apperp/ui/input';
-import { NativeSelect } from '@apperp/ui/native-select';
-import Heading from '@/components/heading';
+import { useEffect, useMemo, useState } from 'react';
 
 type Config = Record<string, unknown>;
 type WorkflowNodeData = { label: string; config: Config };
 type WorkflowNode = Node<WorkflowNodeData>;
-type WorkflowEdge = Edge<{ outcome?: string | null; condition?: Config | null }>;
+type WorkflowEdge = Edge<{
+    outcome?: string | null;
+    condition?: Config | null;
+}>;
 type Role = { id: string; name: string };
 type Member = { id: string; name: string; email: string };
 type Props = {
@@ -109,16 +103,17 @@ function FlowNode({ data, selected, type }: NodeProps<WorkflowNode>) {
 
     return (
         <div
-            className={`min-w-48 rounded-xl border bg-card p-3 shadow-xs transition-all ${selected
-                    ? 'border-primary ring-2 ring-primary/20 shadow-sm'
+            className={`min-w-48 rounded-xl border bg-card p-3 shadow-xs transition-all ${
+                selected
+                    ? 'border-primary shadow-sm ring-2 ring-primary/20'
                     : 'border-border hover:border-border/80'
-                }`}
+            }`}
         >
             {!isStart && (
                 <Handle
                     type="target"
                     position={Position.Left}
-                    className="!size-3 !bg-muted-foreground !border-2 !border-background"
+                    className="!size-3 !border-2 !border-background !bg-muted-foreground"
                 />
             )}
             <div className="flex items-center gap-2">
@@ -129,13 +124,17 @@ function FlowNode({ data, selected, type }: NodeProps<WorkflowNode>) {
                             : 'bg-muted text-muted-foreground'
                     }`}
                 >
-                    {isStart ? 'A' : isEnd ? 'Z' : (nodeTitles[type ?? '']?.[0] ?? 'L')}
+                    {isStart
+                        ? 'A'
+                        : isEnd
+                          ? 'Z'
+                          : (nodeTitles[type ?? '']?.[0] ?? 'L')}
                 </span>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                <p className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
                     {nodeTitles[type ?? ''] ?? 'Langkah'}
                 </p>
             </div>
-            <p className="mt-1.5 text-xs font-bold text-foreground truncate">
+            <p className="mt-1.5 truncate text-xs font-bold text-foreground">
                 {data.label}
             </p>
             {isApproval && (
@@ -144,7 +143,7 @@ function FlowNode({ data, selected, type }: NodeProps<WorkflowNode>) {
                 </p>
             )}
             {isCondition && (
-                <p className="mt-1 text-[10px] text-muted-foreground font-mono">
+                <p className="mt-1 font-mono text-[10px] text-muted-foreground">
                     Cabang: True / False
                 </p>
             )}
@@ -156,14 +155,14 @@ function FlowNode({ data, selected, type }: NodeProps<WorkflowNode>) {
                         type="source"
                         position={Position.Right}
                         style={{ top: '35%' }}
-                        className="!size-3 !bg-muted-foreground !border-2 !border-background"
+                        className="!size-3 !border-2 !border-background !bg-muted-foreground"
                     />
                     <Handle
                         id="false"
                         type="source"
                         position={Position.Right}
                         style={{ top: '70%' }}
-                        className="!size-3 !bg-muted-foreground !border-2 !border-background"
+                        className="!size-3 !border-2 !border-background !bg-muted-foreground"
                     />
                 </>
             ) : isApproval ? (
@@ -173,14 +172,14 @@ function FlowNode({ data, selected, type }: NodeProps<WorkflowNode>) {
                         type="source"
                         position={Position.Right}
                         style={{ top: '35%' }}
-                        className="!size-3 !bg-muted-foreground !border-2 !border-background"
+                        className="!size-3 !border-2 !border-background !bg-muted-foreground"
                     />
                     <Handle
                         id="reject"
                         type="source"
                         position={Position.Right}
                         style={{ top: '70%' }}
-                        className="!size-3 !bg-muted-foreground !border-2 !border-background"
+                        className="!size-3 !border-2 !border-background !bg-muted-foreground"
                     />
                 </>
             ) : (
@@ -188,7 +187,7 @@ function FlowNode({ data, selected, type }: NodeProps<WorkflowNode>) {
                     <Handle
                         type="source"
                         position={Position.Right}
-                        className="!size-3 !bg-muted-foreground !border-2 !border-background"
+                        className="!size-3 !border-2 !border-background !bg-muted-foreground"
                     />
                 )
             )}
@@ -212,8 +211,7 @@ function contextFields(
         const parsed = typeof schema === 'string' ? JSON.parse(schema) : schema;
         const properties = (parsed as { properties?: Record<string, unknown> })
             .properties;
-        const required =
-            (parsed as { required?: string[] }).required ?? [];
+        const required = (parsed as { required?: string[] }).required ?? [];
 
         return [...new Set([...required, ...Object.keys(properties ?? {})])];
     } catch {
@@ -238,8 +236,7 @@ function configuredMemberIds(config: Config): string[] {
     }
 
     const assignee = config.assignee as
-        | { type?: string; id?: string }
-        | undefined;
+        { type?: string; id?: string } | undefined;
 
     return assignee?.type === 'member' && assignee.id ? [assignee.id] : [];
 }
@@ -274,7 +271,9 @@ export default function WorkflowEditor({
             : 'Draf';
 
     const updateSelected = (change: Partial<WorkflowNodeData>) => {
-        if (!selected) return;
+        if (!selected) {
+            return;
+        }
 
         setNodes((current) =>
             current.map((node) =>
@@ -286,18 +285,20 @@ export default function WorkflowEditor({
     };
 
     const updateConfig = (change: Config) => {
-        if (!selected) return;
+        if (!selected) {
+            return;
+        }
 
         setNodes((current) =>
             current.map((node) =>
                 node.id === selected.id
                     ? {
-                        ...node,
-                        data: {
-                            ...node.data,
-                            config: { ...node.data.config, ...change },
-                        },
-                    }
+                          ...node,
+                          data: {
+                              ...node.data,
+                              config: { ...node.data.config, ...change },
+                          },
+                      }
                     : node,
             ),
         );
@@ -305,8 +306,7 @@ export default function WorkflowEditor({
 
     const selectedConfig = selected?.data.config ?? {};
     const selectedAssignee = selectedConfig.assignee as
-        | { type?: string; id?: string }
-        | undefined;
+        { type?: string; id?: string } | undefined;
     const recipientMode =
         selectedAssignee?.type === 'role' ? 'role' : 'members';
     const selectedMemberIds = configuredMemberIds(selectedConfig);
@@ -316,10 +316,9 @@ export default function WorkflowEditor({
             updateConfig({
                 assignees: null,
                 assignee:
-                    selectedAssignee?.type === 'role'
-                        ? selectedAssignee
-                        : null,
+                    selectedAssignee?.type === 'role' ? selectedAssignee : null,
             });
+
             return;
         }
 
@@ -349,8 +348,7 @@ export default function WorkflowEditor({
 
     useEffect(() => {
         const assignee = selected?.data.config.assignee as
-            | { type?: string; id?: string }
-            | undefined;
+            { type?: string; id?: string } | undefined;
 
         if (
             !selected ||
@@ -394,7 +392,9 @@ export default function WorkflowEditor({
     };
 
     const connect = (connection: Connection) => {
-        if (readOnly || !connection.source || !connection.target) return;
+        if (readOnly || !connection.source || !connection.target) {
+            return;
+        }
 
         const source = nodes.find((node) => node.id === connection.source);
         const outcome =
@@ -402,8 +402,8 @@ export default function WorkflowEditor({
             (source?.type === 'condition'
                 ? 'true'
                 : source?.type === 'approval'
-                    ? 'approve'
-                    : null);
+                  ? 'approve'
+                  : null);
         setEdges((current) =>
             addEdge(
                 {
@@ -465,10 +465,11 @@ export default function WorkflowEditor({
                             asChild
                             variant="outline"
                             size="sm"
-                            className="shadow-2xs text-xs font-medium"
+                            className="text-xs font-medium shadow-2xs"
                         >
                             <Link href="/settings/workflows">
-                                <ArrowLeft className="mr-1.5 size-3.5" /> Kembali
+                                <ArrowLeft className="mr-1.5 size-3.5" />{' '}
+                                Kembali
                             </Link>
                         </Button>
                         <div>
@@ -476,11 +477,9 @@ export default function WorkflowEditor({
                                 <h1 className="text-lg font-bold tracking-tight text-foreground">
                                     {workflow.name}
                                 </h1>
-                                <Badge variant="outline">
-                                    {displayStatus}
-                                </Badge>
+                                <Badge variant="outline">{displayStatus}</Badge>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
+                            <p className="mt-0.5 text-xs text-muted-foreground">
                                 {workflowType.app_name} — {workflowType.name}
                             </p>
                         </div>
@@ -495,7 +494,8 @@ export default function WorkflowEditor({
                                 disabled={!canManage}
                                 className="text-xs font-medium"
                             >
-                                <Plus className="mr-1.5 size-3.5" /> Buat Draf Baru
+                                <Plus className="mr-1.5 size-3.5" /> Buat Draf
+                                Baru
                             </Button>
                         )}
                         {version.status === 'draft' && (
@@ -507,7 +507,8 @@ export default function WorkflowEditor({
                                     disabled={readOnly}
                                     className="text-xs font-medium"
                                 >
-                                    <Save className="mr-1.5 size-3.5" /> Simpan Alur
+                                    <Save className="mr-1.5 size-3.5" /> Simpan
+                                    Alur
                                 </Button>
                                 <Button
                                     size="sm"
@@ -515,7 +516,8 @@ export default function WorkflowEditor({
                                     disabled={readOnly}
                                     className="text-xs font-medium shadow-xs"
                                 >
-                                    <CheckCircle2 className="mr-1.5 size-3.5" /> Aktifkan Workflow
+                                    <CheckCircle2 className="mr-1.5 size-3.5" />{' '}
+                                    Aktifkan Workflow
                                 </Button>
                             </>
                         )}
@@ -523,7 +525,7 @@ export default function WorkflowEditor({
                 </div>
 
                 {/* Canvas Container */}
-                <Card className="overflow-hidden shadow-xs border border-border">
+                <Card className="overflow-hidden border border-border shadow-xs">
                     <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
                         <div className="flex items-center justify-between">
                             <div className="flex flex-row items-center gap-2">
@@ -535,49 +537,58 @@ export default function WorkflowEditor({
                                         <button
                                             type="button"
                                             aria-label="Lihat petunjuk canvas"
-                                            className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted transition-colors cursor-pointer"
+                                            className="shrink-0 cursor-pointer rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                         >
-                                            <CircleAlert className="size-4 text-muted-foreground hover:text-primary transition-colors" />
+                                            <CircleAlert className="size-4 text-muted-foreground transition-colors hover:text-primary" />
                                         </button>
                                     </TooltipTrigger>
-                                    <TooltipContent side="right" className="max-w-xs text-xs">
-                                        Tambah langkah dari panel kiri, seret garis antar-node untuk menghubungkan, dan klik elemen untuk mengedit detailnya.
+                                    <TooltipContent
+                                        side="right"
+                                        className="max-w-xs text-xs"
+                                    >
+                                        Tambah langkah dari panel kiri, seret
+                                        garis antar-node untuk menghubungkan,
+                                        dan klik elemen untuk mengedit
+                                        detailnya.
                                     </TooltipContent>
                                 </Tooltip>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-4 bg-card">
-                        <div className="grid min-h-[660px] grid-cols-[240px_minmax(0,1fr)_320px] gap-4 items-stretch">
+                    <CardContent className="bg-card p-4">
+                        <div className="grid min-h-[660px] grid-cols-[240px_minmax(0,1fr)_320px] items-stretch gap-4">
                             {/* Panel Kiri: Palette Tambah Langkah (Menyatu dalam Card Utama) */}
                             <aside className="space-y-4 p-2">
                                 <div>
-                                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                    <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                         TAMBAH LANGKAH
                                     </h3>
-                                    <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
-                                        Langkah Mulai dan Selesai sudah tersedia secara default.
+                                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                                        Langkah Mulai dan Selesai sudah tersedia
+                                        secara default.
                                     </p>
                                 </div>
                                 <div className="space-y-2">
-                                    {palette.map(([type, label, IconComponent]) => (
-                                        <Button
-                                            key={type}
-                                            type="button"
-                                            variant="outline"
-                                            disabled={readOnly}
-                                            className="w-full justify-start text-xs font-medium bg-background hover:bg-accent cursor-pointer shadow-2xs"
-                                            onClick={() => addNode(type)}
-                                        >
-                                            <IconComponent className="mr-2 size-3.5 text-primary shrink-0" />
-                                            {label}
-                                        </Button>
-                                    ))}
+                                    {palette.map(
+                                        ([type, label, IconComponent]) => (
+                                            <Button
+                                                key={type}
+                                                type="button"
+                                                variant="outline"
+                                                disabled={readOnly}
+                                                className="w-full cursor-pointer justify-start bg-background text-xs font-medium shadow-2xs hover:bg-accent"
+                                                onClick={() => addNode(type)}
+                                            >
+                                                <IconComponent className="mr-2 size-3.5 shrink-0 text-primary" />
+                                                {label}
+                                            </Button>
+                                        ),
+                                    )}
                                 </div>
                             </aside>
 
                             {/* Canvas Tengah: Satu-satunya Area Ber-Corner Pembatas Membulat (rounded-xl) */}
-                            <div className="relative min-h-[660px] rounded-xl border border-border bg-background overflow-hidden shadow-2xs">
+                            <div className="relative min-h-[660px] overflow-hidden rounded-xl border border-border bg-background shadow-2xs">
                                 <ReactFlow
                                     nodes={nodes}
                                     edges={edges}
@@ -595,26 +606,38 @@ export default function WorkflowEditor({
                                     onPaneClick={() => setSelectedId(null)}
                                     fitView
                                     deleteKeyCode={
-                                        readOnly ? null : ['Backspace', 'Delete']
+                                        readOnly
+                                            ? null
+                                            : ['Backspace', 'Delete']
                                     }
                                     proOptions={{ hideAttribution: true }}
                                 >
                                     <Background gap={20} size={1} />
                                     <Controls />
-                                    <MiniMap pannable zoomable className="!bottom-3 !right-3 !rounded-lg overflow-hidden border border-border/60" />
+                                    <MiniMap
+                                        pannable
+                                        zoomable
+                                        className="!right-3 !bottom-3 overflow-hidden !rounded-lg border border-border/60"
+                                    />
                                     <Panel
                                         position="top-left"
                                         className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-background/95 px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-2xs backdrop-blur-xs"
                                     >
                                         {readOnly ? (
                                             <>
-                                                <Lock className="size-3.5 text-muted-foreground shrink-0" />
-                                                <span>Versi aktif hanya dapat dilihat.</span>
+                                                <Lock className="size-3.5 shrink-0 text-muted-foreground" />
+                                                <span>
+                                                    Versi aktif hanya dapat
+                                                    dilihat.
+                                                </span>
                                             </>
                                         ) : (
                                             <>
-                                                <Info className="size-3.5 text-primary shrink-0" />
-                                                <span>Draf aktif: Bebas ubah alur sebelum diaktifkan.</span>
+                                                <Info className="size-3.5 shrink-0 text-primary" />
+                                                <span>
+                                                    Draf aktif: Bebas ubah alur
+                                                    sebelum diaktifkan.
+                                                </span>
                                             </>
                                         )}
                                     </Panel>
@@ -622,27 +645,33 @@ export default function WorkflowEditor({
                             </div>
 
                             {/* Panel Kanan: Properti Node Terpilih (Menyatu dalam Card Utama) */}
-                            <aside className="p-2 space-y-4">
+                            <aside className="space-y-4 p-2">
                                 {!selected ? (
-                                    <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-                                        <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground mb-2">
+                                    <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+                                        <div className="mb-2 flex size-10 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground">
                                             <HelpCircle className="size-5" />
                                         </div>
                                         <h4 className="text-xs font-bold text-foreground">
                                             Properti Langkah
                                         </h4>
-                                        <p className="mt-1 text-[11px] text-muted-foreground max-w-44 leading-relaxed">
-                                            Pilih salah satu elemen node di canvas untuk mengubah nama, penerima tugas, atau syarat kondisi.
+                                        <p className="mt-1 max-w-44 text-[11px] leading-relaxed text-muted-foreground">
+                                            Pilih salah satu elemen node di
+                                            canvas untuk mengubah nama, penerima
+                                            tugas, atau syarat kondisi.
                                         </p>
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
                                         <div className="border-b border-border/60 pb-3">
-                                            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                            <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                                 PENGATURAN LANGKAH
                                             </h3>
-                                            <p className="text-sm font-bold text-foreground mt-1">
-                                                {nodeTitles[selected.type ?? '']}
+                                            <p className="mt-1 text-sm font-bold text-foreground">
+                                                {
+                                                    nodeTitles[
+                                                        selected.type ?? ''
+                                                    ]
+                                                }
                                             </p>
                                         </div>
 
@@ -657,167 +686,209 @@ export default function WorkflowEditor({
                                                 }
                                                 onChange={(event) =>
                                                     updateSelected({
-                                                        label: event.target.value,
+                                                        label: event.target
+                                                            .value,
                                                     })
                                                 }
                                             />
                                         </Field>
 
                                         {(selected.type === 'approval' ||
-                                            selected.type === 'manual_task') && (
-                                                <>
+                                            selected.type ===
+                                                'manual_task') && (
+                                            <>
+                                                <Field>
+                                                    <NativeSelect
+                                                        label="Jenis penerima"
+                                                        value={recipientMode}
+                                                        disabled={readOnly}
+                                                        onChange={(event) =>
+                                                            setRecipientMode(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                    >
+                                                        <option value="role">
+                                                            Role
+                                                        </option>
+                                                        <option value="members">
+                                                            Anggota tertentu
+                                                        </option>
+                                                    </NativeSelect>
+                                                </Field>
+
+                                                {recipientMode === 'role' ? (
                                                     <Field>
                                                         <NativeSelect
-                                                            label="Jenis penerima"
-                                                            value={recipientMode}
+                                                            label="Role penerima"
+                                                            value={String(
+                                                                selectedAssignee?.id ??
+                                                                    '',
+                                                            )}
                                                             disabled={readOnly}
                                                             onChange={(event) =>
-                                                                setRecipientMode(
-                                                                    event.target.value,
-                                                                )
+                                                                updateConfig({
+                                                                    assignee:
+                                                                        event
+                                                                            .target
+                                                                            .value
+                                                                            ? {
+                                                                                  type: 'role',
+                                                                                  id: event
+                                                                                      .target
+                                                                                      .value,
+                                                                              }
+                                                                            : null,
+                                                                    assignees:
+                                                                        null,
+                                                                })
                                                             }
                                                         >
-                                                            <option value="role">
-                                                                Role
+                                                            <option value="">
+                                                                Pilih role
                                                             </option>
-                                                            <option value="members">
-                                                                Anggota tertentu
-                                                            </option>
+                                                            {roles.map(
+                                                                (role) => (
+                                                                    <option
+                                                                        key={
+                                                                            role.id
+                                                                        }
+                                                                        value={
+                                                                            role.id
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            role.name
+                                                                        }
+                                                                    </option>
+                                                                ),
+                                                            )}
                                                         </NativeSelect>
                                                     </Field>
-
-                                                    {recipientMode === 'role' ? (
-                                                        <Field>
-                                                            <NativeSelect
-                                                                label="Role penerima"
-                                                                value={String(
-                                                                    selectedAssignee?.id ?? '',
-                                                                )}
-                                                                disabled={readOnly}
-                                                                onChange={(event) =>
-                                                                    updateConfig({
-                                                                        assignee: event.target.value
-                                                                            ? {
-                                                                                type: 'role',
-                                                                                id: event.target.value,
-                                                                            }
-                                                                            : null,
-                                                                        assignees: null,
-                                                                    })
-                                                                }
-                                                            >
-                                                                <option value="">
-                                                                    Pilih role
-                                                                </option>
-                                                                {roles.map((role) => (
-                                                                    <option
-                                                                        key={role.id}
-                                                                        value={role.id}
-                                                                    >
-                                                                        {role.name}
-                                                                    </option>
-                                                                ))}
-                                                            </NativeSelect>
-                                                        </Field>
-                                                    ) : (
-                                                        <Field>
-                                                            <div className="space-y-2 rounded-lg border border-border/60 bg-background p-3">
-                                                                <p className="text-xs font-semibold text-foreground">
-                                                                    Pilih anggota penerima
+                                                ) : (
+                                                    <Field>
+                                                        <div className="space-y-2 rounded-lg border border-border/60 bg-background p-3">
+                                                            <p className="text-xs font-semibold text-foreground">
+                                                                Pilih anggota
+                                                                penerima
+                                                            </p>
+                                                            {members.length ===
+                                                            0 ? (
+                                                                <p className="text-xs text-muted-foreground italic">
+                                                                    Belum ada
+                                                                    anggota
+                                                                    aktif.
                                                                 </p>
-                                                                {members.length === 0 ? (
-                                                                    <p className="text-xs text-muted-foreground italic">
-                                                                        Belum ada anggota aktif.
-                                                                    </p>
-                                                                ) : (
-                                                                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                                                                        {members.map((member) => (
+                                                            ) : (
+                                                                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                                                                    {members.map(
+                                                                        (
+                                                                            member,
+                                                                        ) => (
                                                                             <label
-                                                                                key={member.id}
-                                                                                className="flex items-start gap-2.5 text-xs cursor-pointer hover:bg-accent/40 p-1.5 rounded-md transition-colors"
+                                                                                key={
+                                                                                    member.id
+                                                                                }
+                                                                                className="flex cursor-pointer items-start gap-2.5 rounded-md p-1.5 text-xs transition-colors hover:bg-accent/40"
                                                                             >
                                                                                 <Checkbox
                                                                                     checked={selectedMemberIds.includes(
                                                                                         member.id,
                                                                                     )}
-                                                                                    disabled={readOnly}
+                                                                                    disabled={
+                                                                                        readOnly
+                                                                                    }
                                                                                     onCheckedChange={(
                                                                                         checked,
                                                                                     ) =>
                                                                                         toggleMember(
                                                                                             member.id,
-                                                                                            checked === true,
+                                                                                            checked ===
+                                                                                                true,
                                                                                         )
                                                                                     }
                                                                                 />
                                                                                 <span className="leading-tight font-medium text-foreground">
-                                                                                    {member.name}
+                                                                                    {
+                                                                                        member.name
+                                                                                    }
                                                                                     <span className="block text-[11px] font-normal text-muted-foreground">
-                                                                                        {member.email}
+                                                                                        {
+                                                                                            member.email
+                                                                                        }
                                                                                     </span>
                                                                                 </span>
                                                                             </label>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </Field>
-                                                    )}
+                                                                        ),
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </Field>
+                                                )}
 
-                                                    <Field>
-                                                        <NativeSelect
-                                                            label="Syarat penyelesaian"
-                                                            value={String(
-                                                                selectedConfig.completion_policy ??
+                                                <Field>
+                                                    <NativeSelect
+                                                        label="Syarat penyelesaian"
+                                                        value={String(
+                                                            selectedConfig.completion_policy ??
                                                                 'single',
+                                                        )}
+                                                        disabled={readOnly}
+                                                        onChange={(event) =>
+                                                            updateConfig({
+                                                                completion_policy:
+                                                                    event.target
+                                                                        .value,
+                                                            })
+                                                        }
+                                                    >
+                                                        <option value="single">
+                                                            Salah satu penerima
+                                                            menyetujui
+                                                        </option>
+                                                        <option value="majority">
+                                                            Mayoritas penerima
+                                                            menyetujui
+                                                        </option>
+                                                        <option value="percentage">
+                                                            Persentase penerima
+                                                            menyetujui
+                                                        </option>
+                                                        <option value="all">
+                                                            Semua penerima
+                                                            menyetujui
+                                                        </option>
+                                                    </NativeSelect>
+                                                </Field>
+
+                                                {selectedConfig.completion_policy ===
+                                                    'percentage' && (
+                                                    <Field>
+                                                        <Input
+                                                            label="Persentase minimal (%)"
+                                                            type="number"
+                                                            min={1}
+                                                            max={100}
+                                                            value={String(
+                                                                selectedConfig.completion_percentage ??
+                                                                    50,
                                                             )}
                                                             disabled={readOnly}
                                                             onChange={(event) =>
                                                                 updateConfig({
-                                                                    completion_policy:
-                                                                        event.target.value,
+                                                                    completion_percentage:
+                                                                        event
+                                                                            .target
+                                                                            .value,
                                                                 })
                                                             }
-                                                        >
-                                                            <option value="single">
-                                                                Salah satu penerima menyetujui
-                                                            </option>
-                                                            <option value="majority">
-                                                                Mayoritas penerima menyetujui
-                                                            </option>
-                                                            <option value="percentage">
-                                                                Persentase penerima menyetujui
-                                                            </option>
-                                                            <option value="all">
-                                                                Semua penerima menyetujui
-                                                            </option>
-                                                        </NativeSelect>
+                                                        />
                                                     </Field>
-
-                                                    {selectedConfig.completion_policy ===
-                                                        'percentage' && (
-                                                            <Field>
-                                                                <Input
-                                                                    label="Persentase minimal (%)"
-                                                                    type="number"
-                                                                    min={1}
-                                                                    max={100}
-                                                                    value={String(
-                                                                        selectedConfig.completion_percentage ??
-                                                                        50,
-                                                                    )}
-                                                                    disabled={readOnly}
-                                                                    onChange={(event) =>
-                                                                        updateConfig({
-                                                                            completion_percentage:
-                                                                                event.target.value,
-                                                                        })
-                                                                    }
-                                                                />
-                                                            </Field>
-                                                        )}
-                                                </>
-                                            )}
+                                                )}
+                                            </>
+                                        )}
 
                                         {selected.type === 'condition' && (
                                             <>
@@ -825,12 +896,15 @@ export default function WorkflowEditor({
                                                     <NativeSelect
                                                         label="Field yang diperiksa"
                                                         value={String(
-                                                            selected.data.config.field ?? '',
+                                                            selected.data.config
+                                                                .field ?? '',
                                                         )}
                                                         disabled={readOnly}
                                                         onChange={(event) =>
                                                             updateConfig({
-                                                                field: event.target.value,
+                                                                field: event
+                                                                    .target
+                                                                    .value,
                                                             })
                                                         }
                                                     >
@@ -851,13 +925,16 @@ export default function WorkflowEditor({
                                                     <NativeSelect
                                                         label="Operator"
                                                         value={String(
-                                                            selected.data.config.operator ??
-                                                            'equals',
+                                                            selected.data.config
+                                                                .operator ??
+                                                                'equals',
                                                         )}
                                                         disabled={readOnly}
                                                         onChange={(event) =>
                                                             updateConfig({
-                                                                operator: event.target.value,
+                                                                operator:
+                                                                    event.target
+                                                                        .value,
                                                             })
                                                         }
                                                     >
@@ -871,13 +948,15 @@ export default function WorkflowEditor({
                                                             Lebih besar dari
                                                         </option>
                                                         <option value="greater_or_equal">
-                                                            Lebih besar atau sama
+                                                            Lebih besar atau
+                                                            sama
                                                         </option>
                                                         <option value="less_than">
                                                             Lebih kecil dari
                                                         </option>
                                                         <option value="less_or_equal">
-                                                            Lebih kecil atau sama
+                                                            Lebih kecil atau
+                                                            sama
                                                         </option>
                                                         <option value="contains">
                                                             Mengandung teks
@@ -894,12 +973,15 @@ export default function WorkflowEditor({
                                                     <Input
                                                         label="Nilai pembanding"
                                                         value={String(
-                                                            selected.data.config.value ?? '',
+                                                            selected.data.config
+                                                                .value ?? '',
                                                         )}
                                                         disabled={readOnly}
                                                         onChange={(event) =>
                                                             updateConfig({
-                                                                value: event.target.value,
+                                                                value: event
+                                                                    .target
+                                                                    .value,
                                                             })
                                                         }
                                                     />

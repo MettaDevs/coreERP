@@ -1,6 +1,3 @@
-import { Head, router } from '@inertiajs/react';
-import { ChevronDown, CircleHelp, Plus, Save } from 'lucide-react';
-import { useMemo, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import {
@@ -23,6 +20,9 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
+import { Head, router } from '@inertiajs/react';
+import { ChevronDown, CircleHelp, Plus, Save } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Choice = { id: string; code: string; name: string; active: boolean };
@@ -89,6 +89,7 @@ export default function UnitsOfMeasure({
     );
     const post = (url: string, data: Record<string, string | number | null>) =>
         router.post(url, data);
+
     return (
         <>
             <Head title="Satuan" />
@@ -368,7 +369,10 @@ export default function UnitsOfMeasure({
                             tersedia.
                         </p>
 
-                        <CollapsibleSectionGroup defaultValue={[]} className="mt-6">
+                        <CollapsibleSectionGroup
+                            defaultValue={[]}
+                            className="mt-6"
+                        >
                             <CollapsibleSection
                                 value="conversions"
                                 title="Konversi yang tersedia"
@@ -406,16 +410,15 @@ export default function UnitsOfMeasure({
                                                             </TooltipTrigger>
                                                             <TooltipContent className="max-w-72">
                                                                 <p>
-                                                                    Rumus:
-                                                                    hasil =
-                                                                    nilai asal
+                                                                    Rumus: hasil
+                                                                    = nilai asal
                                                                     × faktor
                                                                     konversi +
                                                                     pergeseran.
                                                                 </p>
                                                                 <p className="mt-1">
-                                                                    Contoh: 2
-                                                                    kg × 1000 =
+                                                                    Contoh: 2 kg
+                                                                    × 1000 =
                                                                     2000 g.
                                                                 </p>
                                                             </TooltipContent>
@@ -476,7 +479,7 @@ export default function UnitsOfMeasure({
                                 <button
                                     type="button"
                                     aria-label="Buka atau tutup daftar satuan"
-                                    className="p-1 rounded-md hover:bg-muted cursor-pointer"
+                                    className="cursor-pointer rounded-md p-1 hover:bg-muted"
                                 >
                                     <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
                                 </button>

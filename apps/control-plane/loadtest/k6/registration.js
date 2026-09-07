@@ -1,7 +1,7 @@
-import http from 'k6/http';
 import { check } from 'k6';
-import { Counter, Trend } from 'k6/metrics';
 import exec from 'k6/execution';
+import http from 'k6/http';
+import { Counter, Trend } from 'k6/metrics';
 
 const BASE = __ENV.BASE_URL || 'http://lb';
 const PROFILE = __ENV.PROFILE || 'registration';
@@ -85,12 +85,15 @@ function markFailure(response) {
     } else if (response.status >= 500) {
         serverErrors.add(1);
     }
+
     if (response.status === 0) {
         clientTimeouts.add(1);
     }
+
     if (response.status === 429) {
         rateLimited.add(1);
     }
+
     if (![0, 201, 502, 504].includes(response.status)) {
         unexpected.add(1, { status: String(response.status) });
     }
@@ -106,6 +109,7 @@ export default function () {
         tags: { op: 'csrf' },
     });
     csrfLatency.add(form.timings.duration);
+
     if (!check(form, { 'form registrasi 200': (response) => response.status === 200 })) {
         if (form.status === 502 || form.status === 504) {
             gatewaySaturation.add(1);
@@ -116,13 +120,16 @@ export default function () {
         } else {
             unexpected.add(1, { status: String(form.status) });
         }
+
         return;
     }
 
     const cookies = http.cookieJar().cookiesForURL(BASE);
     const csrf = cookies['XSRF-TOKEN']?.[0];
+
     if (!csrf) {
         unexpected.add(1, { status: 'missing_csrf' });
+
         return;
     }
 
@@ -148,6 +155,7 @@ export default function () {
     );
     registrationLatency.add(response.timings.duration);
     markFailure(response);
+
     if (check(response, { 'registrasi 201': (result) => result.status === 201 })) {
         registrations.add(1);
     }
@@ -156,6 +164,7 @@ export default function () {
 export function handleSummary(data) {
     const metric = (name, stat) => {
         const value = data.metrics[name]?.values?.[stat];
+
         return value === undefined ? null : Number(value.toFixed(2));
     };
     const summary = {

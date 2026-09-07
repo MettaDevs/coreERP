@@ -1,5 +1,6 @@
+import { Sidebar } from '@apperp/ui/sidebar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Link, usePage } from '@inertiajs/react';
-import { useLayoutEffect, useRef, useState } from 'react';
 import {
     Building2,
     Database,
@@ -15,9 +16,8 @@ import {
     UserRound,
     Users,
 } from 'lucide-react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
-import { Sidebar } from '@apperp/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 type NavigationItem = {

@@ -1,7 +1,3 @@
-import { Pencil, Plus, Star, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-
 import {
     AlertDialog,
     AlertDialogAction,
@@ -38,6 +34,9 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
+import { Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { apiJson, apiRequest, errorText } from '@/lib/core-api';
 
 /**

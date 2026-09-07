@@ -1,47 +1,13 @@
-import { useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    Background,
-    Controls,
-    Handle,
-    MiniMap,
-    Position,
-    ReactFlow,
-} from '@xyflow/react';
-import type {
-    Edge,
-    Node as FlowNode,
-    NodeProps,
-    NodeTypes,
-} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import {
-    Building2,
-    Check,
-    ChevronRight,
-    CircleAlert,
-    CreditCard,
-    FileText,
-    Globe,
-    Hash,
-    Image,
-    Layers,
-    Mail,
-    MapPin,
-    Network,
-    Pencil,
-    Plus,
-    Search,
-    Shield,
-    Trash2,
-} from 'lucide-react';
-
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from '@apperp/ui/accordion';
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -50,6 +16,8 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@apperp/ui/alert-dialog';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
 import {
     Card,
     CardAction,
@@ -58,12 +26,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from '@apperp/ui/accordion';
 import {
     Dialog,
     DialogAction,
@@ -95,12 +57,46 @@ import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
+import { Head, Link, useForm } from '@inertiajs/react';
+import type {
+    Edge,
+    Node as FlowNode,
+    NodeProps,
+    NodeTypes,
+} from '@xyflow/react';
+import {
+    Background,
+    Controls,
+    Handle,
+    MiniMap,
+    Position,
+    ReactFlow,
+} from '@xyflow/react';
+import {
+    Building2,
+    Check,
+    ChevronRight,
+    CircleAlert,
+    CreditCard,
+    FileText,
+    Hash,
+    Image,
+    Layers,
+    Mail,
+    MapPin,
+    Network,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+} from 'lucide-react';
+import { useState } from 'react';
+import Heading from '@/components/heading';
 import {
     OrganizationAddressesSection,
     OrganizationContactsSection,
 } from '@/components/organization/address-book-section';
 import { PrintIdentitySection } from '@/components/organization/print-identity-section';
-import Heading from '@/components/heading';
 
 type Organization = {
     id: string;
@@ -1424,12 +1420,6 @@ export default function OrganizationPage({
     const visibleOrganizations = organizations.filter(
         (organization) => organization.classification === classification,
     );
-    const legalEntitiesCount = organizations.filter(
-        (o) => o.classification === 'legal_entity',
-    ).length;
-    const operatingUnitsCount = organizations.filter(
-        (o) => o.classification === 'operating_unit',
-    ).length;
 
     const organizationSearchTerm = organizationSearch
         .trim()

@@ -1,15 +1,8 @@
+import { Badge } from '@apperp/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import { Head } from '@inertiajs/react';
 import { DotLottie } from '@lottiefiles/dotlottie-web';
 import { useEffect, useRef, useState } from 'react';
-
-import { Badge } from '@apperp/ui/badge';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
 
 const lottieFiles = import.meta.glob('../assets/lottie/*.lottie', {
     eager: true,
@@ -30,7 +23,9 @@ function LottieCanvas({ src }: { src: string }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
-        if (!canvasRef.current) return;
+        if (!canvasRef.current) {
+            return;
+        }
 
         const player = new DotLottie({
             canvas: canvasRef.current,
@@ -51,7 +46,9 @@ function LottiePlayer({ src }: { src: string }) {
     const [isNearViewport, setIsNearViewport] = useState(false);
 
     useEffect(() => {
-        if (!containerRef.current) return;
+        if (!containerRef.current) {
+            return;
+        }
 
         const observer = new IntersectionObserver(
             ([entry]) => setIsNearViewport(entry.isIntersecting),

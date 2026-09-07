@@ -25,7 +25,36 @@ jobs:
         working-directory: apps/control-plane
     strategy:
       matrix:
-        php-version: ['8.3', '8.4', '8.5']
+        # 8.4 adalah versi yang dijalankan image produksi (apps/control-plane/Dockerfile).
+        # 8.5 dijalankan supaya kenaikan versi berikutnya ketahuan lebih awal.
+        php-version: ['8.4', '8.5']
+
+    # Suite ini menuntut PostgreSQL sungguhan, bukan SQLite: setiap klausa kunci yang
+    # dipakai penerbitan nomor (lockForUpdate, FOR UPDATE SKIP LOCKED) berubah menjadi
+    # string kosong di SQLite, sehingga test tidak membuktikan apa pun. Alasannya
+    # ditulis juga di apps/control-plane/phpunit.xml.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: core_erp
+          POSTGRES_USER: core_erp
+          POSTGRES_PASSWORD: core_erp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U core_erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_TEST_HOST: 127.0.0.1
+      DB_TEST_PORT: 5432
+      DB_TEST_DATABASE: core_erp
+      DB_TEST_USERNAME: core_erp
+      DB_TEST_PASSWORD: core_erp
+      DB_TEST_SCHEMA: coreerp_test
 
     steps:
       - name: Checkout code
@@ -62,6 +91,12 @@ jobs:
 
       - name: Run Type Analysis
         run: composer types:check
+
+      # Koneksi test menunjuk schema tersendiri lewat search_path, dan PostgreSQL tidak
+      # membuat schema itu sendiri. Di mesin pengembang langkah ini dilakukan tangan
+      # sekali, sesuai catatan pada apps/control-plane/.env.example.
+      - name: Create Test Schema
+        run: PGPASSWORD=$DB_TEST_PASSWORD psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" -c "CREATE SCHEMA IF NOT EXISTS $DB_TEST_SCHEMA;"
 
       - name: Tests
         run: php artisan test

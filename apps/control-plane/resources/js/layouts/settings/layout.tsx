@@ -1,7 +1,7 @@
-import { Link, usePage } from '@inertiajs/react';
-import type { PropsWithChildren } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Separator } from '@apperp/ui/separator';
+import { Link, usePage } from '@inertiajs/react';
+import type { PropsWithChildren } from 'react';
 import Heading from '@/components/heading';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';

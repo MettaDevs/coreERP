@@ -1,7 +1,3 @@
-import { Head } from '@inertiajs/react';
-import { Box, Database, PackageCheck } from 'lucide-react';
-
-import Heading from '@/components/heading';
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import { Badge } from '@apperp/ui/badge';
 import {
@@ -11,6 +7,10 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { Head } from '@inertiajs/react';
+import { Box, Database, PackageCheck } from 'lucide-react';
+
+import Heading from '@/components/heading';
 
 type App = {
     id: string;

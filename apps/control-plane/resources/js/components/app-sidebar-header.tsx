@@ -1,7 +1,3 @@
-import { Link, usePage } from '@inertiajs/react';
-import { Command, Moon, Palette, Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
-
 import { Avatar, AvatarFallback, AvatarImage } from '@apperp/ui/avatar';
 import { Button } from '@apperp/ui/button';
 import {
@@ -11,11 +7,14 @@ import {
 } from '@apperp/ui/dropdown-menu';
 import { Kbd } from '@apperp/ui/kbd';
 import { SidebarTrigger } from '@apperp/ui/sidebar';
-import { ProductLauncher } from '@/components/product-launcher';
+import { Link, usePage } from '@inertiajs/react';
+import { Command, Moon, Palette, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AppCommandPalette } from '@/components/app-command-palette';
 import { ExportTray } from '@/components/export-tray';
 import { NotificationBell } from '@/components/notification-bell';
 import { PrintDialog } from '@/components/print-dialog';
-import { AppCommandPalette } from '@/components/app-command-palette';
+import { ProductLauncher } from '@/components/product-launcher';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { WorkspaceSwitcher } from '@/components/workspace-switcher';
 import { cn } from '@/lib/utils';
