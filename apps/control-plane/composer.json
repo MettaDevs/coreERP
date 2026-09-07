@@ -9,7 +9,7 @@
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "dedoc/scramble": "^0.13.35",
         "inertiajs/inertia-laravel": "^3.0",
         "laravel/chisel": "^0.1.0",

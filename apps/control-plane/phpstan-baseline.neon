@@ -1,0 +1,1147 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Offset ''label'' on array\{system_role\: string, assignments\: list\<array\{role_id\: string, policy_scopes\: list\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool\}\>\}\>\} on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Actions/Access/CreateInvitation.php
+
+		-
+			message: '#^Parameter \#1 \$scopes of method App\\Support\\DataPolicyScopeResolver\:\:assertNoRedundantGrants\(\) expects list\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\?\: bool\}\>, list\<array\<string, mixed\>\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Access/UpdateMembership.php
+
+		-
+			message: '#^Parameter \#2 \$manualRoleIds of method App\\Support\\SodConflictEvaluator\:\:assertManualAssignmentAllowed\(\) expects list\<string\>, array\<int, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Access/UpdateMembership.php
+
+		-
+			message: '#^Parameter \#3 \$data of method App\\Support\\DataPolicyScopeResolver\:\:resolve\(\) expects array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\?\: bool\}, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/Access/UpdateMembership.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\{name\: string, starts_on\: Carbon\\CarbonInterface\|string, ends_on\: Carbon\\CarbonInterface\|string\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Actions/FiscalCalendar/FiscalCalendarService.php
+
+		-
+			message: '#^Parameter \#2 \$scope of method App\\Actions\\NumberSequence\\NumberSequenceService\:\:format\(\) expects array\{key\: string, period\: string, code\: string\|null, year\: string, fiscal_year\: string\|null, fiscal_period\: int\|null\}, array\{key\: string, period\: string, code\: string\|null\} given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Actions/NumberSequence/NumberSequenceService.php
+
+		-
+			message: '#^Parameter \#2 \$scope of method App\\Actions\\NumberSequence\\NumberSequenceService\:\:matchesFormat\(\) expects array\{key\: string, period\: string, code\: string\|null, year\: string, fiscal_year\: string\|null, fiscal_period\: int\|null\}, array\{key\: string, period\: string, code\: string\|null\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Actions/NumberSequence/NumberSequenceService.php
+
+		-
+			message: '#^Method App\\Actions\\Provider\\RegisterAppCatalog\:\:handle\(\) has parameter \$reports with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Actions/Provider/RegisterAppCatalog.php
+
+		-
+			message: '#^Method App\\Actions\\ReferenceData\\ProvisionDefaultUnitsOfMeasure\:\:records\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Actions/ReferenceData/ProvisionDefaultUnitsOfMeasure.php
+
+		-
+			message: '#^Offset ''CM''\|''G''\|''HA''\|''HOUR''\|''KPA''\|''L''\|''M''\|''MIN''\|''ML''\|''PCS''\|''TON'' might not exist on non\-empty\-array\{CM\?\: mixed, DAY\?\: mixed, G\?\: mixed, HA\?\: mixed, HOUR\?\: mixed, KG\?\: mixed, KM\?\: mixed, KPA\?\: mixed, \.\.\.\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 2
+			path: app/Actions/ReferenceData/ProvisionDefaultUnitsOfMeasure.php
+
+		-
+			message: '#^Offset ''DAY''\|''HOUR''\|''KG''\|''KM''\|''L''\|''LUSIN''\|''M''\|''M2''\|''M3''\|''PSI'' might not exist on non\-empty\-array\{CM\?\: mixed, DAY\?\: mixed, G\?\: mixed, HA\?\: mixed, HOUR\?\: mixed, KG\?\: mixed, KM\?\: mixed, KPA\?\: mixed, \.\.\.\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 2
+			path: app/Actions/ReferenceData/ProvisionDefaultUnitsOfMeasure.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\CoreApp\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\CoreApp\>\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 9
+			path: app/Console/Commands/BootstrapLocalAppRuntimeCommand.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\CoreApp\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\CoreApp\>\:\:\$version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Console/Commands/BootstrapLocalAppRuntimeCommand.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>created_at" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/BootstrapLocalAppRuntimeCommand.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Console/Commands/BootstrapLocalAppRuntimeCommand.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Console/Commands/PublishWorkflowEvents.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Console/Commands/PublishWorkflowEvents.php
+
+		-
+			message: '#^Parameter \#4 \$workflowTypes of method App\\Actions\\Provider\\RegisterAppCatalog\:\:handle\(\) expects list\<array\{code\: string, name\: string, scope\: string, decision_context_schema\: array\<string, mixed\>\}\>, array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/RegisterAppManifestCommand.php
+
+		-
+			message: '#^Anonymous function should return array\{role_id\: string, role_name\: string, source\: string, policy_scopes\: Illuminate\\Support\\Collection\<int, array\{policy_code\: mixed, policy_name\: mixed, legal_entity_id\: mixed, organization_id\: mixed, hierarchy_id\: mixed, include_descendants\: mixed, unrestricted\: bool, valid_from\: mixed, \.\.\.\}\>\} but returns array\{role_id\: string, role_name\: string, source\: string, policy_scopes\: Illuminate\\Support\\Collection\<int, array\{policy_code\: mixed, policy_name\: mixed, legal_entity_id\: mixed, organization_id\: mixed, hierarchy_id\: mixed, include_descendants\: mixed, unrestricted\: bool, valid_from\: mixed, \.\.\.\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Cannot call method toDateTimeString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Access\\AccessController\:\:hierarchies\(\) should return Illuminate\\Support\\Collection\<int, array\{id\: string, name\: string, version_id\: string\|null, nodes\: array\<int, array\{organization_id\: string, parent_organization_id\: string\|null\}\>\}\> but returns Illuminate\\Support\\Collection\<int, array\{id\: string, name\: string, version_id\: string\|null, nodes\: array\<int, array\{organization_id\: string, parent_organization_id\: string\|null\}\>\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Access\\AccessController\:\:invitations\(\) should return Illuminate\\Support\\Collection\<int, array\<string, mixed\>\> but returns Illuminate\\Support\\Collection\<int, array\{id\: string, redeemed_count\: int\<0, max\>, system_role\: string, label\: string\|null, roles\: Illuminate\\Support\\Collection\<int, mixed\>, assignments\: Illuminate\\Support\\Collection\<int, array\{role_id\: string, role_name\: string, policy_scopes\: Illuminate\\Support\\Collection\<int, array\{policy_code\: mixed, legal_entity_id\: mixed, organization_id\: mixed, hierarchy_id\: mixed, include_descendants\: bool, unrestricted\: bool\}\>\}\>, code\: string\|null, expires_at\: Illuminate\\Support\\Carbon\|null, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Access\\AccessController\:\:roles\(\) should return Illuminate\\Support\\Collection\<int, array\{id\: string, name\: string, duties\: Illuminate\\Support\\Collection\<int, mixed\>, data_policy_codes\: list\<string\>\}\> but returns Illuminate\\Support\\Collection\<int, array\{id\: string, name\: string, duties\: Illuminate\\Support\\Collection\<int, mixed\>, data_policy_codes\: array\<int, mixed\>\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_intersect expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\RoleAssignmentDataPolicyScope\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\RoleAssignmentDataPolicyScope\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:values\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Access/AccessController.php
+
+		-
+			message: '#^Parameter \#2 \$data of method App\\Actions\\Access\\CreateInvitation\:\:handle\(\) expects array\{system_role\: string, assignments\: list\<array\{role_id\: string, policy_scopes\: list\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool\}\>\}\>\}, array\{system_role\: string, assignments\: list\<array\<string, mixed\>\>\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Access/InvitationCodeController.php
+
+		-
+			message: '#^Parameter \#3 \$data of method App\\Actions\\Access\\UpdateInvitation\:\:handle\(\) expects array\{system_role\: string, label\: string\|null, assignments\: list\<array\{role_id\: string, policy_scopes\: list\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\: bool\}\>\}\>\}, array\{system_role\: string, assignments\: list\<array\<string, mixed\>\>\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Access/InvitationCodeController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\SecurityDuty\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\SecurityDuty\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\SecurityPrivilege\:\:\$source\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\SecurityPrivilege\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Access\\SecurityConfigurationController\:\:entitledAppIds\(\) should return list\<string\> but returns array\<mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SecurityDuty\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SecurityPrivilege\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SecurityDuty\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\SecurityPrivilege\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Support\\Collection\<int,array\<string, mixed\>\>\:\:values\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 2
+			path: app/Http/Controllers/Access/SecurityConfigurationController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\TenantMembership\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/AppLaunchManifestController.php
+
+		-
+			message: '#^Anonymous function should return array\{id\: string, code\: string, name\: string, years\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, starts_on\: mixed, ends_on\: mixed, periods\: mixed\}\>\} but returns array\{id\: string, code\: string, name\: string, years\: Illuminate\\Support\\Collection\<int, array\{id\: string, name\: string, starts_on\: mixed, ends_on\: mixed, periods\: mixed\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
+
+		-
+			message: '#^Anonymous function should return array\{id\: string, name\: string, starts_on\: mixed, ends_on\: mixed, periods\: Illuminate\\Support\\Collection\<int, array\{ordinal\: mixed, name\: mixed, starts_on\: mixed, ends_on\: mixed\}\>\} but returns array\{id\: string, name\: string, starts_on\: mixed, ends_on\: mixed, periods\: Illuminate\\Support\\Collection\<int, array\{ordinal\: mixed, name\: string, starts_on\: mixed, ends_on\: mixed\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 4
+			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\FiscalPeriod\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\FiscalYear\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\FiscalPeriod\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\FiscalYear\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 4
+			path: app/Http/Controllers/Internal/FiscalCalendarDirectoryController.php
+
+		-
+			message: '#^Parameter \#4 \$workflowTypes of method App\\Actions\\Provider\\RegisterAppCatalog\:\:handle\(\) expects list\<array\{code\: string, name\: string, scope\: string, decision_context_schema\: array\<string, mixed\>\}\>, array given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Provider/AppCatalogController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$file_mime\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Reporting/ReportExportController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$file_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Reporting/ReportExportController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Reporting/ReportExportController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$parameters\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Reporting/ReportExportController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Reporting/ReportExportController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Reporting/ReportLayoutController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Reporting\\ReportLayoutController\:\:knownKeys\(\) should return list\<string\> but returns array\<string\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Reporting/ReportLayoutController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$source_document_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$source_document_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Workflow\\InternalWorkflowInstanceController\:\:present\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$enabled\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 25
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$legal_entity_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$version\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$workflow_type_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Workflow\\WorkflowConfigurationController\:\:presentGraph\(\) should return array\{nodes\: list\<array\<string, mixed\>\>, edges\: list\<array\<string, mixed\>\>\} but returns array\{nodes\: array\<int, array\{id\: mixed, type\: mixed, data\: array\{label\: mixed, config\: mixed\}, position\: array\{x\: float, y\: float\}\}\>, edges\: array\<int, array\{id\: mixed, source\: mixed, target\: mixed, outcome\: mixed, condition\: mixed\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 5
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Parameter \#1 \$elements of static method App\\Support\\WorkflowGraph\:\:validateRows\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Workflow/WorkflowConfigurationController.php
+
+		-
+			message: '#^Cannot call method lessThan\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Middleware/AuthenticateAppService.php
+
+		-
+			message: '#^Method App\\Http\\Middleware\\HandleInertiaRequests\:\:appCatalog\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{id\: string, name\: string, description\: string\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Middleware/HandleInertiaRequests.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\Access\\InvitationRequest\:\:payloads\(\) should return list\<array\{system_role\: string, assignments\: list\<array\<string, mixed\>\>\}\> but returns array\<int, array\{system_role\: string, label\: mixed, assignments\: array\<int, array\{role_id\: string, policy_scopes\: array\<int, array\{policy_code\: string, legal_entity_id\: mixed, organization_id\: mixed, hierarchy_id\: mixed, include_descendants\: bool, unrestricted\: bool\}\>\}\>\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Requests/Access/InvitationRequest.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 2
+			path: app/Http/Requests/Access/InvitationRequest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 2
+			path: app/Http/Requests/Access/InvitationRequest.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\Access\\MembershipRequest\:\:payload\(\) should return array\{system_role\: string, assignments\: list\<array\{role_id\: string, policy_scopes\: list\<array\<string, mixed\>\>\}\>\} but returns array\{system_role\: string, assignments\: array\<array\{role_id\: string, policy_scopes\: array\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\: bool\}\>\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Http/Requests/Access/MembershipRequest.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Http/Requests/Access/MembershipRequest.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Http/Requests/Access/MembershipRequest.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\Organization\\UpdateOrganizationRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Requests/Organization/UpdateOrganizationRequest.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\Provider\\AppCatalogRequest\:\:workflowTypesPayload\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Requests/Provider/AppCatalogRequest.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\ReferenceData\\ConvertUnitsRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Requests/ReferenceData/ConvertUnitsRequest.php
+
+		-
+			message: '#^Method App\\Http\\Requests\\ReferenceData\\ResolveUnitsRequest\:\:rules\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Requests/ReferenceData/ResolveUnitsRequest.php
+
+		-
+			message: '#^Parameter \#2 \$contents of method Illuminate\\Filesystem\\FilesystemAdapter\:\:put\(\) expects Illuminate\\Http\\File\|Illuminate\\Http\\UploadedFile\|Psr\\Http\\Message\\StreamInterface\|resource\|string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Jobs/RunReportExport.php
+
+		-
+			message: '#^Method App\\Services\\UnitOfMeasureService\:\:resolve\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/UnitOfMeasureService.php
+
+		-
+			message: '#^Method App\\Support\\AppContextToken\:\:issue\(\) has parameter \$dataPolicies with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/AppContextToken.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<string\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Support/AppContextToken.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$hierarchy_version_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/DataPolicyAccessResolver.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$include_descendants\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/DataPolicyAccessResolver.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$legal_entity_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/DataPolicyAccessResolver.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Support/DataPolicyAccessResolver.php
+
+		-
+			message: '#^Method App\\Support\\DataPolicyAccessResolver\:\:resolveGrant\(\) should return array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\} but returns array\{legal_entity_id\: mixed, operating_unit_ids\: array\<int, mixed\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/DataPolicyAccessResolver.php
+
+		-
+			message: '#^Method App\\Support\\DataPolicyAccessResolver\:\:resolvePolicy\(\) should return array\{all\: bool, scope_grants\: list\<array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\}\>\} but returns array\{all\: false, scope_grants\: array\<int, array\{legal_entity_id\: string\|null, operating_unit_ids\: list\<string\>\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/DataPolicyAccessResolver.php
+
+		-
+			message: '#^Parameter \#2 \$scopes of method App\\Support\\DataPolicyAccessResolver\:\:resolvePolicy\(\) expects Illuminate\\Support\\Collection\<int, object\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/DataPolicyAccessResolver.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Support/DataPolicyAccessResolver.php
+
+		-
+			message: '#^Method App\\Support\\LaunchableAppCatalog\:\:permissionsFor\(\) should return list\<string\> but returns array\<mixed\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/LaunchableAppCatalog.php
+
+		-
+			message: '#^Parameter \#2 \$roleIds of method App\\Support\\RoleHierarchy\:\:effectiveRoleIds\(\) expects list\<string\>, array\<string\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/LaunchableAppCatalog.php
+
+		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 2
+			path: app/Support/LaunchableAppCatalog.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 2
+			path: app/Support/LaunchableAppCatalog.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Support/Reporting/AppReportClient.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$app_name\.$#'
+			identifier: property.notFound
+			count: 6
+			path: app/Support/Reporting/AppReportClient.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/AppReportClient.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$file_path\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$format\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$layout_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$layout_ref\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$parameters\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$progress\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$report_code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$report_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$tenant_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Method App\\Support\\Reporting\\ExportQueue\:\:mine\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\<string, mixed\>\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Reporting/ExportQueue.php
+
+		-
+			message: '#^Method App\\Support\\Reporting\\LayoutInspector\:\:docxPlaceholders\(\) should return list\<string\> but returns array\<string\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Reporting/LayoutInspector.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$app_version\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$builtin_layouts\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 14
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$created_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$description\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$file_size\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$format\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$legal_entity_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Method App\\Support\\Reporting\\LayoutStore\:\:list\(\) should return list\<array\<string, mixed\>\> but returns array\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Parameter \#2 \$contents of method Illuminate\\Contracts\\Filesystem\\Filesystem\:\:put\(\) expects Illuminate\\Http\\File\|Illuminate\\Http\\UploadedFile\|Psr\\Http\\Message\\StreamInterface\|resource\|string, string\|false given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Support/Reporting/LayoutStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$display_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$footer_text\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$logos\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$organization_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$parent_lines\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$registration_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$tax_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$updated_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Method App\\Support\\Reporting\\PrintIdentityStore\:\:placeholders\(\) should return array\{fields\: array\<string, string\|null\>, images\: array\<string, string\>\} but returns array\{fields\: non\-empty\-array\<string, mixed\>, images\: array\<non\-falsy\-string, array\{path\: non\-falsy\-string, width_mm\: int\}\>\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Parameter \#2 \$contents of method Illuminate\\Contracts\\Filesystem\\Filesystem\:\:put\(\) expects Illuminate\\Http\\File\|Illuminate\\Http\\UploadedFile\|Psr\\Http\\Message\\StreamInterface\|resource\|string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Reporting/PrintIdentityStore.php
+
+		-
+			message: '#^Parameter \#1 \$array \(non\-empty\-list\<array\<string, float\|int\|string\|null\>\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Support/Reporting/Rendering/DocxTemplateRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$contents of method Illuminate\\Http\\Client\\PendingRequest\<false\>\:\:attach\(\) expects resource\|string, string\|false given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Reporting/Rendering/PdfConverter.php
+
+		-
+			message: '#^Anonymous function never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Support/Reporting/Rendering/XlsxTemplateRenderer.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\<string, float\|int\|string\|null\>\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Support/Reporting/Rendering/XlsxTemplateRenderer.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Support/Reporting/ReportCatalog.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$code\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ReportCatalog.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$permission\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/Reporting/ReportCatalog.php
+
+		-
+			message: '#^Method App\\Support\\Reporting\\ReportCatalog\:\:forMembership\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{code\: mixed, app_id\: mixed, app_name\: string, name\: mixed, description\: mixed, permission\: mixed, parameters\: mixed, can_run\: bool, \.\.\.\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Reporting/ReportCatalog.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$role_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/RoleHierarchy.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 11
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$key\.$#'
+			identifier: property.notFound
+			count: 9
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$kind\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$label\.$#'
+			identifier: property.notFound
+			count: 7
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$to_element_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowGraph\:\:starter\(\) has parameter \$assignee with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowGraph\:\:validateRows\(\) has parameter \$transitions with generic class Illuminate\\Support\\Collection but does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowGraph\:\:walk\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Parameter \#2 \$outgoing of static method App\\Support\\WorkflowGraph\:\:hasCycle\(\) expects Illuminate\\Support\\Collection\<string, Illuminate\\Support\\Collection\<int, object\>\>, Illuminate\\Support\\Collection\<\(int\|string\), Illuminate\\Support\\Collection\<int, mixed\>\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Parameter \#2 \$outgoing of static method App\\Support\\WorkflowGraph\:\:walk\(\) expects Illuminate\\Support\\Collection\<int, Illuminate\\Support\\Collection\<int, object\>\>, Illuminate\\Support\\Collection\<\(int\|string\), Illuminate\\Support\\Collection\<int, mixed\>\> given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Support/WorkflowGraph.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$configuration\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$configuration_version_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$decision_context\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 18
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$key\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$kind\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$label\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$outcome\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$source_document_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$source_document_type\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Access to an undefined property object\:\:\$workflow_type_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Called ''pluck'' on Laravel collection, but could have been retrieved as a query\.$#'
+			identifier: larastan.noUnnecessaryCollectionCall
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowRuntime\:\:advance\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowRuntime\:\:advance\(\) has parameter \$transitions with generic class Illuminate\\Support\\Collection but does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowRuntime\:\:advanceEdges\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowRuntime\:\:advanceEdges\(\) has parameter \$transitions with generic class Illuminate\\Support\\Collection but does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowRuntime\:\:assignees\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowRuntime\:\:completionDecision\(\) has parameter \$items with generic class Illuminate\\Support\\Collection but does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Method App\\Support\\WorkflowRuntime\:\:predecessorsCompleted\(\) has parameter \$transitions with generic class Illuminate\\Support\\Collection but does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Parameter \#3 \$elements of method App\\Support\\WorkflowRuntime\:\:advance\(\) expects Illuminate\\Support\\Collection\<string, object\>, Illuminate\\Support\\Collection\<\(int\|string\), stdClass\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Parameter \#3 \$elements of method App\\Support\\WorkflowRuntime\:\:advanceEdges\(\) expects Illuminate\\Support\\Collection\<string, object\>, Illuminate\\Support\\Collection\<\(int\|string\), stdClass\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/WorkflowRuntime.php
+
+		-
+			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
+			identifier: larastan.noEnvCallsOutsideOfConfig
+			count: 1
+			path: bootstrap/app.php
+
+		-
+			message: '#^Undefined variable\: \$tableName$#'
+			identifier: variable.undefined
+			count: 1
+			path: database/migrations/2026_08_03_120000_add_tenant_security_configuration.php
+
+		-
+			message: '#^Property Illuminate\\Database\\Migrations\\Migration@anonymous/database/migrations/2026_08_12_120000_repair_unused_number_sequence_scopes\.php\:6\:\:\$numberingStateTables type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: database/migrations/2026_08_12_120000_repair_unused_number_sequence_scopes.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Console\\Command\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: database/seeders/ReadOnlyRoleSeeder.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, string\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: routes/web.php

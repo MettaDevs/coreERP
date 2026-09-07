@@ -31,9 +31,7 @@ export function subscribePrintRequests(listener: Listener): () => void {
 }
 
 /** Validasi bentuk pesan dari iframe app. Sumber dan origin diperiksa pemanggil. */
-export function isPrintMessage(
-    data: unknown,
-): data is {
+export function isPrintMessage(data: unknown): data is {
     type: 'coreerp.print';
     appId: string;
     report: string;

@@ -1,10 +1,10 @@
 // Components
+import { Button } from '@apperp/ui/button';
+import { Input } from '@apperp/ui/input';
 import { Form, Head } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
-import { Button } from '@apperp/ui/button';
-import { Input } from '@apperp/ui/input';
 import { login } from '@/routes';
 import { email } from '@/routes/password';
 

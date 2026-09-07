@@ -3,9 +3,9 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
+use App\Models\RoleAssignment;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
-use App\Models\RoleAssignment;
 use App\Models\User;
 use App\Support\LaunchableAppCatalog;
 use Database\Seeders\AppCatalogSeeder;

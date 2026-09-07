@@ -9,6 +9,7 @@ use App\Models\User;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class SodConflictTest extends TestCase
@@ -39,7 +40,7 @@ class SodConflictTest extends TestCase
         $first = $this->createRole('Pengaju', ['management-aset.entitas-aset.manage']);
         $second = $this->createRole('Verifikator', ['management-aset.group-aset.manage']);
         DB::table('sod_rules')->insert([
-            'id' => (string) \Illuminate\Support\Str::ulid(),
+            'id' => (string) Str::ulid(),
             'tenant_id' => $this->member->tenant_id,
             'first_duty_code' => 'management-aset.entitas-aset.manage',
             'second_duty_code' => 'management-aset.group-aset.manage',

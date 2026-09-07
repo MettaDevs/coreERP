@@ -1,9 +1,9 @@
-import { Form, Head } from '@inertiajs/react';
-import InputError from '@/components/input-error';
-import PasswordInput from '@/components/password-input';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { Spinner } from '@apperp/ui/spinner';
+import { Form, Head } from '@inertiajs/react';
+import InputError from '@/components/input-error';
+import PasswordInput from '@/components/password-input';
 import { update } from '@/routes/password';
 
 type Props = {

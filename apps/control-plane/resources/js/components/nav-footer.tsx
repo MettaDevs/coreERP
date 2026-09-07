@@ -1,4 +1,3 @@
-import type { ComponentPropsWithoutRef } from 'react';
 import {
     SidebarGroup,
     SidebarGroupContent,
@@ -6,6 +5,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@apperp/ui/sidebar';
+import type { ComponentPropsWithoutRef } from 'react';
 import { toUrl } from '@/lib/utils';
 import type { NavItem } from '@/types';
 

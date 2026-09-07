@@ -1,4 +1,3 @@
-import { Link } from '@inertiajs/react';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -6,6 +5,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@apperp/ui/sidebar';
+import { Link } from '@inertiajs/react';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 

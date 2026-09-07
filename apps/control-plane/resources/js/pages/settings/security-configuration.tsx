@@ -1,23 +1,3 @@
-import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    Check,
-    ChevronRight,
-    CopyPlus,
-    ExternalLink,
-    FileKey2,
-    FileText,
-    KeyRound,
-    Layers,
-    Pencil,
-    Plus,
-    Search,
-    ShieldCheck,
-    Sparkles,
-    Trash2,
-    UserCog,
-} from 'lucide-react';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-
 import {
     AlertDialog,
     AlertDialogAction,
@@ -63,6 +43,24 @@ import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import { Separator } from '@apperp/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@apperp/ui/tabs';
+import { Head, Link, useForm } from '@inertiajs/react';
+import {
+    Check,
+    ChevronRight,
+    CopyPlus,
+    ExternalLink,
+    FileKey2,
+    FileText,
+    KeyRound,
+    Layers,
+    Pencil,
+    Plus,
+    Search,
+    ShieldCheck,
+    Trash2,
+    UserCog,
+} from 'lucide-react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import Heading from '@/components/heading';
 
 type Source = 'manifest' | 'custom';
@@ -185,17 +183,24 @@ function Column({
 
     return (
         <div className="flex w-64 shrink-0 flex-col border-r border-border bg-card/30 last:border-r-0">
-            <div className="flex items-center gap-2 border-b border-border bg-primary/10 dark:bg-primary/20 px-3.5 py-2.5">
+            <div className="flex items-center gap-2 border-b border-border bg-primary/10 px-3.5 py-2.5 dark:bg-primary/20">
                 <Glyph className="size-4 shrink-0 text-primary" />
-                <span className="flex-1 text-xs font-bold uppercase tracking-wider text-foreground">
+                <span className="flex-1 text-xs font-bold tracking-wider text-foreground uppercase">
                     {LABEL[level]}
                 </span>
-                <Badge variant="secondary" className="bg-primary/15 text-primary border-0 text-[10px] px-1.5 py-0 font-semibold">
+                <Badge
+                    variant="secondary"
+                    className="border-0 bg-primary/15 px-1.5 py-0 text-[10px] font-semibold text-primary"
+                >
                     {rows.length}
                 </Badge>
             </div>
-            {filter ? <div className="border-b border-border p-2.5 bg-background/50">{filter}</div> : null}
-            <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-border/40">
+            {filter ? (
+                <div className="border-b border-border bg-background/50 p-2.5">
+                    {filter}
+                </div>
+            ) : null}
+            <div className="min-h-0 flex-1 divide-y divide-border/40 overflow-y-auto">
                 {rows.length === 0 ? (
                     <p className="p-4 text-xs text-muted-foreground italic">
                         Tidak ada {LABEL[level].toLowerCase()}.
@@ -206,10 +211,11 @@ function Column({
                             key={row.id}
                             type="button"
                             onClick={() => onSelect(row.id)}
-                            className={`flex w-full items-center gap-2.5 border-l-4 px-3.5 py-2.5 text-left text-sm transition-all hover:bg-accent/60 ${selected === row.id
+                            className={`flex w-full items-center gap-2.5 border-l-4 px-3.5 py-2.5 text-left text-sm transition-all hover:bg-accent/60 ${
+                                selected === row.id
                                     ? 'border-l-primary bg-primary/10 font-semibold text-primary'
                                     : 'border-l-transparent text-foreground'
-                                }`}
+                            }`}
                         >
                             <span className="min-w-0 flex-1">
                                 <span className="block truncate">
@@ -363,12 +369,12 @@ function PermissionMatrix({
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
-                <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+                <div className="relative min-w-[200px] flex-1">
+                    <Search className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
                     <Input
                         type="search"
                         placeholder="Cari entry point / titik akses…"
-                        className="pl-8 text-xs h-9 bg-background"
+                        className="h-9 bg-background pl-8 text-xs"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                     />
@@ -390,17 +396,20 @@ function PermissionMatrix({
 
             <div className="max-h-96 overflow-auto rounded-lg border border-border bg-card shadow-xs">
                 <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-muted/90 backdrop-blur-xs z-10">
+                    <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur-xs">
                         <tr className="border-b border-border">
-                            <th className="px-4 py-2.5 text-left font-bold uppercase tracking-wider text-muted-foreground">
+                            <th className="px-4 py-2.5 text-left font-bold tracking-wider text-muted-foreground uppercase">
                                 Titik Akses (Entry Point)
                             </th>
                             {ACCESS_LEVELS.map((access) => (
-                                <th key={access} className="px-2 py-2.5 text-center min-w-[90px]">
+                                <th
+                                    key={access}
+                                    className="min-w-[90px] px-2 py-2.5 text-center"
+                                >
                                     <button
                                         type="button"
                                         onClick={() => toggleColumn(access)}
-                                        className="w-full rounded-md px-2 py-1 font-semibold text-xs border border-border/60 bg-background/80 hover:bg-primary/10 hover:border-primary/40 hover:text-primary transition-all shadow-2xs cursor-pointer"
+                                        className="w-full cursor-pointer rounded-md border border-border/60 bg-background/80 px-2 py-1 text-xs font-semibold shadow-2xs transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
                                         title={`Klik untuk pilih semua izin ${access}`}
                                     >
                                         {access}
@@ -414,18 +423,19 @@ function PermissionMatrix({
                             <tr>
                                 <td
                                     colSpan={ACCESS_LEVELS.length + 1}
-                                    className="p-8 text-center text-muted-foreground font-medium"
+                                    className="p-8 text-center font-medium text-muted-foreground"
                                 >
-                                    Tidak ada entry point yang cocok dengan kriteria pencarian.
+                                    Tidak ada entry point yang cocok dengan
+                                    kriteria pencarian.
                                 </td>
                             </tr>
                         ) : (
                             grouped.map(([appId, items]) => (
                                 <Fragment key={appId}>
-                                    <tr className="bg-muted/40 font-semibold border-y border-border/80">
+                                    <tr className="border-y border-border/80 bg-muted/40 font-semibold">
                                         <td
                                             colSpan={ACCESS_LEVELS.length + 1}
-                                            className="px-4 py-2 text-[11px] uppercase tracking-wider text-primary"
+                                            className="px-4 py-2 text-[11px] tracking-wider text-primary uppercase"
                                         >
                                             <span className="inline-flex items-center gap-1.5">
                                                 <Layers className="size-3.5 shrink-0" />
@@ -434,40 +444,57 @@ function PermissionMatrix({
                                         </td>
                                     </tr>
                                     {items.map((row) => (
-                                        <tr key={row.key} className="hover:bg-accent/40 transition-colors">
+                                        <tr
+                                            key={row.key}
+                                            className="transition-colors hover:bg-accent/40"
+                                        >
                                             <td className="px-4 py-2.5">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="font-semibold text-foreground text-xs">
+                                                    <span className="text-xs font-semibold text-foreground">
                                                         {row.label}
                                                     </span>
-                                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono bg-muted/50 text-muted-foreground border-border/60">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-border/60 bg-muted/50 px-1.5 py-0 font-mono text-[10px] text-muted-foreground"
+                                                    >
                                                         {row.type}
                                                     </Badge>
                                                 </div>
-                                                <span className="text-[11px] font-mono text-muted-foreground/80 block mt-0.5">
+                                                <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground/80">
                                                     {row.key}
                                                 </span>
                                             </td>
                                             {ACCESS_LEVELS.map((access) => {
-                                                const code = row.byAccess.get(access);
-                                                const isChecked = code ? selected.includes(code) : false;
+                                                const code =
+                                                    row.byAccess.get(access);
+                                                const isChecked = code
+                                                    ? selected.includes(code)
+                                                    : false;
 
                                                 return (
                                                     <td
                                                         key={access}
-                                                        className={`px-2 py-2.5 text-center transition-colors ${isChecked ? 'bg-primary/5' : ''
-                                                            }`}
+                                                        className={`px-2 py-2.5 text-center transition-colors ${
+                                                            isChecked
+                                                                ? 'bg-primary/5'
+                                                                : ''
+                                                        }`}
                                                     >
                                                         {code ? (
                                                             <div className="flex items-center justify-center">
                                                                 <Checkbox
-                                                                    checked={isChecked}
-                                                                    onCheckedChange={(checked) =>
+                                                                    checked={
+                                                                        isChecked
+                                                                    }
+                                                                    onCheckedChange={(
+                                                                        checked,
+                                                                    ) =>
                                                                         onChange(
                                                                             toggle(
                                                                                 selected,
                                                                                 code,
-                                                                                checked === true,
+                                                                                checked ===
+                                                                                    true,
                                                                             ),
                                                                         )
                                                                     }
@@ -476,7 +503,7 @@ function PermissionMatrix({
                                                             </div>
                                                         ) : (
                                                             <span
-                                                                className="text-muted-foreground/30 text-xs select-none"
+                                                                className="text-xs text-muted-foreground/30 select-none"
                                                                 title="Aplikasi tidak mendeklarasikan izin ini"
                                                             >
                                                                 —
@@ -493,12 +520,17 @@ function PermissionMatrix({
                     </tbody>
                 </table>
             </div>
-            <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
                 <span>
-                    ✨ Total <strong className="text-foreground font-semibold">{selected.length}</strong> izin terpilih untuk tugas akses ini.
+                    ✨ Total{' '}
+                    <strong className="font-semibold text-foreground">
+                        {selected.length}
+                    </strong>{' '}
+                    izin terpilih untuk tugas akses ini.
                 </span>
                 <span>
-                    Gunakan tombol kolom di header untuk memilih seluruh izin sejajar.
+                    Gunakan tombol kolom di header untuk memilih seluruh izin
+                    sejajar.
                 </span>
             </div>
         </div>
@@ -526,16 +558,24 @@ function PrivilegeDialog({
                 <Button
                     variant={privilege ? 'outline' : 'default'}
                     size="sm"
-                    className={privilege ? 'bg-background shadow-xs hover:bg-accent' : 'shadow-xs font-medium text-xs'}
+                    className={
+                        privilege
+                            ? 'bg-background shadow-xs hover:bg-accent'
+                            : 'text-xs font-medium shadow-xs'
+                    }
                 >
-                    {privilege ? <Pencil className="size-3.5 mr-1" /> : <Plus className="size-3.5 mr-1" />}
+                    {privilege ? (
+                        <Pencil className="mr-1 size-3.5" />
+                    ) : (
+                        <Plus className="mr-1 size-3.5" />
+                    )}
                     {privilege ? 'Edit draf' : 'Tugas Akses'}
                 </Button>
             </DialogTrigger>
             <DialogContent size="full">
                 <DialogHeader>
                     <div className="flex items-center gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                             <KeyRound className="size-5" />
                         </div>
                         <div>
@@ -544,8 +584,10 @@ function PrivilegeDialog({
                                     ? `Edit ${privilege.name}`
                                     : 'Tugas Akses Baru'}
                             </DialogTitle>
-                            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                                Centang pasangan entry point dan access level yang diperlukan. Klik judul kolom untuk memilih seluruh kolom sekaligus.
+                            <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+                                Centang pasangan entry point dan access level
+                                yang diperlukan. Klik judul kolom untuk memilih
+                                seluruh kolom sekaligus.
                             </DialogDescription>
                         </div>
                     </div>
@@ -608,7 +650,8 @@ function PrivilegeDialog({
                     </DialogBody>
                     <DialogFooter>
                         <DialogAction type="submit" disabled={form.processing}>
-                            <KeyRound className="mr-1.5 size-3.5" /> Simpan sebagai draf
+                            <KeyRound className="mr-1.5 size-3.5" /> Simpan
+                            sebagai draf
                         </DialogAction>
                         <DialogCancel />
                     </DialogFooter>
@@ -660,24 +703,36 @@ function DutyDialog({
                 <Button
                     size="sm"
                     variant={duty ? 'outline' : 'default'}
-                    className={duty ? 'bg-background shadow-xs hover:bg-accent' : 'shadow-xs font-medium text-xs'}
+                    className={
+                        duty
+                            ? 'bg-background shadow-xs hover:bg-accent'
+                            : 'text-xs font-medium shadow-xs'
+                    }
                 >
-                    {duty ? <Pencil className="size-3.5 mr-1" /> : <Plus className="size-3.5 mr-1" />}
+                    {duty ? (
+                        <Pencil className="mr-1 size-3.5" />
+                    ) : (
+                        <Plus className="mr-1 size-3.5" />
+                    )}
                     {duty ? 'Edit draf' : 'Tanggung Jawab'}
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
                     <div className="flex items-center gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                             <ShieldCheck className="size-5" />
                         </div>
                         <div>
                             <DialogTitle className="text-base font-bold text-foreground">
-                                {duty ? `Edit ${duty.name}` : 'Tanggung Jawab Baru'}
+                                {duty
+                                    ? `Edit ${duty.name}`
+                                    : 'Tanggung Jawab Baru'}
                             </DialogTitle>
-                            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                                Tanggung jawab menggabungkan beberapa tugas akses menjadi satu bagian proses bisnis yang dapat dipasang pada role.
+                            <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+                                Tanggung jawab menggabungkan beberapa tugas
+                                akses menjadi satu bagian proses bisnis yang
+                                dapat dipasang pada role.
                             </DialogDescription>
                         </div>
                     </div>
@@ -729,41 +784,50 @@ function DutyDialog({
                                         setQuery(event.target.value)
                                     }
                                 />
-                                <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-border bg-white dark:bg-card p-3 shadow-2xs">
+                                <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-border bg-white p-3 shadow-2xs dark:bg-card">
                                     {visible.map((privilege) => {
-                                        const checked = form.data.privilege_codes.includes(privilege.code);
+                                        const checked =
+                                            form.data.privilege_codes.includes(
+                                                privilege.code,
+                                            );
+
                                         return (
                                             <label
                                                 key={privilege.code}
-                                                className={`flex items-start gap-3 rounded-md border p-2.5 text-sm transition-colors cursor-pointer ${checked
+                                                className={`flex cursor-pointer items-start gap-3 rounded-md border p-2.5 text-sm transition-colors ${
+                                                    checked
                                                         ? 'border-primary/40 bg-primary/5'
                                                         : 'border-border/60 bg-card hover:bg-accent/40'
-                                                    }`}
+                                                }`}
                                             >
                                                 <Checkbox
                                                     checked={checked}
-                                                    onCheckedChange={(checked) =>
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
                                                         form.setData(
                                                             'privilege_codes',
                                                             toggle(
                                                                 form.data
                                                                     .privilege_codes,
                                                                 privilege.code,
-                                                                checked === true,
+                                                                checked ===
+                                                                    true,
                                                             ),
                                                         )
                                                     }
                                                     className="mt-0.5"
                                                 />
-                                                <span className="flex-1 min-w-0">
-                                                    <span className="block font-semibold text-foreground text-xs">
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block text-xs font-semibold text-foreground">
                                                         {privilege.name}
                                                     </span>
                                                     <span className="text-[11px] text-muted-foreground">
                                                         {privilege.app_id
                                                             ? (appName.get(
-                                                                privilege.app_id,
-                                                            ) ?? privilege.app_id)
+                                                                  privilege.app_id,
+                                                              ) ??
+                                                              privilege.app_id)
                                                             : 'Dibuat khusus'}{' '}
                                                         ·{' '}
                                                         {
@@ -786,7 +850,8 @@ function DutyDialog({
                     </DialogBody>
                     <DialogFooter>
                         <DialogAction type="submit" disabled={form.processing}>
-                            <ShieldCheck className="mr-1.5 size-3.5" /> Simpan sebagai draf
+                            <ShieldCheck className="mr-1.5 size-3.5" /> Simpan
+                            sebagai draf
                         </DialogAction>
                         <DialogCancel />
                     </DialogFooter>
@@ -833,24 +898,36 @@ function RoleDialog({
                 <Button
                     variant={role ? 'outline' : 'default'}
                     size="sm"
-                    className={role ? 'bg-background shadow-xs hover:bg-accent' : 'shadow-xs font-medium text-xs'}
+                    className={
+                        role
+                            ? 'bg-background shadow-xs hover:bg-accent'
+                            : 'text-xs font-medium shadow-xs'
+                    }
                 >
-                    {role ? <Pencil className="size-3.5 mr-1" /> : <Plus className="size-3.5 mr-1" />}
+                    {role ? (
+                        <Pencil className="mr-1 size-3.5" />
+                    ) : (
+                        <Plus className="mr-1 size-3.5" />
+                    )}
                     {role ? 'Edit role' : 'Role'}
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
                     <div className="flex items-center gap-3">
-                        <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                             <UserCog className="size-5" />
                         </div>
                         <div>
                             <DialogTitle className="text-base font-bold text-foreground">
-                                {role ? 'Edit Security Role' : 'Security Role Baru'}
+                                {role
+                                    ? 'Edit Security Role'
+                                    : 'Security Role Baru'}
                             </DialogTitle>
-                            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                                Role menentukan tindakan yang boleh dilakukan. Batas data diatur saat role diberikan ke anggota.
+                            <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
+                                Role menentukan tindakan yang boleh dilakukan.
+                                Batas data diatur saat role diberikan ke
+                                anggota.
                             </DialogDescription>
                         </div>
                     </div>
@@ -884,46 +961,63 @@ function RoleDialog({
                             </Field>
                             <FieldSet>
                                 <FieldLegend>Tanggung jawab bisnis</FieldLegend>
-                                <div className="max-h-72 space-y-4 overflow-y-auto rounded-lg border border-border bg-white dark:bg-card p-3.5 shadow-2xs">
+                                <div className="max-h-72 space-y-4 overflow-y-auto rounded-lg border border-border bg-white p-3.5 shadow-2xs dark:bg-card">
                                     {groups.map((group) => (
                                         <div
                                             key={group.id}
                                             className="space-y-2"
                                         >
-                                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                            <p className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
                                                 {group.name}
                                             </p>
                                             <div className="space-y-1.5">
                                                 {group.items.map((duty) => {
-                                                    const checked = form.data.duty_codes.includes(duty.code);
+                                                    const checked =
+                                                        form.data.duty_codes.includes(
+                                                            duty.code,
+                                                        );
+
                                                     return (
                                                         <label
                                                             key={duty.code}
-                                                            className={`flex items-start gap-3 rounded-md border p-2.5 text-sm transition-colors cursor-pointer ${checked
+                                                            className={`flex cursor-pointer items-start gap-3 rounded-md border p-2.5 text-sm transition-colors ${
+                                                                checked
                                                                     ? 'border-primary/40 bg-primary/5'
                                                                     : 'border-border/60 bg-card hover:bg-accent/40'
-                                                                }`}
+                                                            }`}
                                                         >
                                                             <Checkbox
-                                                                checked={checked}
-                                                                onCheckedChange={(checked) =>
+                                                                checked={
+                                                                    checked
+                                                                }
+                                                                onCheckedChange={(
+                                                                    checked,
+                                                                ) =>
                                                                     form.setData(
                                                                         'duty_codes',
                                                                         toggle(
-                                                                            form.data.duty_codes,
+                                                                            form
+                                                                                .data
+                                                                                .duty_codes,
                                                                             duty.code,
-                                                                            checked === true,
+                                                                            checked ===
+                                                                                true,
                                                                         ),
                                                                     )
                                                                 }
                                                                 className="mt-0.5"
                                                             />
-                                                            <span className="flex-1 min-w-0">
-                                                                <span className="block font-semibold text-foreground text-xs">
+                                                            <span className="min-w-0 flex-1">
+                                                                <span className="block text-xs font-semibold text-foreground">
                                                                     {duty.name}
                                                                 </span>
                                                                 <span className="text-[11px] text-muted-foreground">
-                                                                    {duty.privilege_codes.length} tugas akses
+                                                                    {
+                                                                        duty
+                                                                            .privilege_codes
+                                                                            .length
+                                                                    }{' '}
+                                                                    tugas akses
                                                                 </span>
                                                             </span>
                                                         </label>
@@ -964,7 +1058,7 @@ function DeleteRoleButton({
         <AlertDialog>
             <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
-                    <Trash2 className="size-3.5 mr-1" />
+                    <Trash2 className="mr-1 size-3.5" />
                     Hapus role
                 </Button>
             </AlertDialogTrigger>
@@ -1006,7 +1100,7 @@ function PublishButton({ path }: { path: string }) {
             disabled={form.processing}
             onClick={() => form.post(path)}
         >
-            <Check className="size-3.5 mr-1" />
+            <Check className="mr-1 size-3.5" />
             Terbitkan
         </Button>
     );
@@ -1019,7 +1113,7 @@ function DeleteDraftButton({ path, name }: { path: string; name: string }) {
         <AlertDialog>
             <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
-                    <Trash2 className="size-3.5 mr-1" />
+                    <Trash2 className="mr-1 size-3.5" />
                     Hapus
                 </Button>
             </AlertDialogTrigger>
@@ -1087,17 +1181,21 @@ function DraftPanel({
     return (
         <div className="space-y-3 p-4">
             {privileges.map((item) => (
-                <div key={item.code} className="rounded-lg border border-border bg-card p-4 shadow-sm hover:shadow transition-all">
+                <div
+                    key={item.code}
+                    className="rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow"
+                >
                     <div className="flex flex-wrap items-center gap-3">
-                        <span className="flex-1 min-w-0">
+                        <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-2">
-                                <span className="font-semibold text-foreground truncate">{item.name}</span>
-                                <Badge variant="outline">
-                                    Draf
-                                </Badge>
+                                <span className="truncate font-semibold text-foreground">
+                                    {item.name}
+                                </span>
+                                <Badge variant="outline">Draf</Badge>
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                Tugas akses · {item.permission_codes.length} izin
+                                Tugas akses · {item.permission_codes.length}{' '}
+                                izin
                             </span>
                         </span>
                         <div className="flex items-center gap-2">
@@ -1118,7 +1216,10 @@ function DraftPanel({
                     <ul className="mt-3 flex flex-wrap gap-1.5">
                         {item.permission_codes.map((code) => (
                             <li key={code}>
-                                <Badge variant="secondary" className="text-xs font-normal">
+                                <Badge
+                                    variant="secondary"
+                                    className="text-xs font-normal"
+                                >
                                     {permissionByCode.get(code)?.name ?? code}
                                     {' · '}
                                     {permissionByCode.get(code)?.access_level}
@@ -1129,17 +1230,21 @@ function DraftPanel({
                 </div>
             ))}
             {duties.map((item) => (
-                <div key={item.code} className="rounded-lg border border-border bg-card p-4 shadow-sm hover:shadow transition-all">
+                <div
+                    key={item.code}
+                    className="rounded-lg border border-border bg-card p-4 shadow-sm transition-all hover:shadow"
+                >
                     <div className="flex flex-wrap items-center gap-3">
-                        <span className="flex-1 min-w-0">
+                        <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-2">
-                                <span className="font-semibold text-foreground truncate">{item.name}</span>
-                                <Badge variant="outline">
-                                    Draf
-                                </Badge>
+                                <span className="truncate font-semibold text-foreground">
+                                    {item.name}
+                                </span>
+                                <Badge variant="outline">Draf</Badge>
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                Tanggung jawab · {item.privilege_codes.length} tugas akses
+                                Tanggung jawab · {item.privilege_codes.length}{' '}
+                                tugas akses
                             </span>
                         </span>
                         <div className="flex items-center gap-2">
@@ -1160,7 +1265,10 @@ function DraftPanel({
                     <ul className="mt-3 flex flex-wrap gap-1.5">
                         {item.privilege_codes.map((code) => (
                             <li key={code}>
-                                <Badge variant="secondary" className="text-xs font-normal">
+                                <Badge
+                                    variant="secondary"
+                                    className="text-xs font-normal"
+                                >
                                     {privilegeByCode.get(code)?.name ?? code}
                                 </Badge>
                             </li>
@@ -1168,7 +1276,7 @@ function DraftPanel({
                     </ul>
                 </div>
             ))}
-            <p className="text-xs text-muted-foreground pt-1">
+            <p className="pt-1 text-xs text-muted-foreground">
                 Terbitkan tugas akses lebih dulu — tanggung jawab menolak terbit
                 selama masih memuat tugas akses berstatus draf.
             </p>
@@ -1308,7 +1416,7 @@ export default function SecurityConfiguration({
                 index === 0
                     ? duties.map((duty) => duty.code)
                     : (roles.find((role) => role.id === parent)?.duty_codes ??
-                        []);
+                      []);
 
             return codes
                 .map((code) => dutyByCode.get(code))
@@ -1434,7 +1542,10 @@ export default function SecurityConfiguration({
                         diatur terpisah.
                     </p>
                     <Button variant="outline" size="sm" asChild>
-                        <Link href="/settings/access?section=roles" className="inline-flex items-center gap-1.5">
+                        <Link
+                            href="/settings/access?section=roles"
+                            className="inline-flex items-center gap-1.5"
+                        >
                             <ExternalLink className="size-3.5" />
                             Buka penugasan role
                         </Link>
@@ -1521,7 +1632,7 @@ export default function SecurityConfiguration({
                         value={
                             privilege.app_id
                                 ? (appName.get(privilege.app_id) ??
-                                    privilege.app_id)
+                                  privilege.app_id)
                                 : '—'
                         }
                     />
@@ -1618,19 +1729,31 @@ export default function SecurityConfiguration({
                         <div className="px-6">
                             <Tabs value={tab} onValueChange={changeTab}>
                                 <TabsList>
-                                    <TabsTrigger value="role" className="gap-1.5">
+                                    <TabsTrigger
+                                        value="role"
+                                        className="gap-1.5"
+                                    >
                                         <UserCog className="size-3.5" />
                                         Role
                                     </TabsTrigger>
-                                    <TabsTrigger value="duty" className="gap-1.5">
+                                    <TabsTrigger
+                                        value="duty"
+                                        className="gap-1.5"
+                                    >
                                         <ShieldCheck className="size-3.5" />
                                         Tanggung jawab
                                     </TabsTrigger>
-                                    <TabsTrigger value="privilege" className="gap-1.5">
+                                    <TabsTrigger
+                                        value="privilege"
+                                        className="gap-1.5"
+                                    >
                                         <KeyRound className="size-3.5" />
                                         Tugas akses
                                     </TabsTrigger>
-                                    <TabsTrigger value="draft" className="gap-1.5">
+                                    <TabsTrigger
+                                        value="draft"
+                                        className="gap-1.5"
+                                    >
                                         <FileText className="size-3.5" />
                                         Draf ({draftCount})
                                     </TabsTrigger>
@@ -1708,8 +1831,8 @@ export default function SecurityConfiguration({
                                     {selectedRole
                                         ? `Edit role untuk menambah atau melepas tanggung jawab ${selectedRole.name}.`
                                         : selectedDuty || selectedPrivilege
-                                            ? 'Duplikat objek aplikasi untuk menyempitkan haknya.'
-                                            : 'Objek dari aplikasi hanya dapat dilihat.'}
+                                          ? 'Duplikat objek aplikasi untuk menyempitkan haknya.'
+                                          : 'Objek dari aplikasi hanya dapat dilihat.'}
                                 </span>
                             </div>
                         ) : null}

@@ -1,7 +1,3 @@
-import { Save, Trash2, Upload } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
-
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -13,6 +9,9 @@ import {
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import { Textarea } from '@apperp/ui/textarea';
+import { Save, Trash2, Upload } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { apiJson, apiRequest, errorText } from '@/lib/core-api';
 
 type Logo = {

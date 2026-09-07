@@ -1,6 +1,6 @@
-import { createInertiaApp } from '@inertiajs/react';
 import { Toaster } from '@apperp/ui/sonner';
 import { TooltipProvider } from '@apperp/ui/tooltip';
+import { createInertiaApp } from '@inertiajs/react';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';

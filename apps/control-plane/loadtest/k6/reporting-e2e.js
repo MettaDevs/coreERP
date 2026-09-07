@@ -1,7 +1,7 @@
-import http from 'k6/http';
 import { check, sleep } from 'k6';
-import { Counter, Trend } from 'k6/metrics';
 import exec from 'k6/execution';
+import http from 'k6/http';
+import { Counter, Trend } from 'k6/metrics';
 
 /**
  * Uji end-to-end laporan lintas app pada stack lokal (erp-dev), tanpa menyentuh UI:
@@ -62,6 +62,7 @@ const jsonHeaders = (csrf) => ({
 
 function csrfToken() {
     const cookies = http.cookieJar().cookiesForURL(BASE);
+
     return cookies['XSRF-TOKEN']?.[0] ?? '';
 }
 
@@ -90,6 +91,7 @@ export default function () {
         { headers: jsonHeaders(csrfToken()), tags: { op: 'registration' } },
     );
     track(registration);
+
     if (!check(registration, { 'registrasi 201': (r) => r.status === 201 })) {
         return;
     }
@@ -103,6 +105,7 @@ export default function () {
         { headers: jsonHeaders(csrfToken()), tags: { op: 'login' } },
     );
     track(login);
+
     if (!check(login, { 'login 200': (r) => r.status === 200 })) {
         return;
     }
@@ -115,6 +118,7 @@ export default function () {
     track(catalog);
     const reports = catalog.status === 200 ? catalog.json('data') : [];
     const report = Array.isArray(reports) ? reports.find((item) => item.code === REPORT) : undefined;
+
     if (
         !check(catalog, {
             'katalog 200': (r) => r.status === 200,
@@ -154,16 +158,19 @@ export default function () {
             { headers: jsonHeaders(csrfToken()), tags: { op: 'export-create', format } },
         );
         track(created);
+
         if (!check(created, { [`ekspor ${format} 202`]: (r) => r.status === 202 })) {
             exportsFailed.add(1, { format, stage: 'create' });
             continue;
         }
+
         const id = created.json('data.id');
 
         // 5. Worker Core mengerjakannya; kita hanya memantau.
         let status = created.json('data.status');
         let last = created.json('data');
         const deadline = Date.now() + WAIT_SECONDS * 1000;
+
         while ((status === 'queued' || status === 'running') && Date.now() < deadline) {
             sleep(1);
             const poll = http.get(`${BASE}/api/v1/report-exports/${id}`, {
@@ -171,12 +178,15 @@ export default function () {
                 tags: { op: 'export-poll' },
             });
             track(poll);
+
             if (poll.status !== 200) {
                 break;
             }
+
             last = poll.json('data');
             status = last.status;
         }
+
         if (status === 'done') {
             exportsDone.add(1, { format });
             queueLatency.add(Date.now() - requested, { format });
@@ -205,6 +215,7 @@ export default function () {
             [`tipe ${format} benar`]: (r) => (r.headers['Content-Type'] ?? '').startsWith(expectedType),
             [`isi ${format} tidak kosong`]: (r) => r.body && r.body.byteLength > 100,
         });
+
         if (download.body) {
             downloadBytes.add(download.body.byteLength, { format });
         }
@@ -225,6 +236,7 @@ export default function () {
 export function handleSummary(data) {
     const metric = (name, stat) => {
         const value = data.metrics[name]?.values?.[stat];
+
         return value === undefined ? null : Number(value.toFixed(2));
     };
     const summary = {

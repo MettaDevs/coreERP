@@ -11,6 +11,7 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -21,7 +22,7 @@ class WorkspaceContextTest extends TestCase
     public function test_member_can_select_legal_entity_and_operating_unit_with_an_effective_policy_scope(): void
     {
         $this->seed(AppCatalogSeeder::class);
-        \Illuminate\Support\Facades\DB::table('app_data_policies')->insert([
+        DB::table('app_data_policies')->insert([
             'code' => 'management-aset.asset-responsibility',
             'app_id' => 'management-aset',
             'name' => 'Akses aset menurut unit penanggung jawab',

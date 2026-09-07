@@ -1,10 +1,10 @@
+import { Button } from '@apperp/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@apperp/ui/popover';
+import { ScrollArea } from '@apperp/ui/scroll-area';
 import { router } from '@inertiajs/react';
 import { Bell, Check, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-import { Button } from '@apperp/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@apperp/ui/popover';
-import { ScrollArea } from '@apperp/ui/scroll-area';
 import { useNotifications } from '@/hooks/use-notifications';
 import {
     clearNotifications,
