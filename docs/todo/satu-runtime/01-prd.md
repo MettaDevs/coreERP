@@ -49,7 +49,8 @@ Kriteria keluar ditulis di awal tiap fase dan berupa hal yang bisa dijalankan, b
 
 ### 2.3 Selesai untuk proyek
 
-1. Satu image berisi Core dan modul Management Aset berjalan dengan satu database.
+1. Satu image berisi Core dan modul Management Aset berjalan dengan satu database, dan modul itu dapat
+   dipasang, dinonaktifkan, diaktifkan lagi, serta dicabut per tenant.
 2. Modul Human Resources ikut di image yang sama, dan bisa dicabut tanpa menyentuh data Management Aset.
 3. Dua bundle edisi berbeda dibangun dari repo yang sama, dan CI membuktikan modul yang tidak dibeli
    tidak ada di dalamnya.
@@ -113,9 +114,23 @@ disentuh, misalnya `core`, `aset`, `ui`, `ci`.
 
 ### 4.4 Ukuran task
 
-Satu task adalah satu PR yang bisa ditinjau dalam setengah jam. Kalau sebuah task menyentuh lebih dari
-sekitar 15 berkas atau menggabungkan dua tujuan berbeda, ia dipecah. Task yang berbunyi "pindahkan
-modul" tanpa rincian dianggap belum ditulis.
+Satu task adalah satu pull request yang bisa ditinjau dalam setengah jam. Kalau sebuah task menyentuh
+lebih dari sekitar 15 berkas atau menggabungkan dua tujuan berbeda, ia dipecah. Task yang berbunyi
+"pindahkan modul" tanpa rincian dianggap belum ditulis.
+
+### 4.5 Kriteria selesai harus bisa gagal
+
+Kalau tidak ada keadaan yang membuat sebuah kriteria berwarna merah, ia bukan kriteria. Tiga bentuk yang
+tampak seperti pemeriksaan padahal bukan:
+
+| Terlihat seperti pemeriksaan | Kenapa tidak menguji apa pun |
+| --- | --- |
+| Mencari jalur lama di repo utama | Rujukan ketiganya ada di repo lain, jadi pencarian selalu hijau sementara stack pengembangan rusak |
+| Membangun situs dokumentasi untuk membuktikan folder mati sudah hilang | Rujukannya bukan tautan, jadi pembangunan tidak pernah gagal karenanya |
+| Menghitung tabel pada database yang baru dibuat | Nol memang jawaban yang selalu benar di sana |
+
+Sebelum menulis kriteria, sebutkan satu keadaan yang membuatnya gagal. Kalau tidak ada, ganti
+kriterianya.
 ## 5. Arsitektur tujuan
 
 Bagian ini adalah gambar akhir yang dituju semua task. Kalau sebuah task tidak mendekatkan kode ke
@@ -148,44 +163,96 @@ CoreERP/
 Repo `app-erp-*` yang sekarang terpisah menjadi folder di bawah `modules/`. Riwayat git-nya dibawa
 serta dengan `git subtree add`, bukan disalin, supaya `git log` dan `git blame` tetap bisa dipakai.
 
-### 5.2 Batas modul: satu database, banyak schema
+### 5.2 Batas modul: awalan tabel, satu koneksi
 
-Ini keputusan teknis paling menentukan di dokumen ini, dan sudah dibuktikan pada PostgreSQL 17 yang
-dipakai stack lokal.
+Semua tabel berada di satu database. Yang memisahkan modul adalah **awalan nama tabel**, bukan schema
+dan bukan koneksi:
 
-Setiap modul memiliki **schema PostgreSQL sendiri** di dalam database tenant yang sama. Nama tabel tidak
-berubah: `m_group_aset` tetap `m_group_aset`, hanya berpindah dari schema `public` ke schema `aset`.
-Konvensi `m_`, `tr_`, `tr_*_details`, dan `tr_<aggregate>_<record>` pada
-[standar app](../../dev/02-module-standard.md) tetap berlaku apa adanya.
+| Milik | Awalan | Contoh |
+| --- | --- | --- |
+| Core | `core_` | `core_tenants`, `core_module_installations` |
+| Management Aset | `aset_` | `aset_m_group`, `aset_tr_penerimaan` |
+| Human Resources | `hr_` | `hr_m_pekerja` |
 
-Setiap modul juga memiliki **role database sendiri** dengan `search_path` yang hanya memuat schema
-miliknya dan schema Core:
+Konvensi `m_`, `tr_`, dan `tr_*_details` pada [standar app](../../dev/02-module-standard.md) tetap
+berlaku; awalan modul ditambahkan di depannya. Tabel yang ada hari ini tanpa awalan modul diganti
+namanya satu kali saat modulnya dipindahkan.
 
-```sql
-GRANT USAGE ON SCHEMA core, aset TO role_aset;
-GRANT SELECT ON ALL TABLES IN SCHEMA core TO role_aset;   -- master saja, baca
-GRANT ALL    ON ALL TABLES IN SCHEMA aset TO role_aset;   -- milik sendiri
-ALTER ROLE role_aset SET search_path = aset, core;
+**Setiap tabel modul membawa `tenant_id`.** Ini bukan pilihan. Kolom itu yang membuat penempatan
+gabungan dan penempatan terpisah memakai skema yang persis sama, sehingga satu tenant bisa dipindahkan
+ke database sendiri tanpa mengubah skema maupun kode. Sudah diuji: baris satu tenant disalin ke database
+baru dengan skema identik, dan query aplikasi yang sama persis memberi hasil yang sama.
+
+#### Kenapa bukan schema per modul
+
+Rancangan sebelumnya memakai schema PostgreSQL per modul beserta peran database sendiri. Itu dibatalkan
+karena bertabrakan dengan janji yang lebih penting.
+
+Peran modul yang hanya boleh membaca schema Core tidak bisa menulis tabel penerbitan nomor, padahal
+`NumberSequenceService` menyentuh `number_sequence_continuous_pool` dan `number_sequence_reservations`.
+Seandainya diberi hak tulis pun, koneksi modul tetap koneksi yang berbeda, jadi transaksinya tetap dua
+transaksi terpisah. Itu persis masalah yang hari ini terjadi lewat jaringan, hanya tanpa jaringannya,
+dan penerbitan nomor di dalam transaksi dokumen adalah keuntungan utama yang membenarkan seluruh
+pemindahan ini.
+
+Karena itu **runtime memakai satu koneksi database**, dan modul menulis tabelnya sendiri lewat koneksi
+yang sama dengan Core.
+
+#### Siapa yang menjaga batasnya
+
+| Lapisan | Yang dijaga | Kapan |
+| --- | --- | --- |
+| Test di CI | migration modul hanya membuat tabel berawalan miliknya | tiap pull request |
+| Analisa statis | kelas modul tidak mengimpor kelas modul lain | tiap pull request |
+| Test tenant | tidak ada query modul tanpa penyaringan tenant | tiap pull request |
+
+Jangan menuliskan bahwa batas ini ditegakkan mesin database. Ia ditegakkan pemeriksaan otomatis, dan itu
+harus disebut apa adanya supaya tidak ada yang merasa aman tanpa alasan. Konsekuensinya, pemeriksaan itu
+wajib hijau sebelum modul pertama masuk, dan itulah isi task paling awal.
+
+#### Penempatan: gabungan atau terpisah
+
+| | Gabungan, bawaan | Terpisah per tenant |
+| --- | --- | --- |
+| Database | satu untuk semua tenant | satu per tenant |
+| Pasang modul | catat satu baris pada `core_module_installations` | jalankan migration modul di database itu, lalu catat baris |
+| Cabut modul | ubah status; hapus data hanya baris milik tenant itu | ubah status; hapus data berarti membuang tabel modul |
+| Risiko | satu query lupa menyaring tenant membocorkan semua | tidak ada |
+| Dipakai untuk | tenant umum | fasilitas kesehatan dan tenant yang menuntutnya |
+
+Skemanya sama, jadi perpindahan antar keduanya adalah memindahkan baris. Keputusannya diambil per
+pelanggan dan bukan keputusan arsitektur.
+
+#### Laporan lintas tenant tidak ada
+
+Konsolidasi terjadi **di dalam** tenant, lewat legal entity dan operating unit, sama seperti Dynamics.
+Satu grup dengan tiga klinik adalah satu tenant dengan tiga legal entity, dan laporan gabungannya satu
+query biasa. Angka yang benar-benar melintasi tenant hanyalah metering milik vendor, dan itu dihitung
+di control plane tanpa menyentuh data bisnis. Jangan merancang federasi database untuk kebutuhan yang
+tidak ada.
+
+#### Retensi menentukan apakah data boleh dihapus
+
+Tidak semua modul boleh menghapus datanya saat dicabut. Rekam medis elektronik wajib disimpan paling
+singkat 25 tahun sejak kunjungan terakhir menurut Permenkes 24/2022, dan banyak fasilitas memilih tidak
+memusnahkannya sama sekali.
+
+Manifest modul menyatakan retensinya, dan perintah pencabutan membaca deklarasi itu:
+
+```yaml
+data_retention: legal-hold
+retention:
+  dasar: Permenkes 24/2022
+  minimum: 25 tahun sejak kunjungan terakhir
+  boleh_dihapus: false
 ```
 
-Yang dihasilkan susunan ini, semuanya sudah diuji:
+Modul dengan `boleh_dihapus: false` **menolak** opsi penghapusan data, bukan sekadar meminta konfirmasi.
+Penolakannya menyebut dasar hukumnya supaya operator tahu ini bukan kesalahan sistem.
 
-| Yang diinginkan | Hasil percobaan |
-| --- | --- |
-| Modul tidak bisa membaca tabel modul lain | `ERROR: permission denied for schema uji_hr`, ditolak PostgreSQL, bukan hanya oleh test |
-| Modul memakai tabelnya sendiri tanpa menyebut schema | `SELECT ... FROM m_group_aset` berjalan lewat `search_path` |
-| Integritas ke master Core terjaga | Foreign key lintas schema menolak `tenant_id` yang tidak ada |
-| Laporan lintas modul tetap satu perintah | Satu `JOIN` tiga schema, dijalankan role pelapor |
-| Mencabut modul bersih | `DROP SCHEMA hr CASCADE`, data modul lain tetap utuh |
-
-Dibanding menambahkan awalan modul ke setiap nama tabel, cara ini punya tiga keuntungan: migration yang
-sudah ada hampir tidak berubah, batasnya ditegakkan mesin database dan bukan sekadar kesepakatan, dan
-mencabut modul menjadi satu perintah yang tidak bisa salah menghapus tabel milik orang lain.
-
-Yang perlu diperhatikan: Laravel menyimpan riwayat migration di satu tabel `migrations`. Modul memakai
-tabel riwayat sendiri di schema-nya (`aset.migrations`) supaya `migrate` dan `rollback` per modul tidak
-saling mengganggu. Mekanisme `search_path` per koneksi sudah dipakai repo ini untuk memisahkan schema
-test, jadi bukan hal baru bagi tim.
+Konsekuensi yang mudah terlewat: tenant yang berhenti berlangganan tetap wajib menyimpan rekam medisnya,
+jadi harus ada jalan keluar berupa ekspor lengkap yang bisa dibaca sistem lain, atau serah terima
+database. Itu ditulis di kontrak, bukan diputuskan saat pelanggan sudah pergi.
 
 ### 5.3 Kode Core yang dipanggil modul
 
@@ -249,195 +316,317 @@ Bentuk manifest ini adalah Customer Edition Manifest pada
 
 | Fase | Isi | Kriteria keluar |
 | --- | --- | --- |
-| 0 | Penjaga batas dan kerangka modul | Penjaga terbukti bisa gagal, dan gagal karena alasan yang benar |
-| 1 | Core menjadi tuan rumah modul | Modul contoh berisi satu tabel bisa dipasang dan dicabut |
-| 2 | Management Aset pindah ke dalam Core | Semua test Management Aset lulus di dalam Core, tanpa satu pun panggilan HTTP ke Core |
-| 3 | UI menjadi satu build | Iframe hilang, React dimuat sekali, halaman modul dipanggil router shell |
-| 4 | Edisi dan bundle on-prem | Dua bundle edisi berbeda terbukti tidak memuat modul yang tidak dibeli |
-| 5 | Dev stack dan CI | `start.ps1` menyalakan satu runtime; satu alur CI |
-| 6 | Modul kedua, pengukuran, dan pembersihan | Human Resources ikut; angka proyeksi diganti angka terukur |
+| 0 | Prasyarat: pemeriksaan otomatis hijau dan aturan kerja diselaraskan | Sebuah pull request kosong lulus CI, dan aturan repo tidak lagi melarang pekerjaan ini |
+| 1 | Penjaga batas dan kerangka modul | Penjaga terbukti bisa gagal, dan gagal karena alasan yang benar |
+| 2 | Core menjadi tuan rumah modul | Modul contoh berisi satu tabel bisa dipasang, dipakai, dinonaktifkan, lalu dicabut |
+| 3 | Management Aset pindah ke dalam Core | Semua test Management Aset lulus di dalam Core, tanpa satu pun panggilan HTTP ke Core |
+| 4 | UI menjadi satu build | Iframe hilang, React dimuat sekali, halaman modul dipanggil router shell |
+| 5 | Edisi dan bundle on-prem | Dua bundle edisi berbeda terbukti tidak memuat modul yang tidak dibeli |
+| 6 | Dev stack dan CI | Skrip pengembangan menyalakan satu runtime; satu alur CI |
+| 7 | Modul kedua, pengukuran, dan pembersihan | Human Resources ikut; angka proyeksi diganti angka terukur |
 
-Fase dikerjakan berurutan. Fase 3 boleh dimulai setelah F2-14 selesai, karena UI tidak bergantung pada
-sisa pemindahan API.
+Fase dikerjakan berurutan. Fase 4 boleh dimulai setelah task pemindahan test pada fase 3 selesai, karena
+UI tidak bergantung pada sisa pemindahan API.
 
-## 7. Fase 0: penjaga batas dan kerangka modul
+Penomoran task memakai nomor fase, jadi task fase 0 bernomor `F0-xx` dan seterusnya. Nomor tidak dipakai
+ulang walau task dibatalkan, supaya rujukan pada pull request lama tetap sah.
 
-**Kenapa fase ini pertama.** Prinsip P2. Sistem lama gagal karena tidak ada yang menghentikan modul
-menyentuh tabel modul lain. Kalau penjaganya dipasang setelah kode dipindah, ia hanya mengesahkan
-pelanggaran yang sudah terjadi.
+## 7. Fase 0: prasyarat
+
+**Kenapa ada fase sebelum penjaga.** Dua hal di luar kode menghalangi seluruh rencana ini, dan keduanya
+sudah ada sebelum proyek dimulai. Selama keduanya belum beres, tidak ada task berikutnya yang bisa
+dibuktikan selesai.
+
+**Kriteria keluar.** Sebuah pull request yang tidak mengubah apa pun lulus seluruh pemeriksaan otomatis,
+dan tidak ada berkas aturan yang melarang modul berjalan di runtime Core.
+
+### F0-01 — Pemeriksaan otomatis punya PostgreSQL
+
+**Kenapa.** Tiga jalan terakhir alur test gagal, termasuk di cabang utama. Penyebabnya alur menjalankan
+`php artisan test` sementara `phpunit.xml` memaksa koneksi `pgsql_test` dan 38 berkas test memakai
+`RefreshDatabase`, padahal alur itu tidak menyediakan PostgreSQL sama sekali. Setiap kalimat "selesai
+bila test lulus" pada dokumen ini bersandar pada alur yang tidak pernah hijau.
+
+**Berkas.**
+- `.github/workflows/tests.yml`
+- `apps/control-plane/.env.example` (catatan cara membuat schema test)
+- `docs/dev/11-local-docker-development.md` (bila langkahnya berubah)
+
+**Langkah.**
+1. Tambahkan layanan PostgreSQL pada alur test, versi yang sama dengan yang dipakai stack lokal.
+2. Tambahkan langkah yang membuat schema test sebelum test dijalankan. Hari ini schema itu dibuat tangan
+   menurut catatan pada berkas contoh lingkungan.
+3. Isi variabel lingkungan yang dibaca koneksi test, termasuk host, port, pengguna, dan kata sandi.
+4. Jalankan seluruh suite dan perbaiki test yang selama ini tidak pernah benar-benar berjalan.
+
+**Selesai bila.** Alur test hijau pada cabang utama, dan jumlah test yang berjalan sama dengan yang
+berjalan di mesin pengembang.
+
+**Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
+
+**Bergantung pada.** Tidak ada. Ini task pertama proyek.
+
+### F0-02 — Aturan kerja repo diselaraskan
+
+**Kenapa.** Berkas panduan kerja menyatakan setiap modul wajib memiliki API, UI, database, migration,
+kontrak, dan container sendiri, serta melarang query lintas modul selain lewat REST atau event. Berkas
+itu dibaca setiap sesi kerja. Selama kalimatnya berdiri tanpa pengecualian, setiap pull request pada
+fase 2 dan 3 melanggar aturan tertulis, dan peninjau berhak menolaknya.
+
+**Berkas.**
+- `AGENTS.md`
+- `.claude/skills/coreerp-architecture/SKILL.md`
+- `.agents/skills/coreerp-architecture/SKILL.md`
+- `.claude/skills/module-discovery/SKILL.md` dan salinannya di `.agents/`
+
+**Langkah.**
+1. Jangan menghapus aturan lama. App di repo `app-erp-*` yang belum dipindah masih menjalankannya, dan
+   menghapusnya membuat aturan salah untuk kode yang sedang berjalan.
+2. Tambahkan pembeda yang jelas antara dua keadaan yang hidup berdampingan selama transisi:
+   app lama tetap memiliki container dan database sendiri; modul di bawah `modules/` berjalan di runtime
+   Core, memakai database tenant yang sama, tabelnya berawalan nama modul, dan tidak memiliki container,
+   database, maupun token layanan sendiri.
+3. Nyatakan bahwa pull request yang memindahkan app menjadi modul adalah pengecualian sah terhadap aturan
+   lama, dan wajib menyebut dokumen keputusan pada badannya.
+4. Dua folder skill berisi salinan yang identik. Ubah keduanya, atau jadikan salah satunya penunjuk ke
+   yang lain, supaya tidak menyimpang diam-diam.
+
+**Selesai bila.** Membaca berkas panduan kerja dari awal, seorang peninjau dapat menjawab dengan pasti
+apakah sebuah pull request yang menaruh modul di runtime Core melanggar aturan atau tidak.
+
+**Rujukan.** [keputusan satu runtime](00-keputusan.md).
+
+**Bergantung pada.** Tidak ada.
+
+### F0-03 — Kunci retensi dinyatakan sebelum ada modul yang bisa dicabut
+
+**Kenapa.** Perintah pencabutan modul dibuat pada fase berikutnya. Bila aturan retensi belum ada saat itu
+ditulis, opsi penghapusan data akan tersedia untuk semua modul, termasuk yang menyimpan rekam medis yang
+wajib disimpan 25 tahun.
+
+**Berkas.**
+- `docs/dev/02-module-standard.md` (blok manifest)
+- `apps/control-plane/app/Http/Requests/Provider/AppCatalogRequest.php`
+- `apps/control-plane/app/Actions/Provider/RegisterAppCatalog.php`
+
+**Langkah.**
+1. Tambahkan blok retensi pada manifest sesuai bentuk pada bagian 5.2 dokumen ini.
+2. Validasi manifest menolak modul yang menyimpan data pasien tanpa deklarasi retensi.
+3. Katalog menyimpan deklarasi itu, supaya perintah pencabutan dapat membacanya nanti.
+
+**Selesai bila.** Manifest tanpa deklarasi retensi ditolak, dan manifest dengan `boleh_dihapus: false`
+tersimpan di katalog.
+
+**Rujukan.** [standar app](../../dev/02-module-standard.md).
+
+**Bergantung pada.** F0-01.
+
+## 8. Fase 1: penjaga batas dan kerangka modul
+
+**Kenapa penjaga sebelum kode.** Prinsip P2. Sistem lama gagal karena tidak ada yang menghentikan modul
+menyentuh tabel modul lain: 445 tabel disentuh tujuh modul inti, dan sekitar 30 tabel dipakai lima sampai
+enam modul sekaligus. Penjaga yang dipasang setelah kode dipindah hanya mengesahkan pelanggaran yang
+sudah terjadi.
 
 **Kriteria keluar.** Sebuah modul contoh yang sengaja melanggar aturan membuat CI gagal, dan pesan
 gagalnya menyebut aturan mana yang dilanggar.
 
-### F0-01 — Susun kerangka folder `modules/` dan konvensi paket
+### F1-01 — Kerangka folder `modules/` dan konvensi
 
 **Kenapa.** Semua task berikutnya menaruh berkas di sini. Tanpa bentuk yang disepakati, tiap modul akan
 tumbuh berbeda.
 
 **Berkas.**
-- `modules/README.md` (ubah; sekarang masih menjelaskan satu container per modul)
+- `modules/README.md` (ubah; sekarang masih mewajibkan container per modul)
 - `modules/apperp/.gitkeep`
 
 **Langkah.**
-1. Tulis ulang `modules/README.md`: satu modul adalah folder dengan `app.yaml`, `src/`,
-   `database/migrations/`, `ui/`, `tests/`, `contracts/`, dan `composer.json`.
-2. Tetapkan namespace PSR-4 `Modules\<Publisher>\<Modul>\` dan schema database `<modul>`.
-3. Sebutkan bahwa modul tidak boleh punya `bootstrap/`, `config/app.php`, atau `public/` sendiri.
+1. Tulis ulang isinya: satu modul adalah folder berisi `app.yaml`, `src/`, `database/migrations/`, `ui/`,
+   `tests/`, dan `composer.json`.
+2. Tetapkan namespace `Modules\<Publisher>\<Modul>\` dan awalan tabel `<modul>_`.
+3. Sebutkan yang dilarang ada di dalam modul: `bootstrap/`, `public/`, `config/app.php`, Dockerfile, dan
+   berkas compose.
 
-**Selesai bila.** `modules/README.md` menjawab pertanyaan "di mana saya menaruh controller modul" tanpa
-perlu bertanya.
+**Selesai bila.** Berkas itu memuat pohon folder lengkap, tabel pemetaan namespace ke awalan tabel, dan
+daftar berkas terlarang; dan kalimat tentang container per modul sudah hilang.
 
 **Rujukan.** Bagian 5.1 dokumen ini, [standar app](../../dev/02-module-standard.md).
 
-**Bergantung pada.** Tidak ada.
+**Bergantung pada.** F0-02.
 
-### F0-02 — Pindahkan tabel Core ke schema `core`
+### F1-02 — Dua modul contoh
 
-**Kenapa.** Selama semua tabel berada di `public`, tidak ada batas yang bisa ditegakkan. Ini langkah yang
-membuat schema per modul mungkin.
+**Kenapa.** Ketiga penjaga berikutnya menguji sesuatu, dan sesuatu itu harus ada lebih dulu. Pada
+rancangan sebelumnya modul contoh dibuat oleh task yang justru bergantung pada penjaga, sehingga tidak
+ada yang bisa dikerjakan lebih dulu.
 
 **Berkas.**
-- `apps/control-plane/config/database.php`
-- `apps/control-plane/database/migrations/<baru>_create_core_schema.php`
-- `apps/control-plane/.env.example`
+- `modules/apperp/contoh-a/` beserta `app.yaml`, satu migration, satu model, `composer.json`
+- `modules/apperp/contoh-b/` dengan bentuk yang sama
 
 **Langkah.**
-1. Migration baru menjalankan `CREATE SCHEMA IF NOT EXISTS core`, lalu memindahkan setiap tabel Core
-   dengan `ALTER TABLE public.<tabel> SET SCHEMA core`. Daftar tabelnya dibaca dari
-   `information_schema.tables`, jangan ditulis tangan, supaya tidak ada yang tertinggal.
-2. Ubah `search_path` koneksi `pgsql` dari `public` menjadi `core`.
-3. Koneksi `pgsql_test` dan `pgsql_test_secondary` sudah memakai schema sendiri lewat `DB_TEST_SCHEMA`;
-   sesuaikan bila perlu supaya kedua koneksi tetap menunjuk schema yang sama.
-4. Jalankan seluruh test Core.
+1. Modul A membuat tabel `contoh_a_m_barang`, modul B membuat `contoh_b_m_rak`. Keduanya membawa
+   `tenant_id`.
+2. Masing-masing punya satu model dan satu rute sederhana.
+3. Modul contoh ini hidup sepanjang proyek dan menjadi bahan uji penjaga; jangan dihapus sampai fase 7.
 
-**Selesai bila.**
-- `composer test` di `apps/control-plane` lulus.
-- `SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'` mengembalikan nol.
-- Stack lokal menyala dan halaman masuk terbuka.
+**Selesai bila.** Kedua folder ada dan migration-nya bisa dijalankan tangan.
 
-**Rujukan.** Bagian 5.2 dokumen ini.
+**Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** Tidak ada.
+**Bergantung pada.** F1-01.
 
-### F0-03 — Tabel catatan pemasangan modul
+### F1-03 — Tabel catatan pemasangan modul
 
-**Kenapa.** Core harus tahu modul apa terpasang di tenant mana dan versinya berapa. Tabel `apps` yang ada
-menyimpan katalog, bukan status pemasangan, dan `app_placements` menggambarkan container.
+**Kenapa.** Core harus tahu modul apa terpasang untuk tenant mana, versinya berapa, apakah sedang aktif,
+dan apakah data awalnya sudah pernah diisi. Tabel `apps` yang ada menyimpan katalog, bukan pemasangan.
 
 **Berkas.**
-- `apps/control-plane/database/migrations/<baru>_create_module_installations_table.php`
+- `apps/control-plane/database/migrations/<baru>_create_core_module_installations_table.php`
 - `apps/control-plane/app/Models/ModuleInstallation.php`
 - `apps/control-plane/tests/Feature/ControlPlane/ModuleInstallationTest.php`
 
 **Langkah.**
-1. Tabel `core.module_installations` berisi `id` ULID, `tenant_id`, `module_id`, `version`,
-   `schema_name`, `status` bernilai `installed` atau `disabled`, `installed_at`, `disabled_at`, dengan
-   indeks unik pada pasangan `tenant_id` dan `module_id`.
-2. Model memakai `CarbonImmutable`, mengikuti kebiasaan repo.
-3. Test memastikan memasang dua kali tidak membuat baris kedua.
+1. Tabel `core_module_installations` berisi `tenant_id`, `module_id`, `version`, `status` bernilai
+   `installed` atau `disabled`, `seeded_at`, `installed_at`, `disabled_at`, dengan kunci utama gabungan
+   `tenant_id` dan `module_id`.
+2. Kolom `seeded_at` adalah yang mencegah data awal terisi dua kali saat tenant berlangganan ulang. Ini
+   sudah diuji: tanpa kolom itu, master bawaan menjadi dobel setiap kali modul diaktifkan kembali.
+3. Test memastikan memasang dua kali tidak membuat baris kedua, dan mengaktifkan kembali tidak mengisi
+   ulang data awal.
 
-**Selesai bila.** Migration berjalan bersih dan test model lulus.
+**Selesai bila.** Kedua test lulus.
 
-**Rujukan.** [empat kebenaran lifecycle](../../onboarding/empat-kebenaran.md).
-
-**Bergantung pada.** F0-02.
-
-### F0-04 — Penjaga pertama: migration modul hanya menyentuh schema sendiri
-
-**Kenapa.** Prinsip P1. Ini penjaga terpenting, karena pelanggaran di lapisan migration tidak terlihat
-sampai datanya sudah telanjur bercampur.
-
-**Berkas.**
-- `apps/control-plane/app/Support/Modules/SchemaInspector.php`
-- `apps/control-plane/tests/Feature/Boundary/ModuleSchemaBoundaryTest.php`
-
-**Langkah.**
-1. `SchemaInspector` membandingkan daftar tabel sebelum dan sesudah migration satu modul dijalankan,
-   lalu melaporkan tabel yang lahir di luar schema modul itu.
-2. Test menjalankan migration tiap modul terdaftar pada database bersih, lalu memastikan tidak ada tabel
-   yang lahir di `core` atau di schema modul lain.
-3. Pengecualian yang diizinkan ditulis langsung di berkas test, bukan di konfigurasi, supaya pengecualian
-   baru terlihat pada diff.
-
-**Selesai bila.** Test lulus untuk modul contoh, dan gagal menyebut nama tabel bila sebuah migration
-diubah untuk membuat tabel di schema lain.
-
-**Rujukan.** Prinsip P1 dan bagian 5.2 dokumen ini.
-
-**Bergantung pada.** F0-03.
-
-### F0-05 — Penjaga kedua: namespace modul tidak boleh saling impor
-
-**Kenapa.** Batas database saja tidak cukup. Modul bisa memanggil kelas modul lain lewat PHP walau
-tabelnya terpisah, dan itu membuat modul tidak bisa dicabut sendirian.
-
-**Berkas.**
-- `apps/control-plane/app/Support/Modules/ModuleIsolationRule.php`
-- `apps/control-plane/phpstan.neon`
-
-**Langkah.**
-1. Tulis aturan PHPStan yang memeriksa setiap nama kelas yang dirujuk dari dalam `Modules\<A>\` dan
-   menolak yang berawalan `Modules\<B>\`.
-2. Kelas Core tetap boleh dirujuk untuk sementara; F1-06 mempersempitnya menjadi hanya antarmuka resmi.
-3. Tambahkan folder `modules/` ke daftar `paths` pada `phpstan.neon` yang sekarang berisi `app/`,
-   `bootstrap/app.php`, `config/`, `database/`, dan `routes/`.
-
-**Selesai bila.** `composer types:check` lulus pada kode yang ada, dan gagal bila sebuah kelas modul
-contoh sengaja mengimpor kelas modul contoh lain.
-
-**Rujukan.** Prinsip P1 dokumen ini.
+**Rujukan.** [empat kebenaran lifecycle](../../onboarding/empat-kebenaran.md), bagian 5.2 dokumen ini.
 
 **Bergantung pada.** F0-01.
 
-### F0-06 — Buktikan kedua penjaga bisa gagal
+### F1-04 — Penjaga pertama: migration modul hanya membuat tabel berawalan miliknya
 
-**Kenapa.** Pemeriksa yang belum pernah terlihat gagal tidak bisa dipercaya. Ini pelajaran yang sudah
-tercatat di skill dokumentasi repo ini: pemeriksa yang rusak melaporkan sukses, dan laporan sukses palsu
-menghentikan pencarian.
+**Kenapa.** Prinsip P1. Pelanggaran di lapisan migration tidak terlihat sampai datanya sudah telanjur
+bercampur, dan sesudah itu memisahkannya berarti menebak-nebak. Itu yang terjadi pada sistem lama.
 
 **Berkas.**
-- `modules/apperp/contoh-a/` dan `modules/apperp/contoh-b/`
-- Dokumen ini, bagian bukti di akhir
+- `apps/control-plane/app/Support/Modules/TableOwnershipInspector.php`
+- `apps/control-plane/tests/Feature/Boundary/ModuleTableBoundaryTest.php`
 
 **Langkah.**
-1. Buat dua modul contoh, masing-masing satu tabel dan satu model.
-2. Ubah `contoh-a` supaya migration-nya membuat tabel di schema `contoh_b`. Jalankan penjaga F0-04,
-   catat pesan gagalnya, lalu kembalikan.
-3. Ubah `contoh-a` supaya mengimpor model `contoh-b`. Jalankan `composer types:check`, catat pesan
-   gagalnya, lalu kembalikan.
-4. Tempelkan kedua pesan gagal itu ke dokumen ini sebagai bukti.
+1. Pemeriksa membandingkan daftar tabel sebelum dan sesudah migration satu modul dijalankan, lalu
+   melaporkan tabel yang lahir tanpa awalan modul itu.
+2. Test menjalankan migration tiap modul terdaftar pada database bersih, lalu memastikan tidak ada tabel
+   baru yang berawalan `core_` atau awalan modul lain.
+3. Pengecualian yang diizinkan ditulis langsung di berkas test, bukan di konfigurasi, supaya pengecualian
+   baru terlihat pada diff.
 
-**Selesai bila.** Dua pesan gagal tercatat, dan kedua pemeriksa hijau kembali.
+**Selesai bila.** Test lulus untuk kedua modul contoh, dan gagal menyebut nama tabel bila sebuah migration
+diubah untuk membuat tabel berawalan modul lain.
+
+**Rujukan.** Prinsip P1 dan bagian 5.2 dokumen ini.
+
+**Bergantung pada.** F1-02, F1-03.
+
+### F1-05 — Penjaga kedua: namespace modul tidak boleh saling impor
+
+**Kenapa.** Batas tabel saja tidak cukup. Modul bisa memanggil kelas modul lain lewat PHP walau tabelnya
+terpisah, dan itu membuat modul tidak bisa dicabut sendirian.
+
+**Berkas.**
+- `apps/control-plane/tests/PHPStan/ModuleIsolationRule.php`
+- `apps/control-plane/composer.json` (daftarkan namespace test pada `autoload-dev`)
+- `apps/control-plane/phpstan.neon`
+
+**Langkah.**
+1. Aturan memeriksa setiap nama kelas yang dirujuk dari dalam `Modules\<A>\` dan menolak yang berawalan
+   `Modules\<B>\`.
+2. Taruh berkasnya di bawah `tests/`, bukan `app/`. Analisa statis adalah dependensi pengembangan
+   sementara image production dibangun tanpa dependensi itu, jadi kelas yang mewarisi antarmukanya akan
+   merujuk kelas yang tidak ada di image.
+3. Tambahkan folder `modules/` ke daftar `paths` pada berkas konfigurasi analisa statis, dan pastikan
+   kelas modul dapat dimuat lewat pemindaian direktori.
+
+**Selesai bila.** Analisa statis lulus pada kode yang ada, dan gagal bila modul contoh A sengaja
+mengimpor kelas modul contoh B.
+
+**Rujukan.** Prinsip P1 dokumen ini.
+
+**Bergantung pada.** F1-02.
+
+### F1-06 — Penjaga ketiga: tidak ada query modul tanpa penyaringan tenant
+
+**Kenapa.** Pada penempatan gabungan, satu query yang lupa menyaring tenant membocorkan data seluruh
+pelanggan. Ini sudah dibuktikan pada simulasi: satu perintah tanpa penyaringan mengembalikan baris milik
+semua tenant. Database tidak bisa mencegahnya, jadi pemeriksaan yang harus.
+
+**Berkas.**
+- `apps/control-plane/tests/Feature/Boundary/TenantScopeBoundaryTest.php`
+- `apps/control-plane/app/Support/Modules/TenantScope.php`
+
+**Langkah.**
+1. Model modul memakai global scope yang menyisipkan penyaringan tenant dari konteks permintaan.
+2. Test membuat dua tenant berisi data, lalu memastikan permintaan atas nama satu tenant tidak pernah
+   mengembalikan baris tenant lain, termasuk pada rute daftar, detail, dan laporan.
+3. Test kedua memastikan query builder mentah tanpa penyaringan tenant tertangkap, dengan memeriksa
+   berkas modul untuk pemanggilan tabel modul yang tidak melewati scope.
+
+**Selesai bila.** Kedua test lulus, dan test kedua gagal bila sebuah query sengaja dibuat tanpa
+penyaringan.
+
+**Rujukan.** [query scope dan schema](../../dev/08-query-scopes-and-schema.md), bagian 5.2 dokumen ini.
+
+**Bergantung pada.** F1-02.
+
+### F1-07 — Buktikan ketiga penjaga bisa gagal
+
+**Kenapa.** Pemeriksa yang belum pernah terlihat gagal tidak bisa dipercaya. Repo ini sudah punya
+catatannya sendiri: sebuah pemeriksa cakupan tabel pernah melaporkan sukses justru karena rusak, dan
+laporan sukses palsu menghentikan pencarian.
+
+**Berkas.**
+- `docs/todo/satu-runtime/02-bukti-penjaga.md` (baru)
+- modul contoh, diubah sementara lalu dikembalikan
+
+**Langkah.**
+1. Ubah modul A supaya migration-nya membuat tabel berawalan modul B. Jalankan penjaga pertama, catat
+   pesan gagalnya, lalu kembalikan.
+2. Ubah modul A supaya mengimpor model modul B. Jalankan analisa statis, catat pesan gagalnya, lalu
+   kembalikan.
+3. Buat satu query modul tanpa penyaringan tenant. Jalankan penjaga ketiga, catat pesan gagalnya, lalu
+   kembalikan.
+4. Tempelkan ketiga pesan gagal itu ke berkas bukti. Jangan menempelkannya ke dokumen ini, supaya
+   dokumen rencana tidak berubah setiap kali penjaga disentuh.
+
+**Selesai bila.** Tiga pesan gagal tercatat pada berkas bukti, dan ketiga pemeriksa hijau kembali.
 
 **Rujukan.** Prinsip P2 dokumen ini.
 
-**Bergantung pada.** F0-04, F0-05.
+**Bergantung pada.** F1-04, F1-05, F1-06.
 
-### F0-07 — Penjaga berjalan di CI
+### F1-08 — Penjaga berjalan di CI
 
-**Kenapa.** Penjaga yang hanya jalan di laptop akan terlewat pada PR pertama yang terburu-buru.
+**Kenapa.** Penjaga yang hanya jalan di laptop akan terlewat pada pull request pertama yang terburu-buru.
 
 **Berkas.**
 - `.github/workflows/tests.yml`
 - `.github/workflows/lint.yml`
 
 **Langkah.**
-1. Tambahkan langkah yang menjalankan `ModuleSchemaBoundaryTest`.
-2. Pastikan `composer types:check` pada `tests.yml` sudah mencakup folder `modules/` setelah F0-05.
+1. Suite `Boundary` masuk ke alur test.
+2. Analisa statis pada alur lint sudah mencakup folder `modules/` setelah F1-05; pastikan demikian.
 3. Kedua langkah wajib, bukan `continue-on-error`.
 
-**Selesai bila.** Sebuah PR percobaan yang melanggar batas ditolak CI.
+**Selesai bila.** Sebuah pull request percobaan yang melanggar salah satu batas ditolak CI.
 
 **Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
 
-**Bergantung pada.** F0-06.
+**Bergantung pada.** F0-01, F1-07.
 
-## 8. Fase 1: Core menjadi tuan rumah modul
+## 9. Fase 2: Core menjadi tuan rumah modul
 
-**Kriteria keluar.** Modul contoh berisi satu tabel dan satu halaman bisa dipasang ke satu tenant,
-muncul di menu, lalu dicabut tanpa menyentuh data modul lain.
+**Kriteria keluar.** Modul contoh berisi satu tabel dapat dipasang untuk satu tenant, muncul di menu,
+diisi data, dinonaktifkan, diaktifkan lagi tanpa data awalnya terisi dua kali, lalu dicabut tanpa
+menyentuh modul lain maupun tenant lain.
 
-### F1-01 — Pemuat modul
+### F2-01 — Pemuat modul
 
 **Kenapa.** Core harus menemukan modul dari folder, bukan dari daftar yang ditulis tangan. Daftar yang
 ditulis tangan adalah berkas pusat yang diperebutkan banyak orang, dan itu salah satu penyakit sistem
@@ -446,47 +635,57 @@ lama.
 **Berkas.**
 - `apps/control-plane/app/Support/Modules/ModuleRegistry.php`
 - `apps/control-plane/app/Providers/ModuleServiceProvider.php`
+- `apps/control-plane/app/Console/Commands/ModuleListCommand.php`
 - `apps/control-plane/bootstrap/providers.php`
 - `apps/control-plane/tests/Feature/ControlPlane/ModuleRegistryTest.php`
 
 **Langkah.**
-1. `ModuleRegistry` memindai `modules/*/*/app.yaml` dan memuat manifest dengan `Symfony\Component\Yaml`,
-   pustaka yang sudah dipakai `RegisterAppManifestCommand`.
-2. `ModuleServiceProvider` mendaftarkan route, view, dan terjemahan tiap modul aktif.
-3. Modul dengan `id: change-me` dilewati, sama seperti yang dilakukan `start.ps1` hari ini.
+1. Registry memindai `modules/*/*/app.yaml` dan memuat manifest dengan pustaka YAML yang sudah dipakai
+   perintah pendaftaran manifest hari ini.
+2. Penyedia layanan mendaftarkan penyedia layanan milik tiap modul, bukan langsung route dan view-nya.
+   Modul yang mendaftarkan penyedia rute sendiri diketahui menjadi penyebab masalah kecepatan pada paket
+   modul Laravel yang beredar, jadi rute dimuat dari satu penyedia per modul.
+3. Modul dengan `id: change-me` dilewati, sama seperti yang dilakukan skrip pengembangan hari ini. Skrip
+   itu berada di repo lain, yaitu `erp-dev`, dan memindai folder saudara, bukan `modules/`.
 4. Test memastikan registry menemukan dua modul contoh dan mengabaikan yang `change-me`.
 
-**Selesai bila.** Perintah `php artisan module:list` menampilkan modul contoh beserta versinya.
+**Selesai bila.** `php artisan module:list` menampilkan kedua modul contoh beserta versinya.
 
 **Rujukan.** [standar app, manifest](../../dev/02-module-standard.md).
 
-**Bergantung pada.** F0-01.
+**Bergantung pada.** F1-02.
 
-### F1-02 — Autoload modul lewat Composer
+### F2-02 — Autoload modul lewat Composer
 
-**Kenapa.** Kelas modul harus bisa dimuat tanpa menambahkan setiap namespace ke `composer.json` Core
+**Kenapa.** Kelas modul harus bisa dimuat tanpa menambahkan setiap namespace ke berkas Composer Core
 secara manual.
 
 **Berkas.**
 - `apps/control-plane/composer.json`
 - `modules/apperp/contoh-a/composer.json`
+- `apps/control-plane/Dockerfile`
+- `erp-dev/compose.yaml`
 
 **Langkah.**
-1. Tambahkan `repositories` bertipe `path` yang menunjuk `../../modules/*/*`.
+1. Tambahkan repositori bertipe `path` yang menunjuk `../../modules/*/*`.
 2. Tiap modul mendeklarasikan `autoload.psr-4` untuk namespace-nya sendiri.
-3. Jalankan `composer update` dan pastikan symlink terbentuk.
+3. Konteks pembangunan image hari ini adalah folder `apps/control-plane`, sehingga folder `modules/`
+   berada di luar jangkauannya dan pemasangan dependensi berjalan sebelum modul disalin. Pindahkan
+   konteks pembangunan ke akar repo dan sesuaikan seluruh jalur relatif pada Dockerfile serta berkas
+   compose yang menunjuknya.
+4. Jalankan pembangunan image sampai selesai, bukan hanya `composer update` di mesin pengembang.
 
-**Selesai bila.** Kelas `Modules\Apperp\ContohA\...` bisa dipanggil dari tinker tanpa `require` manual.
+**Selesai bila.** Kelas `Modules\Apperp\ContohA\...` dapat dipanggil dari tinker, **dan** image berhasil
+dibangun.
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** F1-01.
+**Bergantung pada.** F2-01.
 
-### F1-03 — Migrator per modul
+### F2-03 — Migrator per modul
 
-**Kenapa.** Tiap modul butuh riwayat migration sendiri di schema-nya, supaya `migrate` dan `rollback`
-satu modul tidak menyentuh modul lain. Laravel menyimpan riwayat di satu tabel `migrations`, dan itu
-tidak cukup di sini.
+**Kenapa.** Migration modul harus bisa dijalankan sendiri, per tenant, dan riwayatnya dicatat terpisah
+supaya menjalankan ulang tidak mengulang yang sudah jalan.
 
 **Berkas.**
 - `apps/control-plane/app/Support/Modules/ModuleMigrator.php`
@@ -494,75 +693,145 @@ tidak cukup di sini.
 - `apps/control-plane/tests/Feature/ControlPlane/ModuleMigratorTest.php`
 
 **Langkah.**
-1. Migrator membuat schema modul bila belum ada, menyetel `search_path` koneksi menjadi
-   `<modul>, core`, lalu menjalankan migration dari folder modul dengan tabel riwayat
-   `<modul>.migrations`.
-2. Perintah `module:migrate {modul} {--tenant=}`.
-3. Test memastikan menjalankan dua kali tidak mengulang migration yang sama, dan `core.migrations` tidak
-   bertambah.
+1. Migrator menjalankan migration dari folder modul dengan tabel riwayat `core_module_migrations` yang
+   membawa kolom `module_id`, bukan tabel `migrations` bawaan. Kelas repositori migration Laravel
+   menerima nama tabel pada konstruktornya, jadi ini tidak butuh penambalan.
+2. Perintah `module:migrate {modul} {--tenant=}`. Pada penempatan gabungan, tabel dibuat sekali dan
+   opsi tenant hanya menentukan pencatatan; pada penempatan terpisah, migrator menjalankannya di
+   database tenant itu.
+3. Test memastikan menjalankan dua kali tidak mengulang migration yang sama, dan tabel `migrations`
+   milik Core tidak bertambah.
 
-**Selesai bila.** Migration modul contoh membuat tabel di schema modul, terbukti lewat query ke
-`information_schema`.
+**Selesai bila.** Migration modul contoh membuat tabel berawalan modul, terbukti lewat query ke
+`information_schema`, dan penjaga F1-04 tetap hijau.
 
 **Rujukan.** Bagian 5.2 dokumen ini.
 
-**Bergantung pada.** F0-04, F1-02.
+**Bergantung pada.** F1-04, F2-02.
 
-### F1-04 — Peran database per modul
+### F2-04 — Data awal modul, sekali saja
 
-**Kenapa.** Ini yang membuat batas ditegakkan mesin database, bukan sekadar kesepakatan. Tanpa peran
-terpisah, sebuah modul yang salah tulis kode tetap bisa membaca tabel modul lain.
+**Kenapa.** Modul membawa master bawaan, misalnya kelompok aset atau satuan. Data itu harus terisi saat
+modul dipasang untuk sebuah tenant, dan **tidak boleh terisi lagi** saat modul diaktifkan kembali setelah
+sempat dinonaktifkan. Tanpa penjaga, master bawaan menjadi dobel setiap kali pelanggan berlangganan
+ulang; ini sudah dibuktikan pada simulasi.
+
+Task ini menggantikan rencana peran database per modul, yang dibatalkan karena alasan pada bagian 5.2.
 
 **Berkas.**
-- `apps/control-plane/app/Support/Modules/ModuleDatabaseRole.php`
-- `apps/control-plane/config/database.php`
-- `apps/control-plane/tests/Feature/Boundary/ModuleDatabaseRoleTest.php`
+- `apps/control-plane/app/Support/Modules/ModuleSeeder.php`
+- `apps/control-plane/tests/Feature/ControlPlane/ModuleSeedTest.php`
+- `modules/apperp/contoh-a/database/seeders/`
 
 **Langkah.**
-1. Saat modul dipasang, buat peran `role_<modul>` dengan kata sandi acak, beri `USAGE` pada schema modul
-   dan `core`, `SELECT` pada tabel Core, dan hak penuh pada schema modul.
-2. Setel `search_path` peran itu menjadi `<modul>, core`.
-3. Daftarkan koneksi Laravel per modul yang memakai peran itu; koneksi mewarisi seluruh setelan `pgsql`
-   kecuali kredensial dan `search_path`.
-4. Test memastikan koneksi modul A ditolak saat membaca tabel modul B, dengan pesan `permission denied`.
+1. Seed milik modul hanya dipanggil oleh pemasangan modul, tidak pernah oleh `db:seed` global. Seed
+   modul lain tidak boleh ikut terpanggil.
+2. Sebelum menjalankan seed, periksa `seeded_at` pada catatan pemasangan. Bila sudah terisi, lewati.
+   Setelah berhasil, isi kolom itu.
+3. Baris yang dihasilkan seed diberi penanda bawaan, supaya dapat dibedakan dari data buatan pengguna
+   saat modul dicabut atau saat dilakukan pemulihan.
+4. Test membuktikan tiga hal: memasang modul A tidak mengisi data modul B; menonaktifkan lalu
+   mengaktifkan lagi tidak menambah baris bawaan; data buatan pengguna selamat sepanjang rangkaian itu.
 
-**Selesai bila.** Test penolakan lulus pada PostgreSQL sungguhan.
+**Selesai bila.** Ketiga test lulus.
 
 **Rujukan.** Bagian 5.2 dokumen ini.
 
-**Bergantung pada.** F1-03.
+**Bergantung pada.** F1-03, F2-03.
 
-### F1-05 — Perintah pasang dan cabut modul
+### F2-05 — Perintah pasang, nonaktifkan, dan cabut
 
-**Kenapa.** Ini fitur produk yang menjadi alasan seluruh proyek: modul bisa dipasang dan dicabut per
+**Kenapa.** Ini fitur produk yang menjadi alasan seluruh proyek: modul dapat dipasang dan dicabut per
 tenant.
 
 **Berkas.**
 - `apps/control-plane/app/Actions/Modules/InstallModule.php`
+- `apps/control-plane/app/Actions/Modules/DisableModule.php`
 - `apps/control-plane/app/Actions/Modules/UninstallModule.php`
 - `apps/control-plane/app/Console/Commands/ModuleInstallCommand.php`
+- `apps/control-plane/app/Console/Commands/ModuleDisableCommand.php`
 - `apps/control-plane/app/Console/Commands/ModuleUninstallCommand.php`
+- `apps/control-plane/app/Support/AppDependencyGraph.php`
 - `apps/control-plane/tests/Feature/ControlPlane/ModuleLifecycleTest.php`
 
 **Langkah.**
-1. `InstallModule` memeriksa dependency dari `app.yaml`, membuat schema dan peran, menjalankan migration,
-   mencatat di `core.module_installations`, lalu mendaftarkan manifest lewat `RegisterAppCatalog` yang
+1. Pemasangan memeriksa dependency dari manifest, menjalankan migration bila perlu, memanggil seed sesuai
+   F2-04, mencatat pada `core_module_installations`, lalu mendaftarkan manifest lewat aksi katalog yang
    sudah ada.
-2. `UninstallModule` secara bawaan hanya mengubah status menjadi `disabled` dan mencabut pendaftaran menu.
-   Penghapusan data adalah opsi terpisah `--hapus-data` yang menjalankan `DROP SCHEMA <modul> CASCADE`
-   dan meminta operator mengetikkan nama modul sebagai konfirmasi.
-3. Menolak mencabut modul yang masih menjadi dependency modul lain yang terpasang, memakai
-   `AppDependencyGraph` yang sudah ada.
-4. Test memasang dua modul, mencabut satu, lalu memastikan tabel modul lain utuh.
+2. Penonaktifan hanya mengubah status dan mengisi `disabled_at`. Data tidak disentuh sama sekali. Menu
+   hilang karena shell hanya membaca modul berstatus terpasang.
+3. Pencabutan dengan penghapusan data adalah perintah terpisah dengan opsi eksplisit, dan **ditolak**
+   bila manifest modul menyatakan `boleh_dihapus: false` sesuai F0-03. Penolakannya menyebut dasar
+   hukumnya.
+4. Menolak mencabut modul yang masih menjadi dependency modul lain yang terpasang pada tenant yang sama.
+   Kelas graf dependency yang ada hanya punya penelusuran maju dan berskala katalog; tambahkan
+   penelusuran balik yang dipotong dengan catatan pemasangan tenant itu.
+5. Test menjalankan seluruh rangkaian: pasang dua modul, isi data, nonaktifkan satu, buktikan datanya
+   utuh dan modul lain tidak terpengaruh, aktifkan lagi, buktikan data awal tidak dobel, lalu cabut
+   dengan penghapusan data dan buktikan modul lain serta tenant lain tetap utuh.
 
-**Selesai bila.** Urutan pasang, cabut, pasang lagi berjalan, dan data modul kedua tidak berubah
-sepanjang rangkaian itu.
+**Selesai bila.** Test rangkaian itu lulus, dan mencoba menghapus data modul berkunci retensi ditolak.
 
 **Rujukan.** [release dan on-prem](../../dev/03-release-and-on-prem.md), bagian 5.2 dokumen ini.
 
-**Bergantung pada.** F1-04.
+**Bergantung pada.** F2-04.
 
-### F1-06 — Kontrak layanan Core untuk modul
+### F2-06 — Modul terpasang menggantikan kesiapan penempatan
+
+**Kenapa.** Rute halaman app memanggil pemeriksaan yang menuntut baris penempatan container dengan
+status siap, dan menu juga disaring lewat jalur yang sama. Setelah tidak ada container per app, penentu
+itu selalu gagal, sehingga **setiap halaman modul akan 404 untuk semua orang**. Tanpa task ini, dua fase
+berikutnya tidak bisa dibuktikan.
+
+**Berkas.**
+- `apps/control-plane/app/Support/LaunchableAppCatalog.php`
+- `apps/control-plane/routes/web.php`
+- `apps/control-plane/app/Http/Middleware/HandleInertiaRequests.php`
+- `apps/control-plane/resources/js/components/product-launcher.tsx`
+- `apps/control-plane/tests/Feature/ControlPlane/BusinessOnboardingTest.php`
+
+**Langkah.**
+1. Penentu kesiapan membaca `core_module_installations` berstatus terpasang, bukan penempatan container.
+2. Untuk app yang belum dipindah dan masih berjalan sebagai container, jalur lama dipertahankan. Kedua
+   jalur hidup berdampingan sampai app terakhir dipindah.
+3. Peluncur produk dan properti bersama yang menyusun tautan app ikut menyesuaikan.
+4. Test onboarding yang memeriksa jumlah produk dan nama komponen halaman ikut diperbarui; ia akan gagal
+   karena alasan yang tidak tampak berhubungan bila dilewatkan.
+
+**Selesai bila.** Halaman modul contoh terbuka untuk pengguna yang berhak, tanpa satu pun baris
+penempatan container.
+
+**Rujukan.** [empat kebenaran lifecycle](../../onboarding/empat-kebenaran.md).
+
+**Bergantung pada.** F2-05.
+
+### F2-07 — Pendaftaran tenant memasang modul, bukan menempatkan container
+
+**Kenapa.** Aksi pendaftaran usaha memicu antrian penempatan container setelah transaksinya selesai. Job
+itu menjalankan perintah compose, menulis penempatan dan pemasangan, lalu menunggu dependency siap.
+Setelah satu runtime, tidak ada container yang perlu ditempatkan; yang harus terjadi adalah memasang
+modul untuk tenant baru itu.
+
+**Berkas.**
+- `apps/control-plane/app/Actions/Onboarding/RegisterBusiness.php`
+- `apps/control-plane/app/Jobs/DeployAppPlacement.php`
+- `apps/control-plane/tests/Feature/ControlPlane/BusinessOnboardingTest.php`
+
+**Langkah.**
+1. Untuk modul di dalam runtime, ganti pengiriman job penempatan dengan pemanggilan aksi pemasangan
+   modul dari F2-05.
+2. Job penempatan dipertahankan selama masih ada app yang berjalan sebagai container, dan dipilih
+   berdasarkan apakah id itu terdaftar sebagai modul atau sebagai app lama.
+3. Test onboarding membuktikan tenant baru langsung memiliki modul terpasang beserta data awalnya.
+
+**Selesai bila.** Mendaftarkan tenant baru menghasilkan baris pemasangan modul dan data awal, tanpa
+menjalankan perintah compose apa pun.
+
+**Rujukan.** [empat kebenaran lifecycle](../../onboarding/empat-kebenaran.md).
+
+**Bergantung pada.** F2-05.
+
+### F2-08 — Kontrak layanan Core untuk modul
 
 **Kenapa.** Modul butuh satu pintu resmi ke Core. Tanpa itu, tiap modul akan memanggil model Core
 langsung dan batasnya kembali kabur.
@@ -574,94 +843,113 @@ langsung dan batasnya kembali kabur.
 - `apps/control-plane/app/Support/Modules/Contracts/MesinWorkflow.php`
 - `apps/control-plane/app/Support/Modules/Contracts/DirektoriOrganisasi.php`
 - `apps/control-plane/app/Support/Modules/CoreServices.php`
-- `apps/control-plane/app/Support/Modules/ModuleIsolationRule.php` (perluas)
+- `apps/control-plane/app/Services/UnitOfMeasureService.php`
+- `apps/control-plane/app/Services/OrganizationDirectoryService.php`
+- `apps/control-plane/tests/PHPStan/ModuleIsolationRule.php`
 
 **Langkah.**
-1. Tiap antarmuka membungkus satu layanan yang sudah ada: `NumberSequenceService`,
-   `FiscalCalendarService`, `UnitOfMeasureService`, `WorkflowRuntime`, dan model organisasi.
-2. Bentuk parameternya mengikuti yang dipakai endpoint internal hari ini, supaya kode modul yang pindah
-   hanya berganti pemanggil, bukan berganti bentuk data.
-3. Perluas aturan PHPStan F0-05: modul hanya boleh menyentuh `App\Support\Modules\Contracts\`, bukan
-   sembarang kelas `App\`.
+1. **Antarmuka menerima id, bukan model Core.** Ini penting: layanan kalender fiskal hari ini menerima
+   objek entitas legal, mesin workflow menerima objek tipe dan versi, dan layanan nomor menerima objek
+   sequence. Modul yang harus mengambil objek itu lebih dulu justru melanggar batas yang task ini buat.
+   Lapisan pembungkus yang menerjemahkan id menjadi objek.
+2. Dua layanan belum ada dan harus dibuat: pendaftaran satuan hari ini berada langsung di controller
+   internal, bukan di layanan; dan direktori organisasi belum punya layanan sama sekali.
+3. Perluas aturan analisa statis F1-05: modul hanya boleh menyentuh namespace kontrak, bukan sembarang
+   kelas Core.
 
-**Selesai bila.** Modul contoh menerbitkan satu nomor dokumen lewat antarmuka ini, dan PHPStan menolak
-modul yang memanggil `App\Models\...` langsung.
+**Selesai bila.** Modul contoh menerbitkan satu nomor lewat antarmuka ini, dan analisa statis menolak
+modul yang memanggil model Core langsung.
 
 **Rujukan.** [number sequence](../../dev/14-number-sequences.md), bagian 5.3 dokumen ini.
 
-**Bergantung pada.** F1-02.
+**Bergantung pada.** F2-02.
 
-### F1-07 — Penerbitan nomor di dalam transaksi dokumen
+### F2-09 — Penerbitan nomor di dalam transaksi dokumen
 
 **Kenapa.** Ini keuntungan nyata pertama yang bisa ditunjukkan. Hari ini nomor sudah tersimpan di
 database Core walau dokumennya gagal disimpan di database modul, dan itu menghasilkan lubang pada urutan
-yang seharusnya tidak berlubang.
+yang seharusnya tidak berlubang. Keuntungan ini hanya mungkin karena modul dan Core memakai satu koneksi,
+sesuai keputusan pada bagian 5.2.
 
 **Berkas.**
 - `apps/control-plane/app/Actions/NumberSequence/NumberSequenceService.php`
 - `apps/control-plane/tests/Feature/ControlPlane/NumberSequenceInTransactionTest.php`
 
 **Langkah.**
-1. Pastikan `issue()` aman dipanggil di dalam transaksi pemanggil dan ikut batal bila transaksi batal.
+1. Penerbitan nomor sudah membungkus transaksinya sendiri di dalam perulangan percobaan ulang; saat
+   dipanggil dari dalam transaksi pemanggil, itu menjadi savepoint. Tetapkan dan tulis apakah bentuk
+   bersarang itu diterima, atau pemanggilan wajib berada dalam transaksi dan dijaga penegasan.
 2. Test pertama: mulai transaksi, terbitkan nomor, lempar kesalahan, lalu pastikan nomor berikutnya tidak
-   melompat.
-3. Test kedua: dua koneksi bersamaan menerbitkan nomor berurutan tanpa duplikat, memakai koneksi
-   `pgsql_test_secondary` yang memang disediakan untuk ini.
+   melompat. Invariannya: nilai berikutnya pada tabel alokasi kembali seperti semula.
+3. Test kedua: dua koneksi bersamaan menerbitkan nomor berurutan tanpa duplikat, memakai koneksi kedua
+   yang memang disediakan untuk pengujian serentak.
 
 **Selesai bila.** Kedua test lulus pada PostgreSQL sungguhan.
 
 **Rujukan.** [number sequence](../../dev/14-number-sequences.md).
 
-**Bergantung pada.** F1-06.
+**Bergantung pada.** F2-08.
 
-### F1-08 — Konteks permintaan untuk modul
+### F2-10 — Konteks permintaan untuk modul
 
-**Kenapa.** Middleware `RequireCoreErpContext` di modul memverifikasi token JWT terbitan Core. Di dalam
-proses yang sama, verifikasi itu tidak ada gunanya. Yang dibutuhkan modul adalah pengguna, tenant, izin,
-dan batas organisasi yang sudah dipegang Core.
+**Kenapa.** Middleware pada app lama memverifikasi token yang diterbitkan Core. Di dalam proses yang sama,
+verifikasi itu tidak ada gunanya; yang dibutuhkan modul adalah pengguna, tenant, izin, dan batas
+organisasi yang sudah dipegang Core.
 
 **Berkas.**
-- `apps/control-plane/app/Support/Modules/ModuleRequestContext.php`
 - `apps/control-plane/app/Http/Middleware/ResolveModuleContext.php`
-- `apps/control-plane/bootstrap/app.php`
+- `apps/control-plane/app/Support/Modules/ModuleRequestContext.php`
+- `apps/control-plane/app/Providers/ModuleServiceProvider.php`
 - `apps/control-plane/tests/Feature/Boundary/ModuleRequestContextTest.php`
 
 **Langkah.**
-1. Middleware baru mengambil membership aktif dari `CurrentWorkspace`, menyusun izin efektif, batas data
-   policy, legal entity, dan operating unit, lalu menaruhnya pada `ModuleRequestContext`.
-2. Bentuk datanya sengaja dibuat sama dengan klaim token hari ini: `tenant_id`, `legal_entity_id`,
-   `org_unit_id`, `user_id`, `permissions`, `data_policies`.
+1. **Middleware menulis atribut permintaan dengan kunci yang persis sama dengan yang dipakai app hari
+   ini**, yaitu tenant, entitas legal, unit organisasi, pengguna, izin, dan kebijakan data. Ini bukan
+   soal selera: 22 berkas pada modul aset membaca atribut itu langsung, sehingga mengganti bentuknya
+   mengubah 22 berkas tanpa alasan. Kelas konteks hanya pembungkus baca di atasnya.
+2. Izin bersifat per app, sedangkan middleware yang dipasang global tidak tahu ia sedang melayani modul
+   yang mana. Id modul diambil dari grup rute modul, dan middleware didaftarkan per grup oleh penyedia
+   layanan modul, bukan global.
 3. Test memastikan pengguna tanpa izin mendapat 403 pada rute modul contoh.
 
-**Selesai bila.** Rute modul contoh terlindungi tanpa token JWT sama sekali.
+**Selesai bila.** Rute modul contoh terlindungi tanpa token, dan atribut permintaannya sama dengan yang
+dibaca app lama.
 
 **Rujukan.** [identity dan access](../../dev/09-identity-and-access.md).
 
-**Bergantung pada.** F1-01.
+**Bergantung pada.** F2-01.
 
-### F1-09 — Halaman modul contoh di shell
+### F2-11 — Halaman modul contoh di shell
 
 **Kenapa.** Membuktikan jalur menu dari manifest sampai layar bekerja sebelum modul sungguhan dipindah.
 
 **Berkas.**
-- `modules/apperp/contoh-a/ui/HalamanContoh.tsx`
-- `apps/control-plane/resources/js/pages/modules/host.tsx`
+- `modules/apperp/contoh-a/ui/Pages/Daftar.tsx`
+- `apps/control-plane/resources/js/pages/modules/host.tsx` (baru)
+- `apps/control-plane/resources/js/app.tsx`
+- `apps/control-plane/vite.config.ts`
+- `apps/control-plane/tsconfig.json`
 - `apps/control-plane/app/Support/LaunchableAppCatalog.php`
 
 **Langkah.**
-1. Rute Core baru memuat komponen modul lewat `React.lazy`, bukan iframe.
-2. `LaunchableAppCatalog::navigationFor()` tetap dipakai untuk menyaring menu berdasarkan izin; hanya
-   tujuan tautannya yang berubah dari sumber iframe menjadi rute shell.
-3. Halaman contoh menampilkan satu daftar dari tabel modul.
+1. Halaman modul bukan halaman Inertia biasa. Pemilih halaman pada berkas masuk React diperluas supaya
+   mengenali nama berformat `Modul::Halaman` dan memuatnya dari folder modul; pola ini sudah dipakai
+   orang lain pada Laravel dengan Inertia dan React.
+2. Satu halaman tuan rumah menjadi satu-satunya halaman Inertia untuk semua modul. Karena komponen modul
+   dimuat malas, halaman itu wajib memiliki pembatas penangguhan dan pembatas kesalahan; tanpa keduanya,
+   pemuatan malas melempar.
+3. Alias dan izin akses berkas pada konfigurasi Vite ditambahkan supaya folder di luar akar proyek dapat
+   dibaca, dan folder modul disertakan pada konfigurasi TypeScript supaya pemeriksaan tipe mencakupnya.
+4. Penyaringan menu berdasarkan izin tetap memakai katalog yang ada; hanya tujuan tautannya yang berubah.
 
-**Selesai bila.** Menu modul contoh muncul di sidebar, halamannya terbuka, dan tidak ada elemen `iframe`
-pada pohon DOM halaman itu.
+**Selesai bila.** Menu modul contoh muncul di sidebar, halamannya terbuka dan menampilkan data dari tabel
+modul, dan tidak ada elemen `iframe` pada pohon dokumen halaman itu.
 
 **Rujukan.** Bagian 5.5 dokumen ini.
 
-**Bergantung pada.** F1-05, F1-08.
+**Bergantung pada.** F2-06, F2-10.
 
-## 9. Fase 2: Management Aset pindah ke dalam Core
+## 10. Fase 3: Management Aset pindah ke dalam Core
 
 Ini fase terbesar. Yang dipindah: 99 berkas PHP, 42 migration yang menghasilkan 45 tabel, 22 berkas test,
 dan manifest berisi 65 entry point, 122 permission, 64 privilege, 36 duty, 29 referensi nomor, 2 tipe
@@ -674,7 +962,7 @@ workflow, dan 2 laporan.
 pemanggilannya satu per satu. Membalik urutan ini membuat setiap PR menyentuh dua hal sekaligus dan
 sulit ditinjau.
 
-### F2-01 — Bawa repo masuk beserta riwayatnya
+### F3-01 — Bawa repo masuk beserta riwayatnya
 
 **Kenapa.** Menyalin folder membuang `git log` dan `git blame` untuk 9.559 baris kode. Riwayat itu satu-
 satunya penjelasan kenapa banyak aturan bisnis ditulis seperti sekarang.
@@ -683,18 +971,26 @@ satunya penjelasan kenapa banyak aturan bisnis ditulis seperti sekarang.
 - `modules/apperp/management-aset/` (baru, hasil subtree)
 
 **Langkah.**
-1. `git remote add aset https://github.com/MettaDevs/app-erp-management-aset.git`
-2. `git subtree add --prefix=modules/apperp/management-aset aset main`
-3. Jangan ubah apa pun pada PR ini. Isinya persis repo lama, hanya berpindah tempat.
+1. **Periksa repo modul bersih lebih dulu.** Saat rencana ini ditulis, repo itu tertinggal 31 commit yang
+   belum terdorong dan 20 berkas yang belum di-commit, termasuk seluruh subsistem laporan. Menarik dari
+   remote dalam keadaan itu akan memindahkan modul versi lama tanpa laporannya, dan sepuluh task
+   berikutnya akan menyebut berkas yang tidak ada. Pastikan `git status` bersih dan cabang utamanya sama
+   dengan remote.
+2. Periksa juga cabang lain yang belum digabung, dan putuskan digabung atau ditinggalkan **sebelum**
+   pemindahan, bukan sesudah.
+3. Tambahkan remote repo modul, lalu tarik masuk dengan `git subtree add` ke `modules/apperp/management-aset`.
+4. Jangan ubah apa pun pada pull request ini. Isinya persis repo lama, hanya berpindah tempat.
+5. Setelah tergabung, tandai repo lama sebagai hanya baca. Repo yang masih bisa ditulis akan menerima
+   commit yang kemudian hilang, dan itu bukan kekhawatiran hipotetis.
 
 **Selesai bila.** `git log -- modules/apperp/management-aset` menampilkan 35 commit asli, dan
 `git blame` pada sebuah controller menunjukkan penulis aslinya.
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** F1-05.
+**Bergantung pada.** F2-05.
 
-### F2-02 — Buang berkas yang menjadi milik Core
+### F3-02 — Buang berkas yang menjadi milik Core
 
 **Kenapa.** Modul tidak boleh punya kerangka aplikasi sendiri. Dua migration framework di
 `api/database/migrations` membuat tabel `cache`, `cache_locks`, `jobs`, `job_batches`, dan `failed_jobs`
@@ -707,10 +1003,10 @@ yang sudah dimiliki Core, dan itu bentrok pasti.
 - `modules/apperp/management-aset/api/database/migrations/0001_01_01_000002_create_jobs_table.php`
 - `modules/apperp/management-aset/api/config/{app,cache,database,filesystems,logging,mail,queue,session}.php`
 - `modules/apperp/management-aset/api/artisan`
-- `modules/apperp/management-aset/api/phpunit.xml` (diganti di F2-16)
+- `modules/apperp/management-aset/api/phpunit.xml` (diganti di F3-16)
 
 **Berkas dipertahankan.**
-- `api/config/management_aset.php` dan `api/config/services.php` (diurus F2-17 dan F2-19)
+- `api/config/management_aset.php` dan `api/config/services.php` (diurus F3-17 dan F3-19)
 
 **Langkah.**
 1. Hapus berkas di daftar atas.
@@ -720,9 +1016,9 @@ yang sudah dimiliki Core, dan itu bentrok pasti.
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** F2-01.
+**Bergantung pada.** F3-01.
 
-### F2-03 — Bentuk ulang menjadi susunan modul
+### F3-03 — Bentuk ulang menjadi susunan modul
 
 **Kenapa.** Susunan `api/app`, `database/migrations` di akar repo, dan `ui/` adalah bentuk repo terpisah.
 Susunan modul memakai `src/`, `database/migrations/`, `ui/`, dan `tests/` sejajar.
@@ -741,7 +1037,7 @@ Susunan modul memakai `src/`, `database/migrations/`, `ui/`, dan `tests/` sejaja
    Lakukan dengan satu perintah ganti massal, lalu periksa hasilnya dengan `composer types:check`.
 3. `composer.json` modul mendeklarasikan PSR-4 untuk namespace itu.
 4. Hapus `AppServiceProvider::boot()` yang memanggil `loadMigrationsFrom(base_path('../database/migrations'))`.
-   Migrator modul dari F1-03 yang mengurus ini sekarang.
+   Migrator modul dari F2-03 yang mengurus ini sekarang.
 5. Hapus `deploy/migrate.sh` dan rujukan `--path=../database/migrations`.
 
 **Selesai bila.** `composer types:check` lulus, dan tidak ada lagi rujukan ke `../database/migrations` di
@@ -749,64 +1045,73 @@ seluruh repo.
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** F2-02.
+**Bergantung pada.** F3-02.
 
-### F2-04 — Migration modul berjalan di schema `aset`
+### F3-04 — Tabel modul diberi awalan `aset_`
 
-**Kenapa.** Inilah yang memisahkan data modul dari data Core dan modul lain. Nama tabel tidak berubah;
-yang berubah hanya schema tempatnya lahir.
+**Kenapa.** Inilah yang memisahkan data modul dari data Core dan modul lain. Tanpa awalan,
+`m_lokasi_aset`, `m_trade`, `m_tingkat_layanan`, dan sembilan tabel pemeliharaan akan bertabrakan dengan
+modul lain yang wajar memakai nama sama. Satu tabel bahkan tidak punya penanda kepemilikan sama sekali,
+yaitu `processed_core_events`, dan itu hampir pasti bentrok dengan modul lain yang melakukan penyaringan
+kejadian ganda.
 
 **Berkas.**
-- `modules/apperp/management-aset/app.yaml` (tambahkan `database.schema: aset`)
-- `modules/apperp/management-aset/database/migrations/*` (periksa, jangan diubah bila tidak perlu)
+- `modules/apperp/management-aset/database/migrations/<baru>_prefix_tabel_modul.php`
+- `modules/apperp/management-aset/src/Models/**` (properti nama tabel)
+- Seluruh pemanggilan query builder mentah yang menyebut nama tabel
 
 **Langkah.**
-1. Tambahkan kunci `database.schema` pada manifest. Kunci `database.logical_name` yang lama tidak dipakai
-   lagi setelah database menyatu, tapi jangan dihapus dulu supaya validator lama tidak pecah; F5-05 yang
-   membereskannya.
-2. Jalankan `php artisan module:migrate management-aset` pada database bersih.
-3. Perhatikan tiga migration yang memakai SQL mentah dan bergantung pada nama tabel tanpa schema:
-   `2026_07_28_092000_widen_asset_user_reference_columns`,
-   `2026_07_28_095000_enforce_one_original_depreciation_period`, dan
-   `2026_07_28_096000_enforce_one_depreciation_reversal`. Pastikan ketiganya berjalan dengan
-   `search_path` yang disetel migrator, atau tulis nama schema secara eksplisit.
-4. Migration `2026_07_28_091000_add_composite_keys_for_asset_references` kosong isinya; biarkan apa adanya
-   supaya riwayat migration tenant lama tidak berubah.
+1. Satu migration mengganti nama seluruh tabel modul dengan awalan `aset_`. Daftar tabelnya dibaca dari
+   `information_schema` dengan pola nama modul, jangan ditulis tangan, supaya tidak ada yang tertinggal.
+2. Perhatikan lima migration yang memakai SQL mentah, bukan tiga seperti dugaan awal. Selain tiga yang
+   mengubah tipe kolom dan membuat indeks unik parsial, ada satu yang mengganti nama enam tabel sekaligus
+   dan satu lagi yang menjalankan pembaruan dengan subquery berkorelasi. Semuanya menyebut nama tabel,
+   jadi semuanya ikut berubah.
+3. Dua migration memiliki cap waktu yang sama persis, sehingga urutannya sekarang ditentukan urutan
+   abjad nama berkas. Pastikan urutannya sebelum pemindahan, jangan setelah.
+4. Migration yang isinya kosong dibiarkan apa adanya supaya riwayat migration tenant lama tidak berubah.
 
-**Selesai bila.** Query ke `information_schema.tables` menunjukkan 45 tabel di schema `aset` dan nol tabel
-modul di `core` atau `public`. Penjaga F0-04 lulus untuk modul ini.
+**Selesai bila.** Seluruh tabel modul berawalan `aset_`, tidak ada tabel modul tanpa awalan, dan penjaga
+F1-04 lulus untuk modul ini. Jumlah tabelnya dicatat oleh task ini, bukan diasumsikan dari dokumen.
 
 **Rujukan.** Bagian 5.2 dokumen ini, [standar app, nama tabel](../../dev/02-module-standard.md).
 
-**Bergantung pada.** F1-03, F2-03.
+**Bergantung pada.** F2-03, F3-03.
 
-### F2-05 — Model dan query builder memakai koneksi modul
+### F3-05 — Semua tabel modul membawa `tenant_id` dan tersaring otomatis
 
-**Kenapa.** Setelah peran database per modul ada, seluruh akses data modul harus lewat koneksi itu.
-Kalau tidak, batas yang ditegakkan PostgreSQL tidak pernah diuji.
+**Kenapa.** Rencana sebelumnya menyematkan koneksi tersendiri pada model modul. Itu dibatalkan karena
+koneksi terpisah membuat penerbitan nomor tidak bisa satu transaksi dengan dokumennya, dan karena 24
+tempat pada modul ini membuka transaksi yang setelahnya akan membungkus koneksi yang salah tanpa gagal
+dengan berisik.
+
+Yang menggantikannya lebih sederhana dan lebih penting: memastikan setiap tabel modul membawa `tenant_id`
+dan setiap query modul tersaring olehnya. Pada penempatan gabungan, satu query yang lupa menyaring
+membocorkan data seluruh pelanggan.
 
 **Berkas.**
+- `modules/apperp/management-aset/database/migrations/` (tabel yang belum membawa `tenant_id`)
 - `modules/apperp/management-aset/src/Models/MasterData.php`
-- `modules/apperp/management-aset/src/Models/master/*.php` (22 berkas)
-- `modules/apperp/management-aset/src/Models/transaksi/InventarisasiAset/*.php` (2 berkas)
-- Seluruh pemanggilan `DB::table(` di `src/`
+- `modules/apperp/management-aset/src/Models/master/KelompokHartaFiskal.php`
+- Seluruh pemanggilan query builder mentah pada `src/`
 
 **Langkah.**
-1. Model dasar `MasterData` menetapkan `protected $connection = 'module_management_aset'`.
-2. Dua model transaksi mewarisi atau menetapkan hal yang sama.
-3. Pemanggilan `DB::table(` yang tersebar di controller work order, dokumen siklus, perencanaan, dan
-   pengadaan diganti `DB::connection('module_management_aset')->table(`. Ini banyak, jadi kerjakan dengan
-   satu perintah ganti massal lalu periksa hasilnya.
-4. Tambahkan test yang membuktikan sebuah query modul gagal bila diarahkan ke tabel Core yang tidak
-   diizinkan.
+1. Periksa 45 tabel modul; tandai yang belum membawa `tenant_id` dan tambahkan lewat migration baru.
+2. Model dasar memakai scope tenant dari F1-06. Perhatikan satu model tidak mewarisi model dasar itu,
+   yaitu kelompok harta fiskal, sehingga ia tidak ikut tersaring bila hanya model dasar yang diubah.
+3. Pemanggilan query builder mentah tersebar di 29 berkas dengan sekitar 207 kemunculan. Karena
+   jumlahnya, sweep ini dipecah menjadi beberapa pull request per area: master, transaksi aset,
+   penyusutan, pemeliharaan, dan penyediaan data awal.
+4. Penjaga F1-06 dijalankan pada modul ini dan harus hijau.
 
-**Selesai bila.** Seluruh test modul lulus memakai koneksi modul, dan test penolakan lintas schema lulus.
+**Selesai bila.** Penjaga penyaringan tenant lulus untuk seluruh berkas modul, dan sebuah test dua tenant
+membuktikan tidak ada kebocoran pada rute daftar, detail, maupun laporan.
 
-**Rujukan.** Bagian 5.2 dokumen ini.
+**Rujukan.** Bagian 5.2 dokumen ini, [query scope](../../dev/08-query-scopes-and-schema.md).
 
-**Bergantung pada.** F1-04, F2-04.
+**Bergantung pada.** F1-06, F3-04.
 
-### F2-06 — Penerbitan nomor lewat kontrak Core
+### F3-06 — Penerbitan nomor lewat kontrak Core
 
 **Kenapa.** Ini pemanggilan HTTP yang paling sering: setiap dokumen baru dan setiap master baru
 memanggilnya. Delapan berkas memakainya, dan semuanya mengembalikan 503 ketika Core tidak terjangkau.
@@ -824,12 +1129,12 @@ memanggilnya. Delapan berkas memakainya, dan semuanya mengembalikan 503 ketika C
 - `src/Services/ProvisionIndonesiaStarterData.php`
 
 **Langkah.**
-1. Ganti ketergantungan pada `NumberSequenceClient` dengan antarmuka `PenerbitNomor` dari F1-06.
+1. Ganti ketergantungan pada `NumberSequenceClient` dengan antarmuka `PenerbitNomor` dari F2-06.
 2. Pertahankan `NumberSequenceException` beserta kode kesalahannya. Kode itu diuji
    `NumberSequenceFailureTest` dan ditampilkan ke pengguna oleh UI; menghapusnya mengubah perilaku yang
    terlihat.
 3. Kesalahan yang dulu berasal dari jaringan (`_unreachable`, `_throttled`, `_unavailable`) sekarang tidak
-   mungkin terjadi. Jangan hapus penanganannya pada PR ini; tandai dengan komentar dan bereskan di F2-20
+   mungkin terjadi. Jangan hapus penanganannya pada PR ini; tandai dengan komentar dan bereskan di F3-20
    setelah semuanya terbukti.
 4. Bungkus penerbitan nomor dan penyimpanan dokumen dalam satu `DB::transaction`.
 
@@ -838,9 +1143,9 @@ test baru membuktikan nomor ikut batal ketika penyimpanan dokumen gagal.
 
 **Rujukan.** [number sequence](../../dev/14-number-sequences.md), bagian 5.3 dokumen ini.
 
-**Bergantung pada.** F1-07, F2-05.
+**Bergantung pada.** F2-07, F3-05.
 
-### F2-07 — Kalender fiskal lewat kontrak Core
+### F3-07 — Kalender fiskal lewat kontrak Core
 
 **Kenapa.** Satu pemanggil saja, jadi ini task kecil dan bagus untuk membuktikan pola penggantian
 sebelum yang lebih besar.
@@ -850,20 +1155,20 @@ sebelum yang lebih besar.
 - `src/Http/Controllers/transaksi/InventarisasiAset/AssetController.php`
 
 **Langkah.**
-1. Ganti dengan antarmuka `KalenderFiskal` dari F1-06.
+1. Ganti dengan antarmuka `KalenderFiskal` dari F2-06.
 2. Perilaku ketika periode tidak ditemukan tetap sama: kembalikan `null` dan biarkan pemanggil yang
    memutuskan.
 3. Catat di PR bahwa `FiscalCalendarDirectoryController` di Core menyalin ulang logika
    `FiscalCalendarService::resolve()`; keduanya sekarang harus memberi jawaban yang sama. Bereskan di
-   F2-20.
+   F3-20.
 
 **Selesai bila.** Test pendaftaran aset yang menyentuh periode fiskal lulus tanpa HTTP.
 
 **Rujukan.** [fiscal calendar](../../dev/15-fiscal-calendars.md).
 
-**Bergantung pada.** F1-06, F2-05.
+**Bergantung pada.** F2-06, F3-05.
 
-### F2-08 — Satuan lewat kontrak Core
+### F3-08 — Satuan lewat kontrak Core
 
 **Kenapa.** Empat pemanggil, dan kegagalannya hari ini melempar `RuntimeException` yang berakhir 500 di
 layar pengguna.
@@ -876,7 +1181,7 @@ layar pengguna.
 - `src/Http/Controllers/transaksi/PerencanaanAset/PerencanaanAsetController.php`
 
 **Langkah.**
-1. Ganti dengan antarmuka `DaftarSatuan` dari F1-06.
+1. Ganti dengan antarmuka `DaftarSatuan` dari F2-06.
 2. Pemeriksaan jumlah hasil yang dilakukan `resolve()` tetap dipertahankan; itu menangkap id satuan yang
    dihapus di Core.
 
@@ -885,9 +1190,9 @@ layar pengguna.
 
 **Rujukan.** [satuan](../../dev/16-units-of-measure.md).
 
-**Bergantung pada.** F1-06, F2-05.
+**Bergantung pada.** F2-06, F3-05.
 
-### F2-09 — Workflow lewat kontrak Core
+### F3-09 — Workflow lewat kontrak Core
 
 **Kenapa.** Ini yang paling berbelit hari ini: modul mengirim HTTP ke Core untuk memulai workflow, lalu
 Core mengirim HTTP balik ke modul lewat perintah terjadwal untuk menyampaikan keputusannya. Dua arah,
@@ -900,7 +1205,7 @@ dua tanda tangan HMAC, satu tabel dedup.
 - `apps/control-plane/app/Console/Commands/PublishWorkflowEvents.php`
 
 **Langkah.**
-1. Arah keluar: ganti `WorkflowClient::submit()` dengan antarmuka `MesinWorkflow` dari F1-06.
+1. Arah keluar: ganti `WorkflowClient::submit()` dengan antarmuka `MesinWorkflow` dari F2-06.
 2. Arah masuk: keputusan workflow menjadi event Laravel biasa. Modul mendaftarkan listener; Core
    memancarkan event setelah keputusan disimpan.
 3. `PublishWorkflowEvents` tetap ada untuk penerima di luar proses, tapi berhenti mengirim ke modul yang
@@ -913,9 +1218,9 @@ tanpa satu pun permintaan HTTP.
 
 **Rujukan.** [visual workflow engine](../../dev/21-visual-workflow-engine.md).
 
-**Bergantung pada.** F1-06, F2-05.
+**Bergantung pada.** F2-06, F3-05.
 
-### F2-10 — Konteks dan izin dari Core, bukan dari token
+### F3-10 — Konteks dan izin dari Core, bukan dari token
 
 **Kenapa.** Ini perubahan perilaku terbesar di seluruh proyek. Middleware `RequireCoreErpContext`
 memverifikasi JWT terbitan Core; di dalam proses yang sama, yang dibutuhkan adalah membership yang sudah
@@ -928,21 +1233,21 @@ dipegang Core.
 - `modules/apperp/management-aset/routes/api.php`
 
 **Langkah.**
-1. Rute modul memakai middleware `ResolveModuleContext` dari F1-08.
+1. Rute modul memakai middleware `ResolveModuleContext` dari F2-08.
 2. `OrganizationScope` membaca `data_policies` dari `ModuleRequestContext`, bukan dari atribut request
-   hasil token. Bentuk datanya sengaja dibuat sama di F1-08, jadi isi kelasnya hampir tidak berubah.
+   hasil token. Bentuk datanya sengaja dibuat sama di F2-08, jadi isi kelasnya hampir tidak berubah.
 3. `ContextController` tetap ada untuk sementara karena UI masih memanggilnya; ia sekarang membaca dari
-   `ModuleRequestContext`. Dihapus di F3-07.
+   `ModuleRequestContext`. Dihapus di F4-07.
 
 **Selesai bila.** Seluruh rute modul terlindungi, dan test batas data policy lulus tanpa token.
 
 **Rujukan.** [identity dan access](../../dev/09-identity-and-access.md).
 
-**Bergantung pada.** F1-08, F2-05.
+**Bergantung pada.** F2-08, F3-05.
 
-### F2-11 — Provisioning tenant lewat event in-process
+### F3-11 — Provisioning tenant lewat event in-process
 
-**Kenapa.** Sama seperti F2-09 arah masuk: Core mengirim HTTP ke modul untuk memberi tahu ada tenant
+**Kenapa.** Sama seperti F3-09 arah masuk: Core mengirim HTTP ke modul untuk memberi tahu ada tenant
 baru. Di dalam proses, itu event biasa.
 
 **Berkas.**
@@ -960,9 +1265,9 @@ baru. Di dalam proses, itu event biasa.
 
 **Rujukan.** [API dan integration bridge](../../dev/04-api-and-integration.md).
 
-**Bergantung pada.** F2-10.
+**Bergantung pada.** F3-10.
 
-### F2-12 — Laporan dibaca langsung, bukan lewat HTTP
+### F3-12 — Laporan dibaca langsung, bukan lewat HTTP
 
 **Kenapa.** Hari ini mesin laporan Core memanggil endpoint modul dengan token pengguna, lalu modul
 memeriksa ulang izin yang sudah diperiksa Core. Di dalam proses, registry laporan modul bisa dibaca
@@ -984,9 +1289,9 @@ dokumen work order menghasilkan PDF tanpa permintaan HTTP antar bagian.
 
 **Rujukan.** [reporting dan replika](../../dev/07-reporting-and-replicas.md), [dokumen cetak](../../dev/23-document-rendering.md).
 
-**Bergantung pada.** F2-10.
+**Bergantung pada.** F3-10.
 
-### F2-13 — Rute modul didaftarkan lewat penyedia layanan
+### F3-13 — Rute modul didaftarkan lewat penyedia layanan
 
 **Kenapa.** Rute modul harus masuk ke daftar rute Core dengan awalan yang jelas, tanpa menabrak rute Core.
 
@@ -997,16 +1302,16 @@ dokumen work order menghasilkan PDF tanpa permintaan HTTP antar bagian.
 **Langkah.**
 1. Rute modul didaftarkan dengan awalan `/api/modules/management-aset/v1`.
 2. Rute lama `/api/v1/...` milik modul dihentikan; UI diperbaiki di fase 3.
-3. Rute internal yang tersisa setelah F2-11 dan F2-12 dihapus dari berkas ini.
+3. Rute internal yang tersisa setelah F3-11 dan F3-12 dihapus dari berkas ini.
 
 **Selesai bila.** `php artisan route:list` menampilkan rute modul di bawah awalan barunya, dan tidak ada
 rute yang bertabrakan.
 
 **Rujukan.** [API dan integration bridge](../../dev/04-api-and-integration.md).
 
-**Bergantung pada.** F2-10.
+**Bergantung pada.** F3-10.
 
-### F2-14 — Manifest modul terdaftar dari folder
+### F3-14 — Manifest modul terdaftar dari folder
 
 **Kenapa.** Setelah modul ada di dalam repo, manifest tidak perlu didaftarkan lewat perintah yang
 menunjuk berkas di repo lain.
@@ -1019,16 +1324,16 @@ menunjuk berkas di repo lain.
 1. Daftarkan manifest modul lewat `ModuleRegistry` dan `RegisterAppCatalog` yang sudah ada.
 2. Pastikan 65 entry point, 122 permission, 64 privilege, 36 duty, 29 referensi nomor, 2 tipe workflow,
    dan 2 laporan terdaftar seperti sebelumnya. Bandingkan jumlah baris di tabel sebelum dan sesudah.
-3. Manifest masih menyebut `api.image` dan `ui.image`; biarkan sampai F4-05 mengganti bentuk rilis.
+3. Manifest masih menyebut `api.image` dan `ui.image`; biarkan sampai F5-05 mengganti bentuk rilis.
 
 **Selesai bila.** Jumlah baris pada `permissions`, `security_duties`, dan `app_number_sequence_references`
 untuk modul ini sama persis dengan sebelum pemindahan.
 
 **Rujukan.** [standar app](../../dev/02-module-standard.md), [rantai keamanan](../../dev/19-transaction-security-chain.md).
 
-**Bergantung pada.** F1-05, F2-13.
+**Bergantung pada.** F2-05, F3-13.
 
-### F2-15 — Test modul pindah dan memakai autentikasi Core
+### F3-15 — Test modul pindah dan memakai autentikasi Core
 
 **Kenapa.** Ke-18 berkas test fitur memakai `InteractsWithCoreErpContext` untuk mencetak token JWT.
 Semuanya harus berganti cara masuk.
@@ -1050,9 +1355,9 @@ Semuanya harus berganti cara masuk.
 
 **Rujukan.** [pengujian](../../apps/management-aset/arsitektur/pengujian.md).
 
-**Bergantung pada.** F2-10.
+**Bergantung pada.** F3-10.
 
-### F2-16 — Test modul berjalan di PostgreSQL
+### F3-16 — Test modul berjalan di PostgreSQL
 
 **Kenapa.** Test modul hari ini memakai SQLite di memori sementara production memakai PostgreSQL. Core
 sudah memutuskan sebaliknya, dengan alasan yang ditulis di `config/database.php`: klausa penguncian baris
@@ -1075,9 +1380,9 @@ PostgreSQL.
 
 **Rujukan.** [pengujian](../../apps/management-aset/arsitektur/pengujian.md).
 
-**Bergantung pada.** F2-15.
+**Bergantung pada.** F3-15.
 
-### F2-17 — Konfigurasi modul masuk ke Core
+### F3-17 — Konfigurasi modul masuk ke Core
 
 **Kenapa.** Berkas `api/config/management_aset.php` berisi data template awal Indonesia yang dipakai
 `ProvisionIndonesiaStarterData`, termasuk klasifikasi fiskal menurut PMK 72/2023. Itu milik modul dan
@@ -1096,9 +1401,9 @@ berada di akar.
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** F2-03.
+**Bergantung pada.** F3-03.
 
-### F2-18 — Perkakas laporan bawaan ikut pindah
+### F3-18 — Perkakas laporan bawaan ikut pindah
 
 **Kenapa.** Perintah pembuat layout bawaan memakai dua pustaka Office yang hari ini hanya terpasang
 sebagai dependensi pengembangan di modul. Kalau tidak diurus, perintah itu gagal di image production.
@@ -1120,9 +1425,9 @@ yang sama seperti sebelumnya.
 
 **Rujukan.** [dokumen cetak](../../dev/23-document-rendering.md).
 
-**Bergantung pada.** F2-12.
+**Bergantung pada.** F3-12.
 
-### F2-19 — Buang sisa konfigurasi klien HTTP
+### F3-19 — Buang sisa konfigurasi klien HTTP
 
 **Kenapa.** Setelah empat klien hilang, empat variabel lingkungan dan satu blok konfigurasi menjadi mati.
 Meninggalkannya membuat orang berikutnya mengira modul masih bicara ke Core lewat jaringan.
@@ -1143,9 +1448,9 @@ aktif.
 
 **Rujukan.** Bagian 5.4 dokumen ini.
 
-**Bergantung pada.** F2-06, F2-07, F2-08, F2-09.
+**Bergantung pada.** F3-06, F3-07, F3-08, F3-09.
 
-### F2-20 — Buktikan tidak ada lagi lompatan HTTP
+### F3-20 — Buktikan tidak ada lagi lompatan HTTP
 
 **Kenapa.** Kriteria keluar fase ini harus diperiksa mesin, bukan dengan perasaan sudah selesai.
 
@@ -1167,9 +1472,109 @@ pun test modul gagal.
 
 **Rujukan.** Prinsip P5 dokumen ini.
 
-**Bergantung pada.** F2-19.
+**Bergantung pada.** F3-19.
 
-## 10. Fase 3: UI menjadi satu build
+### F3-21 — Penyedia layanan modul
+
+**Kenapa.** Empat task pada fase ini menyerahkan pekerjaan kepada "penyedia layanan modul", tapi tidak
+ada satu pun yang membuatnya. Berkas penyedia layanan app lama juga memegang pendaftaran registry laporan
+dan alias middleware yang dipakai setiap rutenya, sehingga menghapusnya tanpa pengganti membuat modul
+tidak bisa menyala.
+
+**Berkas.**
+- `modules/apperp/management-aset/src/Providers/ManagementAsetServiceProvider.php`
+- `apps/control-plane/app/Support/Modules/ModuleRegistry.php`
+
+**Langkah.**
+1. Penyedia layanan modul memuat konfigurasi, rute, perintah artisan, pendaftaran registry laporan, dan
+   listener event modul.
+2. Registry menemukannya lewat konvensi nama, bukan daftar yang ditulis tangan.
+3. Berkas kerangka aplikasi app lama baru boleh dihapus setelah penyedia ini memikul isinya.
+
+**Selesai bila.** Rute, perintah, dan laporan modul tersedia tanpa satu pun berkas kerangka aplikasi di
+dalam folder modul.
+
+**Rujukan.** Bagian 5.1 dokumen ini.
+
+**Bergantung pada.** F3-03.
+
+### F3-22 — Namespace test modul dan pendaftaran suite
+
+**Kenapa.** Test modul memakai namespace `Tests\` dengan kelas dasar bernama sama seperti milik Core,
+dan keduanya mendaftarkan akar PSR-4 yang sama. Dua akar untuk satu awalan dengan kelas bernama sama
+membuat suite tidak bisa dimuat sama sekali.
+
+**Berkas.**
+- `modules/apperp/management-aset/tests/` (seluruhnya)
+- `modules/apperp/management-aset/composer.json`
+- `apps/control-plane/phpunit.xml`
+
+**Langkah.**
+1. Ganti namespace test modul menjadi `Modules\Apperp\ManagementAset\Tests\` dan daftarkan pada
+   `autoload-dev` modul.
+2. Hapus kelas dasar dan test contoh milik modul; pakai milik Core.
+3. Tambahkan suite dan direktori sumber modul pada konfigurasi PHPUnit Core, karena konfigurasinya hari
+   ini hanya menyertakan folder aplikasi.
+
+**Selesai bila.** `composer test` menjalankan test Core dan test modul dalam satu perintah.
+
+**Rujukan.** [pengujian](../../apps/management-aset/arsitektur/pengujian.md).
+
+**Bergantung pada.** F3-03.
+
+### F3-23 — Nasib berkas kontrak, uji beban, dan penyebaran milik modul
+
+**Kenapa.** Pemindahan menarik masuk folder kontrak, uji beban, dokumentasi, dan penyebaran milik repo
+lama. Hanya folder antarmuka yang punya masa depan tertulis; sisanya menggantung, dan pemeriksa cakupan
+kontrak pada alur lint akan menunjuk berkas yang tidak jelas statusnya.
+
+**Berkas.**
+- `modules/apperp/management-aset/contracts/`
+- `modules/apperp/management-aset/loadtest/`
+- `modules/apperp/management-aset/deploy/`
+- `modules/apperp/management-aset/docs/`
+- `.github/workflows/lint.yml`
+
+**Langkah.**
+1. Putuskan dan tulis: setelah rute modul hanya dipanggil antarmukanya sendiri di proses yang sama,
+   apakah spesifikasi OpenAPI-nya masih kontrak yang dijaga, atau menjadi dokumentasi biasa. Jawabannya
+   menentukan apakah pemeriksa cakupan tetap berjalan di CI.
+2. Folder penyebaran milik modul dihapus; runtime tidak lagi punya container sendiri.
+3. Folder uji beban digabungkan ke milik Core pada fase 7; sampai itu, biarkan dan tandai.
+4. Dokumentasi modul dipindahkan ke `docs/apps/` bila belum di sana.
+
+**Selesai bila.** Tidak ada folder menggantung tanpa keputusan tertulis, dan alur lint tetap hijau.
+
+**Rujukan.** [API dan integration bridge](../../dev/04-api-and-integration.md).
+
+**Bergantung pada.** F3-13.
+
+### F3-24 — Stack pengembangan tetap menyala selama pemindahan
+
+**Kenapa.** Prinsip P3. Skrip pengembangan menyentuh modul lewat empat jalur: pemasangan volume
+migration, alamat dan token layanan Core, daftar alamat event, dan penerbitan token per app. Semuanya
+rusak sejak task pembuangan berkas kerangka, sedangkan perbaikannya baru dijadwalkan pada fase 6. Di
+antara keduanya, stack lokal tidak bisa menyala, dan itu melanggar prinsip yang dokumen ini tetapkan
+sendiri.
+
+**Berkas.**
+- `erp-dev/start.ps1`
+- `erp-dev/compose.yaml`
+
+**Langkah.**
+1. Sesuaikan skrip supaya modul yang sudah berada di dalam runtime tidak lagi diperlakukan sebagai app
+   dengan container sendiri.
+2. App yang belum dipindah tetap diperlakukan seperti sekarang. Kedua jalur hidup berdampingan.
+3. Hapus pemasangan volume migration yang menunjuk jalur lama, karena jalur itu sudah tidak ada.
+
+**Selesai bila.** Menjalankan skrip pengembangan menyalakan Core beserta modul aset di dalamnya, dan
+halaman modul terbuka.
+
+**Rujukan.** [pengembangan lokal](../../dev/11-local-docker-development.md).
+
+**Bergantung pada.** F3-13.
+
+## 11. Fase 4: UI menjadi satu build
 
 **Kriteria keluar.** Tidak ada elemen `iframe` pada halaman modul, React hanya termuat sekali, dan
 berpindah antar menu modul tidak memuat ulang halaman.
@@ -1178,7 +1583,7 @@ berpindah antar menu modul tidak memuat ulang halaman.
 perutean hash di UI modul. Tabel rute per modul bisa memakai id itu langsung, jadi manifest tidak perlu
 diubah.
 
-### F3-01 — Hapus `apps/web-shell`
+### F4-01 — Hapus `apps/web-shell`
 
 **Kenapa.** Folder itu berisi peluncur lama yang sudah digantikan `product-launcher.tsx` dan halaman
 halaman tuan rumah app di shell. Tidak ada compose, skrip, atau CI yang menyebutnya, tapi dua halaman dokumen masih
@@ -1199,7 +1604,7 @@ menyuruh orang membacanya.
 
 **Bergantung pada.** Tidak ada.
 
-### F3-02 — `@apperp/ui` menjadi paket dalam repo
+### F4-02 — `@apperp/ui` menjadi paket dalam repo
 
 **Kenapa.** Hari ini paket dibangun menjadi berkas `.tgz` lalu disalin ke Core, ke setiap repo app, dan ke
 template. Mekanisme itu butuh penyelarasan berkas kunci npm setiap kali dibangun ulang, dan sisa versi
@@ -1210,7 +1615,7 @@ lama masih tertinggal di repo sebagai bukti bahwa penyalinan bisa meleset.
 - `packages/ui/package.json`
 - `apps/control-plane/.packages/apperp-ui.tgz` (dihapus)
 - `packages/ui/apperp-ui-0.4.2.tgz` dan `packages/ui/.tmp-pack/` (dihapus)
-- `erp-dev/start.ps1` (fungsi penerbit dan penyelaras berkas kunci, dihapus di F5-03)
+- `erp-dev/start.ps1` (fungsi penerbit dan penyelaras berkas kunci, dihapus di F6-03)
 
 **Langkah.**
 1. Pakai npm workspaces: `packages/ui` menjadi workspace, Core memakainya sebagai `*`.
@@ -1224,7 +1629,7 @@ repo.
 
 **Bergantung pada.** Tidak ada.
 
-### F3-03 — Halaman modul pindah ke dalam repo shell
+### F4-03 — Halaman modul pindah ke dalam repo shell
 
 **Kenapa.** Selama UI modul berada di proyek Vite sendiri, React akan selalu terbundel dua kali.
 
@@ -1248,9 +1653,9 @@ repo.
 
 **Rujukan.** Bagian 5.5 dokumen ini.
 
-**Bergantung pada.** F3-02.
+**Bergantung pada.** F4-02.
 
-### F3-04 — Perutean modul memakai rute shell
+### F4-04 — Perutean modul memakai rute shell
 
 **Kenapa.** Perutean hash di UI modul ada karena satu image harus bisa disajikan di bawah awalan mana pun.
 Setelah UI menyatu, awalan itu tidak ada lagi.
@@ -1271,9 +1676,9 @@ Setelah UI menyatu, awalan itu tidak ada lagi.
 
 **Rujukan.** Bagian 5.5 dokumen ini.
 
-**Bergantung pada.** F3-03.
+**Bergantung pada.** F4-03.
 
-### F3-05 — Buang jabat tangan antar bingkai
+### F4-05 — Buang jabat tangan antar bingkai
 
 **Kenapa.** Tiga jenis pesan antar bingkai ada hanya karena UI berada di dalam iframe: pemberitahuan
 siap, pengiriman konteks dan tema, serta permintaan cetak.
@@ -1298,9 +1703,9 @@ bekerja.
 
 **Rujukan.** Bagian 5.5 dokumen ini.
 
-**Bergantung pada.** F3-04.
+**Bergantung pada.** F4-04.
 
-### F3-06 — Panggilan API modul memakai sesi
+### F4-06 — Panggilan API modul memakai sesi
 
 **Kenapa.** Pembungkus permintaan di UI modul menyusun alamat relatif terhadap dokumen dan menyertakan
 token pembawa. Keduanya hanya masuk akal ketika UI disajikan di bawah awalan penempatan.
@@ -1310,7 +1715,7 @@ token pembawa. Keduanya hanya masuk akal ketika UI disajikan di bawah awalan pen
 - `modules/apperp/management-aset/src/Http/Controllers/ContextController.php` (dihapus)
 
 **Langkah.**
-1. Alamat menjadi `/api/modules/management-aset/v1/...` sesuai F2-13.
+1. Alamat menjadi `/api/modules/management-aset/v1/...` sesuai F3-13.
 2. Header `Authorization` dihapus; permintaan memakai sesi dan token CSRF Core.
 3. Kunci idempoten dan penormalan pesan kesalahan validasi dipertahankan apa adanya.
 4. Izin dibaca dari properti halaman Inertia, bukan dari endpoint konteks.
@@ -1320,9 +1725,9 @@ token pembawa. Keduanya hanya masuk akal ketika UI disajikan di bawah awalan pen
 
 **Rujukan.** Bagian 5.5 dokumen ini.
 
-**Bergantung pada.** F3-05.
+**Bergantung pada.** F4-05.
 
-### F3-07 — Ganti bingkai dengan komponen
+### F4-07 — Ganti bingkai dengan komponen
 
 **Kenapa.** Ini langkah yang menghapus iframe.
 
@@ -1342,9 +1747,9 @@ token pembawa. Keduanya hanya masuk akal ketika UI disajikan di bawah awalan pen
 
 **Rujukan.** Bagian 5.5 dokumen ini.
 
-**Bergantung pada.** F3-06.
+**Bergantung pada.** F4-06.
 
-### F3-08 — Buang jalur konten dan proxy
+### F4-08 — Buang jalur konten dan proxy
 
 **Kenapa.** Perintah pembuat konfigurasi proxy, kelas penyusun jalur konten, dan dua modul Apache ada
 hanya untuk mengarahkan permintaan ke container UI per app.
@@ -1366,12 +1771,12 @@ hanya untuk mengarahkan permintaan ke container UI per app.
 
 **Rujukan.** [release dan on-prem](../../dev/03-release-and-on-prem.md).
 
-**Bergantung pada.** F3-07.
+**Bergantung pada.** F4-07.
 
-### F3-09 — Token konteks tinggal untuk event
+### F4-09 — Token konteks tinggal untuk event
 
 **Kenapa.** Kunci penandatangan dipakai dua hal: token konteks untuk bingkai dan HMAC event keluar.
-Pemakaian pertama hilang di F3-07.
+Pemakaian pertama hilang di F4-07.
 
 **Berkas.**
 - `apps/control-plane/app/Support/AppContextToken.php`
@@ -1388,9 +1793,9 @@ tersisa.
 
 **Rujukan.** Bagian 5.4 dokumen ini.
 
-**Bergantung pada.** F3-07.
+**Bergantung pada.** F4-07.
 
-### F3-10 — Ukur bundel dan buktikan tidak ada penggandaan
+### F4-10 — Ukur bundel dan buktikan tidak ada penggandaan
 
 **Kenapa.** Prinsip P5. Ini angka yang menggantikan klaim penghematan pada dokumen keputusan.
 
@@ -1409,14 +1814,14 @@ di lebih dari satu potongan.
 
 **Rujukan.** [keputusan satu runtime](00-keputusan.md).
 
-**Bergantung pada.** F3-07.
+**Bergantung pada.** F4-07.
 
-## 11. Fase 4: edisi dan bundle on-prem
+## 12. Fase 5: edisi dan bundle on-prem
 
 **Kriteria keluar.** Dua bundle edisi berbeda dibangun dari repo yang sama, dan CI membuktikan modul yang
 tidak dibeli tidak ada di dalamnya.
 
-### F4-01 — Berkas manifest edisi
+### F5-01 — Berkas manifest edisi
 
 **Kenapa.** Ini Customer Edition Manifest yang sudah dijelaskan pada dokumen rilis tapi belum pernah
 dibangun.
@@ -1436,7 +1841,7 @@ dibangun.
 
 **Bergantung pada.** Tidak ada.
 
-### F4-02 — Penghitung dependency edisi
+### F5-02 — Penghitung dependency edisi
 
 **Kenapa.** Daftar modul yang dibeli belum lengkap. Dependency dan modul penghubung harus ikut, dan modul
 penghubung hanya ikut bila kedua modul yang dihubungkannya ada.
@@ -1457,9 +1862,9 @@ penghubung ikut hanya ketika kedua sisinya ada.
 
 **Rujukan.** [standar app, dependency](../../dev/02-module-standard.md).
 
-**Bergantung pada.** F4-01.
+**Bergantung pada.** F5-01.
 
-### F4-03 — Image per edisi
+### F5-03 — Image per edisi
 
 **Kenapa.** Tidak ada satu pun Dockerfile hari ini yang sadar modul; semuanya menyalin seluruh repo.
 
@@ -1476,9 +1881,9 @@ penghubung ikut hanya ketika kedua sisinya ada.
 
 **Rujukan.** Bagian 5.6 dokumen ini.
 
-**Bergantung pada.** F4-02.
+**Bergantung pada.** F5-02.
 
-### F4-04 — Pemeriksaan kebocoran modul
+### F5-04 — Pemeriksaan kebocoran modul
 
 **Kenapa.** Klaim bahwa modul yang tidak dibeli tidak ada di server pelanggan harus dibuktikan mesin,
 bukan dijanjikan. Ini pemeriksaan yang membuat seluruh model lisensi berdiri.
@@ -1499,9 +1904,9 @@ bukan dijanjikan. Ini pemeriksaan yang membuat seluruh model lisensi berdiri.
 
 **Rujukan.** Bagian 5.6 dokumen ini, prinsip P2.
 
-**Bergantung pada.** F4-03.
+**Bergantung pada.** F5-03.
 
-### F4-05 — Catatan rilis berbentuk satu image
+### F5-05 — Catatan rilis berbentuk satu image
 
 **Kenapa.** Catatan rilis hari ini mewajibkan dua sidik jari image, yaitu API dan UI, ditambah tiga nama
 layanan. Bentuk itu tidak ada lagi. Tiga berkas test mengunci bentuk lama, dan salah satunya adalah test
@@ -1525,9 +1930,9 @@ laporan yang akan gagal karena alasan yang tidak terlihat berhubungan.
 
 **Rujukan.** [menerbitkan release app](../../dev/13-publishing-an-app-release.md).
 
-**Bergantung pada.** F4-03.
+**Bergantung pada.** F5-03.
 
-### F4-06 — Bundle dan pemasangan di server pelanggan
+### F5-06 — Bundle dan pemasangan di server pelanggan
 
 **Kenapa.** Ini bagian yang belum pernah dibangun sama sekali, dan satu-satunya alasan seluruh arsitektur
 ini ada.
@@ -1549,14 +1954,14 @@ tanpa npm, lalu berhasil dimutakhirkan ke versi berikutnya dan dikembalikan lagi
 
 **Rujukan.** [release dan on-prem](../../dev/03-release-and-on-prem.md).
 
-**Bergantung pada.** F4-04, F4-05.
+**Bergantung pada.** F5-04, F5-05.
 
-## 12. Fase 5: dev stack dan CI
+## 13. Fase 6: dev stack dan CI
 
 **Kriteria keluar.** Menjalankan skrip pengembangan menyalakan satu runtime dengan modul terpilih, dan
 satu alur CI menjaga seluruh repo.
 
-### F5-01 — Penemuan modul pada skrip pengembangan
+### F6-01 — Penemuan modul pada skrip pengembangan
 
 **Kenapa.** Skrip hari ini mencari folder saudara berpola tertentu dan mewajibkan tiap app punya dua
 Dockerfile. Modul di dalam repo tidak punya keduanya, jadi tidak akan pernah ditemukan.
@@ -1573,9 +1978,9 @@ Dockerfile. Modul di dalam repo tidak punya keduanya, jadi tidak akan pernah dit
 
 **Rujukan.** [pengembangan lokal](../../dev/11-local-docker-development.md).
 
-**Bergantung pada.** F2-20.
+**Bergantung pada.** F3-20.
 
-### F5-02 — Satu compose
+### F6-02 — Satu compose
 
 **Kenapa.** Berkas compose yang dihasilkan berisi tiga layanan dan satu volume per app. Semuanya hilang.
 
@@ -1593,9 +1998,9 @@ Dockerfile. Modul di dalam repo tidak punya keduanya, jadi tidak akan pernah dit
 
 **Rujukan.** [pengembangan lokal](../../dev/11-local-docker-development.md).
 
-**Bergantung pada.** F5-01.
+**Bergantung pada.** F6-01.
 
-### F5-03 — Buang penyebaran paket antarmuka
+### F6-03 — Buang penyebaran paket antarmuka
 
 **Kenapa.** Fungsi penerbit paket dan penyelaras berkas kunci ada hanya untuk menyalin berkas `.tgz` ke
 banyak repo.
@@ -1612,9 +2017,9 @@ banyak repo.
 
 **Rujukan.** Bagian 5.5 dokumen ini.
 
-**Bergantung pada.** F3-02, F5-02.
+**Bergantung pada.** F4-02, F6-02.
 
-### F5-04 — Satu alur CI
+### F6-04 — Satu alur CI
 
 **Kenapa.** Hari ini hanya satu repo app yang punya pemeriksaan CI, dan alur bersamanya mewajibkan susunan
 repo terpisah. Tidak ada satu pun alur yang membangun atau menerbitkan image.
@@ -1633,14 +2038,14 @@ repo terpisah. Tidak ada satu pun alur yang membangun atau menerbitkan image.
    bahwa pemeriksa itu juga menolak ejaan kunci dependency yang masih dipakai skrip pengembangan; samakan
    keduanya pada PR ini.
 
-**Selesai bila.** Satu PR yang menyentuh Core dan modul dijaga satu alur, dan alur edisi dari F4-04 ikut
+**Selesai bila.** Satu PR yang menyentuh Core dan modul dijaga satu alur, dan alur edisi dari F5-04 ikut
 berjalan.
 
 **Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
 
-**Bergantung pada.** F4-04.
+**Bergantung pada.** F5-04.
 
-### F5-05 — Alur bangun dan terbit image
+### F6-05 — Alur bangun dan terbit image
 
 **Kenapa.** Tidak ada satu pun repo yang membangun dan mendorong image hari ini. Tanpa ini, bundle edisi
 harus dibangun di laptop.
@@ -1659,14 +2064,14 @@ harus dibangun di laptop.
 
 **Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
 
-**Bergantung pada.** F5-04.
+**Bergantung pada.** F6-04.
 
-## 13. Fase 6: modul kedua, pengukuran, dan pembersihan
+## 14. Fase 7: modul kedua, pengukuran, dan pembersihan
 
 **Kriteria keluar.** Human Resources berjalan sebagai modul kedua, angka proyeksi pada dokumen keputusan
 diganti angka terukur, dan repo lama diarsipkan dengan penunjuk ke lokasi barunya.
 
-### F6-01 — Human Resources menjadi modul kedua
+### F7-01 — Human Resources menjadi modul kedua
 
 **Kenapa.** Satu modul tidak membuktikan batas antar modul. Modul kedua yang punya kebutuhan berbeda,
 misalnya direktori anggota dan unit organisasi, membuktikannya.
@@ -1675,19 +2080,19 @@ misalnya direktori anggota dan unit organisasi, membuktikannya.
 - `modules/apperp/human-resources/`
 
 **Langkah.**
-1. Ikuti urutan fase 2 dalam bentuk ringkas: bawa masuk beserta riwayat, bentuk ulang, pindahkan ke schema
+1. Ikuti urutan fase 3 dalam bentuk ringkas: bawa masuk beserta riwayat, bentuk ulang, pindahkan ke schema
    sendiri, ganti pemanggilan HTTP, pindahkan test.
 2. Dua endpoint direktori Core yang hari ini hanya boleh dipanggil modul ini menjadi pemanggilan fungsi
-   lewat antarmuka F1-06.
+   lewat antarmuka F2-06.
 3. Pastikan penjaga F0-04 dan F0-05 tetap hijau dengan dua modul terpasang.
 
 **Selesai bila.** Kedua modul berjalan bersamaan, dan mencabut satu tidak menyentuh data yang lain.
 
-**Rujukan.** Fase 2 dokumen ini.
+**Rujukan.** Fase 3 dokumen ini.
 
-**Bergantung pada.** F3-10.
+**Bergantung pada.** F4-10.
 
-### F6-02 — Ukur ulang dan ganti proyeksi
+### F7-02 — Ukur ulang dan ganti proyeksi
 
 **Kenapa.** Prinsip P5. Dokumen keputusan memuat baris proyeksi yang ditandai jelas; sekarang ada angka
 nyata untuk menggantikannya.
@@ -1706,9 +2111,9 @@ nyata untuk menggantikannya.
 
 **Rujukan.** [keputusan satu runtime](00-keputusan.md).
 
-**Bergantung pada.** F6-01.
+**Bergantung pada.** F7-01.
 
-### F6-03 — Uji beban di runtime baru
+### F7-03 — Uji beban di runtime baru
 
 **Kenapa.** Skenario beban yang ada menguji hal yang benar: kebocoran antar tenant, idempotensi, dan
 perlombaan penguncian. Semuanya harus tetap lulus setelah pemindahan, dan sekarang tanpa tiruan Core.
@@ -1726,9 +2131,9 @@ perlombaan penguncian. Semuanya harus tetap lulus setelah pemindahan, dan sekara
 
 **Rujukan.** [load dan concurrency testing](../../dev/20-load-and-concurrency-testing.md).
 
-**Bergantung pada.** F6-01.
+**Bergantung pada.** F7-01.
 
-### F6-04 — Arsipkan repo lama
+### F7-04 — Arsipkan repo lama
 
 **Kenapa.** Repo yang masih bisa ditulis akan menerima perubahan yang hilang, dan itu terjadi diam-diam.
 
@@ -1744,9 +2149,9 @@ perlombaan penguncian. Semuanya harus tetap lulus setelah pemindahan, dan sekara
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** F6-01.
+**Bergantung pada.** F7-01.
 
-### F6-05 — Perbarui dokumen yang terpengaruh
+### F7-05 — Perbarui dokumen yang terpengaruh
 
 **Kenapa.** Dokumen yang menggambarkan susunan lama akan menyesatkan orang berikutnya, dan repo ini sudah
 punya aturan bahwa fitur belum selesai sampai halamannya ada.
@@ -1774,9 +2179,9 @@ database per app sebagai keadaan sekarang.
 
 **Rujukan.** [keputusan satu runtime](00-keputusan.md).
 
-**Bergantung pada.** F6-02.
+**Bergantung pada.** F7-02.
 
-### F6-06 — Bersihkan sisa
+### F7-06 — Bersihkan sisa
 
 **Kenapa.** Beberapa berkas sudah tidak dipakai sebelum proyek ini dimulai, dan sekarang waktunya
 sekalian.
@@ -1796,28 +2201,118 @@ sebenarnya dipakai.
 
 **Rujukan.** Bagian 5.6 dokumen ini.
 
-**Bergantung pada.** F6-05.
+**Bergantung pada.** F7-05.
 
-## 14. Rencana mundur
+### F7-07 — Dokumentasi di luar folder desain ikut diperbarui
+
+**Kenapa.** Task pembaruan dokumen hanya mendaftar halaman di folder desain dan satu halaman orientasi.
+Yang terlewat justru yang paling spesifik menjelaskan susunan lama: panduan membangun app baru dengan
+sepuluh tahapnya, empat halaman orientasi, dan enam halaman arsitektur app. Totalnya sekitar 1.200 baris.
+
+**Berkas.**
+- `docs/apps/membangun-app-baru.md`
+- `docs/apps/management-aset/arsitektur/integrasi-core.md`
+- `docs/apps/management-aset/arsitektur/database.md`
+- `docs/apps/management-aset/arsitektur/kontrak.md`
+- `docs/apps/management-aset/arsitektur/pengujian.md`
+- `docs/apps/management-aset/arsitektur/batas-tenant-dan-organisasi.md`
+- `docs/apps/management-aset/arsitektur/index.md`
+- `docs/onboarding/hari-pertama.md`
+- `docs/onboarding/setup.md`
+- `docs/onboarding/index.md`
+- `docs/onboarding/definition-of-done.md`
+
+**Langkah.**
+1. Satu halaman per pull request, jangan sebelas sekaligus.
+2. Halaman integrasi Core menjelaskan empat klien HTTP yang sudah dihapus; ia ditulis ulang, bukan
+   ditambal.
+3. Panduan membangun app baru berubah menjadi panduan membangun modul baru, dan tahap yang menyebut
+   repositori dari template, masuk stack lokal, serta katalog dan release ikut berubah isinya.
+
+**Selesai bila.** Situs dokumentasi terbangun tanpa tautan mati, dan tidak ada halaman yang masih
+mengajarkan satu container per app sebagai keadaan sekarang.
+
+**Rujukan.** [keputusan satu runtime](00-keputusan.md).
+
+**Bergantung pada.** F7-02.
+
+### F7-08 — Cetakan modul baru menggantikan repo template
+
+**Kenapa.** Repo template dipakai untuk membuat app baru, dan disebut pada panduan membangun app serta
+tiga halaman orientasi. Setelah repo itu dipensiunkan, tidak ada satu pun task yang menyediakan
+penggantinya, sehingga membuat modul baru menjadi menyalin folder modul lama dan menebak apa yang harus
+diubah.
+
+**Berkas.**
+- `modules/_template/`
+- `apps/control-plane/app/Console/Commands/ModuleMakeCommand.php`
+- `docs/apps/membangun-app-baru.md`
+
+**Langkah.**
+1. Cetakan berisi bentuk minimal satu modul: manifest, satu migration bertabel berawalan, satu model
+   bertenant, satu rute, satu halaman, dan satu test.
+2. Perintah pembuat modul menyalin cetakan itu dan mengganti nama serta awalan tabelnya.
+3. Manifest cetakan memakai id `change-me` supaya dilewati registry, seperti perilaku yang sudah ada.
+
+**Selesai bila.** Perintah pembuat modul menghasilkan modul yang langsung lulus ketiga penjaga tanpa
+diubah.
+
+**Rujukan.** Bagian 5.1 dokumen ini.
+
+**Bergantung pada.** F7-04.
+
+### F7-09 — Keputusan yang mengeras dipindahkan ke desain kanonik
+
+**Kenapa.** Folder tempat dokumen ini berada adalah pekerjaan sekali jalan yang boleh dihapus setelah
+selesai. Aturan yang lahir dari pekerjaan ini harus berpindah menjadi desain kanonik, kalau tidak ia ikut
+terhapus bersama rencana kerjanya.
+
+**Berkas.**
+- `docs/dev/02-module-standard.md` (awalan tabel, `tenant_id` wajib, retensi)
+- `docs/dev/04-api-and-integration.md` (kontrak layanan Core yang boleh dipanggil modul)
+- `docs/dev/03-release-and-on-prem.md` (bentuk edisi dan bundle)
+- `docs/dev/11-local-docker-development.md` (susunan runtime)
+- `docs/todo/satu-runtime/` (dihapus setelah isinya pindah)
+
+**Langkah.**
+1. Pindahkan aturan, bukan menyalin. Setelah pindah, hapus dari dokumen rencana supaya tidak ada dua
+   sumber yang bisa menyimpang.
+2. Berkas bukti penjaga disimpan sebagai lampiran pada halaman standar app, karena ia menjelaskan kenapa
+   penjaganya berbentuk begitu.
+3. Folder rencana kerja dihapus terakhir, setelah seluruh isinya punya rumah baru.
+
+**Selesai bila.** Folder rencana kerja kosong dan dihapus, dan seluruh aturannya dapat ditemukan dari
+indeks desain kanonik.
+
+**Rujukan.** [ikhtisar](index.md).
+
+**Bergantung pada.** F7-07.
+
+## 15. Rencana mundur
 
 Setiap fase punya jalan mundur yang berbeda, dan jalannya harus diketahui sebelum fase dimulai.
 
 | Fase | Cara mundur | Yang hilang bila mundur |
 | --- | --- | --- |
-| 0 | Kembalikan PR penjaga | Tidak ada; belum ada kode dipindah |
-| 1 | Kembalikan PR pemuat modul | Tidak ada; Core belum bergantung padanya |
-| 2 | Repo lama masih ada dan belum diarsipkan sampai F6-04 | Pekerjaan pemindahan, bukan data |
-| 3 | Kembalikan ke halaman bingkai; kode UI modul masih ada | Tampilan menyatu |
-| 4 | Bundle lama masih bisa dibangun dari image lama | Kemampuan membuat edisi baru |
-| 5 | Skrip pengembangan lama ada di riwayat git | Kenyamanan, bukan kemampuan |
-| 6 | Tidak ada; ini fase penutup | Tidak ada |
+| 0 | Kembalikan pull request-nya | Tidak ada. Belum ada kode yang dipindah |
+| 1 | Kembalikan pull request penjaga dan modul contoh | Tidak ada. Core belum bergantung padanya |
+| 2 | Kembalikan pull request-nya; app lama masih berjalan sebagai container | Kerangka modul, bukan data |
+| 3 | Repo modul lama masih ada dan belum diarsipkan | Pekerjaan pemindahan, bukan data |
+| 4 | Balikkan seluruh task fase ini, lalu bangun ulang image UI modul | Bukan sekadar mengembalikan bingkai. Berkas pembangunan UI modul sudah dihapus, jadi tidak ada image yang bisa ditunjuk bingkai |
+| 5 | Tidak ada jalan mundur, karena bundle edisi belum pernah ada sebelumnya | Kemampuan yang memang belum pernah dimiliki |
+| 6 | Skrip lama ada di riwayat, tapi ia menuntut Dockerfile per app yang sudah dihapus pada fase 4 | Stack pengembangan yang berjalan, bukan sekadar kenyamanan |
+| 7 | Tidak ada. Ini fase penutup | Tidak ada |
 
-Titik yang tidak bisa dibalik dengan mudah adalah F6-04, yaitu saat repo lama diarsipkan. Sebelum itu,
-seluruh proyek bisa ditinggalkan dan sistem lama tetap bisa dijalankan.
+Titik yang tidak bisa dibalik dengan mudah adalah **F3-01**, yaitu saat repo modul ditarik masuk. Sejak
+itu pekerjaan bercabang, dan repo lama menjadi basi walau masih bisa ditulis. Pengarsipan repo pada fase
+7 hanya membuat keadaan itu terlihat, bukan menciptakannya.
 
-## 15. Ukuran keberhasilan
+Karena itu, sebelum F3-01 dijalankan, repo modul wajib dalam keadaan bersih dan seluruh commit-nya sudah
+terdorong ke remote. Pemeriksaan itu adalah langkah pertama task tersebut, bukan anggapan.
 
-Diperiksa saat fase 6 selesai, dan dibandingkan dengan angka pada
+## 16. Ukuran keberhasilan
+
+Diperiksa saat fase 7 selesai, dan dibandingkan dengan angka pada
 [dokumen keputusan](00-keputusan.md).
 
 | Yang diukur | Sebelum | Sasaran |
@@ -1827,6 +2322,6 @@ Diperiksa saat fase 6 selesai, dan dibandingkan dengan angka pada
 | Pemakaian memori idle | 275 MiB dengan satu modul | di bawah 250 MiB dengan dua modul |
 | Lompatan jaringan saat membuat satu dokumen | 3 | 0 |
 | Berkas React di bundel | satu per app ditambah shell | satu |
-| Image yang dibangun per rilis | 11 | 1 |
+| Image yang dibangun per rilis | 6 | 1 |
 | Langkah memasang di server pelanggan | belum pernah dibuktikan | satu skrip, terbukti di mesin virtual bersih |
 | Waktu satu fitur lintas modul | dua repo, dua PR | satu PR |
