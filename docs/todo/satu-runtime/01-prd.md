@@ -608,6 +608,30 @@ dan mencoba mendorong langsung ke cabang utama ditolak.
 
 **Bergantung pada.** F0-01. Mengunci cabang sebelum alurnya hijau berarti mengunci semua orang di luar.
 
+#### Terhalang: fitur ini tidak tersedia pada paket yang dipakai sekarang
+
+Dicoba 7 September 2026. Dua jalan yang disediakan GitHub keduanya ditolak dengan pesan yang sama:
+
+| Yang dicoba | Hasil |
+| --- | --- |
+| `PUT /repos/:owner/:repo/branches/main/protection` | 403, "Upgrade to GitHub Pro or make this repository public" |
+| `POST /repos/:owner/:repo/rulesets` | 403, pesan yang sama |
+
+Sebabnya organisasi `MettaDevs` memakai paket gratis dan repo ini privat. Penguncian cabang pada repo
+privat menuntut paket berbayar. Membuat repo ini publik bukan pilihan.
+
+Tiga jalan yang tersisa, dan keputusannya bukan keputusan teknis:
+
+| Jalan | Yang didapat | Yang tidak didapat |
+| --- | --- | --- |
+| Naik ke GitHub Team | penguncian penuh, persis seperti langkah task ini | biaya bulanan per anggota |
+| Hook `pre-push` yang dibagikan di repo | menolak dorongan langsung ke cabang utama dari mesin yang sudah menyetelnya | tidak menghalangi penggabungan pull request merah lewat antarmuka GitHub, dan bisa dilewati siapa pun yang belum menyetel `core.hooksPath` |
+| Alur yang gagal keras saat cabang utama merah | pemberitahuan cepat | tidak mencegah apa pun, hanya memberi tahu setelah terjadi |
+
+Sampai salah satunya dipilih, aturan ini ditegakkan orang, bukan mesin. Itu berarti seluruh kalimat
+"selesai bila test lulus" pada dokumen ini masih bersandar pada disiplin, dan itu keadaan yang sama
+dengan sebelum proyek dimulai. Task ini **tetap terbuka**.
+
 ## 8. Fase 1: penjaga batas dan kerangka modul
 
 **Kenapa penjaga sebelum kode.** Prinsip P2. Sistem lama gagal karena tidak ada yang menghentikan modul
