@@ -1461,3 +1461,29 @@ number_sequences:
       name: Nomor pemusnahan aset
       default_prefix: PMSA
       allowed_scopes: [legal_entity]
+
+# Laporan cetak/ekspor gaya Business Central. Dataset tetap milik app ini (kelas di
+# api/app/Reporting/Definitions); layout unggahan tenant, antrean ekspor, render, dan
+# halamannya milik Core. Kode diawali ID app; `permission` adalah hak membaca datanya.
+# Lihat docs/dev/23-document-rendering.md di repository CoreERP.
+reports:
+  - code: management-aset.work-order
+    name: Work order
+    description: Satu work order lengkap dengan baris pekerjaan dan checklist-nya.
+    permission: management-aset.pemeliharaan-aset.read
+    parameters: [id]
+    builtin_layouts:
+      - key: standar
+        name: Work order standar (Word)
+        description: Header, tabel baris pekerjaan, dan checklist per baris.
+        format: docx
+  - code: management-aset.daftar-work-order
+    name: Daftar work order
+    description: Seluruh work order dalam jangkauan Anda, satu baris per work order, untuk diolah di Excel.
+    permission: management-aset.pemeliharaan-aset.read
+    parameters: [status, dari, sampai]
+    builtin_layouts:
+      - key: standar
+        name: Daftar work order standar (Excel)
+        description: Satu lembar dengan kolom identitas, jadwal, dan ringkasan jam.
+        format: xlsx

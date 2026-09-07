@@ -138,11 +138,16 @@ def main() -> int:
         sys.exit(f"Not found: {API_DIR} or {CONTRACT}. Run this from the repo root.")
 
     routes = routes_from_laravel()
-    events = {route for route in routes if route[1].startswith("/api/internal/v1/")}
-    public = {route for route in routes if route[1].startswith("/api/v1/")}
+    contract = paths_in_contract()
+    internal = {route for route in routes if route[1].startswith("/api/internal/v1/")}
+    # Internal routes come in two shapes. Event receivers are contracted as
+    # channels in asyncapi.yaml. Request/response endpoints that Core calls --
+    # the report dataset, for instance -- are commands and queries, so they are
+    # contracted in openapi.yaml like any other REST surface and checked here.
+    events = {route for route in internal if route not in contract}
+    public = {route for route in routes if route[1].startswith("/api/v1/")} | (internal - events)
     unclassified = set(routes) - events - public
 
-    contract = paths_in_contract()
     undocumented = public - contract
     orphaned = contract - public
 

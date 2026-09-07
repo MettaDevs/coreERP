@@ -79,3 +79,11 @@ TipeLokasiAsetFilter:
   description: Membatasi daftar pada satu tipe lokasi aset.
   schema:
     $ref: '#/components/schemas/Ulid'
+KodeLaporan:
+  name: kode
+  in: path
+  required: true
+  description: Kode laporan seperti pada katalog `GET /laporan`, misalnya `work-order`.
+  schema:
+    type: string
+    pattern: ^[a-z0-9-]+$

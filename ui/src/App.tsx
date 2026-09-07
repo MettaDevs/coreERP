@@ -19,6 +19,7 @@ import { config as penjualanAset } from './transactions/penjualan-aset/config';
 import { config as pemusnahanAset } from './transactions/pemusnahan-aset/config';
 import { MASTERS, MasterResource, Permission, permission } from './master/masters';
 import FixedAssetSetupPlaceholderPage from './fixed-assets-setup/FixedAssetSetupPlaceholderPage';
+import { setParentOrigin } from './shell';
 
 /**
  * Alamat dibaca sebagai nama sumber daya diikuti ruas-ruas miliknya, misalnya
@@ -77,6 +78,7 @@ export default function App() {
             if (event.data?.type !== 'coreerp.context' || event.data?.appId !== 'management-aset')
                 return;
             applyCoreErpTheme(event.data.theme as CoreErpTheme);
+            setParentOrigin(event.origin);
             setContextToken(event.data.token);
             setAppContextToken(event.data.token);
             setContextReady(true);

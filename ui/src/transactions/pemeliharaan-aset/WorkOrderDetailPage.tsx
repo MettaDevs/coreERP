@@ -9,9 +9,11 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
+import { Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import EditShield from '../../_shared/EditShield';
+import { requestPrint, shellTersedia } from '../../shell';
 import {
     ChecklistRow,
     Context,
@@ -421,6 +423,10 @@ export default function WorkOrderDetailPage({
     checklistJobId?: string;
 }) {
     const can = izin(permissions);
+    // Cetak dikerjakan Core lewat Shell: dialog, layout, dan antreannya bukan milik app
+    // ini. Hak membaca work order sudah dipunyai karena halaman ini terbuka; Core dan
+    // app memeriksanya lagi saat dataset diminta.
+    const dapatMencetak = shellTersedia();
     const [record, setRecord] = useState<EditableWorkOrder | undefined>(
         mode === 'create' ? emptyWorkOrder() : undefined,
     );
@@ -960,6 +966,22 @@ export default function WorkOrderDetailPage({
                                         {transisi.label}
                                     </Button>
                                 ))}
+                        {record.id && dapatMencetak && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() =>
+                                    requestPrint({
+                                        report: 'work-order',
+                                        title: `Cetak work order ${record.kode ?? ''}`,
+                                        parameters: { id: record.id },
+                                    })
+                                }
+                            >
+                                <Printer />
+                                Cetak
+                            </Button>
+                        )}
                         <Button type="button" variant="outline" onClick={bukaDaftar}>
                             Kembali ke daftar
                         </Button>
