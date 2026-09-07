@@ -337,6 +337,9 @@ ulang walau task dibatalkan, supaya rujukan pada pull request lama tetap sah.
 sudah ada sebelum proyek dimulai. Selama keduanya belum beres, tidak ada task berikutnya yang bisa
 dibuktikan selesai.
 
+F0-04 lahir dari pengerjaan F0-01, bukan dari perencanaan. Nomornya mengikuti urutan lahir, bukan urutan
+kerja, sesuai aturan bahwa nomor task tidak dipakai ulang.
+
 **Kriteria keluar.** Sebuah pull request yang tidak mengubah apa pun lulus seluruh pemeriksaan otomatis,
 dan tidak ada berkas aturan yang melarang modul berjalan di runtime Core.
 
@@ -365,6 +368,69 @@ berjalan di mesin pengembang.
 **Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
 
 **Bergantung pada.** Tidak ada. Ini task pertama proyek.
+
+**Selesai.** Pull request [#27](https://github.com/MettaDevs/coreERP/pull/27), 7 September 2026. Alur
+test hijau di PHP 8.4 dan 8.5 dengan 198 test dan 942 asersi, jumlah yang sama dengan mesin pengembang.
+
+#### Yang ternyata berbeda dari dugaan task ini
+
+Task ini menyebut satu penyebab. Ada empat, dan tiga sisanya tersembunyi karena langkah pertama alur
+selalu mati lebih dulu:
+
+| Penghalang | Disebut task ini |
+| --- | --- |
+| `composer install` gagal di PHP 8.3: lock menuntut `>= 8.4.1`, `composer.json` menulis `^8.3` | tidak |
+| Pint 7 berkas, Prettier 10 berkas, ESLint 126 kesalahan | tidak |
+| PHPStan level 7 melaporkan 348 temuan sejak commit pertama | tidak |
+| Alur test tidak menyediakan PostgreSQL | ya |
+
+Karena Pint berada di langkah paling awal alur linter, tiga pemeriksaan sesudahnya — Prettier, ESLint,
+dan cakupan kontrak internal — tidak pernah dijalankan satu kali pun sejak repo dibuat. Pelajarannya
+berlaku untuk seluruh dokumen ini: **alur yang gagal tidak melaporkan apa lagi yang akan gagal.** Angka
+kegagalan yang terlihat selalu batas bawah.
+
+#### Bug yang hanya bisa ketahuan setelah suitenya berjalan
+
+`NumberSequenceConcurrencyTest` memakai `DatabaseTruncation`, dan daftar pengecualiannya ketinggalan dua
+tabel referensi yang diisi migrasi, yaitu `party_types` dan `country_regions`. Ia mengosongkan keduanya,
+lalu tiga test pada berkas lain gagal dengan pesan yang terbaca seperti bug berkas itu sendiri. Kedua
+tabel ditambahkan 24 Agustus dan 5 September 2026, jadi jebakan ini menunggu dua minggu tanpa terlihat.
+
+Daftar itu kini lengkap dan membawa perintah untuk memeriksanya. Aturan yang lahir dari sini: **setiap
+tabel yang diisi migrasi harus terdaftar sebagai pengecualian pemangkasan.** Modul yang masuk pada fase
+berikutnya akan membawa tabel referensinya sendiri, jadi aturan ini akan diuji lagi.
+
+#### Dua keputusan yang perlu diketahui pembaca berikutnya
+
+**Baseline PHPStan.** 348 temuan tidak bisa diperbaiki dalam satu pull request, dan menurunkan level
+berarti kode modul yang masuk nanti diperiksa selemah kode lama. Yang lama dibekukan di
+`apps/control-plane/phpstan-baseline.neon`; kode baru diperiksa penuh di level 7. Berkas itu hanya boleh
+menyusut, dan menambah baris ke dalamnya ditolak saat peninjauan. Sudah dibuktikan masih bisa gagal
+lewat kelas bercacat sengaja, sesuai bagian 4.5.
+
+**`import/order` dimatikan pada enam berkas antarmuka.** Berkas itu membawa penanda `@chisel-*`, dan
+`laravel/chisel` menghapus kode di antara sepasang penanda saat sebuah fitur dimatikan. Menata ulang
+impor memindahkan penandanya, sehingga penghapusan fitur akan membuang baris yang salah. Ini ketahuan
+karena `composer update --lock` memicu `install:features` dan mengubah 13 berkas di luar task ini;
+semuanya dikembalikan. **Jangan menjalankan `composer update` di repo ini tanpa memeriksa berkas yang
+ikut berubah.**
+
+#### Alur linter juga disentuh, dan itu memang perlu
+
+Alur linter melaporkan tujuh pelanggaran urutan impor yang tidak muncul di mesin pengembang, karena
+`resources/js/actions`, `resources/js/routes`, dan `resources/js/wayfinder` tidak ikut di-commit dan
+hanya lahir dari `wayfinder:generate`. Tanpa berkasnya, resolver ESLint gagal menemukan modulnya dan
+menggolongkannya sebagai paket luar. Alur test tidak terkena karena `npm run build` membuatnya sebagai
+efek samping. Langkah pembuatan berkas itu kini ada pada alur linter.
+
+Ini contoh lain dari pola yang sama: pemeriksaan yang melihat pohon berkas berbeda dari yang dilihat
+pengembang akan menuntut hal yang justru ditolak di mesin pengembang.
+
+#### Yang sengaja ditinggalkan
+
+`npm run types:check` melaporkan empat kesalahan `TS2322` yang identik: komponen `Heading` menerima
+prop `icon` yang tidak ada pada tipenya. Keempatnya sudah ada di cabang utama sebelum task ini, dan
+`tsc` tidak dijalankan alur mana pun. Memasukkan `tsc` ke alur adalah task tersendiri; lihat F0-04.
 
 ### F0-02 — Aturan kerja repo diselaraskan
 
@@ -418,6 +484,30 @@ wajib disimpan 25 tahun.
 tersimpan di katalog.
 
 **Rujukan.** [standar app](../../dev/02-module-standard.md).
+
+**Bergantung pada.** F0-01.
+
+### F0-04 — `tsc` masuk ke alur linter
+
+**Kenapa.** Berkas TypeScript diperiksa ESLint dan Prettier, tapi tipenya tidak pernah diperiksa mesin
+mana pun. Empat kesalahan `TS2322` sudah berdiri di cabang utama dan tidak ada yang menahannya. Fase 4
+menyatukan antarmuka modul ke dalam build Core, dan antarmuka modul akan mengimpor tipe dari Core; tanpa
+pemeriksaan tipe, ketidakcocokan itu baru terlihat saat halaman dibuka.
+
+**Berkas.**
+- `.github/workflows/lint.yml`
+- `apps/control-plane/resources/js/components/heading.tsx` atau pemanggilnya
+
+**Langkah.**
+1. Perbaiki empat kesalahan yang ada. Putuskan apakah `Heading` memang harus menerima `icon`, lalu
+   perbaiki tipenya atau buang prop itu dari keempat pemanggil.
+2. Tambahkan langkah `npm run types:check` pada alur linter, setelah berkas Wayfinder dibuat.
+3. Buktikan langkah itu bisa gagal dengan satu kesalahan tipe yang sengaja dibuat, lalu kembalikan.
+
+**Selesai bila.** `npm run types:check` hijau di alur, dan sebuah kesalahan tipe yang sengaja
+dimasukkan membuat alur merah.
+
+**Rujukan.** F0-01 pada dokumen ini.
 
 **Bergantung pada.** F0-01.
 
