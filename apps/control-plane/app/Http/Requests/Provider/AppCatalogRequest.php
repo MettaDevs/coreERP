@@ -104,6 +104,21 @@ class AppCatalogRequest extends FormRequest
             'workflow_types.*.name' => ['required', 'string', 'max:160'],
             'workflow_types.*.scope' => ['nullable', Rule::in(['tenant', 'legal_entity'])],
             'workflow_types.*.decision_context_schema' => ['required', 'array'],
+
+            // Laporan cetak/ekspor. Dataset tetap milik app; Core hanya mengenal
+            // katalognya. Lihat docs/dev/23-document-rendering.md.
+            'reports' => ['nullable', 'array'],
+            'reports.*.code' => ['required', 'string', 'max:160', 'regex:/^[a-z0-9][a-z0-9.-]*$/'],
+            'reports.*.name' => ['required', 'string', 'max:160'],
+            'reports.*.description' => ['nullable', 'string', 'max:500'],
+            'reports.*.permission' => ['required', 'string', 'max:160'],
+            'reports.*.parameters' => ['nullable', 'array'],
+            'reports.*.parameters.*' => ['required', 'string', 'max:60', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'reports.*.builtin_layouts' => ['required', 'array', 'min:1'],
+            'reports.*.builtin_layouts.*.key' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9-]+$/'],
+            'reports.*.builtin_layouts.*.name' => ['required', 'string', 'max:120'],
+            'reports.*.builtin_layouts.*.description' => ['nullable', 'string', 'max:500'],
+            'reports.*.builtin_layouts.*.format' => ['required', Rule::in(['docx', 'xlsx'])],
         ];
     }
 
@@ -235,6 +250,26 @@ class AppCatalogRequest extends FormRequest
                 if (! str_starts_with((string) $code, $appId.'.')) {
                     $validator->errors()->add('workflow_types', 'Kode jenis workflow harus memakai ID app sebagai awalan.');
                     break;
+                }
+            }
+
+            $reportCodes = $this->collect('reports')->pluck('code')->all();
+            if (count($reportCodes) !== count(array_unique($reportCodes))) {
+                $validator->errors()->add('reports', 'Kode laporan tidak boleh duplikat.');
+            }
+            $permissionCodes = array_flip($this->collect('security.permissions')->pluck('code')->all());
+            foreach ($this->collect('reports') as $index => $report) {
+                if (! str_starts_with((string) ($report['code'] ?? ''), $appId.'.')) {
+                    $validator->errors()->add("reports.$index.code", 'Kode laporan harus memakai ID app sebagai awalan.');
+                }
+                // Permission laporan harus permission yang dideklarasikan app ini; laporan
+                // yang menunjuk hak app lain tidak dapat ditegakkan siapa pun.
+                if (! isset($permissionCodes[$report['permission'] ?? ''])) {
+                    $validator->errors()->add("reports.$index.permission", 'Permission laporan harus salah satu permission app ini.');
+                }
+                $keys = array_column($report['builtin_layouts'] ?? [], 'key');
+                if (count($keys) !== count(array_unique($keys))) {
+                    $validator->errors()->add("reports.$index.builtin_layouts", 'Kunci layout bawaan tidak boleh duplikat.');
                 }
             }
         }];
@@ -378,6 +413,24 @@ class AppCatalogRequest extends FormRequest
     }
 
     /** @return list<array{code:string,name:string,scope:string,decision_context_schema:array<string,mixed>}> */
+    /** @return list<array{code:string,name:string,description:?string,permission:string,parameters:list<string>,builtin_layouts:list<array{key:string,name:string,description:?string,format:string}>}> */
+    public function reportsPayload(): array
+    {
+        return array_values($this->collect('reports')->map(fn (array $report): array => [
+            'code' => (string) $report['code'],
+            'name' => (string) $report['name'],
+            'description' => isset($report['description']) ? (string) $report['description'] : null,
+            'permission' => (string) $report['permission'],
+            'parameters' => array_values(array_map('strval', $report['parameters'] ?? [])),
+            'builtin_layouts' => array_values(array_map(fn (array $layout): array => [
+                'key' => (string) $layout['key'],
+                'name' => (string) $layout['name'],
+                'description' => isset($layout['description']) ? (string) $layout['description'] : null,
+                'format' => (string) $layout['format'],
+            ], $report['builtin_layouts'] ?? [])),
+        ])->all());
+    }
+
     public function workflowTypesPayload(): array
     {
         return array_values($this->collect('workflow_types')->map(fn (array $type): array => [

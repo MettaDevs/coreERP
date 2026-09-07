@@ -29,6 +29,7 @@ class AppCatalogController extends Controller
             $request->workflowTypesPayload(),
             $request->dataPoliciesPayload(),
             $request->dependenciesPayload(),
+            $request->reportsPayload(),
         );
 
         return response()->json(['data' => $this->present($app)], $app->wasRecentlyCreated ? 201 : 200);

@@ -42,6 +42,8 @@ Target yang dikunci:
 | [20-load-and-concurrency-testing.md](20-load-and-concurrency-testing.md) | Gate concurrency wajib sebelum modul dinyatakan selesai: 1000+ VU, 100+ tenant, multi-instance, penguncian endpoint pengganti, dan oracle kebenaran |
 | [21-visual-workflow-engine.md](21-visual-workflow-engine.md) | Visual Workflow Engine: tipe workflow manifest, editor visual, resolusi assignee, inbox persetujuan terpusat, dan callback event v2 |
 | [22-ci-cd.md](22-ci-cd.md) | CI/CD polyrepo, runner trust zone, immutable image, promotion, signing, dan bundle on-prem |
+| [23-document-rendering.md](23-document-rendering.md) | Dokumen cetak gaya Business Central: dataset milik app, layout Word/Excel milik tenant, engine render milik Core, ekspor di latar belakang |
+| [24-global-address-book.md](24-global-address-book.md) | Buku alamat gaya Global Address Book: party, alamat pos, kontak elektronik; organisasi tenant adalah party, dan kop dokumen membaca alamatnya dari sini |
 
 ## Referensi utama
 

@@ -7,16 +7,22 @@ use App\Http\Controllers\Access\RoleController;
 use App\Http\Controllers\Access\SecurityConfigurationController;
 use App\Http\Controllers\AppLaunchManifestController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
+use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
+use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;
 use App\Http\Controllers\NumberSequence\NumberSequenceController;
 use App\Http\Controllers\Onboarding\BusinessRegistrationController;
 use App\Http\Controllers\Onboarding\InvitationRedemptionController;
 use App\Http\Controllers\Organization\OrganizationController;
+use App\Http\Controllers\Organization\PrintIdentityController;
 use App\Http\Controllers\Organization\WorkspaceContextController;
 use App\Http\Controllers\Provider\AppCatalogController;
 use App\Http\Controllers\Provider\AppReleaseController;
 use App\Http\Controllers\Provider\AppServiceCredentialController;
 use App\Http\Controllers\Provider\IdentityMonitorController;
 use App\Http\Controllers\ReferenceData\UnitOfMeasureController;
+use App\Http\Controllers\Reporting\ReportController;
+use App\Http\Controllers\Reporting\ReportExportController;
+use App\Http\Controllers\Reporting\ReportLayoutController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
 use App\Models\CoreApp;
@@ -137,6 +143,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index');
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
     Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
+    // Laporan cetak/ekspor untuk semua app; lihat docs/dev/23-document-rendering.md.
+    Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index');
+    Route::get('reports/exports', [ReportExportController::class, 'page'])->name('report-exports.index');
     Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
@@ -209,6 +218,19 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
         Route::post('number-sequences/{sequence}/advance', [NumberSequenceController::class, 'advance'])->name('number-sequences.advance');
         Route::get('fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
+        Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('report-exports', [ReportExportController::class, 'index'])->name('report-exports.list');
+        Route::get('report-exports/{id}/download', [ReportExportController::class, 'download'])->name('report-exports.download');
+        Route::get('report-exports/{id}', [ReportExportController::class, 'show'])->name('report-exports.show');
+        Route::delete('report-exports/{id}', [ReportExportController::class, 'destroy'])->name('report-exports.destroy');
+        Route::get('reports/{code}/fields', [ReportController::class, 'fields'])->name('reports.fields');
+        Route::get('reports/{code}/layouts', [ReportLayoutController::class, 'index'])->name('reports.layouts.index');
+        Route::post('reports/{code}/layouts', [ReportLayoutController::class, 'store'])->name('reports.layouts.store');
+        Route::put('reports/{code}/layout-default', [ReportLayoutController::class, 'setDefault'])->name('reports.layouts.default');
+        Route::get('reports/{code}/layouts/{ref}/file', [ReportLayoutController::class, 'file'])->name('reports.layouts.file');
+        Route::post('reports/{code}/layouts/{id}', [ReportLayoutController::class, 'update'])->name('reports.layouts.update');
+        Route::delete('reports/{code}/layouts/{id}', [ReportLayoutController::class, 'destroy'])->name('reports.layouts.destroy');
+        Route::post('reports/{code}/exports', [ReportExportController::class, 'store'])->name('reports.exports.store');
         Route::get('units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index');
         Route::post('units-of-measure/classes', [UnitOfMeasureController::class, 'storeClass'])->name('units-of-measure.classes.store');
         Route::post('units-of-measure/systems', [UnitOfMeasureController::class, 'storeSystem'])->name('units-of-measure.systems.store');
@@ -220,6 +242,21 @@ Route::middleware(['auth'])->group(function () {
         Route::post('fiscal-calendars/{calendar}/assign', [FiscalCalendarController::class, 'assign'])->name('fiscal-calendars.assign');
         Route::post('organizations', [OrganizationController::class, 'store'])->name('organizations.store');
         Route::patch('organizations/{organization}', [OrganizationController::class, 'update'])->name('organizations.update');
+        // Identitas cetak: kop, footer, dan logo per organisasi; lihat docs/dev/23-document-rendering.md.
+        Route::get('organizations/{organization}/locations', [OrganizationLocationController::class, 'index'])->name('organizations.locations.index');
+        Route::post('organizations/{organization}/locations', [OrganizationLocationController::class, 'store'])->name('organizations.locations.store');
+        Route::put('organizations/{organization}/locations/{location}', [OrganizationLocationController::class, 'update'])->name('organizations.locations.update');
+        Route::delete('organizations/{organization}/locations/{location}', [OrganizationLocationController::class, 'destroy'])->name('organizations.locations.destroy');
+        Route::get('organizations/{organization}/contacts', [OrganizationContactController::class, 'index'])->name('organizations.contacts.index');
+        Route::post('organizations/{organization}/contacts', [OrganizationContactController::class, 'store'])->name('organizations.contacts.store');
+        Route::put('organizations/{organization}/contacts/{contact}', [OrganizationContactController::class, 'update'])->name('organizations.contacts.update');
+        Route::delete('organizations/{organization}/contacts/{contact}', [OrganizationContactController::class, 'destroy'])->name('organizations.contacts.destroy');
+        Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
+        Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
+        Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');
+        Route::get('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'logo'])->name('organizations.print-identity.logos.show');
+        Route::patch('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'updateLogo'])->name('organizations.print-identity.logos.update');
+        Route::delete('organizations/{organization}/print-identity/logos/{logo}', [PrintIdentityController::class, 'destroyLogo'])->name('organizations.print-identity.logos.destroy');
         Route::get('invitation-codes', [InvitationCodeController::class, 'index'])->name('invitation-codes.index');
         Route::post('invitation-codes', [InvitationCodeController::class, 'store'])
             ->middleware('throttle:20,1')

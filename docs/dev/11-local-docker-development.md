@@ -12,7 +12,7 @@ D:\Kerja\
     └─ .env                  # rahasia lokal, tidak di-commit
 ```
 
-`erp-dev` memakai Compose project `erp`; Docker Desktop mengelompokkan `core-app`, `core-db`, `<app>-api`, `<app>-ui`, `<app>-db`, dan `docs` di bawahnya. Ia bukan repository domain dan tidak mengubah ownership aplikasi.
+`erp-dev` memakai Compose project `erp`; Docker Desktop mengelompokkan `core-app`, `core-worker`, `core-scheduler`, `core-db`, `core-renderer`, `<app>-api`, `<app>-ui`, `<app>-db`, dan `docs` di bawahnya. `core-renderer` adalah engine PDF milik platform pada network internal tanpa jalan keluar; `core-app` dan `core-worker` berbagi volume `core-storage` untuk layout unggahan dan hasil ekspor laporan. Lihat [dokumen cetak, layout, dan ekspor](23-document-rendering.md). Ia bukan repository domain dan tidak mengubah ownership aplikasi.
 
 Service `docs` menyajikan situs dokumentasi CoreERP pada `http://localhost:18090`. Ia dibangun dari `CoreERP/docs` dengan pola yang sama seperti UI app — artifact dibangun saat build image, lalu disajikan nginx — sehingga perubahan dokumen tampil setelah `start.ps1 -Build`. Untuk menulis dokumen, jalankan `npm run docs:dev` dari `CoreERP/docs` di host agar mendapat hot reload.
 

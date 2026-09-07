@@ -92,6 +92,7 @@ class RegisterAppManifestCommand extends Command
             $request->workflowTypesPayload(),
             $request->dataPoliciesPayload(),
             $request->dependenciesPayload(),
+            $request->reportsPayload(),
         );
 
         $this->components->info(sprintf(
@@ -136,6 +137,7 @@ class RegisterAppManifestCommand extends Command
             'security' => $manifest['security'] ?? [],
             'number_sequences' => $manifest['number_sequences'] ?? [],
             'workflow_types' => $manifest['workflow_types'] ?? [],
+            'reports' => $manifest['reports'] ?? [],
         ];
     }
 
@@ -183,6 +185,7 @@ class RegisterAppManifestCommand extends Command
         $this->components->twoColumnDetail('<fg=gray>Reference nomor</>', (string) count($request->numberSequenceReferencesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Jenis workflow</>', (string) count($request->workflowTypesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Policy data</>', (string) count($request->dataPoliciesPayload()));
+        $this->components->twoColumnDetail('<fg=gray>Laporan</>', (string) count($request->reportsPayload()));
     }
 
     /** Opsi CLI yang kosong dianggap tidak diisi sehingga manifest tetap dipakai. */

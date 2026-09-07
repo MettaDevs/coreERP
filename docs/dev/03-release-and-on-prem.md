@@ -169,6 +169,9 @@ services:
     image: coreerp/core-api:1.0.0
   core-db:
     image: postgres:17
+  # Engine render PDF milik platform; stateless, dipakai semua app. Lihat 23-document-rendering.md.
+  core-renderer:
+    image: gotenberg/gotenberg:8
   pos-api:
     image: coreerp/pos-api:1.0.0
   pos-ui:
@@ -188,6 +191,8 @@ services:
 ```
 
 Jika customer tidak membeli Booking, seluruh `booking-*` dan `pos-booking-bridge` tidak muncul pada manifest, inventaris bundle, Compose file, image cache, atau database server. Dalam production cloud, `pos-db` dapat berarti database logis pada cluster managed; Compose menunjukkan boundary yang mudah dipahami pada server customer.
+
+`core-renderer` adalah engine render dokumen milik Core: ia hanya mengubah berkas Office yang sudah diisi Core menjadi PDF, tidak menyimpan data, dan selalu ikut bundle. Ekspor laporan semua app dikerjakan `core-worker`; jumlah replica-nya adalah angka di compose customer, dan web serta worker Core berbagi volume storage.
 
 `core-api` menyimpan identitas administrator lokal, manifest app aktif, riwayat instalasi, dan lisensi perpetual yang telah diverifikasi. `core-db` adalah database milik platform core; ia bukan database POS atau Booking. Control plane vendor **tidak** dijalankan pada server customer, juga tidak dibutuhkan agar deployment berfungsi. Images dapat dimuat dari bundle release (misalnya `docker load`) sehingga server runtime tidak perlu memiliki akses registry vendor.
 

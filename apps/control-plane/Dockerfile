@@ -1,7 +1,8 @@
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+# ext-gd hanya ada pada image runtime di bawah; image composer tidak membawanya.
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --ignore-platform-req=ext-gd
 COPY . .
 RUN php artisan wayfinder:generate --with-form --no-interaction
 
@@ -26,8 +27,10 @@ COPY vite.config.ts tsconfig.json ./
 RUN npm run build
 
 FROM php:8.4-apache
-RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev unzip \
-    && docker-php-ext-install bcmath intl pdo_pgsql pgsql zip \
+# gd dibutuhkan PhpSpreadsheet (layout Excel laporan); zip oleh PhpWord dan PhpSpreadsheet.
+RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev unzip \
+    && docker-php-ext-configure gd --with-jpeg \
+    && docker-php-ext-install bcmath gd intl pdo_pgsql pgsql zip \
     && a2enmod rewrite proxy proxy_http \
     && sed -ri 's!/var/www/html!/var/www/html/public!g' /etc/apache2/sites-available/000-default.conf \
     && rm -rf /var/lib/apt/lists/*
