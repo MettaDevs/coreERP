@@ -61,6 +61,7 @@ Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, atu
 | [Penempatan dan mutasi](/apps/management-aset/transaction/penempatan/) | Perpindahan dan kenapa riwayatnya tidak ditimpa |
 | [Proses penyusutan](/apps/management-aset/transaction/penyusutan/) | Proposal, finalisasi, pembalikan |
 | [Pemeliharaan aset](/apps/management-aset/transaction/pemeliharaan-aset/) | Work order dan mesin statusnya |
+| [Laporan dan ekspor](/apps/management-aset/transaction/laporan/) | Dataset dan layout bawaan yang diminta Core untuk dicetak |
 | [Dokumen siklus aset](/apps/management-aset/transaction/siklus-aset/) | Dekomisioning, penjualan, pemusnahan |
 | [Monitoring dan layar kosong](/apps/management-aset/transaction/monitoring/) | Ringkasan aset, dan dua layar setup yang sengaja belum berisi |
 

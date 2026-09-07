@@ -1,8 +1,8 @@
 import { Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
-import Heading from '@/components/heading';
 import { Button } from '@apperp/ui/button';
 import { Separator } from '@apperp/ui/separator';
+import Heading from '@/components/heading';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
@@ -29,6 +29,16 @@ const sidebarNavItems: NavItem[] = [
     {
         title: 'Konfigurasi workflow',
         href: '/settings/workflows',
+        icon: null,
+    },
+    {
+        title: 'Layout laporan',
+        href: '/settings/report-layouts',
+        icon: null,
+    },
+    {
+        title: 'Ekspor laporan',
+        href: '/reports/exports',
         icon: null,
     },
     {

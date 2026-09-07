@@ -3,6 +3,8 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import {
     Building2,
     Database,
+    FileOutput,
+    FileText,
     KeyRound,
     LayoutDashboard,
     Hash,
@@ -42,8 +44,8 @@ function TruncatedLabel({ children }: { children: string }) {
         const observer = new ResizeObserver(update);
 
         if (label.current) {
-observer.observe(label.current);
-}
+            observer.observe(label.current);
+        }
 
         return () => observer.disconnect();
     }, [children]);
@@ -55,8 +57,8 @@ observer.observe(label.current);
     );
 
     if (!truncated) {
-return content;
-}
+        return content;
+    }
 
     return (
         <Tooltip>
@@ -80,6 +82,15 @@ export function AppSidebar() {
                     icon: LayoutDashboard,
                     href: '/dashboard',
                 },
+                ...(props.auth.membership
+                    ? [
+                          {
+                              label: 'Ekspor laporan',
+                              icon: FileOutput,
+                              href: '/reports/exports',
+                          },
+                      ]
+                    : []),
             ],
         },
         ...(props.auth.membership
@@ -135,6 +146,11 @@ export function AppSidebar() {
                                         label: 'Satuan',
                                         icon: Ruler,
                                         href: '/settings/units-of-measure',
+                                    },
+                                    {
+                                        label: 'Layout laporan',
+                                        icon: FileText,
+                                        href: '/settings/report-layouts',
                                     },
                                 ],
                             },

@@ -128,6 +128,7 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 | `dependsOn` | Tidak, bila app berdiri sendiri | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu. |
 | `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
+| `reports` | Hanya bila app punya dokumen cetak atau ekspor | Laporan muncul di katalog Core; admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Dataset tetap diminta ke app; lihat [dokumen cetak](23-document-rendering.md) |
 
 App tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, app meminta nomor lewat API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`, dengan `idempotency_key` wajib. Detailnya di [Number sequence](14-number-sequences.md).
 

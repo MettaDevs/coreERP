@@ -161,6 +161,7 @@ Pola kode keamanan mengikuti `<app>.<resource>.<aksi>` — Control Plane menolak
 | `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat role diberikan ke anggota |
 | `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** (`settings/number-sequences`) untuk diaktifkan admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
+| `reports` | Hanya bila app punya dokumen cetak atau ekspor | Laporan masuk katalog Core; layout, antrean, dan render milik Core, app hanya menyediakan dataset lewat `internal/v1/laporan`. Lihat [dokumen cetak](/dev/23-document-rendering) |
 
 Contoh reference nomor:
 
@@ -259,6 +260,59 @@ satu-satunya bukti app benar-benar hidup — ketika container UI mati, reverse p
 membalas halaman errornya sendiri dan halaman itu **berhasil** dimuat di iframe.
 App yang tidak pernah mengumumkan diri akan ditampilkan shell sebagai gagal dimuat
 setelah beberapa detik.
+
+### Mencetak lewat Shell
+
+App tidak merender dokumen. Tombol Cetak hanya mengirim kode laporan dan parameternya ke
+Shell; Core yang menawarkan layout, mengantrekan ekspor, dan memberi tahu hasilnya:
+
+```ts
+window.parent.postMessage(
+    {
+        type: 'coreerp.print',
+        appId: '<app-id>',
+        report: 'purchase-order',          // kode pada blok `reports`, tanpa awalan ID app
+        title: 'Cetak purchase order PO-000012',
+        parameters: { id: '<ulid>' },      // nama parameter sesuai manifest; validasi di app
+    },
+    parentOrigin,
+);
+```
+
+Yang harus ada di app: blok `reports` di manifest, kelas dataset, dan tiga rute
+`internal/v1/laporan` yang dikontrak di OpenAPI. Semuanya dijelaskan di
+[dokumen cetak, layout, dan ekspor](/dev/23-document-rendering).
+
+### Memberi tahu pengguna lewat lonceng Shell
+
+Kejadian yang selesai di latar belakang — ekspor siap diunduh, proses gagal — dikirim ke
+lonceng di header Shell, bukan hanya ditampilkan sebagai toast di dalam iframe, supaya
+pengguna yang sudah pindah ke aplikasi lain tetap mendapat kabarnya:
+
+```ts
+window.parent.postMessage(
+    {
+        type: 'coreerp.notification',
+        appId: '<app-id>',
+        notification: {
+            id: 'ekspor:<id>',        // stabil per kejadian; id sama memperbarui, bukan menggandakan
+            level: 'success',         // info | success | warning | error
+            title: 'Work order siap diunduh',
+            body: 'PMHA-000012.pdf · layout standar',
+            view: 'laporan',          // id item navigasi pada app.yaml yang dibuka saat diklik
+        },
+    },
+    parentOrigin,
+);
+```
+
+Shell memeriksa sumber, origin, dan `appId` seperti pada `coreerp.ready`, lalu menyimpan
+notifikasi di browser pengguna (localStorage per tenant dan user, dibatasi jumlah dan
+umur). Tidak ada tabel atau endpoint di Core untuk ini: notifikasi adalah pemberitahuan
+ringan, sumber kebenarannya tetap di app. Konsekuensinya, pemberitahuan hanya ada di
+browser tempat ia diterima; app yang menampilkan riwayat sendiri sebaiknya mengulang
+pemberitahuan yang belum pernah disampaikan saat dibuka kembali. Hasil ekspor laporan
+tidak perlu dikirim app: Shell sendiri yang memantau Core dan mengumumkannya.
 
 Teks untuk pengguna bisnis memakai bahasa sehari-hari. Istilah internal — `entitlement`, `artifact`, `placement`, `tenant_id` — dilarang tampil.
 
