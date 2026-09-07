@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
+import { Button } from '@apperp/ui/button';
 import { DataTable, type DataTableColumn, type DataTableRowAction } from '@apperp/ui/data-table';
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
+import { FileOutput } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errorMessage } from '../../api';
+import { requestPrint, shellTersedia } from '../../shell';
 import {
     STATUS,
     StatusBadge,
@@ -28,6 +31,7 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
     const [hanyaPekerjaanSaya, setHanyaPekerjaanSaya] = useState(false);
     const [pekerjaanSaya, setPekerjaanSaya] = useState<Record<string, unknown>[]>([]);
     const [search, setSearch] = useState('');
+    const dapatMengekspor = shellTersedia();
 
     useEffect(() => {
         api<{ data: WorkOrder[] }>('/pemeliharaan-aset')
@@ -192,6 +196,22 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
                     <ActionButton action="create" type="button" onClick={bukaWorkOrderBaru}>
                         Tambah work order
                     </ActionButton>
+                )}
+                {dapatMengekspor && !hanyaPekerjaanSaya && (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                            requestPrint({
+                                report: 'daftar-work-order',
+                                title: 'Ekspor daftar work order',
+                                parameters: {},
+                            })
+                        }
+                    >
+                        <FileOutput />
+                        Ekspor daftar
+                    </Button>
                 )}
             </RecordActionBar>
 

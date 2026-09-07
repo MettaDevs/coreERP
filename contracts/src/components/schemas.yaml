@@ -1567,3 +1567,67 @@ JenisAsetAtributDefinisi:
                     $ref: '#/components/schemas/Ulid'
                   nilai:
                     type: string
+LaporanField:
+  type: object
+  required: [key, label, table]
+  properties:
+    key:
+      type: string
+      description: Nama placeholder, dipakai sebagai `${key}` pada layout.
+    label:
+      type: string
+    table:
+      type: [string, 'null']
+      description: Nama tabel bila kolom ini diulang per baris.
+LaporanDefinisi:
+  type: object
+  required: [kode, nama, fields, parameters, builtin_layouts]
+  properties:
+    kode:
+      type: string
+    nama:
+      type: string
+    fields:
+      type: array
+      items:
+        $ref: '#/components/schemas/LaporanField'
+    parameters:
+      type: array
+      items:
+        type: string
+    builtin_layouts:
+      type: array
+      items:
+        type: object
+        required: [key, name, description, format]
+        properties:
+          key:
+            type: string
+          name:
+            type: string
+          description:
+            type: [string, 'null']
+          format:
+            type: string
+            enum: [docx, xlsx]
+LaporanDataset:
+  type: object
+  required: [fields, tables, file_name]
+  properties:
+    fields:
+      type: object
+      description: Nilai tunggal siap tampil; tanggal dan angka sudah diformat app.
+      additionalProperties:
+        type: [string, number, 'null']
+    tables:
+      type: object
+      description: Baris yang diulang per tabel; kunci tabel adalah awalan placeholder.
+      additionalProperties:
+        type: array
+        items:
+          type: object
+          additionalProperties:
+            type: [string, number, 'null']
+    file_name:
+      type: string
+      description: Nama berkas hasil tanpa ekstensi.

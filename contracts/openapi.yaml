@@ -37,6 +37,8 @@ tags:
   description: Proposal dan finalisasi penyusutan beserta bridge internal tanpa posting GL.
 - name: Reference data
   description: Referensi konfigurasi yang dibaca oleh form dan proses Management Aset.
+- name: Laporan
+  description: Definisi, layout bawaan, dan dataset laporan yang dipanggil Core atas nama pengguna.
 paths:
   /api/v1/health:
     get:
@@ -3658,6 +3660,108 @@ paths:
         description: Pembalikan dan bridge internal dibuat tanpa posting GL
         '409':
           description: Periode tidak dapat dibalik
+  /api/internal/v1/laporan/{kode}:
+    get:
+      tags:
+      - Laporan
+      operationId: internalShowReport
+      summary: Definisi laporan untuk Core; placeholder, parameter, dan layout bawaan
+      parameters:
+      - $ref: '#/components/parameters/KodeLaporan'
+      responses:
+        '200':
+          description: Definisi laporan
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/LaporanDefinisi'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Pengguna pada token tidak memegang permission data laporan ini
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/internal/v1/laporan/{kode}/layouts/{key}:
+    get:
+      tags:
+      - Laporan
+      operationId: internalDownloadBuiltinLayout
+      summary: Berkas layout bawaan yang ikut release app
+      parameters:
+      - $ref: '#/components/parameters/KodeLaporan'
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9-]+$
+      responses:
+        '200':
+          description: Berkas .docx atau .xlsx
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Pengguna pada token tidak memegang permission data laporan ini
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/internal/v1/laporan/{kode}/dataset:
+    post:
+      tags:
+      - Laporan
+      operationId: internalReportDataset
+      summary: Dataset laporan untuk diisi ke layout oleh Core
+      description: Parameter divalidasi dengan aturan laporan; scope organisasi ditegakkan dengan `OrganizationScope` yang
+        sama seperti endpoint detailnya. Record yang tidak ada atau di luar scope dijawab 422 dengan `message` yang layak
+        ditampilkan ke pengguna.
+      parameters:
+      - $ref: '#/components/parameters/KodeLaporan'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - parameter
+              properties:
+                parameter:
+                  type: object
+                  description: '`work-order` menuntut `id`; `daftar-work-order` menerima `status`, `dari`, `sampai`.'
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Dataset
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/LaporanDataset'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Pengguna pada token tidak memegang permission data laporan ini
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Parameter tidak valid, atau record tidak ada / di luar scope (`message`)
 components:
   securitySchemes:
     CoreERPContext:
@@ -3746,6 +3850,14 @@ components:
       description: Membatasi daftar pada satu tipe lokasi aset.
       schema:
         $ref: '#/components/schemas/Ulid'
+    KodeLaporan:
+      name: kode
+      in: path
+      required: true
+      description: Kode laporan seperti pada katalog `GET /laporan`, misalnya `work-order`.
+      schema:
+        type: string
+        pattern: ^[a-z0-9-]+$
   schemas:
     Ulid:
       type: string
@@ -5683,6 +5795,97 @@ components:
                         $ref: '#/components/schemas/Ulid'
                       nilai:
                         type: string
+    LaporanField:
+      type: object
+      required:
+      - key
+      - label
+      - table
+      properties:
+        key:
+          type: string
+          description: Nama placeholder, dipakai sebagai `${key}` pada layout.
+        label:
+          type: string
+        table:
+          type:
+          - string
+          - 'null'
+          description: Nama tabel bila kolom ini diulang per baris.
+    LaporanDefinisi:
+      type: object
+      required:
+      - kode
+      - nama
+      - fields
+      - parameters
+      - builtin_layouts
+      properties:
+        kode:
+          type: string
+        nama:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/LaporanField'
+        parameters:
+          type: array
+          items:
+            type: string
+        builtin_layouts:
+          type: array
+          items:
+            type: object
+            required:
+            - key
+            - name
+            - description
+            - format
+            properties:
+              key:
+                type: string
+              name:
+                type: string
+              description:
+                type:
+                - string
+                - 'null'
+              format:
+                type: string
+                enum:
+                - docx
+                - xlsx
+    LaporanDataset:
+      type: object
+      required:
+      - fields
+      - tables
+      - file_name
+      properties:
+        fields:
+          type: object
+          description: Nilai tunggal siap tampil; tanggal dan angka sudah diformat app.
+          additionalProperties:
+            type:
+            - string
+            - number
+            - 'null'
+        tables:
+          type: object
+          description: Baris yang diulang per tabel; kunci tabel adalah awalan placeholder.
+          additionalProperties:
+            type: array
+            items:
+              type: object
+              additionalProperties:
+                type:
+                - string
+                - number
+                - 'null'
+        file_name:
+          type: string
+          description: Nama berkas hasil tanpa ekstensi.
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

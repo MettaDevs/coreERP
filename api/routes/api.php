@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ContextController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\laporan\LaporanInternalController;
 use App\Http\Controllers\master\AnalisaMaintenanceController;
 use App\Http\Controllers\master\BukuPenyusutanController;
 use App\Http\Controllers\master\GroupAsetController;
@@ -78,6 +79,16 @@ $masters = [
 Route::get('v1/health', HealthController::class);
 Route::post('internal/v1/workflow-events', [WorkflowDecisionController::class, 'store'])->middleware('coreerp-event');
 Route::post('internal/v1/provisioning/tenant', [TenantProvisioningController::class, 'store'])->middleware('coreerp-event');
+
+// Laporan: dipanggil Core dengan token konteks pengguna yang meminta cetak, sehingga
+// permission dan scope organisasi ditegakkan seperti request biasa. Layout, antrean
+// ekspor, dan render ada di Core; app hanya menyerahkan definisi, layout bawaan, dan
+// dataset. Lihat docs/dev/23-document-rendering.md di repository CoreERP.
+Route::prefix('internal/v1/laporan')->middleware('coreerp')->group(function (): void {
+    Route::get('{kode}', [LaporanInternalController::class, 'show']);
+    Route::get('{kode}/layouts/{key}', [LaporanInternalController::class, 'builtinLayout']);
+    Route::post('{kode}/dataset', [LaporanInternalController::class, 'dataset']);
+});
 
 Route::prefix('v1')->middleware('coreerp')->group(function () use ($masters): void {
     Route::get('context', ContextController::class);

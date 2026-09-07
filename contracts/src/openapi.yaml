@@ -36,6 +36,8 @@ tags:
   description: Proposal dan finalisasi penyusutan beserta bridge internal tanpa posting GL.
 - name: Reference data
   description: Referensi konfigurasi yang dibaca oleh form dan proses Management Aset.
+- name: Laporan
+  description: Definisi, layout bawaan, dan dataset laporan yang dipanggil Core atas nama pengguna.
 x-bundle:
   paths:
   - paths/platform.yaml
@@ -44,6 +46,7 @@ x-bundle:
   - paths/aset.yaml
   - paths/pemeliharaan-aset.yaml
   - paths/penyusutan.yaml
+  - paths/laporan.yaml
   components:
     securitySchemes: components/security.yaml
     parameters: components/parameters.yaml
