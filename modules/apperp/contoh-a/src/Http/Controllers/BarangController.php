@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Http\Controllers;
 
+use App\Support\Modules\Contracts\KonteksPermintaan;
 use App\Support\Modules\Contracts\KonteksTenant;
 use App\Support\Modules\Contracts\PenerbitNomor;
 use Illuminate\Http\JsonResponse;
@@ -13,21 +14,26 @@ use Modules\Apperp\ContohA\Models\Barang;
 /**
  * Rute contoh. Ia ada supaya penjaga batas punya sesuatu untuk diuji.
  *
- * Tiga hal yang ditunjukkan dengan sengaja:
+ * Empat hal yang ditunjukkan dengan sengaja:
  *
- * 1. Module memanggil Core lewat kontrak, bukan lewat kelas Core langsung. `KonteksTenant`
- *    dan `PenerbitNomor` adalah dua dari enam pintu resmi yang didaftar `CoreServices`;
- *    menyentuh kelas Core di luar daftar itu ditolak penjaga batas.
+ * 1. Module memanggil Core lewat kontrak, bukan lewat kelas Core langsung. `KonteksTenant`,
+ *    `KonteksPermintaan`, dan `PenerbitNomor` adalah tiga dari pintu resmi yang didaftar
+ *    `CoreServices`; menyentuh kelas Core di luar daftar itu ditolak penjaga batas.
  * 2. Setiap query menyaring `tenant_id`. Tidak ada lagi database terpisah yang menahan
  *    kebocoran, jadi satu query yang lupa menyaring membocorkan data seluruh tenant.
  * 3. Nomor diterbitkan **di dalam** transaksi dokumen. Ini keuntungan yang membenarkan
  *    seluruh pemindahan: dokumen gagal, nomornya ikut batal, tidak ada lompatan nomor yang
  *    harus dijelaskan ke pemeriksa.
+ * 4. Izin diperiksa per entry point di sini, bukan hanya di middleware. Middleware menolak
+ *    pengguna yang tidak punya izin apa pun pada module ini; yang membedakan "boleh melihat"
+ *    dari "boleh menambah" tetap pemeriksaan di titik pemakaiannya.
  */
 final class BarangController
 {
-    public function index(KonteksTenant $konteks): JsonResponse
+    public function index(KonteksTenant $konteks, KonteksPermintaan $akses): JsonResponse
     {
+        abort_unless($akses->punyaIzin('contoh-a.barang.read'), 403);
+
         return new JsonResponse([
             'data' => Barang::query()
                 ->where('tenant_id', $konteks->tenantId())
@@ -36,8 +42,10 @@ final class BarangController
         ]);
     }
 
-    public function store(KonteksTenant $konteks, PenerbitNomor $penerbit): JsonResponse
+    public function store(KonteksTenant $konteks, KonteksPermintaan $akses, PenerbitNomor $penerbit): JsonResponse
     {
+        abort_unless($akses->punyaIzin('contoh-a.barang.create'), 403);
+
         $tenantId = $konteks->tenantId();
 
         $nomor = $penerbit->terbitkan(
