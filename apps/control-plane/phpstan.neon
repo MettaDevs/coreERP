@@ -40,4 +40,6 @@ parameters:
     # entri yang tertinggal setelah modulnya selesai dipindah membuat alur merah.
     excludePaths:
         analyse:
-            - ../../modules/apperp/management-aset/
+            # Tanda `(?)` menyatakan jalur ini boleh belum ada. Ia memang belum ada sampai
+            # F3-01 menariknya masuk, dan tanpa tanda itu PHPStan menolak jalan sama sekali.
+            - ../../modules/apperp/management-aset (?)
