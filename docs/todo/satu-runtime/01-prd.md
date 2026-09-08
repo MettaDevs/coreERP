@@ -3072,6 +3072,15 @@ berhenti di tempat yang benar; keduanya dibuang setelah dibuktikan build dan `ts
 tanpanya. `react` dan `react-dom` tetap di `dedupe`: keduanya soal satu salinan React, bukan soal
 penemuan berkas.
 
+**`dist/` yang dulu selalu ada kini harus dibangun, dan yang menagihnya bukan cuma `build`.** Sebagai
+berkas `.tgz` paket ini datang sudah terbangun; sebagai workspace ia baru lahir saat dibangun, dan
+`ignore-scripts=true` menutup jalan `prepare`. Yang menemukan sisanya adalah CI merah: `format:check`
+melaporkan 52 berkas tidak terformat sementara mesin pengembang hijau, karena `.prettierrc` menunjuk
+`resources/css/app.css` yang mengimpor `@apperp/ui/styles.css` — tanpa `dist/`,
+`prettier-plugin-tailwindcss` mengurutkan kelas dengan urutan lain. Delapan skrip akhirnya diawali
+`ui:build`. Pelajarannya: pemeriksaan yang selama ini menumpang pada efek samping `npm ci` tidak
+mengumumkan ketergantungannya sampai efek samping itu hilang.
+
 **Kriteria "tidak ada berkas `.tgz` di repo" belum terpenuhi seluruhnya, dan itu keputusan.**
 `modules/apperp/management-aset/ui/vendor/apperp-ui.tgz` masuk lewat subtree F3-01 setelah rencana ini
 ditulis. Folder itu masih proyek Vite tersendiri dengan `Dockerfile` berkonteks foldernya sendiri;
