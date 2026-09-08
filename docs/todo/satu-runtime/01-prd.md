@@ -2614,6 +2614,41 @@ membocorkan data seluruh pelanggan.
 **Selesai bila.** Penjaga penyaringan tenant lulus untuk seluruh berkas modul, dan sebuah test dua tenant
 membuktikan tidak ada kebocoran pada rute daftar, detail, maupun laporan.
 
+#### Catatan pelaksanaan — bagian pertama (kolom dan model)
+
+Langkah 1 dan 2 selesai pada 8 September 2026. Langkah 3, sapuan query mentah, dipecah menurut area
+seperti disebut rencana.
+
+**Langkah 1 ternyata tidak perlu dikerjakan sama sekali.** Rencana menyuruh memeriksa tabel yang belum
+membawa `tenant_id` lalu menambahkannya lewat migration baru. Diperiksa pada PostgreSQL sungguhan:
+**keempat puluh enam tabel modul sudah membawa `tenant_id`**, termasuk `processed_core_events` yang paling
+dicurigai. Tidak ada migration yang perlu ditulis. Angka 45 pada rencana juga meleset satu.
+
+**Langkah 2 menyebut satu model yang tidak mewarisi model dasar; sebenarnya tiga.** Selain
+`KelompokHartaFiskal` yang memang disebut, ada `Asset` dan `AssetBook` — dan justru dua itu yang memegang
+data aset beserta buku penyusutannya. Kalau hanya model dasar yang diubah, dua model paling berisi di
+modul ini tidak ikut tersaring, dan tidak ada satu pun yang gagal karenanya.
+
+**Karena itu penjaganya memindai berkas, bukan mengandalkan pewarisan.** `ModelModuleMilikTenantTest`
+menuntut setiap kelas modul yang `extends Model` memakai `MilikTenant`. Penjaga yang mengandalkan model
+dasar hanya menjaga yang mewarisinya — dan yang tidak mewarisi persis kasus yang paling mudah terlewat.
+Ia berlaku untuk semua modul tanpa kecuali, termasuk yang sedang dipindah: modul yang sudah dipasang di
+tenant sungguhan sambil menunggu dibereskan adalah modul yang sudah membocorkan data.
+
+Dibuktikan bisa gagal dengan mencabut `MilikTenant` dari satu model:
+
+```
+Model module tidak memakai MilikTenant: management-aset/AssetBook.php
+Model yang tidak tersaring membocorkan baris milik tenant lain pada penempatan gabungan, dan
+kebocoran itu tidak gagal dengan sendirinya — ia tampak seperti daftar yang isinya kebetulan
+banyak. Model dasar tidak cukup: yang tidak mewarisinya tidak ikut terjaga.
+```
+
+**Kode modul justru menjadi lebih pendek.** Yang ditambahkan hanya satu baris `use MilikTenant;` pada
+empat berkas; tidak ada satu pun query yang perlu menyebut `tenant_id` lagi, dan penulisan yang
+mencantumkan tenant lain dibatalkan trait itu sendiri. Ini yang membuat aturannya tetap satu kalimat
+sekaligus terjaga.
+
 **Rujukan.** Bagian 5.2 dokumen ini, [query scope](../../dev/08-query-scopes-and-schema.md).
 
 **Bergantung pada.** F1-06, F3-04.
