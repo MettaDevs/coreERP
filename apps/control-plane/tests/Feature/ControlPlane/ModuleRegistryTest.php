@@ -52,17 +52,17 @@ class ModuleRegistryTest extends TestCase
 
     public function test_module_tanpa_awalan_tabel_dilewati(): void
     {
-        $this->tulisManifest('apperp/berawalan', "id: berawalan
+        $this->tulisManifest('apperp/berawalan', 'id: berawalan
 name: Berawalan
 version: 1.0.0
 publisher: apperp
 table_prefix: awal_
-");
-        $this->tulisManifest('apperp/belum-dibentuk', "id: belum-dibentuk
+');
+        $this->tulisManifest('apperp/belum-dibentuk', 'id: belum-dibentuk
 name: Belum dibentuk
 version: 0.9.0
 publisher: apperp
-");
+');
 
         $registry = new ModuleRegistry($this->akarSementara);
 
