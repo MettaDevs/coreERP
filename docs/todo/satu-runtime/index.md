@@ -4,12 +4,13 @@ Folder ini adalah **pekerjaan sekali jalan**, bukan desain kanonik. Setelah pemi
 aturannya sudah masuk ke `docs/dev`, folder ini boleh dihapus. Orang yang bergabung setahun lagi tidak
 perlu tahu apa yang terjadi di sini.
 
-## Dua dokumen
+## Tiga dokumen
 
 | Dokumen | Isi | Kapan dibaca |
 | --- | --- | --- |
 | [00-keputusan.md](00-keputusan.md) | Kenapa CoreERP berpindah dari satu proses dan satu database per app menjadi satu runtime dengan modul; angka terukur di laptop, proyeksi 100 tenant, bukti dari Odoo, ERPNext, Business Central, Shopify | Sebelum menyetujui rencananya, atau saat ada yang bertanya kenapa |
 | [01-prd.md](01-prd.md) | Rencana kerjanya: 79 task ukuran satu pull request dalam delapan fase, lengkap dengan berkas yang disentuh, syarat selesai, rencana mundur, dan ukuran keberhasilan | Saat mengambil task berikutnya |
+| [02-bukti-penjaga.md](02-bukti-penjaga.md) | Pesan gagal ketiga penjaga batas, apa adanya, beserta cara memperbaruinya | Saat menyentuh penjaga batas, atau saat ada yang meragukan penjaganya menguji sesuatu |
 
 ## Cara memakai daftar task
 
