@@ -1,11 +1,6 @@
 import { Button } from '@apperp/ui/button';
 import { Head, router } from '@inertiajs/react';
-import {
-    ArrowUpDown,
-    Filter,
-    Loader2,
-    RotateCcw,
-} from 'lucide-react';
+import { ArrowUpDown, Filter, Loader2, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -629,14 +624,13 @@ export default function AddressSetup({
 
     // Keep activeSection valid if its parameter is deactivated
     const activeNavItem = navItems.find((n) => n.key === activeSection);
-    const isCurrentSectionDisabled =
-        Boolean(
-            activeNavItem?.paramKey &&
-                paramState?.country_code &&
-                (!paramState[activeNavItem.paramKey] ||
-                    paramState[activeNavItem.paramKey] === '0' ||
-                    paramState[activeNavItem.paramKey] === 'false'),
-        );
+    const isCurrentSectionDisabled = Boolean(
+        activeNavItem?.paramKey &&
+        paramState?.country_code &&
+        (!paramState[activeNavItem.paramKey] ||
+            paramState[activeNavItem.paramKey] === '0' ||
+            paramState[activeNavItem.paramKey] === 'false'),
+    );
 
     if (isCurrentSectionDisabled && activeSection !== 'parameters') {
         setActiveSection('parameters');
@@ -1934,10 +1928,7 @@ export default function AddressSetup({
 
             if (!targetCountry) {
                 setIsSaving(false);
-                showToast(
-                    'Pilih Negara / Wilayah terlebih dahulu.',
-                    'error',
-                );
+                showToast('Pilih Negara / Wilayah terlebih dahulu.', 'error');
 
                 return;
             }
@@ -2069,7 +2060,11 @@ export default function AddressSetup({
         }
 
         // Default country for postal codes
-        if (activeSection === 'postalCodes' && !payload.country_code && filterCountry) {
+        if (
+            activeSection === 'postalCodes' &&
+            !payload.country_code &&
+            filterCountry
+        ) {
             payload.country_code = filterCountry;
         }
 
@@ -2079,10 +2074,7 @@ export default function AddressSetup({
             !payload.province_id
         ) {
             setIsSaving(false);
-            showToast(
-                'Pilih provinsi terlebih dahulu pada filter.',
-                'error',
-            );
+            showToast('Pilih provinsi terlebih dahulu pada filter.', 'error');
 
             return;
         }
@@ -2099,10 +2091,7 @@ export default function AddressSetup({
 
         if (activeSection === 'villages' && !payload.district_id) {
             setIsSaving(false);
-            showToast(
-                'Pilih kecamatan terlebih dahulu pada filter.',
-                'error',
-            );
+            showToast('Pilih kecamatan terlebih dahulu pada filter.', 'error');
 
             return;
         }
@@ -2170,7 +2159,9 @@ export default function AddressSetup({
 
                 if (!page?.props?.flash?.status) {
                     showToast(
-                        wasNew ? 'Data berhasil disimpan.' : 'Data berhasil diubah.',
+                        wasNew
+                            ? 'Data berhasil disimpan.'
+                            : 'Data berhasil diubah.',
                         'success',
                     );
                 }
@@ -2893,9 +2884,7 @@ export default function AddressSetup({
                             </div>
 
                             <div className="space-y-4">
-                                <AddressFieldGroup
-                                    label="Address Format Template"
-                                >
+                                <AddressFieldGroup label="Address Format Template">
                                     <AddressInput
                                         value={paramState.address_format || ''}
                                         disabled={!filterCountry}
@@ -2937,9 +2926,10 @@ export default function AddressSetup({
                                                 onClick={() => {
                                                     setParamState((prev) => ({
                                                         ...prev,
-                                                        address_format: prev.address_format
-                                                            ? `${prev.address_format} ${tag}`
-                                                            : tag,
+                                                        address_format:
+                                                            prev.address_format
+                                                                ? `${prev.address_format} ${tag}`
+                                                                : tag,
                                                     }));
                                                 }}
                                                 className="cursor-pointer rounded border border-[#e5e7eb] bg-[#f9fafb] px-1.5 py-0.5 font-mono text-[11px] text-[#374151] transition-colors hover:border-[#0284c7] hover:bg-[#f0f9ff] hover:text-[#0284c7] disabled:cursor-not-allowed disabled:opacity-50"
@@ -2963,24 +2953,33 @@ export default function AddressSetup({
                                             </span>
                                         </div>
                                         <span className="text-[11px] text-[#605e5c]">
-                                            Pratinjau otomatis sesuai format template
+                                            Pratinjau otomatis sesuai format
+                                            template
                                         </span>
                                     </div>
 
                                     <div className="mt-3 rounded border border-[#e5e7eb] bg-white p-3 font-sans text-sm text-[#111827] shadow-2xs">
                                         {(() => {
-                                            const tpl = paramState.address_format;
+                                            const tpl =
+                                                paramState.address_format;
 
                                             if (!tpl || !tpl.trim()) {
                                                 return (
-                                                    <span className="italic text-[#8a8886]">
-                                                        (Template format alamat masih kosong - ketik manual atau klik tag di atas)
+                                                    <span className="text-[#8a8886] italic">
+                                                        (Template format alamat
+                                                        masih kosong - ketik
+                                                        manual atau klik tag di
+                                                        atas)
                                                     </span>
                                                 );
                                             }
 
-                                            const sampleMap: Record<string, string> = {
-                                                '{street}': 'Jl. Jenderal Sudirman No. 45',
+                                            const sampleMap: Record<
+                                                string,
+                                                string
+                                            > = {
+                                                '{street}':
+                                                    'Jl. Jenderal Sudirman No. 45',
                                                 '{rt}': '03',
                                                 '{rw}': '05',
                                                 '{village}': 'Senayan',
@@ -2996,7 +2995,10 @@ export default function AddressSetup({
                                             };
                                             let res = tpl;
 
-                                            for (const [tag, val] of Object.entries(sampleMap)) {
+                                            for (const [
+                                                tag,
+                                                val,
+                                            ] of Object.entries(sampleMap)) {
                                                 res = res.split(tag).join(val);
                                             }
 
@@ -3005,7 +3007,9 @@ export default function AddressSetup({
                                     </div>
 
                                     <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-[#6b7280]">
-                                        <span className="font-medium">Active tags in template:</span>
+                                        <span className="font-medium">
+                                            Active tags in template:
+                                        </span>
                                         {[
                                             'street',
                                             'rt',
@@ -3021,9 +3025,17 @@ export default function AddressSetup({
                                             'unit',
                                             'floor',
                                         ]
-                                            .filter((tag) => (paramState.address_format || '').includes(`{${tag}}`))
+                                            .filter((tag) =>
+                                                (
+                                                    paramState.address_format ||
+                                                    ''
+                                                ).includes(`{${tag}}`),
+                                            )
                                             .map((tag) => (
-                                                <span key={tag} className="rounded bg-[#eff6ff] px-1.5 py-0.5 font-mono text-[10px] text-[#2563eb]">
+                                                <span
+                                                    key={tag}
+                                                    className="rounded bg-[#eff6ff] px-1.5 py-0.5 font-mono text-[10px] text-[#2563eb]"
+                                                >
                                                     {`{${tag}}`}
                                                 </span>
                                             ))}
@@ -3234,7 +3246,10 @@ export default function AddressSetup({
                                     {activeSection === 'countries' && (
                                         <div className="max-w-3xl space-y-6">
                                             <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-                                                <AddressFieldGroup label="Country Code" required>
+                                                <AddressFieldGroup
+                                                    label="Country Code"
+                                                    required
+                                                >
                                                     <AddressInput
                                                         value={
                                                             form.code ||
@@ -3250,7 +3265,11 @@ export default function AddressSetup({
                                                                 v,
                                                             );
 
-                                                            if (!form.iso3 || form.iso3.length <= 3) {
+                                                            if (
+                                                                !form.iso3 ||
+                                                                form.iso3
+                                                                    .length <= 3
+                                                            ) {
                                                                 updateFormField(
                                                                     'iso3',
                                                                     v,
@@ -3258,13 +3277,17 @@ export default function AddressSetup({
                                                             }
                                                         }}
                                                         disabled={
-                                                            isFormDisabled || !isNew
+                                                            isFormDisabled ||
+                                                            !isNew
                                                         }
                                                         placeholder=""
                                                         required
                                                     />
                                                 </AddressFieldGroup>
-                                                <AddressFieldGroup label="Country Name" required>
+                                                <AddressFieldGroup
+                                                    label="Country Name"
+                                                    required
+                                                >
                                                     <AddressInput
                                                         value={form.name || ''}
                                                         onChange={(val) =>
@@ -3273,7 +3296,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder=""
                                                         required
                                                     />
@@ -3290,17 +3315,23 @@ export default function AddressSetup({
                                                                 'iso3',
                                                                 val
                                                                     .toUpperCase()
-                                                                    .slice(0, 3),
+                                                                    .slice(
+                                                                        0,
+                                                                        3,
+                                                                    ),
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder=""
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Phone Code">
                                                     <AddressInput
                                                         value={
-                                                            form.phone_code || ''
+                                                            form.phone_code ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -3308,15 +3339,21 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder=""
                                                     />
                                                 </AddressFieldGroup>
-                                                <AddressFieldGroup label="Time Zone" required>
+                                                <AddressFieldGroup
+                                                    label="Time Zone"
+                                                    required
+                                                >
                                                     <AddressSelect
                                                         value={
                                                             form.timezone ||
-                                                            (selectedId && form.code
+                                                            (selectedId &&
+                                                            form.code
                                                                 ? detectTimezone(
                                                                       form.code,
                                                                       form.name ||
@@ -3330,8 +3367,12 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        options={allTimezoneOptions}
-                                                        disabled={isFormDisabled}
+                                                        options={
+                                                            allTimezoneOptions
+                                                        }
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Select Time Zone"
                                                         required
                                                     />
@@ -3354,7 +3395,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -3382,7 +3425,8 @@ export default function AddressSetup({
                                                                     val,
                                                                 );
                                                                 executeFilter({
-                                                                    country: val,
+                                                                    country:
+                                                                        val,
                                                                 });
                                                             }}
                                                             options={(
@@ -3415,7 +3459,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="State Name"
                                                     />
                                                 </AddressFieldGroup>
@@ -3436,7 +3482,9 @@ export default function AddressSetup({
                                                                 val,
                                                             );
                                                         }}
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="State Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -3453,11 +3501,16 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Description"
                                                     />
                                                 </AddressFieldGroup>
-                                                <AddressFieldGroup label="Time Zone" required>
+                                                <AddressFieldGroup
+                                                    label="Time Zone"
+                                                    required
+                                                >
                                                     <AddressSelect
                                                         value={
                                                             form.timezone ||
@@ -3476,8 +3529,12 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        options={allTimezoneOptions}
-                                                        disabled={isFormDisabled}
+                                                        options={
+                                                            allTimezoneOptions
+                                                        }
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Select Time Zone"
                                                         required
                                                     />
@@ -3485,7 +3542,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="IT State Code">
                                                     <AddressInput
                                                         value={
-                                                            form.it_state_code || ''
+                                                            form.it_state_code ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -3493,19 +3551,25 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Intrastat Code">
                                                     <AddressInput
-                                                        value={form.intrastat || ''}
+                                                        value={
+                                                            form.intrastat || ''
+                                                        }
                                                         onChange={(val) =>
                                                             updateFormField(
                                                                 'intrastat',
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -3525,7 +3589,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Default State / Province">
@@ -3543,7 +3609,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -3655,7 +3723,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="State / Province">
                                                     <AddressInput
                                                         value={
-                                                            activeProvinceName || ''
+                                                            activeProvinceName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -3669,7 +3738,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="City Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -3690,7 +3761,9 @@ export default function AddressSetup({
                                                                 val,
                                                             );
                                                         }}
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Description"
                                                     />
                                                 </AddressFieldGroup>
@@ -3712,7 +3785,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -3736,7 +3811,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="State / Province">
                                                     <AddressInput
                                                         value={
-                                                            activeProvinceName || ''
+                                                            activeProvinceName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -3744,7 +3820,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="County / City">
                                                     <AddressInput
                                                         value={
-                                                            activeRegencyName || ''
+                                                            activeRegencyName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -3758,7 +3835,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="District Name"
                                                     />
                                                 </AddressFieldGroup>
@@ -3771,7 +3850,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="District Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -3793,7 +3874,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -3807,7 +3890,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="District">
                                                     <AddressInput
                                                         value={
-                                                            activeDistrictName || ''
+                                                            activeDistrictName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -3821,7 +3905,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Village Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -3834,14 +3920,17 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Village Name"
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Postal Code">
                                                     <AddressInput
                                                         value={
-                                                            form.postal_code || ''
+                                                            form.postal_code ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -3849,7 +3938,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Postal Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -3871,7 +3962,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -3885,7 +3978,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Village">
                                                     <AddressInput
                                                         value={
-                                                            activeVillageName || ''
+                                                            activeVillageName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -3899,7 +3993,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Street Name"
                                                     />
                                                 </AddressFieldGroup>
@@ -3912,7 +4008,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="RT"
                                                     />
                                                 </AddressFieldGroup>
@@ -3925,14 +4023,17 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="RW"
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Postal Code">
                                                     <AddressInput
                                                         value={
-                                                            form.postal_code || ''
+                                                            form.postal_code ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -3940,7 +4041,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Postal Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -3962,7 +4065,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -3976,7 +4081,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Village">
                                                     <AddressInput
                                                         value={
-                                                            activeVillageName || ''
+                                                            activeVillageName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -3990,7 +4096,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -4003,14 +4111,17 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Name"
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Postal Code">
                                                     <AddressInput
                                                         value={
-                                                            form.postal_code || ''
+                                                            form.postal_code ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -4018,7 +4129,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Postal Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -4040,7 +4153,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -4054,7 +4169,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Village">
                                                     <AddressInput
                                                         value={
-                                                            activeVillageName || ''
+                                                            activeVillageName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -4062,7 +4178,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Plot Number">
                                                     <AddressInput
                                                         value={
-                                                            form.plot_number || ''
+                                                            form.plot_number ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -4070,7 +4187,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Plot Number"
                                                     />
                                                 </AddressFieldGroup>
@@ -4083,14 +4202,17 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Name"
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Postal Code">
                                                     <AddressInput
                                                         value={
-                                                            form.postal_code || ''
+                                                            form.postal_code ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -4098,7 +4220,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Postal Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -4120,7 +4244,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -4134,7 +4260,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Village">
                                                     <AddressInput
                                                         value={
-                                                            activeVillageName || ''
+                                                            activeVillageName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -4148,7 +4275,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Building Name"
                                                     />
                                                 </AddressFieldGroup>
@@ -4161,7 +4290,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Block"
                                                     />
                                                 </AddressFieldGroup>
@@ -4174,7 +4305,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Unit"
                                                     />
                                                 </AddressFieldGroup>
@@ -4187,14 +4320,17 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Floor"
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Postal Code">
                                                     <AddressInput
                                                         value={
-                                                            form.postal_code || ''
+                                                            form.postal_code ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -4202,7 +4338,9 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Postal Code"
                                                     />
                                                 </AddressFieldGroup>
@@ -4224,7 +4362,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>
@@ -4248,7 +4388,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="State / Province">
                                                     <AddressInput
                                                         value={
-                                                            activeProvinceName || ''
+                                                            activeProvinceName ||
+                                                            ''
                                                         }
                                                         disabled
                                                     />
@@ -4256,7 +4397,8 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Postal Code">
                                                     <AddressInput
                                                         value={
-                                                            form.postal_code || ''
+                                                            form.postal_code ||
+                                                            ''
                                                         }
                                                         onChange={(val) =>
                                                             updateFormField(
@@ -4264,20 +4406,26 @@ export default function AddressSetup({
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Postal Code"
                                                     />
                                                 </AddressFieldGroup>
                                                 <AddressFieldGroup label="Area Name">
                                                     <AddressInput
-                                                        value={form.area_name || ''}
+                                                        value={
+                                                            form.area_name || ''
+                                                        }
                                                         onChange={(val) =>
                                                             updateFormField(
                                                                 'area_name',
                                                                 val,
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                         placeholder="Area Name"
                                                     />
                                                 </AddressFieldGroup>
@@ -4299,7 +4447,9 @@ export default function AddressSetup({
                                                                 val ? '1' : '0',
                                                             )
                                                         }
-                                                        disabled={isFormDisabled}
+                                                        disabled={
+                                                            isFormDisabled
+                                                        }
                                                     />
                                                 </AddressFieldGroup>
                                             </div>

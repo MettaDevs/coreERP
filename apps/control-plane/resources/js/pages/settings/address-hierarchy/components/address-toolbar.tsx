@@ -79,11 +79,17 @@ export function AddressToolbar({
                             variant="outline"
                             size="sm"
                             onClick={onSave}
-                            disabled={isSaving || (canSave !== undefined && !canSave)}
+                            disabled={
+                                isSaving || (canSave !== undefined && !canSave)
+                            }
                             className="h-8 cursor-pointer gap-1.5 rounded-md border-[#0284c7]/40 bg-white px-3 text-xs font-medium text-[#0284c7] shadow-none transition-colors hover:bg-[#f0f9ff] hover:text-[#0369a1] disabled:opacity-40"
                         >
                             <Save className="size-3.5 stroke-[1.8] text-[#0284c7]" />
-                            <span>{isSaving ? 'Menyimpan…' : (saveLabel || 'Simpan')}</span>
+                            <span>
+                                {isSaving
+                                    ? 'Menyimpan…'
+                                    : saveLabel || 'Simpan'}
+                            </span>
                         </Button>
                         <Button
                             variant="outline"
@@ -104,7 +110,9 @@ export function AddressToolbar({
                                 onClick={onSave}
                                 disabled={
                                     isSaving ||
-                                    (canSave !== undefined ? !canSave : !canDelete)
+                                    (canSave !== undefined
+                                        ? !canSave
+                                        : !canDelete)
                                 }
                                 className={`h-8 cursor-pointer gap-1.5 rounded-md ${
                                     saveVariant === 'blue'
@@ -118,7 +126,9 @@ export function AddressToolbar({
                                     <Pencil className="size-3.5 stroke-[1.8] text-[#b45309]" />
                                 )}
                                 <span>
-                                    {isSaving ? 'Menyimpan…' : (saveLabel || 'Ubah')}
+                                    {isSaving
+                                        ? 'Menyimpan…'
+                                        : saveLabel || 'Ubah'}
                                 </span>
                             </Button>
                         )}
@@ -133,7 +143,8 @@ export function AddressToolbar({
                             >
                                 <Plus className="size-3.5 stroke-[2.2] text-[#047857]" />
                                 <span>
-                                    {newLabel || (title ? `Tambah ${title}` : 'Tambah')}
+                                    {newLabel ||
+                                        (title ? `Tambah ${title}` : 'Tambah')}
                                 </span>
                             </Button>
                         )}

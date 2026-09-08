@@ -20,7 +20,11 @@ export const navItems: NavItemDef[] = [
     { key: 'groupOfHouses', label: 'Group of Houses', paramKey: 'use_rt_rw' },
     { key: 'landPlots', label: 'Land Plots', paramKey: 'use_rt_rw' },
     { key: 'buildings', label: 'Group of Flats', paramKey: 'use_building' },
-    { key: 'postalCodes', label: 'ZIP / Postal Codes', paramKey: 'use_postal_code' },
+    {
+        key: 'postalCodes',
+        label: 'ZIP / Postal Codes',
+        paramKey: 'use_postal_code',
+    },
 ];
 
 export function AddressSidebar({

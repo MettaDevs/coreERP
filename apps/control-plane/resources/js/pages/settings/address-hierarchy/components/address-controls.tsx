@@ -45,7 +45,9 @@ export function AddressFieldGroup({
         <div className={`flex flex-col gap-2 ${className}`}>
             <Label className="text-xs font-normal text-[#605e5c] select-none">
                 {label}
-                {required && <span className="text-red-500 font-semibold"> *</span>}
+                {required && (
+                    <span className="font-semibold text-red-500"> *</span>
+                )}
             </Label>
             {children}
         </div>
@@ -127,8 +129,8 @@ export function AddressInput({
                     isFloating
                         ? `${
                               isSm
-                                  ? 'start-2.5 top-0 text-[11px] px-1.5 py-0'
-                                  : 'start-3 top-0 text-xs px-1.5 py-0'
+                                  ? 'start-2.5 top-0 px-1.5 py-0 text-[11px]'
+                                  : 'start-3 top-0 px-1.5 py-0 text-xs'
                           } -translate-y-1/2 font-normal ${
                               disabled
                                   ? 'bg-[#f3f2f1] text-[#8a8886]'
@@ -140,7 +142,7 @@ export function AddressInput({
                               isSm
                                   ? 'start-3 top-1/2 text-xs'
                                   : 'start-3.5 top-1/2 text-sm'
-                          } -translate-y-1/2 font-normal px-0 bg-transparent ${
+                          } -translate-y-1/2 bg-transparent px-0 font-normal ${
                               disabled ? 'text-[#8a8886]' : 'text-[#605e5c]'
                           }`
                 }`}
@@ -279,7 +281,7 @@ export function AddressSelect({
                     setSearchQuery('');
                 }}
                 className={`${
-                    isSm ? 'h-9 pl-3 pr-7 text-xs' : 'h-10 pl-3.5 pr-9 text-sm'
+                    isSm ? 'h-9 pr-7 pl-3 text-xs' : 'h-10 pr-9 pl-3.5 text-sm'
                 } w-full border bg-white ${
                     isOpen
                         ? 'border-[#0284c7] ring-2 ring-[#0284c7]/15'
@@ -313,8 +315,8 @@ export function AddressSelect({
                         isFloating
                             ? `${
                                   isSm
-                                      ? 'start-2.5 top-0 text-[11px] px-1.5 py-0'
-                                      : 'start-3 top-0 text-xs px-1.5 py-0'
+                                      ? 'start-2.5 top-0 px-1.5 py-0 text-[11px]'
+                                      : 'start-3 top-0 px-1.5 py-0 text-xs'
                               } -translate-y-1/2 font-normal ${
                                   disabled
                                       ? 'bg-[#f3f2f1] text-[#8a8886]'
@@ -326,7 +328,7 @@ export function AddressSelect({
                                   isSm
                                       ? 'start-3 top-1/2 text-xs'
                                       : 'start-3.5 top-1/2 text-sm'
-                              } -translate-y-1/2 font-normal px-0 bg-transparent ${
+                              } -translate-y-1/2 bg-transparent px-0 font-normal ${
                                   disabled ? 'text-[#8a8886]' : 'text-[#605e5c]'
                               }`
                     }`}
