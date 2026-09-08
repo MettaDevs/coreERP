@@ -1580,6 +1580,46 @@ menjalankan perintah compose apa pun.
 
 **Bergantung pada.** F2-05.
 
+#### Jalurnya dipilih dari satu pertanyaan
+
+Apakah id itu ada sebagai folder di `modules/`. Bila ya, tidak ada container yang perlu ditempatkan;
+memasangnya berarti menjalankan migration, mencatat pemasangan, dan mengisi data awal, semuanya di
+proses yang sama.
+
+Jalur container **tidak dibuang**. Ada empat test, dan salah satunya sengaja mendaftarkan modul dan app
+lama sekaligus untuk membuktikan keduanya berjalan berdampingan pada satu pendaftaran. Membuang jalur
+lama sekarang akan mematikan produk yang sedang dipakai.
+
+#### Temuan: katalog masih menuntut nama database per app
+
+Kolom `apps.database_name` masih wajib diisi. Ia sisa rancangan database per app, dan modul tidak punya
+database sendiri. Untuk sekarang test mengisinya dengan nama database Core supaya pendaftaran bisa
+berjalan, tetapi itu menuliskan sesuatu yang tidak benar ke dalam katalog.
+
+### F2-12 — Katalog berhenti menuntut nama database per app
+
+**Kenapa.** `apps.database_name` wajib diisi, padahal modul memakai database yang sama dengan Core.
+Selama kolom itu wajib, setiap pendaftaran modul menuliskan nilai yang tidak berarti, dan nilai yang
+tidak berarti di kolom wajib adalah cara paling cepat membuat orang berikutnya percaya modul punya
+database sendiri.
+
+**Berkas.**
+- `apps/control-plane/database/migrations/<baru>` (kolom menjadi opsional)
+- `apps/control-plane/app/Http/Requests/Provider/AppCatalogRequest.php`
+- `apps/control-plane/app/Actions/Provider/RegisterAppCatalog.php`
+
+**Langkah.**
+1. Kolom dibuat opsional lewat migration, bukan diisi nilai pura-pura.
+2. Validasi manifest mewajibkannya hanya untuk app yang berjalan sebagai container.
+3. Test membuktikan modul dapat didaftarkan ke katalog tanpa nama database, dan app container tetap
+   ditolak bila tidak menyebutkannya.
+
+**Selesai bila.** Test pendaftaran tenant tidak lagi perlu mengisi kolom itu.
+
+**Rujukan.** [standar app](../../dev/02-module-standard.md).
+
+**Bergantung pada.** F2-07.
+
 ### F2-08 — Kontrak layanan Core untuk modul
 
 **Kenapa.** Modul butuh satu pintu resmi ke Core. Tanpa itu, tiap modul akan memanggil model Core
