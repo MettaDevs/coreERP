@@ -1123,6 +1123,7 @@ lama.
 
 **Berkas.**
 - `apps/control-plane/app/Support/Modules/ModuleRegistry.php`
+- `apps/control-plane/app/Support/Modules/ModuleManifest.php`
 - `apps/control-plane/app/Providers/ModuleServiceProvider.php`
 - `apps/control-plane/app/Console/Commands/ModuleListCommand.php`
 - `apps/control-plane/bootstrap/providers.php`
@@ -1143,6 +1144,36 @@ lama.
 **Rujukan.** [standar app, manifest](../../dev/02-module-standard.md).
 
 **Bergantung pada.** F1-02.
+
+#### Manifest menjadi objek, bukan array
+
+Registry mengembalikan `ModuleManifest`, bukan array asosiatif. Bedanya terasa di tempat yang tidak
+terlihat sekarang: setiap pemakai manifest — perintah pasang, penentu kesiapan, pembangun edisi —
+akan menanyakan hal yang sama, dan array asosiatif membuat setiap pemakai menebak nama kuncinya sendiri
+lalu gagal diam-diam saat kuncinya salah eja.
+
+Objek itu **tidak** menyalin seluruh manifest. Entry point, permission, privilege, duty, referensi
+nomor, dan tipe workflow tetap dibaca aksi pendaftaran katalog yang sudah ada. Yang disalin hanya yang
+dibutuhkan untuk menemukan, menamai, dan memuat modulnya.
+
+#### Manifest rusak dilewati, bukan menjatuhkan runtime
+
+Tidak diminta task ini, tapi diputuskan saat menulisnya: sebuah `app.yaml` yang tidak bisa dibaca
+membuat modulnya diabaikan, bukan membuat seluruh aplikasi gagal menyala. Satu modul yang salah ketik
+tidak boleh mematikan modul lain milik pelanggan yang sama.
+
+Konsekuensinya harus disebut supaya tidak menjadi jebakan: modul yang manifestnya rusak **hilang tanpa
+pesan**. Perintah `module:list` ada justru untuk itu — ia menjawab "apakah runtime melihat modul saya"
+tanpa perlu membuka halaman dan menunggu 404.
+
+#### Penyedia layanan per modul, bukan rute langsung
+
+Penyedia layanan pusat mendaftarkan penyedia milik tiap modul, dan berhenti di situ. Modul yang belum
+punya penyedia dilewati tanpa suara; modul contoh memang belum punya pada fase ini.
+
+Alasannya bukan selera. Bila penyedia pusat memuat rute setiap modul, jumlah pekerjaan saat menyalakan
+aplikasi tumbuh seiring jumlah modul, dan itu keluhan yang berulang pada paket modul Laravel yang
+beredar. Satu penyedia per modul membuat modul memutuskan sendiri apa yang perlu dimuat.
 
 ### F2-02 — Autoload modul lewat Composer
 
