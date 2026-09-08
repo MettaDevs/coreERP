@@ -121,7 +121,7 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 
 | Blok | Wajib? | Yang terjadi di Core setelah registrasi |
 | --- | --- | --- |
-| `api`, `ui`, `database`, `events` | Ya | Katalog mengenal artifact, database logis, dan kontrak app |
+| `api`, `ui`, `database`, `events` | Ya untuk app yang berjalan sebagai container sendiri | Katalog mengenal artifact, database logis, dan kontrak app. `database.logical_name` hanya wajib bagi app container: module berjalan di dalam runtime Core dan memakai database Core, jadi ia tidak punya nama database sendiri untuk disebutkan dan katalog menyimpannya sebagai kosong |
 | `ui.navigation` | Ya | Menu app muncul di shell Core. Item menu hanya boleh memakai permission `read` milik app yang sama |
 | `security.entry_points` / `permissions` / `privileges` / `duties` | Ya, keempatnya | Duty tersedia untuk disusun admin tenant menjadi security role |
 | `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat admin memberi role ke anggota |

@@ -7,8 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * Katalog app yang dikenal platform.
+ *
+ * `database_name` bernilai null untuk module: module berjalan di dalam runtime Core dan
+ * memakai database Core, jadi ia tidak punya nama database sendiri untuk disebutkan.
+ *
  * @property string $id
  * @property string $name
+ * @property string|null $database_name
  * @property bool $has_ui
  * @property array<string, mixed>|null $navigation
  * @property string|null $repository_url

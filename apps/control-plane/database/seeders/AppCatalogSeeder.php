@@ -25,7 +25,10 @@ class AppCatalogSeeder extends Seeder
                     'name' => $definition['name'],
                     'description' => $definition['description'] ?? null,
                     'version' => $definition['version'],
-                    'database_name' => $definition['database'],
+                    // Definisi katalog module tidak menyebutkan database karena ia memakai
+                    // database Core. Yang tidak disebutkan disimpan sebagai null, bukan
+                    // diisi nama database Core supaya kolomnya terlihat penuh.
+                    'database_name' => $definition['database'] ?? null,
                     'has_ui' => (bool) ($definition['has_ui'] ?? false),
                     'navigation' => $definition['navigation'] ?? null,
                     'repository_url' => $definition['repository_url'] ?? null,

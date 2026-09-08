@@ -50,6 +50,11 @@ class TenantRegistrationInstallsModulesTest extends TestCase
             DB::table('contoh_a_m_barang')->where('tenant_id', $tenantId)->where('bawaan', true)->count(),
             'Data awal module harus ikut terisi saat tenant mendaftar.'
         );
+
+        $this->assertNull(
+            DB::table('apps')->where('id', 'contoh-a')->value('database_name'),
+            'Module memakai database Core, jadi katalog tidak boleh menyimpan nama database untuknya.'
+        );
     }
 
     public function test_pendaftaran_module_tidak_menjalankan_penempatan_container(): void
@@ -103,9 +108,11 @@ class TenantRegistrationInstallsModulesTest extends TestCase
                     'description' => 'Module contoh untuk test pendaftaran.',
                     'version' => '0.1.0',
                     'status' => 'available',
-                    // Sisa rancangan database per app: kolom ini masih wajib diisi walau
-                    // module memakai database yang sama dengan Core. Dicatat sebagai F2-12.
-                    'database_name' => 'core_erp',
+                    // `database_name` sengaja tidak diisi. Module memakai database Core,
+                    // jadi ia tidak punya nama database untuk disebutkan, dan sejak F2-12
+                    // katalog tidak lagi menuntutnya. App container yang sudah ada di
+                    // katalog (mis. management-aset dari AppCatalogSeeder) tidak tersentuh
+                    // di sini, sehingga nama databasenya tetap seperti yang dideklarasikan.
                     'created_at' => now(),
                     'updated_at' => now(),
                 ],

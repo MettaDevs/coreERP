@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Provider;
 
+use App\Support\Modules\ModuleRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -33,7 +34,17 @@ class AppCatalogRequest extends FormRequest
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:2000'],
             'version' => ['required', 'string', 'max:40', 'regex:/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/'],
-            'database_name' => ['required', 'string', 'max:120', 'regex:/^[a-z][a-z0-9_]*$/'],
+            // Hanya app yang berjalan sebagai container sendiri yang punya database
+            // sendiri untuk disebutkan. Module berjalan di dalam runtime Core dan memakai
+            // database Core, jadi menuntutnya menyebutkan nama database berarti menuntut
+            // sebuah karangan. Lihat `berjalanSebagaiContainer()` untuk cara membedakannya.
+            'database_name' => [
+                Rule::requiredIf(fn (): bool => $this->berjalanSebagaiContainer()),
+                'nullable',
+                'string',
+                'max:120',
+                'regex:/^[a-z][a-z0-9_]*$/',
+            ],
             // Path konten UI ditentukan platform dari (app_id, placement), bukan
             // didaftarkan app. Menerima nilai dari app akan membuat dua placement
             // dari app yang sama berebut path yang sama.
@@ -298,7 +309,27 @@ class AppCatalogRequest extends FormRequest
         return array_values(array_unique($codes));
     }
 
-    /** @return array{id:string,name:string,description:?string,version:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string} */
+    /**
+     * Apakah app ini berjalan sebagai container sendiri, bukan sebagai module di dalam
+     * runtime Core.
+     *
+     * Pembedanya sengaja bukan bendera baru di manifest: app yang ada sebagai folder di
+     * `modules/` adalah module, sisanya container. Bendera manifest akan menjadi klaim yang
+     * dapat berbohong — sebuah module bisa mengaku container demi lolos pemeriksaan lain —
+     * sedangkan keberadaan folder adalah kenyataan yang sama dengan yang dipakai runtime
+     * untuk memuat module. Satu sumber kebenaran, bukan dua yang bisa berselisih.
+     *
+     * Id kosong dihitung sebagai container supaya manifest tanpa id tidak diam-diam
+     * membebaskan diri dari kewajiban ini; aturan `id` sendiri yang akan melaporkannya.
+     */
+    private function berjalanSebagaiContainer(): bool
+    {
+        $id = $this->string('id')->toString();
+
+        return $id === '' || app(ModuleRegistry::class)->cari($id) === null;
+    }
+
+    /** @return array{id:string,name:string,description:?string,version:string,database_name:?string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string} */
     public function appPayload(): array
     {
         return [
@@ -306,7 +337,9 @@ class AppCatalogRequest extends FormRequest
             'name' => $this->string('name')->trim()->toString(),
             'description' => $this->string('description')->trim()->toString() ?: null,
             'version' => $this->string('version')->toString(),
-            'database_name' => $this->string('database_name')->toString(),
+            // Module menyimpan null, bukan string kosong. Kolom yang kosong tetapi tidak
+            // null masih terbaca sebagai "punya database, namanya belum diisi".
+            'database_name' => $this->string('database_name')->toString() ?: null,
             'has_ui' => $this->boolean('has_ui'),
             'navigation' => $this->navigationPayload(),
             'repository_url' => $this->string('repository_url')->toString() ?: null,
