@@ -79,7 +79,7 @@ class ModuleNamespaceBoundaryTest extends TestCase
 
         $this->assertSame([], array_values(array_unique($pelanggaran)), implode("\n", [
             'Module menyentuh kelas Core di luar kontrak.',
-            'Permukaan yang boleh dipanggil module ada di App\\Support\\Modules, dan daftarnya di CoreServices.',
+            'Satu-satunya permukaan yang boleh disebut module adalah App\\Support\\Modules\\Contracts.',
             'Butuh sesuatu yang belum ada di sana? Usulkan antarmuka baru; jangan mengambil jalan',
             'pintas ke kelas Core, karena kelas Core bebas berubah bentuk dan module akan ikut',
             'pecah tanpa peringatan.',
@@ -90,7 +90,7 @@ class ModuleNamespaceBoundaryTest extends TestCase
     {
         $contoh = implode("\n", [
             'use App\\Support\\Modules\\Contracts\\PenerbitNomor;',
-            'use App\\Support\\Modules\\TenantScope;',
+            'use App\\Support\\Modules\\Contracts\\MilikTenant;',
             'use App\\Models\\Tenant;',
             'use App\\Support\\CurrentWorkspace;',
         ]);
@@ -98,15 +98,19 @@ class ModuleNamespaceBoundaryTest extends TestCase
         $this->assertSame(
             ['App\\Models\\Tenant', 'App\\Support\\CurrentWorkspace'],
             $this->kelasCoreYangDisebut($contoh),
-            'Kontrak dan TenantScope boleh; model Core dan kelas Support lain tidak.',
+            'Hanya isi Contracts yang boleh; model Core dan kelas Support lain tidak.',
         );
     }
 
     /**
      * Kelas Core yang disebut sebuah isi berkas, kecuali yang memang dikontrakkan.
      *
-     * Seluruh `App\\Support\\Modules` diizinkan: di situlah kontrak dan `TenantScope` berada,
-     * dan keduanya memang permukaan yang dituju module.
+     * Yang diizinkan hanya `App\\Support\\Modules\\Contracts`, dan itu satu-satunya
+     * kalimat aturannya. Sebelumnya seluruh `App\\Support\\Modules` diizinkan supaya model
+     * module bisa menyebut `TenantScope` — dan itu berarti kelas apa pun yang kelak ditaruh
+     * di folder itu ikut boleh disentuh module, tanpa ada yang menahan dan tanpa ada yang
+     * memutuskan. Sekarang model memakai trait `MilikTenant` dan seeder mewarisi
+     * `SeederModule`, keduanya di dalam `Contracts`, jadi aturannya bisa kembali sempit.
      *
      * @return list<string>
      */
@@ -119,7 +123,7 @@ class ModuleNamespaceBoundaryTest extends TestCase
         foreach ($cocok[0] as $nama) {
             $rapi = str_replace('\\\\', '\\', $nama);
 
-            if (str_starts_with($rapi, 'App\\Support\\Modules\\')) {
+            if (str_starts_with($rapi, 'App\\Support\\Modules\\Contracts\\')) {
                 continue;
             }
 

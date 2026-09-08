@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohB\Database\Seeders;
 
-use App\Support\Modules\TenantScope;
-use Illuminate\Database\Seeder;
+use App\Support\Modules\Contracts\SeederModule;
 use Illuminate\Support\Str;
 use Modules\Apperp\ContohB\Models\Rak;
 
@@ -15,11 +14,11 @@ use Modules\Apperp\ContohB\Models\Rak;
  * Ia ada supaya test bisa membuktikan hal yang paling mudah salah: memasang satu module
  * tidak boleh mengisi data awal module lain.
  */
-final class RakBawaanSeeder extends Seeder
+final class RakBawaanSeeder extends SeederModule
 {
     public function run(): void
     {
-        $tenantId = TenantScope::tenantAktif();
+        $tenantId = $this->tenantId();
 
         Rak::query()->create([
             'id' => (string) Str::ulid(),
