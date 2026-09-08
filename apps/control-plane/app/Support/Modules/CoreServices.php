@@ -13,6 +13,7 @@ use App\Services\Modules\PenerbitNomorCore;
 use App\Support\Modules\Contracts\DaftarSatuan;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use App\Support\Modules\Contracts\KalenderFiskal;
+use App\Support\Modules\Contracts\KonteksPermintaan;
 use App\Support\Modules\Contracts\KonteksTenant;
 use App\Support\Modules\Contracts\MesinWorkflow;
 use App\Support\Modules\Contracts\PenerbitNomor;
@@ -39,6 +40,12 @@ final class CoreServices
         MesinWorkflow::class => MesinWorkflowCore::class,
         DirektoriOrganisasi::class => DirektoriOrganisasiCore::class,
         KonteksTenant::class => KonteksTenantPermintaan::class,
+        // Berdiri sendiri di samping KonteksTenant, tidak digabung ke dalamnya. Tenant
+        // menjawab "di mana boleh membaca", konteks permintaan menjawab "apa yang boleh
+        // dilakukan"; menggabungkannya membuat satu antarmuka punya dua sumber data —
+        // sesi untuk yang satu, atribut permintaan untuk yang lain — dan pintu yang
+        // jawabannya bergantung pada bagian mana yang dipanggil bukan pintu yang jelas.
+        KonteksPermintaan::class => ModuleRequestContext::class,
     ];
 
     public static function daftarkan(Application $app): void

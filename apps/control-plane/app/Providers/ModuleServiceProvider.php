@@ -17,8 +17,11 @@ use Illuminate\Support\ServiceProvider;
  * pusat, sehingga jumlah pekerjaan saat menyalakan aplikasi tumbuh seiring jumlah module.
  * Satu penyedia per module membuat module memutuskan sendiri apa yang perlu dimuat.
  *
- * Module yang belum memiliki penyedia layanan dilewati tanpa suara. Pada fase ini module
- * contoh memang belum punya; yang penting registry sudah menemukannya.
+ * Module yang belum memiliki penyedia layanan dilewati tanpa suara. Sejak F2-10 kedua module
+ * contoh sudah punya, dan penyedia layanan itulah yang memuat rute module beserta middleware
+ * konteksnya. Rute module tidak pernah dimuat dari sini: kalau Core yang memuatnya, Core
+ * harus tahu id tiap module untuk memasang middleware konteks yang benar, dan itu kembali
+ * menjadi daftar terpusat yang justru dihindari registry.
  */
 final class ModuleServiceProvider extends ServiceProvider
 {

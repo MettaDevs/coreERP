@@ -6,11 +6,17 @@ use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ContohA\Http\Controllers\BarangController;
 
 /*
- * Berkas ini belum dimuat siapa pun. Penyedia layanan module yang memuatnya dibuat pada
- * fase 2; sampai saat itu, isinya hanya menyatakan bentuk yang disepakati.
+ * Dimuat oleh penyedia layanan module ini, bukan oleh Core.
+ *
+ * `konteks-module` menerima id module sebagai parameter. Itu sebabnya ia dipasang di sini,
+ * pada grup rute module, dan bukan sebagai middleware global: izin bersifat per app, dan
+ * middleware global tidak tahu ia sedang melayani module yang mana.
+ *
+ * Tidak ada token di jalur ini. Module berjalan di dalam proses Core, jadi konteksnya dibaca
+ * langsung dari permintaan yang sedang dilayani.
  */
 
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', 'konteks-module:contoh-a'])
     ->prefix('contoh-a')
     ->name('contoh-a.')
     ->group(function (): void {
