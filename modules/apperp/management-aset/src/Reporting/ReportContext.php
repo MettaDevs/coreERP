@@ -70,7 +70,7 @@ final class ReportContext
         return in_array($permission, $this->permissions, true);
     }
 
-    /** Request tiruan dengan atribut persis seperti yang dipasang `RequireCoreErpContext`. */
+    /** Request tiruan dengan atribut persis seperti yang dipasang `ResolveModuleContext` milik Core. */
     public function request(): Request
     {
         $request = new Request;
