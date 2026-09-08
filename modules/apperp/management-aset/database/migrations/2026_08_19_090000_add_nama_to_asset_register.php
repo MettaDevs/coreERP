@@ -31,9 +31,8 @@ return new class extends Migration
         SQL);
 
         DB::table('tr_penerimaan_aset')->whereNull('nama')->update(['nama' => DB::raw("'Aset ' || kode")]);
-        if (DB::getDriverName() !== 'sqlite') {
-            DB::statement('ALTER TABLE tr_penerimaan_aset ALTER COLUMN nama SET NOT NULL');
-        }
+        // Cabang SQLite dibuang pada F3-16; hanya ada satu mesin database sekarang.
+        DB::statement('ALTER TABLE tr_penerimaan_aset ALTER COLUMN nama SET NOT NULL');
     }
 
     public function down(): void
