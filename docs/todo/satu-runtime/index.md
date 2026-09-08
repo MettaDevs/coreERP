@@ -30,7 +30,9 @@ berbahaya daripada yang tidak ada.
 
 | Task | Siapa | Cabang | Catatan |
 | --- | --- | --- | --- |
-| F3-02 buang kerangka modul | induk | `refactor/f3-02-buang-kerangka-modul` | menghalangi F3-03 |
+| F3-03 bentuk ulang susunan modul | induk | `refactor/f3-03-susunan-modul` | menghalangi seluruh sisa fase 3 |
+| F4-01 hapus `apps/web-shell` | agent | `chore/f4-01-hapus-web-shell` | tanpa ketergantungan |
+| F4-02 `@apperp/ui` jadi workspace | agent | `chore/f4-02-ui-workspace` | tanpa ketergantungan |
 
 Kosongkan barisnya setelah pull request-nya digabungkan.
 
