@@ -35,7 +35,7 @@ final class AddressSetupController extends Controller
     public function index(Request $request): JsonResponse|Response
     {
         $section  = $request->query('section', 'countries');
-        $country  = $request->query('country', 'IDN');
+        $country  = (string) $request->query('country', '');
         if ($country === 'ID') {
             $country = 'IDN';
         }
@@ -48,7 +48,9 @@ final class AddressSetupController extends Controller
         $savedSection = session('saved_section') ?: $section;
 
         if (!empty($selectedId)) {
-            if ($savedSection === 'provinces') {
+            if ($savedSection === 'countries') {
+                $country = $selectedId;
+            } elseif ($savedSection === 'provinces') {
                 $p = Province::find($selectedId);
                 if ($p) {
                     $country = $p->country_code ?: $country;
@@ -158,98 +160,147 @@ final class AddressSetupController extends Controller
             }
         }
 
-        $countries = Country::where('active', true)->orderBy('name')->get();
-        if ($countries->isEmpty()) {
-            $countries = Country::orderBy('name')->get();
+        $allCountries = Country::where('active', true)->orderBy('name')->get();
+        if ($allCountries->isEmpty()) {
+            $allCountries = Country::orderBy('name')->get();
         }
 
-        $provinces = Province::when($country, fn ($q) => $q->where('country_code', $country))
+        $countries = ($country && $section === 'countries')
+            ? $allCountries->filter(fn ($c) => $c->code === $country || $c->iso3 === $country)->values()
+            : $allCountries;
+
+        $provinces = ($section === 'provinces' || $section === 'regencies' || $section === 'cities' || $section === 'districts')
+            ? Province::when($country, fn ($q) => $q->where('country_code', $country))
+                ->when($province && $section === 'provinces', fn ($q) => $q->where('id', $province))
+                ->orderBy('name')
+                ->get()
+            : collect([]);
+
+        $regencies = ($section === 'regencies' || $section === 'cities')
+            ? ($province
+                ? Regency::with('province')->where('province_id', $province)->orderBy('name')->get()
+                : ($country
+                    ? Regency::with('province')->whereHas('province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->get()
+                    : Regency::with('province')->orderBy('name')->limit(500)->get()))
+            : collect([]);
+
+        $districts = ($section === 'districts')
+            ? ($regency
+                ? District::with('regency.province')->where('regency_id', $regency)->orderBy('name')->get()
+                : ($province
+                    ? District::with('regency.province')->whereHas('regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->get()
+                    : ($country
+                        ? District::with('regency.province')->whereHas('regency.province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->limit(500)->get()
+                        : District::with('regency.province')->orderBy('name')->limit(500)->get())))
+            : collect([]);
+
+        $villages = ($section === 'villages')
+            ? ($district
+                ? Village::with('district.regency.province')->where('district_id', $district)->orderBy('name')->get()
+                : ($regency
+                    ? Village::with('district.regency.province')->whereHas('district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
+                    : ($province
+                        ? Village::with('district.regency.province')->whereHas('district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
+                        : ($country
+                            ? Village::with('district.regency.province')->whereHas('district.regency.province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->limit(300)->get()
+                            : Village::with('district.regency.province')->orderBy('name')->limit(300)->get()))))
+            : collect([]);
+
+        $streets = ($section === 'streets')
+            ? ($village
+                ? Street::where('village_id', $village)->orderBy('rt')->orderBy('rw')->get()
+                : ($district
+                    ? Street::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
+                    : ($regency
+                        ? Street::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
+                        : ($province
+                            ? Street::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
+                            : Street::orderBy('name')->limit(300)->get()))))
+            : collect([]);
+
+        $groupOfHouses = ($section === 'groupOfHouses')
+            ? ($village
+                ? GroupOfHouses::where('village_id', $village)->orderBy('name')->get()
+                : ($district
+                    ? GroupOfHouses::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
+                    : ($regency
+                        ? GroupOfHouses::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
+                        : ($province
+                            ? GroupOfHouses::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
+                            : GroupOfHouses::orderBy('name')->limit(300)->get()))))
+            : collect([]);
+
+        $landPlots = ($section === 'landPlots')
+            ? ($village
+                ? LandPlot::where('village_id', $village)->orderBy('plot_number')->get()
+                : ($district
+                    ? LandPlot::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('plot_number')->limit(300)->get()
+                    : ($regency
+                        ? LandPlot::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('plot_number')->limit(300)->get()
+                        : ($province
+                            ? LandPlot::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('plot_number')->limit(300)->get()
+                            : LandPlot::orderBy('plot_number')->limit(300)->get()))))
+            : collect([]);
+
+        $buildings = ($section === 'buildings')
+            ? ($village
+                ? Building::where('village_id', $village)->orderBy('name')->get()
+                : ($district
+                    ? Building::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
+                    : ($regency
+                        ? Building::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
+                        : ($province
+                            ? Building::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
+                            : Building::orderBy('name')->limit(300)->get()))))
+            : collect([]);
+
+        $postalCodes = ($section === 'postalCodes')
+            ? PostalCode::with(['country', 'province', 'regency', 'district', 'village'])
+                ->when($country, fn ($q) => $q->where('country_code', $country))
+                ->when($province, fn ($q) => $q->where('province_id', $province))
+                ->when($regency,  fn ($q) => $q->where('regency_id', $regency))
+                ->when($district, fn ($q) => $q->where('district_id', $district))
+                ->when($village,  fn ($q) => $q->where('village_id', $village))
+                ->orderBy('postal_code')
+                ->limit(150)
+                ->get()
+            : collect([]);
+        $parameters = DB::table('ref_address_parameters')->get();
+
+        $dropdownProvinces = $country
+            ? Province::where('country_code', $country)->orderBy('name')->get()
+            : Province::orderBy('name')->get();
+
+        $dropdownRegencies = Regency::select('id', 'province_id', 'name', 'code', 'type', 'active')
+            ->when($province, fn ($q) => $q->where('province_id', $province))
+            ->when(!$province && $country, fn ($q) => $q->whereHas('province', fn ($p) => $p->where('country_code', $country)))
             ->orderBy('name')
             ->get();
 
-        $regencies = $province
-            ? Regency::with('province')->where('province_id', $province)->orderBy('name')->get()
-            : ($country ? Regency::with('province')->whereHas('province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->get() : collect());
-
-        $districts = $regency
-            ? District::with('regency.province')->where('regency_id', $regency)->orderBy('name')->get()
-            : ($province ? District::with('regency.province')->whereHas('regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->get()
-                : ($country ? District::with('regency.province')->whereHas('regency.province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->limit(500)->get() : collect()));
-
-        $villages = $district
-            ? Village::with('district.regency.province')->where('district_id', $district)->orderBy('name')->get()
-            : ($regency
-                ? Village::with('district.regency.province')->whereHas('district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
-                : ($province
-                    ? Village::with('district.regency.province')->whereHas('district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
-                    : ($country ? Village::with('district.regency.province')->whereHas('district.regency.province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->limit(300)->get() : collect())));
-
-        $streets = $village
-            ? Street::where('village_id', $village)->orderBy('rt')->orderBy('rw')->get()
-            : ($district
-                ? Street::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
-                : ($regency
-                    ? Street::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
-                    : ($province
-                        ? Street::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
-                        : Street::orderBy('name')->limit(300)->get())));
-
-        $groupOfHouses = $village
-            ? GroupOfHouses::where('village_id', $village)->orderBy('name')->get()
-            : ($district
-                ? GroupOfHouses::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
-                : ($regency
-                    ? GroupOfHouses::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
-                    : ($province
-                        ? GroupOfHouses::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
-                        : GroupOfHouses::orderBy('name')->limit(300)->get())));
-
-        $landPlots = $village
-            ? LandPlot::where('village_id', $village)->orderBy('plot_number')->get()
-            : ($district
-                ? LandPlot::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('plot_number')->limit(300)->get()
-                : ($regency
-                    ? LandPlot::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('plot_number')->limit(300)->get()
-                    : ($province
-                        ? LandPlot::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('plot_number')->limit(300)->get()
-                        : LandPlot::orderBy('plot_number')->limit(300)->get())));
-
-        $buildings = $village
-            ? Building::where('village_id', $village)->orderBy('name')->get()
-            : ($district
-                ? Building::whereHas('village', fn ($q) => $q->where('district_id', $district))->orderBy('name')->limit(300)->get()
-                : ($regency
-                    ? Building::whereHas('village.district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(300)->get()
-                    : ($province
-                        ? Building::whereHas('village.district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(300)->get()
-                        : Building::orderBy('name')->limit(300)->get())));
-
-        $postalCodes = PostalCode::with(['country', 'province', 'regency', 'district', 'village'])
-            ->when($country, fn ($q) => $q->where('country_code', $country))
-            ->when($province, fn ($q) => $q->where('province_id', $province))
-            ->when($regency,  fn ($q) => $q->where('regency_id', $regency))
-            ->when($district, fn ($q) => $q->where('district_id', $district))
-            ->when($village,  fn ($q) => $q->where('village_id', $village))
-            ->orderBy('postal_code')
-            ->limit(150)
+        $dropdownDistricts = District::select('id', 'regency_id', 'name', 'code', 'active')
+            ->when($regency, fn ($q) => $q->where('regency_id', $regency))
+            ->when(!$regency && $province, fn ($q) => $q->whereHas('regency', fn ($r) => $r->where('province_id', $province)))
+            ->when(!$regency && !$province && $country, fn ($q) => $q->whereHas('regency.province', fn ($p) => $p->where('country_code', $country)))
+            ->orderBy('name')
             ->get();
-        $parameters = DB::table('ref_address_parameters')->get();
 
-        $dropdownProvinces = $country ? Province::where('country_code', $country)->orderBy('name')->get() : Province::orderBy('name')->get();
-        $dropdownRegencies = $province ? Regency::where('province_id', $province)->orderBy('name')->get() : ($country ? Regency::whereHas('province', fn ($q) => $q->where('country_code', $country))->orderBy('name')->get() : collect());
-        $dropdownDistricts = $regency ? District::where('regency_id', $regency)->orderBy('name')->get() : ($province ? District::whereHas('regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->get() : collect());
-        $dropdownVillages  = $district ? Village::where('district_id', $district)->orderBy('name')->get() : ($regency ? Village::whereHas('district', fn ($q) => $q->where('regency_id', $regency))->orderBy('name')->limit(500)->get() : ($province ? Village::whereHas('district.regency', fn ($q) => $q->where('province_id', $province))->orderBy('name')->limit(500)->get() : collect()));
+        $dropdownVillages = Village::select('id', 'district_id', 'name', 'code', 'active')
+            ->when($district, fn ($q) => $q->where('district_id', $district))
+            ->when(!$district && $regency, fn ($q) => $q->whereHas('district', fn ($d) => $d->where('regency_id', $regency)))
+            ->orderBy('name')
+            ->limit(500)
+            ->get();
 
-        $currentCountry  = Country::where('code', $country)->first();
+        $currentCountry  = $country ? Country::where('code', $country)->first() : null;
         $currentProvince = $province ? Province::find($province) : null;
         $currentRegency  = $regency ? Regency::find($regency) : null;
         $currentDistrict = $district ? District::find($district) : null;
 
-        $activeDivisionType = $village ? 'village' : ($district ? 'district' : ($regency ? 'regency' : ($province ? 'province' : 'country')));
-        $activeDivisionId   = $village ?: ($district ?: ($regency ?: ($province ?: $country)));
-        $activeTimezone     = $activeDivisionId ? $this->timezoneResolver->resolve($activeDivisionType, $activeDivisionId) : null;
+        $activeDivisionType = $village ? 'village' : ($district ? 'district' : ($regency ? 'regency' : ($province ? 'province' : ($country ? 'country' : null))));
+        $activeDivisionId   = $village ?: ($district ?: ($regency ?: ($province ?: ($country ?: null))));
+        $activeTimezone     = ($activeDivisionType && $activeDivisionId) ? $this->timezoneResolver->resolve($activeDivisionType, $activeDivisionId) : null;
 
-        $hierarchyLevels = CountryHierarchyLevel::where('country_code', $country)->orderBy('level')->get();
+        $hierarchyLevels = $country ? CountryHierarchyLevel::where('country_code', $country)->orderBy('level')->get() : collect();
 
         return Inertia::render('settings/address-hierarchy/address-setup', [
             'section'         => $section,
@@ -267,6 +318,7 @@ final class AddressSetupController extends Controller
             'hierarchyLevels' => $hierarchyLevels,
             'activeTimezone'  => $activeTimezone,
             'dropdowns'   => [
+                'countries' => $allCountries,
                 'provinces' => $dropdownProvinces,
                 'regencies' => $dropdownRegencies,
                 'districts' => $dropdownDistricts,
@@ -290,7 +342,7 @@ final class AddressSetupController extends Controller
             'iso3'       => 'nullable|string|max:3|uppercase',
             'name'       => 'required|string|max:100',
             'phone_code' => 'nullable|string|max:10',
-            'timezone'   => 'nullable|string|max:50',
+            'timezone'   => 'required|string|max:50',
             'active'     => 'boolean',
         ]);
 
@@ -340,7 +392,7 @@ final class AddressSetupController extends Controller
             'code'            => 'required|string|max:20',
             'name'            => 'required|string|max:150',
             'description'     => 'nullable|string|max:500',
-            'timezone'        => 'nullable|string|max:50',
+            'timezone'        => 'required|string|max:50',
             'intrastat'       => 'nullable|string|max:50',
             'it_state_code'   => 'nullable|string|max:50',
             'state_code'      => 'nullable|string|max:50',
@@ -535,7 +587,7 @@ final class AddressSetupController extends Controller
         if (! $district || ! $district->regency || ! $district->regency->province) {
             return back()->withErrors(['district_id' => 'Invalid district parent reference.']);
         }
-        $countryCode = $district->regency->province->country_code ?? 'ID';
+        $countryCode = $district->regency->province->country_code ?? null;
 
         $cleanCode = str_replace('.', '', $data['code']);
         $displayCode = 'V-' . $cleanCode;
@@ -940,11 +992,22 @@ final class AddressSetupController extends Controller
             }
         }
 
-        DB::table('ref_address_parameters')->updateOrInsert(
-            ['country_code' => $data['country_code']],
-            array_merge($data, ['updated_at' => now()])
-        );
-        return back();
+        $now = now();
+        $exists = DB::table('ref_address_parameters')->where('country_code', $data['country_code'])->exists();
+        if ($exists) {
+            DB::table('ref_address_parameters')->where('country_code', $data['country_code'])->update(
+                array_merge($data, ['updated_at' => $now])
+            );
+        } else {
+            DB::table('ref_address_parameters')->insert(
+                array_merge($data, [
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])
+            );
+        }
+
+        return back()->with('status', 'Parameters successfully saved.');
     }
 
     /** Hierarchy Lookups */
@@ -1166,15 +1229,20 @@ final class AddressSetupController extends Controller
 
     public function lookupTopDown(Request $request): JsonResponse
     {
-        $parentType = $request->query('parent_type');
-        $parentId   = $request->query('parent_id');
-        $provinceId = $request->query('province_id');
-        $regencyId  = $request->query('regency_id');
-        $districtId = $request->query('district_id');
+        $countryCode = $request->query('country_code') ?: $request->query('country_id');
+        $parentType  = $request->query('parent_type');
+        $parentId    = $request->query('parent_id');
+        $provinceId  = $request->query('province_id');
+        $regencyId   = $request->query('regency_id');
+        $districtId  = $request->query('district_id');
 
         if ($provinceId || $regencyId || $districtId) {
+            $provinceQuery = Province::query();
+            if ($countryCode) {
+                $provinceQuery->where('country_code', $countryCode);
+            }
             return response()->json([
-                'provinces' => Province::where('country_code', 'ID')->orderBy('name')->get(),
+                'provinces' => $provinceQuery->orderBy('name')->get(),
                 'regencies' => $provinceId ? Regency::where('province_id', $provinceId)->orderBy('name')->get() : collect(),
                 'districts' => $regencyId ? District::where('regency_id', $regencyId)->orderBy('name')->get() : collect(),
                 'villages'  => $districtId ? Village::where('district_id', $districtId)->orderBy('name')->get() : collect(),
@@ -1182,7 +1250,11 @@ final class AddressSetupController extends Controller
         }
 
         if ($parentType === 'country') {
-            return response()->json(Province::where('country_code', $parentId ?: 'ID')->orderBy('name')->get());
+            $provQuery = Province::query();
+            if ($parentId) {
+                $provQuery->where('country_code', $parentId);
+            }
+            return response()->json($provQuery->orderBy('name')->get());
         }
         if ($parentType === 'province') {
             return response()->json(Regency::where('province_id', $parentId)->orderBy('name')->get());
@@ -1194,8 +1266,12 @@ final class AddressSetupController extends Controller
             return response()->json(Village::where('district_id', $parentId)->orderBy('name')->get());
         }
 
+        $fallbackProvQuery = Province::query();
+        if ($countryCode) {
+            $fallbackProvQuery->where('country_code', $countryCode);
+        }
         return response()->json([
-            'provinces' => Province::where('country_code', 'ID')->orderBy('name')->get(),
+            'provinces' => $fallbackProvQuery->orderBy('name')->get(),
         ]);
     }
 
@@ -1272,17 +1348,17 @@ final class AddressSetupController extends Controller
     /** Administrative Divisions */
     public function getDivisions(Request $request): JsonResponse
     {
-        $countryId = $request->query('country_id', 'ID');
+        $countryId = $request->query('country_id');
         $parentId  = $request->query('parent_id');
         $level     = (int) $request->query('level', 1);
         $search    = $request->query('search');
 
         $query = match ($level) {
-            1 => Province::where('country_code', $countryId),
-            2 => $parentId ? Regency::where('province_id', $parentId) : Regency::whereHas('province', fn ($q) => $q->where('country_code', $countryId)),
-            3 => $parentId ? District::where('regency_id', $parentId) : District::whereHas('regency.province', fn ($q) => $q->where('country_code', $countryId)),
-            4 => $parentId ? Village::where('district_id', $parentId) : Village::whereHas('district.regency.province', fn ($q) => $q->where('country_code', $countryId)),
-            default => Province::where('country_code', $countryId),
+            1 => $countryId ? Province::where('country_code', $countryId) : Province::query(),
+            2 => $parentId ? Regency::where('province_id', $parentId) : ($countryId ? Regency::whereHas('province', fn ($q) => $q->where('country_code', $countryId)) : Regency::query()),
+            3 => $parentId ? District::where('regency_id', $parentId) : ($countryId ? District::whereHas('regency.province', fn ($q) => $q->where('country_code', $countryId)) : District::query()),
+            4 => $parentId ? Village::where('district_id', $parentId) : ($countryId ? Village::whereHas('district.regency.province', fn ($q) => $q->where('country_code', $countryId)) : Village::query()),
+            default => $countryId ? Province::where('country_code', $countryId) : Province::query(),
         };
 
         if ($search) {
@@ -1302,7 +1378,7 @@ final class AddressSetupController extends Controller
         $districtId = $request->query('district_id');
         $regencyId  = $request->query('regency_id');
         $provinceId = $request->query('province_id');
-        $country    = $request->query('country', 'ID');
+        $country    = $request->query('country');
         $search     = $request->query('search');
         $page       = (int) $request->query('page', 1);
         $perPage    = (int) $request->query('per_page', 50);

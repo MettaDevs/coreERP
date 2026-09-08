@@ -26,6 +26,8 @@ export type Province = {
 export type Regency = {
     id: string;
     province_id: string;
+    country_code?: string | null;
+    province?: Province | null;
     code: string;
     display_code?: string | null;
     name: string;
@@ -39,6 +41,7 @@ export type Regency = {
 export type District = {
     id: string;
     regency_id: string;
+    regency?: Regency | null;
     code: string;
     display_code?: string | null;
     name: string;
@@ -160,7 +163,13 @@ export interface LineageData {
     province?: { id: string; code: string; name: string } | null;
     regency?: { id: string; code: string; name: string; type: string } | null;
     district?: { id: string; code: string; name: string } | null;
-    village?: { id: string; code: string; name: string; type: string; postal_code: string | null } | null;
+    village?: {
+        id: string;
+        code: string;
+        name: string;
+        type: string;
+        postal_code: string | null;
+    } | null;
     timezone?: ResolvedTimezone | null;
     lineage?: Record<string, string>;
     formatted?: string;
@@ -214,6 +223,7 @@ export interface Props {
     hierarchyLevels?: HierarchyLevel[];
     activeTimezone?: ResolvedTimezone | null;
     dropdowns?: {
+        countries?: Country[];
         provinces: Province[];
         regencies: Regency[];
         districts: District[];
