@@ -907,9 +907,8 @@ F2-01; saat itu pemindaian di sini diganti dengannya, dan jangan dibiarkan menja
 terpisah, dan itu membuat modul tidak bisa dicabut sendirian.
 
 **Berkas.**
-- `apps/control-plane/tests/PHPStan/ModuleIsolationRule.php`
-- `apps/control-plane/composer.json` (daftarkan namespace test pada `autoload-dev`)
-- `apps/control-plane/phpstan.neon`
+- `apps/control-plane/tests/Feature/Boundary/ModuleNamespaceBoundaryTest.php`
+- `apps/control-plane/phpstan.neon` (folder `modules/` masuk ke `paths` dan `scanDirectories`)
 
 **Langkah.**
 1. Aturan memeriksa setiap nama kelas yang dirujuk dari dalam `Modules\<A>\` dan menolak yang berawalan
@@ -920,12 +919,50 @@ terpisah, dan itu membuat modul tidak bisa dicabut sendirian.
 3. Tambahkan folder `modules/` ke daftar `paths` pada berkas konfigurasi analisa statis, dan pastikan
    kelas modul dapat dimuat lewat pemindaian direktori.
 
-**Selesai bila.** Analisa statis lulus pada kode yang ada, dan gagal bila modul contoh A sengaja
-mengimpor kelas modul contoh B.
+**Selesai bila.** Penjaga lulus pada kode yang ada, dan gagal bila modul contoh A sengaja mengimpor kelas
+modul contoh B.
 
 **Rujukan.** Prinsip P1 dokumen ini.
 
 **Bergantung pada.** F1-02.
+
+#### Aturan PHPStan ditulis lebih dulu, lalu dibuang
+
+Task ini menyuruh menulis aturan PHPStan. Aturannya ditulis, dijalankan, dan **berlubang**. PHPStan hanya
+mengunjungi nama kelas pada posisi tertentu: pada berkas contoh hanya tiga nama yang sampai ke aturan,
+ketiganya tipe argumen. Baris `use`, pemanggilan statis, dan nama kelas di dalam string tidak pernah
+sampai — padahal ketiganya justru jalur yang paling mudah dipakai menembus batas.
+
+Penggantinya membaca berkas dengan pencocokan pola. Terdengar lebih kasar, tapi **menangkap lebih
+banyak**: impor, pemanggilan statis, nama di dalam string, dan bahkan di dalam komentar. Yang terakhir
+bukan berlebihan — sebuah `@return \Modules\Apperp\Lain\Kelas` pada docblock adalah rujukan tipe yang
+dibaca alat, bukan sekadar tulisan.
+
+Folder `modules/` tetap dimasukkan ke daftar `paths` PHPStan, karena kode modul memang perlu diperiksa
+tipenya. Yang dibuang hanya aturan buatan sendiri itu.
+
+#### Jebakan yang memakan waktu paling lama, dan harus diketahui semua orang
+
+**PHPStan menyimpan hasil analisa, dan mengubah berkas aturan buatan sendiri tidak membatalkan
+simpanan itu.** Aturannya sudah terpasang dan sudah berjalan sejak awal, tetapi setiap kali kodenya
+diubah, PHPStan menyajikan hasil lama dan melaporkan nol temuan. Itu terbaca persis seperti "aturannya
+tidak jalan", dan waktu habis mencari kesalahan yang tidak ada.
+
+Cara memastikannya: hapus foldernya secara paksa, jangan hanya memanggil perintah pembersihnya.
+
+```bash
+rm -rf "$TEMP/phpstan"
+```
+
+Ini masuk ke keluarga yang sama dengan bagian 4.5. Sebuah penjaga yang melaporkan hijau karena
+simpanan lama sama tidak bergunanya dengan penjaga yang tidak pernah dipasang.
+
+#### Penjaganya menangkap pelanggaran yang tidak disengaja
+
+Selain pelanggaran yang sengaja dibuat untuk mengujinya, penjaga ini langsung menemukan satu yang nyata:
+docblock pada modul contoh B menyebut namespace modul contoh A secara harfiah, sebagai contoh hal yang
+dilarang. Kalimatnya diubah. Sebuah penjaga yang menemukan sesuatu pada hari pertama adalah penjaga
+yang menguji sesuatu.
 
 ### F1-06 — Penjaga ketiga: tidak ada query modul tanpa penyaringan tenant
 

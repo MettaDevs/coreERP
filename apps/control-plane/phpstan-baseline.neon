@@ -1128,11 +1128,6 @@ parameters:
 			count: 1
 			path: database/migrations/2026_08_03_120000_add_tenant_security_configuration.php
 
-		-
-			message: '#^Property Illuminate\\Database\\Migrations\\Migration@anonymous/database/migrations/2026_08_12_120000_repair_unused_number_sequence_scopes\.php\:6\:\:\$numberingStateTables type has no value type specified in iterable type array\.$#'
-			identifier: missingType.iterableValue
-			count: 1
-			path: database/migrations/2026_08_12_120000_repair_unused_number_sequence_scopes.php
 
 		-
 			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Console\\Command\. Use \-\> instead\.$#'
