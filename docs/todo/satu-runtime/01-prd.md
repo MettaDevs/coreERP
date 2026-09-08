@@ -2653,6 +2653,51 @@ sekaligus terjaga.
 
 **Bergantung pada.** F1-06, F3-04.
 
+### F3-26 — Konteks permintaan dihitung sekali, bukan sekali per penanya
+
+**Kenapa.** Diukur pada permintaan daftar module yang paling sederhana — satu tabel, satu tenant, tanpa
+relasi: **22 query, dan hanya satu di antaranya mengambil data yang diminta.** Sisanya konteks dan izin
+yang ditanyakan berulang oleh pemanggil yang berbeda, dengan parameter yang sama persis:
+`tenant_memberships` empat kali, lingkup kebijakan data enam kali, `organizations` lima kali.
+
+Penyebabnya bukan pemindahan ke satu runtime. `CurrentWorkspace` dan `DataPolicyAccessResolver` memang
+tidak pernah mengingat jawabannya, dan Core sudah begitu jauh sebelum module masuk; rute module hanya
+melewati seluruh rantai itu sekaligus sehingga akibatnya terlihat.
+
+**Berkas.**
+- `apps/control-plane/app/Support/CurrentWorkspace.php`
+- `apps/control-plane/app/Support/DataPolicyAccessResolver.php`
+- `apps/control-plane/app/Providers/AppServiceProvider.php`
+- `apps/control-plane/tests/Feature/Boundary/AnggaranQueryPermintaanModuleTest.php` (baru)
+
+**Langkah.**
+1. Kedua kelas mengingat jawabannya selama satu permintaan, berkunci id pengguna dan id keanggotaan.
+2. Keduanya diikat `scoped()`, **bukan** `singleton()`. Bedanya menentukan pada pekerja yang hidup lama:
+   singleton akan membawa keanggotaan pengguna sebelumnya ke permintaan berikutnya.
+3. Berpindah tenant membuang ingatannya.
+4. Tambahkan anggaran query per permintaan sebagai test, dan buktikan ia bisa merah.
+
+**Selesai bila.** Satu permintaan daftar module tidak melebihi anggaran query yang ditetapkan, dan
+anggaran itu terbukti bisa gagal.
+
+**Bergantung pada.** F3-22.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Hasil: 22 query menjadi 9, 45,2 ms menjadi 19,4 ms.** Sembilan yang tersisa semuanya berbeda dan
+masing-masing punya alasan; tidak ada yang mengulang.
+
+**Pengukuran pertama saya salah, dan koreksinya patut dicatat.** Ia menghasilkan 5 query — karena
+ingatan dari permintaan pemanasan ikut terpakai, padahal di produksi tiap permintaan mulai dari nol.
+Setelah batas permintaan ditiru dengan `forgetScopedInstances()`, angkanya 9. Pengukuran yang tidak
+meniru batas permintaan akan selalu memuji dirinya sendiri.
+
+**Penjaganya mengukur jumlah query, bukan milidetik.** Jumlah query stabil antar mesin; milidetik tidak,
+dan test kecepatan yang bergantung mesin akan dimatikan orang pada hari pertama ia berkedip. Dibuktikan
+bisa merah dengan melumpuhkan ikatan `scoped`: **14 query, batasnya 10.**
+
 ### F3-06 — Penerbitan nomor lewat kontrak Core
 
 **Kenapa.** Ini pemanggilan HTTP yang paling sering: setiap dokumen baru dan setiap master baru

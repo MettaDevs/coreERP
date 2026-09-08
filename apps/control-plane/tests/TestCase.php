@@ -109,6 +109,25 @@ abstract class TestCase extends BaseTestCase
         ]]);
     }
 
+    /**
+     * Tiap permintaan test dimulai dengan ikatan `scoped` yang bersih, sama seperti produksi.
+     *
+     * Di produksi tiap permintaan HTTP mendapat container baru, jadi apa pun yang diingat
+     * sebuah kelas selama permintaan hilang di permintaan berikutnya. Di dalam test, satu
+     * container dipakai untuk seluruh permintaan pada satu test — dan itu membuat ingatan
+     * bocor melewati batas yang di produksi tidak pernah dilewati.
+     *
+     * Akibatnya bukan test yang gagal palsu, melainkan yang lebih buruk: test yang **lulus**
+     * karena membaca ingatan basi, lalu produksi berperilaku lain. Karena itu batasnya ditiru
+     * di sini, bukan diakali di tempat pemakaian.
+     */
+    public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
+    {
+        $this->app->forgetScopedInstances();
+
+        return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);
+    }
+
     protected function skipUnlessFortifyHas(string $feature, ?string $message = null): void
     {
         if (! Features::enabled($feature)) {

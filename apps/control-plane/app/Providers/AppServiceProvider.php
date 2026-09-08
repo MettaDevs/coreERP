@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Support\CurrentWorkspace;
+use App\Support\DataPolicyAccessResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -23,7 +24,22 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        /*
+         * Konteks permintaan dihitung sekali, bukan sekali per penanya.
+         *
+         * Keduanya ditanyai berkali-kali dalam satu permintaan oleh pihak yang berbeda, dan tiap
+         * pemanggilan dulu berujung query baru dengan parameter yang sama persis. Diukur pada satu
+         * permintaan daftar module yang paling sederhana: **22 query, hanya satu di antaranya
+         * mengambil data yang diminta.** `tenant_memberships` dibaca empat kali, lingkup kebijakan
+         * enam kali, `organizations` lima kali.
+         *
+         * `scoped()`, bukan `singleton()`. Bedanya menentukan pada pekerja yang hidup lama: ikatan
+         * scoped dibuang di antara permintaan, sedangkan singleton akan membawa keanggotaan
+         * pengguna sebelumnya ke permintaan berikutnya — kesalahan yang tidak pernah gagal, hanya
+         * salah.
+         */
+        $this->app->scoped(CurrentWorkspace::class);
+        $this->app->scoped(DataPolicyAccessResolver::class);
     }
 
     /**
