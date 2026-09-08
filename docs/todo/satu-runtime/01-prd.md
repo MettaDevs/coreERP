@@ -628,9 +628,19 @@ Tiga jalan yang tersisa, dan keputusannya bukan keputusan teknis:
 | Hook `pre-push` yang dibagikan di repo | menolak dorongan langsung ke cabang utama dari mesin yang sudah menyetelnya | tidak menghalangi penggabungan pull request merah lewat antarmuka GitHub, dan bisa dilewati siapa pun yang belum menyetel `core.hooksPath` |
 | Alur yang gagal keras saat cabang utama merah | pemberitahuan cepat | tidak mencegah apa pun, hanya memberi tahu setelah terjadi |
 
-Sampai salah satunya dipilih, aturan ini ditegakkan orang, bukan mesin. Itu berarti seluruh kalimat
-"selesai bila test lulus" pada dokumen ini masih bersandar pada disiplin, dan itu keadaan yang sama
-dengan sebelum proyek dimulai. Task ini **tetap terbuka**.
+#### Diputuskan: tidak dikerjakan
+
+Pemilik produk memutuskan 8 September 2026 untuk tidak menaikkan paket dan tidak memasang penambal.
+Task ini **ditutup tanpa dikerjakan**, dan nomornya tidak dipakai ulang.
+
+Akibatnya harus dinyatakan terang-terangan supaya tidak ada yang salah mengira: **setiap pemeriksaan
+pada dokumen ini bisa dilewati dengan satu klik gabungkan.** Kalimat "selesai bila test lulus" bersandar
+pada disiplin orang, bukan pada mesin. Ini keadaan yang sama dengan sebelum proyek dimulai, dan itulah
+keadaan yang membuat alur merah bertahan berbulan-bulan.
+
+Yang berubah dibanding sebelumnya cuma satu, tapi bukan hal kecil: alurnya sekarang **benar-benar
+hijau**, jadi merahnya berarti sesuatu. Sebelum F0-01 setiap pull request merah, sehingga warna merah
+tidak membedakan apa pun dan wajar diabaikan.
 
 ## 8. Fase 1: penjaga batas dan kerangka modul
 
@@ -665,6 +675,20 @@ daftar berkas terlarang; dan kalimat tentang container per modul sudah hilang.
 
 **Bergantung pada.** F0-02.
 
+#### Yang ditambahkan di luar langkah task ini
+
+**Awalan tabel tidak selalu sama dengan nama folder,** dan itu perlu dinyatakan. `management-aset`
+berawalan `aset_`, bukan `management_aset_`. Awalan dipilih pendek dan **tidak boleh berubah** setelah
+modul pertama kali dipasang, karena mengubahnya berarti mengganti nama tabel di setiap instalasi
+pelanggan. Karena itu tabel pemetaannya berada di `modules/README.md` dan diisi pada pull request yang
+membuat modulnya, supaya tabrakan awalan ketahuan saat peninjauan, bukan saat migrasi berjalan.
+
+**Modul contoh tidak boleh sampai ke pelanggan.** Pemilik produk menegaskan ini 8 September 2026.
+`contoh-a` dan `contoh-b` hidup di repo sampai fase 7, jadi mereka ada saat bundle edisi dibangun.
+Keduanya menandai diri `kind: internal-fixture`, dan F5-04 menolak modul bertanda itu pada edisi mana
+pun beserta test yang membuktikannya. Sebuah menu bernama "Contoh A" di layar pelanggan adalah kegagalan
+yang tidak boleh mungkin terjadi.
+
 ### F1-02 — Dua modul contoh
 
 **Kenapa.** Ketiga penjaga berikutnya menguji sesuatu, dan sesuatu itu harus ada lebih dulu. Pada
@@ -680,6 +704,8 @@ ada yang bisa dikerjakan lebih dulu.
    `tenant_id`.
 2. Masing-masing punya satu model dan satu rute sederhana.
 3. Modul contoh ini hidup sepanjang proyek dan menjadi bahan uji penjaga; jangan dihapus sampai fase 7.
+4. Keduanya menandai diri `kind: internal-fixture` pada `app.yaml`. Karena mereka masih ada saat bundle
+   edisi dibangun, tanda inilah yang dipakai F5-04 untuk menolaknya.
 
 **Selesai bila.** Kedua folder ada dan migration-nya bisa dijalankan tangan.
 
@@ -1422,8 +1448,9 @@ dua tanda tangan HMAC, satu tabel dedup.
    memancarkan event setelah keputusan disimpan.
 3. `PublishWorkflowEvents` tetap ada untuk penerima di luar proses, tapi berhenti mengirim ke modul yang
    berada di dalam proses. Jangan hapus perintahnya.
-4. Tabel `processed_core_events` tetap dipakai untuk dedup listener; namanya tidak perlu diubah karena
-   sekarang berada di schema `aset`.
+4. Tabel `processed_core_events` dipakai untuk dedup listener. Karena semua tabel kini satu database,
+   namanya **wajib** diberi awalan modul menjadi `aset_processed_core_events`; tanpa itu ia bertabrakan
+   dengan tabel bernama sama milik Core atau modul lain.
 
 **Selesai bila.** `AssetLifecycleTest` lulus, dan satu dokumen dekomisioning bisa diajukan lalu disetujui
 tanpa satu pun permintaan HTTP.
@@ -2106,11 +2133,14 @@ bukan dijanjikan. Ini pemeriksaan yang membuat seluruh model lisensi berdiri.
 
 **Langkah.**
 1. Bangun image edisi, lalu cari nama namespace modul yang tidak dibeli di dalam berkas image.
-2. Jalankan migrasi ke database kosong, lalu hitung schema yang terbentuk. Schema modul yang tidak dibeli
-   tidak boleh ada.
+2. Jalankan migrasi ke database kosong, lalu daftar nama tabel yang terbentuk. Tidak boleh ada tabel
+   berawalan milik modul yang tidak dibeli.
 3. Periksa bundel JavaScript untuk rute modul yang tidak dibeli.
 4. Buktikan pemeriksa bisa gagal: tambahkan satu modul ke daftar, jalankan, catat pesannya, lalu
-   kembalikan. Ini mengikuti pelajaran yang sama dengan F0-06.
+   kembalikan. Ini mengikuti pelajaran yang sama dengan F1-07.
+5. Tolak modul ber-`kind: internal-fixture` pada edisi mana pun, dan buktikan penolakannya dengan test.
+   `contoh-a` dan `contoh-b` hidup di repo sampai fase 7; sebuah menu bernama "Contoh A" di layar
+   pelanggan adalah kegagalan yang tidak boleh mungkin terjadi.
 
 **Selesai bila.** Pemeriksaan hijau untuk dua edisi contoh, dan pesan gagalnya tercatat di PR.
 
@@ -2245,7 +2275,8 @@ repo terpisah. Tidak ada satu pun alur yang membangun atau menerbitkan image.
 **Langkah.**
 1. Alur test menjalankan test Core dan seluruh modul dalam satu perintah.
 2. Pemeriksa susunan repo diubah menjadi pemeriksa susunan modul: manifest sah, rantai keamanan lengkap,
-   kontrak ada, dan schema dideklarasikan.
+   kontrak ada bila memang ada permukaan yang dipanggil dari luar runtime, dan awalan tabel modul
+   terdaftar pada tabel pemetaan di `modules/README.md`.
 3. Syarat lama tentang Dockerfile per app, potongan compose, dan skrip migrasi per app dihapus. Perhatikan
    bahwa pemeriksa itu juga menolak ejaan kunci dependency yang masih dipakai skrip pengembangan; samakan
    keduanya pada PR ini.
@@ -2292,11 +2323,11 @@ misalnya direktori anggota dan unit organisasi, membuktikannya.
 - `modules/apperp/human-resources/`
 
 **Langkah.**
-1. Ikuti urutan fase 3 dalam bentuk ringkas: bawa masuk beserta riwayat, bentuk ulang, pindahkan ke schema
-   sendiri, ganti pemanggilan HTTP, pindahkan test.
+1. Ikuti urutan fase 3 dalam bentuk ringkas: bawa masuk beserta riwayat, bentuk ulang, ganti nama tabel
+   ke awalan `hr_`, ganti pemanggilan HTTP, pindahkan test.
 2. Dua endpoint direktori Core yang hari ini hanya boleh dipanggil modul ini menjadi pemanggilan fungsi
    lewat antarmuka F2-06.
-3. Pastikan penjaga F0-04 dan F0-05 tetap hijau dengan dua modul terpasang.
+3. Pastikan ketiga penjaga F1-04, F1-05, dan F1-06 tetap hijau dengan dua modul terpasang.
 
 **Selesai bila.** Kedua modul berjalan bersamaan, dan mencabut satu tidak menyentuh data yang lain.
 
