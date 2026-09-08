@@ -1,0 +1,237 @@
+# Register aset, penempatan, perencanaan, dan dokumen lifecycle.
+/api/v1/aset:
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: listAset
+    summary: Menampilkan register aset tenant aktif
+    responses:
+      '200':
+        description: Register aset
+  post:
+    tags:
+    - Lifecycle aset
+    operationId: receiveAset
+    summary: Mencatat penerimaan aset dan penempatan awal; plan atau permintaan bersifat opsional
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    responses:
+      '201':
+        description: Aset diterima
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '503':
+        $ref: '#/components/responses/NumberSequenceUnavailable'
+/api/v1/aset/{id}:
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: showAset
+    summary: Menampilkan satu aset beserta nilai atribut jenisnya
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Aset beserta atributnya
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+  patch:
+    tags:
+    - Lifecycle aset
+    operationId: updateAset
+    summary: Mengoreksi data aset; group tidak dapat diganti dan nilai perolehan terkunci setelah ada periode penyusutan
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Aset diperbarui
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Aset sudah dilepas, atau nilainya terkunci oleh periode penyusutan
+      '422':
+        $ref: '#/components/responses/ValidationError'
+/api/v1/aset/{id}/history:
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: assetHistory
+    summary: Membaca histori penempatan efektif aset tanpa mengubah histori lama
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Aset dan histori penempatan
+      '404':
+        $ref: '#/components/responses/NotFound'
+/api/v1/aset/{id}/penempatan:
+  post:
+    tags:
+    - Lifecycle aset
+    operationId: placeAsset
+    summary: Menambah mutasi penggunaan, PIC, atau lokasi aset
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Mutasi dicatat
+      '409':
+        description: Aset yang dilepas tidak dapat dimutasi
+/api/v1/perencanaan-aset:
+  get:
+    tags:
+    - Perencanaan aset
+    operationId: listAssetPlans
+    summary: Menampilkan rencana aset tenant aktif
+    responses:
+      '200':
+        description: Daftar rencana aset
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+  post:
+    tags:
+    - Perencanaan aset
+    operationId: createAssetPlan
+    summary: Membuat header dan rincian perencanaan aset; spesifikasi adalah snapshot pada rincian transaksi
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssetPlanningWrite'
+    responses:
+      '200':
+        description: Permintaan yang sama diulang
+      '201':
+        description: Rencana dibuat
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+      '503':
+        description: Number Sequence Core belum tersedia
+/api/v1/perencanaan-aset/{id}:
+  get:
+    tags:
+    - Perencanaan aset
+    operationId: showAssetPlan
+    summary: Menampilkan satu rencana aset beserta rinciannya
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Rencana aset
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        description: Rencana tidak ditemukan
+  patch:
+    tags:
+    - Perencanaan aset
+    operationId: updateAssetPlan
+    summary: Mengubah rencana draf dengan version saat ini
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/AssetPlanningWrite'
+            - type: object
+              required:
+              - version
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+    responses:
+      '200':
+        description: Rencana diperbarui
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '409':
+        description: Version sudah berubah
+      '422':
+        $ref: '#/components/responses/ValidationError'
+  delete:
+    tags:
+    - Perencanaan aset
+    operationId: archiveAssetPlan
+    summary: Mengarsipkan rencana draf tanpa menghapus data fisik
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - version
+            properties:
+              version:
+                type: integer
+                minimum: 1
+    responses:
+      '204':
+        description: Rencana diarsipkan
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '409':
+        description: Version sudah berubah
+      '422':
+        $ref: '#/components/responses/ValidationError'
+/api/v1/{lifecycleDocument}:
+  get:
+    tags:
+    - Lifecycle aset
+    operationId: listLifecycleDocument
+    summary: Menampilkan permintaan pembelian, dekomisioning, penjualan, atau pemusnahan
+    parameters:
+    - name: lifecycleDocument
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+        - permintaan-pembelian-aset
+        - dekomisioning-aset
+        - penjualan-aset
+        - pemusnahan-aset
+    responses:
+      '200':
+        description: Daftar dokumen lifecycle
+  post:
+    tags:
+    - Lifecycle aset
+    operationId: createLifecycleDocument
+    summary: Membuat dokumen lifecycle; dekomisioning yang disetujui menghentikan pemakaian aset sebelum penjualan atau pemusnahan
+    parameters:
+    - name: lifecycleDocument
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+        - permintaan-pembelian-aset
+        - dekomisioning-aset
+        - penjualan-aset
+        - pemusnahan-aset
+    - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    responses:
+      '201':
+        description: Dokumen dibuat

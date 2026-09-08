@@ -1,0 +1,106 @@
+# Laporan cetak/ekspor, dipanggil Core — bukan browser. Core memanggil dengan token
+# konteks pengguna yang meminta cetak (skema keamanan yang sama dengan endpoint
+# /api/v1), sehingga permission dan scope organisasi ditegakkan seperti request biasa.
+# Layout unggahan, antrean ekspor, render, dan halamannya milik Core; lihat
+# docs/dev/23-document-rendering.md di repository CoreERP. Kode laporan di sini tanpa
+# awalan ID app; katalog Core menyimpannya sebagai `management-aset.<kode>`.
+/api/internal/v1/laporan/{kode}:
+  get:
+    tags:
+    - Laporan
+    operationId: internalShowReport
+    summary: Definisi laporan untuk Core; placeholder, parameter, dan layout bawaan
+    parameters:
+    - $ref: '#/components/parameters/KodeLaporan'
+    responses:
+      '200':
+        description: Definisi laporan
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '#/components/schemas/LaporanDefinisi'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        description: Pengguna pada token tidak memegang permission data laporan ini
+      '404':
+        $ref: '#/components/responses/NotFound'
+/api/internal/v1/laporan/{kode}/layouts/{key}:
+  get:
+    tags:
+    - Laporan
+    operationId: internalDownloadBuiltinLayout
+    summary: Berkas layout bawaan yang ikut release app
+    parameters:
+    - $ref: '#/components/parameters/KodeLaporan'
+    - name: key
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[a-z0-9-]+$
+    responses:
+      '200':
+        description: Berkas .docx atau .xlsx
+        content:
+          application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+            schema:
+              type: string
+              format: binary
+          application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+            schema:
+              type: string
+              format: binary
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        description: Pengguna pada token tidak memegang permission data laporan ini
+      '404':
+        $ref: '#/components/responses/NotFound'
+/api/internal/v1/laporan/{kode}/dataset:
+  post:
+    tags:
+    - Laporan
+    operationId: internalReportDataset
+    summary: Dataset laporan untuk diisi ke layout oleh Core
+    description: >-
+      Parameter divalidasi dengan aturan laporan; scope organisasi ditegakkan dengan
+      `OrganizationScope` yang sama seperti endpoint detailnya. Record yang tidak ada atau
+      di luar scope dijawab 422 dengan `message` yang layak ditampilkan ke pengguna.
+    parameters:
+    - $ref: '#/components/parameters/KodeLaporan'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [parameter]
+            properties:
+              parameter:
+                type: object
+                description: '`work-order` menuntut `id`; `daftar-work-order` menerima `status`, `dari`, `sampai`.'
+                additionalProperties: true
+    responses:
+      '200':
+        description: Dataset
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '#/components/schemas/LaporanDataset'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        description: Pengguna pada token tidak memegang permission data laporan ini
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        description: Parameter tidak valid, atau record tidak ada / di luar scope (`message`)

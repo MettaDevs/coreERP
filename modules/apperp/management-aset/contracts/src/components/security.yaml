@@ -1,0 +1,6 @@
+# Skema keamanan: token konteks bertanda tangan dari Core.
+CoreERPContext:
+  type: http
+  scheme: bearer
+  bearerFormat: CoreERP context token
+  description: Token singkat bertanda tangan yang diterbitkan Web Shell untuk aplikasi ini.
