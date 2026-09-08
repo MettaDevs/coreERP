@@ -68,7 +68,7 @@ Semua path relatif terhadap `apps/control-plane` kecuali disebutkan lain.
 | --- | --- |
 | `resources/js/pages/`, `components/`, `layouts/` | `.agents/skills/coreerp-ui/SKILL.md`, `.agents/skills/coreerp-page-standard/SKILL.md` |
 | `packages/ui/` (root repo) | SDK UI bersama `@apperp/ui` |
-| `apps/web-shell/` (root repo) | Shell yang memuat app |
+| `apps/control-plane/resources/js/components/product-launcher.tsx`, `pages/apps/host.tsx` | Shell yang memuat app |
 | `apps/provider-console/` (root repo) | Konsol vendor |
 
 ## Berdasarkan pertanyaan

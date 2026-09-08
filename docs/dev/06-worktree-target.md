@@ -8,7 +8,7 @@ Repository saat ini adalah monorepo transisi. Laravel 13 React starter berada di
 | --- | --- | --- |
 | `apps/control-plane/` | Laravel 13, Inertia, Fortify; organization, access, entitlement, placement, dan worker sudah ada. | Tetap di repository CoreERP ini sebagai Control Plane. Ia tidak memiliki domain bisnis app. |
 | `apps/provider-console/` | Belum dipisahkan sebagai aplikasi mandiri. | Dibuat di repository CoreERP ini; hanya memakai Control Plane API untuk operasi provider. |
-| `apps/web-shell/` | Belum dipisahkan sebagai aplikasi mandiri. | Dibuat di repository CoreERP ini; menjadi host UI dan launcher app tenant. |
+| Web Shell | Tidak punya folder sendiri. Launcher dan halaman tuan rumah app hidup di UI Control Plane (`resources/js/components/product-launcher.tsx`, `resources/js/pages/apps/host.tsx`). | Dipisahkan sebagai aplikasi mandiri di repository CoreERP ini bila surface lintas app sudah cukup banyak untuk membenarkannya. |
 | App bisnis | Tidak lagi disimpan di repository CoreERP. | Management Aset berjalan dari repository `app-erp-management-aset`; app berikutnya dibuat sebagai repository `app-erp-<app-key>` sendiri. |
 | `packages/` | Belum merupakan package registry berversi. | Tidak dipisahkan dulu. Package hanya dipublish bila dipakai minimal dua repository. |
 
@@ -21,7 +21,7 @@ CoreERP/                            # repository platform yang sekarang ini
 ├── apps/
 │   ├── control-plane/              # tenant, identity, entitlement, placement, installer
 │   ├── provider-console/           # operasi provider, memakai Control Plane API
-│   └── web-shell/                  # host UI tenant dan launcher app
+│   └── web-shell/                  # host UI tenant dan launcher app (belum ada, lihat tabel di atas)
 ├── deploy/                         # deployment platform
 └── README.md
 

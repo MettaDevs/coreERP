@@ -45,8 +45,7 @@ Worker dan scheduler Core ikut jalan. Itu penting: job onboarding seperti `Deplo
 ## Peta repo CoreERP
 
 ```text
-apps/control-plane/    Laravel. Identity, tenant, entitlement, placement, release registry.
-apps/web-shell/        Shell UI yang memuat app.
+apps/control-plane/    Laravel. Identity, tenant, entitlement, placement, release registry. Sekaligus shell UI yang memuat app.
 apps/provider-console/ Konsol vendor.
 packages/ui/           SDK UI bersama (@apperp/ui).
 modules/               Kosong sampai module diimplementasikan di sini.
