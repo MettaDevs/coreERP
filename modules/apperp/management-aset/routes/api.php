@@ -77,6 +77,12 @@ $masters = [
 ];
 
 Route::get('v1/health', HealthController::class);
+// Dua rute berikut adalah panggilan balik Core ke module lewat HTTP, dan keduanya berhenti
+// masuk akal begitu keduanya berada di proses yang sama: keputusan workflow menjadi event
+// Laravel biasa pada F3-09, dan penyediaan data awal tenant menjadi event in-process pada
+// F3-11. Aliasnya sengaja dibiarkan menunjuk `coreerp-event` yang sudah tidak terdaftar,
+// supaya ia gagal berisik kalau ada yang memuat rute ini sebelum kedua task itu selesai —
+// bukan diam-diam melayani permintaan tanpa pemeriksaan apa pun.
 Route::post('internal/v1/workflow-events', [WorkflowDecisionController::class, 'store'])->middleware('coreerp-event');
 Route::post('internal/v1/provisioning/tenant', [TenantProvisioningController::class, 'store'])->middleware('coreerp-event');
 
@@ -84,13 +90,13 @@ Route::post('internal/v1/provisioning/tenant', [TenantProvisioningController::cl
 // permission dan scope organisasi ditegakkan seperti request biasa. Layout, antrean
 // ekspor, dan render ada di Core; app hanya menyerahkan definisi, layout bawaan, dan
 // dataset. Lihat docs/dev/23-document-rendering.md di repository CoreERP.
-Route::prefix('internal/v1/laporan')->middleware('coreerp')->group(function (): void {
+Route::prefix('internal/v1/laporan')->middleware('konteks-module:management-aset')->group(function (): void {
     Route::get('{kode}', [LaporanInternalController::class, 'show']);
     Route::get('{kode}/layouts/{key}', [LaporanInternalController::class, 'builtinLayout']);
     Route::post('{kode}/dataset', [LaporanInternalController::class, 'dataset']);
 });
 
-Route::prefix('v1')->middleware('coreerp')->group(function () use ($masters): void {
+Route::prefix('v1')->middleware('konteks-module:management-aset')->group(function () use ($masters): void {
     Route::get('context', ContextController::class);
     Route::get('reference-data/units-of-measure', [ReferenceDataController::class, 'unitsOfMeasure']);
     Route::get('reference-data/kelompok-harta-fiskal', [ReferenceDataController::class, 'fiscalClassifications']);

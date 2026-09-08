@@ -2782,7 +2782,54 @@ dipegang Core.
 3. `ContextController` tetap ada untuk sementara karena UI masih memanggilnya; ia sekarang membaca dari
    `ModuleRequestContext`. Dihapus di F4-07.
 
-**Selesai bila.** Seluruh rute modul terlindungi, dan test batas data policy lulus tanpa token.
+**Selesai bila.** Seluruh rute modul terlindungi — dibuktikan sebuah penjaga yang menolak alias middleware
+yang tidak terdaftar — dan test batas data policy lulus tanpa token. Bagian kedua baru bisa dijalankan
+setelah F3-16; sampai saat itu ia tercatat sebagai belum terbukti, bukan dianggap lulus.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026.
+
+**Yang membuat task ini kecil adalah keputusan yang diambil dua task sebelumnya.** F2-10 menyalin kunci
+atribut permintaan **harfiah** dari middleware lama modul (`coreerp.tenant_id`, `coreerp.permissions`,
+`coreerp.data_policies`, dan seterusnya). Akibatnya `OrganizationScope` — kelas yang menegakkan batas
+kebijakan data — **tidak berubah satu baris pun**. Yang berubah hanya siapa yang mengisi atributnya.
+
+Ini contoh keputusan yang tampak sepele saat diambil ("pakai nama kunci yang sama") dan menghemat
+perubahan pada 22 berkas saat ditagih.
+
+**Satu bahaya ditemukan yang tidak ada di rencana mana pun.** Alias `coreerp` dan `coreerp-event`
+didaftarkan `bootstrap/app.php` milik modul — berkas yang **dihapus F3-02**. Sejak saat itu rute modul
+menunjuk alias yang tidak ada di mana pun, dan tidak ada satu pun yang memberi tahu: berkas rutenya belum
+dimuat siapa pun (F3-13 yang memuatnya), jadi kesalahannya menunggu diam sampai rutenya dipanggil.
+
+`RuteModuleTerlindungiTest` menutup itu: setiap alias pada berkas rute modul wajib terdaftar di Core, atau
+tercatat sebagai sengaja-belum beserta task yang membereskannya. Dua rute panggilan balik Core sengaja
+dibiarkan menunjuk alias yang tidak terdaftar — supaya gagal berisik kalau ada yang memuatnya sebelum
+F3-09 dan F3-11 mengubahnya menjadi event in-process.
+
+Dibuktikan bisa gagal dengan mengembalikan satu grup ke alias lama:
+
+```
+Rute module memakai middleware yang tidak terdaftar di Core:
+- management-aset/api.php (api.php) memakai middleware "coreerp"
+```
+
+#### Urutan fase 3 perlu dibaca ulang: sebagian besar kriterianya belum bisa dijalankan
+
+Ini bukan temuan tentang task ini melainkan tentang rencananya, dan lebih baik ditulis sekarang daripada
+ditemukan lima task lagi.
+
+Kriteria selesai F3-06 sampai F3-10 semuanya menyebut test milik modul — `NumberSequenceFailureTest`,
+`AssetLifecycleTest`, "test pendaftaran aset", "test batas data policy". **Kedua puluh berkas test itu
+belum berjalan di dalam Core**, dan baru berjalan setelah F3-16, yang bergantung pada F3-15, yang
+bergantung pada F3-10. Artinya lima task berturut-turut dikerjakan tanpa jaring pengaman, dan yang paling
+besar di antaranya — sapuan 216 query mentah pada langkah 3 F3-05 — adalah yang paling butuh jaring itu.
+
+Yang saya lakukan: F3-10 dikerjakan lebih dulu justru karena ia penghalang F3-15. Sesudah ini **F3-15 dan
+F3-16 dikerjakan sebelum sisa F3-05 dan sebelum F3-06 sampai F3-09**, supaya kedua puluh berkas test itu
+menjadi jaring bagi semuanya. Urutan aslinya tidak salah secara ketergantungan; ia hanya menunda
+satu-satunya alat yang bisa membuktikan pekerjaan berikutnya benar.
 
 **Rujukan.** [identity dan access](../../dev/09-identity-and-access.md).
 
