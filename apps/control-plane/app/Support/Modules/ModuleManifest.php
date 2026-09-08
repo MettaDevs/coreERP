@@ -21,6 +21,8 @@ final readonly class ModuleManifest
         public string $jenis,
         public string $awalanTabel,
         public string $folder,
+        /** @var list<string> id module lain yang wajib terpasang lebih dulu */
+        public array $dependency = [],
     ) {}
 
     /**

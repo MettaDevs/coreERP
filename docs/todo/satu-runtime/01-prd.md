@@ -1410,6 +1410,41 @@ dalam bentuk apa pun.
 
 **Bergantung pada.** F2-04.
 
+#### Bug yang ditemukan test, bukan diperkirakan sebelumnya
+
+`ModuleInstallation` berkunci gabungan, jadi ia tidak punya primary key tunggal. Akibatnya
+`$model->fresh()` **mengembalikan baris yang salah tanpa satu pun peringatan**: ia membangun query dari
+primary key yang tidak ada. Aksi penonaktifan dan pencabutan sempat memakainya, dan hanya satu dari
+tujuh test yang menangkapnya — yang lain memeriksa status lewat query langsung dan lolos.
+
+Pelajarannya untuk seluruh proyek: **model berkunci gabungan tidak boleh memakai pembantu Eloquent yang
+bersandar pada primary key.** Selain `fresh()`, itu termasuk `refresh()`, `find()`, dan `save()` pada
+model yang sudah ada.
+
+#### Pemasangan aman dijalankan dua kali
+
+Memasang modul yang sudah terpasang bukan kesalahan. Ia mengembalikan status ke terpasang tanpa
+menyentuh data dan tanpa mengisi ulang data awal. Ini bukan kenyamanan: pembaruan on-prem dijalankan
+admin pelanggan dengan tangan (bagian 5.7), dan perintah yang meledak bila diulang akan diulang juga,
+lalu ditinggal setengah jalan.
+
+#### Dependency diperiksa terhadap tenant, bukan terhadap katalog
+
+Katalog tahu modul mana bergantung pada modul mana, tapi itu bukan pertanyaannya. Pertanyaannya: adakah
+modul yang **tenant ini** pakai dan akan rusak bila modul ini dicabut. Modul yang bergantung tapi tidak
+dimiliki tenant ini tidak menghalangi apa pun, dan ada test tersendiri untuk itu.
+
+#### Ketiadaan opsi hapus data diuji, bukan hanya dijanjikan
+
+Satu test membaca definisi perintah pencabutan dan menolak setiap opsi yang namanya mengandung `purge`,
+`delete`, `drop`, atau `hapus`. Sebuah janji di dalam komentar tidak menahan siapa pun; test ini menahan.
+
+#### Tujuh test
+
+Rangkaian penuh dijalankan sebagai satu test, bukan dipecah per aksi, karena kesalahannya justru muncul
+di sambungan antar aksi: pasang dua modul untuk dua tenant, ketik data sendiri, nonaktifkan satu,
+aktifkan lagi, cabut. Setiap langkah memeriksa modul lain dan tenant lain ikut tidak terpengaruh.
+
 ### F2-06 — Modul terpasang menggantikan kesiapan penempatan
 
 **Kenapa.** Rute halaman app memanggil pemeriksaan yang menuntut baris penempatan container dengan
