@@ -62,6 +62,13 @@ jobs:
       - name: Lint Frontend
         run: npm run lint:check
 
+      # `.agents/skills` dan `.claude/skills` dibaca alat yang berbeda dan isinya sudah
+      # menyimpang diam-diam sekali. Tidak ada test yang gagal karena aturan di satu
+      # salinan hilang di salinan lain.
+      - name: Check skill copies are in sync
+        working-directory: .
+        run: python3 .github/scripts/check-skill-copies.py
+
       # A route under internal/v1 is called by another application. No test fails when
       # one is missing from the contract, so this is the only step that notices.
       - name: Check internal API contract coverage
