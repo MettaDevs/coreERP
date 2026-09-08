@@ -135,7 +135,7 @@ class ModulSedangDipindahTest extends TestCase
             ));
             $isi = substr($isi, $mulai);
         }
-        preg_match_all('#\.\./\.\./modules/[^/"]+/([^/"]+)/#', $isi, $cocok);
+        preg_match_all('#\.\./\.\./modules/[^/"\s]+/([^/"\s]+)#', $isi, $cocok);
         $diabaikan = array_values(array_unique($cocok[1]));
 
         sort($dipindah);
