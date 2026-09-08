@@ -8,7 +8,6 @@ use App\Support\Modules\TableOwnershipInspector;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\Yaml\Yaml;
 use Tests\TestCase;
 
 /**
@@ -18,6 +17,22 @@ use Tests\TestCase;
  * satu koneksi, jadi tidak ada yang menghalangi migration module membuat tabel bernama
  * `core_tenants`. Yang menegakkannya adalah test ini. Ia harus disebut apa adanya supaya
  * tidak ada yang merasa aman tanpa alasan.
+ *
+ * ## Asimetri yang diterima, bukan disamarkan
+ *
+ * Dua penjaga lain hanya **membaca** berkas, jadi modul yang sedang dipindah tetap bisa
+ * dipindai penuh dan pemeriksaan basi bisa dihitung untuknya. Penjaga ini **menjalankan**
+ * migration modul. Modul yang belum dibentuk ulang masih membawa migration kerangka Laravel
+ * bawaan repo asalnya — `users`, `jobs`, `cache` — dan menjalankannya di schema test berarti
+ * bertabrakan dengan tabel milik Core yang bernama sama. Bukan sekadar melaporkan pelanggaran:
+ * migration-nya gagal, atau lebih buruk, berhasil menimpa.
+ *
+ * Karena itu, untuk penjaga ini pengecualian harus **melewatkan penjalanannya sama sekali**.
+ * Konsekuensinya jujur dan harus ditulis di sini supaya tidak ada yang menyangka pengecualian
+ * bekerja seragam pada ketiga penjaga: untuk dimensi awalan tabel, pemeriksaan basi tidak bisa
+ * dihitung, dan `tenggat` pada `ModulSedangDipindah` menjadi satu-satunya yang mengakhirinya.
+ * Bila entri dibuang sebelum awalan tabelnya benar-benar dibereskan, yang memberi tahu adalah
+ * penjaga ini pada pull request berikutnya, bukan pemeriksaan basi.
  */
 class ModuleTableBoundaryTest extends TestCase
 {
@@ -35,13 +50,22 @@ class ModuleTableBoundaryTest extends TestCase
 
     public function test_migration_tiap_module_hanya_membuat_tabel_berawalan_miliknya(): void
     {
-        $modules = $this->modules();
-        $this->assertNotEmpty($modules, 'Tidak ada module yang ditemukan; penjaga ini akan lulus tanpa menguji apa pun.');
+        // Modul yang sedang dipindah tidak ikut dijalankan; alasannya ada pada docblock kelas ini.
+        // Daftarnya tidak ditulis ulang di sini melainkan dibaca dari ModulSedangDipindah, satu
+        // tempat yang sama dengan dua penjaga lain. Daftar batas modul yang hidup di tiga tempat
+        // akan menyimpang, dan yang menyimpang lebih berbahaya daripada yang tidak ada.
+        $modules = PemindaiModul::padaRepo()->modulDenganMigration(ModulSedangDipindah::bawaan());
+        $this->assertNotEmpty($modules, 'Tidak ada module yang dijalankan; penjaga ini akan lulus tanpa menguji apa pun.');
 
         $inspector = new TableOwnershipInspector;
         $connection = DB::connection();
 
         foreach ($modules as $module) {
+            $this->assertNotSame('', $module['awalan'], sprintf(
+                'Module "%s" tidak menyatakan table_prefix pada app.yaml, jadi tidak ada awalan yang bisa ditegakkan.',
+                $module['id'],
+            ));
+
             $sebelum = $inspector->tabelSaatIni($connection);
 
             Artisan::call('migrate', [
@@ -78,41 +102,5 @@ class ModuleTableBoundaryTest extends TestCase
         );
 
         $this->assertSame(['contoh_b_m_rak', 'core_module_installations'], $pelanggaran);
-    }
-
-    /**
-     * Semua module di bawah `modules/<publisher>/<module>/`.
-     *
-     * Pemindaian ini sengaja sederhana dan hidup di dalam test. Registry module yang
-     * sebenarnya dibuat pada fase 2; saat itu, pemindaian di sini diganti dengannya.
-     *
-     * @return list<array{id: string, awalan: string, migrations: string}>
-     */
-    private function modules(): array
-    {
-        $akar = dirname(base_path(), 2).'/modules';
-        $modules = [];
-
-        foreach (glob($akar.'/*/*/app.yaml') ?: [] as $manifest) {
-            /** @var array<string, mixed> $isi */
-            $isi = Yaml::parseFile($manifest);
-            $folder = dirname($manifest);
-            $migrations = $folder.'/database/migrations';
-
-            if (! is_dir($migrations)) {
-                continue;
-            }
-
-            $awalan = (string) ($isi['table_prefix'] ?? '');
-            $this->assertNotSame('', $awalan, sprintf('Manifest %s tidak menyatakan table_prefix.', $manifest));
-
-            $modules[] = [
-                'id' => (string) ($isi['id'] ?? basename($folder)),
-                'awalan' => $awalan,
-                'migrations' => $migrations,
-            ];
-        }
-
-        return $modules;
     }
 }
