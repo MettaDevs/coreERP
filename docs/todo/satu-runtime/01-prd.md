@@ -986,7 +986,44 @@ penyaringan.
 
 **Rujukan.** [query scope dan schema](../../dev/08-query-scopes-and-schema.md), bagian 5.2 dokumen ini.
 
-**Bergantung pada.** F1-02.
+**Bergantung pada.** F1-02, dan langkah 1–2 F2-02 yang ditarik ke sini.
+
+#### Scope gagal menutup, bukan gagal membuka
+
+Keputusan yang tidak disebut task ini tapi menentukan segalanya: bila tenant aktif tidak diketahui,
+query **dibatalkan dengan pengecualian**, bukan dijalankan tanpa penyaringan.
+
+Pilihan sebaliknya terlihat lebih ramah dan justru paling berbahaya. Sebuah pekerjaan latar yang lupa
+menyetel konteks akan membaca data semua orang tanpa satu pun tanda bahaya, dan hasilnya terlihat wajar
+sampai ada yang menyadarinya berbulan-bulan kemudian.
+
+#### Langkah 1 dan 2 F2-02 ditarik ke sini
+
+Test model tidak bisa berjalan tanpa kelas modul dapat dimuat, dan itu tugas F2-02. Yang ditarik hanya
+bagian autoload-nya: repositori bertipe `path` menunjuk `../../modules/*/*`, dan tiap modul
+mendeklarasikan `autoload.psr-4` sendiri. Bagian pemindahan konteks pembangunan image **tetap di F2-02**,
+karena ia menyentuh Dockerfile dan compose yang tidak ada hubungannya dengan penjaga ini.
+
+Dua catatan untuk yang mengerjakannya nanti:
+
+- Paket lokal harus diminta dengan `@dev`, bukan `*`. Dengan `*` Composer menolaknya karena tidak memenuhi
+  `minimum-stability`, dan pesannya tidak menyebutkan itu dengan jelas.
+- Jalankan `composer update` dengan `--no-scripts`. Tanpa itu, `post-update-cmd` memanggil
+  `install:features` dan mengubah tiga belas berkas yang tidak ada hubungannya dengan pekerjaan ini.
+  Ini sudah pernah terjadi pada F0-01.
+
+#### Penjaganya dua lapis, karena satu lapis bisa dilewati
+
+| Lapis | Menangkap |
+| --- | --- |
+| Global scope pada model | query lewat model, termasuk `find()` dengan id milik tenant lain |
+| Pembacaan berkas modul | `DB::table(`, `DB::select(`, dan `DB::statement(` yang melewati model |
+
+Lapis kedua ada karena lapis pertama hanya berlaku bila query memang lewat model. Query mentah melewati
+global scope tanpa memberi tanda apa pun. Migration dikecualikan: ia memang menulis SQL langsung, dan ia
+berjalan sebelum ada tenant mana pun.
+
+Keduanya sudah dibuktikan bisa gagal.
 
 ### F1-07 — Buktikan ketiga penjaga bisa gagal
 

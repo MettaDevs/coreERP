@@ -4,8 +4,70 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "adca283d47b13168c46125399c9cec9f",
+    "content-hash": "0784283a039bd7175c044d6157febc01",
     "packages": [
+        {
+            "name": "apperp/contoh-a",
+            "version": "dev-feat/f1-06-penjaga-tenant",
+            "dist": {
+                "type": "path",
+                "url": "../../modules/apperp/contoh-a",
+                "reference": "413b2287af97d1875ccb8aee0c9282846d603761"
+            },
+            "require": {
+                "php": "^8.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Apperp\\ContohA\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Modules\\Apperp\\ContohA\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Module contoh untuk menguji penjaga batas. Bukan produk.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "apperp/contoh-b",
+            "version": "dev-feat/f1-06-penjaga-tenant",
+            "dist": {
+                "type": "path",
+                "url": "../../modules/apperp/contoh-b",
+                "reference": "9613360e211120f7fb742396a0aee11745530f1a"
+            },
+            "require": {
+                "php": "^8.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Apperp\\ContohB\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Modules\\Apperp\\ContohB\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Module contoh untuk menguji penjaga batas. Bukan produk.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
         {
             "name": "bacon/bacon-qr-code",
             "version": "v3.1.1",
@@ -10866,7 +10928,10 @@
     ],
     "aliases": [],
     "minimum-stability": "stable",
-    "stability-flags": {},
+    "stability-flags": {
+        "apperp/contoh-a": 20,
+        "apperp/contoh-b": 20
+    },
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
