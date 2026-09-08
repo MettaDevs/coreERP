@@ -634,6 +634,21 @@ dimasukkan membuat alur merah.
 
 **Bergantung pada.** F0-01.
 
+#### Yang ditemukan saat mengerjakannya
+
+Keempat kesalahan itu satu sebab: empat halaman mengoper prop `icon` ke komponen `Heading`, dan `Heading`
+tidak menerimanya. Prop itu **tidak pernah dirender**, jadi ikonnya tidak pernah muncul dan tidak ada
+yang menyadarinya.
+
+Perbaikannya membuang prop tersebut, bukan menambah dukungan `icon` pada `Heading`. Alasannya bukan
+karena lebih sedikit baris: aturan UI pada `AGENTS.md` menyatakan jangan menambahkan ikon pada judul
+page atau card. Dari 17 halaman yang memakai `Heading`, hanya 4 yang mengoper `icon`. Menambah dukungan
+berarti membuat empat halaman itu berbeda dari tiga belas lainnya, melanggar aturan tertulis, dan
+mengubah tampilan yang selama ini tidak pernah berubah.
+
+Ini pola yang layak diingat: **kesalahan tipe yang tidak diperiksa mesin menyembunyikan fitur yang tidak
+pernah jalan.** Orang yang menulis keempat halaman itu mengira ikonnya tampil.
+
 ### F0-05 — Cabang utama dikunci
 
 **Kenapa.** Alur merah diabaikan berbulan-bulan dan tidak ada yang meninjau. Selama penggabungan tidak

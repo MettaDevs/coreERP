@@ -1712,7 +1712,6 @@ export default function SecurityConfiguration({
                 <Heading
                     title="Konfigurasi keamanan"
                     description="Telusuri struktur akses dari role sampai izin. Bagian yang berasal dari aplikasi hanya dapat dilihat; konfigurasi khusus tenant dimulai sebagai draf."
-                    icon={ShieldCheck}
                 />
                 <Card className="overflow-hidden">
                     <CardHeader>
