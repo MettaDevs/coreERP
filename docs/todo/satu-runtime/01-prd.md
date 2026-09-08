@@ -588,6 +588,59 @@ memperbaikinya tanpa melonggarkan apa pun — dua baris hidup dengan kode sama t
 Memperbaiki 18 tabel itu bukan bagian task ini, karena 17 di antaranya ada di repo yang akan ditarik
 masuk pada F3-01 dan migrasinya akan disentuh lagi di sana. Lihat F0-06.
 
+### F0-07 — Alur otomatis dihemat supaya kuota tidak habis
+
+**Kenapa.** Repo ini privat pada paket gratis, jadi menit alur otomatis terbatas. Kuota yang habis
+berarti **tidak ada pemeriksaan sama sekali**, dan itu mengembalikan keadaan sebelum F0-01. Ini bukan
+penghematan demi kerapian.
+
+**Berkas.**
+- `.github/workflows/tests.yml`
+- `.github/workflows/lint.yml`
+
+**Yang diukur lebih dulu.** Ketiga pemeriksaan berjalan **bersamaan**, jadi memangkas satu tidak
+memperpendek waktu tunggu sama sekali; yang berkurang adalah menit terpakai.
+
+| Pemeriksaan | Durasi |
+| --- | --- |
+| `quality` | 1 menit 26 detik |
+| `ci (8.4)` | 2 menit 16 detik |
+| `ci (8.5)` | 2 menit 41 detik |
+
+Rincian di dalam satu job test: menyiapkan PHP 14 detik, `npm ci` 9 detik, `composer install` 11 detik,
+membangun aset 10 detik, analisa tipe 23 detik, test 43 detik. Pemasangan dependensi ternyata murah,
+jadi menambah cache tidak menolong banyak.
+
+**Langkah.**
+1. PHP 8.5 hanya dijalankan pada cabang utama dan sekali seminggu, bukan pada tiap pull request.
+   Produksi berjalan di 8.4; peringatan dini tentang versi berikutnya tetap didapat.
+2. Analisa tipe PHP dipindah dari alur test ke alur linter. Ia tidak bergantung versi PHP, jadi
+   menjalankannya di dalam matriks berarti mengerjakan hal yang sama dua kali dengan hasil yang pasti
+   sama.
+3. Kedua alur mendapat `concurrency` dengan pembatalan: mendorong dua kali beruntun tidak lagi
+   menghabiskan kuota untuk jalan yang sudah usang.
+
+**Selesai bila.** Sebuah pull request hanya memunculkan dua pemeriksaan, `quality` dan `ci (8.4)`, dan
+keduanya hijau.
+
+**Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
+
+**Bergantung pada.** F0-01.
+
+#### Yang dicoba dan dibatalkan
+
+Pembangunan aset sempat ikut dipindah ke alur linter dengan alasan yang sama. Itu **salah**, dan cepat
+ketahuan karena dicoba: tanpa manifest Vite, tiga test gagal dengan pesan `Not a valid Inertia response`
+— pesan yang sama sekali tidak menyebut aset. Seseorang yang memindahkannya tanpa mencoba akan
+menghabiskan waktu lama mencari penyebab di tempat yang salah.
+
+#### Yang sengaja tidak dilakukan
+
+Menggabungkan ketiga pemeriksaan menjadi satu job. Sekarang bila Pint merah, itu terlihat tanpa menunggu
+test selesai, dan sebaliknya. Menggabungkannya membuat satu kegagalan menyembunyikan yang lain — persis
+penyakit yang membuat alur repo ini merah berbulan-bulan tanpa ada yang tahu bahwa Prettier dan ESLint
+belum pernah dijalankan sekali pun.
+
 ### F0-06 — Indeks unik penuh pada tabel yang mengarsipkan diperbaiki
 
 **Kenapa.** Delapan belas tabel memiliki `deleted_at` beserta indeks unik penuh pada kode bisnis, jadi
