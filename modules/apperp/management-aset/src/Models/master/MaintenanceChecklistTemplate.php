@@ -6,5 +6,5 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 
 class MaintenanceChecklistTemplate extends MasterData
 {
-    protected $table = 'm_maintenance_checklist_template';
+    protected $table = 'aset_m_maintenance_checklist_template';
 }

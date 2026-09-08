@@ -23,7 +23,7 @@ class PabrikanAsetDetailController extends Controller
 
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
         abort_unless(
-            $this->unarchived('m_pabrikan_aset')
+            $this->unarchived('aset_m_pabrikan_aset')
                 ->where('tenant_id', $tenantId)
                 ->where('id', $pabrikanAsetId)
                 ->exists(),
@@ -35,14 +35,14 @@ class PabrikanAsetDetailController extends Controller
 
         return response()->json(['data' => [
             'model_count' => $mayReadModels
-                ? $this->unarchived('m_model_aset')
+                ? $this->unarchived('aset_m_model_aset')
                     ->where('tenant_id', $tenantId)
                     ->where('pabrikan_aset_id', $pabrikanAsetId)
                     ->count()
                 : null,
             'asset_count' => $mayReadAssets
                 ? $scope->assetQuery(
-                    $this->unarchived('tr_penerimaan_aset')
+                    $this->unarchived('aset_tr_penerimaan_aset')
                         ->where('tenant_id', $tenantId)
                         ->where('pabrikan_aset_id', $pabrikanAsetId)
                         ->whereNotIn('lifecycle_state', ['decommissioned', 'disposed']),

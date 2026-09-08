@@ -45,7 +45,7 @@ class ValidasiStatusWorkOrderController extends Controller
             foreach ($data['aturan'] as $baris) {
                 // Baris yang belum ada tetap dibuat: tenant lama dapat saja disemai sebelum
                 // satu aturan diperkenalkan, dan layar tidak boleh menolak menyimpannya.
-                DB::table('m_validasi_status_work_order')->updateOrInsert(
+                DB::table('aset_m_validasi_status_work_order')->updateOrInsert(
                     ['tenant_id' => $tenant, 'status' => $baris['status'], 'aturan' => $baris['aturan']],
                     [
                         'id' => (string) Str::ulid(),
@@ -64,7 +64,7 @@ class ValidasiStatusWorkOrderController extends Controller
     /** @return Collection<int, object> */
     private function aturan(string $tenant): mixed
     {
-        return DB::table('m_validasi_status_work_order')
+        return DB::table('aset_m_validasi_status_work_order')
             ->where('tenant_id', $tenant)
             ->orderBy('status')->orderBy('aturan')
             ->get(['id', 'status', 'aturan', 'aktif', 'keparahan']);

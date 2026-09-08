@@ -11,5 +11,5 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  */
 class Trade extends MasterData
 {
-    protected $table = 'm_trade';
+    protected $table = 'aset_m_trade';
 }

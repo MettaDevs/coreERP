@@ -18,7 +18,7 @@ class JenisAsetAtributController extends MasterLinkController
 
     protected function ownerTable(): string
     {
-        return 'm_jenis_aset';
+        return 'aset_m_jenis_aset';
     }
 
     protected function ownerColumn(): string
@@ -28,7 +28,7 @@ class JenisAsetAtributController extends MasterLinkController
 
     protected function table(): string
     {
-        return 'm_jenis_aset_atribut';
+        return 'aset_m_jenis_aset_atribut';
     }
 
     protected function rowRules(string $tenantId): array
@@ -36,7 +36,7 @@ class JenisAsetAtributController extends MasterLinkController
         return [
             'tipe_atribut_id' => [
                 'required', 'ulid',
-                Rule::exists('m_tipe_atribut', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at'),
+                Rule::exists('aset_m_tipe_atribut', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at'),
             ],
             'wajib' => ['sometimes', 'boolean'],
             'urutan' => ['sometimes', 'integer', 'min:0'],

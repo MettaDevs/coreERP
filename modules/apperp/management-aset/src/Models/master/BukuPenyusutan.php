@@ -30,7 +30,7 @@ class BukuPenyusutan extends MasterData
         'half_year_next_year',
     ];
 
-    protected $table = 'm_buku_penyusutan';
+    protected $table = 'aset_m_buku_penyusutan';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',

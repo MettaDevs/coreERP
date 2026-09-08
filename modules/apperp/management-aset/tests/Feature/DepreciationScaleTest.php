@@ -123,17 +123,17 @@ class DepreciationScaleTest extends TestCase
 
         foreach ($this->tenants as $tenant) {
             // Tiap tenant hanya melihat periodenya sendiri: 3 aset x 6 periode.
-            $this->assertSame(18, DB::table('tr_penyusutan_aset')->where('tenant_id', $tenant)->count(), 'jumlah periode tenant '.$tenant);
+            $this->assertSame(18, DB::table('aset_tr_penyusutan_aset')->where('tenant_id', $tenant)->count(), 'jumlah periode tenant '.$tenant);
             $this->assertSame(
                 1800.0,
-                round((float) DB::table('tr_penyusutan_aset')->where('tenant_id', $tenant)->sum('amount'), 2),
+                round((float) DB::table('aset_tr_penyusutan_aset')->where('tenant_id', $tenant)->sum('amount'), 2),
                 'total penyusutan tenant '.$tenant,
             );
             $this->withHeaders($this->contextHeaders($tenant, ['management-aset.penyusutan.read']))
                 ->getJson('/api/v1/penyusutan')->assertOk()->assertJsonCount(18, 'data');
         }
 
-        $this->assertSame(self::TENANTS * 18, DB::table('tr_penyusutan_aset')->count());
+        $this->assertSame(self::TENANTS * 18, DB::table('aset_tr_penyusutan_aset')->count());
     }
 
     // ---- invarian -----------------------------------------------------------
@@ -245,7 +245,7 @@ class DepreciationScaleTest extends TestCase
                 'currency_code' => 'IDR', 'usage_org_unit_id' => $this->orgUnitId,
             ])->assertCreated()->json('data.id');
 
-        return (string) DB::table('tr_buku_aset')->where('asset_id', $asset)->value('id');
+        return (string) DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
     }
 
     private function propose(string $tenant, string $book, int $monthOffset, ?float $consumption = null): TestResponse
@@ -268,17 +268,17 @@ class DepreciationScaleTest extends TestCase
         $this->withHeaders($this->contextHeaders($tenant, ['management-aset.penyusutan.finalize']))
             ->postJson('/api/v1/penyusutan/'.$id.'/finalisasi')->assertOk();
 
-        return (float) DB::table('tr_penyusutan_aset')->where('id', $id)->value('amount');
+        return (float) DB::table('aset_tr_penyusutan_aset')->where('id', $id)->value('amount');
     }
 
     private function netBookValue(string $book): float
     {
-        return round((float) DB::table('tr_buku_aset')->where('id', $book)->value('net_book_value'), 2);
+        return round((float) DB::table('aset_tr_buku_aset')->where('id', $book)->value('net_book_value'), 2);
     }
 
     private function accumulated(string $book): float
     {
-        return round((float) DB::table('tr_buku_aset')->where('id', $book)->value('accumulated_depreciation'), 2);
+        return round((float) DB::table('aset_tr_buku_aset')->where('id', $book)->value('accumulated_depreciation'), 2);
     }
 
     /** @param array<string, mixed> $payload */

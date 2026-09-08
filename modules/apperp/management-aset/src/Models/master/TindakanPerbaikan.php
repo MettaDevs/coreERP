@@ -11,7 +11,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  */
 class TindakanPerbaikan extends MasterData
 {
-    protected $table = 'm_tindakan_perbaikan';
+    protected $table = 'aset_m_tindakan_perbaikan';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif', 'minta_keterangan',

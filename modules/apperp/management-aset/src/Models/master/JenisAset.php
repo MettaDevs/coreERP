@@ -11,5 +11,5 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  */
 class JenisAset extends MasterData
 {
-    protected $table = 'm_jenis_aset';
+    protected $table = 'aset_m_jenis_aset';
 }

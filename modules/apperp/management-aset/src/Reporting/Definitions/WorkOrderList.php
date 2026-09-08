@@ -88,9 +88,9 @@ final class WorkOrderList implements ReportDefinition
     public function data(ReportContext $context, array $parameters): ReportData
     {
         $tenant = $context->tenantId;
-        $query = DB::table('tr_pemeliharaan_aset as wo')
-            ->leftJoin('m_tipe_work_order as tipe', fn ($join) => $join->on('tipe.id', '=', 'wo.tipe_work_order_id')->on('tipe.tenant_id', '=', 'wo.tenant_id'))
-            ->leftJoin('m_tingkat_layanan as layanan', fn ($join) => $join->on('layanan.id', '=', 'wo.tingkat_layanan_id')->on('layanan.tenant_id', '=', 'wo.tenant_id'))
+        $query = DB::table('aset_tr_pemeliharaan_aset as wo')
+            ->leftJoin('aset_m_tipe_work_order as tipe', fn ($join) => $join->on('tipe.id', '=', 'wo.tipe_work_order_id')->on('tipe.tenant_id', '=', 'wo.tenant_id'))
+            ->leftJoin('aset_m_tingkat_layanan as layanan', fn ($join) => $join->on('layanan.id', '=', 'wo.tingkat_layanan_id')->on('layanan.tenant_id', '=', 'wo.tenant_id'))
             ->where('wo.tenant_id', $tenant)
             ->whereNull('wo.deleted_at');
         app(OrganizationScope::class)->query($query, $context->request(), 'wo.legal_entity_id', 'wo.responsible_org_unit_id');
@@ -106,17 +106,17 @@ final class WorkOrderList implements ReportDefinition
 
         $rows = $query
             ->selectSub(
-                DB::table('tr_pemeliharaan_aset_details as d')->selectRaw('count(*)')
+                DB::table('aset_tr_pemeliharaan_aset_details as d')->selectRaw('count(*)')
                     ->whereColumn('d.pemeliharaan_aset_id', 'wo.id')->where('d.tenant_id', $tenant),
                 'jumlah_baris',
             )
             ->selectSub(
-                DB::table('tr_pemeliharaan_aset_details as d')->selectRaw('coalesce(sum(d.estimasi_jam), 0)')
+                DB::table('aset_tr_pemeliharaan_aset_details as d')->selectRaw('coalesce(sum(d.estimasi_jam), 0)')
                     ->whereColumn('d.pemeliharaan_aset_id', 'wo.id')->where('d.tenant_id', $tenant),
                 'estimasi_jam',
             )
             ->selectSub(
-                DB::table('tr_pemeliharaan_aset_details as d')->selectRaw('coalesce(sum(d.aktual_jam), 0)')
+                DB::table('aset_tr_pemeliharaan_aset_details as d')->selectRaw('coalesce(sum(d.aktual_jam), 0)')
                     ->whereColumn('d.pemeliharaan_aset_id', 'wo.id')->where('d.tenant_id', $tenant),
                 'aktual_jam',
             )

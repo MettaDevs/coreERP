@@ -31,12 +31,12 @@ class ProfilPenyusutanController extends MasterDataController
     protected function childMasters(): array
     {
         return [
-            new MasterChild(table: 'm_buku_penyusutan', column: 'depreciation_profile_id', label: 'buku penyusutan'),
-            new MasterChild(table: 'm_buku_penyusutan', column: 'alternative_profile_id', label: 'buku penyusutan'),
-            new MasterChild(table: 'm_group_buku_penyusutan', column: 'depreciation_profile_id', label: 'baris matriks group'),
-            new MasterChild(table: 'm_group_buku_penyusutan', column: 'alternative_profile_id', label: 'baris matriks group'),
-            new MasterChild(table: 'tr_buku_aset', column: 'depreciation_profile_id', label: 'buku aset'),
-            new MasterChild(table: 'tr_buku_aset', column: 'alternative_profile_id', label: 'buku aset'),
+            new MasterChild(table: 'aset_m_buku_penyusutan', column: 'depreciation_profile_id', label: 'buku penyusutan'),
+            new MasterChild(table: 'aset_m_buku_penyusutan', column: 'alternative_profile_id', label: 'buku penyusutan'),
+            new MasterChild(table: 'aset_m_group_buku_penyusutan', column: 'depreciation_profile_id', label: 'baris matriks group'),
+            new MasterChild(table: 'aset_m_group_buku_penyusutan', column: 'alternative_profile_id', label: 'baris matriks group'),
+            new MasterChild(table: 'aset_tr_buku_aset', column: 'depreciation_profile_id', label: 'buku aset'),
+            new MasterChild(table: 'aset_tr_buku_aset', column: 'alternative_profile_id', label: 'buku aset'),
         ];
     }
 
@@ -86,7 +86,7 @@ class ProfilPenyusutanController extends MasterDataController
             return;
         }
 
-        $used = DB::table('tr_buku_aset')
+        $used = DB::table('aset_tr_buku_aset')
             ->where('tenant_id', $tenantId)
             ->where(fn ($query) => $query
                 ->where('depreciation_profile_id', $record->getKey())

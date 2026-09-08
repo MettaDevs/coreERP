@@ -23,7 +23,7 @@ class GroupAset extends MasterData
      */
     public const PROPERTY_TYPE = ['fixed_asset', 'inventory_item', 'other'];
 
-    protected $table = 'm_group_aset';
+    protected $table = 'aset_m_group_aset';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',

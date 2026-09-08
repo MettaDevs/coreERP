@@ -16,7 +16,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  */
 class LokasiAset extends MasterData
 {
-    protected $table = 'm_lokasi_aset';
+    protected $table = 'aset_m_lokasi_aset';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',

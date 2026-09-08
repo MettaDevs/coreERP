@@ -27,9 +27,9 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
     protected function parentMasters(): array
     {
         return [
-            new MasterParent('m_maintenance_job_type', 'maintenance_job_type_id', 'maintenanceJobType', 'Jenis pekerjaan maintenance'),
-            new MasterParent('m_maintenance_job_type_variant', 'variant_id', 'variant', 'Varian job type', false),
-            new MasterParent('m_maintenance_checklist_template', 'checklist_template_id', 'checklistTemplate', 'Template checklist', false),
+            new MasterParent('aset_m_maintenance_job_type', 'maintenance_job_type_id', 'maintenanceJobType', 'Jenis pekerjaan maintenance'),
+            new MasterParent('aset_m_maintenance_job_type_variant', 'variant_id', 'variant', 'Varian job type', false),
+            new MasterParent('aset_m_maintenance_checklist_template', 'checklist_template_id', 'checklistTemplate', 'Template checklist', false),
         ];
     }
 
@@ -37,11 +37,11 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
     {
         return [
             'trade' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'functional_location_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('m_lokasi_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
-            'jenis_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('m_jenis_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
-            'pabrikan_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('m_pabrikan_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
-            'model_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('m_model_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
-            'asset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('tr_penerimaan_aset', 'id')->where('tenant_id', $tenantId)],
+            'functional_location_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_lokasi_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            'jenis_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_jenis_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            'pabrikan_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_pabrikan_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            'model_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_model_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            'asset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_tr_penerimaan_aset', 'id')->where('tenant_id', $tenantId)],
             'hours' => ['sometimes', 'numeric', 'min:0', 'max:999999999.99'],
             'items_count' => ['sometimes', 'integer', 'min:0'],
             'expenses_count' => ['sometimes', 'integer', 'min:0'],
@@ -53,7 +53,7 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
     {
         $jobTypeId = $data['maintenance_job_type_id'] ?? $record?->maintenance_job_type_id;
         $variantId = array_key_exists('variant_id', $data) ? $data['variant_id'] : $record?->variant_id;
-        if ($variantId !== null && ! DB::table('m_maintenance_job_type_variant')->where([
+        if ($variantId !== null && ! DB::table('aset_m_maintenance_job_type_variant')->where([
             'tenant_id' => $tenantId,
             'id' => $variantId,
             'maintenance_job_type_id' => $jobTypeId,

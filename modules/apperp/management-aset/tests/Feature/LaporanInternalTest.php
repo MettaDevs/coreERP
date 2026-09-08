@@ -125,22 +125,22 @@ class LaporanInternalTest extends TestCase
     private function workOrder(): string
     {
         $seed = [
-            'tipe' => $this->master('m_tipe_work_order', 'Korektif', 'TPWO-1'),
-            'layanan' => $this->master('m_tingkat_layanan', 'Mendesak', 'TGLY-1', ['urutan' => 1]),
-            'trade' => $this->master('m_trade', 'Mekanik', 'TRDE-1'),
-            'jobType' => $this->master('m_maintenance_job_type', 'Ganti ban', 'JOB-1', ['category_code' => 'corrective']),
-            'group' => $this->master('m_group_aset', 'Kendaraan', 'GRPA-1'),
-            'jenis' => $this->master('m_jenis_aset', 'Kendaraan roda 4', 'JNSA-1'),
-            'tipeLokasi' => $this->master('m_tipe_lokasi_aset', 'Gudang', 'TLKA-1'),
+            'tipe' => $this->master('aset_m_tipe_work_order', 'Korektif', 'TPWO-1'),
+            'layanan' => $this->master('aset_m_tingkat_layanan', 'Mendesak', 'TGLY-1', ['urutan' => 1]),
+            'trade' => $this->master('aset_m_trade', 'Mekanik', 'TRDE-1'),
+            'jobType' => $this->master('aset_m_maintenance_job_type', 'Ganti ban', 'JOB-1', ['category_code' => 'corrective']),
+            'group' => $this->master('aset_m_group_aset', 'Kendaraan', 'GRPA-1'),
+            'jenis' => $this->master('aset_m_jenis_aset', 'Kendaraan roda 4', 'JNSA-1'),
+            'tipeLokasi' => $this->master('aset_m_tipe_lokasi_aset', 'Gudang', 'TLKA-1'),
         ];
         $locationId = (string) Str::ulid();
-        DB::table('m_lokasi_aset')->insert([
+        DB::table('aset_m_lokasi_aset')->insert([
             'id' => $locationId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(),
             'kode' => 'LOCA-1', 'nama' => 'Gudang Cakung', 'tipe_lokasi_id' => $seed['tipeLokasi'], 'aktif' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         $assetId = (string) Str::ulid();
-        DB::table('tr_penerimaan_aset')->insert([
+        DB::table('aset_tr_penerimaan_aset')->insert([
             'id' => $assetId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => 'AST-WO-1',
             'nama' => 'Forklift 1', 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
             'group_aset_id' => $seed['group'], 'jenis_aset_id' => $seed['jenis'], 'asset_location_id' => $locationId,

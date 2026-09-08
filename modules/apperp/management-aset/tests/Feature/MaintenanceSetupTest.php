@@ -65,19 +65,19 @@ class MaintenanceSetupTest extends TestCase
 
         // Instruksi dan penanda wajib menentukan apa yang dibaca dan harus diisi teknisi,
         // jadi hilangnya keduanya saat menyimpan tidak boleh lolos diam-diam.
-        $this->assertDatabaseHas('m_maintenance_checklist_template_line', [
+        $this->assertDatabaseHas('aset_m_maintenance_checklist_template_line', [
             'template_id' => $template, 'line_number' => 2,
             'instruksi' => 'Ukur pada terminal utama.', 'wajib' => true, 'unit_id' => $this->unitId,
             'unit' => 'V', 'min_value' => 210, 'max_value' => 230,
         ]);
         // Baris judul tidak pernah diisi teknisi, jadi ia tidak boleh menahan penyelesaian
         // walaupun penyusun template menandainya wajib.
-        $this->assertDatabaseHas('m_maintenance_checklist_template_line', [
+        $this->assertDatabaseHas('aset_m_maintenance_checklist_template_line', [
             'template_id' => $template, 'line_number' => 1, 'wajib' => false,
         ]);
 
-        $this->assertDatabaseHas('m_maintenance_job_type_variant', ['id' => $variant, 'maintenance_job_type_id' => $jobType]);
-        $this->assertDatabaseHas('m_maintenance_job_type_asset_type', ['job_type_id' => $jobType, 'jenis_aset_id' => $jenisAset]);
+        $this->assertDatabaseHas('aset_m_maintenance_job_type_variant', ['id' => $variant, 'maintenance_job_type_id' => $jobType]);
+        $this->assertDatabaseHas('aset_m_maintenance_job_type_asset_type', ['job_type_id' => $jobType, 'jenis_aset_id' => $jenisAset]);
     }
 
     public function test_baris_pengukuran_boleh_disimpan_tanpa_satuan(): void
@@ -91,7 +91,7 @@ class MaintenanceSetupTest extends TestCase
             ->assertJsonPath('data.0.unit_id', null)
             ->assertJsonPath('data.0.unit', null);
 
-        $this->assertDatabaseHas('m_maintenance_checklist_template_line', [
+        $this->assertDatabaseHas('aset_m_maintenance_checklist_template_line', [
             'template_id' => $template, 'line_number' => 1, 'unit_id' => null, 'unit' => null,
             'min_value' => 1, 'max_value' => 5,
         ]);
@@ -115,9 +115,9 @@ class MaintenanceSetupTest extends TestCase
         $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
 
         // Matriks lengkap disemai dan seluruh aturannya aktif secara bawaan.
-        $this->assertDatabaseCount('m_validasi_status_work_order', 12);
-        $this->assertSame(12, DB::table('m_validasi_status_work_order')->where('aktif', true)->count());
-        $this->assertDatabaseHas('m_validasi_status_work_order', [
+        $this->assertDatabaseCount('aset_m_validasi_status_work_order', 12);
+        $this->assertSame(12, DB::table('aset_m_validasi_status_work_order')->where('aktif', true)->count());
+        $this->assertDatabaseHas('aset_m_validasi_status_work_order', [
             'status' => 'selesai', 'aturan' => 'checklist_wajib', 'aktif' => true, 'keparahan' => 'error',
         ]);
 
@@ -131,13 +131,13 @@ class MaintenanceSetupTest extends TestCase
             ]])
             ->assertOk();
 
-        $this->assertDatabaseHas('m_validasi_status_work_order', [
+        $this->assertDatabaseHas('aset_m_validasi_status_work_order', [
             'status' => 'selesai', 'aturan' => 'sebab_kerusakan', 'aktif' => true, 'keparahan' => 'peringatan',
         ]);
 
         // Seed ulang tidak boleh membatalkan keputusan tenant.
         $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
-        $this->assertDatabaseHas('m_validasi_status_work_order', [
+        $this->assertDatabaseHas('aset_m_validasi_status_work_order', [
             'status' => 'selesai', 'aturan' => 'sebab_kerusakan', 'aktif' => true, 'keparahan' => 'peringatan',
         ]);
     }
@@ -145,14 +145,14 @@ class MaintenanceSetupTest extends TestCase
     public function test_seed_maintenance_manual_idempotent_dan_tidak_menimpa_data_custom(): void
     {
         $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
-        $this->assertDatabaseCount('m_maintenance_job_type', 7);
+        $this->assertDatabaseCount('aset_m_maintenance_job_type', 7);
 
         $custom = $this->postMaster('maintenance-job-types', ['nama' => 'Pekerjaan tenant'])->assertCreated()->json('data.id');
         $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
 
-        $this->assertDatabaseCount('m_maintenance_job_type', 8);
-        $this->assertDatabaseHas('m_maintenance_job_type', ['id' => $custom, 'nama' => 'Pekerjaan tenant']);
-        $this->assertDatabaseCount('m_maintenance_checklist_variable_value', 3);
+        $this->assertDatabaseCount('aset_m_maintenance_job_type', 8);
+        $this->assertDatabaseHas('aset_m_maintenance_job_type', ['id' => $custom, 'nama' => 'Pekerjaan tenant']);
+        $this->assertDatabaseCount('aset_m_maintenance_checklist_variable_value', 3);
     }
 
     /** @param array<string, mixed> $payload */

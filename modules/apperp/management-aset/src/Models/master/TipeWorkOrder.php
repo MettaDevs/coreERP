@@ -12,7 +12,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  */
 class TipeWorkOrder extends MasterData
 {
-    protected $table = 'm_tipe_work_order';
+    protected $table = 'aset_m_tipe_work_order';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',

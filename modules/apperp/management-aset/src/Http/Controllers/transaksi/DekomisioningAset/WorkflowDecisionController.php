@@ -28,20 +28,20 @@ class WorkflowDecisionController extends Controller
         ]);
 
         DB::transaction(function () use ($event): void {
-            if (DB::table('processed_core_events')->insertOrIgnore([
+            if (DB::table('aset_processed_core_events')->insertOrIgnore([
                 'id' => (string) Str::ulid(), 'tenant_id' => $event['tenant_id'], 'event_id' => $event['id'],
                 'processed_at' => now(), 'created_at' => now(), 'updated_at' => now(),
             ]) === 0) {
                 return;
             }
-            $document = DB::table('tr_dokumen_siklus_aset')->where([
+            $document = DB::table('aset_tr_dokumen_siklus_aset')->where([
                 'tenant_id' => $event['tenant_id'], 'id' => $event['data']['source_document_id'],
                 'jenis_dokumen' => 'dekomisioning-aset', 'workflow_instance_id' => $event['data']['workflow_instance_id'],
             ])->lockForUpdate()->first();
             abort_unless($document && $document->asset_id === $event['data']['decision_context']['asset_id'], 404);
-            DB::table('tr_dokumen_siklus_aset')->where('id', $document->id)->update(['status' => $event['data']['decision'], 'updated_at' => now()]);
+            DB::table('aset_tr_dokumen_siklus_aset')->where('id', $document->id)->update(['status' => $event['data']['decision'], 'updated_at' => now()]);
             if ($event['data']['decision'] === 'approved') {
-                DB::table('tr_penerimaan_aset')->where(['tenant_id' => $event['tenant_id'], 'id' => $document->asset_id])
+                DB::table('aset_tr_penerimaan_aset')->where(['tenant_id' => $event['tenant_id'], 'id' => $document->asset_id])
                     ->whereNotIn('lifecycle_state', ['disposed'])->update(['lifecycle_state' => 'decommissioned', 'updated_at' => now()]);
             }
         });

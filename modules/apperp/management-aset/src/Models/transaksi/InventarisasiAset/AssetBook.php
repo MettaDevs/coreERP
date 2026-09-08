@@ -9,7 +9,7 @@ class AssetBook extends Model
 {
     use HasUlids;
 
-    protected $table = 'tr_buku_aset';
+    protected $table = 'aset_tr_buku_aset';
 
     protected $fillable = [
         'tenant_id', 'asset_id', 'buku_id', 'depreciation_profile_id', 'alternative_profile_id', 'book_code',

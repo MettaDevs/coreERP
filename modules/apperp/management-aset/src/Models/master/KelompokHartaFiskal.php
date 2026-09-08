@@ -14,7 +14,7 @@ class KelompokHartaFiskal extends Model
 {
     use HasUlids, SoftDeletes;
 
-    protected $table = 'm_kelompok_harta_fiskal';
+    protected $table = 'aset_m_kelompok_harta_fiskal';
 
     protected $fillable = [
         'tenant_id', 'template_key', 'jurisdiction', 'label', 'regulation_reference',

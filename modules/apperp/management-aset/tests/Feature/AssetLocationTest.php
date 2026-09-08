@@ -134,8 +134,8 @@ class AssetLocationTest extends TestCase
         $now = now();
         $group = (string) Str::ulid();
         $jenis = (string) Str::ulid();
-        DB::table('m_group_aset')->insert(['id' => $group, 'tenant_id' => $this->tenantId, 'creation_key' => 'g-'.Str::ulid(), 'kode' => 'G'.Str::random(6), 'nama' => 'Group', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
-        DB::table('m_jenis_aset')->insert(['id' => $jenis, 'tenant_id' => $this->tenantId, 'creation_key' => 'j-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('aset_m_group_aset')->insert(['id' => $group, 'tenant_id' => $this->tenantId, 'creation_key' => 'g-'.Str::ulid(), 'kode' => 'G'.Str::random(6), 'nama' => 'Group', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('aset_m_jenis_aset')->insert(['id' => $jenis, 'tenant_id' => $this->tenantId, 'creation_key' => 'j-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
 
         return ['group_aset_id' => $group, 'jenis_aset_id' => $jenis];
     }
@@ -145,19 +145,19 @@ class AssetLocationTest extends TestCase
         $now = now();
         $profile = (string) Str::ulid();
         $book = (string) Str::ulid();
-        DB::table('m_profil_penyusutan')->insert([
+        DB::table('aset_m_profil_penyusutan')->insert([
             'id' => $profile, 'tenant_id' => $this->tenantId, 'creation_key' => 'profile-ready-'.Str::ulid(),
             'kode' => 'P'.Str::random(8), 'nama' => 'Profil siap', 'aktif' => true,
             'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar',
             'useful_life_periods' => 12, 'created_at' => $now, 'updated_at' => $now,
         ]);
-        DB::table('m_buku_penyusutan')->insert([
+        DB::table('aset_m_buku_penyusutan')->insert([
             'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-ready-'.Str::ulid(),
             'kode' => 'B'.Str::random(8), 'nama' => 'Buku siap', 'aktif' => true,
             'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => $profile,
             'created_at' => $now, 'updated_at' => $now,
         ]);
-        DB::table('m_group_buku_penyusutan')->insert([
+        DB::table('aset_m_group_buku_penyusutan')->insert([
             'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'group_aset_id' => $groupId,
             'buku_id' => $book, 'depreciate' => true, 'useful_life_periods' => 12,
             'convention' => 'full_month', 'created_at' => $now, 'updated_at' => $now,

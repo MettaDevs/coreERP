@@ -51,8 +51,8 @@ class TipeAtributController extends MasterDataController
     protected function childMasters(): array
     {
         return [
-            new MasterChild(table: 'm_tipe_atribut_nilai', column: 'tipe_atribut_id', label: 'pilihan nilai'),
-            new MasterChild(table: 'm_jenis_aset_atribut', column: 'tipe_atribut_id', label: 'atribut pada jenis aset'),
+            new MasterChild(table: 'aset_m_tipe_atribut_nilai', column: 'tipe_atribut_id', label: 'pilihan nilai'),
+            new MasterChild(table: 'aset_m_jenis_aset_atribut', column: 'tipe_atribut_id', label: 'atribut pada jenis aset'),
         ];
     }
 
@@ -94,7 +94,7 @@ class TipeAtributController extends MasterDataController
                     'message' => 'Tipe data tidak dapat diubah karena atribut ini sudah pernah diisi pada aset. Buat tipe atribut baru bila bentuk datanya berbeda.',
                 ]], 409));
             }
-            if ($record->data_type === 'string' && DB::table('m_tipe_atribut_nilai')
+            if ($record->data_type === 'string' && DB::table('aset_m_tipe_atribut_nilai')
                 ->where(['tenant_id' => $tenantId, 'tipe_atribut_id' => $record->id])
                 ->whereNull('deleted_at')->exists()) {
                 abort(response()->json(['error' => [
@@ -194,15 +194,15 @@ class TipeAtributController extends MasterDataController
     protected function prepareQuery(Builder $query, ?Request $request = null): Builder
     {
         return $query->addSelect([
-            'values_count' => DB::table('m_tipe_atribut_nilai as nilai')
+            'values_count' => DB::table('aset_m_tipe_atribut_nilai as nilai')
                 ->selectRaw('count(*)')
-                ->whereColumn('nilai.tenant_id', 'm_tipe_atribut.tenant_id')
-                ->whereColumn('nilai.tipe_atribut_id', 'm_tipe_atribut.id')
+                ->whereColumn('nilai.tenant_id', 'aset_m_tipe_atribut.tenant_id')
+                ->whereColumn('nilai.tipe_atribut_id', 'aset_m_tipe_atribut.id')
                 ->whereNull('nilai.deleted_at'),
-            'asset_types_count' => DB::table('m_jenis_aset_atribut as link')
+            'asset_types_count' => DB::table('aset_m_jenis_aset_atribut as link')
                 ->selectRaw('count(*)')
-                ->whereColumn('link.tenant_id', 'm_tipe_atribut.tenant_id')
-                ->whereColumn('link.tipe_atribut_id', 'm_tipe_atribut.id')
+                ->whereColumn('link.tenant_id', 'aset_m_tipe_atribut.tenant_id')
+                ->whereColumn('link.tipe_atribut_id', 'aset_m_tipe_atribut.id')
                 ->whereNull('link.deleted_at'),
         ]);
     }

@@ -44,7 +44,7 @@ class AssetRegisterTest extends TestCase
         ])->assertCreated()->assertJsonPath('data.kode', 'AST-000001');
 
         $assetId = $response->json('data.id');
-        $this->assertDatabaseHas('tr_penempatan_aset', [
+        $this->assertDatabaseHas('aset_tr_penempatan_aset', [
             'tenant_id' => $this->tenantId, 'asset_id' => $assetId,
             'receiving_org_unit_id' => $receivingUnit, 'usage_org_unit_id' => $usageUnit,
             'received_by_user_id' => $receiver, 'custodian_user_id' => $custodian,
@@ -61,8 +61,8 @@ class AssetRegisterTest extends TestCase
                 'effective_on' => '2026-08-01', 'reason' => 'Pindah pengguna', 'usage_org_unit_id' => $newUnit,
             ])->assertOk();
 
-        $this->assertDatabaseCount('tr_penempatan_aset', 2);
-        $this->assertDatabaseHas('tr_penempatan_aset', ['asset_id' => $assetId, 'usage_org_unit_id' => $newUnit, 'effective_on' => '2026-08-01']);
+        $this->assertDatabaseCount('aset_tr_penempatan_aset', 2);
+        $this->assertDatabaseHas('aset_tr_penempatan_aset', ['asset_id' => $assetId, 'usage_org_unit_id' => $newUnit, 'effective_on' => '2026-08-01']);
     }
 
     public function test_register_hides_assets_outside_the_signed_operating_unit_scope(): void
@@ -79,7 +79,7 @@ class AssetRegisterTest extends TestCase
         // Klasifikasi tidak diuji di sini; satu pasang dipakai bersama agar yang tersaring
         // benar-benar berasal dari legal entity dan operating unit.
         $scopeClassification = $this->classification();
-        DB::table('tr_penerimaan_aset')->insert([
+        DB::table('aset_tr_penerimaan_aset')->insert([
             ['id' => $first, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-a', 'kode' => 'AST-SCOPE-A', 'nama' => 'Aset scope A', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
             ['id' => $second, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-b', 'kode' => 'AST-SCOPE-B', 'nama' => 'Aset scope B', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
             ['id' => $crossFirst, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-c', 'kode' => 'AST-SCOPE-C', 'nama' => 'Aset scope C', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
@@ -103,7 +103,7 @@ class AssetRegisterTest extends TestCase
             ? Http::response(['data' => ['id' => $workflowId]], 201)
             : Http::response(['data' => ['number' => 'AST-000001']], 200));
         $assetId = $this->receive();
-        $asset = DB::table('tr_penerimaan_aset')->where('id', $assetId)->first();
+        $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
         $document = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.dekomisioning-aset.create']))
             ->withHeader('Idempotency-Key', 'decommission-1')->postJson('/api/v1/dekomisioning-aset', [
                 'legal_entity_id' => $asset->legal_entity_id, 'responsible_org_unit_id' => $asset->responsible_org_unit_id,
@@ -125,8 +125,8 @@ class AssetRegisterTest extends TestCase
         $this->call('POST', '/api/internal/v1/workflow-events', [], [], [], $headers, $body)->assertOk();
         $this->call('POST', '/api/internal/v1/workflow-events', [], [], [], $headers, $body)->assertOk();
 
-        $this->assertDatabaseHas('tr_penerimaan_aset', ['id' => $assetId, 'lifecycle_state' => 'decommissioned']);
-        $this->assertDatabaseCount('processed_core_events', 1);
+        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $assetId, 'lifecycle_state' => 'decommissioned']);
+        $this->assertDatabaseCount('aset_processed_core_events', 1);
     }
 
     /**
@@ -145,7 +145,7 @@ class AssetRegisterTest extends TestCase
                 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
             ])->assertCreated()->json('data.id');
 
-        $this->assertDatabaseHas('tr_buku_aset', [
+        $this->assertDatabaseHas('aset_tr_buku_aset', [
             'asset_id' => $assetId, 'depreciate' => false, 'depreciation_profile_id' => null,
         ]);
 
@@ -163,7 +163,7 @@ class AssetRegisterTest extends TestCase
     {
         $classification = $this->classification();
         $this->configureNonDepreciatingBook($classification['group_aset_id'], depreciate: true);
-        DB::table('m_group_aset')
+        DB::table('aset_m_group_aset')
             ->where(['tenant_id' => $this->tenantId, 'id' => $classification['group_aset_id']])
             ->update(['capitalization_threshold' => 1000000]);
 
@@ -174,7 +174,7 @@ class AssetRegisterTest extends TestCase
                 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
             ])->assertCreated()->json('data.id');
 
-        $this->assertDatabaseHas('tr_buku_aset', ['asset_id' => $assetId, 'depreciate' => false]);
+        $this->assertDatabaseHas('aset_tr_buku_aset', ['asset_id' => $assetId, 'depreciate' => false]);
 
         $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.mutate']))
             ->postJson('/api/v1/aset/'.$assetId.'/penempatan', [
@@ -220,8 +220,8 @@ class AssetRegisterTest extends TestCase
         $group = (string) Str::ulid();
         $type = (string) Str::ulid();
         $now = now();
-        DB::table('m_group_aset')->insert(['id' => $group, 'tenant_id' => $this->tenantId, 'creation_key' => 'group-'.Str::ulid(), 'kode' => 'G'.Str::random(6), 'nama' => 'Group', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
-        DB::table('m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('aset_m_group_aset')->insert(['id' => $group, 'tenant_id' => $this->tenantId, 'creation_key' => 'group-'.Str::ulid(), 'kode' => 'G'.Str::random(6), 'nama' => 'Group', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('aset_m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Jenis', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
 
         return ['group_aset_id' => $group, 'jenis_aset_id' => $type];
     }
@@ -231,19 +231,19 @@ class AssetRegisterTest extends TestCase
         $now = now();
         $profile = (string) Str::ulid();
         $book = (string) Str::ulid();
-        DB::table('m_profil_penyusutan')->insert([
+        DB::table('aset_m_profil_penyusutan')->insert([
             'id' => $profile, 'tenant_id' => $this->tenantId, 'creation_key' => 'profile-ready-'.Str::ulid(),
             'kode' => 'P'.Str::random(8), 'nama' => 'Profil siap', 'aktif' => true,
             'method' => 'straight_line', 'frequency' => 'monthly', 'year_basis' => 'calendar',
             'useful_life_periods' => 12, 'created_at' => $now, 'updated_at' => $now,
         ]);
-        DB::table('m_buku_penyusutan')->insert([
+        DB::table('aset_m_buku_penyusutan')->insert([
             'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-ready-'.Str::ulid(),
             'kode' => 'B'.Str::random(8), 'nama' => 'Buku siap', 'aktif' => true,
             'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => $profile,
             'created_at' => $now, 'updated_at' => $now,
         ]);
-        DB::table('m_group_buku_penyusutan')->insert([
+        DB::table('aset_m_group_buku_penyusutan')->insert([
             'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'group_aset_id' => $groupId,
             'buku_id' => $book, 'depreciate' => true, 'useful_life_periods' => 12,
             'convention' => 'full_month', 'created_at' => $now, 'updated_at' => $now,
@@ -259,13 +259,13 @@ class AssetRegisterTest extends TestCase
     {
         $now = now();
         $book = (string) Str::ulid();
-        DB::table('m_buku_penyusutan')->insert([
+        DB::table('aset_m_buku_penyusutan')->insert([
             'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-register-'.Str::ulid(),
             'kode' => 'B'.Str::random(8), 'nama' => 'Buku register', 'aktif' => true,
             'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => null,
             'created_at' => $now, 'updated_at' => $now,
         ]);
-        DB::table('m_group_buku_penyusutan')->insert([
+        DB::table('aset_m_group_buku_penyusutan')->insert([
             'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'group_aset_id' => $groupId,
             'buku_id' => $book, 'depreciate' => $depreciate, 'useful_life_periods' => null,
             'convention' => null, 'created_at' => $now, 'updated_at' => $now,

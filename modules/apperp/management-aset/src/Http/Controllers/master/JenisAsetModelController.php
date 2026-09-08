@@ -24,7 +24,7 @@ class JenisAsetModelController extends Controller
 
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
         abort_unless(
-            DB::table('m_jenis_aset')
+            DB::table('aset_m_jenis_aset')
                 ->where(['tenant_id' => $tenantId, 'id' => $jenisAsetId])
                 ->whereNull('deleted_at')
                 ->exists(),
@@ -35,7 +35,7 @@ class JenisAsetModelController extends Controller
             'model_ids' => ['present', 'array', 'max:100'],
             'model_ids.*' => [
                 'required', 'distinct', 'ulid',
-                Rule::exists('m_model_aset', 'id')
+                Rule::exists('aset_m_model_aset', 'id')
                     ->where('tenant_id', $tenantId)
                     ->whereNull('deleted_at'),
             ],
@@ -43,12 +43,12 @@ class JenisAsetModelController extends Controller
         $modelIds = array_values($data['model_ids']);
 
         DB::transaction(function () use ($tenantId, $jenisAsetId, $modelIds): void {
-            DB::table('m_jenis_aset')
+            DB::table('aset_m_jenis_aset')
                 ->where(['tenant_id' => $tenantId, 'id' => $jenisAsetId])
                 ->lockForUpdate()
                 ->first();
 
-            $models = DB::table('m_model_aset')
+            $models = DB::table('aset_m_model_aset')
                 ->where('tenant_id', $tenantId)
                 ->whereIn('id', $modelIds)
                 ->whereNull('deleted_at')
@@ -61,12 +61,12 @@ class JenisAsetModelController extends Controller
                 ]);
             }
 
-            DB::table('m_model_aset')
+            DB::table('aset_m_model_aset')
                 ->where(['tenant_id' => $tenantId, 'jenis_aset_id' => $jenisAsetId])
                 ->update(['jenis_aset_id' => null, 'updated_at' => now()]);
 
             if ($modelIds !== []) {
-                DB::table('m_model_aset')
+                DB::table('aset_m_model_aset')
                     ->where('tenant_id', $tenantId)
                     ->whereIn('id', $modelIds)
                     ->update(['jenis_aset_id' => $jenisAsetId, 'updated_at' => now()]);

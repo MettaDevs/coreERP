@@ -6,5 +6,5 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 
 class AnalisaMaintenance extends MasterData
 {
-    protected $table = 'm_analisa_maintenance';
+    protected $table = 'aset_m_analisa_maintenance';
 }

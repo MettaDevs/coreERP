@@ -76,7 +76,7 @@ class AssetAttributeTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors('satuan_id');
-        $this->assertDatabaseCount('m_tipe_atribut', 0);
+        $this->assertDatabaseCount('aset_m_tipe_atribut', 0);
     }
 
     /** Satuan tidak bermakna untuk teks atau daftar tetap, jadi tidak boleh diam-diam tersimpan. */
@@ -125,9 +125,9 @@ class AssetAttributeTest extends TestCase
         // Tiap tipe mendarat di kolom yang benar, bukan semuanya jadi teks.
         // Dibandingkan sebagai angka: PostgreSQL mengembalikan decimal sebagai string
         // ("100.500000") sedangkan SQLite sebagai float.
-        $this->assertSame(100.5, (float) DB::table('tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $kapasitas])->value('nilai_number'));
-        $this->assertTrue((bool) DB::table('tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $bergaransi])->value('nilai_boolean'));
-        $this->assertSame('2026-03-20', substr((string) DB::table('tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $dipasang])->value('nilai_date'), 0, 10));
+        $this->assertSame(100.5, (float) DB::table('aset_tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $kapasitas])->value('nilai_number'));
+        $this->assertTrue((bool) DB::table('aset_tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $bergaransi])->value('nilai_boolean'));
+        $this->assertSame('2026-03-20', substr((string) DB::table('aset_tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $dipasang])->value('nilai_date'), 0, 10));
     }
 
     public function test_detail_jenis_aset_menghitung_atribut_model_dan_aset(): void
@@ -180,8 +180,8 @@ class AssetAttributeTest extends TestCase
             ->assertJsonPath('data.model_ids.0', $modelA)
             ->assertJsonPath('data.model_ids.1', $modelB);
 
-        $this->assertDatabaseHas('m_model_aset', ['id' => $modelA, 'jenis_aset_id' => $jenis]);
-        $this->assertDatabaseHas('m_model_aset', ['id' => $modelB, 'jenis_aset_id' => $jenis]);
+        $this->assertDatabaseHas('aset_m_model_aset', ['id' => $modelA, 'jenis_aset_id' => $jenis]);
+        $this->assertDatabaseHas('aset_m_model_aset', ['id' => $modelB, 'jenis_aset_id' => $jenis]);
     }
 
     /**
@@ -240,7 +240,7 @@ class AssetAttributeTest extends TestCase
         $this->attach($jenis, [['tipe_atribut_id' => $kapasitas, 'wajib' => true]])->assertOk();
 
         $this->receiveRaw($jenis, [])->assertStatus(422)->assertJsonValidationErrors('atribut.'.$kapasitas);
-        $this->assertDatabaseCount('tr_penerimaan_aset', 0);
+        $this->assertDatabaseCount('aset_tr_penerimaan_aset', 0);
     }
 
     public function test_atribut_yang_tidak_terdaftar_pada_jenis_ditolak(): void
@@ -268,7 +268,7 @@ class AssetAttributeTest extends TestCase
 
         $asset = $this->receive($jenis, [['tipe_atribut_id' => $bahanBakar, 'nilai' => 'Solar']]);
         // Nilai terpilih ditautkan ke barisnya, bukan sekadar disalin sebagai teks.
-        $row = DB::table('tr_aset_atribut')->where('asset_id', $asset)->first();
+        $row = DB::table('aset_tr_aset_atribut')->where('asset_id', $asset)->first();
         $this->assertNotNull($row->tipe_atribut_nilai_id);
         $this->assertSame('Solar', $row->nilai_text);
     }
@@ -363,7 +363,7 @@ class AssetAttributeTest extends TestCase
             ->patchJson('/api/v1/tipe-atribut/'.$atribut, ['data_type' => 'integer'])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'data_type_locked');
-        $this->assertDatabaseHas('m_tipe_atribut', [
+        $this->assertDatabaseHas('aset_m_tipe_atribut', [
             'tenant_id' => $this->tenantId,
             'id' => $atribut,
             'data_type' => 'decimal',
@@ -383,7 +383,7 @@ class AssetAttributeTest extends TestCase
             ->assertJsonPath('error.code', 'attribute_values_in_use')
             ->assertJsonPath('error.conflicting_count', 1)
             ->assertJsonPath('error.conflicting_values.0', 'Biru khusus');
-        $this->assertDatabaseCount('m_tipe_atribut_nilai', 0);
+        $this->assertDatabaseCount('aset_m_tipe_atribut_nilai', 0);
 
         $this->values($warna, [['nilai' => 'Biru khusus'], ['nilai' => 'Merah']])->assertOk();
         $this->receiveRaw($jenis, [['tipe_atribut_id' => $warna, 'nilai' => 'Hijau']])

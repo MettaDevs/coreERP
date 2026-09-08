@@ -26,14 +26,14 @@ class LokasiAsetController extends MasterDataController
             // Induk lokasi menunjuk tabel yang sama, jadi inilah satu-satunya master
             // yang perlu dijaga dari siklus.
             new MasterParent(
-                table: 'm_lokasi_aset',
+                table: 'aset_m_lokasi_aset',
                 column: 'parent_id',
                 relation: 'parentLocation',
                 label: 'lokasi induk',
                 required: false,
             ),
             new MasterParent(
-                table: 'm_tipe_lokasi_aset',
+                table: 'aset_m_tipe_lokasi_aset',
                 column: 'tipe_lokasi_id',
                 relation: 'tipeLokasi',
                 label: 'tipe lokasi',
@@ -45,11 +45,11 @@ class LokasiAsetController extends MasterDataController
     protected function childMasters(): array
     {
         return [
-            new MasterChild(table: 'm_lokasi_aset', column: 'parent_id', label: 'lokasi anak'),
-            new MasterChild(table: 'tr_penerimaan_aset', column: 'asset_location_id', label: 'aset'),
+            new MasterChild(table: 'aset_m_lokasi_aset', column: 'parent_id', label: 'lokasi anak'),
+            new MasterChild(table: 'aset_tr_penerimaan_aset', column: 'asset_location_id', label: 'aset'),
             // Group yang memakai lokasi ini sebagai lokasi bawaan penerimaan. Tanpa ini
             // mengarsipkan lokasi meninggalkan group yang diam-diam menunjuk data mati.
-            new MasterChild(table: 'm_group_aset', column: 'asset_location_id', label: 'group aset'),
+            new MasterChild(table: 'aset_m_group_aset', column: 'asset_location_id', label: 'group aset'),
         ];
     }
 

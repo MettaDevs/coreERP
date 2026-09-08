@@ -26,7 +26,7 @@ class GroupBukuPenyusutanController extends MasterLinkController
 
     protected function ownerTable(): string
     {
-        return 'm_group_aset';
+        return 'aset_m_group_aset';
     }
 
     protected function ownerColumn(): string
@@ -36,16 +36,16 @@ class GroupBukuPenyusutanController extends MasterLinkController
 
     protected function table(): string
     {
-        return 'm_group_buku_penyusutan';
+        return 'aset_m_group_buku_penyusutan';
     }
 
     protected function rowRules(string $tenantId): array
     {
-        $activeBook = Rule::exists('m_buku_penyusutan', 'id')
+        $activeBook = Rule::exists('aset_m_buku_penyusutan', 'id')
             ->where('tenant_id', $tenantId)
             ->where('aktif', true)
             ->whereNull('deleted_at');
-        $activeProfile = Rule::exists('m_profil_penyusutan', 'id')
+        $activeProfile = Rule::exists('aset_m_profil_penyusutan', 'id')
             ->where('tenant_id', $tenantId)
             ->where('aktif', true)
             ->whereNull('deleted_at');
@@ -71,7 +71,7 @@ class GroupBukuPenyusutanController extends MasterLinkController
             fn (array $row): ?string => $row['buku_id'] ?? null,
             $rows,
         )));
-        $books = DB::table('m_buku_penyusutan')
+        $books = DB::table('aset_m_buku_penyusutan')
             ->where('tenant_id', $tenantId)
             ->whereIn('id', $bookIds)
             ->whereNull('deleted_at')
@@ -92,7 +92,7 @@ class GroupBukuPenyusutanController extends MasterLinkController
                 }
             }
         }
-        $profiles = DB::table('m_profil_penyusutan')
+        $profiles = DB::table('aset_m_profil_penyusutan')
             ->where('tenant_id', $tenantId)
             ->whereIn('id', array_values(array_unique($profileIds)))
             ->where('aktif', true)

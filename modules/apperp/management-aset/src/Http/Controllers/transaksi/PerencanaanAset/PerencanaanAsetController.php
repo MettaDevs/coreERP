@@ -25,7 +25,7 @@ class PerencanaanAsetController extends Controller
     {
         $this->guard($request, 'read');
 
-        $query = DB::table('tr_perencanaan_aset')
+        $query = DB::table('aset_tr_perencanaan_aset')
             ->where('tenant_id', $this->tenant($request))->whereNull('deleted_at');
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
 
@@ -38,8 +38,8 @@ class PerencanaanAsetController extends Controller
     {
         $this->guard($request, 'read');
         $plan = $this->plan($request, $id);
-        $plan->details = DB::table('tr_perencanaan_aset_details as detail')
-            ->leftJoin('m_jenis_aset as jenis', function ($join): void {
+        $plan->details = DB::table('aset_tr_perencanaan_aset_details as detail')
+            ->leftJoin('aset_m_jenis_aset as jenis', function ($join): void {
                 $join->on('jenis.id', '=', 'detail.jenis_aset_id')->on('jenis.tenant_id', '=', 'detail.tenant_id');
             })
             ->where('detail.tenant_id', $this->tenant($request))->where('detail.planning_id', $id)
@@ -56,7 +56,7 @@ class PerencanaanAsetController extends Controller
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
-        if ($existing = DB::table('tr_perencanaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first()) {
+        if ($existing = DB::table('aset_tr_perencanaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first()) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -72,13 +72,13 @@ class PerencanaanAsetController extends Controller
         try {
             $plan = DB::transaction(function () use ($request, $data, $key, $tenant, $kode, $unitMap): array {
                 $record = $this->header($request, $data, $key, $kode);
-                DB::table('tr_perencanaan_aset')->insert($record);
+                DB::table('aset_tr_perencanaan_aset')->insert($record);
                 $this->replaceDetails($record['id'], $tenant, $data['details'], $unitMap);
 
                 return $record;
             });
         } catch (QueryException $exception) {
-            $existing = DB::table('tr_perencanaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first();
+            $existing = DB::table('aset_tr_perencanaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first();
             if (! $existing) {
                 throw $exception;
             }
@@ -104,7 +104,7 @@ class PerencanaanAsetController extends Controller
         $changed = DB::transaction(function () use ($request, $id, $tenant, $version, $data, $unitMap): int {
             $changes = $this->header($request, $data, '', '', false);
             unset($changes['responsible_user_id']);
-            $updated = DB::table('tr_perencanaan_aset')->where([
+            $updated = DB::table('aset_tr_perencanaan_aset')->where([
                 'id' => $id, 'tenant_id' => $tenant, 'version' => $version,
             ])->whereNull('deleted_at')->update([
                 ...$changes,
@@ -112,7 +112,7 @@ class PerencanaanAsetController extends Controller
                 'updated_at' => now(),
             ]);
             if ($updated) {
-                DB::table('tr_perencanaan_aset_details')->where(['tenant_id' => $tenant, 'planning_id' => $id])->delete();
+                DB::table('aset_tr_perencanaan_aset_details')->where(['tenant_id' => $tenant, 'planning_id' => $id])->delete();
                 $this->replaceDetails($id, $tenant, $data['details'], $unitMap);
             }
 
@@ -132,7 +132,7 @@ class PerencanaanAsetController extends Controller
         abort_unless($plan->status === 'draft', 422, 'Hanya rencana draf yang dapat diarsipkan.');
         $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
         app(OrganizationScope::class)->require($request, $plan->legal_entity_id, $plan->planning_org_unit_id);
-        $updated = DB::table('tr_perencanaan_aset')->where([
+        $updated = DB::table('aset_tr_perencanaan_aset')->where([
             'id' => $id, 'tenant_id' => $this->tenant($request), 'version' => $version,
         ])->whereNull('deleted_at')->update(['deleted_at' => now(), 'version' => $version + 1, 'updated_at' => now()]);
         if (! $updated) {
@@ -171,7 +171,7 @@ class PerencanaanAsetController extends Controller
     private function validateLookupMasters(string $tenant, array $details, UnitOfMeasureClient $units): array
     {
         $ids = array_values(array_unique(array_column($details, 'jenis_aset_id')));
-        $count = DB::table('m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', $ids)->where('aktif', true)->whereNull('deleted_at')->count();
+        $count = DB::table('aset_m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', $ids)->where('aktif', true)->whereNull('deleted_at')->count();
         if ($count !== count($ids)) {
             throw ValidationException::withMessages(['details' => 'Jenis aset tidak ditemukan atau sudah tidak aktif.']);
         }
@@ -204,8 +204,8 @@ class PerencanaanAsetController extends Controller
     /** @param list<array<string, mixed>> $details */
     private function replaceDetails(string $planId, string $tenant, array $details, array $units): void
     {
-        $types = DB::table('m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
-        DB::table('tr_perencanaan_aset_details')->insert(collect($details)->values()->map(fn (array $detail, int $index): array => [
+        $types = DB::table('aset_m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
+        DB::table('aset_tr_perencanaan_aset_details')->insert(collect($details)->values()->map(fn (array $detail, int $index): array => [
             'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'planning_id' => $planId, 'line_number' => $index + 1,
             'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'], 'asset_name' => $types[$detail['jenis_aset_id']], 'unit' => $units[$detail['satuan_id']]['name'],
             'quantity' => $detail['quantity'], 'requested_specification' => $detail['requested_specification'],
@@ -222,7 +222,7 @@ class PerencanaanAsetController extends Controller
 
     private function plan(Request $request, string $id): object
     {
-        $query = DB::table('tr_perencanaan_aset')->where(['id' => $id, 'tenant_id' => $this->tenant($request)])->whereNull('deleted_at');
+        $query = DB::table('aset_tr_perencanaan_aset')->where(['id' => $id, 'tenant_id' => $this->tenant($request)])->whereNull('deleted_at');
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
 
         return $query->firstOrFail();

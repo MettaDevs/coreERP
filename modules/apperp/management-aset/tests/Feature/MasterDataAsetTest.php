@@ -46,17 +46,17 @@ class MasterDataAsetTest extends TestCase
     public static function standaloneMasters(): array
     {
         return [
-            'group aset' => ['group-aset', 'm_group_aset'],
-            'jenis aset' => ['jenis-aset', 'm_jenis_aset'],
-            'kondisi aset' => ['kondisi-aset', 'm_kondisi_aset'],
-            'pabrikan aset' => ['pabrikan-aset', 'm_pabrikan_aset'],
-            'item checklist maintenance' => ['item-checklist-maintenance', 'm_item_checklist_maintenance'],
-            'analisa maintenance' => ['analisa-maintenance', 'm_analisa_maintenance'],
-            'tipe work order' => ['tipe-work-order', 'm_tipe_work_order'],
-            'tingkat layanan' => ['tingkat-layanan', 'm_tingkat_layanan'],
-            'trade' => ['trade', 'm_trade'],
-            'sebab kerusakan' => ['sebab-kerusakan', 'm_sebab_kerusakan'],
-            'tindakan perbaikan' => ['tindakan-perbaikan', 'm_tindakan_perbaikan'],
+            'group aset' => ['group-aset', 'aset_m_group_aset'],
+            'jenis aset' => ['jenis-aset', 'aset_m_jenis_aset'],
+            'kondisi aset' => ['kondisi-aset', 'aset_m_kondisi_aset'],
+            'pabrikan aset' => ['pabrikan-aset', 'aset_m_pabrikan_aset'],
+            'item checklist maintenance' => ['item-checklist-maintenance', 'aset_m_item_checklist_maintenance'],
+            'analisa maintenance' => ['analisa-maintenance', 'aset_m_analisa_maintenance'],
+            'tipe work order' => ['tipe-work-order', 'aset_m_tipe_work_order'],
+            'tingkat layanan' => ['tingkat-layanan', 'aset_m_tingkat_layanan'],
+            'trade' => ['trade', 'aset_m_trade'],
+            'sebab kerusakan' => ['sebab-kerusakan', 'aset_m_sebab_kerusakan'],
+            'tindakan perbaikan' => ['tindakan-perbaikan', 'aset_m_tindakan_perbaikan'],
         ];
     }
 
@@ -111,7 +111,7 @@ class MasterDataAsetTest extends TestCase
             'minta_keterangan' => true,
         ])->assertCreated()->assertJsonPath('data.minta_keterangan', true)->json('data.id');
 
-        $this->assertDatabaseHas('m_sebab_kerusakan', ['id' => $id, 'minta_keterangan' => true]);
+        $this->assertDatabaseHas('aset_m_sebab_kerusakan', ['id' => $id, 'minta_keterangan' => true]);
     }
 
     #[DataProvider('chainedMasters')]
@@ -193,7 +193,7 @@ class MasterDataAsetTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('pabrikan_aset_id');
 
-        $this->assertDatabaseCount('m_model_aset', 0);
+        $this->assertDatabaseCount('aset_m_model_aset', 0);
         Http::assertSentCount(1);
     }
 
@@ -227,7 +227,7 @@ class MasterDataAsetTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('pabrikan_aset_id');
 
-        $this->assertDatabaseHas('m_model_aset', [
+        $this->assertDatabaseHas('aset_m_model_aset', [
             'id' => $classification['model-aset'],
             'pabrikan_aset_id' => $classification['pabrikan-aset'],
         ]);
@@ -314,7 +314,7 @@ class MasterDataAsetTest extends TestCase
     {
         $reference = $this->fiscalReference();
         $this->fiscalReference((string) Str::ulid(), 'tenant-lain:kelompok-1');
-        DB::table('m_kelompok_harta_fiskal')->insert([
+        DB::table('aset_m_kelompok_harta_fiskal')->insert([
             'id' => (string) Str::ulid(),
             'tenant_id' => $this->tenantId,
             'template_key' => 'test:tidak-aktif',
@@ -460,7 +460,7 @@ class MasterDataAsetTest extends TestCase
             ->assertJsonPath('data.id', $created->json('data.id'));
 
         Http::assertSentCount(1);
-        $this->assertDatabaseCount('m_kondisi_aset', 1);
+        $this->assertDatabaseCount('aset_m_kondisi_aset', 1);
     }
 
     public function test_retry_tetap_direplay_walau_aktif_dikirim_sebagai_angka(): void
@@ -518,15 +518,15 @@ class MasterDataAsetTest extends TestCase
         // Menulis langsung ke tabel, melewati validasi aplikasi, agar yang diuji adalah
         // foreign key gabungan (tenant_id, pabrikan_aset_id) -> (tenant_id, id).
         $this->assertTrue($this->insertModelDirectly($this->tenantId, $pabrikan));
-        $this->assertDatabaseCount('m_model_aset', 2);
+        $this->assertDatabaseCount('aset_m_model_aset', 2);
 
         $this->assertFalse($this->insertModelDirectly((string) Str::ulid(), $pabrikan), 'induk milik tenant lain harus ditolak database');
         $this->assertFalse($this->insertModelDirectly($this->tenantId, (string) Str::ulid()), 'induk yang tidak ada harus ditolak database');
-        $this->assertDatabaseCount('m_model_aset', 2);
+        $this->assertDatabaseCount('aset_m_model_aset', 2);
 
         // Arsip adalah soft delete sehingga referensi tidak pernah terputus; hard delete tetap ditahan.
-        $this->assertFalse($this->hardDelete('m_pabrikan_aset', $pabrikan), 'hard delete induk yang masih direferensikan harus ditahan');
-        $this->assertDatabaseHas('m_pabrikan_aset', ['id' => $pabrikan, 'deleted_at' => null]);
+        $this->assertFalse($this->hardDelete('aset_m_pabrikan_aset', $pabrikan), 'hard delete induk yang masih direferensikan harus ditahan');
+        $this->assertDatabaseHas('aset_m_pabrikan_aset', ['id' => $pabrikan, 'deleted_at' => null]);
     }
 
     /**
@@ -544,7 +544,7 @@ class MasterDataAsetTest extends TestCase
         $suffix = ++$this->requestCounter;
 
         try {
-            return DB::transaction(fn (): bool => DB::table('m_model_aset')->insert([
+            return DB::transaction(fn (): bool => DB::table('aset_m_model_aset')->insert([
                 'id' => (string) Str::ulid(),
                 'tenant_id' => $tenantId,
                 'creation_key' => 'langsung-'.$suffix,
@@ -602,7 +602,7 @@ class MasterDataAsetTest extends TestCase
     private function fiscalReference(?string $tenantId = null, string $templateKey = 'test:kelompok-1'): string
     {
         $id = (string) Str::ulid();
-        DB::table('m_kelompok_harta_fiskal')->insert([
+        DB::table('aset_m_kelompok_harta_fiskal')->insert([
             'id' => $id,
             'tenant_id' => $tenantId ?? $this->tenantId,
             'template_key' => $templateKey,
