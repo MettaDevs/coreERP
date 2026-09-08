@@ -30,8 +30,8 @@ berbahaya daripada yang tidak ada.
 
 | Task | Siapa | Cabang | Catatan |
 | --- | --- | --- | --- |
-| F2-10 konteks permintaan | agent | `feat/f2-10-konteks-permintaan` | menghalangi F2-11 |
-| F2-12 kolom `database_name` | agent | `fix/f2-12-database-name-opsional` | |
+| F2-10 konteks permintaan | agent | `feat/f2-10-konteks-permintaan` | selesai, menunggu #53 digabungkan; menghalangi F2-11 |
+| F2-12 kolom `database_name` | agent | `fix/f2-12-database-name-opsional` | selesai, menunggu #52 digabungkan |
 | F3-00 penjaga kenal modul migrasi | agent | `feat/f3-00-penjaga-modul-migrasi` | menghalangi F3-01 |
 
 Kosongkan barisnya setelah pull request-nya digabungkan.
