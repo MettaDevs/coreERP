@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Services\NumberSequenceClient;
+use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
 class PermintaanPengadaanAsetController extends Controller
@@ -32,7 +32,7 @@ class PermintaanPengadaanAsetController extends Controller
         return response()->json(['data' => $record]);
     }
 
-    public function store(Request $request, NumberSequenceClient $numbers): JsonResponse
+    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->key($request);

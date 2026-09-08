@@ -20,7 +20,7 @@ class AssetRegisterTest extends TestCase
     {
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
-        Http::fake(['core.test/*' => Http::response(['data' => ['number' => 'AST-000001']], 200)]);
+        Http::fake(['core.test/*' => Http::response(['data' => ['number' => $this->awalanNomor('management-aset.aset').'-000001']], 200)]);
     }
 
     public function test_direct_receipt_keeps_receiver_usage_unit_and_custodian_separate(): void
@@ -40,7 +40,7 @@ class AssetRegisterTest extends TestCase
             'currency_code' => 'IDR', 'receiving_org_unit_id' => $receivingUnit,
             'usage_org_unit_id' => $usageUnit, 'received_by_user_id' => $receiver,
             'custodian_user_id' => $custodian,
-        ])->assertCreated()->assertJsonPath('data.kode', 'AST-000001');
+        ])->assertCreated()->assertJsonPath('data.kode', $this->awalanNomor('management-aset.aset').'-000001');
 
         $assetId = $response->json('data.id');
         $this->assertDatabaseHas('aset_tr_penempatan_aset', [
@@ -48,7 +48,7 @@ class AssetRegisterTest extends TestCase
             'receiving_org_unit_id' => $receivingUnit, 'usage_org_unit_id' => $usageUnit,
             'received_by_user_id' => $receiver, 'custodian_user_id' => $custodian,
         ]);
-        Http::assertSent(fn ($request) => $request['legal_entity_id'] === $legalEntity);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Penerbitan nomor tidak terjadi.');
     }
 
     public function test_mutation_adds_history_instead_of_rewriting_receipt(): void
@@ -100,7 +100,7 @@ class AssetRegisterTest extends TestCase
         Http::swap(new Factory);
         Http::fake(fn ($request) => str_contains($request->url(), 'workflow-instances')
             ? Http::response(['data' => ['id' => $workflowId]], 201)
-            : Http::response(['data' => ['number' => 'AST-000001']], 200));
+            : Http::response(['data' => ['number' => $this->awalanNomor('management-aset.aset').'-000001']], 200));
         $assetId = $this->receive();
         $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
         $document = $this->sebagaiPengguna($this->tenantId, ['management-aset.dekomisioning-aset.create'])

@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 use Modules\Apperp\ManagementAset\Models\MasterData;
-use Modules\Apperp\ManagementAset\Services\NumberSequenceClient;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
 
@@ -104,7 +104,7 @@ abstract class MasterDataController extends Controller
         ]);
     }
 
-    public function store(Request $request, NumberSequenceClient $numbers): JsonResponse
+    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
     {
         $this->requirePermission($request, 'create');
         $creationKey = (string) $request->header('Idempotency-Key');
@@ -122,22 +122,30 @@ abstract class MasterDataController extends Controller
         $this->afterWriteValidation($data, $tenantId, creating: true);
 
         try {
-            $kode = $numbers->issue(
-                static::APP_ID.'.'.$this->resource(),
-                $tenantId,
-                $this->resource().':'.$creationKey,
-            );
+            // Penerbitan nomor dan penyimpanan record berada dalam **satu** transaksi.
+            //
+            // Selama penerbitan berjalan lewat HTTP, ia mustahil berada di dalam transaksi ini:
+            // nomor sudah terbit di Core sementara penyimpanan batal, dan penghitung melompat
+            // tanpa ada record yang memakainya. Lompatan itu yang harus dijelaskan ke pemeriksa.
+            //
+            // Sekarang keduanya berjalan pada koneksi yang sama, jadi keduanya batal bersama.
+            // Ini keuntungan yang membenarkan seluruh pemindahan ke satu runtime.
+            $record = DB::transaction(function () use ($numbers, $tenantId, $creationKey, $payload) {
+                $kode = $numbers->issue(
+                    static::APP_ID.'.'.$this->resource(),
+                    $tenantId,
+                    $this->resource().':'.$creationKey,
+                );
+
+                return $this->newQuery()->create([
+                    'tenant_id' => $tenantId,
+                    'creation_key' => $creationKey,
+                    'kode' => $kode,
+                    ...$payload,
+                ]);
+            });
         } catch (NumberSequenceException $exception) {
             return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], $exception->status);
-        }
-
-        try {
-            $record = DB::transaction(fn () => $this->newQuery()->create([
-                'tenant_id' => $tenantId,
-                'creation_key' => $creationKey,
-                'kode' => $kode,
-                ...$payload,
-            ]));
         } catch (QueryException $exception) {
             $existing = $this->creationKeyQuery($tenantId, $creationKey)->first();
             if (! $existing) {

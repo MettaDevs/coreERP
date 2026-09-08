@@ -7,11 +7,12 @@ use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class IndonesiaStarterProvisioningTest extends TestCase
 {
-    use RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $signingKey = 'test-context-signing-key-32-bytes';
 
@@ -35,8 +36,10 @@ class IndonesiaStarterProvisioningTest extends TestCase
             return Http::response(['data' => ['number' => 'SEED'.str_pad((string) $calls, 5, '0', STR_PAD_LEFT)]], 200);
         });
 
-        $tenant = (string) Str::ulid();
-        $otherTenant = (string) Str::ulid();
+        // Tenant dibuat lewat trait supaya urutan nomornya ikut disiapkan; penyediaan data awal
+        // menerbitkan nomor sungguhan sekarang, dan tenant tanpa urutan nomor ditolak Core.
+        $tenant = $this->buatTenantUji();
+        $otherTenant = $this->buatTenantUji();
         $body = $this->eventBody($tenant);
 
         $this->call('POST', '/api/modules/management-aset/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
@@ -119,10 +122,16 @@ class IndonesiaStarterProvisioningTest extends TestCase
             ->where('creation_key', 'profil-penyusutan:starter:id:pmk72-2023:profil:kelompok-1:garis-lurus:v1')
             ->value('id');
 
+        // Dihitung **sebelum** event diulang: yang dijaga adalah pengulangan tidak menerbitkan
+        // nomor baru. Dulu ini dihitung dari jumlah permintaan HTTP; sekarang dari baris
+        // penerbitan Core, yang membuktikan lebih banyak — permintaan bisa saja terkirim ulang
+        // tanpa menerbitkan apa pun, dan itu justru yang benar.
+        $sebelumDiulang = $this->jumlahNomorTerbit();
+
         $this->call('POST', '/api/modules/management-aset/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
             ->assertOk();
 
-        $this->assertSame(365, $calls, 'Pengulangan event tidak boleh meminta nomor baru.');
+        $this->assertSame($sebelumDiulang, $this->jumlahNomorTerbit(), 'Pengulangan event menerbitkan nomor baru.');
         $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 7);
         $this->assertDatabaseCount('aset_m_profil_penyusutan', 10);
         $this->assertDatabaseCount('aset_m_buku_penyusutan', 2);
@@ -165,7 +174,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.skipped', true);
 
-        Http::assertNothingSent();
+        $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
         $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 0);
         $this->assertDatabaseCount('aset_m_profil_penyusutan', 0);
         $this->assertDatabaseCount('aset_m_buku_penyusutan', 0);

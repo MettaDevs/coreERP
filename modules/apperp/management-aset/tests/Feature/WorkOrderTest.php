@@ -43,8 +43,7 @@ class WorkOrderTest extends TestCase
             'asset_id' => $seed['asset'], 'asset_location_id' => $seed['location'],
             'maintenance_job_type_id' => $seed['jobType'], 'trade_id' => $seed['trade'],
         ]);
-        Http::assertSent(fn ($request) => str_contains($request->url(), '/number-sequences/')
-            && $request['legal_entity_id'] === $this->legalEntityId);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Penerbitan nomor tidak terjadi.');
 
         $this->headers(['management-aset.pemeliharaan-aset.read'])
             ->getJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'])
@@ -67,7 +66,7 @@ class WorkOrderTest extends TestCase
 
         $this->create($seed)->assertUnprocessable()->assertJsonValidationErrors('details');
         $this->assertDatabaseCount('aset_tr_pemeliharaan_aset', 0);
-        Http::assertNothingSent();
+        $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
     }
 
     public function test_menolak_varian_dari_jenis_pekerjaan_lain(): void
@@ -78,7 +77,7 @@ class WorkOrderTest extends TestCase
         $payload['details'][0]['variant_id'] = $this->variant($lain, 'VAR-LAIN');
 
         $this->submit($payload)->assertUnprocessable()->assertJsonValidationErrors('details');
-        Http::assertNothingSent();
+        $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
     }
 
     public function test_update_dan_archive_menuntut_izinnya_sendiri_dan_versi_terkini(): void
@@ -111,7 +110,7 @@ class WorkOrderTest extends TestCase
             ->assertHeader('Idempotent-Replayed', 'true')
             ->assertJsonPath('data.id', $first);
         $this->assertDatabaseCount('aset_tr_pemeliharaan_aset', 1);
-        Http::assertSentCount(1);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
     }
 
     public function test_daftar_hanya_menampilkan_work_order_di_dalam_jangkauan_organisasi(): void

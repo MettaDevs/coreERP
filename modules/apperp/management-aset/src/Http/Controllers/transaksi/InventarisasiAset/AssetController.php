@@ -15,8 +15,8 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use Modules\Apperp\ManagementAset\Services\FiscalCalendarClient;
-use Modules\Apperp\ManagementAset\Services\NumberSequenceClient;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AssetAttributeValidator;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
@@ -40,7 +40,7 @@ class AssetController extends Controller
         return response()->json(['data' => $query->orderByDesc('created_at')->get()->map($this->present(...))->values()]);
     }
 
-    public function store(Request $request, NumberSequenceClient $numbers): JsonResponse
+    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
     {
         $this->requirePermission($request, 'create');
         $key = (string) $request->header('Idempotency-Key');

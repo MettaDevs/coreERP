@@ -102,7 +102,7 @@ class ProfilPenyusutanTest extends TestCase
             ->assertCreated();
 
         // Nomor hanya terbit untuk yang berhasil; validasi berjalan lebih dahulu.
-        Http::assertSentCount(1);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
     }
 
     public function test_metode_di_luar_daftar_ditolak(): void
@@ -131,7 +131,7 @@ class ProfilPenyusutanTest extends TestCase
             ->assertHeader('Idempotent-Replayed', 'true')
             ->assertJsonPath('data.id', $first->json('data.id'));
 
-        Http::assertSentCount(1);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
     }
 
     /** @param array<string, mixed> $payload */

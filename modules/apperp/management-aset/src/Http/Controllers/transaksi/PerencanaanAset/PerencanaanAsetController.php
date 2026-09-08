@@ -11,8 +11,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Services\NumberSequenceClient;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Services\UnitOfMeasureClient;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
@@ -51,7 +51,7 @@ class PerencanaanAsetController extends Controller
         return response()->json(['data' => $plan]);
     }
 
-    public function store(Request $request, NumberSequenceClient $numbers, UnitOfMeasureClient $units): JsonResponse
+    public function store(Request $request, PenerbitNomorAset $numbers, UnitOfMeasureClient $units): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);

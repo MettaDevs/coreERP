@@ -88,10 +88,7 @@ trait BerinteraksiDenganKonteksCore
     {
         $this->konfigurasiKlienCore();
 
-        $tenantId = $this->pastikanTenantAda((string) Str::ulid());
-        $this->pastikanNomorUrutSiap($tenantId);
-
-        return $this->tenantUjiId = $tenantId;
+        return $this->tenantUjiId = $this->pastikanTenantAda((string) Str::ulid());
     }
 
     /**
@@ -162,6 +159,54 @@ trait BerinteraksiDenganKonteksCore
     }
 
     /**
+     * Berapa nomor yang benar-benar diterbitkan Core sejauh ini.
+     *
+     * Menggantikan `Http::assertSentCount()` pada test yang dulu mengintip kabel. Yang diperiksa
+     * sekarang **akibatnya**, bukan perjalanannya: satu baris penerbitan berarti satu nomor
+     * benar-benar dipakai dan penghitungnya maju. Assertion lama tidak pernah bisa membuktikan
+     * itu — jawaban palsu tidak menyentuh penghitung apa pun.
+     */
+    protected function jumlahNomorTerbit(): int
+    {
+        return DB::table('number_sequence_issues')->where('app_id', 'management-aset')->count();
+    }
+
+    /**
+     * Nomor terakhir yang diterbitkan Core, atau null bila belum ada.
+     */
+    protected function nomorTerakhir(): ?string
+    {
+        $nilai = DB::table('number_sequence_issues')
+            ->where('app_id', 'management-aset')
+            ->orderByDesc('issued_at')
+            ->value('formatted_value');
+
+        return is_string($nilai) ? $nilai : null;
+    }
+
+    /**
+     * Awalan nomor yang dijanjikan manifest untuk sebuah referensi.
+     *
+     * Dipakai test yang memeriksa kode yang diterbitkan. Membacanya dari manifest, bukan
+     * menuliskannya sebagai konstanta di test, membuat assertion-nya sekaligus membuktikan
+     * **referensi yang benar yang dipakai** — sesuatu yang tidak pernah bisa dibuktikan selama
+     * nomornya dipalsukan `Http::fake`, karena jawaban palsu tidak peduli referensi apa yang
+     * diminta.
+     */
+    protected function awalanNomor(string $kodeReferensi): string
+    {
+        $manifest = Yaml::parseFile(dirname(__DIR__, 2).'/app.yaml');
+
+        foreach ($manifest['number_sequences']['references'] ?? [] as $baris) {
+            if (($baris['code'] ?? null) === $kodeReferensi) {
+                return (string) ($baris['default_prefix'] ?? 'NS');
+            }
+        }
+
+        throw new \RuntimeException(sprintf('Referensi nomor "%s" tidak ada di app.yaml module.', $kodeReferensi));
+    }
+
+    /**
      * Organisasi dibuat hanya bila belum ada dan idnya memang disebut.
      */
     private function pastikanOrganisasiAda(string $tenantId, ?string $organisasiId, string $klasifikasi): void
@@ -214,6 +259,12 @@ trait BerinteraksiDenganKonteksCore
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        // Tiap tenant, termasuk tenant kedua yang dibuat test isolasi, mendapat urutan nomornya
+        // sendiri. Nomor urut bersifat per tenant di Core; tenant tanpa urutan tidak bisa
+        // menerbitkan apa pun, dan test lintas tenant akan gagal dengan 422 yang tidak
+        // menyebut sebabnya.
+        $this->pastikanNomorUrutSiap($tenantId);
 
         return $tenantId;
     }

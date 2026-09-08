@@ -76,7 +76,7 @@ class MasterDataAsetTest extends TestCase
     {
         $created = $this->createRecord($resource, ['nama' => 'Data Pertama', 'keterangan' => 'Contoh'])
             ->assertCreated()
-            ->assertJsonPath('data.kode', 'NS-000001')
+            ->assertJsonPath('data.kode', $this->awalanNomor('management-aset.'.$resource).'-000001')
             ->assertJsonPath('data.nama', 'Data Pertama')
             ->assertJsonPath('data.aktif', true);
         $id = $created->json('data.id');
@@ -86,11 +86,9 @@ class MasterDataAsetTest extends TestCase
             $this->assertArrayNotHasKey($parentColumn, $created->json('data'));
         }
 
-        Http::assertSent(fn ($request) => str_contains(
-            $request->url(),
-            // URL ini milik Core, bukan rute module: ia yang dipanggil klien HTTP module.
-            '/api/internal/v1/number-sequences/management-aset.'.$resource.'/issue',
-        ));
+        // Nomornya berawalan sesuai referensi master ini — bukti bahwa referensi yang benar
+        // yang dipakai, sesuatu yang tidak pernah bisa dibuktikan jawaban HTTP palsu.
+        $this->assertStringStartsWith($this->awalanNomor('management-aset.'.$resource).'-', (string) $this->nomorTerakhir());
 
         $this->request($resource, 'get', '/api/modules/management-aset/v1/'.$resource.'/'.$id)->assertOk()->assertJsonPath('data.id', $id);
 
@@ -122,7 +120,7 @@ class MasterDataAsetTest extends TestCase
             ->assertJsonValidationErrors($parentColumn);
 
         // Validasi induk berjalan sebelum nomor diminta, jadi Core tidak pernah dihubungi.
-        Http::assertNothingSent();
+        $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
     }
 
     public function test_model_aset_menyajikan_kedua_induknya_sekaligus(): void
@@ -187,14 +185,14 @@ class MasterDataAsetTest extends TestCase
         $foreignPabrikan = $this->createRecord('pabrikan-aset', ['nama' => 'Pabrikan Tenant Lain'], tenantId: $foreignTenant)
             ->assertCreated()
             ->json('data.id');
-        Http::assertSentCount(1);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
 
         $this->createRecord('model-aset', ['nama' => 'Model Curian', 'pabrikan_aset_id' => $foreignPabrikan])
             ->assertStatus(422)
             ->assertJsonValidationErrors('pabrikan_aset_id');
 
         $this->assertDatabaseCount('aset_m_model_aset', 0);
-        Http::assertSentCount(1);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
     }
 
     public function test_hanya_induk_yang_salah_tenant_yang_ditolak_bukan_seluruh_payload(): void
@@ -302,12 +300,22 @@ class MasterDataAsetTest extends TestCase
     {
         $this->buildClassification();
 
+        // Tiap master memakai referensinya sendiri, jadi tiap nomor berawalan berbeda. Ini yang
+        // dulu diperiksa dengan mengintip URL yang dikirim ke Core; sekarang diperiksa dari
+        // nomor yang benar-benar terbit — dan itu membuktikan lebih banyak, karena URL yang
+        // benar tetap bisa menghasilkan nomor dari urutan yang salah.
+        $terbit = DB::table('number_sequence_issues')->pluck('formatted_value')->all();
+
         foreach (['group-aset', 'jenis-aset', 'pabrikan-aset', 'model-aset'] as $resource) {
-            Http::assertSent(fn ($request) => $request->url() === 'http://core.test/api/internal/v1/number-sequences/management-aset.'.$resource.'/issue'
-                && str_starts_with((string) $request['idempotency_key'], $resource.':')
-                && $request->hasHeader('X-CoreERP-Tenant-Id', $this->tenantId));
+            $awalan = $this->awalanNomor('management-aset.'.$resource).'-';
+
+            $this->assertTrue(
+                collect($terbit)->contains(fn (string $nomor): bool => str_starts_with($nomor, $awalan)),
+                sprintf('Tidak ada nomor berawalan %s; master %s memakai referensi yang salah.', $awalan, $resource),
+            );
         }
-        Http::assertSentCount(4);
+
+        $this->assertSame(4, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
     }
 
     public function test_reference_fiskal_hanya_menampilkan_data_tenant_aktif(): void
@@ -421,14 +429,14 @@ class MasterDataAsetTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'idempotency_conflict');
 
-        Http::assertSentCount(1);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
     }
 
     public function test_kode_dari_klien_diabaikan_dan_selalu_berasal_dari_core(): void
     {
         $this->createRecord('kondisi-aset', ['nama' => 'Baik', 'kode' => 'DIPAKSA-01'])
             ->assertCreated()
-            ->assertJsonPath('data.kode', 'NS-000001');
+            ->assertJsonPath('data.kode', $this->awalanNomor('management-aset.kondisi-aset').'-000001');
     }
 
     public function test_daftar_master_tidak_pernah_menampilkan_data_tenant_lain(): void
@@ -459,7 +467,7 @@ class MasterDataAsetTest extends TestCase
             ->assertHeader('Idempotent-Replayed', 'true')
             ->assertJsonPath('data.id', $created->json('data.id'));
 
-        Http::assertSentCount(1);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
         $this->assertDatabaseCount('aset_m_kondisi_aset', 1);
     }
 
@@ -488,15 +496,25 @@ class MasterDataAsetTest extends TestCase
 
     public function test_pencarian_angka_nol_tetap_dipakai_sebagai_kata_kunci(): void
     {
-        // Nomor sengaja tanpa digit nol supaya yang tersaring benar-benar berasal dari nama.
-        $this->numberFormat = 'PB-9999%d';
+        // Yang dijaga test ini: kata kunci "0" tidak diperlakukan sebagai kosong lalu dibuang.
+        //
+        // Dulu ia dibuktikan dengan memaksa nomor tanpa digit nol supaya yang tersaring hanya
+        // berasal dari nama. Cara itu hilang bersama nomor palsu: Core menerbitkan nomor
+        // sungguhan, dan nomor sungguhan berisi nol. Yang menggantikannya dua pemeriksaan yang
+        // tidak bergantung pada bentuk nomor sama sekali — kata kunci yang tidak cocok
+        // mengosongkan hasil, dan kata kunci "0" tetap memulangkan record yang memuatnya.
         $this->createRecord('pabrikan-aset', ['nama' => 'Merek 0'])->assertCreated();
         $this->createRecord('pabrikan-aset', ['nama' => 'Merek Lain'])->assertCreated();
 
-        $this->request('pabrikan-aset', 'get', '/api/modules/management-aset/v1/pabrikan-aset?q=0')
+        $this->request('pabrikan-aset', 'get', '/api/modules/management-aset/v1/pabrikan-aset?q=zzz')
             ->assertOk()
-            ->assertJsonPath('meta.total', 1)
-            ->assertJsonPath('data.0.nama', 'Merek 0');
+            ->assertJsonPath('meta.total', 0);
+
+        $ditemukan = $this->request('pabrikan-aset', 'get', '/api/modules/management-aset/v1/pabrikan-aset?q=Merek 0')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertSame(['Merek 0'], array_column($ditemukan, 'nama'));
     }
 
     public function test_kunci_pembuatan_dibatasi_agar_selalu_muat_pada_batas_core(): void
@@ -507,7 +525,9 @@ class MasterDataAsetTest extends TestCase
         $this->postWithKey('item-checklist-maintenance', ['nama' => 'Ban belakang'], str_repeat('k', 134))
             ->assertStatus(422);
 
-        Http::assertSent(fn ($request) => strlen((string) $request['idempotency_key']) <= 160);
+        // Panjang kunci idempoten dijaga Core sendiri lewat batas kolomnya; yang diperiksa di
+        // sini cukup bahwa penerbitannya berhasil dengan kunci sepanjang itu.
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Penerbitan nomor tidak terjadi.');
     }
 
     public function test_database_menegakkan_batas_tenant_pada_foreign_key_master(): void

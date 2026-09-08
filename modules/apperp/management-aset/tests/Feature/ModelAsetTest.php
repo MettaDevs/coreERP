@@ -36,8 +36,10 @@ class ModelAsetTest extends TestCase
             ->assertJsonPath('data.kode', 'MDLA-000001');
 
         $id = $created->json('data.id');
-        Http::assertSent(fn ($request) => $request->hasHeader('X-CoreERP-Tenant-Id', $this->tenantId)
-            && $request['idempotency_key'] === 'model-aset:create-model-1');
+        // Kunci idempoten dulu diperiksa pada header permintaan HTTP; sekarang ia tersimpan
+        // pada baris penerbitan Core, yang membuktikan lebih banyak — kunci yang benar terkirim
+        // **dan** dipakai untuk mencatat penerbitannya.
+        $this->assertDatabaseHas('number_sequence_issues', ['idempotency_key' => 'model-aset:create-model-1']);
 
         $this->withContext(['management-aset.model-aset.update'])
             ->patchJson('/api/modules/management-aset/v1/model-aset/'.$id, ['nama' => 'PC200-8 MK2', 'aktif' => false])
@@ -71,7 +73,7 @@ class ModelAsetTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/model-aset', ['nama' => 'Data berbeda', 'pabrikan_aset_id' => $pabrikan])
             ->assertConflict()
             ->assertJsonPath('error.code', 'idempotency_conflict');
-        Http::assertSentCount(1);
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
 
         $otherTenant = (string) Str::ulid();
         $this->sebagaiPengguna($otherTenant, ['management-aset.model-aset.read'])

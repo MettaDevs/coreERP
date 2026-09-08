@@ -3,22 +3,29 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
-use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * Sebab kegagalan penerbitan nomor harus dapat dibedakan dari responsnya.
+ * Kegagalan penerbitan nomor, setelah Core berada di proses yang sama.
  *
- * Ini pernah menjadi masalah nyata: token service app tidak sinkron dengan Control Plane,
- * Core menjawab 403, dan app melaporkannya sebagai "Nomor belum dapat diterbitkan" —
- * pesan yang sama persis dengan Core yang sedang mati. Menelusurinya berakhir dengan
- * membandingkan digest kredensial secara manual. Kode di sini yang mencegah itu terulang.
+ * Berkas ini pernah berisi sepuluh test tentang kegagalan jaringan: kredensial ditolak, batas
+ * laju terlampaui, Core tidak terjangkau, dan klasifikasi 4xx serta 5xx menjadi kode kesalahan
+ * yang berbeda-beda. Semuanya lahir dari masalah nyata — token service yang tidak sinkron
+ * pernah terbaca seolah layanan nomor sedang tumbang.
+ *
+ * **Tidak satu pun dari kegagalan itu bisa terjadi lagi.** Tidak ada permintaan HTTP, tidak ada
+ * token, tidak ada batas laju, dan Core tidak bisa "tidak terjangkau" dari dirinya sendiri.
+ * Mempertahankan test-test itu berarti menjaga mekanisme yang sudah tidak ada: ia akan hijau
+ * selamanya tanpa membuktikan apa pun, dan orang berikutnya akan percaya penanganan kegagalan
+ * masih teruji.
+ *
+ * Yang menggantikannya dua kegagalan yang **masih mungkin**, dan satu jaminan baru yang dulu
+ * mustahil diuji sama sekali.
  */
 class NumberSequenceFailureTest extends TestCase
 {
@@ -33,87 +40,96 @@ class NumberSequenceFailureTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0:int, 1:string}>
+     * Tenant tanpa urutan nomor aktif ditolak, dan penolakannya bukan 503.
+     *
+     * 503 berarti "layanan belum dapat dihubungi", dan itu tidak pernah lagi benar. Yang terjadi
+     * adalah permintaannya sendiri tidak bisa dipenuhi: tenant ini belum punya urutan nomor untuk
+     * referensi yang diminta. Status yang jujur untuk itu 422.
      */
-    public static function coreAnswers(): array
+    public function test_tenant_tanpa_urutan_nomor_ditolak_dan_tidak_menyimpan_apa_pun(): void
     {
-        return [
-            // Kredensial app ditolak: bukan gangguan, dan mencoba ulang tidak menolong.
-            'kredensial ditolak' => [403, 'number_sequence_forbidden'],
-            'tidak terautentikasi' => [401, 'number_sequence_forbidden'],
-            'reference belum terdaftar' => [404, 'number_sequence_reference_unknown'],
-            'melebihi batas laju' => [429, 'number_sequence_throttled'],
-            'permintaan ditolak' => [422, 'number_sequence_rejected'],
-            // Hanya ini yang benar-benar berarti layanannya sedang tidak tersedia.
-            'core bermasalah' => [500, 'number_sequence_unavailable'],
-        ];
-    }
+        DB::table('tenant_number_sequences')->where('tenant_id', $this->tenantId)->delete();
 
-    #[DataProvider('coreAnswers')]
-    public function test_setiap_jawaban_core_menghasilkan_kode_error_sendiri(int $status, string $expectedCode): void
-    {
-        Http::fake(['*' => Http::response(['message' => 'ditolak'], $status)]);
+        $this->buatGroup()->assertStatus(422);
 
-        $this->createGroup()
-            ->assertStatus(503)
-            ->assertJsonPath('error.code', $expectedCode);
-    }
-
-    /** Core tidak terjangkau berbeda dari Core yang menjawab dengan galat. */
-    public function test_core_tidak_terjangkau_dibedakan_dari_core_yang_menjawab_galat(): void
-    {
-        Http::fake(fn () => throw new ConnectionException('gagal terhubung'));
-
-        $this->createGroup()
-            ->assertStatus(503)
-            ->assertJsonPath('error.code', 'number_sequence_unreachable');
-    }
-
-    /** Konfigurasi yang belum diisi tidak boleh terbaca sebagai layanan yang tumbang. */
-    public function test_token_service_belum_diisi_menghasilkan_kode_konfigurasi(): void
-    {
-        config(['services.coreerp.service_token' => '']);
-
-        $this->createGroup()
-            ->assertStatus(503)
-            ->assertJsonPath('error.code', 'number_sequence_not_configured');
-    }
-
-    /** Nomor yang tidak sah dari Core adalah bug Core, bukan gangguan jaringan. */
-    public function test_jawaban_tanpa_nomor_yang_sah_dilaporkan_terpisah(): void
-    {
-        Http::fake(['*' => Http::response(['data' => ['number' => '']])]);
-
-        $this->createGroup()
-            ->assertStatus(503)
-            ->assertJsonPath('error.code', 'number_sequence_invalid_response');
+        $this->assertSame(0, DB::table('aset_m_group_aset')->count(), 'Master tersimpan padahal nomornya gagal terbit.');
+        $this->assertSame(0, $this->jumlahNomorTerbit());
     }
 
     /**
-     * Status HTTP dan reference wajib masuk log. Tanpa keduanya, satu-satunya cara
-     * mengetahui sebabnya adalah membaca token — yang justru tidak boleh dicatat.
+     * Kegagalan tercatat beserta referensinya, dan tanpa satu pun kredensial.
+     *
+     * Bagian "tanpa kredensial" dipertahankan dari test lama meski tokennya sendiri sudah tidak
+     * ada: aturannya tetap berlaku untuk apa pun yang kelak ikut dicatat, dan aturan yang
+     * penjaganya dibuang akan dilanggar pada perubahan berikutnya.
      */
-    public function test_log_memuat_status_core_dan_reference_tanpa_token(): void
+    public function test_kegagalan_tercatat_beserta_referensinya(): void
     {
-        Http::fake(['*' => Http::response(['message' => 'ditolak'], 403)]);
-        $captured = [];
-        Log::listen(function ($message) use (&$captured): void {
-            $captured[] = ['message' => $message->message, 'context' => $message->context];
+        DB::table('tenant_number_sequences')->where('tenant_id', $this->tenantId)->delete();
+
+        $tercatat = [];
+        Log::listen(function ($pesan) use (&$tercatat): void {
+            $tercatat[] = ['message' => $pesan->message, 'context' => $pesan->context];
         });
 
-        $this->createGroup()->assertStatus(503);
+        $this->buatGroup()->assertStatus(422);
 
-        $entry = collect($captured)->firstWhere(fn (array $item): bool => str_contains($item['message'], 'Penerbitan nomor gagal'));
-        $this->assertNotNull($entry, 'Kegagalan penerbitan nomor harus tercatat di log.');
-        $this->assertSame('number_sequence_forbidden', $entry['context']['error_code']);
-        $this->assertSame('management-aset.group-aset', $entry['context']['reference']);
-        $this->assertSame(403, $entry['context']['core_http_status']);
-        $this->assertSame($this->tenantId, $entry['context']['tenant_id']);
-        // Token tidak pernah ikut dicatat, termasuk potongannya.
-        $this->assertStringNotContainsString('service-token', json_encode($entry['context'], JSON_THROW_ON_ERROR));
+        $baris = collect($tercatat)->firstWhere(fn (array $item): bool => str_contains($item['message'], 'Penerbitan nomor gagal'));
+
+        $this->assertNotNull($baris, 'Kegagalan penerbitan nomor harus tercatat di log.');
+        $this->assertSame('management-aset.group-aset', $baris['context']['reference']);
+        $this->assertSame($this->tenantId, $baris['context']['tenant_id']);
+        $this->assertStringNotContainsString('service-token', json_encode($baris['context'], JSON_THROW_ON_ERROR));
     }
 
-    private function createGroup(): TestResponse
+    /**
+     * Jaminan yang dulu mustahil diuji: nomor ikut batal ketika dokumennya gagal disimpan.
+     *
+     * Selama penerbitan berjalan lewat HTTP, ia berada di luar transaksi dokumen — nomor sudah
+     * terbit di Core sementara dokumennya batal, dan penghitung melompat tanpa ada dokumen yang
+     * memakainya. Lompatan itu yang harus dijelaskan ke pemeriksa.
+     *
+     * Sekarang keduanya satu transaksi pada koneksi yang sama. Test ini yang membuktikannya, dan
+     * ia satu-satunya alasan terkuat seluruh pemindahan ke satu runtime ini ada.
+     */
+    public function test_nomor_ikut_batal_ketika_penyimpanan_dokumen_gagal(): void
+    {
+        $this->buatGroup()->assertCreated();
+
+        $sesudahSukses = $this->jumlahNomorTerbit();
+        $this->assertSame(1, $sesudahSukses);
+
+        // Kegagalan harus terjadi **setelah** nomor diminta, bukan pada validasi — kalau
+        // penyimpanannya ditolak sebelum penerbitan, test ini hijau tanpa membuktikan apa pun.
+        //
+        // Caranya: satu baris disisipkan lebih dulu dengan kode yang akan diterbitkan
+        // berikutnya. Validasi meloloskannya (kode tidak pernah datang dari klien), penerbitan
+        // berjalan, lalu penyimpanan ditolak indeks unik — persis urutan yang diperlukan.
+        DB::table('aset_m_group_aset')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $this->tenantId,
+            'creation_key' => 'penghalang-'.Str::ulid(),
+            'kode' => $this->awalanNomor('management-aset.group-aset').'-000002',
+            'nama' => 'Penghalang',
+            'aktif' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.create'])
+                ->withHeader('Idempotency-Key', 'group-aset:'.Str::ulid())
+                ->postJson('/api/modules/management-aset/v1/group-aset', ['nama' => 'Bangunan Kedua']);
+        } catch (\Throwable) {
+            // Kegagalannya memang yang diharapkan; yang diperiksa akibatnya di bawah.
+        }
+
+        $this->assertSame($sesudahSukses, $this->jumlahNomorTerbit(), 'Nomor tetap terbit padahal recordnya batal.');
+        // Dua baris: yang berhasil dibuat di awal, dan penghalang yang disisipkan test ini.
+        $this->assertSame(2, DB::table('aset_m_group_aset')->count());
+    }
+
+    private function buatGroup(): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.create'])
             ->withHeader('Idempotency-Key', 'group-aset:'.Str::ulid())
