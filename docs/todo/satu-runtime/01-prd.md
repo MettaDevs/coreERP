@@ -383,6 +383,9 @@ UI tidak bergantung pada sisa pemindahan API.
 Penomoran task memakai nomor fase, jadi task fase 0 bernomor `F0-xx` dan seterusnya. Nomor tidak dipakai
 ulang walau task dibatalkan, supaya rujukan pada pull request lama tetap sah.
 
+**Sebelum mengambil task, lihat papan "sedang dikerjakan" pada [ikhtisar](index.md).** Papan itu hanya ada
+di sana; menyalinnya ke sini akan membuat dua daftar yang menyimpang.
+
 ## 7. Fase 0: prasyarat
 
 **Kenapa ada fase sebelum penjaga.** Dua hal di luar kode menghalangi seluruh rencana ini, dan keduanya
@@ -1838,6 +1841,53 @@ workflow, dan 2 laporan.
 pemanggilannya satu per satu. Membalik urutan ini membuat setiap PR menyentuh dua hal sekaligus dan
 sulit ditinjau.
 
+### F3-00 — Penjaga batas mengenal modul yang sedang dipindah
+
+**Kenapa.** F3-01 menyatakan tidak mengubah apa pun di dalam subtree yang ditariknya. Pull request itu
+tidak akan bisa hijau. Sudah diukur pada repo aset apa adanya:
+
+| Penjaga | Yang ditemukannya begitu subtree mendarat |
+| --- | --- |
+| namespace modul | 131 berkas PHP ber-namespace `App\`, bukan `Modules\Apperp\ManagementAset\` |
+| penyaringan tenant | 200 pemanggilan `DB::table(` |
+| awalan tabel | `app.yaml` repo itu tidak menyatakan `table_prefix` sama sekali |
+
+Penjaganya benar; rencananya yang belum lengkap. Task ini membuat penjaga mengenal satu keadaan
+tambahan — modul sedang dipindah dan belum dibentuk ulang — tanpa melemahkan penjaga untuk modul yang
+sudah jadi.
+
+**Berkas.**
+- ketiga penjaga di `apps/control-plane/tests/Feature/Boundary/`
+- satu tempat bersama yang menyimpan daftar modul yang sedang dipindah
+
+**Langkah.**
+1. Penandanya hidup di sisi CoreERP, **bukan di dalam folder modul**. Alasannya menentukan: `app.yaml`
+   berada di dalam subtree, dan penanda di sana akan terhapus setiap kali subtree ditarik ulang dari repo
+   asalnya — repo yang tidak tahu apa-apa tentang CoreERP.
+2. Pengecualian wajib terlihat pada diff pull request, mengikuti pola `PENGECUALIAN` yang sudah dipakai
+   penjaga tabel.
+3. Pengecualian wajib punya cara berakhir. Dua yang saling melengkapi: sebuah tenggat yang membuat alur
+   merah setelah lewat, dan pemeriksaan basi — modul yang dikecualikan tetap dipindai penuh, dan bila
+   ternyata **tidak** melanggar apa pun, pengecualiannya sendiri yang gagal. Yang kedua menjawab
+   pertanyaan "bagaimana orang tahu ia sudah boleh dibuang" tanpa mengandalkan ingatan siapa pun.
+4. Buktikan melonggarkan untuk satu modul tidak melonggarkan untuk modul lain.
+
+**Selesai bila.** Modul yang ditandai lolos ketiga penjaga meski melanggar semuanya, dan modul yang tidak
+ditandai tetap merah pada pelanggaran yang sama persis.
+
+**Rujukan.** [bukti penjaga](02-bukti-penjaga.md).
+
+**Bergantung pada.** F1-07.
+
+#### Satu asimetri yang harus diterima, bukan disamarkan
+
+Penjaga namespace dan penjaga tenant hanya membaca berkas, jadi modul yang dikecualikan tetap bisa
+dipindai dan pemeriksaan basi bisa dihitung. Penjaga tabel **menjalankan** migration modul, dan modul
+yang belum dibentuk ulang membawa migration kerangka Laravel yang akan membuat `users`, `jobs`, dan
+`cache` di schema test lalu bertabrakan dengan milik Core. Untuk penjaga itu, pengecualian harus
+melewatkan penjalanannya sama sekali, sehingga pemeriksaan basi tidak bisa dihitung dan tenggat menjadi
+satu-satunya yang mengakhirinya. Tulis alasannya di tempat pengecualian itu berada.
+
 ### F3-01 — Bawa repo masuk beserta riwayatnya
 
 **Kenapa.** Menyalin folder membuang `git log` dan `git blame` untuk 9.559 baris kode. Riwayat itu satu-
@@ -1864,7 +1914,7 @@ satunya penjelasan kenapa banyak aturan bisnis ditulis seperti sekarang.
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** F2-05.
+**Bergantung pada.** F2-05 dan F3-00. Tanpa F3-00, pull request ini merah karena tiga penjaga sekaligus.
 
 ### F3-02 — Buang berkas yang menjadi milik Core
 

@@ -20,6 +20,22 @@ dibatalkan, supaya rujukan pada pull request lama tetap sah.
 Sebelum mengambil task, baca bagian 2 sampai 4 pada PRD: apa yang dianggap selesai, lima prinsip yang
 tidak boleh dilanggar, dan konvensi penamaan branch serta commit.
 
+## Sedang dikerjakan
+
+Papan ini mencegah dua orang mengambil task yang sama. Isinya berubah cepat, jadi ia hidup di sini saja
+dan tidak disalin ke PRD — daftar yang ada di dua tempat akan menyimpang, dan yang menyimpang lebih
+berbahaya daripada yang tidak ada.
+
+**Ambil task berikutnya dengan menulis namamu di sini lebih dulu, sebelum menyentuh kode.**
+
+| Task | Siapa | Cabang | Catatan |
+| --- | --- | --- | --- |
+| F2-10 konteks permintaan | agent | `feat/f2-10-konteks-permintaan` | menghalangi F2-11 |
+| F2-12 kolom `database_name` | agent | `fix/f2-12-database-name-opsional` | |
+| F3-00 penjaga kenal modul migrasi | agent | `feat/f3-00-penjaga-modul-migrasi` | menghalangi F3-01 |
+
+Kosongkan barisnya setelah pull request-nya digabungkan.
+
 ## Status
 
 | Fase | Task | Selesai |
