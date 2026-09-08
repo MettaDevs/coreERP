@@ -258,6 +258,11 @@ pemanggilan fungsi. Pemetaannya:
 | `GET units-of-measure`, `POST units-of-measure/resolve`, `/convert` | `App\Services\UnitOfMeasureService` |
 | `POST workflow-instances` | `App\Support\WorkflowRuntime::submit()` |
 | `GET members`, `GET members/{id}`, `GET operating-units` | model Core langsung, dibungkus service baru |
+| *(tidak pernah lewat HTTP; app lama membacanya dari token)* | `App\Support\CurrentWorkspace::membership()` untuk mendapatkan tenant dan organisasi aktif |
+
+Baris terakhir ditambahkan 8 September 2026 saat mengerjakan F1-02. Ia sebelumnya tidak ada, padahal
+**setiap** modul membutuhkannya sebelum bisa melakukan apa pun: tanpa tenant aktif, tidak ada query yang
+boleh dijalankan. Yang tidak lewat HTTP mudah terlewat saat memetakan panggilan HTTP.
 
 Arah sebaliknya juga hilang. Hari ini Core memanggil app untuk mengambil data laporan lewat
 `App\Support\Reporting\AppReportClient`, dan mengirim keputusan workflow lewat perintah terjadwal
@@ -777,6 +782,33 @@ ada yang bisa dikerjakan lebih dulu.
 
 **Bergantung pada.** F1-01.
 
+#### Kriteria selesai dinaikkan
+
+"Kedua folder ada dan migration-nya bisa dijalankan tangan" tidak bisa gagal karena alasan yang menarik:
+folder yang ada tetap ada walau isinya salah. Yang dibuktikan sekarang lebih keras, dan semuanya
+dijalankan pada PostgreSQL 16, bukan disimpulkan:
+
+| Yang dibuktikan | Hasil |
+| --- | --- |
+| Kedua migration jalan lewat `migrate --path` | dua tabel dan dua indeks parsial terbentuk |
+| Indeks parsial mengizinkan kode dipakai ulang setelah diarsipkan | baris baru masuk |
+| Indeks parsial tetap menolak dua baris hidup berkode sama | `duplicate key value violates unique constraint` |
+| `migrate:rollback` mengembalikan keadaan | schema kosong kembali, tanpa indeks tertinggal |
+
+#### Yang ditemukan saat mengerjakannya
+
+**Bagian 5.3 tidak memuat cara modul mengetahui tenant-nya.** Pemetaan di sana disusun dari tiga belas
+endpoint HTTP, dan penyelesaian tenant tidak pernah lewat HTTP — app lama membacanya dari token. Padahal
+itu hal pertama yang dibutuhkan setiap modul. Barisnya sudah ditambahkan.
+
+**Pint tidak pernah memeriksa `modules/`.** Perintah lint berjalan dari `apps/control-plane`, jadi kode
+modul pertama akan masuk tanpa diperiksa siapa pun. `lint:check` kini mencakup `../../modules`, dan sudah
+dibuktikan bisa gagal dengan satu berkas berformat kacau.
+
+**PHPStan belum bisa mencakup `modules/`, dan itu bukan kelalaian.** Ia butuh kelas modul dapat dimuat,
+dan pemuatan itu baru ada setelah task autoload Composer pada fase 2. Sampai saat itu kode modul
+diperiksa Pint saja. Ini harus dibereskan pada F1-08, bukan dibiarkan sampai fase 3.
+
 ### F1-03 — Tabel catatan pemasangan modul
 
 **Kenapa.** Core harus tahu modul apa terpasang untuk tenant mana, versinya berapa, apakah sedang aktif,
@@ -930,6 +962,11 @@ laporan sukses palsu menghentikan pencarian.
 **Bergantung pada.** F1-04, F1-05, F1-06.
 
 ### F1-08 — Penjaga berjalan di CI
+
+**Tambahan dari F1-02.** Alur wajib memeriksa kode modul dengan PHPStan, bukan hanya Pint. Ini baru bisa
+dikerjakan setelah autoload Composer untuk namespace modul ada; bila urutannya memaksa, pindahkan task
+autoload itu ke fase 1.
+
 
 **Kenapa.** Penjaga yang hanya jalan di laptop akan terlewat pada pull request pertama yang terburu-buru.
 
