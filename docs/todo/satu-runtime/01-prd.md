@@ -821,8 +821,8 @@ dan apakah data awalnya sudah pernah diisi. Tabel `apps` yang ada menyimpan kata
 
 **Langkah.**
 1. Tabel `core_module_installations` berisi `tenant_id`, `module_id`, `version`, `status` bernilai
-   `installed` atau `disabled`, `seeded_at`, `installed_at`, `disabled_at`, dengan kunci utama gabungan
-   `tenant_id` dan `module_id`.
+   `installed`, `disabled`, atau `uninstalled`, ditambah `seeded_at`, `installed_at`, `disabled_at`, dan
+   `uninstalled_at`, dengan kunci utama gabungan `tenant_id` dan `module_id`.
 2. Kolom `seeded_at` adalah yang mencegah data awal terisi dua kali saat tenant berlangganan ulang. Ini
    sudah diuji: tanpa kolom itu, master bawaan menjadi dobel setiap kali modul diaktifkan kembali.
 3. Test memastikan memasang dua kali tidak membuat baris kedua, dan mengaktifkan kembali tidak mengisi
@@ -833,6 +833,33 @@ dan apakah data awalnya sudah pernah diisi. Tabel `apps` yang ada menyimpan kata
 **Rujukan.** [empat kebenaran lifecycle](../../onboarding/empat-kebenaran.md), bagian 5.2 dokumen ini.
 
 **Bergantung pada.** F0-01.
+
+#### Yang ditemukan saat mengerjakannya
+
+**Statusnya harus tiga, bukan dua.** Task ini menulis `installed` atau `disabled`, sementara task
+pencabutan pada fase 2 menyatakan pencabutan "mengubah status pemasangan dan berhenti di situ". Diubah
+menjadi apa? Dua kemungkinannya sama-sama salah:
+
+| Kalau pencabutan… | Akibatnya |
+| --- | --- |
+| menghapus barisnya | `seeded_at` ikut hilang, jadi berlangganan ulang mengisi data awal **di atas data lama yang tidak pernah dihapus** |
+| menulis `disabled` | tidak ada bedanya antara dimatikan sementara dan berhenti berlangganan |
+
+Karena itu ada status ketiga, `uninstalled`, dengan `uninstalled_at`, dan barisnya tidak pernah dihapus.
+Ini konsekuensi langsung dari keputusan penghapusan lunak pada bagian 5.7 yang belum ada saat task ini
+ditulis.
+
+**Status dijaga database, bukan hanya model.** Baris ini ditulis perintah pemasangan, perintah
+pencabutan, dan nanti alur pendaftaran tenant. Satu di antaranya menulis status yang salah eja sudah
+cukup membuat menu modul hilang tanpa jejak, karena tidak ada yang menolaknya. Sebuah `CHECK` menolaknya
+sejak awal.
+
+**Lima test, bukan dua.** Selain dua yang diminta, ditambahkan: pencabutan menyimpan barisnya beserta
+jejak data awal, dua tenant yang memasang modul yang sama berdiri sendiri, dan status di luar tiga yang
+sah ditolak database. Ketiganya menjaga janji yang baru saja diputuskan dan belum punya penjaga.
+
+Sudah dibuktikan bisa gagal: perintah pemasangan dibuat cacat sengaja supaya menulis ulang `seeded_at`,
+dan test yang benar merah dengan pesan yang benar.
 
 ### F1-04 — Penjaga pertama: migration modul hanya membuat tabel berawalan miliknya
 
