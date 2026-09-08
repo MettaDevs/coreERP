@@ -41,6 +41,12 @@ class DepreciationEndToEndTest extends TestCase
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
+
+        // Tahun buku Juli–Juni dibuat sungguhan: periode fiskal sekarang dibaca dari database
+        // Core, bukan dari jawaban HTTP palsu. Test ini memang tentang dasar tahun fiskal yang
+        // berbeda dari tahun kalender, jadi kalendernya harus benar-benar begitu.
+        $this->pastikanOrganisasiAda($this->tenantId, $this->legalEntityId, 'legal_entity');
+        $this->buatKalenderFiskalUji($this->tenantId, $this->legalEntityId, self::FISCAL_YEAR['starts_on'], self::FISCAL_YEAR['ends_on']);
         Http::fake(function ($request) {
             if (str_contains($request->url(), '/fiscal-periods')) {
                 return Http::response(['data' => [

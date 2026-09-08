@@ -22,7 +22,7 @@ class MaintenanceSetupTest extends TestCase
     {
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
-        $this->unitId = (string) Str::ulid();
+        $this->unitId = $this->buatSatuanUji($this->tenantId, 'V', 'Volt');
         Http::fake(function ($request) {
             if (str_ends_with($request->url(), '/units-of-measure/resolve')) {
                 return Http::response(['data' => [[

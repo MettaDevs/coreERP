@@ -7,7 +7,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
-use Modules\Apperp\ManagementAset\Services\UnitOfMeasureClient;
+use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
 use RuntimeException;
 
 final class ReferenceDataController extends Controller
@@ -25,7 +25,7 @@ final class ReferenceDataController extends Controller
         'management-aset.maintenance-checklist-templates.read',
     ];
 
-    public function unitsOfMeasure(Request $request, UnitOfMeasureClient $units): JsonResponse
+    public function unitsOfMeasure(Request $request, DaftarSatuanAset $units): JsonResponse
     {
         $held = $request->attributes->get('coreerp.permissions', []);
         abort_if(array_intersect(self::UNIT_READERS, $held) === [], 403);

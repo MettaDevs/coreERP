@@ -27,7 +27,7 @@ class AssetPlanningTest extends TestCase
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->unitId = (string) Str::ulid();
+        $this->unitId = $this->buatSatuanUji($this->tenantId);
         Http::fake(function ($request) {
             if (str_ends_with($request->url(), '/units-of-measure/resolve')) {
                 return Http::response(['data' => [['id' => $this->unitId, 'code' => 'EA', 'name' => 'Unit', 'symbol' => null, 'decimal_places' => 0]]], 200);

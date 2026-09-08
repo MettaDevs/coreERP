@@ -7,6 +7,7 @@ namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 use App\Models\TenantMembership;
 use App\Models\User;
 use Database\Seeders\NumberSequenceProfileSeeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
@@ -207,9 +208,122 @@ trait BerinteraksiDenganKonteksCore
     }
 
     /**
+     * Kalender fiskal sungguhan untuk sebuah entitas legal.
+     *
+     * Dulu periode fiskal dipalsukan `Http::fake`; lewat kontrak Core ia dibaca dari database.
+     * Test yang bergantung pada tahun buku non-kalender — Juli sampai Juni, misalnya — harus
+     * membuatnya sungguhan, karena jawabannya sekarang datang dari baris `fiscal_years`.
+     *
+     * Periode dibuat bulanan sepanjang tahunnya; itu bentuk yang dipakai test yang ada.
+     */
+    protected function buatKalenderFiskalUji(string $tenantId, string $legalEntityId, string $mulai, string $selesai): void
+    {
+        $kalenderId = (string) Str::ulid();
+
+        DB::table('fiscal_calendars')->insert([
+            'id' => $kalenderId,
+            'tenant_id' => $tenantId,
+            'code' => 'UJI-'.Str::upper(Str::random(4)),
+            'name' => 'Kalender uji',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $tahunId = (string) Str::ulid();
+        $awal = Carbon::parse($mulai);
+        $akhir = Carbon::parse($selesai);
+
+        DB::table('fiscal_years')->insert([
+            'id' => $tahunId,
+            'fiscal_calendar_id' => $kalenderId,
+            'name' => 'FY'.$akhir->year,
+            'starts_on' => $awal->toDateString(),
+            'ends_on' => $akhir->toDateString(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $periode = $awal->copy();
+        $urutan = 1;
+
+        while ($periode->lessThanOrEqualTo($akhir)) {
+            $akhirPeriode = $periode->copy()->endOfMonth()->min($akhir);
+
+            DB::table('fiscal_periods')->insert([
+                'id' => (string) Str::ulid(),
+                'fiscal_year_id' => $tahunId,
+                'ordinal' => $urutan,
+                'name' => 'P'.$urutan,
+                'starts_on' => $periode->toDateString(),
+                'ends_on' => $akhirPeriode->toDateString(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $periode = $akhirPeriode->copy()->addDay();
+            $urutan++;
+        }
+
+        // Kalender menempel pada `legal_entities`, bukan pada `organizations`: entitas legal
+        // adalah pandangan tersendiri atas organisasi, dan hanya ia yang punya tahun buku.
+        DB::table('legal_entities')->updateOrInsert(
+            ['organization_id' => $legalEntityId],
+            [
+                'tenant_id' => $tenantId,
+                'company_code' => 'UJI'.Str::upper(Str::random(4)),
+                'country_code' => 'ID',
+                'fiscal_calendar_id' => $kalenderId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
+    }
+
+    /**
+     * Satu satuan milik tenant uji, dibuat sungguhan di Core.
+     *
+     * Dulu satuan dipalsukan `Http::fake`; lewat kontrak Core ia dibaca dari database. Test yang
+     * memakai satuan memanggil ini dan memakai id yang dipulangkannya, bukan id karangan —
+     * dengan begitu ia sekaligus membuktikan module benar-benar membaca satuan milik tenantnya.
+     */
+    protected function buatSatuanUji(string $tenantId, string $kode = 'cm', string $nama = 'Sentimeter'): string
+    {
+        $kelasId = DB::table('uom_classes')->where('tenant_id', $tenantId)->value('id');
+
+        if ($kelasId === null) {
+            $kelasId = (string) Str::ulid();
+            DB::table('uom_classes')->insert([
+                'id' => $kelasId,
+                'tenant_id' => $tenantId,
+                'code' => 'PANJANG',
+                'name' => 'Panjang',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $satuanId = (string) Str::ulid();
+
+        DB::table('units_of_measure')->insert([
+            'id' => $satuanId,
+            'tenant_id' => $tenantId,
+            'uom_class_id' => $kelasId,
+            'code' => $kode,
+            'name' => $nama,
+            'symbol' => Str::lower($kode),
+            'decimal_places' => 2,
+            'active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $satuanId;
+    }
+
+    /**
      * Organisasi dibuat hanya bila belum ada dan idnya memang disebut.
      */
-    private function pastikanOrganisasiAda(string $tenantId, ?string $organisasiId, string $klasifikasi): void
+    protected function pastikanOrganisasiAda(string $tenantId, ?string $organisasiId, string $klasifikasi): void
     {
         if ($organisasiId === null || DB::table('organizations')->where('id', $organisasiId)->exists()) {
             return;

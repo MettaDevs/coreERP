@@ -2851,6 +2851,30 @@ sebelum yang lebih besar.
 
 **Selesai bila.** Test pendaftaran aset yang menyentuh periode fiskal lulus tanpa HTTP.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Kontraknya dibangun dari bentuk yang salah, dan itu nyaris lolos tanpa suara.** `KalenderFiskal`
+memulangkan bentuk milik `FiscalCalendarService::resolve()` — datar, tanpa tanggal: `year_id`,
+`year_name`, `period_id`, `period_ordinal`, `period_name`. Yang benar-benar dipakai modul adalah
+`year.starts_on`, dan itu **hanya ada pada jawaban endpoint HTTP**, yang menyusun bentuknya sendiri.
+
+Akibatnya: dasar tahun fiskal diam-diam jatuh kembali ke tahun kalender. Tanpa exception, tanpa log,
+hanya angka penyusutan yang berbeda — `2027-01-01` di tempat yang seharusnya `2026-07-01`. Setiap
+perusahaan yang tahun bukunya bukan Januari–Desember akan mendapat jadwal penyusutan yang salah.
+
+Pelajarannya tentang cara kontrak dibuat, bukan tentang kalender fiskal: **F2-08 membangun kontraknya dari
+apa yang kebetulan tersedia di layanan Core, bukan dari apa yang dibutuhkan pemakainya.** Yang benar adalah
+bentuk yang selama ini dikirim endpoint, dan itu yang sekarang dipulangkan `KalenderFiskalCore`.
+
+**Perbedaan kedua ditutup di pembungkus modul.** Endpoint menjawab 404 → `null` ketika tanggalnya di luar
+tahun fiskal; layanan Core melempar untuk keadaan yang sama. Dibiarkan, pendaftaran aset di luar tahun
+fiskal berubah dari "silakan pilih tanggal lain" menjadi kesalahan yang tidak diminta siapa pun.
+
+**Bahan uji kalender fiskal dibuat sungguhan**, bersama satuan dan nomor urut. Tiap kali satu bahan uji
+berpindah dari palsu ke sungguhan, ia menemukan sesuatu.
+
 **Rujukan.** [fiscal calendar](../../dev/15-fiscal-calendars.md).
 
 **Bergantung pada.** F2-06, F3-05.
@@ -2874,6 +2898,23 @@ layar pengguna.
 
 **Selesai bila.** Test yang menyentuh satuan lulus, dan tidak ada lagi `RuntimeException` bertuliskan
 "Satuan belum dapat dihubungi".
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Kontraknya kurang satu pintu, dan modul yang membutuhkannya tidak punya jalan resmi sama sekali.**
+`DaftarSatuan` hanya punya `resolusi()` dan `konversi()` — keduanya menuntut id yang **sudah diketahui**.
+Modul yang perlu menampilkan daftar pilihan satuan pada layar tidak punya apa-apa, dan yang tidak punya
+pintu resmi akan menyentuh model Core langsung. Ditambahkan `aktif()`.
+
+**Core membocorkan nama field-nya sendiri ke jawaban modul.** `UnitOfMeasureService` melempar
+`ValidationException` dengan kunci `unit_ids` — nama field milik permintaan **Core**, bukan milik modul.
+Dibiarkan lewat, ia muncul sebagai kesalahan validasi pada field yang tidak pernah dikirim pengguna.
+
+Selama jalurnya HTTP, penerjemahan ini terjadi dengan sendirinya: kegagalan datang sebagai status, bukan
+sebagai exception milik Core. Sekarang pembungkus modul yang harus melakukannya — dan **itu salah satu
+alasan pembungkus per modul ada**, bukan sekadar lapisan formalitas.
 
 **Rujukan.** [satuan](../../dev/16-units-of-measure.md).
 
