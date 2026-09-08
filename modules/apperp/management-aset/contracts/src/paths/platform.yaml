@@ -1,0 +1,71 @@
+# Health, context, dan reference data Core.
+/api/v1/health:
+  get:
+    security: []
+    operationId: health
+    summary: Memeriksa kesiapan API
+    responses:
+      '200':
+        description: API siap
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HealthResponse'
+/api/v1/context:
+  get:
+    operationId: currentContext
+    summary: Membaca hak akses pengguna pada aplikasi
+    responses:
+      '200':
+        description: Konteks sudah diverifikasi gateway
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - data
+              properties:
+                data:
+                  type: object
+                  required:
+                  - permissions
+                  properties:
+                    permissions:
+                      type: array
+                      items:
+                        type: string
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+/api/v1/reference-data/units-of-measure:
+  get:
+    tags:
+    - Reference data
+    operationId: listCoreUnitsOfMeasure
+    summary: Menampilkan satuan aktif dari Core untuk dipilih dalam transaksi aset
+    responses:
+      '200':
+        description: Daftar satuan aktif
+      '503':
+        description: Layanan satuan Core belum dapat dihubungi
+/api/v1/reference-data/kelompok-harta-fiskal:
+  get:
+    tags:
+    - Reference data
+    operationId: listFiscalClassifications
+    summary: Menampilkan referensi klasifikasi fiskal aktif untuk Group aset
+    parameters:
+    - $ref: '#/components/parameters/Search'
+    - $ref: '#/components/parameters/ActiveFilter'
+    - $ref: '#/components/parameters/Page'
+    - $ref: '#/components/parameters/PerPage'
+    responses:
+      '200':
+        description: Daftar referensi klasifikasi fiskal tenant aktif
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FiscalClassificationList'
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'

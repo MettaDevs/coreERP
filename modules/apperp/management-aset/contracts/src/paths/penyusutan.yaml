@@ -1,0 +1,91 @@
+# Proposal, finalisasi, reversal, dan buku penyusutan.
+/api/v1/penyusutan/proposal:
+  post:
+    tags:
+    - Penyusutan
+    operationId: proposeDepreciation
+    summary: Membuat proposal penyusutan satu Asset Book tanpa jurnal GL
+    responses:
+      '201':
+        description: Proposal dibuat
+/api/v1/penyusutan/proposal-massal:
+  post:
+    tags:
+    - Penyusutan
+    operationId: proposeDepreciationBulk
+    summary: Membuat proposal penyusutan seluruh Asset Book aktif satu periode sekaligus tanpa jurnal GL
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - period_starts_on
+            - period_ends_on
+            properties:
+              period_starts_on:
+                type: string
+                format: date
+              period_ends_on:
+                type: string
+                format: date
+              group_aset_id:
+                type: string
+                nullable: true
+                description: Menjalankan hanya untuk aset dari satu group.
+              buku_id:
+                type: string
+                nullable: true
+                description: Menjalankan hanya untuk satu buku, misalnya komersial lebih dahulu.
+    responses:
+      '201':
+        description: >-
+          Ringkasan proposal. Buku yang tidak dapat diusulkan dilewati beserta alasannya,
+          bukan menggagalkan seluruh proses.
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+/api/v1/penyusutan:
+  get:
+    tags:
+    - Penyusutan
+    operationId: listDepreciationPeriods
+    summary: Menampilkan periode penyusutan tenant aktif
+    responses:
+      '200':
+        description: Daftar periode
+/api/v1/penyusutan/buku:
+  get:
+    tags:
+    - Penyusutan
+    operationId: listAssetBooksForDepreciation
+    summary: Menampilkan Asset Book aktif yang dapat dihitung penyusutannya
+    responses:
+      '200':
+        description: Daftar Asset Book
+/api/v1/penyusutan/{id}/finalisasi:
+  post:
+    tags:
+    - Penyusutan
+    operationId: finalizeDepreciation
+    summary: Mengunci subledger periode dan mengembalikan bridge internal tanpa posting GL
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Periode final; retry mengembalikan data yang sama tanpa export kedua
+/api/v1/penyusutan/{id}/reversal:
+  post:
+    tags:
+    - Penyusutan
+    operationId: reverseDepreciation
+    summary: Membuat pembalikan baru untuk periode final tanpa mengubah periode asal
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '201':
+      description: Pembalikan dan bridge internal dibuat tanpa posting GL
+      '409':
+        description: Periode tidak dapat dibalik

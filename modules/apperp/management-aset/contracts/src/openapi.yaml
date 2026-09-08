@@ -1,0 +1,56 @@
+# Sumber kontrak. Jalankan `python contracts/bundle.py` untuk membangun bundle.
+openapi: 3.1.0
+info:
+  title: Management Aset API
+  version: 0.1.0
+  description: |
+    Master data aset. Seluruh endpoint dibatasi tenant dan policy
+    `management-aset.asset-responsibility` pada token konteks yang ditandatangani
+    Core; `tenant_id` tidak pernah diterima dari request browser. Claim policy
+    berisi pasangan legal entity dan operating unit (`scope_grants`), sehingga
+    dua grant tidak dapat membentuk kombinasi organisasi baru.
+
+    Kode setiap master diterbitkan Number Sequence Core dan tidak dapat dikirim klien.
+    Arsip memakai soft delete agar record yang direferensikan data turunan tidak hilang.
+
+    Klasifikasi aset mengikuti model Dynamics 365 F&O: seluruh master klasifikasi datar
+    dan saling lepas, dan aset menunjuk masing-masing secara langsung. `group aset`
+    membawa perlakuan finansial (penyusutan, GL, penomoran), `jenis aset` membawa
+    perlakuan teknis (maintenance, atribut), dan `model aset` adalah katalog barang per
+    pabrikan. Tidak ada rantai berjenjang yang wajib diisi, sehingga tenant dengan
+    kedalaman klasifikasi berbeda tidak dipaksa mengisi tingkat yang tidak mereka punya.
+
+    Yang hierarkis hanya data, bukan skema: lokasi aset dan komposisi aset (`parent_asset_id`)
+    menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya struktur domain milik
+    app ini, bukan organization hierarchy CoreERP.
+servers:
+- url: /
+security:
+- CoreERPContext: []
+tags:
+- name: Master data
+  description: Master aset dan master maintenance.
+- name: Lifecycle aset
+  description: Dokumen lifecycle aset, register, mutasi, dan pelepasan tanpa jurnal GL.
+- name: Penyusutan
+  description: Proposal dan finalisasi penyusutan beserta bridge internal tanpa posting GL.
+- name: Reference data
+  description: Referensi konfigurasi yang dibaca oleh form dan proses Management Aset.
+- name: Laporan
+  description: Definisi, layout bawaan, dan dataset laporan yang dipanggil Core atas nama pengguna.
+x-bundle:
+  paths:
+  - paths/platform.yaml
+  - paths/master-data.yaml
+  - paths/maintenance.yaml
+  - paths/aset.yaml
+  - paths/pemeliharaan-aset.yaml
+  - paths/penyusutan.yaml
+  - paths/laporan.yaml
+  components:
+    securitySchemes: components/security.yaml
+    parameters: components/parameters.yaml
+    schemas: components/schemas.yaml
+    responses: components/responses.yaml
+paths: {}
+components: {}

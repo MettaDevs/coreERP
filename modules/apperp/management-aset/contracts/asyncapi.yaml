@@ -1,0 +1,100 @@
+asyncapi: 3.0.0
+info:
+  title: Management Aset events
+  version: 0.3.0
+  description: |
+    Event yang **diterima** app ini. Sisi penerbitnya dikontrakkan pada
+    `CoreERP/apps/control-plane/contracts/asyncapi.yaml`; kedua file wajib
+    berubah bersama-sama.
+
+    Sejak `v2`, `correlation_id` wajib dan berisi id dokumen dekomisioning yang
+    dikirim app saat mengajukan workflow, sehingga keputusan yang datang berhari-hari
+    kemudian dapat ditelusuri balik ke dokumen asalnya. `v1` tidak lagi diterima.
+channels:
+  core.tenant.provisioned.v1:
+    address: core.tenant.provisioned.v1
+    description: Event Core yang meminta app menyediakan starter reference untuk tenant.
+    messages:
+      tenantProvisioned:
+        contentType: application/json
+        headers:
+          type: object
+          required: [X-CoreERP-Event-Timestamp, X-CoreERP-Event-Signature]
+          properties:
+            X-CoreERP-Event-Timestamp:
+              type: string
+              description: Unix timestamp saat Core mengirim request.
+            X-CoreERP-Event-Signature:
+              type: string
+              description: hash_hmac SHA-256 atas timestamp dan raw body dengan secret CoreERP.
+        payload:
+          type: object
+          required: [id, type, occurred_at, tenant_id, correlation_id, data]
+          properties:
+            id: { type: string }
+            type: { const: core.tenant.provisioned.v1 }
+            occurred_at: { type: string, format: date-time }
+            tenant_id: { type: string }
+            correlation_id: { type: string }
+            legal_entity_id: { type: [string, 'null'] }
+            data:
+              type: object
+              additionalProperties: false
+              required: [app_ids]
+              properties:
+                app_ids:
+                  type: array
+                  uniqueItems: true
+                  items: { type: string }
+  core.workflow.decision.v2:
+    address: core.workflow.decision.v2
+    description: Keputusan workflow dekomisioning aset yang diputuskan Core.
+    messages:
+      workflowDecision:
+        contentType: application/json
+        headers:
+          type: object
+          required: [X-CoreERP-Event-Timestamp, X-CoreERP-Event-Signature]
+          properties:
+            X-CoreERP-Event-Timestamp:
+              type: string
+              description: Unix timestamp saat Core mengirim request.
+            X-CoreERP-Event-Signature:
+              type: string
+              description: |
+                `hash_hmac('sha256', "<timestamp>.<raw body>", COREERP_APP_CONTEXT_SIGNING_KEY)`.
+                Diverifikasi `VerifyCoreErpEvent` sebelum body dibaca; gagal verifikasi
+                menghasilkan 401.
+        payload:
+          type: object
+          required: [id, type, occurred_at, tenant_id, correlation_id, data]
+          properties:
+            id: { type: string }
+            type: { const: core.workflow.decision.v2 }
+            occurred_at: { type: string, format: date-time }
+            tenant_id: { type: string }
+            correlation_id:
+              type: string
+              description: Id dokumen dekomisioning yang memulai rantai ini.
+            legal_entity_id:
+              type: [string, 'null']
+              description: Legal entity pemilik keputusan; null untuk workflow ber-scope tenant.
+            data:
+              type: object
+              required: [workflow_instance_id, workflow_type, decision, source_document_type, source_document_id, decision_context]
+              properties:
+                workflow_instance_id: { type: string }
+                workflow_type: { const: management-aset.dekomisioning-aset-verification }
+                decision: { enum: [approved, rejected] }
+                source_document_type: { const: dekomisioning-aset }
+                source_document_id: { type: string }
+                decision_context: { type: object }
+operations:
+  receiveTenantProvisioned:
+    action: receive
+    channel:
+      $ref: '#/channels/core.tenant.provisioned.v1'
+  receiveWorkflowDecision:
+    action: receive
+    channel:
+      $ref: '#/channels/core.workflow.decision.v2'

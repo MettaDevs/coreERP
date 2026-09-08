@@ -1,0 +1,72 @@
+# Response error yang dipakai ulang lintas endpoint.
+Unauthenticated:
+  description: Sesi aplikasi tidak valid
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+Forbidden:
+  description: Pengguna tidak memiliki hak untuk tindakan ini pada resource ini
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+NotFound:
+  description: Data tidak ditemukan pada tenant aktif
+ValidationError:
+  description: Data tidak valid, termasuk induk yang tidak ada, sudah diarsipkan, milik tenant lain, atau kombinasi model-pabrikan-jenis aset yang tidak sesuai
+IdempotencyConflict:
+  description: Idempotency-Key sudah dipakai untuk data yang berbeda
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+ReferencedByChildren:
+  description: Data masih dipakai master turunan yang aktif
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+DataTypeLocked:
+  description: Tipe data sudah pernah dipakai dan tidak dapat diubah (`data_type_locked`)
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+AttributeTypeHasValues:
+  description: Tipe teks masih memiliki Values aktif (`attribute_type_has_values`)
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
+AttributeValuesInUse:
+  description: Values baru tidak mencakup seluruh nilai aset yang tersimpan (`attribute_values_in_use`)
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/AttributeValuesConflictResponse'
+NumberSequenceUnavailable:
+  description: |
+    Kode tidak dapat diterbitkan karena Number Sequence Core tidak dapat dipakai.
+
+    Statusnya selalu 503 karena dari sudut pandang pemanggil penulisan memang tidak dapat
+    diselesaikan, tetapi `error.code` membedakan sebabnya — dan sebab-sebab ini ditangani
+    orang yang berbeda dengan cara yang berbeda:
+
+    | `error.code` | Arti | Ditangani oleh |
+    | --- | --- | --- |
+    | `number_sequence_unreachable` | Core tidak terjangkau dari jaringan app | Operasional; sementara, boleh dicoba lagi |
+    | `number_sequence_unavailable` | Core terjangkau tetapi menjawab 5xx | Operasional; sementara, boleh dicoba lagi |
+    | `number_sequence_throttled` | Permintaan melebihi batas laju Core | Sementara, boleh dicoba lagi |
+    | `number_sequence_forbidden` | Kredensial service app ditolak Core (401/403) | Deployment; token service tidak sinkron dengan Control Plane |
+    | `number_sequence_reference_unknown` | Reference belum terdaftar di Core (404) | Katalog app; manifest belum tercatat |
+    | `number_sequence_rejected` | Core menolak permintaannya (4xx lain) | Pemanggil; periksa idempotency key dan scope |
+    | `number_sequence_not_configured` | URL atau token Core belum diisi pada app | Deployment |
+    | `number_sequence_invalid_response` | Core menjawab tanpa nomor yang sah | Bug Core |
+
+    Mencoba ulang hanya masuk akal untuk tiga kode pertama. Sisanya akan gagal dengan cara
+    yang sama sampai ada yang memperbaiki konfigurasinya.
+  content:
+    application/json:
+      schema:
+        $ref: '#/components/schemas/ErrorResponse'
