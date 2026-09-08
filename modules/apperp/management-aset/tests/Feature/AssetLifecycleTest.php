@@ -1,13 +1,13 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 /**
@@ -20,7 +20,7 @@ use Tests\TestCase;
  */
 class AssetLifecycleTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -36,11 +36,10 @@ class AssetLifecycleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
         $this->unitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         Http::fake(function ($request) {
             if (str_contains($request->url(), '/units-of-measure')) {
                 return Http::response(['data' => [[
@@ -180,8 +179,8 @@ class AssetLifecycleTest extends TestCase
     {
         $asset = $this->receive();
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.mutate']))
-            ->postJson('/api/v1/aset/'.$asset.'/penempatan', [
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
+            ->postJson('/api/modules/management-aset/v1/aset/'.$asset.'/penempatan', [
                 'effective_on' => '2026-06-15',
                 'reason' => 'Mulai dipakai',
                 'usage_org_unit_id' => $this->orgUnitId,
@@ -202,13 +201,13 @@ class AssetLifecycleTest extends TestCase
             'year_basis' => 'calendar', 'useful_life_periods' => 12, 'effective_from' => '2027-01-01',
         ]);
         $buku = $this->master('buku-penyusutan', ['nama' => 'Buku versi masa depan', 'depreciation_profile_id' => $profil]);
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('group-aset')))
-            ->putJson('/api/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [['buku_id' => $buku]]])
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [['buku_id' => $buku]]])
             ->assertOk();
         $asset = $this->receive(['group_aset_id' => $group, 'jenis_aset_id' => $jenis]);
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.mutate']))
-            ->postJson('/api/v1/aset/'.$asset.'/penempatan', [
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
+            ->postJson('/api/modules/management-aset/v1/aset/'.$asset.'/penempatan', [
                 'effective_on' => '2026-06-15', 'reason' => 'Mulai dipakai', 'usage_org_unit_id' => $this->orgUnitId,
             ])
             ->assertStatus(422)
@@ -284,8 +283,8 @@ class AssetLifecycleTest extends TestCase
         $this->decommission($dilepas);
         $this->document('penjualan-aset', $dilepas, '2026-06-30')->assertCreated();
 
-        $response = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create']))
-            ->postJson('/api/v1/penyusutan/proposal-massal', [
+        $response = $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/proposal-massal', [
                 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31',
             ])->assertCreated();
 
@@ -305,8 +304,8 @@ class AssetLifecycleTest extends TestCase
             ->where('id', DB::table('aset_tr_buku_aset')->where('id', $satu)->value('asset_id'))
             ->value('group_aset_id');
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create']))
-            ->postJson('/api/v1/penyusutan/proposal-massal', [
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/proposal-massal', [
                 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31', 'group_aset_id' => $group,
             ])->assertCreated()->assertJsonPath('data.dibuat', 1);
 
@@ -318,8 +317,8 @@ class AssetLifecycleTest extends TestCase
     {
         $this->bookedAsset();
 
-        $this->withHeaders($this->contextHeaders((string) Str::ulid(), ['management-aset.penyusutan.create']))
-            ->postJson('/api/v1/penyusutan/proposal-massal', [
+        $this->sebagaiPengguna((string) Str::ulid(), ['management-aset.penyusutan.create'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/proposal-massal', [
                 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31',
             ])->assertCreated()->assertJsonPath('data.dibuat', 0);
 
@@ -338,8 +337,8 @@ class AssetLifecycleTest extends TestCase
             'frequency' => 'monthly', 'year_basis' => 'calendar', 'useful_life_periods' => 12,
         ]);
         $buku = $this->master('buku-penyusutan', ['nama' => 'Buku '.Str::random(6), 'depreciation_profile_id' => $profil]);
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('group-aset')))
-            ->putJson('/api/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [[
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [[
                 'buku_id' => $buku, 'useful_life_periods' => 12, 'convention' => $convention,
             ]]])->assertOk();
         $asset = $this->receive(['group_aset_id' => $group, 'jenis_aset_id' => $jenis]);
@@ -362,9 +361,9 @@ class AssetLifecycleTest extends TestCase
         $group = $overrides['group_aset_id'] ?? $this->master('group-aset', ['nama' => 'Group '.Str::random(6)]);
         $jenis = $overrides['jenis_aset_id'] ?? $this->master('jenis-aset', ['nama' => 'Jenis '.Str::random(6)]);
 
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/v1/aset', [
+            ->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => $this->legalEntityId,
                 'nama' => $overrides['nama'] ?? 'Aset lifecycle uji',
                 'group_aset_id' => $group,
@@ -403,21 +402,21 @@ class AssetLifecycleTest extends TestCase
 
     private function show(string $assetId): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.read']))
-            ->getJson('/api/v1/aset/'.$assetId);
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'])
+            ->getJson('/api/modules/management-aset/v1/aset/'.$assetId);
     }
 
     /** @param array<string, mixed> $payload */
     private function correct(string $assetId, array $payload): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.update']))
-            ->patchJson('/api/v1/aset/'.$assetId, $payload);
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.update'])
+            ->patchJson('/api/modules/management-aset/v1/aset/'.$assetId, $payload);
     }
 
     private function propose(string $bookId, string $start, string $end): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create']))
-            ->postJson('/api/v1/penyusutan/proposal', [
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', [
                 'asset_book_id' => $bookId, 'period_starts_on' => $start, 'period_ends_on' => $end,
             ]);
     }
@@ -430,9 +429,9 @@ class AssetLifecycleTest extends TestCase
 
     private function document(string $type, string $assetId, string $tanggal): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.'.$type.'.create']))
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$type.'.create'])
             ->withHeader('Idempotency-Key', $type.'-'.Str::ulid())
-            ->postJson('/api/v1/'.$type, [
+            ->postJson('/api/modules/management-aset/v1/'.$type, [
                 'legal_entity_id' => $this->legalEntityId,
                 'responsible_org_unit_id' => $this->orgUnitId,
                 'asset_id' => $assetId, 'tanggal' => $tanggal,
@@ -447,17 +446,17 @@ class AssetLifecycleTest extends TestCase
     /** @param array<string, mixed> $payload */
     private function master(string $resource, array $payload): string
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor($resource)))
+        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/v1/'.$resource, $payload)
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload)
             ->assertCreated()->json('data.id');
     }
 
     /** @param list<array<string, mixed>> $rows */
     private function attach(string $jenisId, array $rows): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('jenis-aset')))
-            ->putJson('/api/v1/jenis-aset/'.$jenisId.'/atribut', ['rows' => $rows]);
+        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'))
+            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenisId.'/atribut', ['rows' => $rows]);
     }
 
     /** @return list<string> */

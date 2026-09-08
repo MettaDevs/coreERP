@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 /**
@@ -28,7 +28,7 @@ use Tests\TestCase;
  */
 class DepreciationScaleTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     /** Beberapa tenant dipakai bergiliran supaya volume tidak menumpuk di satu tenant. */
     private const TENANTS = 4;
@@ -45,10 +45,10 @@ class DepreciationScaleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->konfigurasiKlienCore();
         $this->tenants = array_map(fn (): string => (string) Str::ulid(), range(1, self::TENANTS));
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         Http::fake(function ($request) {
             if (str_contains($request->url(), '/fiscal-periods')) {
                 return Http::response(['data' => [
@@ -129,8 +129,8 @@ class DepreciationScaleTest extends TestCase
                 round((float) DB::table('aset_tr_penyusutan_aset')->where('tenant_id', $tenant)->sum('amount'), 2),
                 'total penyusutan tenant '.$tenant,
             );
-            $this->withHeaders($this->contextHeaders($tenant, ['management-aset.penyusutan.read']))
-                ->getJson('/api/v1/penyusutan')->assertOk()->assertJsonCount(18, 'data');
+            $this->sebagaiPengguna($tenant, ['management-aset.penyusutan.read'])
+                ->getJson('/api/modules/management-aset/v1/penyusutan')->assertOk()->assertJsonCount(18, 'data');
         }
 
         $this->assertSame(self::TENANTS * 18, DB::table('aset_tr_penyusutan_aset')->count());
@@ -227,16 +227,16 @@ class DepreciationScaleTest extends TestCase
             'depreciation_profile_id' => $this->profil($tenant, $profile),
             'alternative_profile_id' => $alternative ? $this->profil($tenant, $alternative) : null,
         ]);
-        $this->withHeaders($this->contextHeaders($tenant, $this->permissionsFor('group-aset')))
-            ->putJson('/api/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [[
+        $this->sebagaiPengguna($tenant, $this->permissionsFor('group-aset'))
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [[
                 'buku_id' => $buku,
                 'useful_life_periods' => $profile['useful_life_periods'] ?? null,
                 'convention' => 'full_month',
             ]]])->assertOk();
 
-        $asset = $this->withHeaders($this->contextHeaders($tenant, ['management-aset.aset.create']))
+        $asset = $this->sebagaiPengguna($tenant, ['management-aset.aset.create'])
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/v1/aset', [
+            ->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => $this->legalEntityId,
                 'nama' => 'Aset skala penyusutan',
                 'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
@@ -252,8 +252,8 @@ class DepreciationScaleTest extends TestCase
     {
         $start = Carbon::parse('2026-07-01')->addMonthsNoOverflow($monthOffset - 1);
 
-        return $this->withHeaders($this->contextHeaders($tenant, ['management-aset.penyusutan.create']))
-            ->postJson('/api/v1/penyusutan/proposal', array_filter([
+        return $this->sebagaiPengguna($tenant, ['management-aset.penyusutan.create'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', array_filter([
                 'asset_book_id' => $book,
                 'period_starts_on' => $start->toDateString(),
                 'period_ends_on' => $start->copy()->endOfMonth()->toDateString(),
@@ -265,8 +265,8 @@ class DepreciationScaleTest extends TestCase
     {
         $proposal->assertSuccessful();
         $id = (string) $proposal->json('data.id');
-        $this->withHeaders($this->contextHeaders($tenant, ['management-aset.penyusutan.finalize']))
-            ->postJson('/api/v1/penyusutan/'.$id.'/finalisasi')->assertOk();
+        $this->sebagaiPengguna($tenant, ['management-aset.penyusutan.finalize'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/'.$id.'/finalisasi')->assertOk();
 
         return (float) DB::table('aset_tr_penyusutan_aset')->where('id', $id)->value('amount');
     }
@@ -284,9 +284,9 @@ class DepreciationScaleTest extends TestCase
     /** @param array<string, mixed> $payload */
     private function master(string $tenant, string $resource, array $payload): string
     {
-        return $this->withHeaders($this->contextHeaders($tenant, $this->permissionsFor($resource)))
+        return $this->sebagaiPengguna($tenant, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/v1/'.$resource, array_filter($payload, fn ($value) => $value !== null))
+            ->postJson('/api/modules/management-aset/v1/'.$resource, array_filter($payload, fn ($value) => $value !== null))
             ->assertCreated()->json('data.id');
     }
 

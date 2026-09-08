@@ -1,17 +1,17 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class WorkOrderTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -22,10 +22,9 @@ class WorkOrderTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         Http::fake(fn () => Http::response(['data' => ['number' => 'PMHA-000001']], 200));
     }
 
@@ -47,8 +46,8 @@ class WorkOrderTest extends TestCase
         Http::assertSent(fn ($request) => str_contains($request->url(), '/number-sequences/')
             && $request['legal_entity_id'] === $this->legalEntityId);
 
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->getJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'])
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'])
             ->assertOk()
             ->assertJsonPath('data.tipe_work_order_nama', 'Korektif')
             ->assertJsonPath('data.details.0.job_type_nama', 'Ganti ban')
@@ -90,14 +89,14 @@ class WorkOrderTest extends TestCase
         $payload['keterangan'] = 'Ban depan kiri juga bocor';
         $payload['version'] = 1;
 
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->patchJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'], $payload)->assertForbidden();
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.update']))
-            ->patchJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'], $payload)->assertOk()->assertJsonPath('data.version', 2);
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.archive']))
-            ->deleteJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => 1])->assertConflict();
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.archive']))
-            ->deleteJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => 2])->assertNoContent();
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], $payload)->assertForbidden();
+        $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.update'])
+            ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], $payload)->assertOk()->assertJsonPath('data.version', 2);
+        $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.archive'])
+            ->deleteJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => 1])->assertConflict();
+        $this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.archive'])
+            ->deleteJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => 2])->assertNoContent();
         $this->assertSoftDeleted('aset_tr_pemeliharaan_aset', ['id' => $workOrder['id']]);
     }
 
@@ -120,14 +119,16 @@ class WorkOrderTest extends TestCase
         $seed = $this->seedMasters();
         $this->create($seed)->assertCreated();
 
-        $asing = ['all' => false, 'scope_grants' => [
-            ['legal_entity_id' => (string) Str::ulid(), 'operating_unit_ids' => [(string) Str::ulid()]],
+        $asing = [[
+            'policy_code' => 'management-aset.asset-responsibility',
+            'legal_entity_id' => (string) Str::ulid(),
+            'organization_id' => (string) Str::ulid(),
         ]];
-        $data = $this->withHeaders($this->contextHeaders(
+        $data = $this->sebagaiPengguna(
             $this->tenantId,
             ['management-aset.pemeliharaan-aset.read'],
-            ['data_policies' => ['management-aset.asset-responsibility' => $asing]],
-        ))->getJson('/api/v1/pemeliharaan-aset')->assertOk()->json('data');
+            $asing,
+        )->getJson('/api/modules/management-aset/v1/pemeliharaan-aset')->assertOk()->json('data');
 
         $this->assertSame([], $data);
     }
@@ -139,9 +140,9 @@ class WorkOrderTest extends TestCase
      */
     public function test_route_pemeliharaan_tidak_lagi_dilayani_dokumen_siklus_generik(): void
     {
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.create']))
+        $this->headers(['management-aset.pemeliharaan-aset.create'])
             ->withHeader('Idempotency-Key', 'wo-'.Str::ulid())
-            ->postJson('/api/v1/pemeliharaan-aset', [
+            ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset', [
                 'legal_entity_id' => $this->legalEntityId,
                 'responsible_org_unit_id' => $this->orgUnitId,
                 'tanggal' => '2026-08-15',
@@ -162,17 +163,15 @@ class WorkOrderTest extends TestCase
 
     private function submit(array $payload, ?string $key = null)
     {
-        return $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.create']))
+        return $this->headers(['management-aset.pemeliharaan-aset.create'])
             ->withHeader('Idempotency-Key', $key ?? 'wo-'.Str::ulid())
-            ->postJson('/api/v1/pemeliharaan-aset', $payload);
+            ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset', $payload);
     }
 
     /** @return array<string, string> */
-    private function headers(array $permissions): array
+    private function headers(array $permissions): static
     {
-        return $this->contextHeaders($this->tenantId, $permissions, [
-            'legal_entity_id' => $this->legalEntityId, 'org_unit_id' => $this->orgUnitId, 'user_id' => 'planner-1',
-        ]);
+        return $this->sebagaiPengguna($this->tenantId, $permissions);
     }
 
     /** @return array<string, mixed> */

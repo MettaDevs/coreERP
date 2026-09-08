@@ -1,17 +1,17 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class ProfilPenyusutanTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -20,8 +20,7 @@ class ProfilPenyusutanTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
-        $this->configureCoreErpContext();
+        $this->tenantId = $this->buatTenantUji();
         Http::fake(function () {
             $this->issued++;
 
@@ -38,13 +37,13 @@ class ProfilPenyusutanTest extends TestCase
             ->assertJsonPath('data.method', 'straight_line')
             ->json('data.id');
 
-        $this->request('get', '/api/v1/profil-penyusutan/'.$id)->assertOk()->assertJsonPath('data.id', $id);
+        $this->request('get', '/api/modules/management-aset/v1/profil-penyusutan/'.$id)->assertOk()->assertJsonPath('data.id', $id);
 
-        $this->request('patch', '/api/v1/profil-penyusutan/'.$id, ['useful_life_periods' => 48])
+        $this->request('patch', '/api/modules/management-aset/v1/profil-penyusutan/'.$id, ['useful_life_periods' => 48])
             ->assertOk()
             ->assertJsonPath('data.useful_life_periods', 48);
 
-        $this->request('delete', '/api/v1/profil-penyusutan/'.$id)->assertNoContent();
+        $this->request('delete', '/api/modules/management-aset/v1/profil-penyusutan/'.$id)->assertNoContent();
         $this->assertSoftDeleted('aset_m_profil_penyusutan', ['id' => $id, 'tenant_id' => $this->tenantId]);
     }
 
@@ -53,7 +52,7 @@ class ProfilPenyusutanTest extends TestCase
         $this->create(['nama' => 'Profil A', 'method' => 'consumption', 'frequency' => 'monthly', 'year_basis' => 'calendar'])->assertCreated();
         $this->create(['nama' => 'Profil B', 'method' => 'consumption', 'frequency' => 'yearly', 'year_basis' => 'fiscal'])->assertCreated();
 
-        $this->request('get', '/api/v1/profil-penyusutan')
+        $this->request('get', '/api/modules/management-aset/v1/profil-penyusutan')
             ->assertOk()
             ->assertJsonPath('meta.total', 2)
             ->assertJsonPath('meta.current_page', 1);
@@ -76,7 +75,7 @@ class ProfilPenyusutanTest extends TestCase
             'manual_schedule' => $schedule,
         ])->assertCreated()->json('data.id');
 
-        $this->request('get', '/api/v1/profil-penyusutan/'.$id)
+        $this->request('get', '/api/modules/management-aset/v1/profil-penyusutan/'.$id)
             ->assertOk()
             ->assertJsonPath('data.manual_schedule.0.amount', 1000)
             ->assertJsonPath('data.manual_schedule.1.amount', 750.5);
@@ -138,15 +137,15 @@ class ProfilPenyusutanTest extends TestCase
     /** @param array<string, mixed> $payload */
     private function create(array $payload, ?string $key = null): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissions()))
+        return $this->sebagaiPengguna($this->tenantId, $this->permissions())
             ->withHeader('Idempotency-Key', $key ?? 'profil-'.Str::ulid())
-            ->postJson('/api/v1/profil-penyusutan', $payload);
+            ->postJson('/api/modules/management-aset/v1/profil-penyusutan', $payload);
     }
 
     /** @param array<string, mixed> $payload */
     private function request(string $method, string $uri, array $payload = []): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissions()))
+        return $this->sebagaiPengguna($this->tenantId, $this->permissions())
             ->json(strtoupper($method), $uri, $payload);
     }
 

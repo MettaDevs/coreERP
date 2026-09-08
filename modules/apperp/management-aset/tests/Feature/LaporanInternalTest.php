@@ -1,12 +1,12 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 /**
@@ -16,7 +16,7 @@ use Tests\TestCase;
  */
 class LaporanInternalTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -27,17 +27,16 @@ class LaporanInternalTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         Http::fake(fn () => Http::response(['data' => ['number' => 'PMHA-000001']], 200));
     }
 
     public function test_definition_lists_placeholders_and_builtin_layouts(): void
     {
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->getJson('/api/internal/v1/laporan/work-order')
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->getJson('/api/modules/management-aset/internal/v1/laporan/work-order')
             ->assertOk()
             ->assertJsonPath('data.kode', 'work-order')
             ->assertJsonPath('data.parameters', ['id'])
@@ -45,13 +44,13 @@ class LaporanInternalTest extends TestCase
             ->assertJsonPath('data.builtin_layouts.0.format', 'docx')
             ->assertJsonFragment(['key' => 'baris.asset_kode', 'table' => 'baris']);
 
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->get('/api/internal/v1/laporan/work-order/layouts/standar')
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->get('/api/modules/management-aset/internal/v1/laporan/work-order/layouts/standar')
             ->assertOk()
             ->assertHeader('Content-Disposition', 'attachment; filename=work-order-standar.docx');
 
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->getJson('/api/internal/v1/laporan/tidak-ada')
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->getJson('/api/modules/management-aset/internal/v1/laporan/tidak-ada')
             ->assertNotFound();
     }
 
@@ -59,12 +58,12 @@ class LaporanInternalTest extends TestCase
     {
         $workOrder = $this->workOrder();
 
-        $this->withHeaders($this->headers(['management-aset.aset.read']))
-            ->postJson('/api/internal/v1/laporan/work-order/dataset', ['parameter' => ['id' => $workOrder]])
+        $this->headers(['management-aset.aset.read'])
+            ->postJson('/api/modules/management-aset/internal/v1/laporan/work-order/dataset', ['parameter' => ['id' => $workOrder]])
             ->assertForbidden();
 
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->postJson('/api/internal/v1/laporan/work-order/dataset', ['parameter' => ['id' => $workOrder]])
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->postJson('/api/modules/management-aset/internal/v1/laporan/work-order/dataset', ['parameter' => ['id' => $workOrder]])
             ->assertOk()
             ->assertJsonPath('data.fields.kode', 'PMHA-000001')
             ->assertJsonPath('data.fields.tipe_work_order', 'Korektif')
@@ -74,17 +73,17 @@ class LaporanInternalTest extends TestCase
 
         // Di luar scope organisasi pengguna: pesan yang sama dengan layar, status 422
         // supaya Core menampilkannya pada baris ekspor, bukan sebagai kesalahan server.
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read'], dataPolicies: [
-            'management-aset.asset-responsibility' => ['all' => false, 'scope_grants' => [
-                ['legal_entity_id' => $this->legalEntityId, 'operating_unit_ids' => [(string) Str::ulid()]],
-            ]],
-        ]))
-            ->postJson('/api/internal/v1/laporan/work-order/dataset', ['parameter' => ['id' => $workOrder]])
+        $this->headers(['management-aset.pemeliharaan-aset.read'], lingkupKebijakan: [[
+            'policy_code' => 'management-aset.asset-responsibility',
+            'legal_entity_id' => $this->legalEntityId,
+            'organization_id' => (string) Str::ulid(),
+        ]])
+            ->postJson('/api/modules/management-aset/internal/v1/laporan/work-order/dataset', ['parameter' => ['id' => $workOrder]])
             ->assertStatus(422)
             ->assertJsonPath('message', 'Work order tidak ditemukan atau berada di luar unit kerja yang dapat Anda akses.');
 
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->postJson('/api/internal/v1/laporan/work-order/dataset', ['parameter' => ['id' => 'bukan-ulid']])
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->postJson('/api/modules/management-aset/internal/v1/laporan/work-order/dataset', ['parameter' => ['id' => 'bukan-ulid']])
             ->assertStatus(422);
     }
 
@@ -92,15 +91,15 @@ class LaporanInternalTest extends TestCase
     {
         $this->workOrder();
 
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->postJson('/api/internal/v1/laporan/daftar-work-order/dataset', ['parameter' => ['status' => 'draft']])
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->postJson('/api/modules/management-aset/internal/v1/laporan/daftar-work-order/dataset', ['parameter' => ['status' => 'draft']])
             ->assertOk()
             ->assertJsonPath('data.fields.jumlah_work_order', 1)
             ->assertJsonPath('data.tables.baris.0.kode', 'PMHA-000001')
             ->assertJsonPath('data.tables.baris.0.jumlah_baris', 1);
 
-        $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read']))
-            ->postJson('/api/internal/v1/laporan/daftar-work-order/dataset', ['parameter' => ['status' => 'ditutup']])
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->postJson('/api/modules/management-aset/internal/v1/laporan/daftar-work-order/dataset', ['parameter' => ['status' => 'ditutup']])
             ->assertOk()
             ->assertJsonPath('data.fields.jumlah_work_order', 0)
             ->assertJsonPath('data.tables.baris', []);
@@ -111,14 +110,9 @@ class LaporanInternalTest extends TestCase
      * @param  array<string, mixed>|null  $dataPolicies
      * @return array<string, string>
      */
-    private function headers(array $permissions, ?array $dataPolicies = null): array
+    private function headers(array $permissions, ?array $lingkupKebijakan = null): static
     {
-        $claims = ['sub' => 'planner-1', 'legal_entity_id' => $this->legalEntityId, 'org_unit_id' => $this->orgUnitId];
-        if ($dataPolicies !== null) {
-            $claims['data_policies'] = $dataPolicies;
-        }
-
-        return $this->contextHeaders($this->tenantId, $permissions, $claims);
+        return $this->sebagaiPengguna($this->tenantId, $permissions, $lingkupKebijakan ?? []);
     }
 
     /** Work order draf dengan satu baris pekerjaan, dibuat lewat API seperti pengguna. */
@@ -148,9 +142,9 @@ class LaporanInternalTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        return $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.create']))
+        return $this->headers(['management-aset.pemeliharaan-aset.create'])
             ->withHeader('Idempotency-Key', 'wo-'.Str::ulid())
-            ->postJson('/api/v1/pemeliharaan-aset', [
+            ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset', [
                 'legal_entity_id' => $this->legalEntityId,
                 'responsible_org_unit_id' => $this->orgUnitId,
                 'tipe_work_order_id' => $seed['tipe'],

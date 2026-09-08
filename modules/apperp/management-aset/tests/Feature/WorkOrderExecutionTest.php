@@ -1,17 +1,17 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class WorkOrderExecutionTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private const SEMUA = [
         'management-aset.pemeliharaan-aset.read',
@@ -34,10 +34,9 @@ class WorkOrderExecutionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         // Nomor harus berurut: satu test dapat membuat lebih dari satu work order, dan dua
         // nomor yang sama akan ditolak unique (tenant_id, kode) persis seperti di produksi.
         $terbit = 0;
@@ -97,7 +96,7 @@ class WorkOrderExecutionTest extends TestCase
 
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_status_log', [
             'pemeliharaan_aset_id' => $workOrder['id'], 'dari_status' => 'draft',
-            'ke_status' => 'dibatalkan', 'alasan' => 'Aset sudah dijual', 'oleh_user_id' => 'penyelia-1',
+            'ke_status' => 'dibatalkan', 'alasan' => 'Aset sudah dijual', 'oleh_user_id' => $this->idPengguna('penyelia-1'),
         ]);
     }
 
@@ -315,8 +314,8 @@ class WorkOrderExecutionTest extends TestCase
         $sebab = $this->master('aset_m_sebab_kerusakan', 'Ban aus', 'SBKR-1');
         $tindakan = $this->master('aset_m_tindakan_perbaikan', 'Ganti ban', 'TDPB-1');
 
-        $this->withHeaders($this->headers(self::SEMUA, 'montir-1'))
-            ->patchJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/execution', [
+        $this->headers(self::SEMUA, 'montir-1')
+            ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/execution', [
                 'aktual_jam' => 2.25,
                 'sebab_kerusakan_id' => $sebab,
                 'tindakan_perbaikan_id' => $tindakan,
@@ -333,8 +332,8 @@ class WorkOrderExecutionTest extends TestCase
         DB::table('aset_m_sebab_kerusakan')->where('id', $sebab)->update(['aktif' => false, 'deleted_at' => now()]);
         DB::table('aset_m_tindakan_perbaikan')->where('id', $tindakan)->update(['aktif' => false, 'deleted_at' => now()]);
 
-        $this->withHeaders($this->headers(self::SEMUA, 'montir-1'))
-            ->getJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'])
+        $this->headers(self::SEMUA, 'montir-1')
+            ->getJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'])
             ->assertOk()
             ->assertJsonPath('data.details.0.sebab_kerusakan_nama', 'Ban aus')
             ->assertJsonPath('data.details.0.tindakan_perbaikan_nama', 'Ganti ban');
@@ -358,8 +357,8 @@ class WorkOrderExecutionTest extends TestCase
         $sebab = $this->master('aset_m_sebab_kerusakan', 'Lainnya', 'SBKR-LAIN');
         DB::table('aset_m_sebab_kerusakan')->where('id', $sebab)->update(['minta_keterangan' => true]);
 
-        $request = fn (?string $keterangan) => $this->withHeaders($this->headers(self::SEMUA, 'montir-1'))
-            ->patchJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/execution', [
+        $request = fn (?string $keterangan) => $this->headers(self::SEMUA, 'montir-1')
+            ->patchJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/jobs/'.$jobId.'/execution', [
                 'sebab_kerusakan_id' => $sebab,
                 'sebab_kerusakan_keterangan' => $keterangan,
             ]);
@@ -379,8 +378,8 @@ class WorkOrderExecutionTest extends TestCase
         $orangLain = $this->buatWorkOrder(['ditugaskan_ke' => 'montir-2']);
         $this->pindah($orangLain['id'], 'dijadwalkan', 1)->assertOk();
 
-        $data = $this->withHeaders($this->headers([...self::SEMUA], 'montir-1'))
-            ->getJson('/api/v1/pemeliharaan-aset/saya')->assertOk()->json('data');
+        $data = $this->headers([...self::SEMUA], 'montir-1')
+            ->getJson('/api/modules/management-aset/v1/pemeliharaan-aset/saya')->assertOk()->json('data');
 
         $this->assertCount(1, $data);
         $this->assertSame($milikSaya['id'], $data[0]['pemeliharaan_aset_id']);
@@ -392,9 +391,9 @@ class WorkOrderExecutionTest extends TestCase
     /** @param array<string, mixed> $ubah */
     private function buatWorkOrder(array $ubah = []): array
     {
-        return $this->withHeaders($this->headers(self::SEMUA))
+        return $this->headers(self::SEMUA, 'montir-1')
             ->withHeader('Idempotency-Key', 'wo-'.Str::ulid())
-            ->postJson('/api/v1/pemeliharaan-aset', $this->payload($ubah))
+            ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset', $this->payload($ubah))
             ->assertCreated()->json('data');
     }
 
@@ -415,24 +414,24 @@ class WorkOrderExecutionTest extends TestCase
 
     private function pindah(string $id, string $ke, int $version, ?array $permissions = null, ?string $alasan = null)
     {
-        return $this->withHeaders($this->headers($permissions ?? self::SEMUA, 'penyelia-1'))
-            ->postJson('/api/v1/pemeliharaan-aset/'.$id.'/status', array_filter([
+        return $this->headers($permissions ?? self::SEMUA, 'penyelia-1')
+            ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/status', array_filter([
                 'ke_status' => $ke, 'version' => $version, 'alasan' => $alasan,
             ], static fn ($value) => $value !== null));
     }
 
     private function salinTemplate(string $id, string $jobId)
     {
-        return $this->withHeaders($this->headers(self::SEMUA))
-            ->postJson('/api/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist/dari-template', [
+        return $this->headers(self::SEMUA, 'montir-1')
+            ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist/dari-template', [
                 'template_id' => $this->masters()['template'],
             ]);
     }
 
     private function simpanChecklist(string $id, string $jobId, array $baris)
     {
-        return $this->withHeaders($this->headers(self::SEMUA, 'montir-1'))
-            ->putJson('/api/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist', ['baris' => $baris]);
+        return $this->headers(self::SEMUA, 'montir-1')
+            ->putJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist', ['baris' => $baris]);
     }
 
     /** Menandai seluruh pemeriksaan wajib sebagai tidak berlaku supaya gate lain dapat diuji sendiri. */
@@ -451,12 +450,13 @@ class WorkOrderExecutionTest extends TestCase
     }
 
     /** @return array<string, string> */
-    private function headers(array $permissions, string $userId = 'penyelia-1'): array
+    /**
+     * Identitas pengguna tidak lagi dioper sebagai klaim; tiap pemanggilan membuat pengguna
+     * sungguhan di Core. Parameter lama dibuang karena nilainya tidak lagi menentukan apa pun.
+     */
+    private function headers(array $permissions, string $sebagai = 'penyelia-1'): static
     {
-        return $this->contextHeaders($this->tenantId, $permissions, [
-            'sub' => $userId,
-            'legal_entity_id' => $this->legalEntityId, 'org_unit_id' => $this->orgUnitId, 'user_id' => $userId,
-        ]);
+        return $this->sebagaiPenggunaBernama($sebagai, $this->tenantId, $permissions);
     }
 
     /** @param array<string, mixed> $ubah */
@@ -471,7 +471,8 @@ class WorkOrderExecutionTest extends TestCase
             'details' => [[
                 'asset_id' => $this->masters()['asset'],
                 'maintenance_job_type_id' => $this->masters()['jobType'],
-                'ditugaskan_ke_user_id' => $ubah['ditugaskan_ke'] ?? 'montir-1',
+                // Penugasan memakai id pengguna sungguhan; 'montir-1' hanya nama panggilan di test.
+                'ditugaskan_ke_user_id' => $ubah['ditugaskan_ke'] ?? $this->idPengguna('montir-1'),
             ]],
         ];
     }

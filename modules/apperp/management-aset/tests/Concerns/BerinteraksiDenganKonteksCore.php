@@ -1,0 +1,389 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Apperp\ManagementAset\Tests\Concerns;
+
+use App\Models\TenantMembership;
+use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+
+/**
+ * Cara test module masuk sebagai pengguna: lewat Core, bukan lewat token.
+ *
+ * Sebelumnya test mencetak JWT sendiri dan menempelkannya sebagai header. Itu masuk akal
+ * ketika module adalah proses terpisah yang hanya bisa percaya pada tanda tangan Core. Di
+ * dalam satu runtime, mencetak token berarti menguji jalur yang sudah tidak ada — dan yang
+ * lebih buruk, ia melewati satu-satunya hal yang sekarang menentukan izin: rantai
+ * role → duty → privilege → permission milik Core.
+ *
+ * Trait ini membangun rantai itu sungguhan. Konsekuensinya disengaja: test yang meminta izin
+ * yang tidak ada akan gagal, bukan lolos dengan klaim yang dikarang sendiri.
+ */
+trait BerinteraksiDenganKonteksCore
+{
+    private ?string $tenantUjiId = null;
+
+    /**
+     * Baris katalog minimum supaya izin module bisa dibuat.
+     *
+     * `permissions` menunjuk `apps` dan `app_entry_points`; tanpa keduanya, izin apa pun yang
+     * diminta test ditolak database dengan pelanggaran kunci asing, bukan dengan pesan yang
+     * menyebut katalog.
+     */
+    private function pastikanKatalogModule(): void
+    {
+        DB::table('apps')->insertOrIgnore([
+            'id' => 'management-aset',
+            'name' => 'Management Aset',
+            'description' => 'Module aset untuk test.',
+            'version' => '0.1.0',
+            'status' => 'active',
+            'has_ui' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('app_entry_points')->insertOrIgnore([
+            'code' => self::ENTRY_POINT_UJI,
+            'app_id' => 'management-aset',
+            'name' => 'Entry point uji',
+            'type' => 'form',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private const ENTRY_POINT_UJI = 'management-aset.uji';
+
+    private const KEBIJAKAN_TANGGUNG_JAWAB = 'management-aset.asset-responsibility';
+
+    /**
+     * Tenant untuk test ini.
+     */
+    /**
+     * Setelan klien HTTP ke Core yang masih dipakai module.
+     *
+     * Module ini belum sepenuhnya berhenti memanggil Core lewat HTTP — penerbitan nomor,
+     * kalender fiskal, satuan, dan workflow baru diganti kontrak pada F3-06 sampai F3-09.
+     * Sampai saat itu setelan ini tetap diperlukan, dan test tetap memalsukan jawabannya.
+     *
+     * Dipanggil dari `buatTenantUji()` supaya tidak ada test yang lupa memanggilnya lalu
+     * gagal dengan 503 yang tidak menjelaskan sebabnya.
+     */
+    protected function konfigurasiKlienCore(): void
+    {
+        config([
+            'services.coreerp.url' => 'http://core.test',
+            'services.coreerp.app_id' => 'management-aset',
+            'services.coreerp.service_token' => 'service-token',
+            'services.coreerp.context_signing_key' => 'test-context-signing-key-32-bytes',
+        ]);
+    }
+
+    protected function buatTenantUji(): string
+    {
+        $this->konfigurasiKlienCore();
+
+        return $this->tenantUjiId = $this->pastikanTenantAda((string) Str::ulid());
+    }
+
+    /**
+     * Organisasi dibuat hanya bila belum ada dan idnya memang disebut.
+     */
+    private function pastikanOrganisasiAda(string $tenantId, ?string $organisasiId, string $klasifikasi): void
+    {
+        if ($organisasiId === null || DB::table('organizations')->where('id', $organisasiId)->exists()) {
+            return;
+        }
+
+        DB::table('organizations')->insert([
+            'id' => $organisasiId,
+            'tenant_id' => $tenantId,
+            'name' => 'Organisasi uji '.Str::lower(Str::random(6)),
+            'classification' => $klasifikasi,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * Tenant beserta client pemiliknya, dibuat hanya bila belum ada.
+     */
+    private function pastikanTenantAda(string $tenantId): string
+    {
+        if (DB::table('tenants')->where('id', $tenantId)->exists()) {
+            return $tenantId;
+        }
+
+        $clientId = (string) Str::ulid();
+        $unik = Str::lower(Str::random(10));
+
+        // Tenant selalu milik satu client di Core. Sebelumnya test module mengarang id tenant
+        // dengan `Str::ulid()` tanpa satu baris pun di database, karena yang membacanya cuma
+        // klaim pada token buatan sendiri. Sekarang tenantnya harus benar-benar ada.
+        DB::table('clients')->insert([
+            'id' => $clientId,
+            'legal_name' => 'Client Uji Aset',
+            'slug' => 'client-uji-'.$unik,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('tenants')->insert([
+            'id' => $tenantId,
+            'client_id' => $clientId,
+            'name' => 'Tenant Uji Aset',
+            'slug' => 'tenant-uji-'.$unik,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $tenantId;
+    }
+
+    /**
+     * Masuk sebagai pengguna tenant dengan izin persis seperti yang diminta.
+     *
+     * Mengembalikan `$this` supaya pemanggilannya terbaca seperti bentuk lama:
+     * `$this->sebagaiPengguna($tenantId, [...])->getJson(...)`.
+     *
+     * @param  list<string>  $izin
+     * @param  list<array{policy_code:string,legal_entity_id?:?string,organization_id?:?string,include_descendants?:bool}>  $kebijakanData
+     */
+    /**
+     * Pengguna yang sudah dibuat pada test ini, dipetakan menurut nama panggilannya.
+     *
+     * @var array<string, string>
+     */
+    private array $penggunaBernama = [];
+
+    /**
+     * Masuk sebagai pengguna yang **sama** setiap kali nama yang sama disebut.
+     *
+     * Beberapa fitur menyaring per pengguna — "pekerjaan saya" pada work order, misalnya — dan
+     * test-nya perlu dua permintaan berturut-turut datang dari orang yang sama. Dulu itu
+     * dilakukan dengan mengoper klaim `sub` pada token; sekarang identitasnya pengguna sungguhan,
+     * jadi yang perlu dipertahankan adalah pemetaan nama ke pengguna itu.
+     *
+     * @param  list<string>  $izin
+     * @param  list<array{policy_code:string,legal_entity_id?:?string,organization_id?:?string,include_descendants?:bool}>  $kebijakanData
+     */
+    protected function sebagaiPenggunaBernama(string $nama, string $tenantId, array $izin, array $kebijakanData = []): static
+    {
+        return $this->sebagaiPengguna($tenantId, $izin, $kebijakanData, $nama);
+    }
+
+    /**
+     * Id pengguna yang dibuat untuk sebuah nama panggilan.
+     *
+     * Dipakai test yang memeriksa kolom "dikerjakan oleh": nilainya sekarang id pengguna
+     * sungguhan, bukan string bebas yang dulu dioper lewat klaim token.
+     */
+    protected function idPengguna(string $nama): string
+    {
+        return $this->penggunaBernama[$nama] ?? throw new \RuntimeException(
+            sprintf('Belum ada pengguna bernama "%s" pada test ini; panggil sebagaiPenggunaBernama() lebih dulu.', $nama),
+        );
+    }
+
+    protected function sebagaiPengguna(string $tenantId, array $izin, array $kebijakanData = [], ?string $nama = null): static
+    {
+        // Test isolasi antar tenant menyusun tenant kedua dengan `Str::ulid()` dan menaruh
+        // baris module atas namanya. Itu sah — tabel module tidak menunjuk `tenants` —
+        // tetapi keanggotaan menunjuk, jadi tenantnya harus benar-benar ada sebelum ada
+        // pengguna yang masuk ke sana.
+        $this->pastikanTenantAda($tenantId);
+
+        // Nama yang sama berarti pengguna yang sama, supaya fitur yang menyaring per pengguna
+        // bisa diuji. Nama yang tidak disebut selalu menghasilkan pengguna baru; itu bawaan
+        // yang benar, karena dua permintaan yang tidak menyatakan hubungan tidak boleh
+        // diam-diam dianggap datang dari orang yang sama.
+        $penggunaId = $nama === null ? null : ($this->penggunaBernama[$nama] ?? null);
+
+        if ($penggunaId !== null) {
+            $pengguna = User::findOrFail($penggunaId);
+            $membership = TenantMembership::where('tenant_id', $tenantId)
+                ->where('user_id', $pengguna->id)
+                ->firstOrFail();
+        } else {
+            $pengguna = User::factory()->create();
+
+            $membership = TenantMembership::create([
+                'tenant_id' => $tenantId,
+                'user_id' => $pengguna->id,
+                'system_role' => 'user',
+                'status' => 'active',
+            ]);
+
+            if ($nama !== null) {
+                $this->penggunaBernama[$nama] = (string) $pengguna->id;
+            }
+        }
+
+        // Penugasan lama dinonaktifkan lebih dulu. Kalau tidak, pengguna bernama yang dipakai
+        // ulang akan **menumpuk** izin dari pemanggilan sebelumnya, dan test yang membuktikan
+        // sebuah langkah ditolak tanpa izin justru akan lulus dengan izin yang tersisa dari
+        // langkah sebelumnya — lolos palsu yang persis kebalikan dari yang diuji.
+        DB::table('role_assignments')->where('membership_id', $membership->id)->delete();
+
+        $penugasanId = $this->beriIzin($membership, $izin);
+
+        // Tanpa lingkup yang disebut test, pengguna diberi tanggung jawab atas **seluruh**
+        // organisasi tenantnya. Itu bentuk yang sama dengan token lama, yang selalu membawa
+        // `asset-responsibility` dengan `all => true` kecuali test menyebut lain. Lingkup
+        // kosong akan menolak hampir semua permintaan dengan 403, dan test yang sebenarnya
+        // menguji hal lain akan gagal karena sebab yang tidak ada hubungannya.
+        $lingkup = $kebijakanData === []
+            ? [['policy_code' => self::KEBIJAKAN_TANGGUNG_JAWAB, 'legal_entity_id' => null, 'organization_id' => null]]
+            : $kebijakanData;
+
+        foreach ($lingkup as $kebijakan) {
+            $this->beriLingkupKebijakan($tenantId, $penugasanId, $kebijakan);
+        }
+
+        $this->actingAs($pengguna);
+
+        return $this;
+    }
+
+    /**
+     * Membangun rantai role → duty → privilege → permission untuk satu daftar izin.
+     *
+     * Satu rantai baru per pemanggilan, bukan satu rantai bersama yang ditumpuk: dua test yang
+     * kebetulan memakai role yang sama akan saling memberi izin tanpa ada yang menyadarinya,
+     * dan test yang membuktikan penolakan izin justru yang paling mudah lolos palsu.
+     *
+     * @param  list<string>  $izin
+     */
+    private function beriIzin(TenantMembership $membership, array $izin): string
+    {
+        $unik = Str::lower(Str::random(12));
+        $roleId = (string) Str::ulid();
+        $kodePrivilege = 'uji-priv-'.$unik;
+        $kodeDuty = 'uji-duty-'.$unik;
+
+        $this->pastikanKatalogModule();
+
+        foreach (array_unique($izin) as $kode) {
+            DB::table('permissions')->insertOrIgnore([
+                'code' => $kode,
+                'app_id' => 'management-aset',
+                'entry_point_code' => self::ENTRY_POINT_UJI,
+                'access_level' => 'read',
+                'name' => $kode,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        DB::table('security_privileges')->insert([
+            'code' => $kodePrivilege,
+            'app_id' => 'management-aset',
+            'name' => 'Privilege uji',
+            'source' => 'system',
+            'status' => 'published',
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('security_duties')->insert([
+            'code' => $kodeDuty,
+            'app_id' => 'management-aset',
+            'name' => 'Duty uji',
+            'source' => 'system',
+            'status' => 'published',
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('security_duty_privileges')->insert([
+            'duty_code' => $kodeDuty,
+            'privilege_code' => $kodePrivilege,
+        ]);
+
+        foreach (array_unique($izin) as $kode) {
+            DB::table('security_privilege_permissions')->insert([
+                'privilege_code' => $kodePrivilege,
+                'permission_code' => $kode,
+            ]);
+        }
+
+        DB::table('roles')->insert([
+            'id' => $roleId,
+            'tenant_id' => $membership->tenant_id,
+            'name' => 'Role uji '.$unik,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('security_role_duties')->insert([
+            'role_id' => $roleId,
+            'duty_code' => $kodeDuty,
+        ]);
+
+        $penugasanId = (string) Str::ulid();
+
+        DB::table('role_assignments')->insert([
+            'id' => $penugasanId,
+            'membership_id' => $membership->id,
+            'role_id' => $roleId,
+            'source' => 'manual',
+            'status' => 'active',
+            'valid_from' => now()->subMinute(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $penugasanId;
+    }
+
+    /**
+     * @param  array{policy_code:string,legal_entity_id?:?string,organization_id?:?string,include_descendants?:bool}  $kebijakan
+     */
+    private function beriLingkupKebijakan(string $tenantId, string $penugasanId, array $kebijakan): void
+    {
+        // Definisi kebijakannya harus ada sebelum lingkupnya. Dulu test cukup menuliskan
+        // `data_policies` sebagai klaim pada token buatan sendiri; sekarang Core yang
+        // menyusunnya dari katalog, jadi kebijakan yang tidak terdaftar berarti lingkup yang
+        // tidak pernah terbaca — dan test batas organisasi akan lulus tanpa membatasi apa pun.
+        DB::table('app_data_policies')->insertOrIgnore([
+            'code' => $kebijakan['policy_code'],
+            'app_id' => 'management-aset',
+            'name' => $kebijakan['policy_code'],
+            'protected_permissions' => json_encode([], JSON_THROW_ON_ERROR),
+            'requires_legal_entity' => true,
+            'requires_operating_unit' => true,
+            'allows_descendants' => false,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Organisasi yang disebut lingkup harus ada. Test batas organisasi biasanya menyebut
+        // organisasi "milik orang lain" dengan `Str::ulid()`, dan dulu itu cukup karena
+        // nilainya hanya klaim pada token. Sekarang lingkupnya baris database dengan kunci
+        // asing ke `organizations`.
+        $this->pastikanOrganisasiAda($tenantId, $kebijakan['legal_entity_id'] ?? null, 'legal_entity');
+        $this->pastikanOrganisasiAda($tenantId, $kebijakan['organization_id'] ?? null, 'operating_unit');
+
+        DB::table('role_assignment_data_policy_scopes')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $tenantId,
+            'role_assignment_id' => $penugasanId,
+            'policy_code' => $kebijakan['policy_code'],
+            'legal_entity_id' => $kebijakan['legal_entity_id'] ?? null,
+            'organization_id' => $kebijakan['organization_id'] ?? null,
+            'include_descendants' => $kebijakan['include_descendants'] ?? false,
+            'valid_from' => now()->subMinute(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+}

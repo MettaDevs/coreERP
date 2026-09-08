@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Tests\Concerns\InteractsWithCoreErpContext;
 use Tests\TestCase;
 
 /**
@@ -22,15 +22,14 @@ use Tests\TestCase;
  */
 class NumberSequenceFailureTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
-        $this->configureCoreErpContext();
+        $this->tenantId = $this->buatTenantUji();
     }
 
     /**
@@ -116,8 +115,8 @@ class NumberSequenceFailureTest extends TestCase
 
     private function createGroup(): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.group-aset.create']))
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.create'])
             ->withHeader('Idempotency-Key', 'group-aset:'.Str::ulid())
-            ->postJson('/api/v1/group-aset', ['nama' => 'Bangunan']);
+            ->postJson('/api/modules/management-aset/v1/group-aset', ['nama' => 'Bangunan']);
     }
 }

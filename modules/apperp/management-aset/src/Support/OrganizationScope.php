@@ -62,7 +62,11 @@ final class OrganizationScope
         }
 
         return [
-            'all' => $scope['all'] === true,
+            // `?? false`, bukan akses langsung: kebijakan yang tidak diberikan kepada
+            // pengguna sama sekali menghasilkan array kosong, dan itu keadaan normal — bukan
+            // alasan untuk melempar. Dulu tidak pernah terjadi karena token selalu memuat
+            // kunci kebijakannya walau isinya kosong; Core menyusunnya hanya bila ada.
+            'all' => ($scope['all'] ?? false) === true,
             'scope_grants' => collect($scope['scope_grants'] ?? [])
                 ->filter(fn (mixed $grant): bool => is_array($grant))
                 ->map(fn (array $grant): array => [

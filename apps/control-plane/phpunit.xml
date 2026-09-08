@@ -12,10 +12,20 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!--
+            Test module berjalan dalam satu perintah dengan test Core, memakai koneksi
+            PostgreSQL yang sama. Sebelumnya module punya suite sendiri di atas SQLite, dan
+            suite itu tidak pernah membuktikan apa pun tentang penguncian baris — klausanya
+            menjadi string kosong di SQLite.
+        -->
+        <testsuite name="Module">
+            <directory>../../modules/*/*/tests</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
             <directory>app</directory>
+            <directory>../../modules/*/*/src</directory>
         </include>
     </source>
     <php>

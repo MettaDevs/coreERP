@@ -36,8 +36,6 @@ use Modules\Apperp\ManagementAset\Http\Controllers\master\TipeWorkOrderControlle
 use Modules\Apperp\ManagementAset\Http\Controllers\master\TradeController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\ValidasiStatusWorkOrderController;
 use Modules\Apperp\ManagementAset\Http\Controllers\ReferenceDataController;
-use Modules\Apperp\ManagementAset\Http\Controllers\TenantProvisioningController;
-use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DekomisioningAset\WorkflowDecisionController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\DokumenSiklusAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\AssetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\DepreciationController;
@@ -77,14 +75,6 @@ $masters = [
 ];
 
 Route::get('v1/health', HealthController::class);
-// Dua rute berikut adalah panggilan balik Core ke module lewat HTTP, dan keduanya berhenti
-// masuk akal begitu keduanya berada di proses yang sama: keputusan workflow menjadi event
-// Laravel biasa pada F3-09, dan penyediaan data awal tenant menjadi event in-process pada
-// F3-11. Aliasnya sengaja dibiarkan menunjuk `coreerp-event` yang sudah tidak terdaftar,
-// supaya ia gagal berisik kalau ada yang memuat rute ini sebelum kedua task itu selesai —
-// bukan diam-diam melayani permintaan tanpa pemeriksaan apa pun.
-Route::post('internal/v1/workflow-events', [WorkflowDecisionController::class, 'store'])->middleware('coreerp-event');
-Route::post('internal/v1/provisioning/tenant', [TenantProvisioningController::class, 'store'])->middleware('coreerp-event');
 
 // Laporan: dipanggil Core dengan token konteks pengguna yang meminta cetak, sehingga
 // permission dan scope organisasi ditegakkan seperti request biasa. Layout, antrean

@@ -23,6 +23,12 @@ final class BuiltinLayout
 
     public function path(string $reportCode): string
     {
-        return resource_path("laporan/{$reportCode}/{$this->key}.{$this->format}");
+        // Jalur dihitung dari folder module, bukan dari `resource_path()`.
+        //
+        // `resource_path()` menunjuk `resources/` milik **Core**, dan sejak F3-03 layout
+        // bawaan module berada di `resources/laporan/` milik module. Selama masih memakai
+        // `resource_path()`, unduhan layout menjawab 404 dengan pesan "berkas tidak ada pada
+        // release ini" — pesan yang menyalahkan release, bukan jalurnya.
+        return dirname(__DIR__, 3)."/resources/laporan/{$reportCode}/{$this->key}.{$this->format}";
     }
 }
