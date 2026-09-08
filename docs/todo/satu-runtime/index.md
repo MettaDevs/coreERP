@@ -30,8 +30,7 @@ berbahaya daripada yang tidak ada.
 
 | Task | Siapa | Cabang | Catatan |
 | --- | --- | --- | --- |
-| F3-00 penjaga kenal modul migrasi | agent | `feat/f3-00-penjaga-modul-migrasi` | selesai, menunggu #55 digabungkan; membuka F3-01 |
-| F2-11 halaman modul di shell | agent | `feat/f2-11-halaman-modul-shell` | bertumpuk di atas cabang F2-10 |
+| F3-02 buang kerangka modul | induk | `refactor/f3-02-buang-kerangka-modul` | menghalangi F3-03 |
 
 Kosongkan barisnya setelah pull request-nya digabungkan.
 

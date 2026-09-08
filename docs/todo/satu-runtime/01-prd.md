@@ -2384,11 +2384,44 @@ yang sudah dimiliki Core, dan itu bentrok pasti.
 1. Hapus berkas di daftar atas.
 2. Jalankan `composer install` pada Core dan pastikan tidak ada yang mencari berkas yang hilang.
 
-**Selesai bila.** Folder modul tidak lagi berisi kerangka Laravel, dan Core tetap menyala.
+**Selesai bila.** Folder modul tidak lagi berisi kerangka Laravel, dan Core tetap menyala — **dan
+sebuah test yang gagal bila kerangka itu kembali.**
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
 **Bergantung pada.** F3-01.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026.
+
+**Kriteria selesainya semula tidak punya keadaan gagal.** "Folder modul tidak lagi berisi kerangka
+Laravel" benar pada hari berkasnya dihapus dan tidak dijaga apa pun sesudahnya: siapa pun yang menarik
+ulang subtree, atau menyalin berkas dari repo lain, mengembalikannya tanpa satu pun peringatan. Karena itu
+`ModuleTanpaKerangkaTest` ditambahkan, dan ia berlaku untuk **semua** modul tanpa kecuali — termasuk yang
+sedang dipindah. Membuang kerangka adalah langkah pertama pemindahan, jadi tidak ada keadaan sah di mana
+sebuah folder modul boleh membawanya.
+
+Dua hal yang dijaganya, dan yang kedua jauh lebih berbahaya:
+
+1. `artisan`, `bootstrap/app.php`, `public/index.php` — selama ada, modul masih bisa dijalankan sebagai
+   aplikasi terpisah, dan perubahan yang dibuat di sana tidak akan terlihat di Core.
+2. **Migration yang membuat tabel milik Core** (`users`, `jobs`, `job_batches`, `failed_jobs`, `cache`,
+   `cache_locks`). Tabrakannya pasti, dan ia muncul saat pemasangan modul di tenant sungguhan — bukan saat
+   ada yang memperhatikan.
+
+Keduanya dibuktikan bisa gagal dengan mengembalikan `api/bootstrap/app.php` dan menambahkan satu migration
+yang membuat `users`; keduanya merah dengan pesan yang menyebut modul dan berkasnya.
+
+**Yang tidak dihapus dan kenapa.** `Dockerfile`, `Dockerfile.test`, `deploy/`, dan `loadtest/` masih ada.
+Ketiganya milik cara penyebaran lama dan nasibnya diputuskan F3-23. Satu akibat yang perlu diketahui
+sekarang: `Dockerfile` menyebut `bootstrap/cache` yang sudah tidak ada, jadi ia **tidak akan bisa dibangun
+lagi**. Itu memang konsekuensi yang dikehendaki — kontainer modul tidak lagi punya alasan untuk ada — tapi
+ia rusak diam-diam sampai F3-23 membuangnya, dan lebih baik dicatat daripada ditemukan orang lain sebagai
+kejutan.
+
+`api/composer.json` juga masih menyebut belasan perintah `artisan`. Ia belum disentuh karena F3-03 yang
+menggantinya dengan `composer.json` modul yang sesungguhnya.
 
 ### F3-03 — Bentuk ulang menjadi susunan modul
 
