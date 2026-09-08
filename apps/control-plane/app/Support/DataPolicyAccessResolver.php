@@ -9,9 +9,35 @@ use Illuminate\Support\Facades\DB;
 final class DataPolicyAccessResolver
 {
     /**
+     * Hasil yang sudah dihitung pada permintaan ini, menurut id keanggotaan.
+     *
+     * Kebijakan data ditanyakan berkali-kali dalam satu permintaan — `organizations()` memanggilnya,
+     * dan `organizations()` sendiri dipanggil sekali untuk entitas legal dan sekali lagi untuk unit
+     * operasi. Diukur pada satu permintaan daftar sederhana: query lingkup kebijakan berjalan **enam
+     * kali** dengan parameter yang sama persis.
+     *
+     * @var array<string, array<string, array{all:bool,scope_grants:list<array{legal_entity_id:?string,operating_unit_ids:list<string>}>}>>
+     */
+    private array $ingatan = [];
+
+    /**
      * @return array<string, array{all:bool,scope_grants:list<array{legal_entity_id:?string,operating_unit_ids:list<string>}>}>
      */
     public function resolve(TenantMembership $membership): array
+    {
+        $kunci = (string) $membership->id;
+
+        if (array_key_exists($kunci, $this->ingatan)) {
+            return $this->ingatan[$kunci];
+        }
+
+        return $this->ingatan[$kunci] = $this->hitung($membership);
+    }
+
+    /**
+     * @return array<string, array{all:bool,scope_grants:list<array{legal_entity_id:?string,operating_unit_ids:list<string>}>}>
+     */
+    private function hitung(TenantMembership $membership): array
     {
         $now = now();
         $scopes = DB::table('role_assignment_data_policy_scopes as scope')

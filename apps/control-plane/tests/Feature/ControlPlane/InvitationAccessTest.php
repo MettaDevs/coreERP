@@ -384,6 +384,12 @@ class InvitationAccessTest extends TestCase
             'organization_id' => null,
             'hierarchy_id' => null,
         ]);
+        // Pemeriksaan ini membaca keadaan **setelah** permintaan di atas menuliskannya, jadi ia
+        // harus melihat container yang bersih — sama seperti permintaan berikutnya di produksi.
+        // Resolver mengingat jawabannya selama satu permintaan; tanpa baris ini yang terbaca
+        // adalah ingatan dari permintaan yang baru saja melakukan penulisannya.
+        $this->app->forgetScopedInstances();
+
         $this->assertTrue(
             app(DataPolicyAccessResolver::class)->resolve($membership->fresh())[$policyCode]['all'],
         );

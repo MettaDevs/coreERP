@@ -15,6 +15,25 @@ final class CurrentWorkspace
 
     private const OPERATING_UNIT_KEY = 'workspace.org_unit_id';
 
+    /**
+     * Keanggotaan dan organisasi yang sudah dibaca pada permintaan ini.
+     *
+     * Kelas ini ditanyai berkali-kali dalam satu permintaan oleh pihak yang berbeda — middleware
+     * konteks module, penyusun prop Inertia, dan penentu entitas legal serta unit operasi — dan
+     * tiap pemanggilan dulu berujung query baru dengan parameter yang sama. Diukur pada satu
+     * permintaan daftar sederhana: 22 query, hanya **satu** di antaranya mengambil data yang
+     * diminta; `tenant_memberships` dibaca empat kali dan `organizations` lima kali.
+     *
+     * Ingatan ini hanya berlaku selama satu permintaan. Ikatannya `scoped()`, bukan `singleton()`,
+     * supaya ia benar juga pada pekerja yang hidup lama.
+     *
+     * @var array<string, Collection<int, TenantMembership>>
+     */
+    private array $ingatanKeanggotaan = [];
+
+    /** @var array<string, Collection<int, Organization>> */
+    private array $ingatanOrganisasi = [];
+
     /** @return Collection<int, TenantMembership> */
     public function memberships(Request $request): Collection
     {
@@ -23,7 +42,17 @@ final class CurrentWorkspace
             return new Collection;
         }
 
-        return $user->memberships()->with('tenant')->where('status', 'active')->orderBy('created_at')->get();
+        $kunci = (string) $user->getAuthIdentifier();
+
+        if (array_key_exists($kunci, $this->ingatanKeanggotaan)) {
+            return $this->ingatanKeanggotaan[$kunci];
+        }
+
+        return $this->ingatanKeanggotaan[$kunci] = $user->memberships()
+            ->with('tenant')
+            ->where('status', 'active')
+            ->orderBy('created_at')
+            ->get();
     }
 
     public function membership(Request $request): ?TenantMembership
@@ -41,6 +70,18 @@ final class CurrentWorkspace
 
     /** @return Collection<int, Organization> */
     public function organizations(TenantMembership $membership): Collection
+    {
+        $kunci = (string) $membership->id;
+
+        if (array_key_exists($kunci, $this->ingatanOrganisasi)) {
+            return $this->ingatanOrganisasi[$kunci];
+        }
+
+        return $this->ingatanOrganisasi[$kunci] = $this->bacaOrganisasi($membership);
+    }
+
+    /** @return Collection<int, Organization> */
+    private function bacaOrganisasi(TenantMembership $membership): Collection
     {
         $query = Organization::query()->where('tenant_id', $membership->tenant_id)->where('status', 'active')->orderBy('name');
         $policies = app(DataPolicyAccessResolver::class)->resolve($membership);
@@ -71,6 +112,12 @@ final class CurrentWorkspace
 
     public function activate(Request $request, TenantMembership $membership, ?Organization $legalEntity, ?Organization $operatingUnit): void
     {
+        // Pindah tenant mengubah jawaban seluruh pertanyaan di atas, jadi ingatannya dibuang.
+        // Tanpa ini, permintaan yang berganti tenant di tengah jalan akan terus menjawab dengan
+        // tenant sebelumnya — persis jenis kesalahan yang tidak pernah gagal, hanya salah.
+        $this->ingatanKeanggotaan = [];
+        $this->ingatanOrganisasi = [];
+
         $request->session()->put(self::MEMBERSHIP_KEY, $membership->id);
         $this->storeSelection($request, self::LEGAL_ENTITY_KEY, $legalEntity);
         $this->storeSelection($request, self::OPERATING_UNIT_KEY, $operatingUnit);
