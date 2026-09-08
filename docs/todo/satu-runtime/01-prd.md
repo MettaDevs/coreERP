@@ -1254,6 +1254,7 @@ supaya menjalankan ulang tidak mengulang yang sudah jalan.
 
 **Berkas.**
 - `apps/control-plane/app/Support/Modules/ModuleMigrator.php`
+- `apps/control-plane/app/Support/Modules/ModuleMigrationRepository.php`
 - `apps/control-plane/app/Console/Commands/ModuleMigrateCommand.php`
 - `apps/control-plane/tests/Feature/ControlPlane/ModuleMigratorTest.php`
 
@@ -1273,6 +1274,41 @@ supaya menjalankan ulang tidak mengulang yang sudah jalan.
 **Rujukan.** Bagian 5.2 dokumen ini.
 
 **Bergantung pada.** F1-04, F2-02.
+
+#### Nama tabel saja tidak cukup; riwayatnya harus disaring per modul
+
+Task ini menyebut tabel riwayat terpisah dengan kolom `module_id`. Kolomnya ada, tapi kolom saja tidak
+menyelesaikan apa pun bila pembacanya tidak menyaringnya.
+
+Nama berkas migration mengikuti pola waktu dan maksud, misalnya
+`2026_09_08_000100_create_m_barang_table`. Dua modul yang ditulis orang berbeda **mudah** menghasilkan
+nama yang sama persis. Tanpa penyaringan `module_id` saat membaca riwayat, migration modul B akan
+terlihat sudah pernah jalan hanya karena modul A punya berkas bernama sama, dan tabelnya tidak pernah
+dibuat. Gejalanya adalah tabel yang hilang tanpa pesan kesalahan apa pun.
+
+Karena itu repositori riwayatnya adalah kelas tersendiri yang menyaring `module_id` pada setiap
+pembacaan, bukan sekadar tabel dengan kolom tambahan.
+
+#### Kenapa riwayat modul tidak boleh menumpang tabel `migrations`
+
+Bila menumpang, mencabut sebuah modul lalu memasangnya lagi akan **melewati seluruh migration-nya**,
+karena riwayatnya masih tercatat di sana, dan tabelnya tidak pernah dibuat ulang. Ini akan muncul
+persis saat pelanggan berlangganan kembali — waktu terburuk untuk menemukannya.
+
+#### Arti opsi tenant berbeda pada dua bentuk penempatan
+
+Perlu ditulis karena mudah disalahpahami sebagai "membuat tabel per tenant":
+
+| Penempatan | Yang dilakukan opsi tenant |
+| --- | --- |
+| Gabungan, bawaan | tabelnya sudah ada untuk semua tenant; opsi ini hanya menandai untuk siapa pemasangan dicatat |
+| Terpisah | migration benar-benar dijalankan di database tenant itu |
+
+#### Enam test
+
+Empat di luar yang diminta, termasuk yang menjaga hal yang baru saja diputuskan: riwayat dua modul tidak
+saling menutupi, perintah menolak modul yang tidak dikenal, dan tabel `migrations` milik Core tidak
+bertambah satu baris pun.
 
 ### F2-04 — Data awal modul, sekali saja
 
