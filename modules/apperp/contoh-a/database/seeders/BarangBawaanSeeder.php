@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Database\Seeders;
 
-use App\Support\Modules\TenantScope;
-use Illuminate\Database\Seeder;
+use App\Support\Modules\Contracts\SeederModule;
 use Illuminate\Support\Str;
 use Modules\Apperp\ContohA\Models\Barang;
 
@@ -18,11 +17,11 @@ use Modules\Apperp\ContohA\Models\Barang;
  *
  * Setiap baris ditandai `bawaan`, supaya bisa dibedakan dari baris yang diketik pengguna.
  */
-final class BarangBawaanSeeder extends Seeder
+final class BarangBawaanSeeder extends SeederModule
 {
     public function run(): void
     {
-        $tenantId = TenantScope::tenantAktif();
+        $tenantId = $this->tenantId();
 
         foreach ([['BRG-BWN-01', 'Barang bawaan satu'], ['BRG-BWN-02', 'Barang bawaan dua']] as [$kode, $nama]) {
             Barang::query()->create([

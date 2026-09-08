@@ -1659,8 +1659,21 @@ Langkah 3 menyebut aturan analisa statis. Aturan itu sudah dibuang pada F1-05 ka
 menggantikannya adalah penjaga yang membaca berkas. Penjaga itulah yang diperluas di sini, dan
 perluasannya menangkap lebih banyak jalur daripada yang bisa dilihat analisa statis.
 
-Aturannya satu kalimat: **modul hanya boleh menyebut `App\Support\Modules\`.** Di situlah kontrak
-berada, dan `TenantScope` juga; keduanya memang permukaan yang dituju modul.
+Aturannya satu kalimat: **modul hanya boleh menyebut `App\Support\Modules\Contracts`.**
+
+Aturan itu sempat lebih longgar, mencakup seluruh `App\Support\Modules`, supaya model modul bisa
+menyebut `TenantScope` langsung. Kelonggaran itu dibuang: ia berarti kelas apa pun yang kelak ditaruh di
+folder itu ikut boleh disentuh modul, tanpa ada yang menahan dan tanpa ada yang memutuskan.
+
+Supaya kalimatnya bisa tetap sempit, dua hal ikut tinggal di dalam `Contracts`:
+
+| Yang dipakai modul | Menggantikan |
+| --- | --- |
+| trait `MilikTenant` | model menyebut `TenantScope` dan memanggil `addGlobalScope` sendiri |
+| kelas induk `SeederModule` | seeder memanggil `TenantScope::tenantAktif()` |
+
+Keduanya menyembunyikan `TenantScope` tanpa melemahkannya: penyaringannya tetap di sana dan tetap gagal
+menutup. Yang berubah hanya siapa yang menyebut namanya.
 
 #### Enam antarmuka, bukan lima
 

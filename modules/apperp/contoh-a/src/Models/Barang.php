@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohA\Models;
 
-use App\Support\Modules\TenantScope;
+use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 final class Barang extends Model
 {
     use HasUlids;
+    use MilikTenant;
     use SoftDeletes;
 
     protected $table = 'contoh_a_m_barang';
@@ -35,9 +36,4 @@ final class Barang extends Model
     protected $fillable = ['tenant_id', 'kode', 'nama', 'bawaan'];
 
     protected $casts = ['bawaan' => 'boolean'];
-
-    protected static function booted(): void
-    {
-        self::addGlobalScope(new TenantScope);
-    }
 }

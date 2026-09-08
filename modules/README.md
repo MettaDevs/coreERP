@@ -63,8 +63,11 @@ berlaku; awalan module ditulis di depannya, misalnya `aset_m_group` dan `aset_tr
   dijaga test dan analisa statis. Sama-sama batas, dan pelanggarnya sama-sama ditolak.
 - **Tidak ada baris yang dihapus fisik.** Lihat [penghapusan lunak](../docs/dev/02-module-standard.md#penghapusan-lunak),
   termasuk kewajiban indeks unik parsial pada kode bisnis.
-- **Module memanggil Core lewat pemanggilan fungsi biasa,** bukan HTTP. Kelas Core yang boleh dipanggil
-  didaftar pada bagian 5.3 [PRD pemindahan](../docs/todo/satu-runtime/01-prd.md).
+- **Module memanggil Core lewat pemanggilan fungsi biasa,** bukan HTTP, dan hanya lewat satu namespace:
+  `App\Support\Modules\Contracts`. Isinya enam antarmuka layanan, trait `MilikTenant` untuk model, dan
+  kelas induk `SeederModule` untuk data awal. Butuh sesuatu yang belum ada di sana? Usulkan antarmuka
+  baru; jangan mengambil jalan pintas ke kelas Core, karena kelas Core bebas berubah bentuk dan module
+  akan ikut pecah tanpa peringatan.
 
 ## Module contoh tidak pernah sampai ke pelanggan
 
