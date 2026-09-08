@@ -2445,12 +2445,56 @@ Susunan modul memakai `src/`, `database/migrations/`, `ui/`, dan `tests/` sejaja
    Migrator modul dari F2-03 yang mengurus ini sekarang.
 5. Hapus `deploy/migrate.sh` dan rujukan `--path=../database/migrations`.
 
-**Selesai bila.** `composer types:check` lulus, dan tidak ada lagi rujukan ke `../database/migrations` di
-seluruh repo.
+**Selesai bila.** Tiap kelas modul dapat dimuat dengan nama yang dijanjikan `composer.json`-nya, dibuktikan
+sebuah test; dan tidak ada lagi rujukan ke jalur migration relatif yang lama di seluruh repo.
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
 **Bergantung pada.** F3-02.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026.
+
+**Kriteria selesainya semula kosong, dan penyebabnya keputusan kita sendiri.** Ia berbunyi
+"`composer types:check` lulus" — padahal F3-25 mengecualikan modul yang sedang dipindah dari PHPStan.
+Analisa statis karena itu hijau **tanpa memeriksa satu berkas pun milik modul ini**. Kriteria yang
+mengandalkan alat yang sudah kita matikan untuk sasarannya sendiri adalah kriteria yang tidak mengukur
+apa pun. Penggantinya `ModuleAutoloadTest`: untuk tiap pemetaan PSR-4 pada `composer.json` modul, tiap
+berkas PHP wajib mendeklarasikan namespace yang sesuai jalurnya dan wajib bisa dimuat autoloader.
+
+**Penjaganya sempat gagal dengan cara yang salah, dan itu memperbaiki bentuknya.** Percobaan pertama
+langsung memanggil `class_exists`. Saat satu berkas dikembalikan ke `App\Http\Controllers`, PHP fatal —
+nama itu **sudah dipakai Core** — dan testnya mati dengan `Premature end of PHP process`, tanpa menyebut
+berkas mana yang salah. Penjaganya sekarang membaca namespace dari berkasnya lebih dulu dan hanya mencoba
+memuat yang namanya sudah benar. Pesan gagalnya kini menyebut modul, jalur, namespace tertulis, dan
+namespace seharusnya.
+
+**Angka sebenarnya.** 99 deklarasi `namespace` dan 233 pernyataan `use` pada 103 berkas. Tidak ada satu
+pun rujukan berbentuk string atau nama berkualifikasi penuh — hanya dua bentuk itu, jadi penggantiannya
+bisa harfiah dan tidak perlu regex yang bisa salah tangkap.
+
+**Seluruh dependensi modul ternyata sudah dimiliki Core.** `api/composer.json` lama meminta
+`laravel/framework`, `laravel/tinker`, `phpoffice/phpspreadsheet`, `phpoffice/phpword`, dan enam paket dev;
+tidak satu pun yang tidak ada di Core. Itu sebabnya `composer.json` modul yang baru tidak perlu meminta apa
+pun selain versi PHP. Diukur dengan membandingkan kedua berkas, bukan diduga.
+
+**`api/database/seeders/DatabaseSeeder.php` ikut dibuang.** Ia kelas kosong ber-namespace
+`Database\Seeders` — sisa kerangka, bukan milik modul. Membiarkannya berarti modul menyumbang kelas ke
+namespace yang dimiliki Core.
+
+**Pemformatan ikut berubah, dan hanya urutan impor.** Mengganti awalan namespace mengubah urutan abjad
+pernyataan `use`, jadi Pint menuntut 42 berkas dirapikan ulang. Diperiksa bahwa selisihnya benar-benar
+hanya itu: 343 baris ditambah, 340 dihapus, seluruhnya baris `namespace` dan `use`. Tidak ada perubahan
+gaya lain yang menyelinap masuk dan mengaburkan `git blame`.
+
+**Modul kini didaftarkan Core lewat `composer.json`-nya** (`apperp/management-aset: @dev`), sama seperti
+kedua modul contoh. Tanpa itu pemetaan PSR-4 modul tidak dipakai siapa pun dan penjaga di atas tidak bisa
+membuktikan apa-apa.
+
+**Yang masih tertinggal di `api/` dan kenapa.** Tinggal `Dockerfile`, `Dockerfile.test`, `README.md`, dan
+`config/` berisi dua berkas yang memang ditahan untuk F3-17 dan F3-19. Keempatnya milik cara penyebaran
+lama; nasibnya diputuskan F3-23.
 
 ### F3-04 — Tabel modul diberi awalan `aset_`
 
