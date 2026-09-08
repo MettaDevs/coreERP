@@ -384,8 +384,9 @@ ulang walau task dibatalkan, supaya rujukan pada pull request lama tetap sah.
 sudah ada sebelum proyek dimulai. Selama keduanya belum beres, tidak ada task berikutnya yang bisa
 dibuktikan selesai.
 
-F0-04 lahir dari pengerjaan F0-01, bukan dari perencanaan. Nomornya mengikuti urutan lahir, bukan urutan
-kerja, sesuai aturan bahwa nomor task tidak dipakai ulang.
+F0-04, F0-05, dan F0-06 lahir dari pengerjaan task sebelumnya, bukan dari perencanaan. Nomornya mengikuti
+urutan lahir, bukan urutan kerja, sesuai aturan bahwa nomor task tidak dipakai ulang. Urutan bacanya
+sengaja menaruh F0-06 tepat setelah F0-03, karena ia kelanjutan langsung dari temuannya.
 
 **Kriteria keluar.** Sebuah pull request yang tidak mengubah apa pun lulus seluruh pemeriksaan otomatis,
 dan tidak ada berkas aturan yang melarang modul berjalan di runtime Core.
@@ -560,6 +561,54 @@ dicabut.
 **Rujukan.** Bagian 5.2 dan 5.7 dokumen ini, [standar app](../../dev/02-module-standard.md).
 
 **Bergantung pada.** Tidak ada.
+
+#### Yang ditemukan saat mengerjakannya
+
+Aturan indeks unik parsial ternyata bukan pencegahan, melainkan perbaikan: **pasangan yang salah sudah
+ada di kode hari ini.**
+
+| Repo | Tabel dengan `deleted_at` dan indeks unik penuh pada kode |
+| --- | --- |
+| CoreERP | 1 (`units_of_measure`) |
+| Management Aset | 17 |
+
+Diukur 8 September 2026. Cara mengukurnya ada pada bagian penghapusan lunak di standar app; angkanya akan
+berubah dan harus diukur ulang, bukan dikutip.
+
+Sudah dibuktikan pada database sungguhan, bukan disimpulkan dari membaca migrasi: satuan diarsipkan,
+hilang dari daftar, lalu kodenya ditolak dengan `duplicate key value violates unique constraint`.
+Pengguna melihat "kode sudah dipakai" untuk kode yang tidak muncul di daftar mana pun. Indeks parsial
+memperbaikinya tanpa melonggarkan apa pun — dua baris hidup dengan kode sama tetap ditolak.
+
+Memperbaiki 18 tabel itu bukan bagian task ini, karena 17 di antaranya ada di repo yang akan ditarik
+masuk pada F3-01 dan migrasinya akan disentuh lagi di sana. Lihat F0-06.
+
+### F0-06 — Indeks unik penuh pada tabel yang mengarsipkan diperbaiki
+
+**Kenapa.** Delapan belas tabel memiliki `deleted_at` beserta indeks unik penuh pada kode bisnis, jadi
+kode yang sudah diarsipkan tidak pernah bisa dipakai ulang. Gejalanya adalah pesan "kode sudah dipakai"
+untuk kode yang tidak terlihat di daftar mana pun, dan penyebabnya tidak bisa ditemukan dari layar.
+
+**Berkas.**
+- `apps/control-plane/database/migrations/` (satu migrasi baru, `units_of_measure`)
+- migrasi Management Aset, dikerjakan setelah reponya ditarik masuk pada F3-01
+
+**Langkah.**
+1. Untuk Core, tulis satu migrasi yang membuang indeks unik penuh dan menggantinya dengan indeks parsial.
+   Migrasi ini memakai SQL langsung; hitungannya masuk ke daftar migrasi ber-SQL mentah pada bagian 5.
+2. Sebelum mengganti, periksa apakah sudah ada baris terarsip yang kodenya bentrok dengan baris hidup.
+   Bila ada, indeks parsial tetap bisa dibuat; yang tidak boleh adalah dua baris **hidup** dengan kode
+   sama. Buktikan dengan query, jangan berasumsi.
+3. Tambahkan test yang mengarsipkan satu baris lalu membuat baris baru dengan kode yang sama, dan
+   membuktikan dua baris hidup dengan kode sama tetap ditolak.
+4. Untuk Management Aset, kerjakan setelah F3-01 supaya migrasinya hanya disentuh sekali.
+
+**Selesai bila.** Test pada langkah 3 lulus, dan pemeriksaan pada standar app tidak lagi menemukan
+pasangan yang salah di repo Core.
+
+**Rujukan.** [penghapusan lunak](../../dev/02-module-standard.md#penghapusan-lunak).
+
+**Bergantung pada.** F0-03. Bagian Management Aset bergantung pada F3-01.
 
 ### F0-04 — `tsc` masuk ke alur linter
 

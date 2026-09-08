@@ -9,7 +9,7 @@ perlu tahu apa yang terjadi di sini.
 | Dokumen | Isi | Kapan dibaca |
 | --- | --- | --- |
 | [00-keputusan.md](00-keputusan.md) | Kenapa CoreERP berpindah dari satu proses dan satu database per app menjadi satu runtime dengan modul; angka terukur di laptop, proyeksi 100 tenant, bukti dari Odoo, ERPNext, Business Central, Shopify | Sebelum menyetujui rencananya, atau saat ada yang bertanya kenapa |
-| [01-prd.md](01-prd.md) | Rencana kerjanya: 78 task ukuran satu pull request dalam delapan fase, lengkap dengan berkas yang disentuh, syarat selesai, rencana mundur, dan ukuran keberhasilan | Saat mengambil task berikutnya |
+| [01-prd.md](01-prd.md) | Rencana kerjanya: 79 task ukuran satu pull request dalam delapan fase, lengkap dengan berkas yang disentuh, syarat selesai, rencana mundur, dan ukuran keberhasilan | Saat mengambil task berikutnya |
 
 ## Cara memakai daftar task
 
@@ -23,7 +23,7 @@ tidak boleh dilanggar, dan konvensi penamaan branch serta commit.
 
 | Fase | Task | Selesai |
 | --- | --- | --- |
-| 0 — prasyarat: CI hijau, aturan kerja, penghapusan lunak, cabang dikunci | F0-01 sampai F0-05 | F0-01 dan F0-02 selesai |
+| 0 — prasyarat: CI hijau, aturan kerja, penghapusan lunak, cabang dikunci | F0-01 sampai F0-06 | F0-01, F0-02, F0-03 selesai; F0-05 terhalang |
 | 1 — penjaga batas dan kerangka modul | F1-01 sampai F1-08 | belum |
 | 2 — Core menjadi tuan rumah modul | F2-01 sampai F2-11 | belum |
 | 3 — Management Aset pindah | F3-01 sampai F3-24 | belum |
@@ -32,7 +32,7 @@ tidak boleh dilanggar, dan konvensi penamaan branch serta commit.
 | 6 — dev stack dan CI | F6-01 sampai F6-05 | belum |
 | 7 — modul kedua, pengukuran, pembersihan | F7-01 sampai F7-09 | belum |
 
-Total 78 task. Fase 0 membereskan yang sudah menghalangi sebelum proyek dimulai: pemeriksaan otomatis
+Total 79 task. Fase 0 membereskan yang sudah menghalangi sebelum proyek dimulai: pemeriksaan otomatis
 yang merah dan aturan repo yang melarang pekerjaan ini. Ia sempat direncanakan tidak menyentuh kode sama
 sekali, tapi menghijaukan pemeriksaan ternyata menuntut perbaikan kode juga — rinciannya ada pada catatan
 pelaksanaan F0-01 di PRD.
