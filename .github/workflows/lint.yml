@@ -7,12 +7,11 @@ on:
       - main
       - master
       - workos
+  # Tanpa daftar cabang. Pull request yang basisnya cabang fitur — pull request
+  # bertumpuk, yang dipakai saat sebuah task bergantung pada task sebelumnya — tidak
+  # mendapat pemeriksaan sama sekali selama daftar ini ada, dan itu tidak terlihat
+  # sebagai kegagalan: halaman pull request-nya hanya kosong.
   pull_request:
-    branches:
-      - develop
-      - main
-      - master
-      - workos
 
 permissions:
   contents: read
