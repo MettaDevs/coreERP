@@ -6,6 +6,9 @@ graphify-out
 artifacts
 **/node_modules
 **/vendor
+# Keluaran build `@apperp/ui`. Image membangunnya sendiri; menyalin milik mesin
+# pengembang hanya menaruh versi basi di lapisan yang lebih awal.
+packages/ui/dist
 **/.env
 apps/control-plane/public/build
 apps/control-plane/storage/logs

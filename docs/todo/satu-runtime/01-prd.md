@@ -3181,6 +3181,64 @@ repo.
 
 **Bergantung pada.** Tidak ada.
 
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026 lewat pull request #67.
+
+**Akar workspace-nya akar repo, dan rencana tidak menyebut itu.** Percobaan pertama menaruh akarnya di
+`apps/control-plane` dengan `"workspaces": ["../../packages/ui"]`. npm menerimanya dan tautan
+simboliknya terbentuk; yang tidak jalan adalah membangun paketnya. npm mengangkat dependensi workspace ke
+`node_modules` milik akar, dan akar itu bukan leluhur `packages/ui`, jadi `tsc` di dalam paket berhenti
+pada `TS2307: Cannot find module 'react'`. Akar karena itu pindah ke akar repo — yang sekaligus
+menjelaskan kenapa `package-lock.json` akar sudah ada di repo sejak commit pertama tanpa `package.json`
+yang menemaninya. Ekornya tiga: `npm ci` berpindah ke akar (dua alur CI dan `Dockerfile`), lockfile app
+dihapus, dan `.npmrc` yang memuat `ignore-scripts=true` ikut pindah karena npm mengabaikan `.npmrc` milik
+workspace — berkas penjaga yang tidak lagi menjaga apa pun adalah yang paling berbahaya dibiarkan.
+
+**"Bundel yang sama" hampir gagal karena dua hal yang tidak ada hubungannya dengan pengemasan.** Pertama,
+menyerahkan lockfile akar ke `npm install` menaikkan 209 paket sekaligus dan mengubah potongan bundel
+besar-besaran: 203 berkas menjadi 163, total turun 337.194 bytes. Lockfile akar karena itu disusun dari
+lockfile lama app entri per entri, sehingga satu-satunya selisih versi adalah `@apperp/ui` sendiri. Kedua,
+`@vitejs/plugin-react` melewatkan `node_modules` secara bawaan; sebagai workspace, `packages/ui/dist`
+keluar dari sana dan React Compiler mulai menggarap keluaran `tsc` milik paket itu — bundel bertambah
+3.067 bytes di 14 potongan. Ditahan dengan `exclude` pada plugin. Hasil akhirnya 203 berkas di kedua sisi
+dengan daftar nama yang sama persis, selisih 346 bytes: `manifest.json` +348 karena 29 kunci font
+mendapat awalan `../../`, dan satu potongan `@inertiajs/core` −2 karena beda tanda kurung minifier.
+
+**Pemindaian Tailwind dibuktikan dengan merusaknya.** Baris `@source` dihapus, build diulang:
+`npm run build` tetap hijau tanpa satu peringatan pun, dan CSS keluarannya turun dari 202.891 menjadi
+81.275 bytes — 1.053 selektor kelas hilang, termasuk `.max-h-\[300px\]{max-height:300px}` milik
+`@apperp/ui/command`. Kegagalan yang tidak berbunyi seperti ini yang membuat kriteria "pastikan
+pemindaian tetap menemukan" tidak bisa dipercaya tanpa dirusak lebih dulu.
+
+**Dua penanganan F2-11 menjadi tidak perlu, keduanya karena sebab yang sama.** `resolve.dedupe` untuk
+`@apperp/ui` dan enam pemetaan `paths` di `tsconfig.json` ada karena pendakian `node_modules` dari
+`modules/*/*/ui` berakhir di akar repo yang kosong. Akar repo sekarang akar workspace, jadi pendakian itu
+berhenti di tempat yang benar; keduanya dibuang setelah dibuktikan build dan `tsc --noEmit` tetap hijau
+tanpanya. `react` dan `react-dom` tetap di `dedupe`: keduanya soal satu salinan React, bukan soal
+penemuan berkas.
+
+**`dist/` yang dulu selalu ada kini harus dibangun, dan yang menagihnya bukan cuma `build`.** Sebagai
+berkas `.tgz` paket ini datang sudah terbangun; sebagai workspace ia baru lahir saat dibangun, dan
+`ignore-scripts=true` menutup jalan `prepare`. Yang menemukan sisanya adalah CI merah: `format:check`
+melaporkan 52 berkas tidak terformat sementara mesin pengembang hijau, karena `.prettierrc` menunjuk
+`resources/css/app.css` yang mengimpor `@apperp/ui/styles.css` — tanpa `dist/`,
+`prettier-plugin-tailwindcss` mengurutkan kelas dengan urutan lain. Delapan skrip akhirnya diawali
+`ui:build`. Pelajarannya: pemeriksaan yang selama ini menumpang pada efek samping `npm ci` tidak
+mengumumkan ketergantungannya sampai efek samping itu hilang.
+
+**Kriteria "tidak ada berkas `.tgz` di repo" belum terpenuhi seluruhnya, dan itu keputusan.**
+`modules/apperp/management-aset/ui/vendor/apperp-ui.tgz` masuk lewat subtree F3-01 setelah rencana ini
+ditulis. Folder itu masih proyek Vite tersendiri dengan `Dockerfile` berkonteks foldernya sendiri;
+menunjuknya ke `packages/ui` menaruh dependensinya di luar konteks build itu, jadi `Dockerfile`-nya harus
+ditulis ulang — untuk build yang di repo ini tidak dijalankan siapa pun, dan yang berkasnya dihapus
+seluruhnya oleh F4-03.
+
+**Tahap aset `Dockerfile` ternyata tidak pernah menyalin `modules/` maupun `vendor/`.** Dua dari empat
+deklarasi `@source` karena itu menunjuk folder yang tidak ada di dalam image, dan glob halaman modul di
+`resources/js/app.tsx` tidak menemukan apa pun — image release dibangun tanpa halaman modul. Keadaannya
+sudah begitu sebelum task ini dan tidak diubah di sini; yang pertama wilayah F4-03.
+
 ### F4-03 — Halaman modul pindah ke dalam repo shell
 
 **Kenapa.** Selama UI modul berada di proyek Vite sendiri, React akan selalu terbundel dua kali.

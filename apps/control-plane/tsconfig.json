@@ -108,23 +108,19 @@
         // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
         "skipLibCheck": true /* Skip type checking all .d.ts files. */,
         /*
-         * Empat pemetaan terakhir ada karena halaman module berada di luar folder ini.
-         * TypeScript mencari `node_modules` dengan menaiki folder dari berkas yang
-         * mengimpor, dan dari `modules/<penerbit>/<modul>/ui` pendakian itu berakhir di
-         * akar repo — tempat yang tidak punya `node_modules`. Tanpa pemetaan ini, setiap
-         * halaman module gagal pada impor React-nya sendiri.
+         * Dulu ada enam pemetaan tambahan di sini — `react`, `react-dom`, dan `@apperp/ui/*`
+         * yang menunjuk `./node_modules`. Sebabnya: halaman module berada di luar folder
+         * ini, TypeScript mencari `node_modules` dengan menaiki folder dari berkas yang
+         * mengimpor, dan dari `modules/<penerbit>/<modul>/ui` pendakian itu berakhir di akar
+         * repo — tempat yang saat itu tidak punya `node_modules`.
+         *
+         * Sejak akar repo menjadi akar workspace npm, akar itu punya `node_modules`. Pendakian
+         * yang sama sekarang berhenti di tempat yang benar, jadi pemetaan itu tidak lagi
+         * menyelesaikan apa pun dan dibuang. Yang tersisa hanyalah dua alias milik proyek ini.
          */
         "paths": {
             "@/*": ["./resources/js/*"],
-            "@modules/*": ["../../modules/*"],
-            "react": ["./node_modules/@types/react"],
-            "react/*": ["./node_modules/@types/react/*"],
-            "react-dom": ["./node_modules/@types/react-dom"],
-            "react-dom/*": ["./node_modules/@types/react-dom/*"],
-            "@apperp/ui/*": [
-                "./node_modules/@apperp/ui/dist/components/*",
-                "./node_modules/@apperp/ui/dist/*"
-            ]
+            "@modules/*": ["../../modules/*"]
         },
         "jsx": "react-jsx"
     },

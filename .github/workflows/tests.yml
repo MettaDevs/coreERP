@@ -90,8 +90,11 @@ jobs:
         with:
           node-version: '22'
 
+      # Berjalan di akar repo, bukan di folder app. `@apperp/ui` adalah workspace npm,
+      # dan lockfile yang memuatnya hanya ada satu — di akar.
       - name: Install Node Dependencies
         run: npm ci
+        working-directory: .
 
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader

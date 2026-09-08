@@ -26,17 +26,26 @@ WORKDIR /repo/apps/control-plane
 RUN php artisan wayfinder:generate --with-form --no-interaction
 
 FROM node:22-bookworm-slim AS assets
-WORKDIR /app
+# Susunan repo ditirukan di sini juga. `@apperp/ui` adalah workspace npm milik repo ini,
+# jadi akar pemasangan npm adalah akar repo dan `packages/ui` harus berada di bawahnya —
+# bukan folder app. Selama tahap ini masih `WORKDIR /app` dengan hanya isi app tersalin,
+# `npm ci` tidak menemukan workspace yang disebut package.json akar dan berhenti sebelum
+# satu paket pun terpasang.
+WORKDIR /repo
 # Wayfinder is generated in the Composer stage because this stage has no PHP.
 ENV WAYFINDER_COMMAND=true
-COPY apps/control-plane/package.json apps/control-plane/package-lock.json ./
-COPY apps/control-plane/.packages ./.packages
+# `.npmrc` ikut karena di sanalah `ignore-scripts=true` berada. Tanpa berkas itu setiap
+# skrip `install` milik dependensi ikut berjalan di dalam image.
+COPY package.json package-lock.json .npmrc ./
+COPY apps/control-plane/package.json ./apps/control-plane/
+COPY packages/ui ./packages/ui
 # npm dapat diam-diam melewatkan optional native binding ketika unduhannya gagal
 # (npm/cli#4828): instalasinya tetap melapor sukses, lalu build meledak jauh
 # kemudian dengan pesan yang menuduh lockfile, padahal penyebabnya jaringan.
 # Pemeriksaan ini membuat kegagalan muncul di langkah yang benar, dan satu kali
 # percobaan ulang menutup kasus yang memang cuma unduhan meleset.
 RUN npm ci && node --input-type=module -e 'await import("rolldown")' || (rm -rf node_modules && npm ci && node --input-type=module -e 'await import("rolldown")')
+WORKDIR /repo/apps/control-plane
 COPY apps/control-plane/resources ./resources
 COPY --from=vendor /repo/apps/control-plane/resources/js/actions ./resources/js/actions
 COPY --from=vendor /repo/apps/control-plane/resources/js/routes ./resources/js/routes
@@ -57,7 +66,7 @@ WORKDIR /repo
 COPY apps/control-plane ./apps/control-plane
 COPY modules ./modules
 COPY --from=vendor /repo/apps/control-plane/vendor ./apps/control-plane/vendor
-COPY --from=assets /app/public/build ./apps/control-plane/public/build
+COPY --from=assets /repo/apps/control-plane/public/build ./apps/control-plane/public/build
 # Susunan repo ditirukan di bawah /var/www/repo supaya `../../modules/*/*` tetap menunjuk
 # tempat yang benar dari dalam vendor.
 RUN mkdir -p /var/www && ln -s /repo /var/www/repo

@@ -14,17 +14,19 @@ const folderModule = fileURLToPath(new URL('../../modules', import.meta.url));
 export default defineConfig({
     resolve: {
         /*
-         * `@apperp/ui` ikut di sini, dan bukan demi menghemat ukuran bundel.
+         * `@apperp/ui` pernah ikut di daftar ini. Sebabnya: halaman module berada di luar
+         * folder proyek ini, sehingga pencarian `node_modules` dari berkasnya menaiki
+         * folder sampai akar repo — tempat yang saat itu tidak punya `node_modules` —
+         * dan `npm run build` berhenti dengan "Rolldown failed to resolve import
+         * "@apperp/ui/table"".
          *
-         * Halaman module berada di luar folder proyek ini, sehingga pencarian
-         * `node_modules` dari berkasnya menaiki folder sampai akar repo — tempat yang
-         * tidak punya `node_modules`. Akibatnya `npm run build` berhenti dengan
-         * "Rolldown failed to resolve import "@apperp/ui/table"". `dedupe` menyuruh Vite
-         * menyelesaikan paket ini dari akar proyek, jadi peta `exports` paketnya tetap
-         * dipakai apa adanya — berbeda dengan alias, yang akan melewatinya dan menuntut
-         * jalur `dist/` ditulis tangan.
+         * Akar repo sekarang akar workspace npm, jadi pendakian itu berakhir di
+         * `node_modules` yang benar dan penyebutan paket itu tidak perlu ditolong lagi.
+         * `react` dan `react-dom` tetap di sini: keduanya bukan soal penemuan berkas
+         * melainkan soal satu salinan React, dan itu masih bisa pecah kapan saja sebuah
+         * dependensi membawa salinannya sendiri.
          */
-        dedupe: ['react', 'react-dom', '@apperp/ui'],
+        dedupe: ['react', 'react-dom'],
         alias: {
             // Halaman module hidup di luar akar proyek ini. Alias dipakai kode yang
             // menyebut satu berkas module secara langsung; pemindaian folder di
@@ -53,6 +55,17 @@ export default defineConfig({
         }),
         inertia(),
         react({
+            /*
+             * `packages/ui/dist` adalah keluaran `tsc`, bukan sumber yang ditulis orang.
+             * Selama `@apperp/ui` dipasang dari berkas `.tgz`, isinya berada di
+             * `node_modules` dan plugin ini melewatinya secara bawaan. Sebagai workspace
+             * ia keluar dari `node_modules`, jadi tanpa baris ini React Compiler ikut
+             * menggarapnya: bundel bertambah 3.067 bytes yang seluruhnya jatuh di 14
+             * potongan yang memuat komponen paket ini. Pengecualian ini menjaga bundel
+             * tetap sama seperti sebelum pemindahan; menjalankan compiler di atas
+             * keluaran build adalah keputusan tersendiri, bukan efek samping pengemasan.
+             */
+            exclude: [/[\\/]packages[\\/]ui[\\/]dist[\\/]/],
             babel: {
                 plugins: ['babel-plugin-react-compiler'],
             },
