@@ -47,6 +47,71 @@ class ModulSedangDipindahTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_folder_tanpa_awalan_tabel_wajib_terdaftar_sedang_dipindah(): void
+    {
+        $dipindah = ModulSedangDipindah::bawaan();
+        $akar = dirname(__DIR__, 5).'/modules';
+        $manifest = glob($akar.'/*/*/app.yaml');
+        $manifest = $manifest === false ? [] : $manifest;
+
+        $this->assertNotSame([], $manifest, 'Tidak ada satu pun manifest module yang terbaca; pemindaiannya salah alamat.');
+
+        $hilangDiamDiam = [];
+
+        foreach ($manifest as $berkas) {
+            $isi = (string) file_get_contents($berkas);
+            $namaFolder = basename(dirname($berkas));
+
+            if (preg_match('/^table_prefix:\s*\S/m', $isi) === 1) {
+                continue;
+            }
+
+            if ($dipindah->menandai($namaFolder)) {
+                continue;
+            }
+
+            $hilangDiamDiam[] = $namaFolder;
+        }
+
+        $this->assertSame([], $hilangDiamDiam, sprintf(
+            'Module %s tidak menyatakan table_prefix dan tidak terdaftar sedang dipindah. '.
+            'ModuleRegistry melewatkan module tanpa awalan tabel, jadi module ini tidak akan '.
+            'ditemukan siapa pun dan tidak ada yang gagal karenanya — persis kegagalan diam '.
+            'yang paling mahal ditemukan belakangan. Nyatakan table_prefix, atau daftarkan '.
+            'ia sebagai module yang sedang dipindah beserta tenggatnya.',
+            implode(', ', $hilangDiamDiam),
+        ));
+    }
+
+    public function test_daftar_prettierignore_sama_dengan_daftar_modul_dipindah(): void
+    {
+        $dipindah = array_keys(ModulSedangDipindah::bawaan()->semua());
+        $berkas = dirname(__DIR__, 3).'/.prettierignore';
+
+        $this->assertFileExists($berkas);
+
+        $isi = (string) file_get_contents($berkas);
+        preg_match_all('#^\.\./\.\./modules/[^/]+/([^/]+)/#m', $isi, $cocok);
+        $diabaikan = $cocok[1];
+
+        sort($dipindah);
+        sort($diabaikan);
+
+        $this->assertSame($dipindah, $diabaikan, sprintf(
+            'Daftar module yang dikecualikan Prettier tidak sama dengan daftar module yang sedang dipindah.
+'.
+            'sedang dipindah : %s
+'.
+            'diabaikan Prettier: %s
+'.
+            'Yang kurang membuat pemeriksaan gaya merah pada berkas yang memang belum dibentuk ulang. '.
+            'Yang berlebih membiarkan module yang sudah selesai dipindah lolos pemeriksaan gaya '.
+            'selamanya — dan tidak ada yang akan menyadarinya, karena tidak ada yang gagal.',
+            implode(', ', $dipindah) ?: '(kosong)',
+            implode(', ', $diabaikan) ?: '(kosong)',
+        ));
+    }
+
     public function test_tiap_entri_menyebut_alasan_dan_tenggat(): void
     {
         $daftar = ModulSedangDipindah::bawaan()->semua();
