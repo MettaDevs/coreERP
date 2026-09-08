@@ -2212,21 +2212,52 @@ Pengecualian itu punya cara berakhir yang sama seperti yang lain: sebuah test me
 merah; entri yang tertinggal setelah modulnya selesai dipindah juga merah — karena pengecualian yang
 tertinggal membiarkan modul jadi lolos pemeriksaan gaya selamanya, dan tidak ada yang akan menyadarinya.
 
-**Dan setelah gaya hijau, giliran pemeriksaan tipe.** `tsconfig.json` menyertakan `modules` sejak F2-11
+**Dan setelah gaya hijau, giliran pemeriksaan tipe — lalu analisa statis.** `tsconfig.json` menyertakan `modules` sejak F2-11
 juga, dan UI modul aset masih aplikasi React tersendiri dengan `package.json` serta `node_modules` miliknya
 sendiri — memeriksanya dengan dependensi Core menghasilkan ratusan `TS2307 Cannot find module` yang tidak
-satu pun menunjuk kesalahan sungguhan. Pengecualiannya dipasang di `exclude`, dan penjaganya digabungkan
-menjadi satu test bertabel: setiap berkas pengecualian Core wajib mendaftar modul yang sama persis.
+satu pun menunjuk kesalahan sungguhan. Pengecualiannya dipasang di `exclude`. Sesudahnya PHPStan
+memulangkan **560 temuan** dari modul yang sama, semuanya menunjuk keadaan yang memang sedang diperbaiki
+bertahap pada F3-02 sampai F3-05 — dan menenggelamkan temuan sungguhan pada kode Core. Modulnya tetap ada
+di `scanDirectories`, jadi kelasnya tetap dikenali bila kode Core menyebutnya; hanya analisanya yang
+dikecualikan.
 
-**Ini kejadian keempat dari pola yang sama dalam satu task**: sebuah pemeriksaan milik Core yang sudah
+Penjaganya digabungkan menjadi satu test bertabel: setiap berkas pengecualian Core wajib mendaftar modul
+yang sama persis. Menambahkan pemeriksaan berikutnya ke tabel itu satu baris.
+
+#### Berhenti menebak: seluruh pemeriksaan yang menjangkau `modules/` didaftar sekali
+
+Tiga putaran pertama dihabiskan dengan menunggu CI merah, memperbaiki satu pemeriksaan, lalu menunggu CI
+merah lagi. Itu boros dan tidak perlu — daftarnya bisa dibaca, bukan ditunggu. Seluruh alur `quality`
+dijalankan di mesin sendiri pada pohon hasil penggabungan, berurutan seperti di CI:
+
+| # | Pemeriksaan | Menjangkau `modules/` | Hasil |
+| --- | --- | --- | --- |
+| 1 | Pint | ya, `pint ../../modules` | lulus apa adanya — gayanya kebetulan sudah cocok |
+| 2 | Prettier | ya, sejak F2-11 | perlu pengecualian |
+| 3 | ESLint | **tidak** | lulus; akan menjadi masalah pada hari ia mencakupnya |
+| 4 | `tsc` | ya, sejak F2-11 | perlu pengecualian |
+| 5 | PHPStan | ya, `paths` memuat `../../modules/` | perlu pengecualian |
+| 6 | salinan skill | tidak | lulus |
+| 7 | cakupan kontrak internal | tidak | lulus |
+| 8 | `npm run build` | lewat pemilih halaman | lulus |
+
+Pelajarannya bukan tentang daftar ini melainkan tentang urutan kerja: **satu pemeriksaan lokal atas
+seluruh alur lebih murah daripada tiga putaran CI**, dan ia menemukan hal yang sama.
+
+**Ini kejadian kelima dari pola yang sama dalam satu task**: sebuah pemeriksaan milik Core yang sudah
 benar mulai menjangkau modul yang belum siap dijangkau. Penjaga batas (F3-00), registry dan katalog
-(task ini), pemeriksaan gaya, lalu pemeriksaan tipe. Yang membedakan keempatnya hanya siapa yang memindai;
+(task ini), pemeriksaan gaya, pemeriksaan tipe, lalu analisa statis. Yang membedakan kelimanya hanya
+siapa yang memindai;
 polanya sama, dan pertanyaan yang seharusnya saya ajukan sejak awal adalah **"apa saja di Core yang
 memindai `modules/`"** — bukan "apa yang rusak".
 
 Satu yang belum menjangkau dan karenanya belum terlihat: **ESLint**. Ia belum mencakup `modules/` sama
-sekali (dicatat pada F2-11), jadi ia akan menjadi kejadian kelima pada hari ia mencakupnya. Daftar
+sekali (dicatat pada F2-11), jadi ia akan menjadi kejadian berikutnya pada hari ia mencakupnya. Daftar
 pengecualiannya sudah bertabel, jadi menambahkannya nanti satu baris.
+
+Satu koreksi atas catatan ini sendiri: kalimat "kejadian ketiga" dan "keempat" di atas ditulis sambil
+menebak siapa yang menyusul, dan tebakannya salah — bukan ESLint melainkan PHPStan. Kalimat yang menebak
+urutan berikutnya memang tidak layak ditulis; yang layak adalah daftarnya.
 
 ### F3-01 — Bawa repo masuk beserta riwayatnya
 

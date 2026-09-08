@@ -99,6 +99,7 @@ class ModulSedangDipindahTest extends TestCase
         return [
             'prettier' => ['.prettierignore', 'pemeriksaan gaya frontend', ''],
             'typescript' => ['tsconfig.json', 'pemeriksaan tipe frontend', '"exclude"'],
+            'phpstan' => ['phpstan.neon', 'analisa statis PHP', 'excludePaths'],
         ];
     }
 
