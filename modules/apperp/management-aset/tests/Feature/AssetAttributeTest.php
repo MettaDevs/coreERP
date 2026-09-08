@@ -1,13 +1,13 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 /**
@@ -17,7 +17,7 @@ use Tests\TestCase;
  */
 class AssetAttributeTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -29,9 +29,8 @@ class AssetAttributeTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->unitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         $unit = fn (string $id): array => [
             'id' => $id, 'code' => 'cm', 'name' => 'Sentimeter', 'symbol' => 'cm', 'decimal_places' => 2,
         ];
@@ -59,8 +58,8 @@ class AssetAttributeTest extends TestCase
             'nama' => 'Kedalaman', 'data_type' => 'decimal', 'satuan_id' => $this->unitId,
         ]);
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
-            ->getJson('/api/v1/tipe-atribut/'.$id)
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
+            ->getJson('/api/modules/management-aset/v1/tipe-atribut/'.$id)
             ->assertOk()
             ->assertJsonPath('data.satuan_id', $this->unitId)
             // Kode satuan datang dari Core, bukan dari kiriman klien.
@@ -69,9 +68,9 @@ class AssetAttributeTest extends TestCase
 
     public function test_satuan_yang_tidak_dikenal_core_ditolak(): void
     {
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
             ->withHeader('Idempotency-Key', 'satuan-asing')
-            ->postJson('/api/v1/tipe-atribut', [
+            ->postJson('/api/modules/management-aset/v1/tipe-atribut', [
                 'nama' => 'Kedalaman', 'data_type' => 'decimal', 'satuan_id' => (string) Str::ulid(),
             ])
             ->assertStatus(422)
@@ -82,9 +81,9 @@ class AssetAttributeTest extends TestCase
     /** Satuan tidak bermakna untuk teks atau daftar tetap, jadi tidak boleh diam-diam tersimpan. */
     public function test_satuan_ditolak_untuk_tipe_data_yang_tidak_mengenal_satuan(): void
     {
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
             ->withHeader('Idempotency-Key', 'satuan-salah-tipe')
-            ->postJson('/api/v1/tipe-atribut', [
+            ->postJson('/api/modules/management-aset/v1/tipe-atribut', [
                 'nama' => 'Warna', 'data_type' => 'string', 'satuan_id' => $this->unitId,
             ])
             ->assertStatus(422)
@@ -94,13 +93,13 @@ class AssetAttributeTest extends TestCase
     /** Daftar satuan dibaca dari dalam layar tipe atribut, jadi izinnya ikut layar itu. */
     public function test_daftar_satuan_dapat_dibaca_dengan_izin_tipe_atribut(): void
     {
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.tipe-atribut.read']))
-            ->getJson('/api/v1/reference-data/units-of-measure')
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.tipe-atribut.read'])
+            ->getJson('/api/modules/management-aset/v1/reference-data/units-of-measure')
             ->assertOk()
             ->assertJsonPath('data.0.kode', 'cm');
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.group-aset.read']))
-            ->getJson('/api/v1/reference-data/units-of-measure')
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/reference-data/units-of-measure')
             ->assertForbidden();
     }
 
@@ -174,8 +173,8 @@ class AssetAttributeTest extends TestCase
         $modelB = $this->master('model-aset', ['nama' => 'PC210-10', 'pabrikan_aset_id' => $pabrikan]);
         $permissions = [...$this->permissionsFor('jenis-aset'), 'management-aset.model-aset.read'];
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions))
-            ->putJson('/api/v1/jenis-aset/'.$jenis.'/models', ['model_ids' => [$modelA, $modelB]])
+        $this->sebagaiPengguna($this->tenantId, $permissions)
+            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/models', ['model_ids' => [$modelA, $modelB]])
             ->assertOk()
             ->assertJsonPath('data.model_ids.0', $modelA)
             ->assertJsonPath('data.model_ids.1', $modelB);
@@ -193,18 +192,14 @@ class AssetAttributeTest extends TestCase
         ['jenis' => $jenis] = $this->jenisDenganTurunan();
         $permissions = [...$this->permissionsFor('jenis-aset'), 'management-aset.aset.read'];
 
-        $diLuarScope = $this->contextHeaders($this->tenantId, $permissions, ['data_policies' => [
-            'management-aset.asset-responsibility' => [
-                'all' => false,
-                'scope_grants' => [[
-                    'legal_entity_id' => (string) Str::ulid(),
-                    'operating_unit_ids' => [(string) Str::ulid()],
-                ]],
-            ],
-        ]]);
-
-        $this->withHeaders($diLuarScope)
-            ->getJson('/api/v1/jenis-aset/'.$jenis.'/detail')
+        // Lingkup kebijakan yang menunjuk organisasi lain: pengguna punya izinnya, tetapi
+        // tidak atas organisasi yang memiliki datanya.
+        $this->sebagaiPengguna($this->tenantId, $permissions, [[
+            'policy_code' => 'management-aset.asset-responsibility',
+            'legal_entity_id' => (string) Str::ulid(),
+            'organization_id' => (string) Str::ulid(),
+        ]])
+            ->getJson('/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/detail')
             ->assertOk()
             ->assertJsonPath('data.asset_count', 0)
             // Atribut milik jenis aset, bukan aset, jadi ia tidak ikut dibatasi scope.
@@ -215,8 +210,8 @@ class AssetAttributeTest extends TestCase
     {
         ['jenis' => $jenis] = $this->jenisDenganTurunan();
 
-        $this->withHeaders($this->contextHeaders((string) Str::ulid(), $this->permissionsFor('jenis-aset')))
-            ->getJson('/api/v1/jenis-aset/'.$jenis.'/detail')
+        $this->sebagaiPengguna((string) Str::ulid(), $this->permissionsFor('jenis-aset'))
+            ->getJson('/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/detail')
             ->assertNotFound();
     }
 
@@ -225,8 +220,8 @@ class AssetAttributeTest extends TestCase
     {
         $this->jenisDenganTurunan();
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('jenis-aset')))
-            ->getJson('/api/v1/jenis-aset')
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'))
+            ->getJson('/api/modules/management-aset/v1/jenis-aset')
             ->assertOk()
             ->assertJsonMissingPath('data.0.atribut_count')
             ->assertJsonMissingPath('data.0.model_count')
@@ -291,9 +286,9 @@ class AssetAttributeTest extends TestCase
 
     public function test_batas_nilai_harus_diisi_berpasangan(): void
     {
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
             ->withHeader('Idempotency-Key', 'tanpa-batas')
-            ->postJson('/api/v1/tipe-atribut', ['nama' => 'Daya', 'data_type' => 'decimal', 'min_value' => 10])
+            ->postJson('/api/modules/management-aset/v1/tipe-atribut', ['nama' => 'Daya', 'data_type' => 'decimal', 'min_value' => 10])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['min_value', 'max_value']);
     }
@@ -305,8 +300,8 @@ class AssetAttributeTest extends TestCase
         $this->values($bahanBakar, [['nilai' => 'Solar', 'urutan' => 1], ['nilai' => 'Bensin', 'urutan' => 0]])->assertOk();
         $this->attach($jenis, [['tipe_atribut_id' => $bahanBakar, 'wajib' => true]])->assertOk();
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.jenis-aset.read']))
-            ->getJson('/api/v1/jenis-aset/'.$jenis.'/atribut-definisi')
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.jenis-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/atribut-definisi')
             ->assertOk()
             ->assertJsonPath('data.0.data_type', 'string')
             ->assertJsonPath('data.0.wajib', true)
@@ -318,9 +313,9 @@ class AssetAttributeTest extends TestCase
     public function test_enum_lama_ditolak_dan_integer_menolak_pecahan(): void
     {
         foreach (['text', 'number', 'fixed_list', 'value_range'] as $legacy) {
-            $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
+            $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
                 ->withHeader('Idempotency-Key', 'legacy-'.$legacy)
-                ->postJson('/api/v1/tipe-atribut', ['nama' => 'Legacy '.$legacy, 'data_type' => $legacy])
+                ->postJson('/api/modules/management-aset/v1/tipe-atribut', ['nama' => 'Legacy '.$legacy, 'data_type' => $legacy])
                 ->assertStatus(422)
                 ->assertJsonValidationErrors('data_type');
         }
@@ -348,10 +343,10 @@ class AssetAttributeTest extends TestCase
     {
         $jenis = $this->master('jenis-aset', ['nama' => 'Pompa']);
         $atribut = $this->master('tipe-atribut', ['nama' => 'Tekanan', 'data_type' => 'string']);
-        $headers = $this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut'));
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'));
 
-        $this->withHeaders($headers)
-            ->patchJson('/api/v1/tipe-atribut/'.$atribut, ['data_type' => 'decimal'])
+        $this
+            ->patchJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut, ['data_type' => 'decimal'])
             ->assertOk()
             ->assertJsonPath('data.data_type', 'decimal')
             ->assertJsonPath('data.data_type_locked', false);
@@ -359,8 +354,13 @@ class AssetAttributeTest extends TestCase
         $this->attach($jenis, [['tipe_atribut_id' => $atribut]])->assertOk();
         $this->receive($jenis, [['tipe_atribut_id' => $atribut, 'nilai' => 12.5]]);
 
-        $this->withHeaders($headers)
-            ->patchJson('/api/v1/tipe-atribut/'.$atribut, ['data_type' => 'integer'])
+        // Masuk lagi dengan izin tipe atribut: dua pemanggilan di atas berganti pengguna, dan
+        // identitas sekarang bertahan antar permintaan — dulu tiap permintaan membawa
+        // headernya sendiri, jadi urutannya tidak berpengaruh.
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'));
+
+        $this
+            ->patchJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut, ['data_type' => 'integer'])
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'data_type_locked');
         $this->assertDatabaseHas('aset_m_tipe_atribut', [
@@ -401,8 +401,8 @@ class AssetAttributeTest extends TestCase
         $this->values($atribut, [['nilai' => 'Satu'], ['nilai' => 'Tiga']])->assertOk();
         $this->attach($jenis, [['tipe_atribut_id' => $atribut]])->assertOk();
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
-            ->getJson('/api/v1/tipe-atribut')
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
+            ->getJson('/api/modules/management-aset/v1/tipe-atribut')
             ->assertOk()
             ->assertJsonPath('data.0.values_count', 2)
             ->assertJsonPath('data.0.asset_types_count', 1);
@@ -414,8 +414,8 @@ class AssetAttributeTest extends TestCase
         $atribut = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'decimal']);
         $this->attach($jenis, [['tipe_atribut_id' => $atribut]])->assertOk();
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
-            ->deleteJson('/api/v1/tipe-atribut/'.$atribut)
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
+            ->deleteJson('/api/modules/management-aset/v1/tipe-atribut/'.$atribut)
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
     }
@@ -450,31 +450,31 @@ class AssetAttributeTest extends TestCase
     /** @param list<string> $permissions */
     private function detail(string $jenisId, array $permissions): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $permissions))
-            ->getJson('/api/v1/jenis-aset/'.$jenisId.'/detail');
+        return $this->sebagaiPengguna($this->tenantId, $permissions)
+            ->getJson('/api/modules/management-aset/v1/jenis-aset/'.$jenisId.'/detail');
     }
 
     /** @param array<string, mixed> $payload */
     private function master(string $resource, array $payload): string
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor($resource)))
+        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/v1/'.$resource, $payload)
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload)
             ->assertCreated()->json('data.id');
     }
 
     /** @param list<array<string, mixed>> $rows */
     private function attach(string $jenisId, array $rows): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('jenis-aset')))
-            ->putJson('/api/v1/jenis-aset/'.$jenisId.'/atribut', ['rows' => $rows]);
+        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'))
+            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenisId.'/atribut', ['rows' => $rows]);
     }
 
     /** @param list<array<string, mixed>> $rows */
     private function values(string $atributId, array $rows): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('tipe-atribut')))
-            ->putJson('/api/v1/tipe-atribut/'.$atributId.'/nilai', ['rows' => $rows]);
+        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
+            ->putJson('/api/modules/management-aset/v1/tipe-atribut/'.$atributId.'/nilai', ['rows' => $rows]);
     }
 
     /** @param list<array<string, mixed>> $atribut */
@@ -488,9 +488,9 @@ class AssetAttributeTest extends TestCase
     {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(5)]);
 
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/v1/aset', [
+            ->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => (string) Str::ulid(),
                 'nama' => 'Aset atribut uji',
                 'group_aset_id' => $group, 'jenis_aset_id' => $jenisId,

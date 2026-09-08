@@ -1,17 +1,17 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class AssetPlanningTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -24,10 +24,9 @@ class AssetPlanningTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         $this->unitId = (string) Str::ulid();
         Http::fake(function ($request) {
             if (str_ends_with($request->url(), '/units-of-measure/resolve')) {
@@ -54,8 +53,8 @@ class AssetPlanningTest extends TestCase
         ]);
         Http::assertSent(fn ($request) => str_contains($request->url(), '/number-sequences/') && $request['legal_entity_id'] === $this->legalEntityId);
 
-        $this->withHeaders($this->headers(['management-aset.perencanaan-aset.read']))
-            ->getJson('/api/v1/perencanaan-aset/'.$planId)
+        $this->headers(['management-aset.perencanaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/perencanaan-aset/'.$planId)
             ->assertOk()->assertJsonPath('data.details.0.jenis_aset_nama', 'Laptop kerja');
     }
 
@@ -75,30 +74,28 @@ class AssetPlanningTest extends TestCase
         $payload['description'] = 'Kebutuhan diperbarui';
         $payload['version'] = 1;
 
-        $this->withHeaders($this->headers(['management-aset.perencanaan-aset.read']))
-            ->patchJson('/api/v1/perencanaan-aset/'.$plan['id'], $payload)->assertForbidden();
-        $this->withHeaders($this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.update']))
-            ->patchJson('/api/v1/perencanaan-aset/'.$plan['id'], $payload)->assertOk()->assertJsonPath('data.version', 2);
-        $this->withHeaders($this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.archive']))
-            ->deleteJson('/api/v1/perencanaan-aset/'.$plan['id'], ['version' => 1])->assertConflict();
-        $this->withHeaders($this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.archive']))
-            ->deleteJson('/api/v1/perencanaan-aset/'.$plan['id'], ['version' => 2])->assertNoContent();
+        $this->headers(['management-aset.perencanaan-aset.read'])
+            ->patchJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], $payload)->assertForbidden();
+        $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.update'])
+            ->patchJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], $payload)->assertOk()->assertJsonPath('data.version', 2);
+        $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.archive'])
+            ->deleteJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], ['version' => 1])->assertConflict();
+        $this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.archive'])
+            ->deleteJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'], ['version' => 2])->assertNoContent();
         $this->assertSoftDeleted('aset_tr_perencanaan_aset', ['id' => $plan['id']]);
     }
 
     private function create(string $jenis)
     {
-        return $this->withHeaders($this->headers(['management-aset.perencanaan-aset.create']))
+        return $this->headers(['management-aset.perencanaan-aset.create'])
             ->withHeader('Idempotency-Key', 'plan-'.Str::ulid())
-            ->postJson('/api/v1/perencanaan-aset', $this->payload($jenis));
+            ->postJson('/api/modules/management-aset/v1/perencanaan-aset', $this->payload($jenis));
     }
 
     /** @return array<string, string> */
-    private function headers(array $permissions): array
+    private function headers(array $permissions): static
     {
-        return $this->contextHeaders($this->tenantId, $permissions, [
-            'legal_entity_id' => $this->legalEntityId, 'org_unit_id' => $this->orgUnitId, 'user_id' => 'planner-1',
-        ]);
+        return $this->sebagaiPengguna($this->tenantId, $permissions);
     }
 
     /** @return array<string, mixed> */

@@ -1,13 +1,13 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 /**
@@ -17,7 +17,7 @@ use Tests\TestCase;
  */
 class DepreciationBookTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -30,10 +30,9 @@ class DepreciationBookTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         Http::fake(fn () => Http::response(['data' => ['number' => 'NS-'.str_pad((string) ++$this->issued, 6, '0', STR_PAD_LEFT)]]));
     }
 
@@ -93,8 +92,8 @@ class DepreciationBookTest extends TestCase
         $asset = $this->receive($group, $jenis, ['acquisition_value' => 500000]);
         $bookId = DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create']))
-            ->postJson('/api/v1/penyusutan/proposal', [
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', [
                 'asset_book_id' => $bookId, 'period_starts_on' => '2026-04-01', 'period_ends_on' => '2026-04-30',
             ])->assertStatus(422);
     }
@@ -135,8 +134,8 @@ class DepreciationBookTest extends TestCase
         $this->matrix($group, [['buku_id' => $buku]])->assertOk();
         $this->receive($group, $jenis);
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('profil-penyusutan')))
-            ->patchJson('/api/v1/profil-penyusutan/'.$profil, ['useful_life_periods' => 24])
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('profil-penyusutan'))
+            ->patchJson('/api/modules/management-aset/v1/profil-penyusutan/'.$profil, ['useful_life_periods' => 24])
             ->assertStatus(422)
             ->assertJsonValidationErrors('method');
     }
@@ -145,8 +144,8 @@ class DepreciationBookTest extends TestCase
     {
         $group = $this->master('group-aset', ['nama' => 'Mesin']);
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.group-aset.read']))
-            ->putJson('/api/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => []])
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.read'])
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => []])
             ->assertForbidden();
 
         $foreignTenant = (string) Str::ulid();
@@ -188,9 +187,9 @@ class DepreciationBookTest extends TestCase
     /** @param array<string, mixed> $payload */
     private function master(string $resource, array $payload, ?string $tenantId = null): string
     {
-        return $this->withHeaders($this->contextHeaders($tenantId ?? $this->tenantId, $this->permissionsFor($resource)))
+        return $this->sebagaiPengguna($tenantId ?? $this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/v1/'.$resource, $payload)
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload)
             ->assertCreated()
             ->json('data.id');
     }
@@ -206,16 +205,16 @@ class DepreciationBookTest extends TestCase
     /** @param list<array<string, mixed>> $rows */
     private function matrix(string $groupId, array $rows): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('group-aset')))
-            ->putJson('/api/v1/group-aset/'.$groupId.'/buku-penyusutan', ['rows' => $rows]);
+        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$groupId.'/buku-penyusutan', ['rows' => $rows]);
     }
 
     /** @param array<string, mixed> $overrides */
     private function receive(string $group, string $jenis, array $overrides = []): string
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/v1/aset', [
+            ->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => $this->legalEntityId,
                 'nama' => 'Aset buku penyusutan uji',
                 'group_aset_id' => $group, 'jenis_aset_id' => $jenis,

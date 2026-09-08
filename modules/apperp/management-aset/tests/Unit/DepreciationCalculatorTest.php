@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Unit;
+namespace Modules\Apperp\ManagementAset\Tests\Unit;
 
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use PHPUnit\Framework\TestCase;

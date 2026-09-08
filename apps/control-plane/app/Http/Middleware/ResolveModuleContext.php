@@ -8,6 +8,7 @@ use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\LaunchableAppCatalog;
 use App\Support\Modules\ModuleRequestContext;
+use App\Support\Modules\TenantScope;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -69,6 +70,23 @@ final class ResolveModuleContext
 
         $legalEntity = $this->workspace->legalEntity($request, $membership);
         $orgUnit = $this->workspace->operatingUnit($request, $membership);
+
+        // Tenant aktif diikat ke container, bukan hanya ditaruh sebagai atribut permintaan.
+        //
+        // `TenantScope` membacanya dari sana, dan ia gagal-menutup: tanpa ikatan ini setiap
+        // query model module melempar "Query module dijalankan tanpa tenant aktif" dan
+        // permintaannya berakhir 500. Lubang ini tidak terlihat sampai ada module sungguhan
+        // yang punya model dan rute sekaligus — kedua module contoh hanya menyentuh modelnya
+        // dari test yang mengikat tenantnya sendiri.
+        //
+        // **Satu batas yang harus diketahui sebelum runtime ini dipindah ke Octane atau
+        // pekerja yang hidup lama:** ikatan ini menempel pada container aplikasi, dan container
+        // itu dibangun ulang per permintaan hanya pada FPM. Di proses yang hidup lama, tenant
+        // dari permintaan sebelumnya akan tersisa untuk permintaan berikutnya yang kebetulan
+        // tidak melewati middleware ini. Yang membuatnya aman hari ini adalah model
+        // penyajiannya, bukan kodenya — jadi pindah ke Octane menuntut ikatan ini dibereskan
+        // lebih dulu, bukan sesudahnya.
+        app()->instance(TenantScope::KUNCI, (string) $membership->tenant_id);
 
         $request->attributes->set(self::MODULE_AKTIF, $moduleId);
         $request->attributes->set(ModuleRequestContext::TENANT_ID, (string) $membership->tenant_id);

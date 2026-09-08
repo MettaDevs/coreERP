@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -39,7 +39,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $otherTenant = (string) Str::ulid();
         $body = $this->eventBody($tenant);
 
-        $this->call('POST', '/api/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
+        $this->call('POST', '/api/modules/management-aset/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
             ->assertOk()
             ->assertJsonPath('data.template_key', 'id:pmk72-2023:starter:v1');
 
@@ -119,7 +119,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
             ->where('creation_key', 'profil-penyusutan:starter:id:pmk72-2023:profil:kelompok-1:garis-lurus:v1')
             ->value('id');
 
-        $this->call('POST', '/api/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
+        $this->call('POST', '/api/modules/management-aset/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
             ->assertOk();
 
         $this->assertSame(365, $calls, 'Pengulangan event tidak boleh meminta nomor baru.');
@@ -146,7 +146,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
 
     public function test_unsigned_provisioning_request_is_rejected(): void
     {
-        $this->postJson('/api/internal/v1/provisioning/tenant', [
+        $this->postJson('/api/modules/management-aset/internal/v1/provisioning/tenant', [
             'id' => (string) Str::ulid(),
             'type' => 'core.tenant.provisioned.v1',
             'occurred_at' => now()->toIso8601String(),
@@ -161,7 +161,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
         Http::fake();
         $body = $this->eventBody((string) Str::ulid(), ['human-resources']);
 
-        $this->call('POST', '/api/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
+        $this->call('POST', '/api/modules/management-aset/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
             ->assertOk()
             ->assertJsonPath('data.skipped', true);
 

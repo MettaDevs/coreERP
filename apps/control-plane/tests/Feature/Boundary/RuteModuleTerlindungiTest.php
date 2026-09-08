@@ -28,11 +28,7 @@ class RuteModuleTerlindungiTest extends TestCase
      *
      * @var array<string, string>
      */
-    private const SENGAJA_BELUM = [
-        'coreerp-event' => 'Panggilan balik Core lewat HTTP. Berhenti masuk akal di satu proses; '
-            .'menjadi event Laravel pada F3-09 (keputusan workflow) dan F3-11 (penyediaan tenant). '
-            .'Dibiarkan gagal berisik supaya tidak ada yang memuat rutenya lebih dulu.',
-    ];
+    private const SENGAJA_BELUM = [];
 
     /**
      * Grup dan alias bawaan Laravel, yang tidak perlu didaftarkan siapa pun.
@@ -91,8 +87,19 @@ class RuteModuleTerlindungiTest extends TestCase
         $isi = (string) file_get_contents(dirname(__DIR__, 3).'/bootstrap/app.php');
 
         preg_match_all("/'([a-z0-9\-\.]+)'\s*=>\s*[A-Za-z]+::class/", $isi, $cocok);
+        $terdaftar = $cocok[1];
 
-        return array_values(array_unique($cocok[1]));
+        // Module boleh mendaftarkan aliasnya sendiri lewat penyedia layanannya, dan memang itu
+        // rumah yang benar: alias yang hanya dipakai satu module tidak perlu diketahui Core.
+        // Penjaga ini karena itu ikut membaca penyedia layanan module, bukan hanya Core.
+        $penyedia = glob(dirname(__DIR__, 5).'/modules/*/*/src/ModuleServiceProvider.php');
+
+        foreach ($penyedia === false ? [] : $penyedia as $berkas) {
+            preg_match_all("/aliasMiddleware\(\s*'([^']+)'/", (string) file_get_contents($berkas), $cocokModule);
+            $terdaftar = [...$terdaftar, ...$cocokModule[1]];
+        }
+
+        return array_values(array_unique($terdaftar));
     }
 
     /**

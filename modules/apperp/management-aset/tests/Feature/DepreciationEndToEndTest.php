@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 /**
@@ -22,7 +22,7 @@ use Tests\TestCase;
  */
 class DepreciationEndToEndTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -38,10 +38,9 @@ class DepreciationEndToEndTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         Http::fake(function ($request) {
             if (str_contains($request->url(), '/fiscal-periods')) {
                 return Http::response(['data' => [
@@ -224,14 +223,14 @@ class DepreciationEndToEndTest extends TestCase
         $this->fastForward($milikKita, 3);
 
         $tenantLain = (string) Str::ulid();
-        $this->withHeaders($this->contextHeaders($tenantLain, ['management-aset.penyusutan.read']))
-            ->getJson('/api/v1/penyusutan')
+        $this->sebagaiPengguna($tenantLain, ['management-aset.penyusutan.read'])
+            ->getJson('/api/modules/management-aset/v1/penyusutan')
             ->assertOk()
             ->assertJsonCount(0, 'data');
 
         // Buku milik tenant lain tidak dapat dipakai membuat proposal.
-        $this->withHeaders($this->contextHeaders($tenantLain, ['management-aset.penyusutan.create']))
-            ->postJson('/api/v1/penyusutan/proposal', [
+        $this->sebagaiPengguna($tenantLain, ['management-aset.penyusutan.create'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', [
                 'asset_book_id' => $milikKita, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31',
             ])->assertNotFound();
 
@@ -245,8 +244,8 @@ class DepreciationEndToEndTest extends TestCase
         $this->finalize($periodId);
         $this->assertSame(1100.0, $this->netBookValue($book));
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.penyusutan.correct']))
-            ->postJson('/api/v1/penyusutan/'.$periodId.'/reversal', ['reason' => 'Salah periode'])
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.correct'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/'.$periodId.'/reversal', ['reason' => 'Salah periode'])
             ->assertCreated();
 
         $this->assertSame(1200.0, $this->netBookValue($book));
@@ -317,8 +316,8 @@ class DepreciationEndToEndTest extends TestCase
 
     private function proposeOn(string $bookId, string $start, string $end, ?float $consumption = null): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create']))
-            ->postJson('/api/v1/penyusutan/proposal', array_filter([
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', array_filter([
                 'asset_book_id' => $bookId,
                 'period_starts_on' => $start,
                 'period_ends_on' => $end,
@@ -337,8 +336,8 @@ class DepreciationEndToEndTest extends TestCase
 
     private function finalize(string $periodId): void
     {
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.penyusutan.finalize']))
-            ->postJson('/api/v1/penyusutan/'.$periodId.'/finalisasi')
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.finalize'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/'.$periodId.'/finalisasi')
             ->assertOk();
     }
 
@@ -360,9 +359,9 @@ class DepreciationEndToEndTest extends TestCase
     /** @param array<string, mixed> $payload */
     private function master(string $resource, array $payload): string
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor($resource)))
+        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/v1/'.$resource, $payload)
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload)
             ->assertCreated()->json('data.id');
     }
 
@@ -380,15 +379,15 @@ class DepreciationEndToEndTest extends TestCase
     /** @param list<array<string, mixed>> $rows */
     private function matrix(string $groupId, array $rows): TestResponse
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $this->permissionsFor('group-aset')))
-            ->putJson('/api/v1/group-aset/'.$groupId.'/buku-penyusutan', ['rows' => $rows]);
+        return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))
+            ->putJson('/api/modules/management-aset/v1/group-aset/'.$groupId.'/buku-penyusutan', ['rows' => $rows]);
     }
 
     private function receive(string $group, string $jenis, float $acquisition, float $residual = 0, string $placedInService = '2026-06-15'): string
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
             ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/v1/aset', [
+            ->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => $this->legalEntityId,
                 'nama' => 'Aset penyusutan ujung ke ujung',
                 'group_aset_id' => $group, 'jenis_aset_id' => $jenis,

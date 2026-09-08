@@ -2901,6 +2901,28 @@ rute yang bertabrakan.
 
 **Bergantung pada.** F3-10.
 
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026, bersama F3-22 dan F3-15.
+
+**181 rute modul terdaftar di bawah `api/modules/management-aset`.** Awalan itu bukan kerapian: Core
+sudah memakai `api/v1` untuk **tujuh belas** kelompok rutenya sendiri, dan dua pemilik pada satu ruang
+nama rute adalah tabrakan yang menunggu tanggal — tabrakan yang muncul sebagai rute yang diam-diam
+menang, bukan sebagai kesalahan.
+
+**Penyedia layanan modul didaftarkan untuk modul yang sedang dipindah juga.** Ini membutuhkan pembedaan
+baru pada registry: `semua()` untuk yang **dilayani** (katalog, pemasangan, data tenant) dan
+`semuaTermasukYangSedangDipindah()` untuk yang **dimuat**. "Belum boleh dipasang untuk tenant" tidak sama
+dengan "kodenya tidak boleh dimuat" — modul yang kodenya tidak dimuat tidak punya satu pun test yang bisa
+berjalan, dan pemindahannya jadi dikerjakan tanpa jaring pengaman sampai hari terakhir.
+
+Untuk alasan yang sama, migration modul yang sedang dipindah ikut dijalankan bersama migration Core.
+Modul yang sudah jadi tidak begitu — migrationnya dijalankan `ModuleMigrator` saat dipasang per tenant.
+Keduanya berakhir sendiri begitu modul keluar dari daftar.
+
+**Langkah 2 rencana ditunda dengan sengaja.** Rute `/api/v1/...` lama tidak "dihentikan" melainkan
+memang tidak pernah didaftarkan di runtime ini; UI modul masih menunjuk ke sana dan diperbaiki di fase 4.
+
 ### F3-14 — Manifest modul terdaftar dari folder
 
 **Kenapa.** Setelah modul ada di dalam repo, manifest tidak perlu didaftarkan lewat perintah yang
@@ -2946,6 +2968,39 @@ Semuanya harus berganti cara masuk.
 **Rujukan.** [pengujian](../../apps/management-aset/arsitektur/pengujian.md).
 
 **Bergantung pada.** F3-10.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026, bersama F3-22 dan F3-13.
+
+**Trait penggantinya membangun rantai izin sungguhan.** Dulu test mencetak JWT sendiri dengan daftar izin
+apa pun yang disebutkannya; sekarang ia membuat `permissions`, `security_privileges`, `security_duties`,
+`roles`, dan `role_assignments` di Core lalu `actingAs()`. Konsekuensinya disengaja: **test yang meminta
+izin yang tidak ada akan gagal**, bukan lolos dengan klaim yang dikarang sendiri.
+
+Satu rantai baru dibuat per pemanggilan, bukan satu rantai bersama. Kalau dua test berbagi role, keduanya
+saling memberi izin tanpa ada yang menyadarinya — dan test yang membuktikan penolakan izin justru yang
+paling mudah lolos palsu.
+
+**Yang ditemukan karena test itu akhirnya berjalan, dan tidak akan ditemukan dengan cara lain:**
+
+1. **Tidak ada satu pun yang mengikat tenant aktif selama permintaan.** `TenantScope` membacanya dari
+   container dan gagal-menutup, jadi setiap query model modul berakhir 500. Lubang ini tidak terlihat
+   sampai ada modul yang punya model **dan** rute sekaligus; kedua modul contoh hanya menyentuh modelnya
+   dari test yang mengikat tenantnya sendiri. `ResolveModuleContext` sekarang yang mengikatnya.
+2. **Rute modul perlu grup `web`**, karena konteks dibaca dari sesi Core. Tanpa itu `Request::session()`
+   melempar "Session store not set on request" — muncul sebagai 500, bukan 401.
+3. **Rute modul perlu `auth` di depan `konteks-module`.** Tanpa `auth`, permintaan tanpa pengguna jatuh ke
+   middleware konteks dan dijawab 403. Yang benar 401: soalnya identitas, bukan wewenang. Ditemukan oleh
+   satu test lama yang memang menuntut 401.
+4. **`OrganizationScope` melempar bila kebijakan datanya tidak ada sama sekali** (`$scope['all']` tanpa
+   `??`). Dulu tidak pernah terjadi karena token selalu memuat kunci kebijakannya walau kosong; Core
+   menyusunnya hanya bila ada.
+
+**Satu test dibuang, bukan diterjemahkan.** `test_gateway_context_and_permission_are_required` memeriksa
+token yang dirusak satu huruf. Tidak ada lagi token untuk dirusak. Test yang menguji mekanisme yang sudah
+tidak ada akan tetap hijau selamanya tanpa menjaga apa pun; yang tersisa dari test itu — 401 tanpa
+pengguna, 403 tanpa izin — dipertahankan dengan nama yang menyebut keduanya.
 
 ### F3-16 — Test modul berjalan di PostgreSQL
 
@@ -3111,6 +3166,20 @@ membuat suite tidak bisa dimuat sama sekali.
 **Rujukan.** [pengujian](../../apps/management-aset/arsitektur/pengujian.md).
 
 **Bergantung pada.** F3-03.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026, digabung dengan F3-13 dan F3-15 karena tidak satu pun dari ketiganya bisa
+dibuktikan sendirian.
+
+**Langkah 1 rencana tidak bekerja, dan sebabnya patut diingat.** Ia menyuruh mendaftarkan namespace test
+modul pada `autoload-dev` modul. **Composer tidak memuat `autoload-dev` milik dependensi** — hanya milik
+paket akar. Akibatnya seluruh test modul gagal dengan "Trait ... not found" tanpa satu pun petunjuk bahwa
+sebabnya berada di berkas `composer.json` yang lain. Pemetaannya karena itu didaftarkan di `autoload-dev`
+Core, sebaris per modul — konsisten dengan `require` yang memang sudah menyebut tiap modul satu per satu.
+
+**Kelas dasar test modul dibuang, memakai milik Core.** Dua akar PSR-4 untuk satu awalan `Tests\` dengan
+kelas bernama sama membuat suite tidak bisa dimuat sama sekali; itu memang yang diperingatkan rencana.
 
 ### F3-23 — Nasib berkas kontrak, uji beban, dan penyebaran milik modul
 

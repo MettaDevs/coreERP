@@ -1,25 +1,24 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class ModelAsetTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
-        $this->configureCoreErpContext();
+        $this->tenantId = $this->buatTenantUji();
     }
 
     public function test_crud_uses_core_number_sequence_and_archives_instead_of_deleting(): void
@@ -32,7 +31,7 @@ class ModelAsetTest extends TestCase
             'management-aset.model-aset.update',
             'management-aset.model-aset.archive',
         ])->withHeader('Idempotency-Key', 'create-model-1')
-            ->postJson('/api/v1/model-aset', ['nama' => 'PC200-8', 'keterangan' => 'Excavator 20 ton', 'pabrikan_aset_id' => $this->pabrikan()])
+            ->postJson('/api/modules/management-aset/v1/model-aset', ['nama' => 'PC200-8', 'keterangan' => 'Excavator 20 ton', 'pabrikan_aset_id' => $this->pabrikan()])
             ->assertCreated()
             ->assertJsonPath('data.kode', 'MDLA-000001');
 
@@ -41,12 +40,12 @@ class ModelAsetTest extends TestCase
             && $request['idempotency_key'] === 'model-aset:create-model-1');
 
         $this->withContext(['management-aset.model-aset.update'])
-            ->patchJson('/api/v1/model-aset/'.$id, ['nama' => 'PC200-8 MK2', 'aktif' => false])
+            ->patchJson('/api/modules/management-aset/v1/model-aset/'.$id, ['nama' => 'PC200-8 MK2', 'aktif' => false])
             ->assertOk()
             ->assertJsonPath('data.aktif', false);
 
         $this->withContext(['management-aset.model-aset.archive'])
-            ->deleteJson('/api/v1/model-aset/'.$id)
+            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$id)
             ->assertNoContent();
 
         $this->assertSoftDeleted('aset_m_model_aset', ['id' => $id, 'tenant_id' => $this->tenantId]);
@@ -59,24 +58,24 @@ class ModelAsetTest extends TestCase
 
         $first = $this->withContext(['management-aset.model-aset.create'])
             ->withHeader('Idempotency-Key', 'same-request')
-            ->postJson('/api/v1/model-aset', ['nama' => 'Pertama', 'pabrikan_aset_id' => $pabrikan])
+            ->postJson('/api/modules/management-aset/v1/model-aset', ['nama' => 'Pertama', 'pabrikan_aset_id' => $pabrikan])
             ->assertCreated();
         $this->withContext(['management-aset.model-aset.create'])
             ->withHeader('Idempotency-Key', 'same-request')
-            ->postJson('/api/v1/model-aset', ['nama' => 'Pertama', 'pabrikan_aset_id' => $pabrikan])
+            ->postJson('/api/modules/management-aset/v1/model-aset', ['nama' => 'Pertama', 'pabrikan_aset_id' => $pabrikan])
             ->assertOk()
             ->assertHeader('Idempotent-Replayed', 'true')
             ->assertJsonPath('data.id', $first->json('data.id'));
         $this->withContext(['management-aset.model-aset.create'])
             ->withHeader('Idempotency-Key', 'same-request')
-            ->postJson('/api/v1/model-aset', ['nama' => 'Data berbeda', 'pabrikan_aset_id' => $pabrikan])
+            ->postJson('/api/modules/management-aset/v1/model-aset', ['nama' => 'Data berbeda', 'pabrikan_aset_id' => $pabrikan])
             ->assertConflict()
             ->assertJsonPath('error.code', 'idempotency_conflict');
         Http::assertSentCount(1);
 
         $otherTenant = (string) Str::ulid();
-        $this->withHeaders($this->contextHeaders($otherTenant, ['management-aset.model-aset.read']))
-            ->getJson('/api/v1/model-aset/'.$first->json('data.id'))
+        $this->sebagaiPengguna($otherTenant, ['management-aset.model-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/model-aset/'.$first->json('data.id'))
             ->assertNotFound();
     }
 
@@ -92,18 +91,14 @@ class ModelAsetTest extends TestCase
             'management-aset.aset.read',
         ];
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, [
-            'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
-        ]))
-            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+        $this->sebagaiPengguna($this->tenantId, $permissions)
+            ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
             ->assertJsonPath('data.model_count', 1)
             ->assertJsonPath('data.asset_count', 1);
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, [
-            'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
-        ]))
-            ->getJson('/api/v1/model-aset?pabrikan_aset_id='.$pabrikan)
+        $this->sebagaiPengguna($this->tenantId, $permissions)
+            ->getJson('/api/modules/management-aset/v1/model-aset?pabrikan_aset_id='.$pabrikan)
             ->assertOk()
             ->assertJsonPath('data.0.asset_count', 1);
     }
@@ -114,8 +109,8 @@ class ModelAsetTest extends TestCase
         $model = $this->model($pabrikan);
         $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.pabrikan-aset.read']))
-            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.pabrikan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
             ->assertJsonPath('data.model_count', null)
             ->assertJsonPath('data.asset_count', null);
@@ -133,29 +128,26 @@ class ModelAsetTest extends TestCase
             'management-aset.model-aset.read',
             'management-aset.aset.read',
         ];
-        $outsideScope = [
-            'data_policies' => ['management-aset.asset-responsibility' => [
-                'all' => false,
-                'scope_grants' => [['legal_entity_id' => (string) Str::ulid(), 'operating_unit_ids' => [(string) Str::ulid()]]],
-            ]],
-        ];
+        $outsideScope = [[
+            'policy_code' => 'management-aset.asset-responsibility',
+            'legal_entity_id' => (string) Str::ulid(),
+            'organization_id' => (string) Str::ulid(),
+        ]];
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, $outsideScope))
-            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+        $this->sebagaiPengguna($this->tenantId, $permissions, $outsideScope)
+            ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
             ->assertJsonPath('data.model_count', 1)
             ->assertJsonPath('data.asset_count', 0);
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, $outsideScope))
-            ->getJson('/api/v1/model-aset?pabrikan_aset_id='.$pabrikan)
+        $this->sebagaiPengguna($this->tenantId, $permissions, $outsideScope)
+            ->getJson('/api/modules/management-aset/v1/model-aset?pabrikan_aset_id='.$pabrikan)
             ->assertOk()
             ->assertJsonPath('data.0.asset_count', 0);
 
         DB::table('aset_tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
-        $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, [
-            'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
-        ]))
-            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+        $this->sebagaiPengguna($this->tenantId, $permissions)
+            ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
             ->assertJsonPath('data.asset_count', 0);
     }
@@ -175,17 +167,15 @@ class ModelAsetTest extends TestCase
             'management-aset.model-aset.read',
             'management-aset.aset.read',
         ];
-        $headers = $this->contextHeaders($this->tenantId, $permissions, [
-            'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
-        ]);
+        $this->sebagaiPengguna($this->tenantId, $permissions);
 
-        $this->withHeaders($headers)
-            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+        $this
+            ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
             ->assertJsonPath('data.asset_count', 1);
 
-        $this->withHeaders($headers)
-            ->getJson('/api/v1/model-aset?pabrikan_aset_id='.$pabrikan)
+        $this
+            ->getJson('/api/modules/management-aset/v1/model-aset?pabrikan_aset_id='.$pabrikan)
             ->assertOk()
             ->assertJsonPath('data.0.asset_count', 1);
 
@@ -199,14 +189,14 @@ class ModelAsetTest extends TestCase
         $asset = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
 
         $this->withContext(['management-aset.model-aset.archive'])
-            ->deleteJson('/api/v1/model-aset/'.$model)
+            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$model)
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
 
         DB::table('aset_tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
 
         $this->withContext(['management-aset.model-aset.archive'])
-            ->deleteJson('/api/v1/model-aset/'.$model)
+            ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$model)
             ->assertNoContent();
     }
 
@@ -214,26 +204,34 @@ class ModelAsetTest extends TestCase
     {
         $pabrikan = $this->pabrikan();
 
-        $this->withHeaders($this->contextHeaders((string) Str::ulid(), ['management-aset.pabrikan-aset.read']))
-            ->getJson('/api/v1/pabrikan-aset/'.$pabrikan.'/detail')
+        $this->sebagaiPengguna((string) Str::ulid(), ['management-aset.pabrikan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertNotFound();
     }
 
-    public function test_gateway_context_and_permission_are_required(): void
+    /**
+     * Dua penolakan yang berbeda, dan bedanya penting.
+     *
+     * Tanpa pengguna sama sekali: 401, dijawab `auth`. Itu soal identitas.
+     * Dengan pengguna tetapi tanpa satu pun izin atas module ini: 403, dijawab middleware
+     * konteks module. Itu soal wewenang.
+     *
+     * Bagian ketiga test lama — token yang dirusak satu huruf — sengaja dibuang, bukan
+     * diterjemahkan. Tidak ada lagi token untuk dirusak: module berjalan di proses yang sama
+     * dan membaca sesi Core. Test yang menguji mekanisme yang sudah tidak ada akan tetap
+     * hijau selamanya tanpa menjaga apa pun.
+     */
+    public function test_tanpa_pengguna_ditolak_401_dan_tanpa_izin_ditolak_403(): void
     {
-        $this->getJson('/api/v1/model-aset')->assertUnauthorized();
-        $this->withContext([])->getJson('/api/v1/model-aset')->assertForbidden();
-        $token = $this->contextToken($this->tenantId, ['management-aset.model-aset.read']);
-        $tampered = substr($token, 0, -1).($token[-1] === 'a' ? 'b' : 'a');
-        $this->withHeader('Authorization', 'Bearer '.$tampered)
-            ->getJson('/api/v1/model-aset')
-            ->assertUnauthorized();
+        $this->getJson('/api/modules/management-aset/v1/model-aset')->assertUnauthorized();
+
+        $this->withContext([])->getJson('/api/modules/management-aset/v1/model-aset')->assertForbidden();
     }
 
     /** @param list<string> $permissions */
     private function withContext(array $permissions): static
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $permissions));
+        return $this->sebagaiPengguna($this->tenantId, $permissions);
     }
 
     /** Induk wajib model aset; datar, jadi cukup satu insert tanpa rantai apa pun. */

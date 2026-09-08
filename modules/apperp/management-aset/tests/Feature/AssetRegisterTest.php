@@ -1,26 +1,25 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class AssetRegisterTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
-        $this->configureCoreErpContext();
+        $this->tenantId = $this->buatTenantUji();
         Http::fake(['core.test/*' => Http::response(['data' => ['number' => 'AST-000001']], 200)]);
     }
 
@@ -33,9 +32,9 @@ class AssetRegisterTest extends TestCase
         $receiver = (string) Str::ulid();
         $custodian = (string) Str::ulid();
 
-        $response = $this->withHeaders($this->contextHeaders($this->tenantId, [
+        $response = $this->sebagaiPengguna($this->tenantId, [
             'management-aset.aset.read', 'management-aset.aset.create', 'management-aset.aset.mutate',
-        ]))->withHeader('Idempotency-Key', 'receipt-1')->postJson('/api/v1/aset', [
+        ])->withHeader('Idempotency-Key', 'receipt-1')->postJson('/api/modules/management-aset/v1/aset', [
             'legal_entity_id' => $legalEntity, 'nama' => 'Aset uji penerimaan', ...$classification,
             'acquired_on' => '2026-07-28', 'acquisition_value' => 12000000,
             'currency_code' => 'IDR', 'receiving_org_unit_id' => $receivingUnit,
@@ -56,8 +55,8 @@ class AssetRegisterTest extends TestCase
     {
         $assetId = $this->receive();
         $newUnit = (string) Str::ulid();
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.mutate']))
-            ->postJson('/api/v1/aset/'.$assetId.'/penempatan', [
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
+            ->postJson('/api/modules/management-aset/v1/aset/'.$assetId.'/penempatan', [
                 'effective_on' => '2026-08-01', 'reason' => 'Pindah pengguna', 'usage_org_unit_id' => $newUnit,
             ])->assertOk();
 
@@ -85,11 +84,11 @@ class AssetRegisterTest extends TestCase
             ['id' => $crossFirst, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-c', 'kode' => 'AST-SCOPE-C', 'nama' => 'Aset scope C', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
             ['id' => $crossSecond, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-d', 'kode' => 'AST-SCOPE-D', 'nama' => 'Aset scope D', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
         ]);
-        $scope = ['all' => false, 'scope_grants' => [
-            ['legal_entity_id' => $firstLegalEntity, 'operating_unit_ids' => [$firstUnit]],
-            ['legal_entity_id' => $secondLegalEntity, 'operating_unit_ids' => [$secondUnit]],
-        ]];
-        $data = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.read'], ['data_policies' => ['management-aset.asset-responsibility' => $scope]]))->getJson('/api/v1/aset')->assertOk()->json('data');
+        $lingkup = [
+            ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $firstLegalEntity, 'organization_id' => $firstUnit],
+            ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $secondLegalEntity, 'organization_id' => $secondUnit],
+        ];
+        $data = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'], $lingkup)->getJson('/api/modules/management-aset/v1/aset')->assertOk()->json('data');
         $this->assertEqualsCanonicalizing([$first, $second], array_column($data, 'id'));
         $this->assertNotContains($crossFirst, array_column($data, 'id'));
         $this->assertNotContains($crossSecond, array_column($data, 'id'));
@@ -104,8 +103,8 @@ class AssetRegisterTest extends TestCase
             : Http::response(['data' => ['number' => 'AST-000001']], 200));
         $assetId = $this->receive();
         $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
-        $document = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.dekomisioning-aset.create']))
-            ->withHeader('Idempotency-Key', 'decommission-1')->postJson('/api/v1/dekomisioning-aset', [
+        $document = $this->sebagaiPengguna($this->tenantId, ['management-aset.dekomisioning-aset.create'])
+            ->withHeader('Idempotency-Key', 'decommission-1')->postJson('/api/modules/management-aset/v1/dekomisioning-aset', [
                 'legal_entity_id' => $asset->legal_entity_id, 'responsible_org_unit_id' => $asset->responsible_org_unit_id,
                 'tanggal' => '2026-08-03', 'asset_id' => $assetId,
             ])->assertCreated()->json('data');
@@ -122,8 +121,8 @@ class AssetRegisterTest extends TestCase
             'CONTENT_TYPE' => 'application/json', 'HTTP_X_COREERP_EVENT_TIMESTAMP' => $timestamp,
             'HTTP_X_COREERP_EVENT_SIGNATURE' => hash_hmac('sha256', $timestamp.'.'.$body, 'test-context-signing-key-32-bytes'),
         ];
-        $this->call('POST', '/api/internal/v1/workflow-events', [], [], [], $headers, $body)->assertOk();
-        $this->call('POST', '/api/internal/v1/workflow-events', [], [], [], $headers, $body)->assertOk();
+        $this->call('POST', '/api/modules/management-aset/internal/v1/workflow-events', [], [], [], $headers, $body)->assertOk();
+        $this->call('POST', '/api/modules/management-aset/internal/v1/workflow-events', [], [], [], $headers, $body)->assertOk();
 
         $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $assetId, 'lifecycle_state' => 'decommissioned']);
         $this->assertDatabaseCount('aset_processed_core_events', 1);
@@ -138,8 +137,8 @@ class AssetRegisterTest extends TestCase
         $classification = $this->classification();
         $this->configureNonDepreciatingBook($classification['group_aset_id']);
 
-        $assetId = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
-            ->withHeader('Idempotency-Key', 'receipt-register-only')->postJson('/api/v1/aset', [
+        $assetId = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
+            ->withHeader('Idempotency-Key', 'receipt-register-only')->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset tanpa penyusutan', ...$classification,
                 'acquired_on' => '2026-07-28', 'acquisition_value' => 9000000,
                 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
@@ -149,8 +148,8 @@ class AssetRegisterTest extends TestCase
             'asset_id' => $assetId, 'depreciate' => false, 'depreciation_profile_id' => null,
         ]);
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.mutate']))
-            ->postJson('/api/v1/aset/'.$assetId.'/penempatan', [
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
+            ->postJson('/api/modules/management-aset/v1/aset/'.$assetId.'/penempatan', [
                 'effective_on' => '2026-08-01', 'reason' => 'Penempatan awal', 'usage_org_unit_id' => (string) Str::ulid(),
             ])->assertOk();
     }
@@ -167,8 +166,8 @@ class AssetRegisterTest extends TestCase
             ->where(['tenant_id' => $this->tenantId, 'id' => $classification['group_aset_id']])
             ->update(['capitalization_threshold' => 1000000]);
 
-        $assetId = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
-            ->withHeader('Idempotency-Key', 'receipt-below-threshold')->postJson('/api/v1/aset', [
+        $assetId = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
+            ->withHeader('Idempotency-Key', 'receipt-below-threshold')->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset di bawah ambang', ...$classification,
                 'acquired_on' => '2026-07-28', 'acquisition_value' => 400000,
                 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
@@ -176,8 +175,8 @@ class AssetRegisterTest extends TestCase
 
         $this->assertDatabaseHas('aset_tr_buku_aset', ['asset_id' => $assetId, 'depreciate' => false]);
 
-        $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.mutate']))
-            ->postJson('/api/v1/aset/'.$assetId.'/penempatan', [
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
+            ->postJson('/api/modules/management-aset/v1/aset/'.$assetId.'/penempatan', [
                 'effective_on' => '2026-08-01', 'reason' => 'Penempatan awal', 'usage_org_unit_id' => (string) Str::ulid(),
             ])->assertOk();
     }
@@ -188,8 +187,8 @@ class AssetRegisterTest extends TestCase
         $classification = $this->classification();
         $this->configureNonDepreciatingBook($classification['group_aset_id'], depreciate: true);
 
-        $assetId = $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
-            ->withHeader('Idempotency-Key', 'receipt-missing-profile')->postJson('/api/v1/aset', [
+        $assetId = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
+            ->withHeader('Idempotency-Key', 'receipt-missing-profile')->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset tanpa profil', ...$classification,
                 'acquired_on' => '2026-07-28', 'acquisition_value' => 9000000,
                 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
@@ -203,8 +202,8 @@ class AssetRegisterTest extends TestCase
         $classification = $this->classification();
         $this->configureReadyBook($classification['group_aset_id']);
 
-        return $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.aset.create']))
-            ->withHeader('Idempotency-Key', 'receipt-test')->postJson('/api/v1/aset', [
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
+            ->withHeader('Idempotency-Key', 'receipt-test')->postJson('/api/modules/management-aset/v1/aset', [
                 'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset uji', ...$classification,
                 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
             ])->assertCreated()->json('data.id');

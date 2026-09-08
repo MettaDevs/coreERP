@@ -1,42 +1,41 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class DepreciationTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
-        $this->configureCoreErpContext();
+        $this->tenantId = $this->buatTenantUji();
     }
 
     public function test_proposal_uses_usage_unit_effective_at_period_end_and_final_export_has_no_gl(): void
     {
         [$book, $usageUnit] = $this->book();
-        $headers = $this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize']);
-        $period = $this->withHeaders($headers)->postJson('/api/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize']);
+        $period = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
 
         $this->assertSame($usageUnit, $period['usage_org_unit_id']);
-        $result = $this->withHeaders($headers)->postJson('/api/v1/penyusutan/'.$period['id'].'/finalisasi')->assertOk()->json('data');
+        $result = $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/finalisasi')->assertOk()->json('data');
         $payload = json_decode($result['export']['payload'], true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame($usageUnit, $payload['usage_org_unit_id']);
         $this->assertArrayNotHasKey('debit', $payload);
         $this->assertArrayNotHasKey('credit', $payload);
         $this->assertArrayNotHasKey('coa', $payload);
 
-        $retry = $this->withHeaders($headers)
-            ->postJson('/api/v1/penyusutan/'.$period['id'].'/finalisasi')
+        $retry = $this
+            ->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/finalisasi')
             ->assertOk()
             ->json('data');
         $this->assertSame($period['id'], $retry['period']['id']);
@@ -46,38 +45,38 @@ class DepreciationTest extends TestCase
     public function test_reversal_creates_a_new_final_period_without_rewriting_the_original(): void
     {
         [$book] = $this->book();
-        $headers = $this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize', 'management-aset.penyusutan.correct']);
-        $period = $this->withHeaders($headers)->postJson('/api/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
-        $this->withHeaders($headers)->postJson('/api/v1/penyusutan/'.$period['id'].'/finalisasi')->assertOk();
-        $reversal = $this->withHeaders($headers)->postJson('/api/v1/penyusutan/'.$period['id'].'/reversal', ['reason' => 'Koreksi periode'])->assertCreated()->json('data.period');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create', 'management-aset.penyusutan.finalize', 'management-aset.penyusutan.correct']);
+        $period = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
+        $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/finalisasi')->assertOk();
+        $reversal = $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/reversal', ['reason' => 'Koreksi periode'])->assertCreated()->json('data.period');
 
         $this->assertSame($period['id'], $reversal['reverses_period_id']);
         $this->assertSame(-100.0, (float) $reversal['amount']);
         $this->assertDatabaseHas('aset_tr_penyusutan_aset', ['id' => $period['id'], 'status' => 'final']);
         $this->assertDatabaseCount('aset_tr_penyusutan_aset', 2);
-        $this->withHeaders($headers)->postJson('/api/v1/penyusutan/'.$period['id'].'/reversal', ['reason' => 'Duplikat'])->assertConflict();
+        $this->postJson('/api/modules/management-aset/v1/penyusutan/'.$period['id'].'/reversal', ['reason' => 'Duplikat'])->assertConflict();
     }
 
     public function test_asset_books_and_periods_are_listed_only_inside_the_active_tenant(): void
     {
         [$book] = $this->book();
-        $headers = $this->contextHeaders($this->tenantId, ['management-aset.penyusutan.read', 'management-aset.penyusutan.create']);
-        $this->withHeaders($headers)->postJson('/api/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated();
-        $this->withHeaders($headers)->getJson('/api/v1/penyusutan/buku')->assertOk()->assertJsonPath('data.0.id', $book);
-        $this->withHeaders($headers)->getJson('/api/v1/penyusutan')->assertOk()->assertJsonCount(1, 'data');
-        $this->withHeaders($this->contextHeaders((string) Str::ulid(), ['management-aset.penyusutan.read']))->getJson('/api/v1/penyusutan/buku')->assertOk()->assertJsonCount(0, 'data');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.read', 'management-aset.penyusutan.create']);
+        $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated();
+        $this->getJson('/api/modules/management-aset/v1/penyusutan/buku')->assertOk()->assertJsonPath('data.0.id', $book);
+        $this->getJson('/api/modules/management-aset/v1/penyusutan')->assertOk()->assertJsonCount(1, 'data');
+        $this->sebagaiPengguna((string) Str::ulid(), ['management-aset.penyusutan.read'])->getJson('/api/modules/management-aset/v1/penyusutan/buku')->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_manual_schedule_uses_the_next_value_and_rejects_an_unplanned_period(): void
     {
         [$book] = $this->book();
         DB::table('aset_m_profil_penyusutan')->where('tenant_id', $this->tenantId)->update(['method' => 'manual', 'manual_schedule' => json_encode([['amount' => 90], ['amount' => 70]]), 'useful_life_periods' => null]);
-        $headers = $this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create']);
-        $first = $this->withHeaders($headers)->postJson('/api/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
-        $second = $this->withHeaders($headers)->postJson('/api/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-08-01', 'period_ends_on' => '2026-08-31'])->assertCreated()->json('data');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create']);
+        $first = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31'])->assertCreated()->json('data');
+        $second = $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-08-01', 'period_ends_on' => '2026-08-31'])->assertCreated()->json('data');
         $this->assertSame(90.0, (float) $first['amount']);
         $this->assertSame(70.0, (float) $second['amount']);
-        $this->withHeaders($headers)->postJson('/api/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-09-01', 'period_ends_on' => '2026-09-30'])->assertStatus(422);
+        $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-09-01', 'period_ends_on' => '2026-09-30'])->assertStatus(422);
     }
 
     private function book(): array

@@ -19,6 +19,9 @@ final class ModuleRegistry
     /** @var list<ModuleManifest>|null */
     private ?array $module = null;
 
+    /** @var list<ModuleManifest>|null */
+    private ?array $moduleTermasukDipindah = null;
+
     public function __construct(private readonly string $akar) {}
 
     /**
@@ -46,6 +49,42 @@ final class ModuleRegistry
         usort($ditemukan, static fn (ModuleManifest $a, ModuleManifest $b): int => strcmp($a->id, $b->id));
 
         return $this->module = $ditemukan;
+    }
+
+    /**
+     * Semua module termasuk yang sedang dipindah masuk.
+     *
+     * Bedanya dengan `semua()` penting dan bukan kenyamanan: **"belum boleh dipasang untuk
+     * tenant" tidak sama dengan "kodenya tidak boleh dimuat".** Module yang sedang dipindah
+     * belum boleh muncul di katalog, belum boleh dipasang, dan belum boleh menerima data
+     * tenant — itu yang dijaga `semua()`. Tetapi kodenya harus tetap bisa dimuat, karena
+     * kalau tidak, tidak ada satu pun testnya yang bisa berjalan, dan pemindahannya
+     * dikerjakan tanpa jaring pengaman sampai hari terakhir.
+     *
+     * Dipakai hanya untuk mendaftarkan penyedia layanan module. Jangan dipakai untuk
+     * katalog, pemasangan, atau apa pun yang menyentuh data tenant.
+     *
+     * @return list<ModuleManifest>
+     */
+    public function semuaTermasukYangSedangDipindah(): array
+    {
+        if ($this->moduleTermasukDipindah !== null) {
+            return $this->moduleTermasukDipindah;
+        }
+
+        $ditemukan = [];
+
+        foreach ($this->berkasManifest() as $berkas) {
+            $manifest = $this->baca($berkas, abaikanDaftarDipindah: true);
+
+            if ($manifest !== null) {
+                $ditemukan[] = $manifest;
+            }
+        }
+
+        usort($ditemukan, static fn (ModuleManifest $a, ModuleManifest $b): int => strcmp($a->id, $b->id));
+
+        return $this->moduleTermasukDipindah = $ditemukan;
     }
 
     public function cari(string $id): ?ModuleManifest
@@ -98,7 +137,7 @@ final class ModuleRegistry
         return isset($isi['table_prefix']) && is_string($isi['table_prefix']) ? $isi['table_prefix'] : '';
     }
 
-    private function baca(string $berkas): ?ModuleManifest
+    private function baca(string $berkas, bool $abaikanDaftarDipindah = false): ?ModuleManifest
     {
         try {
             /** @var mixed $isi */
@@ -130,7 +169,7 @@ final class ModuleRegistry
         // sempat memakai `table_prefix` yang belum ada sebagai tanda, dan tanda itu runtuh pada
         // F3-04 — task yang justru memberi awalan tabel, dan dengan itu menyalakan module yang
         // belum siap. Alasan lengkapnya ada di `ModulSedangDipindah`.
-        if (ModulSedangDipindah::bawaan()->menandai(basename(dirname($berkas)))) {
+        if (! $abaikanDaftarDipindah && ModulSedangDipindah::bawaan()->menandai(basename(dirname($berkas)))) {
             return null;
         }
 

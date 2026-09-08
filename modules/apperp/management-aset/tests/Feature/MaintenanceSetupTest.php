@@ -1,18 +1,18 @@
 <?php
 
-namespace Tests\Feature;
+namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
-use Tests\Concerns\InteractsWithCoreErpContext;
+use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
 
 class MaintenanceSetupTest extends TestCase
 {
-    use InteractsWithCoreErpContext, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
     private string $tenantId;
 
@@ -21,9 +21,8 @@ class MaintenanceSetupTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->tenantId = (string) Str::ulid();
+        $this->tenantId = $this->buatTenantUji();
         $this->unitId = (string) Str::ulid();
-        $this->configureCoreErpContext();
         Http::fake(function ($request) {
             if (str_ends_with($request->url(), '/units-of-measure/resolve')) {
                 return Http::response(['data' => [[
@@ -44,13 +43,13 @@ class MaintenanceSetupTest extends TestCase
 
         $jenisAset = $this->postMaster('jenis-aset', ['nama' => 'Genset'])->assertCreated()->json('data.id');
         $this->withContext(['management-aset.jenis-aset.read', 'management-aset.jenis-aset.update', 'management-aset.maintenance-job-types.read'])
-            ->putJson('/api/v1/jenis-aset/'.$jenisAset.'/maintenance-job-types', ['jenis_aset_ids' => [$jobType]])
+            ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenisAset.'/maintenance-job-types', ['jenis_aset_ids' => [$jobType]])
             ->assertOk()
             ->assertJsonPath('data.selected.0.id', $jobType);
 
         $variable = $this->postMaster('maintenance-checklist-variables', ['nama' => 'Kualitas oli'])->assertCreated()->json('data.id');
         $this->withContext(['management-aset.maintenance-checklist-variables.read', 'management-aset.maintenance-checklist-variables.update'])
-            ->putJson('/api/v1/maintenance-checklist-variables/'.$variable.'/values', ['values' => [
+            ->putJson('/api/modules/management-aset/v1/maintenance-checklist-variables/'.$variable.'/values', ['values' => [
                 ['line_number' => 1, 'value' => 'Jernih', 'result_code' => 'pass'],
                 ['line_number' => 2, 'value' => 'Keruh', 'result_code' => 'fail'],
                 ['line_number' => 3, 'value' => 'Belum dapat diperiksa', 'result_code' => 'none'],
@@ -58,7 +57,7 @@ class MaintenanceSetupTest extends TestCase
 
         $template = $this->postMaster('maintenance-checklist-templates', ['nama' => 'Pemeriksaan genset'])->assertCreated()->json('data.id');
         $this->withContext(['management-aset.maintenance-checklist-templates.read', 'management-aset.maintenance-checklist-templates.update'])
-            ->putJson('/api/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
+            ->putJson('/api/modules/management-aset/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
                 ['line_number' => 1, 'type' => 'header', 'nama' => 'Pemeriksaan genset', 'wajib' => true],
                 ['line_number' => 2, 'type' => 'measurement', 'nama' => 'Tegangan', 'unit_id' => $this->unitId, 'min_value' => 210, 'max_value' => 230, 'wajib' => true, 'instruksi' => 'Ukur pada terminal utama.'],
             ]])->assertOk()->assertJsonCount(2, 'data');
@@ -85,7 +84,7 @@ class MaintenanceSetupTest extends TestCase
         $template = $this->postMaster('maintenance-checklist-templates', ['nama' => 'Pemeriksaan tanpa satuan'])->assertCreated()->json('data.id');
 
         $this->withContext(['management-aset.maintenance-checklist-templates.read', 'management-aset.maintenance-checklist-templates.update'])
-            ->putJson('/api/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
+            ->putJson('/api/modules/management-aset/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
                 ['line_number' => 1, 'type' => 'measurement', 'nama' => 'Nilai hasil pemeriksaan', 'min_value' => 1, 'max_value' => 5, 'wajib' => true],
             ]])->assertOk()
             ->assertJsonPath('data.0.unit_id', null)
@@ -102,7 +101,7 @@ class MaintenanceSetupTest extends TestCase
         $template = $this->postMaster('maintenance-checklist-templates', ['nama' => 'Template nama wajib'])->assertCreated()->json('data.id');
 
         $this->withContext(['management-aset.maintenance-checklist-templates.read', 'management-aset.maintenance-checklist-templates.update'])
-            ->putJson('/api/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
+            ->putJson('/api/modules/management-aset/v1/maintenance-checklist-templates/'.$template.'/lines', ['lines' => [
                 ['line_number' => 1, 'type' => 'text', 'nama' => '', 'wajib' => false],
             ]])
             ->assertUnprocessable()
@@ -122,11 +121,11 @@ class MaintenanceSetupTest extends TestCase
         ]);
 
         $this->withContext(['management-aset.validasi-status-work-order.read'])
-            ->putJson('/api/v1/validasi-status-work-order', ['aturan' => []])
+            ->putJson('/api/modules/management-aset/v1/validasi-status-work-order', ['aturan' => []])
             ->assertForbidden();
 
         $this->withContext(['management-aset.validasi-status-work-order.read', 'management-aset.validasi-status-work-order.update'])
-            ->putJson('/api/v1/validasi-status-work-order', ['aturan' => [
+            ->putJson('/api/modules/management-aset/v1/validasi-status-work-order', ['aturan' => [
                 ['status' => 'selesai', 'aturan' => 'sebab_kerusakan', 'aktif' => true, 'keparahan' => 'peringatan'],
             ]])
             ->assertOk();
@@ -160,13 +159,13 @@ class MaintenanceSetupTest extends TestCase
     {
         return $this->withContext(array_merge($this->permissions($resource), $resource === 'jenis-aset' ? [] : []))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::lower(Str::random(12)))
-            ->postJson('/api/v1/'.$resource, $payload);
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
     }
 
     /** @param list<string> $permissions */
     private function withContext(array $permissions)
     {
-        return $this->withHeaders($this->contextHeaders($this->tenantId, $permissions));
+        return $this->sebagaiPengguna($this->tenantId, $permissions);
     }
 
     /** @return list<string> */

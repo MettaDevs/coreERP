@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Support\Modules\CoreServices;
 use App\Support\Modules\ModuleRegistry;
+use App\Support\Modules\ModulSedangDipindah;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -35,11 +36,39 @@ final class ModuleServiceProvider extends ServiceProvider
             dirname(base_path(), 2).'/modules',
         ));
 
-        foreach ($this->app->make(ModuleRegistry::class)->semua() as $module) {
+        // Penyedia layanan didaftarkan untuk **semua** module, termasuk yang sedang dipindah
+        // masuk. "Belum boleh dipasang untuk tenant" tidak sama dengan "kodenya tidak boleh
+        // dimuat": module yang kodenya tidak dimuat tidak punya satu pun test yang bisa
+        // berjalan, dan pemindahannya jadi dikerjakan tanpa jaring pengaman sampai hari
+        // terakhir. Katalog, pemasangan, dan segala yang menyentuh data tenant tetap memakai
+        // `semua()`, yang melewatkan module yang sedang dipindah.
+        foreach ($this->app->make(ModuleRegistry::class)->semuaTermasukYangSedangDipindah() as $module) {
             $penyedia = $module->penyediaLayanan();
 
             if (class_exists($penyedia)) {
                 $this->app->register($penyedia);
+            }
+        }
+    }
+
+    public function boot(): void
+    {
+        // Migration module yang sedang dipindah dijalankan bersama migration Core.
+        //
+        // Module yang sudah jadi tidak begini: migrationnya dijalankan `ModuleMigrator` saat
+        // module dipasang untuk sebuah tenant, dan dicatat per module supaya pencabutan bisa
+        // dilacak. Module yang sedang dipindah belum boleh dipasang untuk tenant mana pun,
+        // jadi tabelnya tidak punya cara lain untuk ada — dan tanpa tabel, tidak satu pun
+        // testnya bisa berjalan.
+        //
+        // Ini berakhir sendiri: begitu module keluar dari daftar `ModulSedangDipindah`, ia
+        // dipasang lewat jalur yang sama seperti module lain dan baris ini berhenti berlaku
+        // untuknya.
+        $dipindah = ModulSedangDipindah::bawaan();
+
+        foreach ($this->app->make(ModuleRegistry::class)->semuaTermasukYangSedangDipindah() as $module) {
+            if ($dipindah->menandai(basename($module->folder))) {
+                $this->loadMigrationsFrom($module->folderMigrasi());
             }
         }
     }
