@@ -1617,11 +1617,53 @@ database sendiri.
 3. Test membuktikan modul dapat didaftarkan ke katalog tanpa nama database, dan app container tetap
    ditolak bila tidak menyebutkannya.
 
-**Selesai bila.** Test pendaftaran tenant tidak lagi perlu mengisi kolom itu.
+**Selesai bila.** Test pendaftaran tenant tidak lagi perlu mengisi kolom itu, **dan** pendaftaran lewat
+jalur resmi berhasil untuk modul tanpa nama database sementara app container tanpa nama database tetap
+ditolak.
 
 **Rujukan.** [standar app](../../dev/02-module-standard.md).
 
 **Bergantung pada.** F2-07.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026 lewat pull request #52.
+
+**Kriteria selesainya semula terlalu longgar, dan kalimat kedua di atas adalah perbaikannya.** Test
+pendaftaran tenant menulis ke tabel `apps` dengan `DB::table()`, jadi yang menahannya selama ini adalah
+`NOT NULL` di skema, bukan `AppCatalogRequest`. Migration saja sudah cukup membuat kriteria lama hijau —
+tanpa satu baris pun validasi tersentuh, dan jalur resmi tetap menolak modul. Kriteria yang bisa dipenuhi
+setengah pekerjaan bukan kriteria; ini contoh bagian 4.5 yang muncul pada rencana yang saya tulis sendiri.
+
+**Yang membedakan modul dari app container adalah keberadaan foldernya di `modules/`, bukan bendera pada
+manifest.** Bendera adalah klaim yang bisa berbohong; keberadaan folder adalah kenyataan yang sama dengan
+yang dipakai `ModuleServiceProvider` untuk memuat modul. Dengan begitu validasi dan runtime memakai satu
+sumber kebenaran, bukan dua yang bisa berselisih. `ModuleRegistry::cari()` yang menjawabnya.
+
+**Daftar berkas di atas kurang satu, dan yang kurang itu jalur pendaftaran kedua.**
+`RegisterAppManifestCommand.php` memetakan manifest YAML ke payload lewat `asString()`, yang memulangkan
+string kosong bila blok `database` tidak ada. Tanpa ikut diubah, modul yang didaftarkan lewat CLI gagal
+pada pola nama database dengan pesan menyesatkan — "format tidak sah", padahal kolomnya memang tidak ada.
+Pelajarannya untuk task berikutnya: cari **semua** pintu masuk sebuah data sebelum menulis daftar
+berkasnya, karena pintu yang terlewat tidak gagal dengan diam melainkan gagal dengan pesan yang salah.
+
+**`apps.database_name` ternyata metadata mati.** Ia divalidasi dan disimpan, tetapi tidak ada pembaca di
+luar presentasi; pembuatan database app didelegasikan sepenuhnya ke compose bundle milik app. Sudah
+tercatat sebagai `LIFE-17` di [lifecycle dan deployment](../general/03-lifecycle-dan-deployment.md).
+Bahkan untuk app container kolom ini hanya keterangan, bukan penggerak. Task ini tidak mengubah keadaan
+itu, hanya berhenti menuntutnya dari pihak yang tidak punya jawabannya.
+
+**`down()` migration sengaja dibiarkan bisa gagal.** Mengembalikan kolom menjadi wajib mustahil dilakukan
+dengan jujur bila katalog sudah memuat baris modul, dan mengisi nilai karangan diam-diam saat rollback
+justru mengulang persis masalah yang task ini perbaiki.
+
+**Kontrak OpenAPI disunting seperlunya, bukan diregenerasi.** `scramble:export` menghasilkan selisih 4.387
+baris terhadap berkas yang di-commit — berkas itu sudah lama tertinggal dari kode dan tidak ada langkah CI
+yang menahannya. Membawa regenerasi penuh ke sini akan menenggelamkan perubahan yang sebenarnya. Selisih
+sebesar itu adalah temuan tersendiri yang belum punya task.
+
+**Satu baris dokumen ikut jadi salah karenanya.** `docs/dev/02-module-standard.md` menyatakan blok
+`database` wajib tanpa syarat; barisnya diperjelas menjadi wajib hanya untuk app container.
 
 ### F2-08 — Kontrak layanan Core untuk modul
 
@@ -1789,7 +1831,8 @@ organisasi yang sudah dipegang Core.
 2. Izin bersifat per app, sedangkan middleware yang dipasang global tidak tahu ia sedang melayani modul
    yang mana. Id modul diambil dari grup rute modul, dan middleware didaftarkan per grup oleh penyedia
    layanan modul, bukan global.
-3. Test memastikan pengguna tanpa izin mendapat 403 pada rute modul contoh.
+3. Test memastikan pengguna tanpa izin mendapat 403 pada rute modul contoh **sebelum controller modul
+   sempat berjalan**. Anak kalimat terakhir bukan hiasan; alasannya di catatan pelaksanaan.
 
 **Selesai bila.** Rute modul contoh terlindungi tanpa token, dan atribut permintaannya sama dengan yang
 dibaca app lama.
@@ -1797,6 +1840,41 @@ dibaca app lama.
 **Rujukan.** [identity dan access](../../dev/09-identity-and-access.md).
 
 **Bergantung pada.** F2-01.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026 lewat pull request #53.
+
+**Kriteria langkah 3 semula bisa lulus palsu, dan itu sudah dibuktikan bukan diduga.** Test "pengguna
+tanpa izin mendapat 403" ditulis, lalu penolakan di middleware dihapus untuk melihat ia merah — **test itu
+tetap hijau**, karena controller modul ikut menjawab 403. Artinya kriteria semula akan menerima middleware
+yang perlindungannya sudah lenyap seluruhnya. Yang benar-benar bisa gagal adalah test yang memasang
+closure selalu-200 di belakang middleware; itu merah dengan `Expected response status code [403] but
+received 200`. Dua penjaga yang menjawab hal sama membuat penjaga pertama tidak terukur — pola ini akan
+terulang di setiap lapisan berlapis, jadi test middleware selalu memakai penutup yang tidak ikut menjaga.
+
+**Kontrak baru `KonteksPermintaan`, bukan `KonteksTenant` yang diperbesar.** Modul hanya boleh menyebut
+namespace `Contracts`, jadi `ModuleRequestContext` tidak boleh disentuhnya langsung. Menggabungkannya ke
+`KonteksTenant` juga salah: yang satu menjawab dari sesi, yang lain dari atribut permintaan, dan satu
+antarmuka dengan dua sumber data pasti menyimpang.
+
+**Middleware ikut menolak, tidak sekadar mengisi atribut.** Kalau ia hanya mengisi, perlindungan bergantung
+pada setiap controller modul ingat memeriksa — dan modul ditulis pihak lain.
+
+**Dua dari enam kunci lulus dalam keadaan kosong, dan PRD tidak menyebutnya.**
+`coreerp.legal_entity_id` dan `coreerp.org_unit_id` bergantung pada kebijakan data:
+`CurrentWorkspace::organizations()` menyaring lewat `DataPolicyAccessResolver`, jadi tanpa lingkup
+kebijakan keduanya selalu `null` meski organisasinya ada. Test karena itu memasang satu kebijakan data
+berlingkup terbatas, supaya isinya bisa dibedakan dari kosong. Test yang membandingkan `null` dengan
+`null` akan hijau pada middleware yang tidak menulis apa pun.
+
+**Berkas rute modul contoh sebelumnya tidak dimuat siapa pun.** `routes/web.php` kedua modul ada tetapi
+tidak pernah dibaca; penyedia layanan modul kini memuatnya. Ini menjelaskan kenapa tidak ada test yang
+gagal sebelumnya: tidak ada rute modul yang benar-benar hidup untuk diuji.
+
+**Satu hal sengaja tidak dikerjakan karena di luar lingkup.** `KonteksTenantPermintaan` mengulang query
+sesi pada tiap panggilan padahal middleware sudah menyelesaikan nilai yang sama di depan. Dicatat di sini
+supaya tidak hilang.
 
 ### F2-11 — Halaman modul contoh di shell
 
