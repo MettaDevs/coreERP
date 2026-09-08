@@ -1520,12 +1520,39 @@ berikutnya tidak bisa dibuktikan.
 4. Test onboarding yang memeriksa jumlah produk dan nama komponen halaman ikut diperbarui; ia akan gagal
    karena alasan yang tidak tampak berhubungan bila dilewatkan.
 
-**Selesai bila.** Halaman modul contoh terbuka untuk pengguna yang berhak, tanpa satu pun baris
-penempatan container.
+**Selesai bila.** Sebuah produk yang terpasang sebagai modul dapat diluncurkan tanpa satu pun baris
+penempatan container, dan app yang masih memakai container tetap bisa diluncurkan seperti sebelumnya.
 
 **Rujukan.** [empat kebenaran lifecycle](../../onboarding/empat-kebenaran.md).
 
 **Bergantung pada.** F2-05.
+
+#### Kriteria selesainya diperbaiki, karena yang lama menuntut sesuatu yang belum ada
+
+Kriteria lama berbunyi "halaman modul contoh terbuka". Halaman modul belum ada — ia dibuat F2-11 — jadi
+kriteria itu tidak bisa dipenuhi task ini tanpa mengerjakan task lain sekaligus. Yang bisa dan harus
+dibuktikan di sini adalah **penentu kesiapannya**, dan itulah yang diuji.
+
+#### Penentu kesiapan modul jauh lebih sederhana, dan itu memang benar
+
+Kesiapan container menuntut lima hal sekaligus: entitlement aktif, deployment aktif, artifact
+ditempatkan, migration berhasil, runtime dinyatakan siap. Kesiapan modul menuntut satu: catatan
+pemasangan berstatus terpasang.
+
+Perbedaannya bukan kelalaian. Tidak ada artifact yang ditempatkan, tidak ada runtime terpisah yang perlu
+dinyatakan siap, dan tidak ada rilis yang dicocokkan versinya. Modul berjalan di proses yang sama dengan
+Core: **kalau Core hidup, modulnya hidup.**
+
+#### Dua jalur hidup berdampingan, dan itu wajib
+
+Menghapus jalur container sekarang akan mematikan app yang belum dipindah. Keduanya digabung sebagai
+himpunan, lalu dipotong dengan hak akses. Ada test untuk masing-masing.
+
+#### Pemasangan bukan izin
+
+Satu test mencabut penugasan peran sambil membiarkan pemasangannya, lalu membuktikan produknya tetap
+tidak muncul. Ini menjaga larangan pada empat kebenaran lifecycle: menyimpulkan izin dari pemasangan
+adalah kesalahan yang sama dengan menyimpulkan pemasangan dari entitlement.
 
 ### F2-07 — Pendaftaran tenant memasang modul, bukan menempatkan container
 

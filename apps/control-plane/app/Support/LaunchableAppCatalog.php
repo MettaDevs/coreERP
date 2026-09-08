@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\CoreApp;
+use App\Models\ModuleInstallation;
 use App\Models\TenantMembership;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
@@ -68,10 +69,25 @@ class LaunchableAppCatalog
             ->distinct()
             ->pluck('permissions.app_id');
 
-        $readyAppIds = $this->readyPlacementQuery($membership)
+        // Dua jalur hidup berdampingan selama pemindahan. App yang masih berjalan sebagai
+        // container siap bila penempatannya siap; module yang berjalan di runtime Core siap
+        // bila catatan pemasangannya berstatus terpasang. Menghapus jalur lama sekarang akan
+        // mematikan app yang belum dipindah.
+        $siapSebagaiContainer = $this->readyPlacementQuery($membership)
             ->whereIn('placements.app_id', $authorizedAppIds)
             ->distinct()
-            ->pluck('placements.app_id');
+            ->pluck('placements.app_id')
+            ->all();
+
+        $siapSebagaiModul = array_values(array_intersect(
+            $this->moduleTerpasang($membership),
+            $authorizedAppIds->map(strval(...))->all(),
+        ));
+
+        $readyAppIds = array_values(array_unique(array_merge(
+            array_map(strval(...), $siapSebagaiContainer),
+            $siapSebagaiModul,
+        )));
 
         return array_values(
             CoreApp::query()
@@ -111,6 +127,34 @@ class LaunchableAppCatalog
             ->join('security_privilege_permissions as privilege_permissions', 'privilege_permissions.privilege_code', '=', 'duty_privileges.privilege_code')
             ->join('permissions', 'permissions.code', '=', 'privilege_permissions.permission_code')
             ->whereIn('role_duties.role_id', $effectiveRoleIds);
+    }
+
+    /**
+     * Module yang terpasang untuk tenant ini.
+     *
+     * Ini penentu kesiapan bagi module, dan bentuknya sengaja jauh lebih sederhana daripada
+     * milik container: tidak ada artifact yang ditempatkan, tidak ada runtime yang perlu
+     * dinyatakan siap, dan tidak ada rilis yang dicocokkan versinya. Module berjalan di
+     * proses yang sama dengan Core; kalau Core hidup, module-nya hidup.
+     *
+     * @return list<string>
+     */
+    public function moduleTerpasang(TenantMembership $membership): array
+    {
+        $id = DB::table('core_module_installations')
+            ->where('tenant_id', $membership->tenant_id)
+            ->where('status', ModuleInstallation::STATUS_INSTALLED)
+            ->orderBy('module_id')
+            ->pluck('module_id')
+            ->all();
+
+        return array_values(array_map(strval(...), $id));
+    }
+
+    /** Apakah app ini dilayani runtime Core sebagai module, bukan oleh container tersendiri. */
+    public function berjalanSebagaiModul(TenantMembership $membership, string $appId): bool
+    {
+        return in_array($appId, $this->moduleTerpasang($membership), true);
     }
 
     private function readyPlacementQuery(TenantMembership $membership): Builder
