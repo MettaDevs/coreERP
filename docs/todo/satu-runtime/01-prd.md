@@ -1202,6 +1202,51 @@ dibangun.
 
 **Bergantung pada.** F2-01.
 
+#### Langkah 1 dan 2 sudah dikerjakan pada F1-06
+
+Autoload lewat repositori path ditarik ke fase 1 karena test penjaga tenant tidak bisa berjalan tanpa
+kelas modul dapat dimuat. Yang dikerjakan di sini adalah langkah 3 dan 4, yaitu image-nya.
+
+#### Image menirukan susunan repo, bukan menyalin modul dua kali
+
+Ini keputusan yang menentukan dan tidak disebut task ini. Composer memasang modul lewat tautan simbolik
+`vendor/apperp/contoh-a -> ../../../../modules/apperp/contoh-a`, dan tautan itu hanya sah bila jarak
+antara `vendor` dan `modules` di dalam image sama dengan jarak keduanya di repo.
+
+Dua jalan lain sempat dipertimbangkan dan ditolak:
+
+| Jalan | Kenapa ditolak |
+| --- | --- |
+| Composer menyalin modul ke `vendor` alih-alih menaut | kode modul ada dua salinan di dalam image, dan menyunting salah satunya tidak mengubah yang lain |
+| Menaruh `modules/` di tempat yang kebetulan cocok dengan hitungan tautan | bekerja karena kebetulan, dan berhenti bekerja begitu ada yang memindahkan folder |
+
+Karena itu image memakai `/repo/apps/control-plane` dan `/repo/modules`, persis seperti repo. Akar
+dokumen Apache dan tiga jalur pada skrip masuk container ikut disesuaikan.
+
+#### Dibuktikan di dalam image, bukan di mesin pengembang
+
+```
+lrwxrwxrwx contoh-a -> ../../../../modules/apperp/contoh-a/
+lrwxrwxrwx contoh-b -> ../../../../modules/apperp/contoh-b/
+
+php artisan module:list      -> kedua modul tampil
+class_exists(Modules\Apperp\ContohA\Models\Barang) -> true
+```
+
+#### Yang belum bisa dipastikan
+
+Mode muat-ulang-panas pada skrip pengembangan memasang folder app dari mesin pengembang ke dalam
+container, termasuk `vendor`. Di Windows, tautan modul di dalam `vendor` adalah reparse point, dan
+apakah Docker menerjemahkannya dengan benar **belum diuji**. Folder `modules` kini ikut dipasang supaya
+perubahannya langsung terlihat, tapi bila mode itu bermasalah, jalankan stack tanpa muat-ulang-panas
+sampai ada yang memeriksanya.
+
+#### Berkas di repo `erp-dev` tidak ikut di-commit
+
+Repo itu punya perubahan yang belum di-commit milik pemiliknya, dan mencampurnya dengan pekerjaan ini
+akan menyulitkan keduanya. Yang diubah di sana: konteks pembangunan pada `compose.yaml`, dua pemasangan
+volume penyimpanan, dan tiga pemasangan volume pada mode muat-ulang-panas di `start.ps1`.
+
 ### F2-03 — Migrator per modul
 
 **Kenapa.** Migration modul harus bisa dijalankan sendiri, per tenant, dan riwayatnya dicatat terpisah
