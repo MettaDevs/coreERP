@@ -8,6 +8,7 @@ use App\Support\CurrentWorkspace;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Apperp\ContohA\Models\Barang;
+use Modules\Apperp\ContohB\Models\Rak;
 
 /**
  * Rute contoh. Ia ada supaya penjaga batas punya sesuatu untuk diuji.
