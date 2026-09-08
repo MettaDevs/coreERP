@@ -1053,11 +1053,6 @@ laporan sukses palsu menghentikan pencarian.
 
 ### F1-08 — Penjaga berjalan di CI
 
-**Tambahan dari F1-02.** Alur wajib memeriksa kode modul dengan PHPStan, bukan hanya Pint. Ini baru bisa
-dikerjakan setelah autoload Composer untuk namespace modul ada; bila urutannya memaksa, pindahkan task
-autoload itu ke fase 1.
-
-
 **Kenapa.** Penjaga yang hanya jalan di laptop akan terlewat pada pull request pertama yang terburu-buru.
 
 **Berkas.**
@@ -1066,14 +1061,53 @@ autoload itu ke fase 1.
 
 **Langkah.**
 1. Suite `Boundary` masuk ke alur test.
-2. Analisa statis pada alur lint sudah mencakup folder `modules/` setelah F1-05; pastikan demikian.
-3. Kedua langkah wajib, bukan `continue-on-error`.
+2. Analisa statis sudah mencakup folder `modules/` setelah F1-05; pastikan demikian. Perhatikan bahwa
+   analisa statis berjalan pada alur **test**, bukan alur linter, meski namanya "Run Type Analysis".
+3. Pint juga wajib mencakup `modules/`, ditambahkan pada F1-02.
+4. Semua langkah wajib, bukan `continue-on-error`.
 
 **Selesai bila.** Sebuah pull request percobaan yang melanggar salah satu batas ditolak CI.
 
-**Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
+**Rujukan.** [CI/CD](../../dev/22-ci-cd.md), [bukti penjaga](02-bukti-penjaga.md).
 
 **Bergantung pada.** F0-01, F1-07.
+
+#### Tidak ada berkas alur yang perlu diubah
+
+Ketiga penjaga adalah test PHPUnit biasa di bawah `tests/Feature/Boundary/`, jadi `php artisan test`
+sudah menjalankannya. Folder `modules/` sudah masuk ke Pint pada F1-02 dan ke PHPStan pada F1-05.
+Task ini karena itu tidak mengubah alur sama sekali; ia **membuktikan** yang sudah ada bekerja.
+
+Itu justru menjadikannya task yang paling mudah dianggap selesai tanpa bukti. Karena itu buktinya
+dijalankan sungguhan, bukan disimpulkan dari membaca berkas alur.
+
+#### Buktinya: sebuah pull request yang melanggar, ditolak CI
+
+Cabang percobaan dibuat dengan satu pelanggaran — modul contoh A mengimpor model modul contoh B — lalu
+didorong sebagai pull request. Keduanya merah:
+
+| Alur | Yang menolak |
+| --- | --- |
+| tests | `ModuleNamespaceBoundaryTest` gagal pada kedua versi PHP |
+| linter | Pint menolak impor yang tidak dipakai |
+
+Pull request itu ditutup dan cabangnya dihapus. Yang perlu dicatat: **penjaga batas dan pemeriksa gaya
+menangkap pelanggaran yang sama dari dua arah berbeda**, dan itu bukan pemborosan — Pint hanya
+menangkapnya karena impornya kebetulan tidak dipakai. Impor yang dipakai lolos dari Pint dan hanya
+tertahan penjaga batas.
+
+Jumlah test di CI sama dengan di mesin pengembang, 211 test dan 972 asersi pada PHP 8.4 maupun 8.5,
+sesuai syarat yang ditetapkan F0-01.
+
+#### Satu hal yang ditemukan dan bukan tentang penjaga
+
+Pull request percobaan itu awalnya **tidak memicu alur sama sekali**, dan halamannya hanya kosong. Sebuah
+commit kosong menyusul membuatnya berjalan. Penyebabnya tidak dapat dipastikan dari luar; yang bisa
+dipastikan adalah gejalanya, dan gejalanya berbahaya: pull request tanpa pemeriksaan **terlihat sama**
+dengan pull request yang pemeriksaannya belum selesai. Selama cabang utama tidak dikunci (F0-05 ditutup
+tanpa dikerjakan), tidak ada yang menahan pull request seperti itu digabungkan.
+
+Kalau ini terulang, dorong satu commit kosong dan periksa lagi sebelum menggabungkan.
 
 ## 9. Fase 2: Core menjadi tuan rumah modul
 
