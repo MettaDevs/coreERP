@@ -3068,6 +3068,24 @@ bahkan punya cabang khusus supaya bisa jalan di SQLite.
 **Selesai bila.** `composer test` menjalankan test Core dan test modul dalam satu perintah, seluruhnya di
 PostgreSQL.
 
+#### Catatan pelaksanaan
+
+Langkah 1 selesai bersama F3-22 pada 8 September 2026; langkah 2 dan 3 pada 9 September.
+
+**Dua cabang mesin database dibuang, bukan disimpan "untuk jaga-jaga".** Satu migration memulangkan diri
+lebih awal pada SQLite; satu lagi melewati `SET NOT NULL`. Keduanya lahir karena test modul dulu berjalan
+di SQLite sementara produksi memakai PostgreSQL — dan akibatnya suite membuktikan perilaku pada mesin yang
+tidak pernah dipakai siapa pun, sementara pada mesin yang benar migration itu tidak pernah diuji sama
+sekali.
+
+Cabang yang tidak pernah dijalankan adalah kode yang tidak pernah dibuktikan. Sekarang hanya ada satu
+mesin, jadi tidak ada yang perlu dijaga-jaga.
+
+**Langkah 3 — "perbaiki test yang selama ini lulus hanya karena SQLite lebih longgar" — ternyata sudah
+terjadi seluruhnya pada F3-15.** Kedua puluh berkas test dijalankan di PostgreSQL sejak hari pertama
+mereka masuk suite Core, dan yang gagal saat itu diperbaiki satu per satu di sana. Tidak ada sisa untuk
+task ini.
+
 **Rujukan.** [pengujian](../../apps/management-aset/arsitektur/pengujian.md).
 
 **Bergantung pada.** F3-15.
