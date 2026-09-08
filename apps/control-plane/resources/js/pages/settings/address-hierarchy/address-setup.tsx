@@ -1,3 +1,4 @@
+import { Button } from '@apperp/ui/button';
 import { Head, router } from '@inertiajs/react';
 import {
     ArrowUpDown,
@@ -6,9 +7,22 @@ import {
     RotateCcw,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from '@apperp/ui/button';
 import { toast } from 'sonner';
 
+import {
+    AddressFieldGroup,
+    AddressInput,
+    AddressSelect,
+    AddressToggle,
+} from './components/address-controls';
+import {
+    DeleteConfirmDialog,
+    ExternalCodesModal,
+    TranslationsModal,
+} from './components/address-modals';
+import { AddressSidebar, navItems } from './components/address-sidebar';
+import { AddressToolbar } from './components/address-toolbar';
+import { TIMEZONE_DROPDOWN_OPTIONS, detectTimezone } from './timezones';
 import type {
     ExternalCode,
     Parameter,
@@ -16,20 +30,6 @@ import type {
     Section,
     TranslationItem,
 } from './types';
-import { TIMEZONE_DROPDOWN_OPTIONS, detectTimezone } from './timezones';
-import {
-    AddressFieldGroup,
-    AddressInput,
-    AddressSelect,
-    AddressToggle,
-} from './components/address-controls';
-import { AddressSidebar, navItems } from './components/address-sidebar';
-import { AddressToolbar } from './components/address-toolbar';
-import {
-    DeleteConfirmDialog,
-    ExternalCodesModal,
-    TranslationsModal,
-} from './components/address-modals';
 
 export const isCityRegency = (r: any): boolean => {
     if (!r) {

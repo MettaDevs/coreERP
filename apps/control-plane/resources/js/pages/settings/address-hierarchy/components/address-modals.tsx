@@ -1,6 +1,3 @@
-import * as React from 'react';
-import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
 import {
     Dialog,
     DialogContent,
@@ -9,6 +6,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
+import { Plus, Trash2 } from 'lucide-react';
+import * as React from 'react';
+import { useState } from 'react';
 import type { ExternalCode, TranslationItem } from '../types';
 import { AddressSelect } from './address-controls';
 

@@ -1,8 +1,8 @@
-import * as React from 'react';
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { Label } from '@apperp/ui/label';
 import { Switch } from '@apperp/ui/switch';
+import { Check, ChevronDown, Search, X } from 'lucide-react';
+import * as React from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 
 export function AddressFieldGroup({
     label,
