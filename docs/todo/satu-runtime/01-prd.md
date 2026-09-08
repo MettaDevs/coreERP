@@ -885,6 +885,22 @@ diubah untuk membuat tabel berawalan modul lain.
 
 **Bergantung pada.** F1-02, F1-03.
 
+#### Catatan pelaksanaan
+
+Penjaganya dua test, bukan satu. Yang pertama menjalankan migration tiap modul yang ditemukan lalu
+memeriksa tabel yang lahir. Yang kedua menguji **pemeriksanya sendiri** dengan daftar tabel buatan, tanpa
+menyentuh database, supaya pesan kesalahannya diketahui benar sebelum ia dipakai.
+
+Satu asersi tambahan yang mudah terlewat: test menolak modul yang migration-nya tidak membuat tabel apa
+pun. Tanpa itu, sebuah modul dengan folder migration kosong akan membuat penjaga ini hijau tanpa menguji
+apa pun — persis pola kriteria selesai yang tidak bisa gagal pada bagian 4.5.
+
+Sudah dibuktikan bisa gagal: migration modul contoh A diubah membuat tabel `contoh_b_m_curian`, dan
+penjaganya merah sambil menyebut nama tabelnya beserta awalan yang sah.
+
+Pemindaian modul untuk sementara hidup di dalam berkas test. Registry modul yang sebenarnya dibuat pada
+F2-01; saat itu pemindaian di sini diganti dengannya, dan jangan dibiarkan menjadi salinan kedua.
+
 ### F1-05 — Penjaga kedua: namespace modul tidak boleh saling impor
 
 **Kenapa.** Batas tabel saja tidak cukup. Modul bisa memanggil kelas modul lain lewat PHP walau tabelnya
