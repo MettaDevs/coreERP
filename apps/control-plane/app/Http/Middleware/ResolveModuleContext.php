@@ -10,6 +10,7 @@ use App\Support\LaunchableAppCatalog;
 use App\Support\Modules\ModuleRequestContext;
 use Closure;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -33,6 +34,16 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class ResolveModuleContext
 {
+    /**
+     * Penanda bahwa permintaan ini sedang dilayani sebuah module, dan module yang mana.
+     *
+     * Sengaja **tidak** berawalan `coreerp.`. Kunci berawalan itu adalah salinan harfiah
+     * dari yang ditulis middleware app lama, daftarnya dijaga test, dan module membacanya
+     * langsung; menambah satu kunci baru ke dalam daftar itu berarti mengubah kontrak yang
+     * dijaga demi alasan yang sama sekali berbeda. Yang di sini urusan shell, bukan module.
+     */
+    public const MODULE_AKTIF = 'module.id';
+
     public function __construct(
         private readonly CurrentWorkspace $workspace,
         private readonly LaunchableAppCatalog $katalog,
@@ -59,12 +70,32 @@ final class ResolveModuleContext
         $legalEntity = $this->workspace->legalEntity($request, $membership);
         $orgUnit = $this->workspace->operatingUnit($request, $membership);
 
+        $request->attributes->set(self::MODULE_AKTIF, $moduleId);
         $request->attributes->set(ModuleRequestContext::TENANT_ID, (string) $membership->tenant_id);
         $request->attributes->set(ModuleRequestContext::LEGAL_ENTITY_ID, $legalEntity?->id);
         $request->attributes->set(ModuleRequestContext::ORG_UNIT_ID, $orgUnit?->id);
         $request->attributes->set(ModuleRequestContext::USER_ID, (string) $membership->user_id);
         $request->attributes->set(ModuleRequestContext::PERMISSIONS, $izin);
         $request->attributes->set(ModuleRequestContext::DATA_POLICIES, $this->kebijakan->resolve($membership));
+
+        /*
+         * Kerangka layar — nama app dan menu sidebar-nya — dibagikan dari sini, bukan dari
+         * `HandleInertiaRequests`.
+         *
+         * Alasannya urutan, dan ini sempat menghabiskan waktu: `Inertia\Middleware` memanggil
+         * `share()` **sebelum** meneruskan permintaan, sehingga middleware ini belum berjalan
+         * saat prop bersama disusun. Prop yang dibaca di sana selalu kosong, dan halamannya
+         * tampil tanpa sidebar tanpa satu pun error.
+         *
+         * Ditutup sebagai closure supaya rute module yang membalas JSON tidak membayar satu
+         * query katalog untuk sesuatu yang tidak dipakai; Inertia hanya menyelesaikannya saat
+         * benar-benar membangun jawaban Inertia.
+         */
+        Inertia::share('app', fn (): ?array => $this->katalog->kerangkaModule(
+            $membership,
+            $moduleId,
+            $request->getPathInfo(),
+        ));
 
         return $next($request);
     }

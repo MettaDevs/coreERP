@@ -43,14 +43,15 @@ class LaunchableAppCatalog
         $allowed = array_flip($this->permissionsFor($membership, $app->id));
         $navigation = $app->navigation ?? [];
         $sidebar = is_array($navigation['sidebar'] ?? null) ? $navigation['sidebar'] : [];
+        $sebagaiModule = $this->berjalanSebagaiModul($membership, $app->id);
 
-        return array_values(collect($navigation['rail'] ?? [])->map(function (array $rail) use ($allowed, $app, $sidebar): ?array {
+        return array_values(collect($navigation['rail'] ?? [])->map(function (array $rail) use ($allowed, $app, $sebagaiModule, $sidebar): ?array {
             $items = array_values(collect($sidebar[$rail['id']] ?? [])
                 ->filter(fn (array $item): bool => isset($allowed[$item['permission']]))
                 ->map(fn (array $item): array => [
                     'id' => $item['id'],
                     'label' => $item['label'],
-                    'href' => '/apps/'.$app->id.'?view='.rawurlencode($item['id']),
+                    'href' => $this->tautanMenu($app->id, (string) $item['id'], $sebagaiModule),
                 ])->all());
 
             return $items === [] ? null : [
@@ -60,6 +61,61 @@ class LaunchableAppCatalog
                 'items' => $items,
             ];
         })->filter()->all());
+    }
+
+    /**
+     * Tujuan sebuah entri menu.
+     *
+     * Penyaringan menu tidak berubah sedikit pun antara app container dan module; yang
+     * berubah hanya baris ini. App container disajikan di dalam iframe, sehingga seluruh
+     * layarnya satu halaman shell dan entri menu hanya menggeser `?view=`. Module berjalan
+     * di runtime yang sama, jadi tiap entri menunjuk rute module sungguhan.
+     *
+     * Jalur module diturunkan dengan aturan tetap `/<id module>/<id entri menu>`, bukan
+     * dibaca dari kolom manifest tersendiri. Alasannya: sebuah kolom kedua yang berisi
+     * jalur akan menyimpang dari berkas rute module cepat atau lambat, dan penyimpangannya
+     * tidak terlihat sampai ada yang mengklik menunya. Dengan aturan tetap, berkas rute
+     * module adalah satu-satunya sumber kebenaran, dan test membuktikan tiap tautan menu
+     * benar-benar mendarat pada rute yang terdaftar.
+     */
+    private function tautanMenu(string $appId, string $itemId, bool $sebagaiModule): string
+    {
+        return $sebagaiModule
+            ? '/'.$appId.'/'.$itemId
+            : '/apps/'.$appId.'?view='.rawurlencode($itemId);
+    }
+
+    /**
+     * Bahan sidebar untuk sebuah halaman module.
+     *
+     * Halaman module dirender module, tetapi kerangka layarnya tetap milik Core: rail,
+     * daftar menu, dan penanda entri yang sedang terbuka. Kalau bahan ini ikut dikirim
+     * module lewat props halamannya, setiap module harus mengulang pemanggilan katalog
+     * yang sama dan satu module yang lupa akan kehilangan sidebar-nya tanpa error.
+     *
+     * @return array{id:string,name:string,navigation:array{rails:list<array{id:string,label:string,href:string,items:list<array{id:string,label:string,href:string}>}>,activeItemId:string|null}}|null
+     */
+    public function kerangkaModule(TenantMembership $membership, string $moduleId, string $path): ?array
+    {
+        $app = CoreApp::query()->whereKey($moduleId)->first();
+
+        if ($app === null) {
+            return null;
+        }
+
+        $rails = $this->navigationFor($membership, $app);
+        $aktif = collect($rails)
+            ->flatMap(fn (array $rail): array => $rail['items'])
+            ->firstWhere('href', $path);
+
+        return [
+            'id' => $app->id,
+            'name' => $app->name,
+            'navigation' => [
+                'rails' => $rails,
+                'activeItemId' => $aktif['id'] ?? null,
+            ],
+        ];
     }
 
     /** @return list<array{id:string,name:string,description:string,href:string,version:string}> */

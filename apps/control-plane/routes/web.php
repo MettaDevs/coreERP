@@ -94,6 +94,25 @@ Route::middleware(['auth'])->group(function () {
     Route::get('apps/{app}', function (CoreApp $app, Request $request, CurrentWorkspace $workspace, LaunchableAppCatalog $catalog, AppContextToken $tokens) {
         $membership = $workspace->membership($request);
         abort_unless($membership && collect($catalog->for($membership))->contains('id', $app->id), 403);
+
+        /*
+         * App yang sudah berjalan sebagai module tidak punya halaman tuan rumah sendiri.
+         * Peluncur produk tetap menautkan `/apps/<id>` untuk keduanya — itu satu-satunya
+         * tautan yang tetap benar sebelum dan sesudah sebuah app dipindahkan — jadi di sini
+         * ia diteruskan ke entri menu pertama yang boleh dilihat pengguna ini.
+         *
+         * Tanpa cabang ini, sebuah module yang sudah terpasang membalas 404 dari
+         * `runtimeFor`, karena module memang tidak punya penempatan container.
+         */
+        if ($catalog->berjalanSebagaiModul($membership, $app->id)) {
+            $tujuan = collect($catalog->navigationFor($membership, $app))
+                ->flatMap(fn (array $rail): array => $rail['items'])
+                ->first();
+            abort_if($tujuan === null, 404);
+
+            return redirect($tujuan['href']);
+        }
+
         $runtimeEntry = $catalog->runtimeFor($membership, $app->id);
         abort_unless($runtimeEntry, 404);
         $navigation = $catalog->navigationFor($membership, $app);

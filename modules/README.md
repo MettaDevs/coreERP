@@ -37,6 +37,42 @@ Tidak ada folder lain di akar module. Yang tidak boleh ada, beserta sebabnya:
 Kunci `api.image` dan `ui.image` pada `app.yaml` masih ada dan dibiarkan apa adanya sampai bentuk rilis
 diganti pada F5-05. Keduanya tidak dibaca runtime.
 
+## Halaman module
+
+Halaman React module berada di `ui/Pages/` dan ikut build shell Core. Tidak ada iframe, tidak ada
+aplikasi React kedua, dan tidak ada token yang dipertukarkan lebih dulu.
+
+```text
+modules/apperp/contoh-a/ui/Pages/Daftar.tsx
+```
+
+Controller module merendernya seperti halaman Inertia biasa, dengan nama berbentuk
+`<id module>::<nama berkas>`:
+
+```php
+return Inertia::render('contoh-a::Daftar', ['barang' => $barang]);
+```
+
+Penerbit tidak ikut disebut; pemilih halaman pada `apps/control-plane/resources/js/app.tsx` mencocokkan
+akhiran jalurnya, dan id module sudah unik di seluruh runtime.
+
+Tiga hal yang mengikat:
+
+- **Halaman module hanya mengimpor `@apperp/ui`, React, dan berkasnya sendiri.** Impor `@/...` milik
+  shell akan berhasil dibangun — folder ini ikut build yang sama — dan justru itu bahayanya: module-nya
+  pecah begitu dipasang di runtime yang shell-nya berbeda.
+- **Id entri menu pada `app.yaml` adalah jalur rutenya.** Core menyusun tautan sidebar dengan aturan
+  `/<id module>/<id entri menu>`, jadi berkas rute module wajib punya rute dengan jalur itu.
+- **Halaman module dimuat malas.** Tuan rumahnya di
+  `apps/control-plane/resources/js/pages/modules/host.tsx` memasang pembatas penangguhan dan pembatas
+  kesalahan; jangan menghapus salah satunya.
+
+Berkas `ui/` diperiksa Prettier lewat `npm run format:check` di `apps/control-plane`, dengan
+`--config .prettierrc` yang ditulis eksplisit: Prettier mencari konfigurasi dengan menaiki folder dari
+berkas yang diperiksa, dan di atas `modules/` tidak ada satu pun. ESLint **belum** mencakup folder ini —
+ia menolak berkas di luar folder konfigurasinya — jadi berkas `ui/` untuk sementara hanya dijaga
+Prettier dan `tsc`.
+
 ## Namespace dan awalan tabel
 
 Setiap module memakai satu namespace dan satu awalan tabel, dan keduanya diturunkan dari nama foldernya:
