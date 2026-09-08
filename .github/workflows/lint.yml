@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -66,6 +70,12 @@ jobs:
       # Wayfinder harus sudah dibuat lebih dulu, karena halaman mengimpor tipe dari sana.
       - name: Check Frontend Types
         run: npm run types:check
+
+      # Dipindah ke sini dari alur test. Analisa tipe PHP tidak bergantung versi PHP, jadi
+      # menjalankannya di dalam matriks berarti mengerjakan hal yang sama dua kali dengan
+      # hasil yang pasti sama. Pembangunan aset TIDAK ikut pindah: test membutuhkannya.
+      - name: Run Type Analysis
+        run: composer types:check
 
       # `.agents/skills` dan `.claude/skills` dibaca alat yang berbeda dan isinya sudah
       # menyimpang diam-diam sekali. Tidak ada test yang gagal karena aturan di satu
