@@ -3010,6 +3010,50 @@ menyuruh orang membacanya.
 
 **Bergantung pada.** Tidak ada.
 
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026 lewat pull request #65.
+
+**Tidak ada `dist/` yang ikut ter-commit.** Langkah 1 menyuruh menghapusnya.
+`git ls-files apps/web-shell` memulangkan tepat sembilan berkas dan tidak satu pun di bawah `dist/`;
+`git log --all -- apps/web-shell/dist` kosong. Folder itu tidak pernah punya build ter-commit.
+
+**Dugaan "tidak ada compose, skrip, atau CI yang menyebutnya" benar, dan sekarang terukur.**
+`grep -ril "web-shell"` di seluruh worktree menemukan sepuluh berkas: dua di dalam folder itu sendiri dan
+delapan halaman dokumen. Awalan env `WEB_SHELL_` hanya muncul di dua berkas milik folder itu. Nama paket
+`@coreerp/web-shell` tidak dirujuk dari mana pun, dan tidak ada `package.json` di akar repo yang membuatnya
+ikut `npm install`. `.github/workflows/` hanya menyebut `apps/control-plane`. `D:\Kerja\erp-dev` dan
+`app-erp-ci-workflows` nol rujukan.
+
+**Angka "dua baris dokumen" meleset: yang sebenarnya lima baris pada empat halaman.** Selain dua halaman
+yang disebut daftar berkas, `docs/onboarding/hari-pertama.md` memuat path itu pada peta repo dan
+`docs/dev/06-worktree-target.md` memuatnya dua kali — sekali sebagai keadaan sekarang, sekali pada pohon
+target. Baris keadaan sekarang diperbaiki; baris pada pohon target ditahan dengan keterangan "belum ada",
+karena memisahkan Web Shell sebagai app tersendiri masih tercatat terbuka sebagai `PLAT-20` di
+[layanan platform](../general/04-layanan-platform.md). Yang salah bukan cita-citanya, melainkan pengakuan
+bahwa foldernya sudah ada.
+
+**Berkas audit di `docs/todo/general/` sengaja dibiarkan.** `LIFE-26` dan `PLAT-20` menyebut
+`apps/web-shell` sebagai bukti temuan pada satu titik waktu, dan `LIFE-26` justru menyarankan penghapusan
+ini sebagai salah satu dari dua pilihannya. Menyunting catatan bukti setelah kejadiannya membuat catatan
+itu berhenti berguna sebagai bukti.
+
+**Kriteria "tanpa tautan mati" bisa gagal, tapi ia tidak menjaga pekerjaan ini.** Menunjuk
+`apps/web-shell/README.md` sebagai tautan Markdown dari `peta-kode.md` membuat build merah dengan
+`Found dead link ./../../apps/web-shell/README in file onboarding\peta-kode.md` lalu
+`[vitepress] 1 dead link(s) found.` — jadi kriterianya nyata. Tetapi kelima rujukan yang diperbaiki di
+sini adalah *code span*, bukan tautan, dan VitePress tidak memeriksa isinya. Build tetap hijau seandainya
+kelimanya dibiarkan menggantung. Yang menemukannya `grep`. Untuk task dokumen berikutnya: kriteria
+`docs:build` menjaga tautan, bukan path yang dikutip sebagai kode.
+
+**Stack lokal dibuktikan dari jalur pembangunannya, bukan dari menyalakan Docker.** `compose.yaml` erp-dev
+membangun `apps/control-plane/Dockerfile` dengan konteks akar repo, dan Dockerfile itu hanya
+`COPY apps/control-plane …` — sibling lain di `apps/` tidak pernah masuk image. Worktree ini juga bukan
+checkout yang dipakai stack.
+
+**Temuan sampingan untuk F7-06.** `package-lock.json` di akar repo dan `apps/package-lock.json` keduanya
+ter-commit, keduanya berisi `"packages": {}`, dan tidak ada `package.json` yang menemani.
+
 ### F4-02 — `@apperp/ui` menjadi paket dalam repo
 
 **Kenapa.** Hari ini paket dibangun menjadi berkas `.tgz` lalu disalin ke Core, ke setiap repo app, dan ke
