@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Modules;
+
+use App\Services\Modules\DaftarSatuanCore;
+use App\Services\Modules\DirektoriOrganisasiCore;
+use App\Services\Modules\KalenderFiskalCore;
+use App\Services\Modules\KonteksTenantPermintaan;
+use App\Services\Modules\MesinWorkflowCore;
+use App\Services\Modules\PenerbitNomorCore;
+use App\Support\Modules\Contracts\DaftarSatuan;
+use App\Support\Modules\Contracts\DirektoriOrganisasi;
+use App\Support\Modules\Contracts\KalenderFiskal;
+use App\Support\Modules\Contracts\KonteksTenant;
+use App\Support\Modules\Contracts\MesinWorkflow;
+use App\Support\Modules\Contracts\PenerbitNomor;
+use Illuminate\Contracts\Foundation\Application;
+
+/**
+ * Satu tempat yang menyebut seluruh permukaan Core yang boleh dipanggil module.
+ *
+ * Daftar ini adalah **kontraknya**. Menambah baris di sini adalah keputusan arsitektur:
+ * setiap pasangan berarti Core berjanji tidak mengubah bentuk panggilan itu tanpa mengubah
+ * antarmukanya. Module yang butuh sesuatu di luar daftar ini tidak boleh mengambil jalan
+ * pintas ke kelas Core; ia mengusulkan antarmuka baru.
+ *
+ * Semua antarmuka menerima **id, bukan objek Core**. Module yang harus mengambil objek Core
+ * lebih dulu sudah menyentuh model Core, dan batas yang dibuat daftar ini kembali kabur.
+ */
+final class CoreServices
+{
+    /** @var array<class-string, class-string> */
+    public const PEMETAAN = [
+        PenerbitNomor::class => PenerbitNomorCore::class,
+        KalenderFiskal::class => KalenderFiskalCore::class,
+        DaftarSatuan::class => DaftarSatuanCore::class,
+        MesinWorkflow::class => MesinWorkflowCore::class,
+        DirektoriOrganisasi::class => DirektoriOrganisasiCore::class,
+        KonteksTenant::class => KonteksTenantPermintaan::class,
+    ];
+
+    public static function daftarkan(Application $app): void
+    {
+        foreach (self::PEMETAAN as $antarmuka => $pelaksana) {
+            $app->bind($antarmuka, $pelaksana);
+        }
+    }
+}

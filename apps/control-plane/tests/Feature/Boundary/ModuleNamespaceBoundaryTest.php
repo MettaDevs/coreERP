@@ -60,6 +60,78 @@ class ModuleNamespaceBoundaryTest extends TestCase
         ]));
     }
 
+    public function test_module_hanya_menyentuh_kelas_core_yang_dikontrakkan(): void
+    {
+        $modules = $this->modules();
+        $this->assertNotEmpty($modules, 'Tidak ada module yang ditemukan; penjaga ini akan lulus tanpa menguji apa pun.');
+
+        $pelanggaran = [];
+
+        foreach ($modules as $folder) {
+            foreach ($this->berkasPhp($folder) as $berkas) {
+                $isi = (string) file_get_contents($berkas->getPathname());
+
+                foreach ($this->kelasCoreYangDisebut($isi) as $kelas) {
+                    $pelanggaran[] = $this->jalurRingkas($berkas->getPathname()).' menyebut '.$kelas;
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($pelanggaran)), implode("\n", [
+            'Module menyentuh kelas Core di luar kontrak.',
+            'Permukaan yang boleh dipanggil module ada di App\\Support\\Modules, dan daftarnya di CoreServices.',
+            'Butuh sesuatu yang belum ada di sana? Usulkan antarmuka baru; jangan mengambil jalan',
+            'pintas ke kelas Core, karena kelas Core bebas berubah bentuk dan module akan ikut',
+            'pecah tanpa peringatan.',
+        ]));
+    }
+
+    public function test_pemeriksa_kelas_core_membedakan_kontrak_dari_kelas_biasa(): void
+    {
+        $contoh = implode("\n", [
+            'use App\\Support\\Modules\\Contracts\\PenerbitNomor;',
+            'use App\\Support\\Modules\\TenantScope;',
+            'use App\\Models\\Tenant;',
+            'use App\\Support\\CurrentWorkspace;',
+        ]);
+
+        $this->assertSame(
+            ['App\\Models\\Tenant', 'App\\Support\\CurrentWorkspace'],
+            $this->kelasCoreYangDisebut($contoh),
+            'Kontrak dan TenantScope boleh; model Core dan kelas Support lain tidak.',
+        );
+    }
+
+    /**
+     * Kelas Core yang disebut sebuah isi berkas, kecuali yang memang dikontrakkan.
+     *
+     * Seluruh `App\\Support\\Modules` diizinkan: di situlah kontrak dan `TenantScope` berada,
+     * dan keduanya memang permukaan yang dituju module.
+     *
+     * @return list<string>
+     */
+    private function kelasCoreYangDisebut(string $isi): array
+    {
+        preg_match_all('/App(?:\\\\{1,2}[A-Za-z0-9_]+)+/', $isi, $cocok);
+
+        $hasil = [];
+
+        foreach ($cocok[0] as $nama) {
+            $rapi = str_replace('\\\\', '\\', $nama);
+
+            if (str_starts_with($rapi, 'App\\Support\\Modules\\')) {
+                continue;
+            }
+
+            $hasil[] = $rapi;
+        }
+
+        $hasil = array_values(array_unique($hasil));
+        sort($hasil);
+
+        return $hasil;
+    }
+
     public function test_pemeriksanya_menangkap_impor_pemanggilan_statis_dan_string(): void
     {
         $contoh = <<<'PHP'
@@ -91,7 +163,13 @@ class ModuleNamespaceBoundaryTest extends TestCase
      */
     private function namespaceYangDisebut(string $isi): array
     {
-        preg_match_all('/Modules\\\\{1,2}([A-Za-z0-9_]+)\\\\{1,2}([A-Za-z0-9_]+)/', $isi, $cocok, PREG_SET_ORDER);
+        // Lookbehind-nya penting. Tanpa itu, pola ini juga cocok di tengah
+        // App\\Support\\Modules\\Contracts\\..., lalu membaca "Contracts" sebagai nama
+        // publisher — sebuah module yang tidak pernah ada. Yang dicari hanya `Modules` di
+        // awal sebuah nama, bukan sebagai potongan di tengahnya. Nama yang diawali satu
+        // garis miring — bentuk lengkap seperti \\Modules\\Apperp\\... — tetap ditangkap,
+        // karena itu justru bentuk yang paling mungkin dipakai untuk menembus batas.
+        preg_match_all('/(?<![A-Za-z0-9_]\\\\)(?<![A-Za-z0-9_])Modules\\\\{1,2}([A-Za-z0-9_]+)\\\\{1,2}([A-Za-z0-9_]+)/', $isi, $cocok, PREG_SET_ORDER);
 
         $hasil = array_map(
             static fn (array $bagian): string => $bagian[1].'\\'.$bagian[2],

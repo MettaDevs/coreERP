@@ -14,6 +14,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * ada yang memakainya. Bentuknya sengaja mengikuti aturan yang berlaku untuk module
  * sungguhan: nama tabel berawalan module, `tenant_id` pada setiap baris, dan
  * penghapusan lunak.
+ *
+ * Properti didaftarkan supaya analisa statis tahu bentuk barisnya. Tanpa itu, setiap
+ * pembacaan kolom dilaporkan sebagai properti yang tidak ada — dan laporan seperti itu
+ * mudah dianggap kebisingan, lalu penemuan yang sungguhan ikut diabaikan.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $kode
+ * @property string $nama
+ * @property bool $bawaan
  */
 final class Rak extends Model
 {
