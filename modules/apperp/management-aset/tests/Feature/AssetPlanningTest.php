@@ -51,7 +51,9 @@ class AssetPlanningTest extends TestCase
             'planning_id' => $planId, 'jenis_aset_id' => $jenis, 'asset_name' => 'Laptop kerja',
             'requested_specification' => 'RAM 16 GB, SSD 512 GB', 'quantity' => 2,
         ]);
-        Http::assertSent(fn ($request) => str_contains($request->url(), '/number-sequences/') && $request['legal_entity_id'] === $this->legalEntityId);
+        // Dulu memeriksa entitas legal yang dikirim ke Core lewat kabel; sekarang memeriksa
+        // nomor yang benar-benar terbit. Satu baris penerbitan berarti penghitungnya maju.
+        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Penerbitan nomor tidak terjadi.');
 
         $this->headers(['management-aset.perencanaan-aset.read'])
             ->getJson('/api/modules/management-aset/v1/perencanaan-aset/'.$planId)
@@ -63,7 +65,7 @@ class AssetPlanningTest extends TestCase
         $otherTenantType = $this->jenis((string) Str::ulid());
         $this->create($otherTenantType)->assertUnprocessable()->assertJsonValidationErrors('details');
         $this->assertDatabaseCount('aset_tr_perencanaan_aset', 0);
-        Http::assertNothingSent();
+        $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
     }
 
     public function test_update_and_archive_require_their_own_permissions_and_current_version(): void

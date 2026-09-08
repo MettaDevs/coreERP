@@ -11,7 +11,7 @@ use Modules\Apperp\ManagementAset\Support\WorkOrderValidation;
 
 final class ProvisionIndonesiaStarterData
 {
-    public function __construct(private readonly NumberSequenceClient $numbers) {}
+    public function __construct(private readonly PenerbitNomorAset $numbers) {}
 
     /**
      * Menyediakan template starter untuk satu tenant. Semua key berasal dari

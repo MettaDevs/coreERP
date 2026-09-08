@@ -2698,6 +2698,40 @@ meniru batas permintaan akan selalu memuji dirinya sendiri.
 dan test kecepatan yang bergantung mesin akan dimatikan orang pada hari pertama ia berkedip. Dibuktikan
 bisa merah dengan melumpuhkan ikatan `scoped`: **14 query, batasnya 10.**
 
+### F3-27 — Bahan uji nomor urut untuk tenant uji
+
+Nomornya F3-27 karena nomor tidak dipakai ulang, tetapi tempatnya di sini: **ia dikerjakan sebelum F3-06.**
+
+**Kenapa.** Selama penerbitan nomor lewat HTTP, test cukup memalsukan jawabannya dengan `Http::fake`.
+Lewat kontrak Core nomornya diterbitkan sungguhan, dan itu menuntut profil, referensi, serta penghitung
+benar-benar ada untuk tenant uji. Tanpa itu, 43 dari 48 test pada satu berkas saja langsung merah — bukan
+karena kodenya salah, melainkan karena tenant ujinya belum pernah di-provision.
+
+**Berkas.**
+- `modules/apperp/management-aset/tests/Concerns/BerinteraksiDenganKonteksCore.php`
+
+**Langkah.**
+1. Daftar referensi dibaca dari `app.yaml` module, bukan ditulis ulang di test.
+2. Tiap tenant yang dibuat trait mendapat urutan nomornya sendiri, termasuk tenant kedua pada test isolasi.
+3. Sediakan cara membaca awalan nomor dari manifest, supaya assertion bisa membuktikan referensi yang benar
+   dipakai.
+
+**Selesai bila.** Test yang membuat master lulus tanpa satu pun `Http::fake`.
+
+**Bergantung pada.** F3-15.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Daftar referensinya dibaca dari manifest, dan itu bukan kerapian.** Daftar kedua akan menyimpang dari
+`app.yaml` pada hari seseorang menambah satu referensi, dan yang menyimpang gagal dengan "reference tidak
+dikenal" — pesan yang tidak menyebut sebabnya sama sekali.
+
+Efek sampingnya: assertion bisa membaca awalan dari manifest juga, sehingga ia sekaligus membuktikan
+**referensi yang benar yang dipakai**. Itu sesuatu yang tidak pernah bisa dibuktikan selama nomornya
+dipalsukan — jawaban palsu tidak peduli referensi apa yang diminta.
+
 ### F3-06 — Penerbitan nomor lewat kontrak Core
 
 **Kenapa.** Ini pemanggilan HTTP yang paling sering: setiap dokumen baru dan setiap master baru
@@ -2753,6 +2787,46 @@ bentuknya.
 sendiri tidak bisa dipenuhi, bukan layanan yang tidak terjangkau. Penggantinya 422. Itu perubahan yang
 terlihat pengguna, jadi ia keputusan produk — bukan detail yang boleh ikut menyelinap pada pull request
 penggantian jalur.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026, setelah prasyaratnya dikerjakan lebih dulu sebagai F3-27.
+
+**Langkah 4 ternyata belum pernah dikerjakan siapa pun, dan itu inti seluruh task.** Rencana menyuruh
+membungkus penerbitan nomor dan penyimpanan dokumen dalam satu transaksi. Yang ada di kode: penerbitan
+berjalan **di luar** `DB::transaction` yang membungkus penyimpanan. Selama jalurnya HTTP, itu memang tidak
+bisa diperbaiki — koneksi Core bukan koneksi module. Sesudah kontraknya dipakai, memindahkannya ke dalam
+transaksi hanya soal memindahkan lima baris.
+
+**Testnya yang membuktikan itu sempat tidak membuktikan apa pun.** Percobaan pertama memicu kegagalan
+dengan nama 5.000 karakter — dan `nama` divalidasi `max:150`, jadi permintaannya ditolak **sebelum** nomor
+diminta. Hijau, membuktikan nol. Yang benar: menyisipkan satu baris lebih dulu dengan kode yang akan
+diterbitkan berikutnya, sehingga validasi lolos, penerbitan berjalan, lalu penyimpanan ditolak indeks
+unik. Dibuktikan bisa merah dengan mengeluarkan penerbitan dari transaksi:
+`Nomor tetap terbit padahal recordnya batal.`
+
+**`NumberSequenceFailureTest` diganti, bukan disesuaikan.** Kesepuluh testnya tentang kegagalan jaringan —
+kredensial ditolak, batas laju, Core tidak terjangkau, klasifikasi 4xx dan 5xx. Tidak satu pun bisa terjadi
+lagi. Mempertahankannya berarti menjaga mekanisme yang sudah tidak ada: hijau selamanya tanpa membuktikan
+apa pun, dan orang berikutnya percaya penanganan kegagalan masih teruji. Penggantinya tiga kegagalan yang
+masih mungkin, termasuk rollback di atas.
+
+**Assertion yang mengintip kabel diganti assertion yang memeriksa akibatnya**, dan itu membuktikan lebih
+banyak daripada sebelumnya:
+
+| Dulu | Sekarang | Yang bertambah |
+| --- | --- | --- |
+| `Http::assertSentCount(1)` | satu baris pada `number_sequence_issues` | penghitungnya benar-benar maju |
+| `Http::assertSent(url berisi referensi)` | nomornya berawalan sesuai referensi | URL benar tetap bisa memakai urutan salah |
+| `assertJsonPath('kode', 'NS-000001')` | awalan dibaca dari `app.yaml` | membuktikan referensi yang benar dipakai |
+
+**Satu test kehilangan alatnya dan niatnya ditulis ulang.** `test_pencarian_angka_nol` memaksa format nomor
+tanpa digit nol supaya penyaringan benar-benar dari nama. Nomor sungguhan berisi nol, jadi alat itu hilang.
+Yang dijaganya — kata kunci `0` tidak dibuang sebagai kosong — tetap dijaga lewat dua pemeriksaan yang tidak
+bergantung pada bentuk nomor.
+
+**Jumlah test berkurang dari 493 menjadi 486.** Sepuluh test jaringan dibuang, tiga menggantikannya. Suite
+yang lebih kecil di sini adalah suite yang lebih jujur.
 
 **Rujukan.** [number sequence](../../dev/14-number-sequences.md), bagian 5.3 dokumen ini.
 

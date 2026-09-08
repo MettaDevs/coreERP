@@ -6,8 +6,10 @@ namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 
 use App\Models\TenantMembership;
 use App\Models\User;
+use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Cara test module masuk sebagai pengguna: lewat Core, bukan lewat token.
@@ -90,6 +92,121 @@ trait BerinteraksiDenganKonteksCore
     }
 
     /**
+     * Referensi nomor module beserta urutan nomor milik tenant uji.
+     *
+     * Selama penerbitan nomor lewat HTTP, test cukup memalsukan jawabannya dengan `Http::fake`.
+     * Lewat kontrak Core nomornya diterbitkan **sungguhan**, dan itu menuntut profil, referensi,
+     * serta penghitung benar-benar ada untuk tenant ini — persis seperti tenant sungguhan setelah
+     * provisioning.
+     *
+     * Daftarnya dibaca dari `app.yaml` module, bukan ditulis ulang di sini. Daftar kedua akan
+     * menyimpang dari manifestnya pada hari seseorang menambah satu referensi, dan yang menyimpang
+     * gagal dengan pesan "reference tidak dikenal" yang tidak menyebut sebabnya.
+     */
+    private function pastikanNomorUrutSiap(string $tenantId): void
+    {
+        $this->pastikanKatalogModule();
+        $this->seed(NumberSequenceProfileSeeder::class);
+
+        $manifest = Yaml::parseFile(dirname(__DIR__, 2).'/app.yaml');
+        $referensi = $manifest['number_sequences']['references'] ?? [];
+
+        foreach (is_array($referensi) ? $referensi : [] as $baris) {
+            $kode = $baris['code'] ?? null;
+
+            if (! is_string($kode) || $kode === '') {
+                continue;
+            }
+
+            $referensiId = DB::table('app_number_sequence_references')->where('code', $kode)->value('id');
+
+            if ($referensiId === null) {
+                $referensiId = (string) Str::ulid();
+                DB::table('app_number_sequence_references')->insert([
+                    'id' => $referensiId,
+                    'app_id' => 'management-aset',
+                    'code' => $kode,
+                    'name' => $baris['name'] ?? $kode,
+                    'default_prefix' => $baris['default_prefix'] ?? null,
+                    'allowed_scopes' => json_encode($baris['allowed_scopes'] ?? ['tenant'], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::table('tenant_number_sequences')->insertOrIgnore([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $tenantId,
+                'reference_id' => $referensiId,
+                'profile_code' => 'non-continuous-default',
+                'scope_type' => 'tenant',
+                'status' => 'active',
+                'is_continuous' => false,
+                'allow_manual' => false,
+                'reset_period' => 'never',
+                'preallocation_enabled' => false,
+                'preallocation_quantity' => 1,
+                'minimum_number' => 1,
+                'segments' => json_encode([
+                    ['type' => 'constant', 'value' => $baris['default_prefix'] ?? 'NS'],
+                    ['type' => 'constant', 'value' => '-'],
+                    ['type' => 'number', 'length' => 6],
+                ], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Berapa nomor yang benar-benar diterbitkan Core sejauh ini.
+     *
+     * Menggantikan `Http::assertSentCount()` pada test yang dulu mengintip kabel. Yang diperiksa
+     * sekarang **akibatnya**, bukan perjalanannya: satu baris penerbitan berarti satu nomor
+     * benar-benar dipakai dan penghitungnya maju. Assertion lama tidak pernah bisa membuktikan
+     * itu — jawaban palsu tidak menyentuh penghitung apa pun.
+     */
+    protected function jumlahNomorTerbit(): int
+    {
+        return DB::table('number_sequence_issues')->where('app_id', 'management-aset')->count();
+    }
+
+    /**
+     * Nomor terakhir yang diterbitkan Core, atau null bila belum ada.
+     */
+    protected function nomorTerakhir(): ?string
+    {
+        $nilai = DB::table('number_sequence_issues')
+            ->where('app_id', 'management-aset')
+            ->orderByDesc('issued_at')
+            ->value('formatted_value');
+
+        return is_string($nilai) ? $nilai : null;
+    }
+
+    /**
+     * Awalan nomor yang dijanjikan manifest untuk sebuah referensi.
+     *
+     * Dipakai test yang memeriksa kode yang diterbitkan. Membacanya dari manifest, bukan
+     * menuliskannya sebagai konstanta di test, membuat assertion-nya sekaligus membuktikan
+     * **referensi yang benar yang dipakai** — sesuatu yang tidak pernah bisa dibuktikan selama
+     * nomornya dipalsukan `Http::fake`, karena jawaban palsu tidak peduli referensi apa yang
+     * diminta.
+     */
+    protected function awalanNomor(string $kodeReferensi): string
+    {
+        $manifest = Yaml::parseFile(dirname(__DIR__, 2).'/app.yaml');
+
+        foreach ($manifest['number_sequences']['references'] ?? [] as $baris) {
+            if (($baris['code'] ?? null) === $kodeReferensi) {
+                return (string) ($baris['default_prefix'] ?? 'NS');
+            }
+        }
+
+        throw new \RuntimeException(sprintf('Referensi nomor "%s" tidak ada di app.yaml module.', $kodeReferensi));
+    }
+
+    /**
      * Organisasi dibuat hanya bila belum ada dan idnya memang disebut.
      */
     private function pastikanOrganisasiAda(string $tenantId, ?string $organisasiId, string $klasifikasi): void
@@ -142,6 +259,12 @@ trait BerinteraksiDenganKonteksCore
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        // Tiap tenant, termasuk tenant kedua yang dibuat test isolasi, mendapat urutan nomornya
+        // sendiri. Nomor urut bersifat per tenant di Core; tenant tanpa urutan tidak bisa
+        // menerbitkan apa pun, dan test lintas tenant akan gagal dengan 422 yang tidak
+        // menyebut sebabnya.
+        $this->pastikanNomorUrutSiap($tenantId);
 
         return $tenantId;
     }

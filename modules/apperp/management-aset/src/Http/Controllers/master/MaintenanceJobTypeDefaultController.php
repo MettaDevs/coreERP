@@ -9,7 +9,7 @@ use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
 use Modules\Apperp\ManagementAset\Models\MasterData;
-use Modules\Apperp\ManagementAset\Services\NumberSequenceClient;
+use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
 
 class MaintenanceJobTypeDefaultController extends MasterDataController
@@ -99,7 +99,7 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
         $data = $request->validate(['nama' => ['required', 'string', 'max:150']]);
         $creationKey = (string) $request->header('Idempotency-Key');
         validator(['key' => $creationKey], ['key' => ['required', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
-        $numbers = app(NumberSequenceClient::class);
+        $numbers = app(PenerbitNomorAset::class);
         $code = $numbers->issue('management-aset.maintenance-job-type-defaults', $tenantId, 'maintenance-job-type-defaults:'.$creationKey);
         $copy = $source->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
         $copy->fill(['tenant_id' => $tenantId, 'creation_key' => $creationKey, 'kode' => $code, 'nama' => trim($data['nama'])]);

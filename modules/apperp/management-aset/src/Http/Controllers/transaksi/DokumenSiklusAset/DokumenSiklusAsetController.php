@@ -8,8 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Services\NumberSequenceClient;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Services\WorkflowClient;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
@@ -29,7 +29,7 @@ class DokumenSiklusAsetController extends Controller
         return $this->index($request, $this->typeFromRequest($request));
     }
 
-    public function storeByRoute(Request $request, NumberSequenceClient $numbers, WorkflowClient $workflow): JsonResponse
+    public function storeByRoute(Request $request, PenerbitNomorAset $numbers, WorkflowClient $workflow): JsonResponse
     {
         return $this->store($request, $this->typeFromRequest($request), $numbers, $workflow);
     }
@@ -43,7 +43,7 @@ class DokumenSiklusAsetController extends Controller
         return response()->json(['data' => $query->latest('created_at')->get()]);
     }
 
-    public function store(Request $request, string $type, NumberSequenceClient $numbers, WorkflowClient $workflow): JsonResponse
+    public function store(Request $request, string $type, PenerbitNomorAset $numbers, WorkflowClient $workflow): JsonResponse
     {
         $this->guard($request, $type, 'create');
         $key = (string) $request->header('Idempotency-Key');

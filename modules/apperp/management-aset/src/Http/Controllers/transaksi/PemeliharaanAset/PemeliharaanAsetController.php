@@ -11,8 +11,8 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Services\MaintenanceChecklistSnapshot;
-use Modules\Apperp\ManagementAset\Services\NumberSequenceClient;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\WorkOrderStatus;
 
@@ -118,7 +118,7 @@ class PemeliharaanAsetController extends Controller
         return response()->json(['data' => $workOrder]);
     }
 
-    public function store(Request $request, NumberSequenceClient $numbers): JsonResponse
+    public function store(Request $request, PenerbitNomorAset $numbers): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
