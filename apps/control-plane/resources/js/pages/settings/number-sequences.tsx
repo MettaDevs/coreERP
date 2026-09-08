@@ -628,7 +628,6 @@ export default function NumberSequences({
                 <Heading
                     title="Nomor dokumen"
                     description="Atur format dan susunan nomor otomatis dokumen operasional bisnis."
-                    icon={Hash}
                 />
                 <div className="grid items-start gap-6 lg:grid-cols-[22rem_1fr]">
                     {/* Sidebar Jenis Nomor Scrollable Memanjang Ke Paling Bawah Layar User */}

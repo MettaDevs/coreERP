@@ -70,7 +70,6 @@ export default function Workflows({
                 <Heading
                     title="Workflow"
                     description="Susun langkah kerja aplikasi, mulai dari tugas, persetujuan, keputusan kondisi, sampai selesai."
-                    icon={WorkflowIcon}
                 />
 
                 {/* Card Form Buat Workflow (Sesuai Tampilan Awal) */}

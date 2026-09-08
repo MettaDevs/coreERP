@@ -1458,7 +1458,6 @@ export default function OrganizationPage({
                 <Heading
                     title="Organisasi Perusahaan"
                     description={`Pengelolaan identitas entitas legal, unit operasional, dan bagan hirarki organisasi untuk ${tenant.name}.`}
-                    icon={Building2}
                 />
 
                 {/* Navigasi Tab Bagian Organisasi */}
