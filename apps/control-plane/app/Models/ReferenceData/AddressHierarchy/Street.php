@@ -27,7 +27,7 @@ class Street extends Model
 
     protected $casts = [
         'override_postal_code' => 'boolean',
-        'active'               => 'boolean',
+        'active' => 'boolean',
     ];
 
     public function village(): BelongsTo

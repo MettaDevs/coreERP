@@ -164,8 +164,8 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
     Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
     Route::get('settings/address-setup', [AddressSetupController::class, 'index'])->name('address-setup.index');
-    Route::get('settings/address setup', fn (\Illuminate\Http\Request $r) => redirect('/settings/address-setup?' . http_build_query($r->query())));
-    Route::get('settings/address_setup', fn (\Illuminate\Http\Request $r) => redirect('/settings/address-setup?' . http_build_query($r->query())));
+    Route::get('settings/address setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
+    Route::get('settings/address_setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
     // Countries
     Route::post('settings/address-setup/countries', [AddressSetupController::class, 'storeCountry'])->name('address-setup.countries.store');
     Route::delete('settings/address-setup/countries/{code}', [AddressSetupController::class, 'destroyCountry'])->name('address-setup.countries.destroy');

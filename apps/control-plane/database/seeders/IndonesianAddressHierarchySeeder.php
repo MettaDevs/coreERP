@@ -43,33 +43,33 @@ class IndonesianAddressHierarchySeeder extends Seeder
         DB::table('ref_address_parameters')->updateOrInsert(
             ['country_code' => 'ID'],
             [
-                'country_code'    => 'ID',
-                'use_province'    => true,
-                'use_regency'     => true,
-                'use_district'    => true,
-                'use_village'     => true,
-                'use_rt_rw'       => true,
+                'country_code' => 'ID',
+                'use_province' => true,
+                'use_regency' => true,
+                'use_district' => true,
+                'use_village' => true,
+                'use_rt_rw' => true,
                 'use_postal_code' => true,
-                'use_building'    => true,
-                'address_format'  => '{street}, RT {rt}/RW {rw}, Kel. {village}, Kec. {district}, {regency}, {province} {postal_code}',
-                'created_at'      => $now,
-                'updated_at'      => $now,
+                'use_building' => true,
+                'address_format' => '{street}, RT {rt}/RW {rw}, Kel. {village}, Kec. {district}, {regency}, {province} {postal_code}',
+                'created_at' => $now,
+                'updated_at' => $now,
             ]
         );
         DB::table('ref_address_parameters')->updateOrInsert(
             ['country_code' => 'MY'],
             [
-                'country_code'    => 'MY',
-                'use_province'    => true,
-                'use_regency'     => true,
-                'use_district'    => true,
-                'use_village'     => true,
-                'use_rt_rw'       => false,
+                'country_code' => 'MY',
+                'use_province' => true,
+                'use_regency' => true,
+                'use_district' => true,
+                'use_village' => true,
+                'use_rt_rw' => false,
                 'use_postal_code' => true,
-                'use_building'    => true,
-                'address_format'  => '{street}, {village}, {district}, {postal_code} {regency}, {province}',
-                'created_at'      => $now,
-                'updated_at'      => $now,
+                'use_building' => true,
+                'address_format' => '{street}, {village}, {district}, {postal_code} {regency}, {province}',
+                'created_at' => $now,
+                'updated_at' => $now,
             ]
         );
 
@@ -114,7 +114,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
             DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                 ['country_code' => $lvl['country_code'], 'level' => $lvl['level']],
                 array_merge($lvl, [
-                    'id'         => (string) Str::ulid(),
+                    'id' => (string) Str::ulid(),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ])
@@ -133,19 +133,41 @@ class IndonesianAddressHierarchySeeder extends Seeder
             if (in_array($provinceCode, ['51', '52', '53', '63', '64', '65', '71', '72', '73', '74', '75', '76'])) {
                 return 'Asia/Makassar';
             }
+
             // WIB: Sumatra, Jawa, Kalbar, Kalteng
             return 'Asia/Jakarta';
         }
-        if (in_array($countryCode, ['MY'])) return 'Asia/Kuala_Lumpur';
-        if (in_array($countryCode, ['SG'])) return 'Asia/Singapore';
-        if (in_array($countryCode, ['BN'])) return 'Asia/Brunei';
-        if (in_array($countryCode, ['PH'])) return 'Asia/Manila';
-        if (in_array($countryCode, ['TH'])) return 'Asia/Bangkok';
-        if (in_array($countryCode, ['VN'])) return 'Asia/Ho_Chi_Minh';
-        if (in_array($countryCode, ['KH'])) return 'Asia/Phnom_Penh';
-        if (in_array($countryCode, ['LA'])) return 'Asia/Vientiane';
-        if ($countryCode === 'MM') return 'Asia/Yangon';
-        if ($countryCode === 'TL') return 'Asia/Dili';
+        if (in_array($countryCode, ['MY'])) {
+            return 'Asia/Kuala_Lumpur';
+        }
+        if (in_array($countryCode, ['SG'])) {
+            return 'Asia/Singapore';
+        }
+        if (in_array($countryCode, ['BN'])) {
+            return 'Asia/Brunei';
+        }
+        if (in_array($countryCode, ['PH'])) {
+            return 'Asia/Manila';
+        }
+        if (in_array($countryCode, ['TH'])) {
+            return 'Asia/Bangkok';
+        }
+        if (in_array($countryCode, ['VN'])) {
+            return 'Asia/Ho_Chi_Minh';
+        }
+        if (in_array($countryCode, ['KH'])) {
+            return 'Asia/Phnom_Penh';
+        }
+        if (in_array($countryCode, ['LA'])) {
+            return 'Asia/Vientiane';
+        }
+        if ($countryCode === 'MM') {
+            return 'Asia/Yangon';
+        }
+        if ($countryCode === 'TL') {
+            return 'Asia/Dili';
+        }
+
         return 'Asia/Jakarta';
     }
 
@@ -176,6 +198,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
             ['province_id' => $provinceId, 'code' => $code],
             ['id' => $id, 'name' => $name, 'type' => $type, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
         );
+
         return $id;
     }
 
@@ -187,6 +210,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
             ['regency_id' => $regencyId, 'code' => $code],
             ['id' => $id, 'name' => $name, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
         );
+
         return $id;
     }
 
@@ -198,6 +222,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
             ['district_id' => $districtId, 'code' => $code],
             ['id' => $id, 'name' => $name, 'type' => $type, 'postal_code' => $postal, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
         );
+
         return $id;
     }
 
@@ -209,6 +234,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
             ['village_id' => $villageId, 'rt' => $rt, 'rw' => $rw],
             ['id' => $id, 'name' => $name, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
         );
+
         return $id;
     }
 
@@ -235,18 +261,18 @@ class IndonesianAddressHierarchySeeder extends Seeder
         $jkt = $this->upsertProvince('ID', '31', 'DKI Jakarta', $now);
 
         $jakPusat = $this->upsertRegency($jkt, '3171', 'Kota Jakarta Pusat', 'kota', $now);
-        $jakSel   = $this->upsertRegency($jkt, '3174', 'Kota Jakarta Selatan', 'kota', $now);
-        $jakBrt   = $this->upsertRegency($jkt, '3173', 'Kota Jakarta Barat', 'kota', $now);
-        $jakTim   = $this->upsertRegency($jkt, '3175', 'Kota Jakarta Timur', 'kota', $now);
-        $jakUtr   = $this->upsertRegency($jkt, '3172', 'Kota Jakarta Utara', 'kota', $now);
+        $jakSel = $this->upsertRegency($jkt, '3174', 'Kota Jakarta Selatan', 'kota', $now);
+        $jakBrt = $this->upsertRegency($jkt, '3173', 'Kota Jakarta Barat', 'kota', $now);
+        $jakTim = $this->upsertRegency($jkt, '3175', 'Kota Jakarta Timur', 'kota', $now);
+        $jakUtr = $this->upsertRegency($jkt, '3172', 'Kota Jakarta Utara', 'kota', $now);
 
-        $gambir    = $this->upsertDistrict($jakPusat, '317101', 'Gambir', $now);
+        $gambir = $this->upsertDistrict($jakPusat, '317101', 'Gambir', $now);
         $tnahAbang = $this->upsertDistrict($jakPusat, '317102', 'Tanah Abang', $now);
-        $menteng   = $this->upsertDistrict($jakPusat, '317103', 'Menteng', $now);
-        $senen     = $this->upsertDistrict($jakPusat, '317104', 'Senen', $now);
+        $menteng = $this->upsertDistrict($jakPusat, '317103', 'Menteng', $now);
+        $senen = $this->upsertDistrict($jakPusat, '317104', 'Senen', $now);
 
-        $vGambir  = $this->upsertVillage($gambir, '3171011001', 'Gambir', 'kelurahan', '10110', $now);
-        $vKebKlp  = $this->upsertVillage($gambir, '3171011002', 'Kebon Kelapa', 'kelurahan', '10120', $now);
+        $vGambir = $this->upsertVillage($gambir, '3171011001', 'Gambir', 'kelurahan', '10110', $now);
+        $vKebKlp = $this->upsertVillage($gambir, '3171011002', 'Kebon Kelapa', 'kelurahan', '10120', $now);
         $vPetojoS = $this->upsertVillage($gambir, '3171011003', 'Petojo Selatan', 'kelurahan', '10130', $now);
 
         $vBendHilir = $this->upsertVillage($tnahAbang, '3171021001', 'Bendungan Hilir', 'kelurahan', '10210', $now);
@@ -293,12 +319,12 @@ class IndonesianAddressHierarchySeeder extends Seeder
         $this->upsertRegency($jabar, '3278', 'Kota Tasikmalaya', 'kota', $now);
         $this->upsertRegency($jabar, '3279', 'Kota Banjar', 'kota', $now);
 
-        $coblong   = $this->upsertDistrict($bandung, '327301', 'Coblong', $now);
-        $sumurBdg  = $this->upsertDistrict($bandung, '327302', 'Sumur Bandung', $now);
+        $coblong = $this->upsertDistrict($bandung, '327301', 'Coblong', $now);
+        $sumurBdg = $this->upsertDistrict($bandung, '327302', 'Sumur Bandung', $now);
 
-        $vDago    = $this->upsertVillage($coblong, '3273011001', 'Dago', 'kelurahan', '40135', $now);
+        $vDago = $this->upsertVillage($coblong, '3273011001', 'Dago', 'kelurahan', '40135', $now);
         $vLebakgd = $this->upsertVillage($coblong, '3273011002', 'Lebakgede', 'kelurahan', '40132', $now);
-        $vSadang  = $this->upsertVillage($coblong, '3273011003', 'Sadang Serang', 'kelurahan', '40133', $now);
+        $vSadang = $this->upsertVillage($coblong, '3273011003', 'Sadang Serang', 'kelurahan', '40133', $now);
 
         $this->upsertStreet($vDago, '01', '01', 'Jl. Ir. H. Juanda', $now);
         $this->upsertStreet($vDago, '02', '02', 'Jl. Dago Pojok', $now);
@@ -307,51 +333,51 @@ class IndonesianAddressHierarchySeeder extends Seeder
 
         // --- Banten ---
         $banten = $this->upsertProvince('ID', '36', 'Banten', $now);
-        $tangerang  = $this->upsertRegency($banten, '3671', 'Kota Tangerang', 'kota', $now);
-        $tangsel    = $this->upsertRegency($banten, '3674', 'Kota Tangerang Selatan', 'kota', $now);
-        $kabTgr     = $this->upsertRegency($banten, '3603', 'Kabupaten Tangerang', 'kabupaten', $now);
+        $tangerang = $this->upsertRegency($banten, '3671', 'Kota Tangerang', 'kota', $now);
+        $tangsel = $this->upsertRegency($banten, '3674', 'Kota Tangerang Selatan', 'kota', $now);
+        $kabTgr = $this->upsertRegency($banten, '3603', 'Kabupaten Tangerang', 'kabupaten', $now);
 
         // --- Jawa Tengah ---
-        $jateng  = $this->upsertProvince('ID', '33', 'Jawa Tengah', $now);
+        $jateng = $this->upsertProvince('ID', '33', 'Jawa Tengah', $now);
         $semarang = $this->upsertRegency($jateng, '3374', 'Kota Semarang', 'kota', $now);
-        $solo     = $this->upsertRegency($jateng, '3372', 'Kota Surakarta', 'kota', $now);
+        $solo = $this->upsertRegency($jateng, '3372', 'Kota Surakarta', 'kota', $now);
 
         $smgTengah = $this->upsertDistrict($semarang, '337401', 'Semarang Tengah', $now);
-        $vSekayu   = $this->upsertVillage($smgTengah, '3374011001', 'Sekayu', 'kelurahan', '50132', $now);
+        $vSekayu = $this->upsertVillage($smgTengah, '3374011001', 'Sekayu', 'kelurahan', '50132', $now);
         $this->upsertStreet($vSekayu, '01', '01', 'Jl. Pemuda', $now);
         $this->upsertPostalCode('ID', '50132', $jateng, $semarang, $smgTengah, $vSekayu, $now);
 
         // --- DI Yogyakarta ---
-        $diy  = $this->upsertProvince('ID', '34', 'DI Yogyakarta', $now);
+        $diy = $this->upsertProvince('ID', '34', 'DI Yogyakarta', $now);
         $yogya = $this->upsertRegency($diy, '3471', 'Kota Yogyakarta', 'kota', $now);
         $sleman = $this->upsertRegency($diy, '3404', 'Kabupaten Sleman', 'kabupaten', $now);
 
         $danurejan = $this->upsertDistrict($yogya, '347101', 'Danurejan', $now);
-        $vSuryatm  = $this->upsertVillage($danurejan, '3471011001', 'Suryatmajan', 'kelurahan', '55213', $now);
+        $vSuryatm = $this->upsertVillage($danurejan, '3471011001', 'Suryatmajan', 'kelurahan', '55213', $now);
         $this->upsertStreet($vSuryatm, '01', '01', 'Jl. Sultan Agung', $now);
         $this->upsertPostalCode('ID', '55213', $diy, $yogya, $danurejan, $vSuryatm, $now);
 
         // --- Jawa Timur ---
-        $jatim    = $this->upsertProvince('ID', '35', 'Jawa Timur', $now);
+        $jatim = $this->upsertProvince('ID', '35', 'Jawa Timur', $now);
         $surabaya = $this->upsertRegency($jatim, '3578', 'Kota Surabaya', 'kota', $now);
-        $malang   = $this->upsertRegency($jatim, '3573', 'Kota Malang', 'kota', $now);
+        $malang = $this->upsertRegency($jatim, '3573', 'Kota Malang', 'kota', $now);
 
         $tegalsari = $this->upsertDistrict($surabaya, '357801', 'Tegalsari', $now);
         $vTegalsari = $this->upsertVillage($tegalsari, '3578011001', 'Tegalsari', 'kelurahan', '60262', $now);
-        $vWonorejo  = $this->upsertVillage($tegalsari, '3578011002', 'Wonorejo', 'kelurahan', '60263', $now);
+        $vWonorejo = $this->upsertVillage($tegalsari, '3578011002', 'Wonorejo', 'kelurahan', '60263', $now);
         $this->upsertStreet($vTegalsari, '01', '01', 'Jl. Raya Darmo', $now);
         $this->upsertPostalCode('ID', '60262', $jatim, $surabaya, $tegalsari, $vTegalsari, $now);
         $this->upsertPostalCode('ID', '60263', $jatim, $surabaya, $tegalsari, $vWonorejo, $now);
 
         // --- Bali (9 Official Regencies / Cities) ---
-        $bali     = $this->upsertProvince('ID', '51', 'Bali', $now);
+        $bali = $this->upsertProvince('ID', '51', 'Bali', $now);
         $jembrana = $this->upsertRegency($bali, '5101', 'Kabupaten Jembrana', 'kabupaten', $now);
-        $tabanan  = $this->upsertRegency($bali, '5102', 'Kabupaten Tabanan', 'kabupaten', $now);
-        $badung   = $this->upsertRegency($bali, '5103', 'Kabupaten Badung', 'kabupaten', $now);
-        $gianyar  = $this->upsertRegency($bali, '5104', 'Kabupaten Gianyar', 'kabupaten', $now);
-        $klungkung= $this->upsertRegency($bali, '5105', 'Kabupaten Klungkung', 'kabupaten', $now);
-        $bangli   = $this->upsertRegency($bali, '5106', 'Kabupaten Bangli', 'kabupaten', $now);
-        $karangasem=$this->upsertRegency($bali, '5107', 'Kabupaten Karangasem', 'kabupaten', $now);
+        $tabanan = $this->upsertRegency($bali, '5102', 'Kabupaten Tabanan', 'kabupaten', $now);
+        $badung = $this->upsertRegency($bali, '5103', 'Kabupaten Badung', 'kabupaten', $now);
+        $gianyar = $this->upsertRegency($bali, '5104', 'Kabupaten Gianyar', 'kabupaten', $now);
+        $klungkung = $this->upsertRegency($bali, '5105', 'Kabupaten Klungkung', 'kabupaten', $now);
+        $bangli = $this->upsertRegency($bali, '5106', 'Kabupaten Bangli', 'kabupaten', $now);
+        $karangasem = $this->upsertRegency($bali, '5107', 'Kabupaten Karangasem', 'kabupaten', $now);
         $buleleng = $this->upsertRegency($bali, '5108', 'Kabupaten Buleleng', 'kabupaten', $now);
         $denpasar = $this->upsertRegency($bali, '5171', 'Kota Denpasar', 'kota', $now);
 
@@ -362,19 +388,19 @@ class IndonesianAddressHierarchySeeder extends Seeder
         $this->upsertPostalCode('ID', '80228', $bali, $denpasar, $denSel, $vSanur, $now);
 
         // Badung Districts (Kuta, Mengwi, Abiansemal, Petang, Kuta Selatan, Kuta Utara)
-        $kuta        = $this->upsertDistrict($badung, '510301', 'Kuta', $now);
-        $mengwi      = $this->upsertDistrict($badung, '510302', 'Mengwi', $now);
-        $abiansemal  = $this->upsertDistrict($badung, '510303', 'Abiansemal', $now);
-        $petang      = $this->upsertDistrict($badung, '510304', 'Petang', $now);
+        $kuta = $this->upsertDistrict($badung, '510301', 'Kuta', $now);
+        $mengwi = $this->upsertDistrict($badung, '510302', 'Mengwi', $now);
+        $abiansemal = $this->upsertDistrict($badung, '510303', 'Abiansemal', $now);
+        $petang = $this->upsertDistrict($badung, '510304', 'Petang', $now);
         $kutaSelatan = $this->upsertDistrict($badung, '510305', 'Kuta Selatan', $now);
-        $kutaUtara   = $this->upsertDistrict($badung, '510306', 'Kuta Utara', $now);
+        $kutaUtara = $this->upsertDistrict($badung, '510306', 'Kuta Utara', $now);
 
         // Kuta Selatan Villages (Benoa, Jimbaran, Kutuh, Pecatu, Tanjung Benoa, Ungasan)
-        $vBenoa   = $this->upsertVillage($kutaSelatan, '5103051004', 'Benoa', 'kelurahan', '80361', $now);
+        $vBenoa = $this->upsertVillage($kutaSelatan, '5103051004', 'Benoa', 'kelurahan', '80361', $now);
         $vTjBenoa = $this->upsertVillage($kutaSelatan, '5103051005', 'Tanjung Benoa', 'kelurahan', '80361', $now);
-        $vJimbrn  = $this->upsertVillage($kutaSelatan, '5103051006', 'Jimbaran', 'kelurahan', '80361', $now);
-        $vKutuh   = $this->upsertVillage($kutaSelatan, '5103052001', 'Kutuh', 'desa', '80361', $now);
-        $vPecatu  = $this->upsertVillage($kutaSelatan, '5103052002', 'Pecatu', 'desa', '80361', $now);
+        $vJimbrn = $this->upsertVillage($kutaSelatan, '5103051006', 'Jimbaran', 'kelurahan', '80361', $now);
+        $vKutuh = $this->upsertVillage($kutaSelatan, '5103052001', 'Kutuh', 'desa', '80361', $now);
+        $vPecatu = $this->upsertVillage($kutaSelatan, '5103052002', 'Pecatu', 'desa', '80361', $now);
         $vUngasan = $this->upsertVillage($kutaSelatan, '5103052003', 'Ungasan', 'desa', '80361', $now);
 
         $this->upsertStreet($vBenoa, '01', '01', 'Jl. Bypass Ngurah Rai', $now);
@@ -383,10 +409,10 @@ class IndonesianAddressHierarchySeeder extends Seeder
 
         // --- Sumatera Utara ---
         $sumut = $this->upsertProvince('ID', '12', 'Sumatera Utara', $now);
-        $medan  = $this->upsertRegency($sumut, '1271', 'Kota Medan', 'kota', $now);
+        $medan = $this->upsertRegency($sumut, '1271', 'Kota Medan', 'kota', $now);
 
         $medanKota = $this->upsertDistrict($medan, '127101', 'Medan Kota', $now);
-        $vMesjid   = $this->upsertVillage($medanKota, '1271011001', 'Mesjid', 'kelurahan', '20213', $now);
+        $vMesjid = $this->upsertVillage($medanKota, '1271011001', 'Mesjid', 'kelurahan', '20213', $now);
         $this->upsertStreet($vMesjid, '01', '01', 'Jl. Sutoyo', $now);
         $this->upsertPostalCode('ID', '20213', $sumut, $medan, $medanKota, $vMesjid, $now);
 

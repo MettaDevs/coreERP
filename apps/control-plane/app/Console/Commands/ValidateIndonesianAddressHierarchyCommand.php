@@ -45,12 +45,12 @@ final class ValidateIndonesianAddressHierarchyCommand extends Command
         }
 
         // 3. Validate Orphan Regencies
-        $orphanRegencies = DB::select("
+        $orphanRegencies = DB::select('
             SELECT r.id, r.code, r.name, r.province_id 
             FROM ref_regencies r 
             LEFT JOIN ref_provinces p ON r.province_id = p.id 
             WHERE p.id IS NULL
-        ");
+        ');
         $orphanRegCount = count($orphanRegencies);
         if ($orphanRegCount > 0) {
             $this->error(" [FAIL] Ditemukan {$orphanRegCount} Kabupaten/Kota tanpa relasi Provinsi (orphan)!");
@@ -61,12 +61,12 @@ final class ValidateIndonesianAddressHierarchyCommand extends Command
         }
 
         // 4. Validate Orphan Districts
-        $orphanDistricts = DB::select("
+        $orphanDistricts = DB::select('
             SELECT d.id, d.code, d.name, d.regency_id 
             FROM ref_districts d 
             LEFT JOIN ref_regencies r ON d.regency_id = r.id 
             WHERE r.id IS NULL
-        ");
+        ');
         $orphanDistCount = count($orphanDistricts);
         if ($orphanDistCount > 0) {
             $this->error(" [FAIL] Ditemukan {$orphanDistCount} Kecamatan tanpa relasi Kabupaten/Kota (orphan)!");
@@ -77,12 +77,12 @@ final class ValidateIndonesianAddressHierarchyCommand extends Command
         }
 
         // 5. Validate Orphan Villages
-        $orphanVillages = DB::select("
+        $orphanVillages = DB::select('
             SELECT v.id, v.code, v.name, v.district_id 
             FROM ref_villages v 
             LEFT JOIN ref_districts d ON v.district_id = d.id 
             WHERE d.id IS NULL
-        ");
+        ');
         $orphanVillCount = count($orphanVillages);
         if ($orphanVillCount > 0) {
             $this->error(" [FAIL] Ditemukan {$orphanVillCount} Desa/Kelurahan tanpa relasi Kecamatan (orphan)!");
@@ -93,12 +93,12 @@ final class ValidateIndonesianAddressHierarchyCommand extends Command
         }
 
         // 6. Check Duplicate Exact Records (district_id, code)
-        $dupVillageCodes = DB::select("
+        $dupVillageCodes = DB::select('
             SELECT district_id, code, COUNT(*) as cnt 
             FROM ref_villages 
             GROUP BY district_id, code 
             HAVING COUNT(*) > 1
-        ");
+        ');
         $dupVillCodeCount = count($dupVillageCodes);
         if ($dupVillCodeCount > 0) {
             $this->error(" [FAIL] Ditemukan {$dupVillCodeCount} duplikasi kode resmi pada kecamatan yang sama!");
@@ -108,12 +108,12 @@ final class ValidateIndonesianAddressHierarchyCommand extends Command
         }
 
         // 7. Check Duplicate Name within same parent and type
-        $dupVillageNames = DB::select("
+        $dupVillageNames = DB::select('
             SELECT district_id, LOWER(TRIM(name)) as norm_name, type, COUNT(*) as cnt 
             FROM ref_villages 
             GROUP BY district_id, LOWER(TRIM(name)), type 
             HAVING COUNT(*) > 1
-        ");
+        ');
         $dupVillNameCount = count($dupVillageNames);
         if ($dupVillNameCount > 0) {
             $this->warn(" [WARN] Ditemukan {$dupVillNameCount} nama desa yang sama dengan tipe sama pada kecamatan yang sama.");
@@ -147,13 +147,13 @@ final class ValidateIndonesianAddressHierarchyCommand extends Command
         $this->info('                   HASIL VALIDASI DATA                      ');
         $this->info('============================================================');
         $this->table(['Metric', 'Count / Status'], [
-            ['Provinsi Indonesia', $provincesCount . ' (Target: 38)'],
+            ['Provinsi Indonesia', $provincesCount.' (Target: 38)'],
             ['Kabupaten / Kota', Regency::whereHas('province', fn ($q) => $q->where('country_code', 'ID'))->count()],
             ['Kecamatan', District::whereHas('regency.province', fn ($q) => $q->where('country_code', 'ID'))->count()],
             ['Desa / Kelurahan', $totalVillages],
             ['Desa dgn Kode Pos', $villagesWithPostal],
-            ['Orphan Records', ($orphanRegCount + $orphanDistCount + $orphanVillCount) . ' (0 Expected)'],
-            ['Duplicate Official Codes', $dupVillCodeCount . ' (0 Expected)'],
+            ['Orphan Records', ($orphanRegCount + $orphanDistCount + $orphanVillCount).' (0 Expected)'],
+            ['Duplicate Official Codes', $dupVillCodeCount.' (0 Expected)'],
             ['Circular Hierarchy', '0 (Protected)'],
             ['Validation Errors', $errors === 0 ? '<info>0 (PASSED)</info>' : "<error>{$errors}</error>"],
         ]);

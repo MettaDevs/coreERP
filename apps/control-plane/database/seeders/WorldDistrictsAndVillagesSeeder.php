@@ -20,7 +20,7 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
 
         $aseanCountryCodes = [
             'IDN', 'THA', 'PHL', 'MYS', 'MMR', 'VNM', 'KHM', 'LAO', 'TLS', 'BRN', 'SGP',
-            'ID', 'TH', 'PH', 'MY', 'MM', 'VN', 'KH', 'LA', 'TL', 'BN', 'SG'
+            'ID', 'TH', 'PH', 'MY', 'MM', 'VN', 'KH', 'LA', 'TL', 'BN', 'SG',
         ];
 
         // 1. Seed Comprehensive Official Hierarchy Levels for World Countries
@@ -45,9 +45,9 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
 
         // Clear existing non-ASEAN districts and villages to allow a clean, uniform sync
         $existingNonAseanRegencyIds = $regencies->pluck('regency_id')->toArray();
-        if (!empty($existingNonAseanRegencyIds)) {
+        if (! empty($existingNonAseanRegencyIds)) {
             $existingDistrictIds = DB::table('ref_districts')->whereIn('regency_id', $existingNonAseanRegencyIds)->pluck('id')->toArray();
-            if (!empty($existingDistrictIds)) {
+            if (! empty($existingDistrictIds)) {
                 DB::table('ref_villages')->whereIn('district_id', $existingDistrictIds)->delete();
                 DB::table('ref_districts')->whereIn('id', $existingDistrictIds)->delete();
             }
@@ -57,9 +57,9 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
         $defaultProfile = [
             'district_names' => ['Central District', 'North District'],
             'village_prefix' => 'Civic Locality',
-            'village_names'  => ['Central Quarter', 'Urban Locality'],
-            'village_type'   => 'locality',
-            'postal_calc'    => fn($c) => str_pad((string)(10000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
+            'village_names' => ['Central Quarter', 'Urban Locality'],
+            'village_type' => 'locality',
+            'postal_calc' => fn ($c) => str_pad((string) (10000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
         ];
 
         $districtRows = [];
@@ -80,10 +80,10 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
                 $distSuffix = $districtNames[$dIdx];
                 $distName = "{$cleanRegName} - {$distSuffix}";
                 if (strlen($distName) > 140) {
-                    $distName = substr($distName, 0, 137) . '...';
+                    $distName = substr($distName, 0, 137).'...';
                 }
 
-                $distCode = strtoupper(substr($cleanRegCode, 0, 12)) . '-D' . str_pad((string)($dIdx + 1), 2, '0', STR_PAD_LEFT);
+                $distCode = strtoupper(substr($cleanRegCode, 0, 12)).'-D'.str_pad((string) ($dIdx + 1), 2, '0', STR_PAD_LEFT);
                 if (strlen($distCode) > 20) {
                     $distCode = substr($distCode, 0, 20);
                 }
@@ -91,15 +91,15 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
                 $districtId = (string) Str::ulid();
 
                 $districtRows[] = [
-                    'id'           => $districtId,
-                    'tenant_id'    => null,
-                    'regency_id'   => $reg->regency_id,
-                    'code'         => $distCode,
+                    'id' => $districtId,
+                    'tenant_id' => null,
+                    'regency_id' => $reg->regency_id,
+                    'code' => $distCode,
                     'display_code' => $distCode,
-                    'name'         => $distName,
-                    'active'       => true,
-                    'created_at'   => $now,
-                    'updated_at'   => $now,
+                    'name' => $distName,
+                    'active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ];
                 $districtCounter++;
 
@@ -113,11 +113,11 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
                     $vSuffix = $vNames[$vIdx % count($vNames)];
                     $vName = "{$vPrefix} {$vSuffix} - {$cleanRegName}";
                     if (strlen($vName) > 140) {
-                        $vName = substr($vName, 0, 137) . '...';
+                        $vName = substr($vName, 0, 137).'...';
                     }
 
                     $cleanDistCode = preg_replace('/[^A-Za-z0-9]/', '', $distCode);
-                    $vCode = strtoupper(substr($cleanDistCode, 0, 14)) . '-V' . ($vIdx + 1);
+                    $vCode = strtoupper(substr($cleanDistCode, 0, 14)).'-V'.($vIdx + 1);
                     if (strlen($vCode) > 20) {
                         $vCode = substr($vCode, 0, 20);
                     }
@@ -128,17 +128,17 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
                     }
 
                     $villageRows[] = [
-                        'id'           => (string) Str::ulid(),
-                        'tenant_id'    => null,
-                        'district_id'  => $districtId,
-                        'code'         => $vCode,
+                        'id' => (string) Str::ulid(),
+                        'tenant_id' => null,
+                        'district_id' => $districtId,
+                        'code' => $vCode,
                         'display_code' => $vCode,
-                        'name'         => $vName,
-                        'type'         => $vType,
-                        'postal_code'  => $postal,
-                        'active'       => true,
-                        'created_at'   => $now,
-                        'updated_at'   => $now,
+                        'name' => $vName,
+                        'type' => $vType,
+                        'postal_code' => $postal,
+                        'active' => true,
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ];
                     $villageCounter++;
                 }
@@ -168,449 +168,449 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
             'CHN' => [
                 'district_names' => ['Chaoyang District (朝阳区)', 'Haidian District (海淀区)', 'Central District'],
                 'village_prefix' => 'Cun/Shequ',
-                'village_names'  => ['1 (村/社区)', '2 (村/社区)'],
-                'village_type'   => 'shequ',
-                'postal_calc'    => fn($c) => str_pad((string)(100000 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['1 (村/社区)', '2 (村/社区)'],
+                'village_type' => 'shequ',
+                'postal_calc' => fn ($c) => str_pad((string) (100000 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
             ],
             'IND' => [
                 'district_names' => ['Central Taluk', 'North Tehsil', 'Development Mandal'],
                 'village_prefix' => 'Gram Panchayat',
-                'village_names'  => ['Panchayat 1', 'Panchayat 2'],
-                'village_type'   => 'gram_panchayat',
-                'postal_calc'    => fn($c) => str_pad((string)(110001 + ($c % 700000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Panchayat 1', 'Panchayat 2'],
+                'village_type' => 'gram_panchayat',
+                'postal_calc' => fn ($c) => str_pad((string) (110001 + ($c % 700000)), 6, '0', STR_PAD_LEFT),
             ],
             'PAK' => [
                 'district_names' => ['Central Tehsil', 'North Town'],
                 'village_prefix' => 'Mauza',
-                'village_names'  => ['Mauza 1', 'Mauza 2'],
-                'village_type'   => 'mauza',
-                'postal_calc'    => fn($c) => str_pad((string)(44000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Mauza 1', 'Mauza 2'],
+                'village_type' => 'mauza',
+                'postal_calc' => fn ($c) => str_pad((string) (44000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
             ],
             'BGD' => [
                 'district_names' => ['Central Upazila', 'Sadar Upazila'],
                 'village_prefix' => 'Gram',
-                'village_names'  => ['Gram 1', 'Gram 2'],
-                'village_type'   => 'gram',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Gram 1', 'Gram 2'],
+                'village_type' => 'gram',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'JPN' => [
                 'district_names' => ['Chuo-ku (Central Ward)', 'Kita-ku (North Ward)', 'Minato-ku (Port District)'],
                 'village_prefix' => 'Chome',
-                'village_names'  => ['1-Chome Honcho', '2-Chome Ekimae'],
-                'village_type'   => 'chome',
-                'postal_calc'    => fn($c) => str_pad((string)(100 + ($c % 800)), 3, '0', STR_PAD_LEFT) . '-' . str_pad((string)($c % 9000), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['1-Chome Honcho', '2-Chome Ekimae'],
+                'village_type' => 'chome',
+                'postal_calc' => fn ($c) => str_pad((string) (100 + ($c % 800)), 3, '0', STR_PAD_LEFT).'-'.str_pad((string) ($c % 9000), 4, '0', STR_PAD_LEFT),
             ],
             'KOR' => [
                 'district_names' => ['Jung-gu (Central District)', 'Gangnam-gu (South District)', 'Seo-gu (West District)'],
                 'village_prefix' => 'Dong',
-                'village_names'  => ['1-ga Central Dong', '2-ga Residential Dong'],
-                'village_type'   => 'dong',
-                'postal_calc'    => fn($c) => str_pad((string)(10000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['1-ga Central Dong', '2-ga Residential Dong'],
+                'village_type' => 'dong',
+                'postal_calc' => fn ($c) => str_pad((string) (10000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
             ],
             'LKA' => [
                 'district_names' => ['Central Division', 'North Division'],
                 'village_prefix' => 'Grama Niladhari',
-                'village_names'  => ['Division 1', 'Division 2'],
-                'village_type'   => 'grama_niladhari',
-                'postal_calc'    => fn($c) => str_pad((string)(10000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Division 1', 'Division 2'],
+                'village_type' => 'grama_niladhari',
+                'postal_calc' => fn ($c) => str_pad((string) (10000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
             ],
             'NPL' => [
                 'district_names' => ['Central Municipality', 'Rural Municipality Area'],
                 'village_prefix' => 'Ward',
-                'village_names'  => ['Ward 1', 'Ward 2'],
-                'village_type'   => 'ward',
-                'postal_calc'    => fn($c) => str_pad((string)(44600 + ($c % 5000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Ward 1', 'Ward 2'],
+                'village_type' => 'ward',
+                'postal_calc' => fn ($c) => str_pad((string) (44600 + ($c % 5000)), 5, '0', STR_PAD_LEFT),
             ],
             'AFG' => [
                 'district_names' => ['Markaz District', 'North District'],
                 'village_prefix' => 'Shura',
-                'village_names'  => ['Shura 1', 'Shura 2'],
-                'village_type'   => 'shura',
-                'postal_calc'    => fn($c) => str_pad((string)(1001 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Shura 1', 'Shura 2'],
+                'village_type' => 'shura',
+                'postal_calc' => fn ($c) => str_pad((string) (1001 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'UZB' => [
                 'district_names' => ['Central Tuman', 'Shahar District'],
                 'village_prefix' => 'Kishlak',
-                'village_names'  => ['Kishlak 1', 'Kishlak 2'],
-                'village_type'   => 'kishlak',
-                'postal_calc'    => fn($c) => str_pad((string)(100000 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Kishlak 1', 'Kishlak 2'],
+                'village_type' => 'kishlak',
+                'postal_calc' => fn ($c) => str_pad((string) (100000 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
             ],
             'KAZ' => [
                 'district_names' => ['Central Audan', 'North District'],
                 'village_prefix' => 'Aul',
-                'village_names'  => ['Aul 1', 'Aul 2'],
-                'village_type'   => 'aul',
-                'postal_calc'    => fn($c) => str_pad((string)(100000 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Aul 1', 'Aul 2'],
+                'village_type' => 'aul',
+                'postal_calc' => fn ($c) => str_pad((string) (100000 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
             ],
             'TJK' => [
                 'district_names' => ['Central Nohiya', 'North District'],
                 'village_prefix' => 'Jamoat',
-                'village_names'  => ['Jamoat 1', 'Jamoat 2'],
-                'village_type'   => 'jamoat',
-                'postal_calc'    => fn($c) => str_pad((string)(734000 + ($c % 50000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Jamoat 1', 'Jamoat 2'],
+                'village_type' => 'jamoat',
+                'postal_calc' => fn ($c) => str_pad((string) (734000 + ($c % 50000)), 6, '0', STR_PAD_LEFT),
             ],
             'KGZ' => [
                 'district_names' => ['Central Rayon', 'North District'],
                 'village_prefix' => 'Aiyl Aimagy',
-                'village_names'  => ['Aiyl 1', 'Aiyl 2'],
-                'village_type'   => 'aiyl_aimagy',
-                'postal_calc'    => fn($c) => str_pad((string)(720000 + ($c % 50000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Aiyl 1', 'Aiyl 2'],
+                'village_type' => 'aiyl_aimagy',
+                'postal_calc' => fn ($c) => str_pad((string) (720000 + ($c % 50000)), 6, '0', STR_PAD_LEFT),
             ],
             'TKM' => [
                 'district_names' => ['Central Etrap', 'North District'],
                 'village_prefix' => 'Gengeshlik',
-                'village_names'  => ['Gengeshlik 1', 'Gengeshlik 2'],
-                'village_type'   => 'gengeshlik',
-                'postal_calc'    => fn($c) => str_pad((string)(744000 + ($c % 50000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Gengeshlik 1', 'Gengeshlik 2'],
+                'village_type' => 'gengeshlik',
+                'postal_calc' => fn ($c) => str_pad((string) (744000 + ($c % 50000)), 6, '0', STR_PAD_LEFT),
             ],
             'AUS' => [
                 'district_names' => ['Central City Area', 'Northern Suburbs Ward', 'Coastal Bay District'],
                 'village_prefix' => 'Suburb',
-                'village_names'  => ['Central Suburb', 'Parklands Locality'],
-                'village_type'   => 'suburb',
-                'postal_calc'    => fn($c) => str_pad((string)(2000 + ($c % 6000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Central Suburb', 'Parklands Locality'],
+                'village_type' => 'suburb',
+                'postal_calc' => fn ($c) => str_pad((string) (2000 + ($c % 6000)), 4, '0', STR_PAD_LEFT),
             ],
             'NZL' => [
                 'district_names' => ['Central Ward', 'North Shore Ward'],
                 'village_prefix' => 'Suburb',
-                'village_names'  => ['Central Suburb', 'Settlement 1'],
-                'village_type'   => 'suburb',
-                'postal_calc'    => fn($c) => str_pad((string)(1010 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Central Suburb', 'Settlement 1'],
+                'village_type' => 'suburb',
+                'postal_calc' => fn ($c) => str_pad((string) (1010 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'FJI' => [
                 'district_names' => ['Central Tikina', 'North District'],
                 'village_prefix' => 'Koro',
-                'village_names'  => ['Koro 1', 'Koro 2'],
-                'village_type'   => 'koro',
-                'postal_calc'    => fn($c) => 'FJI-' . str_pad((string)($c % 900), 3, '0', STR_PAD_LEFT),
+                'village_names' => ['Koro 1', 'Koro 2'],
+                'village_type' => 'koro',
+                'postal_calc' => fn ($c) => 'FJI-'.str_pad((string) ($c % 900), 3, '0', STR_PAD_LEFT),
             ],
             'WSM' => [
                 'district_names' => ['Central District', 'Outer District'],
                 'village_prefix' => "Nu'u",
-                'village_names'  => ["Nu'u 1", "Nu'u 2"],
-                'village_type'   => 'nuu',
-                'postal_calc'    => fn($c) => 'WSM-' . str_pad((string)($c % 900), 3, '0', STR_PAD_LEFT),
+                'village_names' => ["Nu'u 1", "Nu'u 2"],
+                'village_type' => 'nuu',
+                'postal_calc' => fn ($c) => 'WSM-'.str_pad((string) ($c % 900), 3, '0', STR_PAD_LEFT),
             ],
             'MDV' => [
                 'district_names' => ['Central Atoll Area', 'North Atoll Area'],
                 'village_prefix' => 'Island',
-                'village_names'  => ['Inhabited Island 1', 'Inhabited Island 2'],
-                'village_type'   => 'island',
-                'postal_calc'    => fn($c) => str_pad((string)(20000 + ($c % 70000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Inhabited Island 1', 'Inhabited Island 2'],
+                'village_type' => 'island',
+                'postal_calc' => fn ($c) => str_pad((string) (20000 + ($c % 70000)), 5, '0', STR_PAD_LEFT),
             ],
 
             // Europe
             'RUS' => [
                 'district_names' => ['Tsentralny Rayon (Центральный)', 'Severny Rayon (Северный)', 'Yuzhny Rayon (Южный)'],
                 'village_prefix' => 'Selo',
-                'village_names'  => ['Tsentralnoye', 'Derevnya Novaya'],
-                'village_type'   => 'selo',
-                'postal_calc'    => fn($c) => str_pad((string)(101000 + ($c % 500000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Tsentralnoye', 'Derevnya Novaya'],
+                'village_type' => 'selo',
+                'postal_calc' => fn ($c) => str_pad((string) (101000 + ($c % 500000)), 6, '0', STR_PAD_LEFT),
             ],
             'FRA' => [
                 'district_names' => ['1er Arrondissement Centre', 'Arrondissement Est', 'Arrondissement Ouest'],
                 'village_prefix' => 'Commune',
-                'village_names'  => ["de l'Hôtel de Ville", 'de la Gare'],
-                'village_type'   => 'commune',
-                'postal_calc'    => fn($c) => str_pad((string)(75001 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ["de l'Hôtel de Ville", 'de la Gare'],
+                'village_type' => 'commune',
+                'postal_calc' => fn ($c) => str_pad((string) (75001 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
             ],
             'ESP' => [
                 'district_names' => ['Distrito Centro', 'Distrito Norte', 'Distrito Este'],
                 'village_prefix' => 'Barrio',
-                'village_names'  => ['Centro Histórico', 'Pedanía Norte'],
-                'village_type'   => 'barrio',
-                'postal_calc'    => fn($c) => str_pad((string)(28001 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Centro Histórico', 'Pedanía Norte'],
+                'village_type' => 'barrio',
+                'postal_calc' => fn ($c) => str_pad((string) (28001 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
             ],
             'UKR' => [
                 'district_names' => ['Tsentralny Rayon', 'Pivnichny Rayon'],
                 'village_prefix' => 'Selo',
-                'village_names'  => ['Tsentralne', 'Nove'],
-                'village_type'   => 'selo',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Tsentralne', 'Nove'],
+                'village_type' => 'selo',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
             ],
             'DEU' => [
                 'district_names' => ['Mitte Stadtbezirk', 'Nordstadt Bezirk', 'Westend Gemeinde'],
                 'village_prefix' => 'Ortsteil',
-                'village_names'  => ['Altstadt', 'Neustadt'],
-                'village_type'   => 'ortsteil',
-                'postal_calc'    => fn($c) => str_pad((string)(10115 + ($c % 88000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Altstadt', 'Neustadt'],
+                'village_type' => 'ortsteil',
+                'postal_calc' => fn ($c) => str_pad((string) (10115 + ($c % 88000)), 5, '0', STR_PAD_LEFT),
             ],
             'GBR' => [
                 'district_names' => ['Central Borough', 'North Urban District', 'West End Commercial Area'],
                 'village_prefix' => 'Parish',
-                'village_names'  => ["St. Mary's Civil Parish", 'High Street Ward'],
-                'village_type'   => 'civil_parish',
-                'postal_calc'    => fn($c) => 'SW' . (($c % 20) + 1) . ' ' . (($c % 9) + 1) . 'AA',
+                'village_names' => ["St. Mary's Civil Parish", 'High Street Ward'],
+                'village_type' => 'civil_parish',
+                'postal_calc' => fn ($c) => 'SW'.(($c % 20) + 1).' '.(($c % 9) + 1).'AA',
             ],
             'CZE' => [
                 'district_names' => ['Městský obvod Střed', 'Městský obvod Sever'],
                 'village_prefix' => 'Obec',
-                'village_names'  => ['Střed', 'Město'],
-                'village_type'   => 'obec',
-                'postal_calc'    => fn($c) => str_pad((string)(11000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Střed', 'Město'],
+                'village_type' => 'obec',
+                'postal_calc' => fn ($c) => str_pad((string) (11000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
             ],
             'CHE' => [
                 'district_names' => ['Bezirk Mitte', 'Bezirk Nord'],
                 'village_prefix' => 'Gemeinde',
-                'village_names'  => ['Zentrum', 'Altstadt'],
-                'village_type'   => 'gemeinde',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Zentrum', 'Altstadt'],
+                'village_type' => 'gemeinde',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'NLD' => [
                 'district_names' => ['Stadsdeel Centrum', 'Stadsdeel Noord'],
                 'village_prefix' => 'Wijk',
-                'village_names'  => ['Centrum', 'Oud-Zuid'],
-                'village_type'   => 'wijk',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT) . ' AA',
+                'village_names' => ['Centrum', 'Oud-Zuid'],
+                'village_type' => 'wijk',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT).' AA',
             ],
             'POL' => [
                 'district_names' => ['Dzielnica Śródmieście', 'Dzielnica Północ'],
                 'village_prefix' => 'Gmina',
-                'village_names'  => ['Centrum', 'Stare Miasto'],
-                'village_type'   => 'gmina',
-                'postal_calc'    => fn($c) => str_pad((string)(10 + ($c % 80)), 2, '0', STR_PAD_LEFT) . '-' . str_pad((string)($c % 900), 3, '0', STR_PAD_LEFT),
+                'village_names' => ['Centrum', 'Stare Miasto'],
+                'village_type' => 'gmina',
+                'postal_calc' => fn ($c) => str_pad((string) (10 + ($c % 80)), 2, '0', STR_PAD_LEFT).'-'.str_pad((string) ($c % 900), 3, '0', STR_PAD_LEFT),
             ],
             'HUN' => [
                 'district_names' => ['Belváros Kerület', 'Északi Kerület'],
                 'village_prefix' => 'Község',
-                'village_names'  => ['Központ', 'Óváros'],
-                'village_type'   => 'kozseg',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Központ', 'Óváros'],
+                'village_type' => 'kozseg',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'PRT' => [
                 'district_names' => ['Bairro Central', 'Zona Norte'],
                 'village_prefix' => 'Freguesia',
-                'village_names'  => ['da Sé', 'de São Nicolau'],
-                'village_type'   => 'freguesia',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT) . '-001',
+                'village_names' => ['da Sé', 'de São Nicolau'],
+                'village_type' => 'freguesia',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT).'-001',
             ],
             'SVK' => [
                 'district_names' => ['Mestská časť Staré Mesto', 'Mestská časť Sever'],
                 'village_prefix' => 'Obec',
-                'village_names'  => ['Stred', 'Nové Mesto'],
-                'village_type'   => 'obec',
-                'postal_calc'    => fn($c) => str_pad((string)(81101 + ($c % 15000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Stred', 'Nové Mesto'],
+                'village_type' => 'obec',
+                'postal_calc' => fn ($c) => str_pad((string) (81101 + ($c % 15000)), 5, '0', STR_PAD_LEFT),
             ],
             'BEL' => [
                 'district_names' => ['District Centre', 'District Nord'],
                 'village_prefix' => 'Commune',
-                'village_names'  => ['Centre', 'Nord'],
-                'village_type'   => 'commune',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Centre', 'Nord'],
+                'village_type' => 'commune',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'AUT' => [
                 'district_names' => ['Gemeindebezirk Innere Stadt', 'Bezirk Nord'],
                 'village_prefix' => 'Gemeinde',
-                'village_names'  => ['Zentrum', 'Ortschaft 1'],
-                'village_type'   => 'gemeinde',
-                'postal_calc'    => fn($c) => str_pad((string)(1010 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Zentrum', 'Ortschaft 1'],
+                'village_type' => 'gemeinde',
+                'postal_calc' => fn ($c) => str_pad((string) (1010 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'ITA' => [
                 'district_names' => ['Municipio 1 Centro Storico', 'Municipio 2 Nord'],
                 'village_prefix' => 'Frazione',
-                'village_names'  => ['Centro', 'Quartiere 1'],
-                'village_type'   => 'frazione',
-                'postal_calc'    => fn($c) => str_pad((string)(100 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Centro', 'Quartiere 1'],
+                'village_type' => 'frazione',
+                'postal_calc' => fn ($c) => str_pad((string) (100 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
             ],
             'GRC' => [
                 'district_names' => ['Dimotiki Enotita Kentro', 'Enotita Voreia'],
                 'village_prefix' => 'Koinotita',
-                'village_names'  => ['Koinotita 1', 'Koinotita 2'],
-                'village_type'   => 'koinotita',
-                'postal_calc'    => fn($c) => str_pad((string)(10000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Koinotita 1', 'Koinotita 2'],
+                'village_type' => 'koinotita',
+                'postal_calc' => fn ($c) => str_pad((string) (10000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
             ],
             'NOR' => [
                 'district_names' => ['Sentrum Bydel', 'Nord Bydel'],
                 'village_prefix' => 'Kommune',
-                'village_names'  => ['Sentrum', 'Bygdelag'],
-                'village_type'   => 'kommune',
-                'postal_calc'    => fn($c) => str_pad((string)(100 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Sentrum', 'Bygdelag'],
+                'village_type' => 'kommune',
+                'postal_calc' => fn ($c) => str_pad((string) (100 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'SWE' => [
                 'district_names' => ['Centrum Stadsdelsområde', 'Norr Stadsdel'],
                 'village_prefix' => 'Kommun',
-                'village_names'  => ['Centrum', 'Församling 1'],
-                'village_type'   => 'kommun',
-                'postal_calc'    => fn($c) => str_pad((string)(100 + ($c % 800)), 3, '0', STR_PAD_LEFT) . ' ' . str_pad((string)($c % 90), 2, '0', STR_PAD_LEFT),
+                'village_names' => ['Centrum', 'Församling 1'],
+                'village_type' => 'kommun',
+                'postal_calc' => fn ($c) => str_pad((string) (100 + ($c % 800)), 3, '0', STR_PAD_LEFT).' '.str_pad((string) ($c % 90), 2, '0', STR_PAD_LEFT),
             ],
             'FIN' => [
                 'district_names' => ['Keskusta Piiri', 'Pohjoinen Piiri'],
                 'village_prefix' => 'Kylä',
-                'village_names'  => ['Keskusta', 'Kylä 1'],
-                'village_type'   => 'kunta',
-                'postal_calc'    => fn($c) => str_pad((string)(100 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Keskusta', 'Kylä 1'],
+                'village_type' => 'kunta',
+                'postal_calc' => fn ($c) => str_pad((string) (100 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
             ],
 
             // Americas
             'USA' => [
                 'district_names' => ['Downtown & Financial District', 'North Metro District', 'Westside Commercial Corridor'],
                 'village_prefix' => 'Town/Village',
-                'village_names'  => ['Civic Center Neighborhood', 'Parkside Community'],
-                'village_type'   => 'neighborhood',
-                'postal_calc'    => fn($c) => str_pad((string)(10001 + ($c % 89990)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Civic Center Neighborhood', 'Parkside Community'],
+                'village_type' => 'neighborhood',
+                'postal_calc' => fn ($c) => str_pad((string) (10001 + ($c % 89990)), 5, '0', STR_PAD_LEFT),
             ],
             'CAN' => [
                 'district_names' => ['Downtown Metropolitan District', 'North Borough', 'West Valley Township'],
                 'village_prefix' => 'Community',
-                'village_names'  => ['Centretown Neighborhood', 'Waterfront Locality'],
-                'village_type'   => 'neighborhood',
-                'postal_calc'    => fn($c) => 'K' . (($c % 9) + 1) . 'A ' . (($c % 8) + 1) . 'B' . (($c % 9) + 1),
+                'village_names' => ['Centretown Neighborhood', 'Waterfront Locality'],
+                'village_type' => 'neighborhood',
+                'postal_calc' => fn ($c) => 'K'.(($c % 9) + 1).'A '.(($c % 8) + 1).'B'.(($c % 9) + 1),
             ],
             'MEX' => [
                 'district_names' => ['Delegación Centro', 'Zona Norte'],
                 'village_prefix' => 'Ejido',
-                'village_names'  => ['Colonia Centro', 'Ejido San Isidro'],
-                'village_type'   => 'ejido',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Colonia Centro', 'Ejido San Isidro'],
+                'village_type' => 'ejido',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
             ],
             'COL' => [
                 'district_names' => ['Comuna Centro', 'Zona Rural Norte'],
                 'village_prefix' => 'Corregimiento',
-                'village_names'  => ['Corregimiento 1', 'Corregimiento 2'],
-                'village_type'   => 'corregimiento',
-                'postal_calc'    => fn($c) => str_pad((string)(110001 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Corregimiento 1', 'Corregimiento 2'],
+                'village_type' => 'corregimiento',
+                'postal_calc' => fn ($c) => str_pad((string) (110001 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
             ],
             'PER' => [
                 'district_names' => ['Distrito Central', 'Distrito Norte'],
                 'village_prefix' => 'Distrito',
-                'village_names'  => ['Zona Urbana', 'Zona Rural'],
-                'village_type'   => 'distrito',
-                'postal_calc'    => fn($c) => str_pad((string)(15001 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Zona Urbana', 'Zona Rural'],
+                'village_type' => 'distrito',
+                'postal_calc' => fn ($c) => str_pad((string) (15001 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
             ],
             'BRA' => [
                 'district_names' => ['Distrito Central', 'Subprefeitura Norte', 'Zona Comercial Sul'],
                 'village_prefix' => 'Bairro',
-                'village_names'  => ['Centro Histórico', 'Jardim América'],
-                'village_type'   => 'bairro',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 80000)), 5, '0', STR_PAD_LEFT) . '-000',
+                'village_names' => ['Centro Histórico', 'Jardim América'],
+                'village_type' => 'bairro',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 80000)), 5, '0', STR_PAD_LEFT).'-000',
             ],
             'ARG' => [
                 'district_names' => ['Comuna Centro', 'Zona Norte'],
                 'village_prefix' => 'Barrio',
-                'village_names'  => ['Centro', 'San Martín'],
-                'village_type'   => 'barrio',
-                'postal_calc'    => fn($c) => 'C' . str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT) . 'ABC',
+                'village_names' => ['Centro', 'San Martín'],
+                'village_type' => 'barrio',
+                'postal_calc' => fn ($c) => 'C'.str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT).'ABC',
             ],
             'CHL' => [
                 'district_names' => ['Distrito Censal Centro', 'Distrito Norte'],
                 'village_prefix' => 'Distrito',
-                'village_names'  => ['Censal 1', 'Censal 2'],
-                'village_type'   => 'distrito',
-                'postal_calc'    => fn($c) => str_pad((string)(8320000 + ($c % 100000)), 7, '0', STR_PAD_LEFT),
+                'village_names' => ['Censal 1', 'Censal 2'],
+                'village_type' => 'distrito',
+                'postal_calc' => fn ($c) => str_pad((string) (8320000 + ($c % 100000)), 7, '0', STR_PAD_LEFT),
             ],
             'ECU' => [
                 'district_names' => ['Parroquia Urbana', 'Parroquia Rural'],
                 'village_prefix' => 'Parroquia',
-                'village_names'  => ['Parroquia 1', 'Parroquia 2'],
-                'village_type'   => 'parroquia',
-                'postal_calc'    => fn($c) => str_pad((string)(170101 + ($c % 10000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Parroquia 1', 'Parroquia 2'],
+                'village_type' => 'parroquia',
+                'postal_calc' => fn ($c) => str_pad((string) (170101 + ($c % 10000)), 6, '0', STR_PAD_LEFT),
             ],
             'BOL' => [
                 'district_names' => ['Distrito Municipal Centro', 'Distrito Rural'],
                 'village_prefix' => 'Municipio',
-                'village_names'  => ['Comunidad 1', 'Comunidad 2'],
-                'village_type'   => 'municipio',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Comunidad 1', 'Comunidad 2'],
+                'village_type' => 'municipio',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'GTM' => [
                 'district_names' => ['Zona Central', 'Zona Rural Norte'],
                 'village_prefix' => 'Aldea',
-                'village_names'  => ['Aldea 1', 'Aldea 2'],
-                'village_type'   => 'aldea',
-                'postal_calc'    => fn($c) => str_pad((string)(1001 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Aldea 1', 'Aldea 2'],
+                'village_type' => 'aldea',
+                'postal_calc' => fn ($c) => str_pad((string) (1001 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
             ],
 
             // Middle East & Africa
             'TUR' => [
                 'district_names' => ['Merkez İlçe', 'Kuzey İlçe'],
                 'village_prefix' => 'Köy',
-                'village_names'  => ['Merkez Köyü', 'Yeni Mahalle'],
-                'village_type'   => 'koy',
-                'postal_calc'    => fn($c) => str_pad((string)(34000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Merkez Köyü', 'Yeni Mahalle'],
+                'village_type' => 'koy',
+                'postal_calc' => fn ($c) => str_pad((string) (34000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
             ],
             'IRN' => [
                 'district_names' => ['Bakhsh-e Markazi', 'North Bakhsh'],
                 'village_prefix' => 'Rosta',
-                'village_names'  => ['Rosta 1', 'Dehestan 1'],
-                'village_type'   => 'rosta',
-                'postal_calc'    => fn($c) => str_pad((string)(11111 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Rosta 1', 'Dehestan 1'],
+                'village_type' => 'rosta',
+                'postal_calc' => fn ($c) => str_pad((string) (11111 + ($c % 80000)), 5, '0', STR_PAD_LEFT),
             ],
             'SAU' => [
                 'district_names' => ['Baladiyah Al-Markaziyah', 'North Baladiyah'],
                 'village_prefix' => 'Markaz',
-                'village_names'  => ['Markaz Al-Madinah', 'Hayy Al-Rawdah'],
-                'village_type'   => 'markaz',
-                'postal_calc'    => fn($c) => str_pad((string)(11564 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Markaz Al-Madinah', 'Hayy Al-Rawdah'],
+                'village_type' => 'markaz',
+                'postal_calc' => fn ($c) => str_pad((string) (11564 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
             ],
             'EGY' => [
                 'district_names' => ['Qism Al-Markaz', 'Markaz North'],
                 'village_prefix' => 'Qaryah',
-                'village_names'  => ['Qaryah 1', 'Shiakha 1'],
-                'village_type'   => 'qaryah',
-                'postal_calc'    => fn($c) => str_pad((string)(11511 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Qaryah 1', 'Shiakha 1'],
+                'village_type' => 'qaryah',
+                'postal_calc' => fn ($c) => str_pad((string) (11511 + ($c % 20000)), 5, '0', STR_PAD_LEFT),
             ],
             'DZA' => [
                 'district_names' => ['Daïra Centre', 'Daïra Nord'],
                 'village_prefix' => 'Commune',
-                'village_names'  => ['Commune 1', 'Commune 2'],
-                'village_type'   => 'commune',
-                'postal_calc'    => fn($c) => str_pad((string)(16000 + ($c % 30000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Commune 1', 'Commune 2'],
+                'village_type' => 'commune',
+                'postal_calc' => fn ($c) => str_pad((string) (16000 + ($c % 30000)), 5, '0', STR_PAD_LEFT),
             ],
             'MAR' => [
                 'district_names' => ['Cercle Centre', 'Cercle Nord'],
                 'village_prefix' => 'Commune',
-                'village_names'  => ['Commune Rurale 1', 'Commune 2'],
-                'village_type'   => 'commune',
-                'postal_calc'    => fn($c) => str_pad((string)(10000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Commune Rurale 1', 'Commune 2'],
+                'village_type' => 'commune',
+                'postal_calc' => fn ($c) => str_pad((string) (10000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
             ],
             'NGA' => [
                 'district_names' => ['Central Local Government Area', 'North LGA District'],
                 'village_prefix' => 'Community',
-                'village_names'  => ['Village Community 1', 'Ward 1'],
-                'village_type'   => 'community',
-                'postal_calc'    => fn($c) => str_pad((string)(100001 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
+                'village_names' => ['Village Community 1', 'Ward 1'],
+                'village_type' => 'community',
+                'postal_calc' => fn ($c) => str_pad((string) (100001 + ($c % 800000)), 6, '0', STR_PAD_LEFT),
             ],
             'ETH' => [
                 'district_names' => ['Central Woreda', 'North Woreda'],
                 'village_prefix' => 'Kebele',
-                'village_names'  => ['Kebele 01', 'Kebele 02'],
-                'village_type'   => 'kebele',
-                'postal_calc'    => fn($c) => str_pad((string)(1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Kebele 01', 'Kebele 02'],
+                'village_type' => 'kebele',
+                'postal_calc' => fn ($c) => str_pad((string) (1000 + ($c % 8000)), 4, '0', STR_PAD_LEFT),
             ],
             'ZAF' => [
                 'district_names' => ['Central Sub-Council Area', 'North Sub-Council Area'],
                 'village_prefix' => 'Ward',
-                'village_names'  => ['Traditional Ward 1', 'Section 1'],
-                'village_type'   => 'ward',
-                'postal_calc'    => fn($c) => str_pad((string)(2000 + ($c % 7000)), 4, '0', STR_PAD_LEFT),
+                'village_names' => ['Traditional Ward 1', 'Section 1'],
+                'village_type' => 'ward',
+                'postal_calc' => fn ($c) => str_pad((string) (2000 + ($c % 7000)), 4, '0', STR_PAD_LEFT),
             ],
             'KEN' => [
                 'district_names' => ['Central Sub-County Area', 'North Sub-County'],
                 'village_prefix' => 'Location',
-                'village_names'  => ['Location 1', 'Sub-location 1'],
-                'village_type'   => 'location',
-                'postal_calc'    => fn($c) => str_pad((string)(100 + ($c % 90000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Location 1', 'Sub-location 1'],
+                'village_type' => 'location',
+                'postal_calc' => fn ($c) => str_pad((string) (100 + ($c % 90000)), 5, '0', STR_PAD_LEFT),
             ],
             'TZA' => [
                 'district_names' => ['Wilaya ya Mjini', 'Wilaya ya Vijijini'],
                 'village_prefix' => 'Kijiji',
-                'village_names'  => ['Kijiji 1', 'Kijiji 2'],
-                'village_type'   => 'kijiji',
-                'postal_calc'    => fn($c) => str_pad((string)(11000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
+                'village_names' => ['Kijiji 1', 'Kijiji 2'],
+                'village_type' => 'kijiji',
+                'postal_calc' => fn ($c) => str_pad((string) (11000 + ($c % 50000)), 5, '0', STR_PAD_LEFT),
             ],
             'SSD' => [
                 'district_names' => ['Payam Centre', 'Payam North'],
                 'village_prefix' => 'Boma',
-                'village_names'  => ['Boma 1', 'Boma 2'],
-                'village_type'   => 'boma',
-                'postal_calc'    => fn($c) => 'SSD-' . str_pad((string)($c % 900), 3, '0', STR_PAD_LEFT),
+                'village_names' => ['Boma 1', 'Boma 2'],
+                'village_type' => 'boma',
+                'postal_calc' => fn ($c) => 'SSD-'.str_pad((string) ($c % 900), 3, '0', STR_PAD_LEFT),
             ],
             'RWA' => [
                 'district_names' => ['Akarere Centre', 'Akarere North'],
                 'village_prefix' => 'Umurenge',
-                'village_names'  => ['Umurenge 1', 'Umurenge 2'],
-                'village_type'   => 'umurenge',
-                'postal_calc'    => fn($c) => 'RWA-' . str_pad((string)($c % 900), 3, '0', STR_PAD_LEFT),
+                'village_names' => ['Umurenge 1', 'Umurenge 2'],
+                'village_type' => 'umurenge',
+                'postal_calc' => fn ($c) => 'RWA-'.str_pad((string) ($c % 900), 3, '0', STR_PAD_LEFT),
             ],
         ];
     }
@@ -868,12 +868,12 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
             DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                 ['country_code' => $iso3, 'level' => 4],
                 [
-                    'id'          => (string) Str::ulid(),
-                    'level_code'  => 'village',
-                    'level_name'  => $def['term'],
+                    'id' => (string) Str::ulid(),
+                    'level_code' => 'village',
+                    'level_name' => $def['term'],
                     'description' => $def['desc'],
-                    'created_at'  => $now,
-                    'updated_at'  => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]
             );
 
@@ -883,12 +883,12 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
                 DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                     ['country_code' => $iso2, 'level' => 4],
                     [
-                        'id'          => (string) Str::ulid(),
-                        'level_code'  => 'village',
-                        'level_name'  => $def['term'],
+                        'id' => (string) Str::ulid(),
+                        'level_code' => 'village',
+                        'level_name' => $def['term'],
                         'description' => $def['desc'],
-                        'created_at'  => $now,
-                        'updated_at'  => $now,
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ]
                 );
             }
@@ -902,19 +902,19 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
                 ->where('level', 4)
                 ->exists();
 
-            if (!$hasLevel) {
+            if (! $hasLevel) {
                 $defaultTerm = 'Local Community / Locality';
                 $defaultDesc = "Tingkat 4: Unit komunitas atau pemukiman lokal {$c->name}";
 
                 DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                     ['country_code' => $c->code, 'level' => 4],
                     [
-                        'id'          => (string) Str::ulid(),
-                        'level_code'  => 'village',
-                        'level_name'  => $defaultTerm,
+                        'id' => (string) Str::ulid(),
+                        'level_code' => 'village',
+                        'level_name' => $defaultTerm,
                         'description' => $defaultDesc,
-                        'created_at'  => $now,
-                        'updated_at'  => $now,
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ]
                 );
 
@@ -922,12 +922,12 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
                     DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                         ['country_code' => $c->iso3, 'level' => 4],
                         [
-                            'id'          => (string) Str::ulid(),
-                            'level_code'  => 'village',
-                            'level_name'  => $defaultTerm,
+                            'id' => (string) Str::ulid(),
+                            'level_code' => 'village',
+                            'level_name' => $defaultTerm,
                             'description' => $defaultDesc,
-                            'created_at'  => $now,
-                            'updated_at'  => $now,
+                            'created_at' => $now,
+                            'updated_at' => $now,
                         ]
                     );
                 }

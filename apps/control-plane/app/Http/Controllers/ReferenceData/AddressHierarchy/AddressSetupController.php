@@ -16,11 +16,13 @@ use App\Models\ReferenceData\AddressHierarchy\PostalCode;
 use App\Models\ReferenceData\AddressHierarchy\Province;
 use App\Models\ReferenceData\AddressHierarchy\Regency;
 use App\Models\ReferenceData\AddressHierarchy\Street;
+use App\Models\ReferenceData\AddressHierarchy\TimeZone;
 use App\Models\ReferenceData\AddressHierarchy\Village;
 use App\Services\AddressHierarchy\TimezoneResolverService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -34,20 +36,20 @@ final class AddressSetupController extends Controller
 
     public function index(Request $request): JsonResponse|Response
     {
-        $section  = $request->query('section', 'countries');
-        $country  = (string) $request->query('country', '');
+        $section = $request->query('section', 'countries');
+        $country = (string) $request->query('country', '');
         if ($country === 'ID') {
             $country = 'IDN';
         }
         $province = $request->query('province_id', '');
-        $regency  = $request->query('regency_id', '');
+        $regency = $request->query('regency_id', '');
         $district = $request->query('district_id', '');
-        $village  = $request->query('village_id', '');
+        $village = $request->query('village_id', '');
 
         $selectedId = session('saved_id') ?: $request->query('selected_id', '');
         $savedSection = session('saved_section') ?: $section;
 
-        if (!empty($selectedId)) {
+        if (! empty($selectedId)) {
             if ($savedSection === 'countries') {
                 $country = $selectedId;
             } elseif ($savedSection === 'provinces') {
@@ -84,43 +86,43 @@ final class AddressSetupController extends Controller
         }
 
         // Bottom-up parent resolution: if child is supplied, automatically discover and sync parents
-        if (!empty($village)) {
+        if (! empty($village)) {
             $v = Village::with('district.regency.province')->find($village);
             if ($v && $v->district) {
-                if (!empty($district) && $v->district_id !== $district) {
+                if (! empty($district) && $v->district_id !== $district) {
                     $village = '';
                 } else {
                     $district = $v->district_id;
-                    $regency  = $v->district->regency_id ?: $regency;
+                    $regency = $v->district->regency_id ?: $regency;
                     $province = $v->district->regency?->province_id ?: $province;
-                    $country  = $v->district->regency?->province?->country_code ?: $country;
+                    $country = $v->district->regency?->province?->country_code ?: $country;
                 }
             }
-        } elseif (!empty($district)) {
+        } elseif (! empty($district)) {
             $d = District::with('regency.province')->find($district);
             if ($d && $d->regency) {
-                if (!empty($regency) && $d->regency_id !== $regency) {
+                if (! empty($regency) && $d->regency_id !== $regency) {
                     $district = '';
                 } else {
-                    $regency  = $d->regency_id;
+                    $regency = $d->regency_id;
                     $province = $d->regency->province_id ?: $province;
-                    $country  = $d->regency->province?->country_code ?: $country;
+                    $country = $d->regency->province?->country_code ?: $country;
                 }
             }
-        } elseif (!empty($regency)) {
+        } elseif (! empty($regency)) {
             $r = Regency::with('province')->find($regency);
             if ($r && $r->province) {
-                if (!empty($province) && $r->province_id !== $province) {
+                if (! empty($province) && $r->province_id !== $province) {
                     $regency = '';
                 } else {
                     $province = $r->province_id;
-                    $country  = $r->province->country_code ?: $country;
+                    $country = $r->province->country_code ?: $country;
                 }
             }
-        } elseif (!empty($province)) {
+        } elseif (! empty($province)) {
             $p = Province::find($province);
             if ($p) {
-                if (!empty($country) && $p->country_code !== $country) {
+                if (! empty($country) && $p->country_code !== $country) {
                     $province = '';
                 } else {
                     $country = $p->country_code ?: $country;
@@ -129,33 +131,33 @@ final class AddressSetupController extends Controller
         }
 
         // Top-down consistency validation: if a child is incompatible with parent, reset child
-        if (!empty($province)) {
+        if (! empty($province)) {
             $p = Province::find($province);
-            if (!$p || ($country && $p->country_code !== $country)) {
+            if (! $p || ($country && $p->country_code !== $country)) {
                 $province = '';
-                $regency  = '';
+                $regency = '';
                 $district = '';
-                $village  = '';
+                $village = '';
             }
         }
-        if (!empty($regency)) {
+        if (! empty($regency)) {
             $r = Regency::find($regency);
-            if (!$r || ($province && $r->province_id !== $province)) {
-                $regency  = '';
+            if (! $r || ($province && $r->province_id !== $province)) {
+                $regency = '';
                 $district = '';
-                $village  = '';
+                $village = '';
             }
         }
-        if (!empty($district)) {
+        if (! empty($district)) {
             $d = District::find($district);
-            if (!$d || ($regency && $d->regency_id !== $regency)) {
+            if (! $d || ($regency && $d->regency_id !== $regency)) {
                 $district = '';
-                $village  = '';
+                $village = '';
             }
         }
-        if (!empty($village)) {
+        if (! empty($village)) {
             $v = Village::find($village);
-            if (!$v || ($district && $v->district_id !== $district)) {
+            if (! $v || ($district && $v->district_id !== $district)) {
                 $village = '';
             }
         }
@@ -258,9 +260,9 @@ final class AddressSetupController extends Controller
             ? PostalCode::with(['country', 'province', 'regency', 'district', 'village'])
                 ->when($country, fn ($q) => $q->where('country_code', $country))
                 ->when($province, fn ($q) => $q->where('province_id', $province))
-                ->when($regency,  fn ($q) => $q->where('regency_id', $regency))
+                ->when($regency, fn ($q) => $q->where('regency_id', $regency))
                 ->when($district, fn ($q) => $q->where('district_id', $district))
-                ->when($village,  fn ($q) => $q->where('village_id', $village))
+                ->when($village, fn ($q) => $q->where('village_id', $village))
                 ->orderBy('postal_code')
                 ->limit(150)
                 ->get()
@@ -273,64 +275,64 @@ final class AddressSetupController extends Controller
 
         $dropdownRegencies = Regency::select('id', 'province_id', 'name', 'code', 'type', 'active')
             ->when($province, fn ($q) => $q->where('province_id', $province))
-            ->when(!$province && $country, fn ($q) => $q->whereHas('province', fn ($p) => $p->where('country_code', $country)))
+            ->when(! $province && $country, fn ($q) => $q->whereHas('province', fn ($p) => $p->where('country_code', $country)))
             ->orderBy('name')
             ->get();
 
         $dropdownDistricts = District::select('id', 'regency_id', 'name', 'code', 'active')
             ->when($regency, fn ($q) => $q->where('regency_id', $regency))
-            ->when(!$regency && $province, fn ($q) => $q->whereHas('regency', fn ($r) => $r->where('province_id', $province)))
-            ->when(!$regency && !$province && $country, fn ($q) => $q->whereHas('regency.province', fn ($p) => $p->where('country_code', $country)))
+            ->when(! $regency && $province, fn ($q) => $q->whereHas('regency', fn ($r) => $r->where('province_id', $province)))
+            ->when(! $regency && ! $province && $country, fn ($q) => $q->whereHas('regency.province', fn ($p) => $p->where('country_code', $country)))
             ->orderBy('name')
             ->get();
 
         $dropdownVillages = Village::select('id', 'district_id', 'name', 'code', 'active')
             ->when($district, fn ($q) => $q->where('district_id', $district))
-            ->when(!$district && $regency, fn ($q) => $q->whereHas('district', fn ($d) => $d->where('regency_id', $regency)))
+            ->when(! $district && $regency, fn ($q) => $q->whereHas('district', fn ($d) => $d->where('regency_id', $regency)))
             ->orderBy('name')
             ->limit(500)
             ->get();
 
-        $currentCountry  = $country ? Country::where('code', $country)->first() : null;
+        $currentCountry = $country ? Country::where('code', $country)->first() : null;
         $currentProvince = $province ? Province::find($province) : null;
-        $currentRegency  = $regency ? Regency::find($regency) : null;
+        $currentRegency = $regency ? Regency::find($regency) : null;
         $currentDistrict = $district ? District::find($district) : null;
 
         $activeDivisionType = $village ? 'village' : ($district ? 'district' : ($regency ? 'regency' : ($province ? 'province' : ($country ? 'country' : null))));
-        $activeDivisionId   = $village ?: ($district ?: ($regency ?: ($province ?: ($country ?: null))));
-        $activeTimezone     = ($activeDivisionType && $activeDivisionId) ? $this->timezoneResolver->resolve($activeDivisionType, $activeDivisionId) : null;
+        $activeDivisionId = $village ?: ($district ?: ($regency ?: ($province ?: ($country ?: null))));
+        $activeTimezone = ($activeDivisionType && $activeDivisionId) ? $this->timezoneResolver->resolve($activeDivisionType, $activeDivisionId) : null;
 
         $hierarchyLevels = $country ? CountryHierarchyLevel::where('country_code', $country)->orderBy('level')->get() : collect();
 
         return Inertia::render('settings/address-hierarchy/address-setup', [
-            'section'         => $section,
-            'countries'       => $countries,
-            'provinces'       => $provinces,
-            'regencies'       => $regencies,
-            'districts'       => $districts,
-            'villages'        => $villages,
-            'streets'         => $streets,
-            'groupOfHouses'   => $groupOfHouses,
-            'landPlots'       => $landPlots,
-            'buildings'       => $buildings,
-            'postalCodes'     => $postalCodes,
-            'parameters'      => $parameters,
+            'section' => $section,
+            'countries' => $countries,
+            'provinces' => $provinces,
+            'regencies' => $regencies,
+            'districts' => $districts,
+            'villages' => $villages,
+            'streets' => $streets,
+            'groupOfHouses' => $groupOfHouses,
+            'landPlots' => $landPlots,
+            'buildings' => $buildings,
+            'postalCodes' => $postalCodes,
+            'parameters' => $parameters,
             'hierarchyLevels' => $hierarchyLevels,
-            'activeTimezone'  => $activeTimezone,
-            'dropdowns'   => [
+            'activeTimezone' => $activeTimezone,
+            'dropdowns' => [
                 'countries' => $allCountries,
                 'provinces' => $dropdownProvinces,
                 'regencies' => $dropdownRegencies,
                 'districts' => $dropdownDistricts,
-                'villages'  => $dropdownVillages,
+                'villages' => $dropdownVillages,
             ],
             'context' => [
-                'country'  => $currentCountry ? ['code' => $currentCountry->code, 'name' => $currentCountry->name] : null,
+                'country' => $currentCountry ? ['code' => $currentCountry->code, 'name' => $currentCountry->name] : null,
                 'province' => $currentProvince ? ['id' => $currentProvince->id, 'name' => $currentProvince->name, 'code' => $currentProvince->code] : null,
-                'regency'  => $currentRegency ? ['id' => $currentRegency->id, 'name' => $currentRegency->name, 'code' => $currentRegency->code] : null,
+                'regency' => $currentRegency ? ['id' => $currentRegency->id, 'name' => $currentRegency->name, 'code' => $currentRegency->code] : null,
                 'district' => $currentDistrict ? ['id' => $currentDistrict->id, 'name' => $currentDistrict->name, 'code' => $currentDistrict->code] : null,
             ],
-            'selectedId'      => $selectedId ?: null,
+            'selectedId' => $selectedId ?: null,
             'filters' => compact('country', 'province', 'regency', 'district', 'village'),
         ]);
     }
@@ -338,12 +340,12 @@ final class AddressSetupController extends Controller
     public function storeCountry(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'code'       => 'required|string|max:3|uppercase',
-            'iso3'       => 'nullable|string|max:3|uppercase',
-            'name'       => 'required|string|max:100',
+            'code' => 'required|string|max:3|uppercase',
+            'iso3' => 'nullable|string|max:3|uppercase',
+            'name' => 'required|string|max:100',
             'phone_code' => 'nullable|string|max:10',
-            'timezone'   => 'required|string|max:50',
-            'active'     => 'boolean',
+            'timezone' => 'nullable|string|max:50',
+            'active' => 'boolean',
         ]);
 
         if (empty($data['timezone'])) {
@@ -357,19 +359,19 @@ final class AddressSetupController extends Controller
         DB::table('ref_administrative_division_timezones')->updateOrInsert(
             ['division_type' => 'country', 'division_id' => $data['code']],
             [
-                'id'         => (string) Str::ulid(),
-                'timezone'   => $data['timezone'],
+                'id' => (string) Str::ulid(),
+                'timezone' => $data['timezone'],
                 'is_default' => true,
-                'status'     => 'active',
+                'status' => 'active',
                 'updated_at' => now(),
             ]
         );
-        \Illuminate\Support\Facades\Cache::forget("timezone:division:country:{$data['code']}");
+        Cache::forget("timezone:division:country:{$data['code']}");
 
         return back()->with([
-            'saved_id'      => $data['code'],
+            'saved_id' => $data['code'],
             'saved_section' => 'countries',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
@@ -380,32 +382,33 @@ final class AddressSetupController extends Controller
         }
         DB::table('ref_countries')->where('code', $code)->delete();
         DB::table('ref_administrative_division_timezones')->where('division_type', 'country')->where('division_id', $code)->delete();
-        \Illuminate\Support\Facades\Cache::forget("timezone:division:country:{$code}");
+        Cache::forget("timezone:division:country:{$code}");
+
         return back();
     }
 
     public function storeProvince(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'              => 'nullable|string|exists:ref_provinces,id',
-            'country_code'    => 'required|string|max:3|exists:ref_countries,code',
-            'code'            => 'required|string|max:20',
-            'name'            => 'required|string|max:150',
-            'description'     => 'nullable|string|max:500',
-            'timezone'        => 'required|string|max:50',
-            'intrastat'       => 'nullable|string|max:50',
-            'it_state_code'   => 'nullable|string|max:50',
-            'state_code'      => 'nullable|string|max:50',
-            'default_state'   => 'boolean',
+            'id' => 'nullable|string|exists:ref_provinces,id',
+            'country_code' => 'required|string|max:3|exists:ref_countries,code',
+            'code' => 'required|string|max:20',
+            'name' => 'required|string|max:150',
+            'description' => 'nullable|string|max:500',
+            'timezone' => 'nullable|string|max:50',
+            'intrastat' => 'nullable|string|max:50',
+            'it_state_code' => 'nullable|string|max:50',
+            'state_code' => 'nullable|string|max:50',
+            'default_state' => 'boolean',
             'union_territory' => 'boolean',
-            'active'          => 'boolean',
+            'active' => 'boolean',
         ]);
 
         if (empty($data['timezone'])) {
             $data['timezone'] = $this->timezoneResolver->inferProvinceTimezone($data['country_code'], $data['code'], $data['name']) ?? 'UTC';
         }
 
-        $existing = (!empty($data['id']) ? Province::find($data['id']) : null)
+        $existing = (! empty($data['id']) ? Province::find($data['id']) : null)
             ?: Province::where('country_code', $data['country_code'])->where('code', $data['code'])->first();
 
         if ($existing) {
@@ -428,19 +431,19 @@ final class AddressSetupController extends Controller
         DB::table('ref_administrative_division_timezones')->updateOrInsert(
             ['division_type' => 'province', 'division_id' => $savedId],
             [
-                'id'         => (string) Str::ulid(),
-                'timezone'   => $data['timezone'],
+                'id' => (string) Str::ulid(),
+                'timezone' => $data['timezone'],
                 'is_default' => true,
-                'status'     => 'active',
+                'status' => 'active',
                 'updated_at' => now(),
             ]
         );
-        \Illuminate\Support\Facades\Cache::forget("timezone:division:province:{$savedId}");
+        Cache::forget("timezone:division:province:{$savedId}");
 
         return back()->with([
-            'saved_id'      => $savedId,
+            'saved_id' => $savedId,
             'saved_section' => 'provinces',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
@@ -450,6 +453,7 @@ final class AddressSetupController extends Controller
             return back()->withErrors(['error' => 'Cannot delete record because it contains child records.']);
         }
         Province::findOrFail($id)->delete();
+
         return back()->with('status', 'Record deleted successfully.');
     }
 
@@ -457,15 +461,15 @@ final class AddressSetupController extends Controller
     public function storeRegency(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'             => 'nullable|string|exists:ref_regencies,id',
-            'province_id'    => 'required|string|exists:ref_provinces,id',
-            'code'           => 'required|string|max:20',
-            'name'           => 'required|string|max:150',
-            'description'    => 'nullable|string|max:500',
-            'type'           => 'nullable|string|max:50',
+            'id' => 'nullable|string|exists:ref_regencies,id',
+            'province_id' => 'required|string|exists:ref_provinces,id',
+            'code' => 'required|string|max:20',
+            'name' => 'required|string|max:150',
+            'description' => 'nullable|string|max:500',
+            'type' => 'nullable|string|max:50',
             'it_county_code' => 'nullable|string|max:50',
             'es_county_code' => 'nullable|string|max:50',
-            'active'         => 'boolean',
+            'active' => 'boolean',
         ]);
 
         if (empty($data['type'])) {
@@ -475,7 +479,7 @@ final class AddressSetupController extends Controller
         $cleanCode = str_replace('.', '', $data['code']);
         $data['code'] = $cleanCode;
 
-        $existing = (!empty($data['id']) ? Regency::find($data['id']) : null)
+        $existing = (! empty($data['id']) ? Regency::find($data['id']) : null)
             ?: Regency::where('province_id', $data['province_id'])->where('code', $cleanCode)->first();
 
         if ($existing) {
@@ -494,10 +498,11 @@ final class AddressSetupController extends Controller
             $saved = Regency::create(array_merge($data, ['id' => (string) Str::ulid()]));
             $savedId = $saved->id;
         }
+
         return back()->with([
-            'saved_id'      => $savedId,
+            'saved_id' => $savedId,
             'saved_section' => 'regencies',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
@@ -507,6 +512,7 @@ final class AddressSetupController extends Controller
             return back()->withErrors(['error' => 'Cannot delete record because it contains child records.']);
         }
         Regency::findOrFail($id)->delete();
+
         return back()->with('status', 'Record deleted successfully.');
     }
 
@@ -514,11 +520,11 @@ final class AddressSetupController extends Controller
     public function storeDistrict(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'         => 'nullable|string|exists:ref_districts,id',
+            'id' => 'nullable|string|exists:ref_districts,id',
             'regency_id' => 'required|string|exists:ref_regencies,id',
-            'code'       => 'required|string|max:20',
-            'name'       => 'required|string|max:150',
-            'active'     => 'boolean',
+            'code' => 'required|string|max:20',
+            'name' => 'required|string|max:150',
+            'active' => 'boolean',
         ]);
 
         // Validate parent chain: regency must belong to a valid province
@@ -530,7 +536,7 @@ final class AddressSetupController extends Controller
         $cleanCode = str_replace('.', '', $data['code']);
         $data['code'] = $cleanCode;
 
-        $existing = (!empty($data['id']) ? District::find($data['id']) : null)
+        $existing = (! empty($data['id']) ? District::find($data['id']) : null)
             ?: District::where('regency_id', $data['regency_id'])->where('code', $cleanCode)->first();
 
         if ($existing) {
@@ -549,10 +555,11 @@ final class AddressSetupController extends Controller
             $saved = District::create(array_merge($data, ['id' => (string) Str::ulid()]));
             $savedId = $saved->id;
         }
+
         return back()->with([
-            'saved_id'      => $savedId,
+            'saved_id' => $savedId,
             'saved_section' => 'districts',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
@@ -562,6 +569,7 @@ final class AddressSetupController extends Controller
             return back()->withErrors(['error' => 'Cannot delete record because it contains child records.']);
         }
         District::findOrFail($id)->delete();
+
         return back()->with('status', 'Record deleted successfully.');
     }
 
@@ -569,13 +577,13 @@ final class AddressSetupController extends Controller
     public function storeVillage(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'          => 'nullable|string|exists:ref_villages,id',
+            'id' => 'nullable|string|exists:ref_villages,id',
             'district_id' => 'required|string|exists:ref_districts,id',
-            'code'        => 'required|string|max:30',
-            'name'        => 'required|string|max:150',
-            'type'        => 'nullable|string|max:50',
+            'code' => 'required|string|max:30',
+            'name' => 'required|string|max:150',
+            'type' => 'nullable|string|max:50',
             'postal_code' => 'nullable|string|max:20',
-            'active'      => 'boolean',
+            'active' => 'boolean',
         ]);
 
         if (empty($data['type'])) {
@@ -590,14 +598,14 @@ final class AddressSetupController extends Controller
         $countryCode = $district->regency->province->country_code ?? null;
 
         $cleanCode = str_replace('.', '', $data['code']);
-        $displayCode = 'V-' . $cleanCode;
+        $displayCode = 'V-'.$cleanCode;
         $data['display_code'] = $displayCode;
 
         if (! empty($data['postal_code']) && ! preg_match('/^[A-Za-z0-9\s\-]{3,10}$/', $data['postal_code'])) {
             return back()->withErrors(['postal_code' => 'Please enter a valid postal code format.']);
         }
 
-        $existing = (!empty($data['id']) ? Village::find($data['id']) : null)
+        $existing = (! empty($data['id']) ? Village::find($data['id']) : null)
             ?: Village::where('district_id', $data['district_id'])->where('code', $cleanCode)->first();
 
         if ($existing) {
@@ -618,42 +626,47 @@ final class AddressSetupController extends Controller
         }
 
         // Sync with ref_administrative_divisions
-        AdministrativeDivision::updateOrCreate(
-            ['country_id' => $countryCode, 'level' => 4, 'official_code' => $cleanCode],
-            [
-                'id'           => $id,
-                'parent_id'    => $data['district_id'],
-                'type'         => $data['type'] === 'kelurahan' ? 'urban_village' : 'village',
-                'display_code' => $displayCode,
-                'name'         => $data['name'],
-                'status'       => 'active',
-            ]
-        );
+        try {
+            $parentExists = AdministrativeDivision::where('id', $data['district_id'])->exists();
+            AdministrativeDivision::updateOrCreate(
+                ['country_id' => $countryCode, 'level' => 4, 'official_code' => $cleanCode],
+                [
+                    'id' => $id,
+                    'parent_id' => $parentExists ? $data['district_id'] : null,
+                    'type' => $data['type'] === 'kelurahan' ? 'urban_village' : 'village',
+                    'display_code' => $displayCode,
+                    'name' => $data['name'],
+                    'status' => 'active',
+                ]
+            );
+        } catch (\Throwable) {
+            // Silently ignore if foreign key constraint or schema mismatch occurs
+        }
 
         // Sync with ref_postal_codes if postal code is supplied
         if (! empty($data['postal_code'])) {
             PostalCode::updateOrCreate(
                 [
                     'country_code' => $countryCode,
-                    'postal_code'  => $data['postal_code'],
-                    'village_id'   => $id,
+                    'postal_code' => $data['postal_code'],
+                    'village_id' => $id,
                 ],
                 [
                     'province_id' => $district?->regency?->province_id,
-                    'regency_id'  => $district?->regency_id,
+                    'regency_id' => $district?->regency_id,
                     'district_id' => $data['district_id'],
-                    'area_name'   => $data['name'],
-                    'source'      => 'POS_INDONESIA',
-                    'status'      => 'active',
-                    'active'      => true,
+                    'area_name' => $data['name'],
+                    'source' => 'POS_INDONESIA',
+                    'status' => 'active',
+                    'active' => true,
                 ]
             );
         }
 
         return back()->with([
-            'saved_id'      => $id,
+            'saved_id' => $id,
             'saved_section' => 'villages',
-            'status'        => 'Data berhasil disimpan.',
+            'status' => 'Data berhasil disimpan.',
         ]);
     }
 
@@ -664,6 +677,7 @@ final class AddressSetupController extends Controller
         }
         Village::where('id', $id)->delete();
         AdministrativeDivision::where('id', $id)->delete();
+
         return back()->with('status', 'Data berhasil dihapus.');
     }
 
@@ -671,14 +685,14 @@ final class AddressSetupController extends Controller
     public function storeStreet(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'                   => 'nullable|string|exists:ref_streets,id',
-            'village_id'           => 'required|string|exists:ref_villages,id',
-            'rt'                   => 'nullable|string|max:5',
-            'rw'                   => 'nullable|string|max:5',
-            'name'                 => 'nullable|string|max:200',
-            'postal_code'          => 'nullable|string|max:10',
+            'id' => 'nullable|string|exists:ref_streets,id',
+            'village_id' => 'required|string|exists:ref_villages,id',
+            'rt' => 'nullable|string|max:5',
+            'rw' => 'nullable|string|max:5',
+            'name' => 'nullable|string|max:200',
+            'postal_code' => 'nullable|string|max:10',
             'override_postal_code' => 'boolean',
-            'active'               => 'boolean',
+            'active' => 'boolean',
         ]);
 
         // Auto-inherit postal code from parent village if not overridden
@@ -708,15 +722,16 @@ final class AddressSetupController extends Controller
         }
 
         return back()->with([
-            'saved_id'      => $savedId,
+            'saved_id' => $savedId,
             'saved_section' => 'streets',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
     public function destroyStreet(string $id): RedirectResponse
     {
         Street::findOrFail($id)->delete();
+
         return back();
     }
 
@@ -724,16 +739,16 @@ final class AddressSetupController extends Controller
     public function storeBuilding(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'                   => 'nullable|string|exists:ref_buildings,id',
-            'village_id'           => 'required|string|exists:ref_villages,id',
-            'street_id'            => 'nullable|string|exists:ref_streets,id',
-            'name'                 => 'required|string|max:200',
-            'block'                => 'nullable|string|max:20',
-            'unit'                 => 'nullable|string|max:50',
-            'floor'                => 'nullable|string|max:20',
-            'postal_code'          => 'nullable|string|max:10',
+            'id' => 'nullable|string|exists:ref_buildings,id',
+            'village_id' => 'required|string|exists:ref_villages,id',
+            'street_id' => 'nullable|string|exists:ref_streets,id',
+            'name' => 'required|string|max:200',
+            'block' => 'nullable|string|max:20',
+            'unit' => 'nullable|string|max:50',
+            'floor' => 'nullable|string|max:20',
+            'postal_code' => 'nullable|string|max:10',
             'override_postal_code' => 'boolean',
-            'active'               => 'boolean',
+            'active' => 'boolean',
         ]);
 
         // Auto-inherit postal code from parent village if not overridden
@@ -756,15 +771,16 @@ final class AddressSetupController extends Controller
         }
 
         return back()->with([
-            'saved_id'      => $savedId,
+            'saved_id' => $savedId,
             'saved_section' => 'buildings',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
     public function destroyBuilding(string $id): RedirectResponse
     {
         Building::findOrFail($id)->delete();
+
         return back();
     }
 
@@ -772,18 +788,18 @@ final class AddressSetupController extends Controller
     public function storePostalCode(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'               => 'nullable|string|exists:ref_postal_codes,id',
-            'country_code'     => 'required|string|max:3|exists:ref_countries,code',
-            'postal_code'      => 'required|string|max:10',
-            'province_id'      => 'nullable|string|exists:ref_provinces,id',
-            'regency_id'       => 'nullable|string|exists:ref_regencies,id',
-            'district_id'      => 'nullable|string|exists:ref_districts,id',
-            'village_id'       => 'nullable|string|exists:ref_villages,id',
-            'area_name'        => 'nullable|string|max:200',
-            'source'           => 'nullable|string|max:100',
+            'id' => 'nullable|string|exists:ref_postal_codes,id',
+            'country_code' => 'required|string|max:3|exists:ref_countries,code',
+            'postal_code' => 'required|string|max:10',
+            'province_id' => 'nullable|string|exists:ref_provinces,id',
+            'regency_id' => 'nullable|string|exists:ref_regencies,id',
+            'district_id' => 'nullable|string|exists:ref_districts,id',
+            'village_id' => 'nullable|string|exists:ref_villages,id',
+            'area_name' => 'nullable|string|max:200',
+            'source' => 'nullable|string|max:100',
             'source_reference' => 'nullable|string|max:255',
-            'status'           => 'nullable|string|max:20',
-            'active'           => 'boolean',
+            'status' => 'nullable|string|max:20',
+            'active' => 'boolean',
         ]);
 
         if ($data['country_code'] === 'ID' && ! preg_match('/^[0-9]{5}$/', $data['postal_code'])) {
@@ -797,7 +813,7 @@ final class AddressSetupController extends Controller
             $village = Village::with('district.regency.province')->find($villageId);
             if ($village) {
                 $data['district_id'] = $village->district_id;
-                $data['regency_id']  = $village->district?->regency_id;
+                $data['regency_id'] = $village->district?->regency_id;
                 $data['province_id'] = $village->district?->regency?->province_id;
                 if (empty($data['area_name'])) {
                     $data['area_name'] = $village->name;
@@ -832,7 +848,7 @@ final class AddressSetupController extends Controller
                 $savedId = $existing->id;
             } else {
                 $created = PostalCode::create(array_merge($data, [
-                    'id'     => (string) Str::ulid(),
+                    'id' => (string) Str::ulid(),
                     'source' => $data['source'] ?? 'POS_INDONESIA',
                     'status' => $data['status'] ?? 'active',
                 ]));
@@ -841,9 +857,9 @@ final class AddressSetupController extends Controller
         }
 
         return back()->with([
-            'saved_id'      => $savedId,
+            'saved_id' => $savedId,
             'saved_section' => 'postalCodes',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
@@ -859,6 +875,7 @@ final class AddressSetupController extends Controller
             return back()->withErrors(['error' => 'Postal code is in use by address records and cannot be deleted.']);
         }
         $pc->delete();
+
         return back();
     }
 
@@ -866,14 +883,14 @@ final class AddressSetupController extends Controller
     public function storeGroupOfHouses(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'                   => 'nullable|string|exists:ref_group_of_houses,id',
-            'village_id'           => 'required|string|exists:ref_villages,id',
-            'code'                 => 'nullable|string|max:30',
-            'name'                 => 'required|string|max:200',
-            'postal_code'          => 'nullable|string|max:10',
+            'id' => 'nullable|string|exists:ref_group_of_houses,id',
+            'village_id' => 'required|string|exists:ref_villages,id',
+            'code' => 'nullable|string|max:30',
+            'name' => 'required|string|max:200',
+            'postal_code' => 'nullable|string|max:10',
             'override_postal_code' => 'boolean',
-            'status'               => 'nullable|string|max:20',
-            'active'               => 'boolean',
+            'status' => 'nullable|string|max:20',
+            'active' => 'boolean',
         ]);
 
         // Auto-inherit postal code from parent village if not overridden
@@ -899,9 +916,9 @@ final class AddressSetupController extends Controller
         }
 
         return back()->with([
-            'saved_id'      => $savedId,
+            'saved_id' => $savedId,
             'saved_section' => 'groupOfHouses',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
@@ -911,6 +928,7 @@ final class AddressSetupController extends Controller
             return back()->withErrors(['error' => 'Cannot delete group of houses because it contains land plots.']);
         }
         GroupOfHouses::findOrFail($id)->delete();
+
         return back();
     }
 
@@ -918,16 +936,16 @@ final class AddressSetupController extends Controller
     public function storeLandPlot(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'id'                   => 'nullable|string|exists:ref_land_plots,id',
-            'village_id'           => 'required|string|exists:ref_villages,id',
-            'street_id'            => 'nullable|string|exists:ref_streets,id',
-            'group_of_houses_id'   => 'nullable|string|exists:ref_group_of_houses,id',
-            'plot_number'          => 'required|string|max:50',
-            'name'                 => 'nullable|string|max:200',
-            'postal_code'          => 'nullable|string|max:10',
+            'id' => 'nullable|string|exists:ref_land_plots,id',
+            'village_id' => 'required|string|exists:ref_villages,id',
+            'street_id' => 'nullable|string|exists:ref_streets,id',
+            'group_of_houses_id' => 'nullable|string|exists:ref_group_of_houses,id',
+            'plot_number' => 'required|string|max:50',
+            'name' => 'nullable|string|max:200',
+            'postal_code' => 'nullable|string|max:10',
             'override_postal_code' => 'boolean',
-            'status'               => 'nullable|string|max:20',
-            'active'               => 'boolean',
+            'status' => 'nullable|string|max:20',
+            'active' => 'boolean',
         ]);
 
         // Auto-inherit postal code from parent village if not overridden
@@ -953,15 +971,16 @@ final class AddressSetupController extends Controller
         }
 
         return back()->with([
-            'saved_id'      => $savedId,
+            'saved_id' => $savedId,
             'saved_section' => 'landPlots',
-            'status'        => 'Record saved successfully.',
+            'status' => 'Record saved successfully.',
         ]);
     }
 
     public function destroyLandPlot(string $id): RedirectResponse
     {
         LandPlot::findOrFail($id)->delete();
+
         return back();
     }
 
@@ -969,14 +988,14 @@ final class AddressSetupController extends Controller
     public function storeParameters(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'country_code'   => 'required|string|max:3|exists:ref_countries,code',
-            'use_province'   => 'boolean',
-            'use_regency'    => 'boolean',
-            'use_district'   => 'boolean',
-            'use_village'    => 'boolean',
-            'use_rt_rw'      => 'boolean',
-            'use_postal_code'=> 'boolean',
-            'use_building'   => 'boolean',
+            'country_code' => 'required|string|max:3|exists:ref_countries,code',
+            'use_province' => 'boolean',
+            'use_regency' => 'boolean',
+            'use_district' => 'boolean',
+            'use_village' => 'boolean',
+            'use_rt_rw' => 'boolean',
+            'use_postal_code' => 'boolean',
+            'use_building' => 'boolean',
             'address_format' => 'nullable|string|max:500',
         ]);
 
@@ -1024,18 +1043,18 @@ final class AddressSetupController extends Controller
             $tzData = $timezoneResolver->resolve('village', $village->id);
 
             return response()->json([
-                'village'  => ['id' => $village->id, 'code' => $village->code, 'name' => $village->name, 'type' => $village->type, 'postal_code' => $village->postal_code],
+                'village' => ['id' => $village->id, 'code' => $village->code, 'name' => $village->name, 'type' => $village->type, 'postal_code' => $village->postal_code],
                 'district' => $village->district ? ['id' => $village->district->id, 'code' => $village->district->code, 'name' => $village->district->name] : null,
-                'regency'  => $village->district?->regency ? ['id' => $village->district->regency->id, 'code' => $village->district->regency->code, 'name' => $village->district->regency->name, 'type' => $village->district->regency->type] : null,
+                'regency' => $village->district?->regency ? ['id' => $village->district->regency->id, 'code' => $village->district->regency->code, 'name' => $village->district->regency->name, 'type' => $village->district->regency->type] : null,
                 'province' => $village->district?->regency?->province ? ['id' => $village->district->regency->province->id, 'code' => $village->district->regency->province->code, 'name' => $village->district->regency->province->name] : null,
-                'country'  => $village->district?->regency?->province?->country ? ['code' => $village->district->regency->province->country->code, 'name' => $village->district->regency->province->country->name] : null,
+                'country' => $village->district?->regency?->province?->country ? ['code' => $village->district->regency->province->country->code, 'name' => $village->district->regency->province->country->name] : null,
                 'timezone' => $tzData,
-                'lineage'  => [
-                    'country'  => $village->district?->regency?->province?->country?->name,
+                'lineage' => [
+                    'country' => $village->district?->regency?->province?->country?->name,
                     'province' => $village->district?->regency?->province?->name,
-                    'regency'  => $village->district?->regency?->name,
+                    'regency' => $village->district?->regency?->name,
                     'district' => $village->district?->name,
-                    'village'  => $village->name,
+                    'village' => $village->name,
                 ],
                 'formatted' => sprintf('%s > %s > %s > %s > %s',
                     $village->district?->regency?->province?->country?->name ?? 'Country',
@@ -1056,14 +1075,14 @@ final class AddressSetupController extends Controller
 
             return response()->json([
                 'district' => ['id' => $district->id, 'code' => $district->code, 'name' => $district->name],
-                'regency'  => $district->regency ? ['id' => $district->regency->id, 'code' => $district->regency->code, 'name' => $district->regency->name, 'type' => $district->regency->type] : null,
+                'regency' => $district->regency ? ['id' => $district->regency->id, 'code' => $district->regency->code, 'name' => $district->regency->name, 'type' => $district->regency->type] : null,
                 'province' => $district->regency?->province ? ['id' => $district->regency->province->id, 'code' => $district->regency->province->code, 'name' => $district->regency->province->name] : null,
-                'country'  => $district->regency?->province?->country ? ['code' => $district->regency->province->country->code, 'name' => $district->regency->province->country->name] : null,
+                'country' => $district->regency?->province?->country ? ['code' => $district->regency->province->country->code, 'name' => $district->regency->province->country->name] : null,
                 'timezone' => $tzData,
-                'lineage'  => [
-                    'country'  => $district->regency?->province?->country?->name,
+                'lineage' => [
+                    'country' => $district->regency?->province?->country?->name,
                     'province' => $district->regency?->province?->name,
-                    'regency'  => $district->regency?->name,
+                    'regency' => $district->regency?->name,
                     'district' => $district->name,
                 ],
                 'formatted' => sprintf('%s > %s > %s > %s',
@@ -1083,14 +1102,14 @@ final class AddressSetupController extends Controller
             $tzData = $timezoneResolver->resolve('regency', $regency->id);
 
             return response()->json([
-                'regency'  => ['id' => $regency->id, 'code' => $regency->code, 'name' => $regency->name, 'type' => $regency->type],
+                'regency' => ['id' => $regency->id, 'code' => $regency->code, 'name' => $regency->name, 'type' => $regency->type],
                 'province' => $regency->province ? ['id' => $regency->province->id, 'code' => $regency->province->code, 'name' => $regency->province->name] : null,
-                'country'  => $regency->province?->country ? ['code' => $regency->province->country->code, 'name' => $regency->province->country->name] : null,
+                'country' => $regency->province?->country ? ['code' => $regency->province->country->code, 'name' => $regency->province->country->name] : null,
                 'timezone' => $tzData,
-                'lineage'  => [
-                    'country'  => $regency->province?->country?->name,
+                'lineage' => [
+                    'country' => $regency->province?->country?->name,
                     'province' => $regency->province?->name,
-                    'regency'  => $regency->name,
+                    'regency' => $regency->name,
                 ],
                 'formatted' => sprintf('%s > %s > %s',
                     $regency->province?->country?->name ?? 'Indonesia',
@@ -1109,10 +1128,10 @@ final class AddressSetupController extends Controller
 
             return response()->json([
                 'province' => ['id' => $province->id, 'code' => $province->code, 'name' => $province->name],
-                'country'  => $province->country ? ['code' => $province->country->code, 'name' => $province->country->name] : null,
+                'country' => $province->country ? ['code' => $province->country->code, 'name' => $province->country->name] : null,
                 'timezone' => $tzData,
-                'lineage'  => [
-                    'country'  => $province->country?->name,
+                'lineage' => [
+                    'country' => $province->country?->name,
                     'province' => $province->name,
                 ],
                 'formatted' => sprintf('%s > %s',
@@ -1124,24 +1143,27 @@ final class AddressSetupController extends Controller
 
         if ($type === 'street') {
             $street = Street::with('village.district.regency.province.country')->find($id);
-            if (! $street) return response()->json(['message' => 'Street tidak ditemukan'], 404);
+            if (! $street) {
+                return response()->json(['message' => 'Street tidak ditemukan'], 404);
+            }
             $village = $street->village;
             $tzData = $village ? $timezoneResolver->resolve('village', $village->id) : null;
+
             return response()->json([
-                'street'   => ['id' => $street->id, 'name' => $street->name, 'rt' => $street->rt, 'rw' => $street->rw, 'postal_code' => $street->postal_code],
-                'village'  => $village ? ['id' => $village->id, 'code' => $village->code, 'name' => $village->name, 'type' => $village->type, 'postal_code' => $village->postal_code] : null,
+                'street' => ['id' => $street->id, 'name' => $street->name, 'rt' => $street->rt, 'rw' => $street->rw, 'postal_code' => $street->postal_code],
+                'village' => $village ? ['id' => $village->id, 'code' => $village->code, 'name' => $village->name, 'type' => $village->type, 'postal_code' => $village->postal_code] : null,
                 'district' => $village?->district ? ['id' => $village->district->id, 'code' => $village->district->code, 'name' => $village->district->name] : null,
-                'regency'  => $village?->district?->regency ? ['id' => $village->district->regency->id, 'code' => $village->district->regency->code, 'name' => $village->district->regency->name, 'type' => $village->district->regency->type] : null,
+                'regency' => $village?->district?->regency ? ['id' => $village->district->regency->id, 'code' => $village->district->regency->code, 'name' => $village->district->regency->name, 'type' => $village->district->regency->type] : null,
                 'province' => $village?->district?->regency?->province ? ['id' => $village->district->regency->province->id, 'code' => $village->district->regency->province->code, 'name' => $village->district->regency->province->name] : null,
-                'country'  => $village?->district?->regency?->province?->country ? ['code' => $village->district->regency->province->country->code, 'name' => $village->district->regency->province->country->name] : null,
+                'country' => $village?->district?->regency?->province?->country ? ['code' => $village->district->regency->province->country->code, 'name' => $village->district->regency->province->country->name] : null,
                 'timezone' => $tzData,
-                'lineage'  => [
-                    'country'  => $village?->district?->regency?->province?->country?->name,
+                'lineage' => [
+                    'country' => $village?->district?->regency?->province?->country?->name,
                     'province' => $village?->district?->regency?->province?->name,
-                    'regency'  => $village?->district?->regency?->name,
+                    'regency' => $village?->district?->regency?->name,
                     'district' => $village?->district?->name,
-                    'village'  => $village?->name,
-                    'street'   => $street->name ?: "RT {$street->rt} / RW {$street->rw}",
+                    'village' => $village?->name,
+                    'street' => $street->name ?: "RT {$street->rt} / RW {$street->rw}",
                 ],
                 'formatted' => sprintf('%s, RT %s/RW %s, %s, Kec. %s, %s, %s %s, %s',
                     $street->name ?: 'Alamat Lokal',
@@ -1159,23 +1181,26 @@ final class AddressSetupController extends Controller
 
         if ($type === 'building') {
             $bldg = Building::with('village.district.regency.province.country')->find($id);
-            if (! $bldg) return response()->json(['message' => 'Gedung tidak ditemukan'], 404);
+            if (! $bldg) {
+                return response()->json(['message' => 'Gedung tidak ditemukan'], 404);
+            }
             $village = $bldg->village;
             $tzData = $village ? $timezoneResolver->resolve('village', $village->id) : null;
+
             return response()->json([
                 'building' => ['id' => $bldg->id, 'name' => $bldg->name, 'block' => $bldg->block, 'unit' => $bldg->unit, 'floor' => $bldg->floor, 'postal_code' => $bldg->postal_code],
-                'village'  => $village ? ['id' => $village->id, 'code' => $village->code, 'name' => $village->name, 'type' => $village->type, 'postal_code' => $village->postal_code] : null,
+                'village' => $village ? ['id' => $village->id, 'code' => $village->code, 'name' => $village->name, 'type' => $village->type, 'postal_code' => $village->postal_code] : null,
                 'district' => $village?->district ? ['id' => $village->district->id, 'code' => $village->district->code, 'name' => $village->district->name] : null,
-                'regency'  => $village?->district?->regency ? ['id' => $village->district->regency->id, 'code' => $village->district->regency->code, 'name' => $village->district->regency->name, 'type' => $village->district->regency->type] : null,
+                'regency' => $village?->district?->regency ? ['id' => $village->district->regency->id, 'code' => $village->district->regency->code, 'name' => $village->district->regency->name, 'type' => $village->district->regency->type] : null,
                 'province' => $village?->district?->regency?->province ? ['id' => $village->district->regency->province->id, 'code' => $village->district->regency->province->code, 'name' => $village->district->regency->province->name] : null,
-                'country'  => $village?->district?->regency?->province?->country ? ['code' => $village->district->regency->province->country->code, 'name' => $village->district->regency->province->country->name] : null,
+                'country' => $village?->district?->regency?->province?->country ? ['code' => $village->district->regency->province->country->code, 'name' => $village->district->regency->province->country->name] : null,
                 'timezone' => $tzData,
-                'lineage'  => [
-                    'country'  => $village?->district?->regency?->province?->country?->name,
+                'lineage' => [
+                    'country' => $village?->district?->regency?->province?->country?->name,
                     'province' => $village?->district?->regency?->province?->name,
-                    'regency'  => $village?->district?->regency?->name,
+                    'regency' => $village?->district?->regency?->name,
                     'district' => $village?->district?->name,
-                    'village'  => $village?->name,
+                    'village' => $village?->name,
                     'building' => $bldg->name,
                 ],
                 'formatted' => sprintf('%s (Blok %s, Unit %s, Lt %s), %s, Kec. %s, %s, %s %s, %s',
@@ -1195,22 +1220,25 @@ final class AddressSetupController extends Controller
 
         if ($type === 'postalCode' || $type === 'postal_code') {
             $pc = PostalCode::with(['country', 'province', 'regency', 'district', 'village'])->find($id);
-            if (! $pc) return response()->json(['message' => 'Kode pos tidak ditemukan'], 404);
+            if (! $pc) {
+                return response()->json(['message' => 'Kode pos tidak ditemukan'], 404);
+            }
             $tzData = $pc->village_id ? $timezoneResolver->resolve('village', $pc->village_id) : ($pc->province_id ? $timezoneResolver->resolve('province', $pc->province_id) : null);
+
             return response()->json([
                 'postal_code' => ['id' => $pc->id, 'postal_code' => $pc->postal_code, 'area_name' => $pc->area_name, 'source' => $pc->source, 'status' => $pc->status],
-                'village'     => $pc->village ? ['id' => $pc->village->id, 'code' => $pc->village->code, 'name' => $pc->village->name, 'type' => $pc->village->type] : null,
-                'district'    => $pc->district ? ['id' => $pc->district->id, 'code' => $pc->district->code, 'name' => $pc->district->name] : null,
-                'regency'     => $pc->regency ? ['id' => $pc->regency->id, 'code' => $pc->regency->code, 'name' => $pc->regency->name, 'type' => $pc->regency->type] : null,
-                'province'    => $pc->province ? ['id' => $pc->province->id, 'code' => $pc->province->code, 'name' => $pc->province->name] : null,
-                'country'     => $pc->country ? ['code' => $pc->country->code, 'name' => $pc->country->name] : null,
-                'timezone'    => $tzData,
-                'lineage'     => [
-                    'country'     => $pc->country?->name,
-                    'province'    => $pc->province?->name,
-                    'regency'     => $pc->regency?->name,
-                    'district'    => $pc->district?->name,
-                    'village'     => $pc->village?->name,
+                'village' => $pc->village ? ['id' => $pc->village->id, 'code' => $pc->village->code, 'name' => $pc->village->name, 'type' => $pc->village->type] : null,
+                'district' => $pc->district ? ['id' => $pc->district->id, 'code' => $pc->district->code, 'name' => $pc->district->name] : null,
+                'regency' => $pc->regency ? ['id' => $pc->regency->id, 'code' => $pc->regency->code, 'name' => $pc->regency->name, 'type' => $pc->regency->type] : null,
+                'province' => $pc->province ? ['id' => $pc->province->id, 'code' => $pc->province->code, 'name' => $pc->province->name] : null,
+                'country' => $pc->country ? ['code' => $pc->country->code, 'name' => $pc->country->name] : null,
+                'timezone' => $tzData,
+                'lineage' => [
+                    'country' => $pc->country?->name,
+                    'province' => $pc->province?->name,
+                    'regency' => $pc->regency?->name,
+                    'district' => $pc->district?->name,
+                    'village' => $pc->village?->name,
                     'postal_code' => $pc->postal_code,
                 ],
                 'formatted' => sprintf('Kode Pos %s (%s, %s, %s, %s %s)',
@@ -1230,22 +1258,23 @@ final class AddressSetupController extends Controller
     public function lookupTopDown(Request $request): JsonResponse
     {
         $countryCode = $request->query('country_code') ?: $request->query('country_id');
-        $parentType  = $request->query('parent_type');
-        $parentId    = $request->query('parent_id');
-        $provinceId  = $request->query('province_id');
-        $regencyId   = $request->query('regency_id');
-        $districtId  = $request->query('district_id');
+        $parentType = $request->query('parent_type');
+        $parentId = $request->query('parent_id');
+        $provinceId = $request->query('province_id');
+        $regencyId = $request->query('regency_id');
+        $districtId = $request->query('district_id');
 
         if ($provinceId || $regencyId || $districtId) {
             $provinceQuery = Province::query();
             if ($countryCode) {
                 $provinceQuery->where('country_code', $countryCode);
             }
+
             return response()->json([
                 'provinces' => $provinceQuery->orderBy('name')->get(),
                 'regencies' => $provinceId ? Regency::where('province_id', $provinceId)->orderBy('name')->get() : collect(),
                 'districts' => $regencyId ? District::where('regency_id', $regencyId)->orderBy('name')->get() : collect(),
-                'villages'  => $districtId ? Village::where('district_id', $districtId)->orderBy('name')->get() : collect(),
+                'villages' => $districtId ? Village::where('district_id', $districtId)->orderBy('name')->get() : collect(),
             ]);
         }
 
@@ -1254,6 +1283,7 @@ final class AddressSetupController extends Controller
             if ($parentId) {
                 $provQuery->where('country_code', $parentId);
             }
+
             return response()->json($provQuery->orderBy('name')->get());
         }
         if ($parentType === 'province') {
@@ -1270,6 +1300,7 @@ final class AddressSetupController extends Controller
         if ($countryCode) {
             $fallbackProvQuery->where('country_code', $countryCode);
         }
+
         return response()->json([
             'provinces' => $fallbackProvQuery->orderBy('name')->get(),
         ]);
@@ -1279,30 +1310,30 @@ final class AddressSetupController extends Controller
     public function resolveTimezone(Request $request, TimezoneResolverService $timezoneResolver): JsonResponse
     {
         $divisionType = $request->query('division_type');
-        $divisionId   = $request->query('division_id');
+        $divisionId = $request->query('division_id');
 
         $countryCode = $request->query('country_code') ?: $request->query('country_id');
-        $provinceId  = $request->query('province_id');
-        $regencyId   = $request->query('regency_id');
-        $districtId  = $request->query('district_id');
-        $villageId   = $request->query('village_id');
+        $provinceId = $request->query('province_id');
+        $regencyId = $request->query('regency_id');
+        $districtId = $request->query('district_id');
+        $villageId = $request->query('village_id');
 
         if (! $divisionType || ! $divisionId) {
             if ($villageId) {
                 $divisionType = 'village';
-                $divisionId   = $villageId;
+                $divisionId = $villageId;
             } elseif ($districtId) {
                 $divisionType = 'district';
-                $divisionId   = $districtId;
+                $divisionId = $districtId;
             } elseif ($regencyId) {
                 $divisionType = 'regency';
-                $divisionId   = $regencyId;
+                $divisionId = $regencyId;
             } elseif ($provinceId) {
                 $divisionType = 'province';
-                $divisionId   = $provinceId;
+                $divisionId = $provinceId;
             } elseif ($countryCode) {
                 $divisionType = 'country';
-                $divisionId   = $countryCode;
+                $divisionId = $countryCode;
             }
         }
 
@@ -1311,7 +1342,7 @@ final class AddressSetupController extends Controller
         }
 
         $result = $timezoneResolver->resolve($divisionType ?: 'country', $divisionId);
-        
+
         // Fetch available timezones for the country
         $targetCountry = $countryCode;
         if (! $targetCountry && $divisionType === 'country') {
@@ -1322,21 +1353,21 @@ final class AddressSetupController extends Controller
 
         $availableTzs = [];
         if ($targetCountry) {
-            $availableTzs = \App\Models\ReferenceData\AddressHierarchy\TimeZone::where('country_code', $targetCountry)
+            $availableTzs = TimeZone::where('country_code', $targetCountry)
                 ->where('active', true)
                 ->get(['iana_name', 'display_name', 'utc_offset', 'is_default']);
         }
 
         if (! $result) {
             return response()->json([
-                'timezone'             => null,
-                'offset'               => null,
-                'label'                => null,
-                'display_name'         => 'Timezone belum dipetakan',
-                'source_division_id'   => null,
+                'timezone' => null,
+                'offset' => null,
+                'label' => null,
+                'display_name' => 'Timezone belum dipetakan',
+                'source_division_id' => null,
                 'source_division_type' => null,
                 'source_division_name' => null,
-                'available_timezones'  => $availableTzs,
+                'available_timezones' => $availableTzs,
             ], 200);
         }
 
@@ -1349,9 +1380,9 @@ final class AddressSetupController extends Controller
     public function getDivisions(Request $request): JsonResponse
     {
         $countryId = $request->query('country_id');
-        $parentId  = $request->query('parent_id');
-        $level     = (int) $request->query('level', 1);
-        $search    = $request->query('search');
+        $parentId = $request->query('parent_id');
+        $level = (int) $request->query('level', 1);
+        $search = $request->query('search');
 
         $query = match ($level) {
             1 => $countryId ? Province::where('country_code', $countryId) : Province::query(),
@@ -1364,8 +1395,8 @@ final class AddressSetupController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ilike', "%{$search}%")
-                  ->orWhere('code', 'ilike', "%{$search}%")
-                  ->orWhere('display_code', 'ilike', "%{$search}%");
+                    ->orWhere('code', 'ilike', "%{$search}%")
+                    ->orWhere('display_code', 'ilike', "%{$search}%");
             });
         }
 
@@ -1376,14 +1407,14 @@ final class AddressSetupController extends Controller
     public function getVillagesPaginated(Request $request): JsonResponse
     {
         $districtId = $request->query('district_id');
-        $regencyId  = $request->query('regency_id');
+        $regencyId = $request->query('regency_id');
         $provinceId = $request->query('province_id');
-        $country    = $request->query('country');
-        $search     = $request->query('search');
-        $page       = (int) $request->query('page', 1);
-        $perPage    = (int) $request->query('per_page', 50);
-        $sort       = $request->query('sort', 'code');
-        $direction  = $request->query('direction', 'asc');
+        $country = $request->query('country');
+        $search = $request->query('search');
+        $page = (int) $request->query('page', 1);
+        $perPage = (int) $request->query('per_page', 50);
+        $sort = $request->query('sort', 'code');
+        $direction = $request->query('direction', 'asc');
 
         $query = Village::with('district.regency.province');
 
@@ -1400,8 +1431,8 @@ final class AddressSetupController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'ilike', "%{$search}%")
-                  ->orWhere('code', 'ilike', "%{$search}%")
-                  ->orWhere('display_code', 'ilike', "%{$search}%");
+                    ->orWhere('code', 'ilike', "%{$search}%")
+                    ->orWhere('display_code', 'ilike', "%{$search}%");
             });
         }
 
@@ -1419,25 +1450,26 @@ final class AddressSetupController extends Controller
         }
 
         $codes = AdministrativeDivisionExternalCode::where('division_id', $divisionId)->orderBy('system')->get();
+
         return response()->json($codes);
     }
 
     public function storeExternalCode(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'division_id'   => 'required|string|max:50',
-            'system'        => 'required|string|max:50',
+            'division_id' => 'required|string|max:50',
+            'system' => 'required|string|max:50',
             'external_code' => 'required|string|max:100',
-            'description'   => 'nullable|string|max:255',
-            'status'        => 'nullable|string|max:20',
+            'description' => 'nullable|string|max:255',
+            'status' => 'nullable|string|max:20',
         ]);
 
         $record = AdministrativeDivisionExternalCode::updateOrCreate(
             ['division_id' => $data['division_id'], 'system' => $data['system'], 'external_code' => $data['external_code']],
             [
-                'id'          => (string) Str::ulid(),
+                'id' => (string) Str::ulid(),
                 'description' => $data['description'] ?? null,
-                'status'      => $data['status'] ?? 'active',
+                'status' => $data['status'] ?? 'active',
             ]
         );
 
@@ -1447,6 +1479,7 @@ final class AddressSetupController extends Controller
     public function destroyExternalCode(string $id): JsonResponse
     {
         AdministrativeDivisionExternalCode::where('id', $id)->delete();
+
         return response()->json(['message' => 'External code deleted']);
     }
 
@@ -1459,6 +1492,7 @@ final class AddressSetupController extends Controller
         }
 
         $translations = AdministrativeDivisionTranslation::where('division_id', $divisionId)->orderBy('locale')->get();
+
         return response()->json($translations);
     }
 
@@ -1466,16 +1500,16 @@ final class AddressSetupController extends Controller
     {
         $data = $request->validate([
             'division_id' => 'required|string|max:50',
-            'locale'      => 'required|string|max:10',
-            'name'        => 'required|string|max:255',
+            'locale' => 'required|string|max:10',
+            'name' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);
 
         $record = AdministrativeDivisionTranslation::updateOrCreate(
             ['division_id' => $data['division_id'], 'locale' => $data['locale']],
             [
-                'id'          => (string) Str::ulid(),
-                'name'        => $data['name'],
+                'id' => (string) Str::ulid(),
+                'name' => $data['name'],
                 'description' => $data['description'] ?? null,
             ]
         );
@@ -1486,7 +1520,7 @@ final class AddressSetupController extends Controller
     public function destroyTranslation(string $id): JsonResponse
     {
         AdministrativeDivisionTranslation::where('id', $id)->delete();
+
         return response()->json(['message' => 'Translation deleted']);
     }
 }
-

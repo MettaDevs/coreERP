@@ -29,7 +29,7 @@ final class AdministrativeDivision extends Model
     ];
 
     protected $casts = [
-        'level'   => 'integer',
+        'level' => 'integer',
         'lineage' => 'array',
     ];
 

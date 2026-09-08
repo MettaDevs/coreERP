@@ -29,9 +29,9 @@ class Province extends Model
     ];
 
     protected $casts = [
-        'default_state'   => 'boolean',
+        'default_state' => 'boolean',
         'union_territory' => 'boolean',
-        'active'          => 'boolean',
+        'active' => 'boolean',
     ];
 
     public function country(): BelongsTo

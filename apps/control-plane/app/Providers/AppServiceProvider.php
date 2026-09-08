@@ -36,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
             if (str_contains($message, 'touch(): Utime failed')) {
                 return true;
             }
+
             return false;
         }, E_WARNING);
 

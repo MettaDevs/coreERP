@@ -3,10 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\ReferenceData\AddressHierarchy\Country;
-use App\Models\ReferenceData\AddressHierarchy\District;
-use App\Models\ReferenceData\AddressHierarchy\PostalCode;
-use App\Models\ReferenceData\AddressHierarchy\Province;
-use App\Models\ReferenceData\AddressHierarchy\Regency;
 use App\Models\ReferenceData\AddressHierarchy\Village;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -27,10 +23,10 @@ final class ImportPostalCodesCommand extends Command
     {
         ini_set('memory_limit', '1024M');
         $countryCode = strtoupper((string) $this->option('country'));
-        $filePath    = $this->option('file');
-        $dryRun      = (bool) $this->option('dry-run');
-        $force       = (bool) $this->option('force');
-        $batchSize   = max(100, (int) $this->option('batch-size'));
+        $filePath = $this->option('file');
+        $dryRun = (bool) $this->option('dry-run');
+        $force = (bool) $this->option('force');
+        $batchSize = max(100, (int) $this->option('batch-size'));
 
         $this->info('============================================================');
         $this->info("  IMPORT OFFICIAL POSTAL CODES (KODE POS) — {$countryCode}");
@@ -43,6 +39,7 @@ final class ImportPostalCodesCommand extends Command
         $country = Country::where('code', $countryCode)->first();
         if (! $country) {
             $this->error("Country with code '{$countryCode}' not found in ref_countries.");
+
             return 1;
         }
 
@@ -56,6 +53,7 @@ final class ImportPostalCodesCommand extends Command
 
         if (! $filePath || ! file_exists($filePath)) {
             $this->error("Postal codes dataset file not found. Expected: {$filePath} or database/data/wilayah_kodepos.sql");
+
             return 1;
         }
 
@@ -66,6 +64,7 @@ final class ImportPostalCodesCommand extends Command
         $handle = fopen($filePath, 'r');
         if (! $handle) {
             $this->error("Could not open file {$filePath}");
+
             return 1;
         }
 
@@ -78,7 +77,7 @@ final class ImportPostalCodesCommand extends Command
                 $postal = $matches[2];
                 $cleanCode = str_replace('.', '', $rawCode);
                 $pairs[] = [
-                    'code'        => $cleanCode,
+                    'code' => $cleanCode,
                     'dotted_code' => $rawCode,
                     'postal_code' => $postal,
                 ];
@@ -91,12 +90,13 @@ final class ImportPostalCodesCommand extends Command
 
         if ($totalRecords === 0) {
             $this->warn('No postal code records matched in the file.');
+
             return 0;
         }
 
         $inserted = 0;
-        $updated  = 0;
-        $skipped  = 0;
+        $updated = 0;
+        $skipped = 0;
         $unmapped = 0;
         $now = now();
 
@@ -134,7 +134,7 @@ final class ImportPostalCodesCommand extends Command
                     if (isset($villages[$c])) {
                         $v = $villages[$c];
                         $dist = $v->district;
-                        $reg  = $dist?->regency;
+                        $reg = $dist?->regency;
                         $prov = $reg?->province;
 
                         // Check if village postal code needs update
@@ -147,19 +147,19 @@ final class ImportPostalCodesCommand extends Command
 
                         // Prepare master postal code record
                         $postalCodeInserts[] = [
-                            'id'           => (string) Str::ulid(),
+                            'id' => (string) Str::ulid(),
                             'country_code' => $countryCode,
-                            'postal_code'  => $p,
-                            'province_id'  => $prov?->id,
-                            'regency_id'   => $reg?->id,
-                            'district_id'  => $dist?->id,
-                            'village_id'   => $v->id,
-                            'area_name'    => $v->name,
-                            'source'       => 'POS_INDONESIA',
-                            'status'       => 'active',
-                            'active'       => true,
-                            'created_at'   => $now,
-                            'updated_at'   => $now,
+                            'postal_code' => $p,
+                            'province_id' => $prov?->id,
+                            'regency_id' => $reg?->id,
+                            'district_id' => $dist?->id,
+                            'village_id' => $v->id,
+                            'area_name' => $v->name,
+                            'source' => 'POS_INDONESIA',
+                            'status' => 'active',
+                            'active' => true,
+                            'created_at' => $now,
+                            'updated_at' => $now,
                         ];
                     } else {
                         $unmapped++;
@@ -175,7 +175,7 @@ final class ImportPostalCodesCommand extends Command
                         $cases = [];
                         $params = [];
                         foreach ($villageUpdates as $vId => $pCode) {
-                            $cases[] = "WHEN id = ? THEN ?";
+                            $cases[] = 'WHEN id = ? THEN ?';
                             $params[] = $vId;
                             $params[] = $pCode;
                         }
@@ -211,7 +211,7 @@ final class ImportPostalCodesCommand extends Command
                 if (! $dryRun) {
                     DB::rollBack();
                 }
-                $this->error("\nError in chunk {$chunkIndex}: " . $e->getMessage());
+                $this->error("\nError in chunk {$chunkIndex}: ".$e->getMessage());
             }
         }
 

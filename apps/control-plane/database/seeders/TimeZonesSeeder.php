@@ -179,19 +179,19 @@ class TimeZonesSeeder extends Seeder
         if ($existing) {
             $existing->update([
                 'display_name' => $displayName,
-                'utc_offset'   => $offsetString,
-                'is_default'   => $isDefault,
-                'active'       => true,
+                'utc_offset' => $offsetString,
+                'is_default' => $isDefault,
+                'active' => true,
             ]);
         } else {
             TimeZone::create([
-                'id'           => (string) Str::ulid(),
-                'iana_name'    => $iana,
+                'id' => (string) Str::ulid(),
+                'iana_name' => $iana,
                 'display_name' => $displayName,
-                'utc_offset'   => $offsetString,
+                'utc_offset' => $offsetString,
                 'country_code' => $countryCode,
-                'is_default'   => $isDefault,
-                'active'       => true,
+                'is_default' => $isDefault,
+                'active' => true,
             ]);
         }
     }

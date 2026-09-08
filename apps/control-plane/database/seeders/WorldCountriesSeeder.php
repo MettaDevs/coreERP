@@ -273,12 +273,12 @@ class WorldCountriesSeeder extends Seeder
             DB::table('ref_countries')->updateOrInsert(
                 ['code' => $c['code']],
                 [
-                    'code'       => $c['code'],
-                    'iso3'       => $c['iso3'],
-                    'name'       => $c['name'],
+                    'code' => $c['code'],
+                    'iso3' => $c['iso3'],
+                    'name' => $c['name'],
                     'phone_code' => $c['phone_code'],
-                    'timezone'   => $c['timezone'],
-                    'active'     => true,
+                    'timezone' => $c['timezone'],
+                    'active' => true,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]
@@ -288,9 +288,9 @@ class WorldCountriesSeeder extends Seeder
             DB::table('country_regions')->updateOrInsert(
                 ['code' => $c['code']],
                 [
-                    'code'       => $c['code'],
-                    'iso3'       => $c['iso3'],
-                    'name'       => $c['name'],
+                    'code' => $c['code'],
+                    'iso3' => $c['iso3'],
+                    'name' => $c['name'],
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]
@@ -300,12 +300,12 @@ class WorldCountriesSeeder extends Seeder
             DB::table('ref_administrative_division_timezones')->updateOrInsert(
                 ['division_type' => 'country', 'division_id' => $c['code']],
                 [
-                    'id'          => (string) Str::ulid(),
-                    'timezone'    => $c['timezone'],
-                    'is_default'  => true,
-                    'status'      => 'active',
-                    'created_at'  => $now,
-                    'updated_at'  => $now,
+                    'id' => (string) Str::ulid(),
+                    'timezone' => $c['timezone'],
+                    'is_default' => true,
+                    'status' => 'active',
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]
             );
 
@@ -313,24 +313,24 @@ class WorldCountriesSeeder extends Seeder
             DB::table('ref_address_parameters')->updateOrInsert(
                 ['country_code' => $c['code']],
                 [
-                    'country_code'    => $c['code'],
-                    'use_province'    => true,
-                    'use_regency'     => true,
-                    'use_district'    => true,
-                    'use_village'     => true,
-                    'use_rt_rw'       => in_array($c['code'], ['ID', 'VN', 'TW', 'JP']),
+                    'country_code' => $c['code'],
+                    'use_province' => true,
+                    'use_regency' => true,
+                    'use_district' => true,
+                    'use_village' => true,
+                    'use_rt_rw' => in_array($c['code'], ['ID', 'VN', 'TW', 'JP']),
                     'use_postal_code' => true,
-                    'use_building'    => true,
-                    'address_format'  => match ($c['code']) {
-                        'ID'    => '{street}, RT {rt}/RW {rw}, Kel. {village}, Kec. {district}, {regency}, {province} {postal_code}, {country}',
-                        'MY'    => '{street}, {village}, {district}, {postal_code} {regency}, {province}, {country}',
-                        'US'    => '{street}, {village}, {province} {postal_code}, {country}',
-                        'GB'    => '{street}, {village}, {district}, {province}, {postal_code}, {country}',
-                        'JP'    => '〒{postal_code} {province} {regency} {district} {village} {street}, {country}',
+                    'use_building' => true,
+                    'address_format' => match ($c['code']) {
+                        'ID' => '{street}, RT {rt}/RW {rw}, Kel. {village}, Kec. {district}, {regency}, {province} {postal_code}, {country}',
+                        'MY' => '{street}, {village}, {district}, {postal_code} {regency}, {province}, {country}',
+                        'US' => '{street}, {village}, {province} {postal_code}, {country}',
+                        'GB' => '{street}, {village}, {district}, {province}, {postal_code}, {country}',
+                        'JP' => '〒{postal_code} {province} {regency} {district} {village} {street}, {country}',
                         default => '{street}, {village}, {district}, {regency}, {province} {postal_code}, {country}',
                     },
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]
             );
         }
@@ -414,14 +414,14 @@ class WorldCountriesSeeder extends Seeder
             DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                 ['country_code' => $lvl['country_code'], 'level' => $lvl['level']],
                 [
-                    'id'          => (string) Str::ulid(),
-                    'country_code'=> $lvl['country_code'],
-                    'level'       => $lvl['level'],
-                    'level_code'  => $lvl['level_code'],
-                    'level_name'  => $lvl['level_name'],
+                    'id' => (string) Str::ulid(),
+                    'country_code' => $lvl['country_code'],
+                    'level' => $lvl['level'],
+                    'level_code' => $lvl['level_code'],
+                    'level_name' => $lvl['level_name'],
                     'description' => $lvl['description'],
-                    'created_at'  => $now,
-                    'updated_at'  => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]
             );
         }

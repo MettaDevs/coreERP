@@ -39,6 +39,7 @@ class TimezoneResolverService
 
         if ($mapping) {
             $divisionName = $this->getDivisionName($divisionType, $divisionId);
+
             return $this->formatTimezoneData($mapping->timezone, $divisionId, $divisionType, $divisionName);
         }
 
@@ -89,6 +90,7 @@ class TimezoneResolverService
                     ->first();
                 if ($tzRecord) {
                     $country = Country::where('code', $divisionId)->first();
+
                     return $this->formatTimezoneData($tzRecord->iana_name, $divisionId, 'country', $country?->name ?? $divisionId);
                 }
 
@@ -100,6 +102,7 @@ class TimezoneResolverService
                     ->first();
                 if ($countryMapping) {
                     $country = Country::where('code', $divisionId)->first();
+
                     return $this->formatTimezoneData($countryMapping->timezone, $divisionId, 'country', $country?->name ?? $divisionId);
                 }
                 $country = Country::where('code', $divisionId)->first();
@@ -132,7 +135,7 @@ class TimezoneResolverService
             return null;
         }
 
-        $raw = trim(($code ?? '') . ' ' . ($name ?? ''));
+        $raw = trim(($code ?? '').' '.($name ?? ''));
         $upper = strtoupper($raw);
         $digits = preg_replace('/\D/', '', $raw);
 
@@ -274,12 +277,12 @@ class TimezoneResolverService
     private function getDivisionName(string $divisionType, string $divisionId): string
     {
         return match ($divisionType) {
-            'village'  => Village::where('id', $divisionId)->value('name') ?? $divisionId,
+            'village' => Village::where('id', $divisionId)->value('name') ?? $divisionId,
             'district' => District::where('id', $divisionId)->value('name') ?? $divisionId,
-            'regency'  => Regency::where('id', $divisionId)->value('name') ?? $divisionId,
+            'regency' => Regency::where('id', $divisionId)->value('name') ?? $divisionId,
             'province' => Province::where('id', $divisionId)->value('name') ?? $divisionId,
-            'country'  => Country::where('code', $divisionId)->value('name') ?? $divisionId,
-            default    => $divisionId,
+            'country' => Country::where('code', $divisionId)->value('name') ?? $divisionId,
+            default => $divisionId,
         };
     }
 
@@ -301,39 +304,39 @@ class TimezoneResolverService
         }
 
         $label = match ($ianaTimezone) {
-            'Asia/Jakarta', 'Asia/Pontianak'                   => 'WIB',
-            'Asia/Makassar', 'Asia/Ujung_Pandang'              => 'WITA',
-            'Asia/Jayapura'                                     => 'WIT',
-            'Asia/Kuala_Lumpur', 'Asia/Kuching'                 => 'MYT',
-            'Asia/Singapore'                                    => 'SGT',
+            'Asia/Jakarta', 'Asia/Pontianak' => 'WIB',
+            'Asia/Makassar', 'Asia/Ujung_Pandang' => 'WITA',
+            'Asia/Jayapura' => 'WIT',
+            'Asia/Kuala_Lumpur', 'Asia/Kuching' => 'MYT',
+            'Asia/Singapore' => 'SGT',
             'Asia/Bangkok', 'Asia/Ho_Chi_Minh', 'Asia/Phnom_Penh', 'Asia/Vientiane' => 'ICT',
-            'Asia/Manila'                                       => 'PHT',
-            'Asia/Brunei'                                       => 'BNT',
-            'Asia/Yangon'                                       => 'MMT',
-            'Asia/Dili'                                         => 'TLT',
-            default                                             => 'UTC',
+            'Asia/Manila' => 'PHT',
+            'Asia/Brunei' => 'BNT',
+            'Asia/Yangon' => 'MMT',
+            'Asia/Dili' => 'TLT',
+            default => 'UTC',
         };
 
         $displayName = match ($ianaTimezone) {
-            'Asia/Jakarta'      => "(UTC{$offsetString}) WIB — Jakarta",
-            'Asia/Makassar'     => "(UTC{$offsetString}) WITA — Bali, Makassar",
-            'Asia/Jayapura'     => "(UTC{$offsetString}) WIT — Jayapura",
+            'Asia/Jakarta' => "(UTC{$offsetString}) WIB — Jakarta",
+            'Asia/Makassar' => "(UTC{$offsetString}) WITA — Bali, Makassar",
+            'Asia/Jayapura' => "(UTC{$offsetString}) WIT — Jayapura",
             'Asia/Kuala_Lumpur' => "(UTC{$offsetString}) MYT — Kuala Lumpur",
-            'Asia/Singapore'    => "(UTC{$offsetString}) SGT — Singapore",
-            'Asia/Bangkok'      => "(UTC{$offsetString}) ICT — Bangkok",
-            'Asia/Manila'       => "(UTC{$offsetString}) PHT — Manila",
-            'Asia/Brunei'       => "(UTC{$offsetString}) BNT — Bandar Seri Begawan",
-            'Asia/Yangon'       => "(UTC{$offsetString}) MMT — Yangon",
-            'Asia/Dili'         => "(UTC{$offsetString}) TLT — Dili",
-            default             => "(UTC{$offsetString}) {$label} — {$ianaTimezone}",
+            'Asia/Singapore' => "(UTC{$offsetString}) SGT — Singapore",
+            'Asia/Bangkok' => "(UTC{$offsetString}) ICT — Bangkok",
+            'Asia/Manila' => "(UTC{$offsetString}) PHT — Manila",
+            'Asia/Brunei' => "(UTC{$offsetString}) BNT — Bandar Seri Begawan",
+            'Asia/Yangon' => "(UTC{$offsetString}) MMT — Yangon",
+            'Asia/Dili' => "(UTC{$offsetString}) TLT — Dili",
+            default => "(UTC{$offsetString}) {$label} — {$ianaTimezone}",
         };
 
         return [
-            'timezone'             => $ianaTimezone,
-            'offset'               => $offsetString,
-            'label'                => $label,
-            'display_name'         => $displayName,
-            'source_division_id'   => $sourceDivisionId,
+            'timezone' => $ianaTimezone,
+            'offset' => $offsetString,
+            'label' => $label,
+            'display_name' => $displayName,
+            'source_division_id' => $sourceDivisionId,
             'source_division_type' => $sourceDivisionType,
             'source_division_name' => $sourceDivisionName,
         ];

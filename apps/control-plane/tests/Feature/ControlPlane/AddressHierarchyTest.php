@@ -2,11 +2,10 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Models\Membership;
-use App\Models\ReferenceData\AddressHierarchy\Country;
+use App\Models\Client;
 use App\Models\ReferenceData\AddressHierarchy\Province;
-use App\Models\ReferenceData\AddressHierarchy\Regency;
 use App\Models\Tenant;
+use App\Models\TenantMembership;
 use App\Models\User;
 use Database\Seeders\IndonesianAddressHierarchySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,8 +25,18 @@ class AddressHierarchyTest extends TestCase
         $this->seed(IndonesianAddressHierarchySeeder::class);
 
         $this->user = User::factory()->create();
-        $this->tenant = Tenant::factory()->create();
-        Membership::create([
+        $client = Client::create([
+            'legal_name' => 'Demo Enterprise',
+            'slug' => 'demo-enterprise',
+            'status' => 'active',
+        ]);
+        $this->tenant = Tenant::create([
+            'client_id' => $client->id,
+            'name' => 'Demo Enterprise',
+            'slug' => 'demo-enterprise',
+            'status' => 'active',
+        ]);
+        TenantMembership::create([
             'tenant_id' => $this->tenant->id,
             'user_id' => $this->user->id,
             'system_role' => 'owner',

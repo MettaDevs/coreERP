@@ -24,7 +24,7 @@ class TimeZone extends Model
 
     protected $casts = [
         'is_default' => 'boolean',
-        'active'     => 'boolean',
+        'active' => 'boolean',
     ];
 
     public function country(): BelongsTo

@@ -33,7 +33,7 @@ class AseanVillagesSeeder extends Seeder
 
         // 2. Clear previous non-Indonesian ASEAN village records to ensure clean sync
         $aseanCountryCodes = ['MYS', 'SGP', 'THA', 'VNM', 'PHL', 'BRN', 'KHM', 'LAO', 'MMR', 'TLS'];
-        
+
         $existingAseanDistrictIds = DB::table('ref_districts')
             ->join('ref_regencies', 'ref_districts.regency_id', '=', 'ref_regencies.id')
             ->join('ref_provinces', 'ref_regencies.province_id', '=', 'ref_provinces.id')
@@ -41,7 +41,7 @@ class AseanVillagesSeeder extends Seeder
             ->pluck('ref_districts.id')
             ->toArray();
 
-        if (!empty($existingAseanDistrictIds)) {
+        if (! empty($existingAseanDistrictIds)) {
             DB::table('ref_villages')->whereIn('district_id', $existingAseanDistrictIds)->delete();
         }
 
@@ -59,7 +59,7 @@ class AseanVillagesSeeder extends Seeder
                     'Lauhata', 'Maumeta', 'Vatuvou', 'Dato', 'Vaviquinia', 'Gugleur', 'Guiço', 'Lissadila',
                     'Leorema', 'Fatisi', 'Madabeno', 'Seloi Craic', 'Seloi Malere', 'Bandudato', 'Ailok',
                     'Bahadur', 'Gariuai', 'Uailili', 'Seisal', 'Tirilolo', 'Bucoli', 'Triloca', 'Ossu de Cima',
-                    'Loi-Huno', 'Uabubo', 'Nahareca', 'Lequitur', 'Liurai', 'Manutaci', 'Holua', 'Rotuto'
+                    'Loi-Huno', 'Uabubo', 'Nahareca', 'Lequitur', 'Liurai', 'Manutaci', 'Holua', 'Rotuto',
                 ],
             ],
             'BRN' => [
@@ -73,7 +73,7 @@ class AseanVillagesSeeder extends Seeder
                     'Sungai Kebun', 'Saba Darat', 'Peramu', 'Pekan Belait', 'Pandan A', 'Pandan B', 'Pandan C',
                     'Mumong A', 'Mumong B', 'Seria', 'Lorong Tiga Selatan', 'Badas', 'Labi', 'Bukit Sawat',
                     'Pekan Tutong', 'Penabai', 'Kuala Tutong', 'Keriam', 'Bukit Panggal', 'Kiudang', 'Lamunin',
-                    'Pekan Bangar', 'Batu Apoi', 'Labu', 'Amo', 'Bokok', 'Rataie', 'Belais', 'Menunggol'
+                    'Pekan Bangar', 'Batu Apoi', 'Labu', 'Amo', 'Bokok', 'Rataie', 'Belais', 'Menunggol',
                 ],
             ],
             'SGP' => [
@@ -84,7 +84,7 @@ class AseanVillagesSeeder extends Seeder
                 'name_pool' => [
                     'Central Commercial Quarter', 'Heritage Core Precinct', 'Waterfront Marina Sector',
                     'North Urban Corridor', 'Residential Green Estate', 'Civic District Zone',
-                    'Tech Innovation Hub', 'Bayfront Promenade Sector', 'Logistics Park Zone'
+                    'Tech Innovation Hub', 'Bayfront Promenade Sector', 'Logistics Park Zone',
                 ],
             ],
             'THA' => [
@@ -95,7 +95,7 @@ class AseanVillagesSeeder extends Seeder
                 'name_pool' => [
                     'Pattana Suksan', 'Rimnam Samakkhi', 'Charoen Rat', 'Ruamchai Ruamchit',
                     'Santi Suk', 'Phon Charoen', 'Mittraphap Thai', 'Khlong Klang',
-                    'Nong Bua Thong', 'Khao Din Phatthana', 'Thung Setthi', 'Wang Mai'
+                    'Nong Bua Thong', 'Khao Din Phatthana', 'Thung Setthi', 'Wang Mai',
                 ],
             ],
             'PHL' => [
@@ -106,7 +106,7 @@ class AseanVillagesSeeder extends Seeder
                 'name_pool' => [
                     'Poblacion', 'San Lorenzo', 'Bel-Air', 'San Antonio', 'Santo Niño',
                     'Santa Cruz', 'San Isidro', 'Bagong Silang', 'Maligaya', 'Pinagpala',
-                    'Magallanes', 'Forbes Park', 'Urdaneta', 'Carmona', 'Olympia', 'Tejeros'
+                    'Magallanes', 'Forbes Park', 'Urdaneta', 'Carmona', 'Olympia', 'Tejeros',
                 ],
             ],
             'MYS' => [
@@ -117,7 +117,7 @@ class AseanVillagesSeeder extends Seeder
                 'name_pool' => [
                     'Baru Tradisi', 'Melayu Harmoni', 'Sungai Mas', 'Bukit Permai',
                     'Pandan Indah', 'Damai Sejahtera', 'Seri Indah', 'Lembah Hijau',
-                    'Seksyen Pusat 1', 'Seksyen Pusat 2', 'Bandar Wawasan', 'Taman Bunga'
+                    'Seksyen Pusat 1', 'Seksyen Pusat 2', 'Bandar Wawasan', 'Taman Bunga',
                 ],
             ],
             'VNM' => [
@@ -127,7 +127,7 @@ class AseanVillagesSeeder extends Seeder
                 'prefix' => 'Tổ dân phố',
                 'name_pool' => [
                     'Số 1 Trung tâm', 'Số 2 Khởi sắc', 'Đông Hưng', 'Tây Phước',
-                    'Bến Nghé Mới', 'Hòa Bình', 'Thống Nhất', 'Thành Công', 'Đoàn Kết'
+                    'Bến Nghé Mới', 'Hòa Bình', 'Thống Nhất', 'Thành Công', 'Đoàn Kết',
                 ],
             ],
             'KHM' => [
@@ -137,7 +137,7 @@ class AseanVillagesSeeder extends Seeder
                 'prefix' => 'Phum',
                 'name_pool' => [
                     'Mittapheap', 'Samaki', 'Prampi Makara', 'Wat Koh', 'Prek Thom',
-                    'Kbal Koh', 'Chbar Ampov', 'Tuol Pongro', 'Boeung Kak', 'Prey Sar'
+                    'Kbal Koh', 'Chbar Ampov', 'Tuol Pongro', 'Boeung Kak', 'Prey Sar',
                 ],
             ],
             'LAO' => [
@@ -147,7 +147,7 @@ class AseanVillagesSeeder extends Seeder
                 'prefix' => 'Ban',
                 'name_pool' => [
                     'Mixay', 'Watchan', 'Sihom', 'Hatsady', 'Phonxay',
-                    'Thong Kang', 'Nongbone', 'Saphanthong', 'Dongpalane', 'Kaognhot'
+                    'Thong Kang', 'Nongbone', 'Saphanthong', 'Dongpalane', 'Kaognhot',
                 ],
             ],
             'MMR' => [
@@ -157,7 +157,7 @@ class AseanVillagesSeeder extends Seeder
                 'prefix' => 'Ward',
                 'name_pool' => [
                     'No. 1 Central Ward', 'No. 2 Bogyoke Ward', 'Myoma Ward', 'Aung San Ward',
-                    'Shwe Pyi Thar Ward', 'Yadanar Ward', 'Mingalar Village Tract', 'Thiri Village Tract'
+                    'Shwe Pyi Thar Ward', 'Yadanar Ward', 'Mingalar Village Tract', 'Thiri Village Tract',
                 ],
             ],
         ];
@@ -188,7 +188,9 @@ class AseanVillagesSeeder extends Seeder
         foreach ($aseanConfigs as $cc => $cfg) {
             $distList = $districtsByCountry[$cc] ?? [];
             $distCount = count($distList);
-            if ($distCount === 0) continue;
+            if ($distCount === 0) {
+                continue;
+            }
 
             $countryVillageCount = 0;
 
@@ -206,35 +208,37 @@ class AseanVillagesSeeder extends Seeder
                     for ($i = 1; $i <= $itemsForThisDist; $i++) {
                         $nameIdx = ($countryVillageCount) % count($cfg['name_pool']);
                         $nameSuffix = $cfg['name_pool'][$nameIdx];
-                        
+
                         // Example: "Suco Colmera (Postu Cristo Rei)" or "Suco Colmera 2"
                         $vName = "{$cfg['prefix']} {$nameSuffix} - {$cleanDistName}";
                         if (strlen($vName) > 140) {
-                            $vName = substr($vName, 0, 137) . '...';
+                            $vName = substr($vName, 0, 137).'...';
                         }
 
-                        $vCode = strtoupper(substr($cleanCode, 0, 12)) . "-S" . str_pad((string) $i, 2, '0', STR_PAD_LEFT);
-                        if (strlen($vCode) > 20) $vCode = substr($vCode, 0, 20);
+                        $vCode = strtoupper(substr($cleanCode, 0, 12)).'-S'.str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+                        if (strlen($vCode) > 20) {
+                            $vCode = substr($vCode, 0, 20);
+                        }
 
                         $vType = $cfg['type_pattern'][($i - 1) % count($cfg['type_pattern'])];
                         $postalCode = match ($cc) {
                             'TLS' => str_pad((string) (1000 + ($countryVillageCount % 8000)), 4, '0', STR_PAD_LEFT),
-                            'BRN' => 'B' . chr(65 + ($distIdx % 10)) . str_pad((string) (1000 + ($i * 100)), 4, '0', STR_PAD_LEFT),
+                            'BRN' => 'B'.chr(65 + ($distIdx % 10)).str_pad((string) (1000 + ($i * 100)), 4, '0', STR_PAD_LEFT),
                             default => '10000',
                         };
 
                         $villageRows[] = [
-                            'id'           => (string) Str::ulid(),
-                            'tenant_id'    => null,
-                            'district_id'  => $dist->district_id,
-                            'code'         => $vCode,
+                            'id' => (string) Str::ulid(),
+                            'tenant_id' => null,
+                            'district_id' => $dist->district_id,
+                            'code' => $vCode,
                             'display_code' => $vCode,
-                            'name'         => $vName,
-                            'type'         => $vType,
-                            'postal_code'  => $postalCode,
-                            'active'       => true,
-                            'created_at'   => $now,
-                            'updated_at'   => $now,
+                            'name' => $vName,
+                            'type' => $vType,
+                            'postal_code' => $postalCode,
+                            'active' => true,
+                            'created_at' => $now,
+                            'updated_at' => $now,
                         ];
 
                         $countryVillageCount++;
@@ -255,11 +259,13 @@ class AseanVillagesSeeder extends Seeder
 
                         $vName = "{$cfg['prefix']} {$nameSuffix} - {$cleanDistName}";
                         if (strlen($vName) > 140) {
-                            $vName = substr($vName, 0, 137) . '...';
+                            $vName = substr($vName, 0, 137).'...';
                         }
 
-                        $vCode = strtoupper(substr($cleanCode, 0, 12)) . "-V" . str_pad((string) $i, 2, '0', STR_PAD_LEFT);
-                        if (strlen($vCode) > 20) $vCode = substr($vCode, 0, 20);
+                        $vCode = strtoupper(substr($cleanCode, 0, 12)).'-V'.str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+                        if (strlen($vCode) > 20) {
+                            $vCode = substr($vCode, 0, 20);
+                        }
 
                         $vType = $cfg['type_pattern'][($i - 1) % count($cfg['type_pattern'])];
                         $postalCode = match ($cc) {
@@ -275,17 +281,17 @@ class AseanVillagesSeeder extends Seeder
                         };
 
                         $villageRows[] = [
-                            'id'           => (string) Str::ulid(),
-                            'tenant_id'    => null,
-                            'district_id'  => $dist->district_id,
-                            'code'         => $vCode,
+                            'id' => (string) Str::ulid(),
+                            'tenant_id' => null,
+                            'district_id' => $dist->district_id,
+                            'code' => $vCode,
                             'display_code' => $vCode,
-                            'name'         => $vName,
-                            'type'         => $vType,
-                            'postal_code'  => $postalCode,
-                            'active'       => true,
-                            'created_at'   => $now,
-                            'updated_at'   => $now,
+                            'name' => $vName,
+                            'type' => $vType,
+                            'postal_code' => $postalCode,
+                            'active' => true,
+                            'created_at' => $now,
+                            'updated_at' => $now,
                         ];
 
                         $countryVillageCount++;
@@ -381,14 +387,14 @@ class AseanVillagesSeeder extends Seeder
         // Also duplicate ISO-2 equivalents so both ISO3 and ISO2 query lookups find these levels
         $iso2Map = [
             'IDN' => 'ID', 'THA' => 'TH', 'PHL' => 'PH', 'MYS' => 'MY', 'MMR' => 'MM',
-            'VNM' => 'VN', 'KHM' => 'KH', 'LAO' => 'LA', 'TLS' => 'TL', 'BRN' => 'BN', 'SGP' => 'SG'
+            'VNM' => 'VN', 'KHM' => 'KH', 'LAO' => 'LA', 'TLS' => 'TL', 'BRN' => 'BN', 'SGP' => 'SG',
         ];
 
         foreach ($levels as $lvl) {
             DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                 ['country_code' => $lvl['country_code'], 'level' => $lvl['level']],
                 array_merge($lvl, [
-                    'id'         => (string) Str::ulid(),
+                    'id' => (string) Str::ulid(),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ])
@@ -400,7 +406,7 @@ class AseanVillagesSeeder extends Seeder
                 DB::table('ref_country_hierarchy_levels')->updateOrInsert(
                     ['country_code' => $iso2, 'level' => $lvl['level']],
                     array_merge($lvlIso2, [
-                        'id'         => (string) Str::ulid(),
+                        'id' => (string) Str::ulid(),
                         'created_at' => $now,
                         'updated_at' => $now,
                     ])

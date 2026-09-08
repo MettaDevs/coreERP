@@ -2,12 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ReferenceData\AddressHierarchy\AdministrativeDivision;
 use App\Models\ReferenceData\AddressHierarchy\Country;
-use App\Models\ReferenceData\AddressHierarchy\District;
-use App\Models\ReferenceData\AddressHierarchy\Province;
-use App\Models\ReferenceData\AddressHierarchy\Regency;
-use App\Models\ReferenceData\AddressHierarchy\Village;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,9 +20,9 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
     public function handle(): int
     {
         ini_set('memory_limit', '1024M');
-        $dryRun   = (bool) $this->option('dry-run');
-        $force    = (bool) $this->option('force');
-        $source   = $this->option('source') ?: base_path('database/data');
+        $dryRun = (bool) $this->option('dry-run');
+        $force = (bool) $this->option('force');
+        $source = $this->option('source') ?: base_path('database/data');
         $levelOpt = $this->option('level');
 
         $this->info('============================================================');
@@ -41,11 +36,11 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
         $country = Country::where('code', 'ID')->first();
         if (! $country && ! $dryRun) {
             Country::create([
-                'code'       => 'ID',
-                'iso3'       => 'IDN',
-                'name'       => 'Indonesia',
+                'code' => 'ID',
+                'iso3' => 'IDN',
+                'name' => 'Indonesia',
                 'phone_code' => '+62',
-                'active'     => true,
+                'active' => true,
             ]);
             $country = Country::where('code', 'ID')->first();
         }
@@ -54,33 +49,34 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
         $this->line("Countries in system: <info>{$allCountriesCount}</info> (Selected: Indonesia / ID)");
 
         // 2. Load JSON Datasets
-        $provincesFile = rtrim($source, '/\\') . '/indonesia_provinces.json';
-        $regenciesFile = rtrim($source, '/\\') . '/indonesia_regencies.json';
-        $districtsFile = rtrim($source, '/\\') . '/indonesia_districts.json';
-        $villagesFile  = rtrim($source, '/\\') . '/indonesia_villages.json';
+        $provincesFile = rtrim($source, '/\\').'/indonesia_provinces.json';
+        $regenciesFile = rtrim($source, '/\\').'/indonesia_regencies.json';
+        $districtsFile = rtrim($source, '/\\').'/indonesia_districts.json';
+        $villagesFile = rtrim($source, '/\\').'/indonesia_villages.json';
 
         if (! file_exists($provincesFile) || ! file_exists($regenciesFile) || ! file_exists($districtsFile)) {
             $this->error("Dataset files missing in {$source}. Required: indonesia_provinces.json, indonesia_regencies.json, indonesia_districts.json");
+
             return 1;
         }
 
         $provincesData = json_decode((string) file_get_contents($provincesFile), true) ?: [];
         $regenciesData = json_decode((string) file_get_contents($regenciesFile), true) ?: [];
         $districtsData = json_decode((string) file_get_contents($districtsFile), true) ?: [];
-        $villagesData  = file_exists($villagesFile) ? (json_decode((string) file_get_contents($villagesFile), true) ?: []) : [];
+        $villagesData = file_exists($villagesFile) ? (json_decode((string) file_get_contents($villagesFile), true) ?: []) : [];
 
         $stats = [
             'provinces_found' => count($provincesData),
             'regencies_found' => count($regenciesData),
             'districts_found' => count($districtsData),
-            'villages_found'  => count($villagesData),
-            'new'             => 0,
-            'updated'         => 0,
-            'skipped'         => 0,
-            'duplicate'       => 0,
-            'invalid_parent'  => 0,
-            'invalid_code'    => 0,
-            'errors'          => 0,
+            'villages_found' => count($villagesData),
+            'new' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'duplicate' => 0,
+            'invalid_parent' => 0,
+            'invalid_code' => 0,
+            'errors' => 0,
         ];
 
         $now = now();
@@ -96,11 +92,12 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                 if (empty($code) || empty($name)) {
                     $stats['invalid_code']++;
                     $stats['errors']++;
+
                     continue;
                 }
 
                 $cleanCode = str_replace('.', '', $code);
-                $displayCode = 'P-' . $cleanCode;
+                $displayCode = 'P-'.$cleanCode;
 
                 $existing = DB::table('ref_administrative_divisions')
                     ->where('country_id', 'ID')
@@ -129,15 +126,15 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                     DB::table('ref_administrative_divisions')->updateOrInsert(
                         ['country_id' => 'ID', 'level' => 1, 'official_code' => $cleanCode],
                         [
-                            'id'           => $id,
-                            'parent_id'    => null,
-                            'type'         => 'province',
+                            'id' => $id,
+                            'parent_id' => null,
+                            'type' => 'province',
                             'display_code' => $displayCode,
-                            'name'         => $name,
-                            'status'       => 'active',
-                            'lineage'      => json_encode(['country' => 'Indonesia', 'country_code' => 'ID']),
-                            'created_at'   => $now,
-                            'updated_at'   => $now,
+                            'name' => $name,
+                            'status' => 'active',
+                            'lineage' => json_encode(['country' => 'Indonesia', 'country_code' => 'ID']),
+                            'created_at' => $now,
+                            'updated_at' => $now,
                         ]
                     );
 
@@ -145,13 +142,13 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                     DB::table('ref_provinces')->updateOrInsert(
                         ['country_code' => 'ID', 'code' => $cleanCode],
                         [
-                            'id'           => $id,
+                            'id' => $id,
                             'display_code' => $displayCode,
-                            'name'         => $name,
-                            'timezone'     => $tz,
-                            'active'       => true,
-                            'created_at'   => $now,
-                            'updated_at'   => $now,
+                            'name' => $name,
+                            'timezone' => $tz,
+                            'active' => true,
+                            'created_at' => $now,
+                            'updated_at' => $now,
                         ]
                     );
 
@@ -159,10 +156,10 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                     DB::table('ref_administrative_division_timezones')->updateOrInsert(
                         ['division_type' => 'province', 'division_id' => $id],
                         [
-                            'id'         => (string) Str::ulid(),
-                            'timezone'   => $tz,
+                            'id' => (string) Str::ulid(),
+                            'timezone' => $tz,
                             'is_default' => true,
-                            'status'     => 'active',
+                            'status' => 'active',
                             'created_at' => $now,
                             'updated_at' => $now,
                         ]
@@ -197,19 +194,21 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                         if (count($parts) < 2) {
                             $stats['invalid_code']++;
                             $stats['errors']++;
+
                             continue;
                         }
 
                         $provCode = $parts[0];
-                        $regCode  = $code;
+                        $regCode = $code;
                         $cleanRegCode = str_replace('.', '', $regCode);
-                        $displayCode = 'K-' . $cleanRegCode;
+                        $displayCode = 'K-'.$cleanRegCode;
 
                         $parentProvinceId = $provinceMap[$provCode] ?? null;
                         if (! $parentProvinceId) {
                             $stats['invalid_parent']++;
                             $stats['errors']++;
                             $this->warn(" [WARN] Invalid parent province code '{$provCode}' for regency {$code} - {$name}");
+
                             continue;
                         }
 
@@ -242,15 +241,15 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                             DB::table('ref_administrative_divisions')->updateOrInsert(
                                 ['country_id' => 'ID', 'level' => 2, 'official_code' => $cleanRegCode],
                                 [
-                                    'id'           => $id,
-                                    'parent_id'    => $parentProvinceId,
-                                    'type'         => $type,
+                                    'id' => $id,
+                                    'parent_id' => $parentProvinceId,
+                                    'type' => $type,
                                     'display_code' => $displayCode,
-                                    'name'         => $name,
-                                    'status'       => 'active',
-                                    'lineage'      => json_encode(['country' => 'Indonesia', 'province_code' => $provCode]),
-                                    'created_at'   => $now,
-                                    'updated_at'   => $now,
+                                    'name' => $name,
+                                    'status' => 'active',
+                                    'lineage' => json_encode(['country' => 'Indonesia', 'province_code' => $provCode]),
+                                    'created_at' => $now,
+                                    'updated_at' => $now,
                                 ]
                             );
 
@@ -258,13 +257,13 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                             DB::table('ref_regencies')->updateOrInsert(
                                 ['province_id' => $parentProvinceId, 'code' => $cleanRegCode],
                                 [
-                                    'id'           => $id,
+                                    'id' => $id,
                                     'display_code' => $displayCode,
-                                    'name'         => $name,
-                                    'type'         => $dbType,
-                                    'active'       => true,
-                                    'created_at'   => $now,
-                                    'updated_at'   => $now,
+                                    'name' => $name,
+                                    'type' => $dbType,
+                                    'active' => true,
+                                    'created_at' => $now,
+                                    'updated_at' => $now,
                                 ]
                             );
                         }
@@ -278,7 +277,7 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                         DB::rollBack();
                     }
                     $stats['errors']++;
-                    $this->error("Batch error on regencies: " . $e->getMessage());
+                    $this->error('Batch error on regencies: '.$e->getMessage());
                 }
             }
             $this->line("Regencies/Cities: <info>{$stats['regencies_found']}</info> validated.");
@@ -309,19 +308,21 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                         if (count($parts) < 3) {
                             $stats['invalid_code']++;
                             $stats['errors']++;
+
                             continue;
                         }
 
-                        $regCode = $parts[0] . '.' . $parts[1];
+                        $regCode = $parts[0].'.'.$parts[1];
                         $cleanRegCode = str_replace('.', '', $regCode);
                         $cleanDistCode = str_replace('.', '', $code);
-                        $displayCode = 'D-' . $cleanDistCode;
+                        $displayCode = 'D-'.$cleanDistCode;
 
                         $parentRegencyId = $regencyMap[$cleanRegCode] ?? ($regencyMap[$regCode] ?? null);
                         if (! $parentRegencyId) {
                             $stats['invalid_parent']++;
                             $stats['errors']++;
                             $this->warn(" [WARN] Invalid parent regency code '{$regCode}' for district {$code} - {$name}");
+
                             continue;
                         }
 
@@ -351,15 +352,15 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                             DB::table('ref_administrative_divisions')->updateOrInsert(
                                 ['country_id' => 'ID', 'level' => 3, 'official_code' => $cleanDistCode],
                                 [
-                                    'id'           => $id,
-                                    'parent_id'    => $parentRegencyId,
-                                    'type'         => 'district',
+                                    'id' => $id,
+                                    'parent_id' => $parentRegencyId,
+                                    'type' => 'district',
                                     'display_code' => $displayCode,
-                                    'name'         => $name,
-                                    'status'       => 'active',
-                                    'lineage'      => json_encode(['country' => 'Indonesia', 'regency_code' => $cleanRegCode]),
-                                    'created_at'   => $now,
-                                    'updated_at'   => $now,
+                                    'name' => $name,
+                                    'status' => 'active',
+                                    'lineage' => json_encode(['country' => 'Indonesia', 'regency_code' => $cleanRegCode]),
+                                    'created_at' => $now,
+                                    'updated_at' => $now,
                                 ]
                             );
 
@@ -367,12 +368,12 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                             DB::table('ref_districts')->updateOrInsert(
                                 ['regency_id' => $parentRegencyId, 'code' => $cleanDistCode],
                                 [
-                                    'id'           => $id,
+                                    'id' => $id,
                                     'display_code' => $displayCode,
-                                    'name'         => $name,
-                                    'active'       => true,
-                                    'created_at'   => $now,
-                                    'updated_at'   => $now,
+                                    'name' => $name,
+                                    'active' => true,
+                                    'created_at' => $now,
+                                    'updated_at' => $now,
                                 ]
                             );
                         }
@@ -386,7 +387,7 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                         DB::rollBack();
                     }
                     $stats['errors']++;
-                    $this->error("Batch error on districts: " . $e->getMessage());
+                    $this->error('Batch error on districts: '.$e->getMessage());
                 }
             }
             $this->line("Districts: <info>{$stats['districts_found']}</info> validated.");
@@ -422,51 +423,52 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
             foreach ($villageChunks as $chunk) {
                 $chunkIndex++;
                 $adminDivBatch = [];
-                $villageBatch  = [];
+                $villageBatch = [];
 
                 foreach ($chunk as $item) {
-                    $code          = $item['code'];
-                    $distCode      = $item['district_code'];
-                    $name          = $item['name'];
-                    $type          = $item['type']; // 'desa' | 'kelurahan'
+                    $code = $item['code'];
+                    $distCode = $item['district_code'];
+                    $name = $item['name'];
+                    $type = $item['type']; // 'desa' | 'kelurahan'
                     $cleanVillCode = str_replace('.', '', $code);
                     $cleanDistCode = str_replace('.', '', $distCode);
-                    $displayCode   = 'V-' . $cleanVillCode;
+                    $displayCode = 'V-'.$cleanVillCode;
 
                     $parentDistrictId = $districtMap[$cleanDistCode] ?? ($districtMap[$distCode] ?? null);
                     if (! $parentDistrictId) {
                         $stats['invalid_parent']++;
                         $stats['errors']++;
+
                         continue;
                     }
 
                     $id = $existingAdminDivs[$cleanVillCode] ?? ($existingVillages[$cleanVillCode] ?? (string) Str::ulid());
 
                     $adminDivBatch[] = [
-                        'id'           => $id,
-                        'country_id'   => 'ID',
-                        'parent_id'    => $parentDistrictId,
-                        'level'        => 4,
-                        'type'         => $type === 'kelurahan' ? 'urban_village' : 'village',
-                        'official_code'=> $cleanVillCode,
+                        'id' => $id,
+                        'country_id' => 'ID',
+                        'parent_id' => $parentDistrictId,
+                        'level' => 4,
+                        'type' => $type === 'kelurahan' ? 'urban_village' : 'village',
+                        'official_code' => $cleanVillCode,
                         'display_code' => $displayCode,
-                        'name'         => $name,
-                        'status'       => 'active',
-                        'lineage'      => json_encode(['country' => 'Indonesia', 'district_code' => $cleanDistCode]),
-                        'created_at'   => $now,
-                        'updated_at'   => $now,
+                        'name' => $name,
+                        'status' => 'active',
+                        'lineage' => json_encode(['country' => 'Indonesia', 'district_code' => $cleanDistCode]),
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ];
 
                     $villageBatch[] = [
-                        'id'           => $id,
-                        'district_id'  => $parentDistrictId,
-                        'code'         => $cleanVillCode,
+                        'id' => $id,
+                        'district_id' => $parentDistrictId,
+                        'code' => $cleanVillCode,
                         'display_code' => $displayCode,
-                        'name'         => $name,
-                        'type'         => $type,
-                        'active'       => true,
-                        'created_at'   => $now,
-                        'updated_at'   => $now,
+                        'name' => $name,
+                        'type' => $type,
+                        'active' => true,
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ];
                 }
 
@@ -487,7 +489,7 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                     }
                 }
 
-                $this->line("  => Chunk {$chunkIndex}/{$totalChunks} (" . count($chunk) . " records) processed.");
+                $this->line("  => Chunk {$chunkIndex}/{$totalChunks} (".count($chunk).' records) processed.');
             }
             $this->line("Villages/Kelurahan: <info>{$stats['villages_found']}</info> validated.");
         }
@@ -496,8 +498,8 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
         // SUMMARY REPORT
         // ----------------------------------------------------
         $this->info("\n============================================================");
-        $this->info("  IMPORT & VALIDATION REPORT SUMMARY");
-        $this->info("============================================================");
+        $this->info('  IMPORT & VALIDATION REPORT SUMMARY');
+        $this->info('============================================================');
         $this->table(
             ['Metric', 'Count'],
             [
@@ -517,9 +519,9 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
         );
 
         if ($dryRun) {
-            $this->warn("DRY RUN COMPLETED: Validation passed with 0 errors. Run without --dry-run to persist.");
+            $this->warn('DRY RUN COMPLETED: Validation passed with 0 errors. Run without --dry-run to persist.');
         } else {
-            $this->info("SUCCESS: Full Indonesian Administrative Hierarchy (Provinces, Regencies, Districts, Villages) successfully imported!");
+            $this->info('SUCCESS: Full Indonesian Administrative Hierarchy (Provinces, Regencies, Districts, Villages) successfully imported!');
         }
 
         return $stats['errors'] === 0 ? 0 : 1;
@@ -535,6 +537,7 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
         if (in_array($provinceCode, ['51', '52', '53', '63', '64', '65', '71', '72', '73', '74', '75', '76'])) {
             return 'Asia/Makassar';
         }
+
         // WIB: Sumatra, Jawa, Kalbar, Kalteng
         return 'Asia/Jakarta';
     }
