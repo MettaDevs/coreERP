@@ -30,9 +30,7 @@ berbahaya daripada yang tidak ada.
 
 | Task | Siapa | Cabang | Catatan |
 | --- | --- | --- | --- |
-| F2-10 konteks permintaan | agent | `feat/f2-10-konteks-permintaan` | selesai, menunggu #53 digabungkan; menghalangi F2-11 |
-| F2-12 kolom `database_name` | agent | `fix/f2-12-database-name-opsional` | selesai, menunggu #52 digabungkan |
-| F3-00 penjaga kenal modul migrasi | agent | `feat/f3-00-penjaga-modul-migrasi` | menghalangi F3-01 |
+| F3-00 penjaga kenal modul migrasi | agent | `feat/f3-00-penjaga-modul-migrasi` | selesai, menunggu #55 digabungkan; membuka F3-01 |
 | F2-11 halaman modul di shell | agent | `feat/f2-11-halaman-modul-shell` | bertumpuk di atas cabang F2-10 |
 
 Kosongkan barisnya setelah pull request-nya digabungkan.
@@ -43,7 +41,7 @@ Kosongkan barisnya setelah pull request-nya digabungkan.
 | --- | --- | --- |
 | 0 — prasyarat: CI hijau, aturan kerja, penghapusan lunak | F0-01 sampai F0-07 | F0-01 sampai F0-04 selesai; F0-05 ditutup tanpa dikerjakan; F0-06 menunggu F3-01 |
 | 1 — penjaga batas dan kerangka modul | F1-01 sampai F1-08 | selesai |
-| 2 — Core menjadi tuan rumah modul | F2-01 sampai F2-12 | F2-01 sampai F2-09 selesai |
+| 2 — Core menjadi tuan rumah modul | F2-01 sampai F2-12 | selesai kecuali F2-11 |
 | 3 — Management Aset pindah | F3-01 sampai F3-24 | belum |
 | 4 — UI menjadi satu build | F4-01 sampai F4-10 | belum |
 | 5 — edisi dan bundle on-prem | F5-01 sampai F5-06 | belum |

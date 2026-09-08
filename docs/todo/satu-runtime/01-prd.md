@@ -1957,6 +1957,46 @@ ditandai tetap merah pada pelanggaran yang sama persis.
 
 **Bergantung pada.** F1-07.
 
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026 lewat pull request #55.
+
+**Pengecualiannya pembalik, bukan pelewat.** Ini bentuk yang tidak saya bayangkan saat menulis task dan
+ternyata lebih baik: modul yang ditandai **tetap dipindai penuh**, hanya arti hasilnya yang dibalik.
+Dengan begitu pemeriksaan basi jatuh gratis — begitu modul yang dikecualikan ternyata tidak melanggar apa
+pun lagi, entrinya sendiri yang gagal. Tidak ada yang perlu mengingat kapan pengecualian boleh dibuang.
+
+**Pemeriksaan basi dinilai utuh per modul, bukan per dimensi.** Kalau per dimensi, modul yang
+namespace-nya sudah dibereskan pada F3-03 tetapi tenant-nya belum akan dituntut membuang entrinya, dan
+penjaga berikutnya langsung merah. Perincian yang terlalu halus di sini berubah menjadi jebakan.
+
+**Daftarnya dikunci pada nama folder, bukan `id` manifest.** Penjaga namespace tidak pernah membaca
+`app.yaml`, dan modul yang belum dibentuk ulang manifestnya mungkin belum terbaca. Nama folder satu-satunya
+penanda yang dipegang ketiga penjaga tanpa syarat. Konsekuensinya jujur: **mengganti nama folder membuat
+pengecualiannya diam-diam tidak berlaku.**
+
+**Asimetri penjaga tabel dibuktikan, bukan diasumsikan.** Dugaan di bagian atas benar, dan bentuk
+kegagalannya sekarang diketahui persis: dengan `table_prefix` diisi, migration kerangka Laravel gagal
+dengan `SQLSTATE[42P07] Duplicate table: relation "users" already exists` — testnya mati sebelum sempat
+melapor. Alasannya ditulis di docblock `ModuleTableBoundaryTest`, bukan hanya di sini.
+
+**Pemindaian dipindahkan ke satu kelas bersama, `PemindaiModul`.** Kalau penjaga dan pemeriksaan basi
+memakai aturan pemindaian yang berbeda, pemeriksaan basi akan mengumumkan "sudah bersih" untuk pelanggaran
+yang masih dilihat penjaganya. Satu sumber, dua pembaca.
+
+**Modul palsu untuk pengujian dibuat di folder sementara, bukan di `modules/`.** Nama acak per jalan tidak
+cukup: satu jalan yang mati di tengah meninggalkan sisa yang lalu terbaca `module:list`, penjaga lain,
+`pint ../../modules`, dan PHPStan yang memang memindai folder itu. Bahan uji yang bocor ke tempat produksi
+merusak alat lain, bukan hanya dirinya sendiri.
+
+**Bukti yang dijalankan.** Satu modul uji yang melanggar keempat dimensi sekaligus: tanpa ditandai
+`tests 17, passed 13, failed 4`; ditandai `tests 17, passed 17`. Bedanya satu entri pada `DAFTAR`.
+
+**Yang masih rapuh, dan disebut apa adanya.** Tenggat `2026-12-31` adalah tebakan — ia hanya berguna kalau
+perpanjangannya ditinjau, bukan distempel. Dimensi awalan tabel tidak punya pemeriksaan basi, konsekuensi
+asimetri di atas. Dan entri boleh ada sebelum modulnya mendarat — memang diperlukan F3-01 — sehingga entri
+yang salah tulis baru ketahuan saat subtree-nya mendarat.
+
 #### Satu asimetri yang harus diterima, bukan disamarkan
 
 Penjaga namespace dan penjaga tenant hanya membaca berkas, jadi modul yang dikecualikan tetap bisa
