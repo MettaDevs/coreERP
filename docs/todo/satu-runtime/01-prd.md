@@ -2728,6 +2728,32 @@ memanggilnya. Delapan berkas memakainya, dan semuanya mengembalikan 503 ketika C
 **Selesai bila.** `NumberSequenceFailureTest` lulus dengan kode kesalahan yang masih relevan, dan sebuah
 test baru membuktikan nomor ikut batal ketika penyimpanan dokumen gagal.
 
+#### Diukur sebelum dikerjakan: task ini jauh lebih besar daripada bentuknya
+
+Percobaan pertama dibatalkan dengan sengaja, dan alasannya perlu diketahui sebelum ada yang mengambilnya
+lagi. Menukar klien HTTP dengan kontrak Core hanya menyentuh sepuluh berkas dan berjalan mulus. Yang
+runtuh adalah **testnya**, dan runtuhnya menunjukkan dua pekerjaan yang tidak disebut rencana ini:
+
+**1. `NumberSequenceFailureTest` menguji mekanisme yang akan lenyap seluruhnya.** Kesepuluh testnya tentang
+kegagalan jaringan: Core tidak terjangkau, token service belum diisi, klasifikasi 4xx dan 5xx, dan status
+503 yang dikembalikan ke layar. Tidak satu pun dari itu bisa terjadi lagi di satu proses. Ini bukan test
+yang perlu disesuaikan melainkan test yang perlu **diganti** dengan kegagalan yang masih mungkin — dan
+memutuskan kegagalan mana yang masih mungkin adalah pekerjaan tersendiri, bukan akibat sampingan.
+
+**2. Seluruh test yang membuat master atau dokumen ikut merah**, 43 dari 48 pada satu berkas saja. Selama
+penerbitan lewat HTTP, test cukup memalsukan jawabannya dengan `Http::fake`. Lewat kontrak Core, nomornya
+diterbitkan sungguhan — dan itu menuntut profil, referensi, serta penghitung nomor benar-benar ada untuk
+tenant uji. Menyiapkannya adalah pekerjaan yang setara dengan trait konteks pada F3-15.
+
+**Yang harus dikerjakan lebih dulu, dan sebaiknya sebagai task tersendiri:** bahan uji nomor urut untuk
+tenant uji, dipasang dari trait yang sama dengan konteksnya. Sesudah itu F3-06 kembali menjadi sekecil
+bentuknya.
+
+**Status 503 juga tidak lagi jujur** begitu Core sekamar: kegagalan penerbitan berarti permintaannya
+sendiri tidak bisa dipenuhi, bukan layanan yang tidak terjangkau. Penggantinya 422. Itu perubahan yang
+terlihat pengguna, jadi ia keputusan produk — bukan detail yang boleh ikut menyelinap pada pull request
+penggantian jalur.
+
 **Rujukan.** [number sequence](../../dev/14-number-sequences.md), bagian 5.3 dokumen ini.
 
 **Bergantung pada.** F2-07, F3-05.
