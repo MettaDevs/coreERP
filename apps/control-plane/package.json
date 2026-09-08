@@ -8,9 +8,9 @@
         "build:ssr": "npm run ui:build && vite build && vite build --ssr",
         "dev": "npm run ui:build && vite",
         "ui:build": "npm --prefix ../../packages/ui run build",
-        "format": "prettier --write resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --write \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
-        "format:check": "prettier --check resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --check \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
-        "lint": "eslint . --fix",
+        "format": "npm run ui:build && prettier --write resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --write \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
+        "format:check": "npm run ui:build && prettier --check resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --check \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
+        "lint": "npm run ui:build && eslint . --fix",
         "lint:check": "npm run ui:build && eslint .",
         "types:check": "npm run ui:build && tsc --noEmit"
     },
