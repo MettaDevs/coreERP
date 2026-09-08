@@ -208,6 +208,34 @@ menciptakan prefix baru diam-diam.
 
 Di dalam database sendiri, app boleh memakai transaksi, foreign key, dan table desain normal. Semua tabel tenant-scoped membawa `tenant_id`; data dengan konsekuensi hukum/akuntansi membawa `legal_entity_id`; data operasional membawa `org_unit_id` bila ownership terjadi pada operating unit. ID organisasi adalah reference opaque ke Organization service, bukan foreign key lintas database. Lihat [model tenant dan organisasi](01a-tenant-and-org-hierarchy.md).
 
+### Penyaringan tenant
+
+Model module memakai trait `MilikTenant` dan tidak menulis penyaringan tenant sendiri:
+
+```php
+use App\Support\Modules\Contracts\MilikTenant;
+
+final class Barang extends Model
+{
+    use MilikTenant;
+}
+```
+
+Trait itu melakukan tiga hal, dan ketiganya perlu:
+
+| Kejadian | Yang dilakukan |
+| --- | --- |
+| membaca | menyaring `tenant_id` ke tenant aktif; tanpa tenant aktif query **dibatalkan**, bukan dijalankan tanpa saringan |
+| menyimpan baris baru | mengisi `tenant_id` dari tenant aktif bila module tidak menuliskannya |
+| menyimpan dengan `tenant_id` berbeda | membatalkan penyimpanan |
+
+**Jangan menyaring `tenant_id` dengan tangan pada model yang sudah memakai trait ini.** Bukan karena
+berlebihan, tetapi karena query seperti itu tetap benar walau traitnya dicabut — sehingga penjaganya
+berhenti terukur, dan tidak ada test yang gagal ketika perlindungannya hilang.
+
+Penjagaan ini hidup di lapisan model. `DB::table()` melewatinya sepenuhnya, dan itulah sebabnya query
+mentah pada tabel module dilarang.
+
 ### Penghapusan lunak
 
 Tidak ada baris yang dihapus fisik. Menghapus berarti mengisi `deleted_at`; baris itu tetap ada di

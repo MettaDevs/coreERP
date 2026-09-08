@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Apperp\ContohB\Http\Controllers;
 
 use App\Support\Modules\Contracts\KonteksPermintaan;
-use App\Support\Modules\Contracts\KonteksTenant;
 use Illuminate\Http\JsonResponse;
 use Modules\Apperp\ContohB\Models\Rak;
 
@@ -27,13 +26,12 @@ use Modules\Apperp\ContohB\Models\Rak;
  */
 final class RakController
 {
-    public function index(KonteksTenant $konteks, KonteksPermintaan $akses): JsonResponse
+    public function index(KonteksPermintaan $akses): JsonResponse
     {
         abort_unless($akses->punyaIzin('contoh-b.rak.read'), 403);
 
         return new JsonResponse([
             'data' => Rak::query()
-                ->where('tenant_id', $konteks->tenantId())
                 ->orderBy('kode')
                 ->get(['id', 'kode', 'nama']),
         ]);
