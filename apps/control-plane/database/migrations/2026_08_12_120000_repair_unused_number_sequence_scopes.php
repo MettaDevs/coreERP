@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
+    /** @var list<string> */
     private array $numberingStateTables = [
         'number_sequence_counters',
         'number_sequence_allocations',

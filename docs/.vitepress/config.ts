@@ -226,6 +226,7 @@ export default withMermaid({
                 { text: 'Ikhtisar', link: '/todo/satu-runtime/' },
                 { text: 'Keputusan arsitektur', link: '/todo/satu-runtime/00-keputusan' },
                 { text: 'PRD dan daftar task', link: '/todo/satu-runtime/01-prd' },
+                { text: 'Bukti penjaga batas', link: '/todo/satu-runtime/02-bukti-penjaga' },
               ],
             },
             {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ContohB\Models;
 
+use App\Support\Modules\TenantScope;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -22,4 +23,9 @@ final class Rak extends Model
     protected $table = 'contoh_b_m_rak';
 
     protected $fillable = ['tenant_id', 'kode', 'nama'];
+
+    protected static function booted(): void
+    {
+        self::addGlobalScope(new TenantScope);
+    }
 }

@@ -18,5 +18,12 @@ parameters:
         - config/
         - database/
         - routes/
+        - ../../modules/
 
     level: 7
+
+    # Kelas module dimuat lewat pemindaian direktori, bukan lewat autoload Composer.
+    # Autoload itu baru dipasang pada fase 2; sampai saat itu, tanpa baris ini setiap
+    # kelas module dilaporkan tidak ditemukan.
+    scanDirectories:
+        - ../../modules/

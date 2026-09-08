@@ -19,8 +19,9 @@ use Modules\Apperp\ContohB\Models\Rak;
  * 2. Setiap query menyaring `tenant_id`. Tidak ada lagi database terpisah yang menahan
  *    kebocoran, jadi satu query yang lupa menyaring membocorkan data seluruh tenant.
  *
- * Yang tidak boleh: memanggil `Modules\Apperp\ContohA\...`. Module tidak menyentuh
- * module lain, dan penjaga F1-05 menolaknya.
+ * Yang tidak boleh: menyebut namespace module lain, termasuk di dalam komentar. Module
+ * tidak menyentuh module lain, dan penjaga F1-05 menolaknya — penjaga itu membaca berkas,
+ * jadi menuliskan contoh pelanggarannya di sini pun ikut tertangkap.
  */
 final class RakController
 {

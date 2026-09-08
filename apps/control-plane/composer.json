@@ -8,6 +8,15 @@
         "framework"
     ],
     "license": "MIT",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../../modules/*/*",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "require": {
         "php": "^8.4",
         "dedoc/scramble": "^0.13.35",
@@ -19,7 +28,9 @@
         "laravel/wayfinder": "^0.1.14",
         "phpoffice/phpspreadsheet": "4.0",
         "phpoffice/phpword": "1.3",
-        "symfony/yaml": "^8.1"
+        "symfony/yaml": "^8.1",
+        "apperp/contoh-a": "@dev",
+        "apperp/contoh-b": "@dev"
     },
     "require-dev": {
         "fakerphp/faker": "^1.24",

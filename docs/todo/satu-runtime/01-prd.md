@@ -907,9 +907,8 @@ F2-01; saat itu pemindaian di sini diganti dengannya, dan jangan dibiarkan menja
 terpisah, dan itu membuat modul tidak bisa dicabut sendirian.
 
 **Berkas.**
-- `apps/control-plane/tests/PHPStan/ModuleIsolationRule.php`
-- `apps/control-plane/composer.json` (daftarkan namespace test pada `autoload-dev`)
-- `apps/control-plane/phpstan.neon`
+- `apps/control-plane/tests/Feature/Boundary/ModuleNamespaceBoundaryTest.php`
+- `apps/control-plane/phpstan.neon` (folder `modules/` masuk ke `paths` dan `scanDirectories`)
 
 **Langkah.**
 1. Aturan memeriksa setiap nama kelas yang dirujuk dari dalam `Modules\<A>\` dan menolak yang berawalan
@@ -920,12 +919,50 @@ terpisah, dan itu membuat modul tidak bisa dicabut sendirian.
 3. Tambahkan folder `modules/` ke daftar `paths` pada berkas konfigurasi analisa statis, dan pastikan
    kelas modul dapat dimuat lewat pemindaian direktori.
 
-**Selesai bila.** Analisa statis lulus pada kode yang ada, dan gagal bila modul contoh A sengaja
-mengimpor kelas modul contoh B.
+**Selesai bila.** Penjaga lulus pada kode yang ada, dan gagal bila modul contoh A sengaja mengimpor kelas
+modul contoh B.
 
 **Rujukan.** Prinsip P1 dokumen ini.
 
 **Bergantung pada.** F1-02.
+
+#### Aturan PHPStan ditulis lebih dulu, lalu dibuang
+
+Task ini menyuruh menulis aturan PHPStan. Aturannya ditulis, dijalankan, dan **berlubang**. PHPStan hanya
+mengunjungi nama kelas pada posisi tertentu: pada berkas contoh hanya tiga nama yang sampai ke aturan,
+ketiganya tipe argumen. Baris `use`, pemanggilan statis, dan nama kelas di dalam string tidak pernah
+sampai — padahal ketiganya justru jalur yang paling mudah dipakai menembus batas.
+
+Penggantinya membaca berkas dengan pencocokan pola. Terdengar lebih kasar, tapi **menangkap lebih
+banyak**: impor, pemanggilan statis, nama di dalam string, dan bahkan di dalam komentar. Yang terakhir
+bukan berlebihan — sebuah `@return \Modules\Apperp\Lain\Kelas` pada docblock adalah rujukan tipe yang
+dibaca alat, bukan sekadar tulisan.
+
+Folder `modules/` tetap dimasukkan ke daftar `paths` PHPStan, karena kode modul memang perlu diperiksa
+tipenya. Yang dibuang hanya aturan buatan sendiri itu.
+
+#### Jebakan yang memakan waktu paling lama, dan harus diketahui semua orang
+
+**PHPStan menyimpan hasil analisa, dan mengubah berkas aturan buatan sendiri tidak membatalkan
+simpanan itu.** Aturannya sudah terpasang dan sudah berjalan sejak awal, tetapi setiap kali kodenya
+diubah, PHPStan menyajikan hasil lama dan melaporkan nol temuan. Itu terbaca persis seperti "aturannya
+tidak jalan", dan waktu habis mencari kesalahan yang tidak ada.
+
+Cara memastikannya: hapus foldernya secara paksa, jangan hanya memanggil perintah pembersihnya.
+
+```bash
+rm -rf "$TEMP/phpstan"
+```
+
+Ini masuk ke keluarga yang sama dengan bagian 4.5. Sebuah penjaga yang melaporkan hijau karena
+simpanan lama sama tidak bergunanya dengan penjaga yang tidak pernah dipasang.
+
+#### Penjaganya menangkap pelanggaran yang tidak disengaja
+
+Selain pelanggaran yang sengaja dibuat untuk mengujinya, penjaga ini langsung menemukan satu yang nyata:
+docblock pada modul contoh B menyebut namespace modul contoh A secara harfiah, sebagai contoh hal yang
+dilarang. Kalimatnya diubah. Sebuah penjaga yang menemukan sesuatu pada hari pertama adalah penjaga
+yang menguji sesuatu.
 
 ### F1-06 — Penjaga ketiga: tidak ada query modul tanpa penyaringan tenant
 
@@ -949,7 +986,44 @@ penyaringan.
 
 **Rujukan.** [query scope dan schema](../../dev/08-query-scopes-and-schema.md), bagian 5.2 dokumen ini.
 
-**Bergantung pada.** F1-02.
+**Bergantung pada.** F1-02, dan langkah 1–2 F2-02 yang ditarik ke sini.
+
+#### Scope gagal menutup, bukan gagal membuka
+
+Keputusan yang tidak disebut task ini tapi menentukan segalanya: bila tenant aktif tidak diketahui,
+query **dibatalkan dengan pengecualian**, bukan dijalankan tanpa penyaringan.
+
+Pilihan sebaliknya terlihat lebih ramah dan justru paling berbahaya. Sebuah pekerjaan latar yang lupa
+menyetel konteks akan membaca data semua orang tanpa satu pun tanda bahaya, dan hasilnya terlihat wajar
+sampai ada yang menyadarinya berbulan-bulan kemudian.
+
+#### Langkah 1 dan 2 F2-02 ditarik ke sini
+
+Test model tidak bisa berjalan tanpa kelas modul dapat dimuat, dan itu tugas F2-02. Yang ditarik hanya
+bagian autoload-nya: repositori bertipe `path` menunjuk `../../modules/*/*`, dan tiap modul
+mendeklarasikan `autoload.psr-4` sendiri. Bagian pemindahan konteks pembangunan image **tetap di F2-02**,
+karena ia menyentuh Dockerfile dan compose yang tidak ada hubungannya dengan penjaga ini.
+
+Dua catatan untuk yang mengerjakannya nanti:
+
+- Paket lokal harus diminta dengan `@dev`, bukan `*`. Dengan `*` Composer menolaknya karena tidak memenuhi
+  `minimum-stability`, dan pesannya tidak menyebutkan itu dengan jelas.
+- Jalankan `composer update` dengan `--no-scripts`. Tanpa itu, `post-update-cmd` memanggil
+  `install:features` dan mengubah tiga belas berkas yang tidak ada hubungannya dengan pekerjaan ini.
+  Ini sudah pernah terjadi pada F0-01.
+
+#### Penjaganya dua lapis, karena satu lapis bisa dilewati
+
+| Lapis | Menangkap |
+| --- | --- |
+| Global scope pada model | query lewat model, termasuk `find()` dengan id milik tenant lain |
+| Pembacaan berkas modul | `DB::table(`, `DB::select(`, dan `DB::statement(` yang melewati model |
+
+Lapis kedua ada karena lapis pertama hanya berlaku bila query memang lewat model. Query mentah melewati
+global scope tanpa memberi tanda apa pun. Migration dikecualikan: ia memang menulis SQL langsung, dan ia
+berjalan sebelum ada tenant mana pun.
+
+Keduanya sudah dibuktikan bisa gagal.
 
 ### F1-07 — Buktikan ketiga penjaga bisa gagal
 
@@ -979,11 +1053,6 @@ laporan sukses palsu menghentikan pencarian.
 
 ### F1-08 — Penjaga berjalan di CI
 
-**Tambahan dari F1-02.** Alur wajib memeriksa kode modul dengan PHPStan, bukan hanya Pint. Ini baru bisa
-dikerjakan setelah autoload Composer untuk namespace modul ada; bila urutannya memaksa, pindahkan task
-autoload itu ke fase 1.
-
-
 **Kenapa.** Penjaga yang hanya jalan di laptop akan terlewat pada pull request pertama yang terburu-buru.
 
 **Berkas.**
@@ -992,14 +1061,53 @@ autoload itu ke fase 1.
 
 **Langkah.**
 1. Suite `Boundary` masuk ke alur test.
-2. Analisa statis pada alur lint sudah mencakup folder `modules/` setelah F1-05; pastikan demikian.
-3. Kedua langkah wajib, bukan `continue-on-error`.
+2. Analisa statis sudah mencakup folder `modules/` setelah F1-05; pastikan demikian. Perhatikan bahwa
+   analisa statis berjalan pada alur **test**, bukan alur linter, meski namanya "Run Type Analysis".
+3. Pint juga wajib mencakup `modules/`, ditambahkan pada F1-02.
+4. Semua langkah wajib, bukan `continue-on-error`.
 
 **Selesai bila.** Sebuah pull request percobaan yang melanggar salah satu batas ditolak CI.
 
-**Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
+**Rujukan.** [CI/CD](../../dev/22-ci-cd.md), [bukti penjaga](02-bukti-penjaga.md).
 
 **Bergantung pada.** F0-01, F1-07.
+
+#### Tidak ada berkas alur yang perlu diubah
+
+Ketiga penjaga adalah test PHPUnit biasa di bawah `tests/Feature/Boundary/`, jadi `php artisan test`
+sudah menjalankannya. Folder `modules/` sudah masuk ke Pint pada F1-02 dan ke PHPStan pada F1-05.
+Task ini karena itu tidak mengubah alur sama sekali; ia **membuktikan** yang sudah ada bekerja.
+
+Itu justru menjadikannya task yang paling mudah dianggap selesai tanpa bukti. Karena itu buktinya
+dijalankan sungguhan, bukan disimpulkan dari membaca berkas alur.
+
+#### Buktinya: sebuah pull request yang melanggar, ditolak CI
+
+Cabang percobaan dibuat dengan satu pelanggaran — modul contoh A mengimpor model modul contoh B — lalu
+didorong sebagai pull request. Keduanya merah:
+
+| Alur | Yang menolak |
+| --- | --- |
+| tests | `ModuleNamespaceBoundaryTest` gagal pada kedua versi PHP |
+| linter | Pint menolak impor yang tidak dipakai |
+
+Pull request itu ditutup dan cabangnya dihapus. Yang perlu dicatat: **penjaga batas dan pemeriksa gaya
+menangkap pelanggaran yang sama dari dua arah berbeda**, dan itu bukan pemborosan — Pint hanya
+menangkapnya karena impornya kebetulan tidak dipakai. Impor yang dipakai lolos dari Pint dan hanya
+tertahan penjaga batas.
+
+Jumlah test di CI sama dengan di mesin pengembang, 211 test dan 972 asersi pada PHP 8.4 maupun 8.5,
+sesuai syarat yang ditetapkan F0-01.
+
+#### Satu hal yang ditemukan dan bukan tentang penjaga
+
+Pull request percobaan itu awalnya **tidak memicu alur sama sekali**, dan halamannya hanya kosong. Sebuah
+commit kosong menyusul membuatnya berjalan. Penyebabnya tidak dapat dipastikan dari luar; yang bisa
+dipastikan adalah gejalanya, dan gejalanya berbahaya: pull request tanpa pemeriksaan **terlihat sama**
+dengan pull request yang pemeriksaannya belum selesai. Selama cabang utama tidak dikunci (F0-05 ditutup
+tanpa dikerjakan), tidak ada yang menahan pull request seperti itu digabungkan.
+
+Kalau ini terulang, dorong satu commit kosong dan periksa lagi sebelum menggabungkan.
 
 ## 9. Fase 2: Core menjadi tuan rumah modul
 
