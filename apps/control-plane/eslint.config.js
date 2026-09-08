@@ -81,7 +81,7 @@ export default [
                         'sibling',
                         'index',
                     ],
-                    // alphabetize: { order: 'asc', caseInsensitive: true },
+                    alphabetize: { order: 'asc', caseInsensitive: true },
                 },
             ],
             'import/consistent-type-specifier-style': [
@@ -100,6 +100,37 @@ export default [
                 'error',
                 ...paddingAroundControl,
             ],
+        },
+    },
+    {
+        // laravel/chisel menghapus kode di antara sepasang penanda `@chisel-*` saat sebuah
+        // fitur dimatikan. Penanda itu berada di tengah blok impor, dan import/order menata
+        // ulang impor melewatinya: penandanya berpindah, isinya berubah, dan penghapusan
+        // fitur diam-diam membuang baris yang salah. Urutan impor pada berkas ini dijaga
+        // tangan sampai penandanya tidak lagi dipakai.
+        files: [
+            'resources/js/pages/auth/confirm-password.tsx',
+            'resources/js/pages/auth/login.tsx',
+            'resources/js/pages/settings/profile.tsx',
+            'resources/js/pages/settings/security.tsx',
+            'resources/js/pages/welcome.tsx',
+            'resources/js/types/auth.ts',
+        ],
+        rules: {
+            'import/order': 'off',
+        },
+    },
+    {
+        // Skenario k6 berjalan di runtime k6, bukan browser maupun Node. `__ENV` dan
+        // kawan-kawannya disediakan runtime itu, jadi tanpa deklarasi ini setiap
+        // pembacaan variabel lingkungan dilaporkan sebagai variabel tak dikenal.
+        files: ['loadtest/k6/**/*.js'],
+        languageOptions: {
+            globals: {
+                __ENV: 'readonly',
+                __ITER: 'readonly',
+                __VU: 'readonly',
+            },
         },
     },
     {

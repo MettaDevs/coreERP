@@ -13,7 +13,9 @@ export default function FlashToasts() {
         const validationError = Object.values(errors ?? {})[0];
         const message =
             flash?.error ??
-            (Array.isArray(validationError) ? validationError[0] : validationError) ??
+            (Array.isArray(validationError)
+                ? validationError[0]
+                : validationError) ??
             flash?.status ??
             '';
 

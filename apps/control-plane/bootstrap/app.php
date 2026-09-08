@@ -3,6 +3,7 @@
 use App\Http\Middleware\AuthenticateAppService;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\ResolveModuleContext;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,7 +23,13 @@ return Application::configure(basePath: dirname(__DIR__))
             $middleware->trustProxies(at: $trustedProxies);
         }
 
-        $middleware->alias(['internal-app' => AuthenticateAppService::class]);
+        // Nama alias-nya didaftarkan di sini bersama alias lain; yang *memasangnya* adalah
+        // penyedia layanan tiap module, per grup rute, karena middleware ini butuh id module
+        // sebagai parameter dan tidak ada gunanya dipasang global.
+        $middleware->alias([
+            'internal-app' => AuthenticateAppService::class,
+            'konteks-module' => ResolveModuleContext::class,
+        ]);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         $middleware->web(append: [

@@ -1,43 +1,13 @@
-import { useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    Background,
-    Controls,
-    Handle,
-    MiniMap,
-    Position,
-    ReactFlow,
-} from '@xyflow/react';
-import type { Edge, Node as FlowNode, NodeProps, NodeTypes } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
 import {
-    Building2,
-    Check,
-    ChevronRight,
-    CircleAlert,
-    CreditCard,
-    FileText,
-    Globe,
-    Hash,
-    Image,
-    Layers,
-    Mail,
-    MapPin,
-    Network,
-    Pencil,
-    Plus,
-    Search,
-    Shield,
-    Trash2,
-} from 'lucide-react';
-
-import Heading from '@/components/heading';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from '@apperp/ui/accordion';
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -46,6 +16,8 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@apperp/ui/alert-dialog';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
 import {
     Card,
     CardAction,
@@ -54,12 +26,6 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from '@apperp/ui/accordion';
 import {
     Dialog,
     DialogAction,
@@ -91,6 +57,46 @@ import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
+import { Head, Link, useForm } from '@inertiajs/react';
+import type {
+    Edge,
+    Node as FlowNode,
+    NodeProps,
+    NodeTypes,
+} from '@xyflow/react';
+import {
+    Background,
+    Controls,
+    Handle,
+    MiniMap,
+    Position,
+    ReactFlow,
+} from '@xyflow/react';
+import {
+    Building2,
+    Check,
+    ChevronRight,
+    CircleAlert,
+    CreditCard,
+    FileText,
+    Hash,
+    Image,
+    Layers,
+    Mail,
+    MapPin,
+    Network,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+} from 'lucide-react';
+import { useState } from 'react';
+import Heading from '@/components/heading';
+import {
+    OrganizationAddressesSection,
+    OrganizationContactsSection,
+} from '@/components/organization/address-book-section';
+import { PrintIdentitySection } from '@/components/organization/print-identity-section';
 
 type Organization = {
     id: string;
@@ -111,7 +117,10 @@ type HierarchyNode = {
     organization: Pick<Organization, 'id' | 'name' | 'classification'> & {
         operating_unit?: { type: string } | null;
     };
-    parent_node: { id: string; organization: Pick<Organization, 'id' | 'name'> } | null;
+    parent_node: {
+        id: string;
+        organization: Pick<Organization, 'id' | 'name'>;
+    } | null;
 };
 type Version = {
     id: string;
@@ -159,7 +168,7 @@ function CreateOrganizationDialog({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" className="shadow-xs font-medium text-xs">
+                <Button size="sm" className="text-xs font-medium shadow-xs">
                     <Plus className="mr-1.5 size-3.5" />
                     {triggerLabel}
                 </Button>
@@ -167,8 +176,12 @@ function CreateOrganizationDialog({
             <DialogContent size="wide">
                 <DialogHeader>
                     <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
-                            {legalEntity ? <Building2 className="size-5" /> : <Layers className="size-5" />}
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                            {legalEntity ? (
+                                <Building2 className="size-5" />
+                            ) : (
+                                <Layers className="size-5" />
+                            )}
                         </div>
                         <div>
                             <DialogTitle>
@@ -287,7 +300,10 @@ function CreateOrganizationDialog({
                                     >
                                         {Object.entries(operatingUnitTypes).map(
                                             ([value, label]) => (
-                                                <option key={value} value={value}>
+                                                <option
+                                                    key={value}
+                                                    value={value}
+                                                >
                                                     {label}
                                                 </option>
                                             ),
@@ -321,36 +337,61 @@ type OrganizationExtraSection = {
 
 function OrganizationExtraSectionContent({
     section,
+    organization,
+    canManage,
 }: {
     section: OrganizationExtraSection;
+    organization: Organization;
+    canManage: boolean;
 }) {
-    if (section.value === 'report-company-logo') {
+    if (section.value === 'addresses') {
         return (
-            <div className="space-y-3 rounded-lg border border-dashed border-border bg-card/50 p-4">
-                <Field>
-                    <Input
-                        label="Logo perusahaan untuk laporan"
-                        type="file"
-                        disabled
-                    />
-                </Field>
-                <p className="text-xs text-muted-foreground italic">
-                    Wadah sudah tersedia. Upload logo belum aktif karena integrasi file belum tersedia.
-                </p>
-            </div>
+            <OrganizationAddressesSection
+                organizationId={organization.id}
+                countryCode={organization.legal_entity?.country_code ?? 'ID'}
+                canManage={canManage}
+            />
+        );
+    }
+
+    if (section.value === 'contact-information') {
+        return (
+            <OrganizationContactsSection
+                organizationId={organization.id}
+                canManage={canManage}
+            />
+        );
+    }
+
+    if (section.value === 'print-identity') {
+        return (
+            <PrintIdentitySection
+                organizationId={organization.id}
+                organizationName={organization.name}
+                canManage={canManage}
+            />
         );
     }
 
     return (
         <div className="rounded-lg border border-dashed border-border bg-card/40 p-4">
-            <p className="text-sm text-muted-foreground">{section.description}</p>
+            <p className="text-sm text-muted-foreground">
+                {section.description}
+            </p>
             {section.action && (
-                <Button type="button" variant="outline" size="sm" className="mt-3 text-xs" disabled>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-3 text-xs"
+                    disabled
+                >
                     {section.action}
                 </Button>
             )}
             <p className="mt-2 text-xs text-muted-foreground italic">
-                Wadah tersedia; fungsi ini akan dihubungkan oleh modul pemiliknya.
+                Wadah tersedia; fungsi ini akan dihubungkan oleh modul
+                pemiliknya.
             </p>
         </div>
     );
@@ -373,55 +414,64 @@ function OrganizationDetailPage({
         country_code: organization.legal_entity?.country_code ?? 'ID',
         operating_unit_type: organization.operating_unit?.type ?? 'department',
     });
-    const unitType = operatingUnitTypes[organization.operating_unit?.type ?? ''] ?? organization.operating_unit?.type;
-    const extraSections: (OrganizationExtraSection & { icon: React.ComponentType<{ className?: string }> })[] = legalEntity
+    const unitType =
+        operatingUnitTypes[organization.operating_unit?.type ?? ''] ??
+        organization.operating_unit?.type;
+    const extraSections: (OrganizationExtraSection & {
+        icon: React.ComponentType<{ className?: string }>;
+    })[] = legalEntity
         ? [
               {
                   value: 'addresses',
                   title: 'Alamat Utama & Cabang',
-                  description: 'Simpan alamat utama dan lokasi kantor legal entity.',
-                  action: 'Tambah Alamat',
+                  description:
+                      'Alamat utama dan lokasi kantor legal entity; alamat utama tampil pada kop dokumen.',
                   icon: MapPin,
               },
               {
                   value: 'contact-information',
                   title: 'Informasi Kontak & Komunikasi',
-                  description: 'Simpan email resmi, nomor telepon, dan narahubung organisasi.',
-                  action: 'Tambah Kontak',
+                  description:
+                      'Email resmi, telepon, WhatsApp, faks, dan laman; kontak utama tampil pada kop dokumen.',
                   icon: Mail,
               },
               {
                   value: 'statutory-reporting',
                   title: 'Pelaporan Wajib & Regulasi',
-                  description: 'Konfigurasi pelaporan resmi pemerintah dan periode pelaporan.',
+                  description:
+                      'Konfigurasi pelaporan resmi pemerintah dan periode pelaporan.',
                   action: 'Pengaturan Pelaporan',
                   icon: FileText,
               },
               {
                   value: 'registration-numbers',
                   title: 'Nomor Registrasi Legal (NIB / NPWP)',
-                  description: 'Nomor registrasi legalitas badan hukum perusahaan.',
+                  description:
+                      'Nomor registrasi legalitas badan hukum perusahaan.',
                   action: 'Tambah Registrasi',
                   icon: Hash,
               },
               {
                   value: 'bank-account-information',
                   title: 'Informasi Rekening Bank',
-                  description: 'Rekening bank resmi yang terdaftar atas nama legal entity.',
+                  description:
+                      'Rekening bank resmi yang terdaftar atas nama legal entity.',
                   action: 'Tambah Rekening',
                   icon: CreditCard,
               },
               {
                   value: 'number-sequences',
                   title: 'Nomor Urut Dokumen (Sequences)',
-                  description: 'Pengaturan penomoran otomatis dokumen transaksi legal entity ini.',
+                  description:
+                      'Pengaturan penomoran otomatis dokumen transaksi legal entity ini.',
                   action: 'Kelola Nomor Urut',
                   icon: Hash,
               },
               {
-                  value: 'report-company-logo',
-                  title: 'Logo Perusahaan Cetakan & Laporan',
-                  description: 'Logo yang dicetak pada invoice, kwitansi, dan surat resmi.',
+                  value: 'print-identity',
+                  title: 'Identitas Cetak: Kop, Footer & Logo',
+                  description:
+                      'Nama pada kop, baris induk, NPWP/NIB, footer, dan logo pada semua dokumen yang dicetak.',
                   icon: Image,
               },
           ]
@@ -429,15 +479,14 @@ function OrganizationDetailPage({
               {
                   value: 'addresses',
                   title: 'Alamat Lokasi Kerja',
-                  description: 'Simpan alamat fisik unit operasional ini.',
-                  action: 'Tambah Alamat',
+                  description: 'Alamat fisik unit operasional ini.',
                   icon: MapPin,
               },
               {
                   value: 'contact-information',
                   title: 'Informasi Kontak Unit',
-                  description: 'Simpan email dan kontak penanggung jawab unit operasional.',
-                  action: 'Tambah Kontak',
+                  description:
+                      'Email dan kontak penanggung jawab unit operasional.',
                   icon: Mail,
               },
               {
@@ -447,19 +496,30 @@ function OrganizationDetailPage({
                   action: 'Buka Detail Unit',
                   icon: Layers,
               },
+              {
+                  value: 'print-identity',
+                  title: 'Identitas Cetak Unit (Kop Sendiri)',
+                  description:
+                      'Isi hanya bila unit ini mencetak dengan kop sendiri, misalnya puskesmas di bawah dinas. Kosong berarti memakai kop legal entity.',
+                  icon: Image,
+              },
           ];
 
     return (
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-card text-foreground">
             {/* Header Sticky Detail dengan Banner Khas */}
-            <div className="sticky top-0 z-10 flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/90 backdrop-blur-md px-6 py-4">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shadow-2xs">
-                        {legalEntity ? <Building2 className="size-5" /> : <Layers className="size-5" />}
+            <div className="sticky top-0 z-10 flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/90 px-6 py-4 backdrop-blur-md">
+                <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-2xs">
+                        {legalEntity ? (
+                            <Building2 className="size-5" />
+                        ) : (
+                            <Layers className="size-5" />
+                        )}
                     </div>
                     <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                            <CardTitle className="text-base font-bold text-foreground truncate">
+                            <CardTitle className="truncate text-base font-bold text-foreground">
                                 {organization.name}
                             </CardTitle>
                             <Tooltip clickToPin>
@@ -467,19 +527,25 @@ function OrganizationDetailPage({
                                     <button
                                         type="button"
                                         aria-label="Lihat rincian"
-                                        className="shrink-0 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted transition-colors cursor-pointer"
+                                        className="shrink-0 cursor-pointer rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
                                         <CircleAlert className="size-4" />
                                     </button>
                                 </TooltipTrigger>
-                                <TooltipContent side="right" className="max-w-xs text-xs">
-                                    Detail identitas dan atribut resmi organisasi {organization.name}.
+                                <TooltipContent
+                                    side="right"
+                                    className="max-w-xs text-xs"
+                                >
+                                    Detail identitas dan atribut resmi
+                                    organisasi {organization.name}.
                                 </TooltipContent>
                             </Tooltip>
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             <Badge variant="outline">
-                                {legalEntity ? 'Legal entity' : 'Operating unit'}
+                                {legalEntity
+                                    ? 'Legal entity'
+                                    : 'Operating unit'}
                             </Badge>
                             <span>
                                 {legalEntity
@@ -492,8 +558,14 @@ function OrganizationDetailPage({
                 {canManage && (
                     <div className="shrink-0">
                         {!editing ? (
-                            <Button type="button" size="sm" onClick={() => setEditing(true)} className="shadow-xs font-medium text-xs">
-                                <Pencil className="mr-1.5 size-3.5" /> Ubah Organisasi
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => setEditing(true)}
+                                className="text-xs font-medium shadow-xs"
+                            >
+                                <Pencil className="mr-1.5 size-3.5" /> Ubah
+                                Organisasi
                             </Button>
                         ) : (
                             <div className="flex gap-2">
@@ -527,7 +599,7 @@ function OrganizationDetailPage({
             </div>
 
             {/* Content Accordion */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
                 <form
                     id={`organization-form-${organization.id}`}
                     onSubmit={(event) => {
@@ -538,27 +610,43 @@ function OrganizationDetailPage({
                         );
                     }}
                 >
-                    <Accordion type="multiple" defaultValue={['general']} className="space-y-3">
-                        <AccordionItem value="general" className="border border-border/80 rounded-xl px-5 bg-card shadow-2xs">
-                            <AccordionTrigger className="py-3.5 text-xs font-bold uppercase tracking-wider text-foreground hover:no-underline">
+                    <Accordion
+                        type="multiple"
+                        defaultValue={['general']}
+                        className="space-y-3"
+                    >
+                        <AccordionItem
+                            value="general"
+                            className="rounded-xl border border-border/80 bg-card px-5 shadow-2xs"
+                        >
+                            <AccordionTrigger className="py-3.5 text-xs font-bold tracking-wider text-foreground uppercase hover:no-underline">
                                 <span className="flex items-center gap-2">
-                                    <Building2 className="size-4 text-primary shrink-0" />
+                                    <Building2 className="size-4 shrink-0 text-primary" />
                                     Identitas Umum Organisasi
                                 </span>
                             </AccordionTrigger>
-                            <AccordionContent className="pb-5 pt-1">
+                            <AccordionContent className="pt-1 pb-5">
                                 <FieldGroup className="grid gap-4 md:grid-cols-2">
-                                    <Field data-invalid={Boolean(form.errors.name)}>
+                                    <Field
+                                        data-invalid={Boolean(form.errors.name)}
+                                    >
                                         <Input
                                             label="Nama Organisasi"
                                             value={form.data.name}
                                             readOnly={!editing}
                                             onChange={(event) =>
-                                                form.setData('name', event.target.value)
+                                                form.setData(
+                                                    'name',
+                                                    event.target.value,
+                                                )
                                             }
-                                            aria-invalid={Boolean(form.errors.name)}
+                                            aria-invalid={Boolean(
+                                                form.errors.name,
+                                            )}
                                         />
-                                        <FieldError>{form.errors.name}</FieldError>
+                                        <FieldError>
+                                            {form.errors.name}
+                                        </FieldError>
                                     </Field>
                                     {legalEntity ? (
                                         <>
@@ -569,7 +657,9 @@ function OrganizationDetailPage({
                                             >
                                                 <Input
                                                     label="Kode Perusahaan"
-                                                    value={form.data.company_code}
+                                                    value={
+                                                        form.data.company_code
+                                                    }
                                                     readOnly={!editing}
                                                     onChange={(event) =>
                                                         form.setData(
@@ -578,7 +668,8 @@ function OrganizationDetailPage({
                                                         )
                                                     }
                                                     aria-invalid={Boolean(
-                                                        form.errors.company_code,
+                                                        form.errors
+                                                            .company_code,
                                                     )}
                                                 />
                                                 <FieldError>
@@ -592,7 +683,9 @@ function OrganizationDetailPage({
                                             >
                                                 <Input
                                                     label="Kode Negara (ISO)"
-                                                    value={form.data.country_code}
+                                                    value={
+                                                        form.data.country_code
+                                                    }
                                                     readOnly={!editing}
                                                     onChange={(event) =>
                                                         form.setData(
@@ -601,7 +694,8 @@ function OrganizationDetailPage({
                                                         )
                                                     }
                                                     aria-invalid={Boolean(
-                                                        form.errors.country_code,
+                                                        form.errors
+                                                            .country_code,
                                                     )}
                                                     maxLength={2}
                                                 />
@@ -618,13 +712,20 @@ function OrganizationDetailPage({
                                         >
                                             <NativeSelect
                                                 label="Tipe Operating Unit"
-                                                value={form.data.operating_unit_type}
+                                                value={
+                                                    form.data
+                                                        .operating_unit_type
+                                                }
                                                 aria-readonly={!editing}
                                                 onMouseDown={(event) => {
-                                                    if (!editing) event.preventDefault();
+                                                    if (!editing) {
+                                                        event.preventDefault();
+                                                    }
                                                 }}
                                                 onKeyDown={(event) => {
-                                                    if (!editing) event.preventDefault();
+                                                    if (!editing) {
+                                                        event.preventDefault();
+                                                    }
                                                 }}
                                                 onChange={(event) =>
                                                     form.setData(
@@ -633,19 +734,26 @@ function OrganizationDetailPage({
                                                     )
                                                 }
                                                 aria-invalid={Boolean(
-                                                    form.errors.operating_unit_type,
+                                                    form.errors
+                                                        .operating_unit_type,
                                                 )}
                                             >
-                                                {Object.entries(operatingUnitTypes).map(
-                                                    ([value, label]) => (
-                                                        <option key={value} value={value}>
-                                                            {label}
-                                                        </option>
-                                                    ),
-                                                )}
+                                                {Object.entries(
+                                                    operatingUnitTypes,
+                                                ).map(([value, label]) => (
+                                                    <option
+                                                        key={value}
+                                                        value={value}
+                                                    >
+                                                        {label}
+                                                    </option>
+                                                ))}
                                             </NativeSelect>
                                             <FieldError>
-                                                {form.errors.operating_unit_type}
+                                                {
+                                                    form.errors
+                                                        .operating_unit_type
+                                                }
                                             </FieldError>
                                         </Field>
                                     )}
@@ -654,20 +762,25 @@ function OrganizationDetailPage({
                         </AccordionItem>
                         {extraSections.map((section) => {
                             const SectionIcon = section.icon;
+
                             return (
                                 <AccordionItem
                                     key={section.value}
                                     value={section.value}
-                                    className="border border-border/80 rounded-xl px-5 bg-card shadow-2xs"
+                                    className="rounded-xl border border-border/80 bg-card px-5 shadow-2xs"
                                 >
                                     <AccordionTrigger className="py-3.5 text-xs font-bold text-foreground hover:no-underline">
                                         <span className="flex items-center gap-2">
-                                            <SectionIcon className="size-4 text-primary shrink-0" />
+                                            <SectionIcon className="size-4 shrink-0 text-primary" />
                                             {section.title}
                                         </span>
                                     </AccordionTrigger>
-                                    <AccordionContent className="pb-5 pt-1">
-                                        <OrganizationExtraSectionContent section={section} />
+                                    <AccordionContent className="pt-1 pb-5">
+                                        <OrganizationExtraSectionContent
+                                            section={section}
+                                            organization={organization}
+                                            canManage={canManage}
+                                        />
                                     </AccordionContent>
                                 </AccordionItem>
                             );
@@ -694,20 +807,21 @@ function CreateHierarchyDialog({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" className="shadow-xs font-medium text-xs">
+                <Button size="sm" className="text-xs font-medium shadow-xs">
                     <Plus className="mr-1.5 size-3.5" /> Hierarchy Baru
                 </Button>
             </DialogTrigger>
             <DialogContent size="wide">
                 <DialogHeader>
                     <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
                             <Network className="size-5" />
                         </div>
                         <div>
                             <DialogTitle>Draft Hierarchy Baru</DialogTitle>
                             <DialogDescription>
-                                Satu hierarchy dapat dipakai oleh beberapa tujuan proses bisnis yang memiliki susunan sama.
+                                Satu hierarchy dapat dipakai oleh beberapa
+                                tujuan proses bisnis yang memiliki susunan sama.
                             </DialogDescription>
                         </div>
                     </div>
@@ -738,7 +852,9 @@ function CreateHierarchyDialog({
                                 <FieldError>{form.errors.name}</FieldError>
                             </Field>
                             <FieldSet
-                                data-invalid={Boolean(form.errors.purpose_codes)}
+                                data-invalid={Boolean(
+                                    form.errors.purpose_codes,
+                                )}
                             >
                                 <FieldLegend hint="Pilih proses bisnis yang akan membaca susunan ini.">
                                     Tujuan Hierarchy
@@ -756,13 +872,15 @@ function CreateHierarchyDialog({
                                         <ToggleGroupItem
                                             key={purpose.code}
                                             value={purpose.code}
-                                            className="text-xs font-medium border-border/80"
+                                            className="border-border/80 text-xs font-medium"
                                         >
                                             {purpose.name}
                                         </ToggleGroupItem>
                                     ))}
                                 </ToggleGroup>
-                                <FieldError>{form.errors.purpose_codes}</FieldError>
+                                <FieldError>
+                                    {form.errors.purpose_codes}
+                                </FieldError>
                             </FieldSet>
                             <div className="grid gap-4 md:grid-cols-2">
                                 <Field
@@ -797,7 +915,9 @@ function CreateHierarchyDialog({
                                     </FieldError>
                                 </Field>
                                 <Field
-                                    data-invalid={Boolean(form.errors.effective_from)}
+                                    data-invalid={Boolean(
+                                        form.errors.effective_from,
+                                    )}
                                 >
                                     <Input
                                         label="Berlaku Mulai Tanggal"
@@ -913,9 +1033,10 @@ function DraftActions({
                     </FieldError>
                 </Field>
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/40">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/40 pt-2">
                 <p className="text-xs text-muted-foreground">
-                    Hubungan ini berlaku pada draf hierarchy ini untuk menyusun struktur pohon.
+                    Hubungan ini berlaku pada draf hierarchy ini untuk menyusun
+                    struktur pohon.
                 </p>
                 <div className="flex gap-2">
                     <Button
@@ -962,19 +1083,29 @@ function OrganizationHierarchyFlowNode({
 }: NodeProps<OrganizationHierarchyFlowNode>) {
     return (
         <div className="min-w-56 rounded-xl border border-border bg-card px-4 py-3 text-foreground shadow-xs">
-            <Handle type="target" position={Position.Top} className="!size-3 !bg-muted-foreground !border-2 !border-background" />
+            <Handle
+                type="target"
+                position={Position.Top}
+                className="!size-3 !border-2 !border-background !bg-muted-foreground"
+            />
             <div className="flex items-center gap-2">
-                <span className="flex size-5 items-center justify-center rounded bg-primary/10 text-primary text-[10px] font-bold">
+                <span className="flex size-5 items-center justify-center rounded bg-primary/10 text-[10px] font-bold text-primary">
                     {data.classification === 'legal_entity' ? 'LE' : 'OU'}
                 </span>
-                <p className="text-xs font-bold text-foreground truncate">{data.label}</p>
+                <p className="truncate text-xs font-bold text-foreground">
+                    {data.label}
+                </p>
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
                 {data.classification === 'legal_entity'
                     ? 'Legal Entity (Badan Hukum)'
-                    : data.operatingUnitType ?? 'Operating Unit'}
+                    : (data.operatingUnitType ?? 'Operating Unit')}
             </p>
-            <Handle type="source" position={Position.Bottom} className="!size-3 !bg-muted-foreground !border-2 !border-background" />
+            <Handle
+                type="source"
+                position={Position.Bottom}
+                className="!size-3 !border-2 !border-background !bg-muted-foreground"
+            />
         </div>
     );
 }
@@ -1014,6 +1145,7 @@ function buildHierarchyGraph(version: Version): {
         }
 
         const known = subtreeWidths.get(node.id);
+
         if (known !== undefined) {
             return known;
         }
@@ -1022,11 +1154,14 @@ function buildHierarchyGraph(version: Version): {
         const nextPath = new Set(path).add(node.id);
         const childrenWidth = children.reduce(
             (total, child, index) =>
-                total + measure(child, nextPath) + (index > 0 ? horizontalGap : 0),
+                total +
+                measure(child, nextPath) +
+                (index > 0 ? horizontalGap : 0),
             0,
         );
         const width = Math.max(nodeWidth, childrenWidth);
         subtreeWidths.set(node.id, width);
+
         return width;
     };
     const positions = new Map<string, { x: number; y: number }>();
@@ -1047,7 +1182,9 @@ function buildHierarchyGraph(version: Version): {
         });
 
         const children = childrenByParent.get(node.id) ?? [];
-        const childWidths = children.map((child) => subtreeWidths.get(child.id) ?? measure(child));
+        const childWidths = children.map(
+            (child) => subtreeWidths.get(child.id) ?? measure(child),
+        );
         const childrenWidth = childWidths.reduce(
             (total, childWidth, index) =>
                 total + childWidth + (index > 0 ? horizontalGap : 0),
@@ -1064,6 +1201,7 @@ function buildHierarchyGraph(version: Version): {
 
     const layoutRoots = roots.length ? roots : version.nodes.slice(0, 1);
     let rootLeft = 0;
+
     for (const root of layoutRoots) {
         const width = measure(root);
         place(root, rootLeft, 0);
@@ -1082,12 +1220,14 @@ function buildHierarchyGraph(version: Version): {
     }));
     const edges = version.nodes.flatMap((node) =>
         node.parent_node
-            ? [{
-                  id: `${node.parent_node.id}-${node.id}`,
-                  source: node.parent_node.id,
-                  target: node.id,
-                  type: 'smoothstep',
-              }]
+            ? [
+                  {
+                      id: `${node.parent_node.id}-${node.id}`,
+                      source: node.parent_node.id,
+                      target: node.id,
+                      type: 'smoothstep',
+                  },
+              ]
             : [],
     );
 
@@ -1099,11 +1239,15 @@ function HierarchyCanvas({ version }: { version: Version }) {
 
     return (
         <div className="overflow-hidden rounded-xl border border-border bg-background shadow-xs">
-            <div className="border-b border-border bg-card/80 px-4 py-2.5 flex items-center justify-between text-xs font-semibold text-foreground">
+            <div className="flex items-center justify-between border-b border-border bg-card/80 px-4 py-2.5 text-xs font-semibold text-foreground">
                 <span className="flex items-center gap-2">
-                    <Network className="size-4 text-primary" /> Visualisasi Organigram Struktur Perusahaan
+                    <Network className="size-4 text-primary" /> Visualisasi
+                    Organigram Struktur Perusahaan
                 </span>
-                <Badge variant="outline" className="text-[10px] font-mono bg-primary/5 text-primary border-primary/20">
+                <Badge
+                    variant="outline"
+                    className="border-primary/20 bg-primary/5 font-mono text-[10px] text-primary"
+                >
                     {version.nodes.length} Unit Terhubung
                 </Badge>
             </div>
@@ -1119,7 +1263,11 @@ function HierarchyCanvas({ version }: { version: Version }) {
                 >
                     <Background gap={18} size={1} />
                     <Controls />
-                    <MiniMap pannable zoomable className="!bottom-3 !right-3 !rounded-lg overflow-hidden border border-border/60" />
+                    <MiniMap
+                        pannable
+                        zoomable
+                        className="!right-3 !bottom-3 overflow-hidden !rounded-lg border border-border/60"
+                    />
                 </ReactFlow>
             </div>
         </div>
@@ -1148,7 +1296,9 @@ function RemovePlacementAction({
                 <AlertDialogHeader>
                     <AlertDialogTitle>Batalkan penempatan?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        {node.organization.name} akan dilepas dari draft ini dan dapat ditempatkan kembali di bawah organisasi yang benar.
+                        {node.organization.name} akan dilepas dari draft ini dan
+                        dapat ditempatkan kembali di bawah organisasi yang
+                        benar.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1186,7 +1336,11 @@ function CreateVersionDraftAction({ version }: { version: Version }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="text-xs font-medium">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs font-medium"
+                >
                     <Plus className="mr-1.5 size-3.5" /> Buat Versi Baru
                 </Button>
             </DialogTrigger>
@@ -1194,7 +1348,8 @@ function CreateVersionDraftAction({ version }: { version: Version }) {
                 <DialogHeader>
                     <DialogTitle>Buat Draft Versi Baru</DialogTitle>
                     <DialogDescription>
-                        Versi yang sudah dipublikasikan tetap menjadi riwayat resmi.
+                        Versi yang sudah dipublikasikan tetap menjadi riwayat
+                        resmi.
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -1209,7 +1364,9 @@ function CreateVersionDraftAction({ version }: { version: Version }) {
                     <DialogBody className="space-y-4 py-3">
                         <FieldGroup>
                             <Field
-                                data-invalid={Boolean(form.errors.effective_from)}
+                                data-invalid={Boolean(
+                                    form.errors.effective_from,
+                                )}
                             >
                                 <Input
                                     label="Berlaku Mulai Tanggal"
@@ -1252,39 +1409,46 @@ export default function OrganizationPage({
     purposes,
     operatingUnitTypes,
 }: Props) {
-    const [selectedOrganizationId, setSelectedOrganizationId] = useState<string | null>(null);
+    const [selectedOrganizationId, setSelectedOrganizationId] = useState<
+        string | null
+    >(null);
     const [organizationSearch, setOrganizationSearch] = useState('');
     const isHierarchySection = section === 'hierarchies';
-    const classification = section === 'operating-units' ? 'operating_unit' : 'legal_entity';
-    
+    const classification =
+        section === 'operating-units' ? 'operating_unit' : 'legal_entity';
+
     const visibleOrganizations = organizations.filter(
         (organization) => organization.classification === classification,
     );
-    const legalEntitiesCount = organizations.filter((o) => o.classification === 'legal_entity').length;
-    const operatingUnitsCount = organizations.filter((o) => o.classification === 'operating_unit').length;
-    
-    const organizationSearchTerm = organizationSearch.trim().toLocaleLowerCase();
-    const filteredOrganizations = visibleOrganizations.filter((organization) => {
-        if (!organizationSearchTerm) {
-            return true;
-        }
 
-        return [
-            organization.name,
-            organization.legal_entity?.company_code,
-            organization.legal_entity?.country_code,
-            organization.operating_unit?.type,
-            organization.operating_unit?.type
-                ? operatingUnitTypes[organization.operating_unit.type]
-                : undefined,
-        ].some((value) =>
-            value?.toLocaleLowerCase().includes(organizationSearchTerm),
-        );
-    });
+    const organizationSearchTerm = organizationSearch
+        .trim()
+        .toLocaleLowerCase();
+    const filteredOrganizations = visibleOrganizations.filter(
+        (organization) => {
+            if (!organizationSearchTerm) {
+                return true;
+            }
+
+            return [
+                organization.name,
+                organization.legal_entity?.company_code,
+                organization.legal_entity?.country_code,
+                organization.operating_unit?.type,
+                organization.operating_unit?.type
+                    ? operatingUnitTypes[organization.operating_unit.type]
+                    : undefined,
+            ].some((value) =>
+                value?.toLocaleLowerCase().includes(organizationSearchTerm),
+            );
+        },
+    );
     const selectedOrganization =
         visibleOrganizations.find(
             (organization) => organization.id === selectedOrganizationId,
-        ) ?? filteredOrganizations[0] ?? null;
+        ) ??
+        filteredOrganizations[0] ??
+        null;
 
     return (
         <>
@@ -1294,10 +1458,7 @@ export default function OrganizationPage({
                 <Heading
                     title="Organisasi Perusahaan"
                     description={`Pengelolaan identitas entitas legal, unit operasional, dan bagan hirarki organisasi untuk ${tenant.name}.`}
-                    icon={Building2}
                 />
-
-
 
                 {/* Navigasi Tab Bagian Organisasi */}
                 <nav
@@ -1318,11 +1479,13 @@ export default function OrganizationPage({
                                 aria-current={isActive ? 'page' : undefined}
                                 className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
                                     isActive
-                                        ? 'bg-card text-foreground shadow-xs border border-border/80 font-bold'
+                                        ? 'border border-border/80 bg-card font-bold text-foreground shadow-xs'
                                         : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'
                                 }`}
                             >
-                                <IconComp className={`size-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                                <IconComp
+                                    className={`size-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
+                                />
                                 {label as string}
                             </Link>
                         );
@@ -1330,11 +1493,11 @@ export default function OrganizationPage({
                 </nav>
 
                 {!isHierarchySection && (
-                    <Card className="w-full min-w-0 shadow-xs border border-border overflow-hidden">
+                    <Card className="w-full min-w-0 overflow-hidden border border-border shadow-xs">
                         <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
-                            <div className="flex items-center justify-between gap-4 w-full">
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                            <div className="flex w-full items-center justify-between gap-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
                                         {classification === 'legal_entity' ? (
                                             <Building2 className="size-4" />
                                         ) : (
@@ -1358,9 +1521,12 @@ export default function OrganizationPage({
                                     <CardAction className="shrink-0">
                                         <CreateOrganizationDialog
                                             classification={classification}
-                                            operatingUnitTypes={operatingUnitTypes}
+                                            operatingUnitTypes={
+                                                operatingUnitTypes
+                                            }
                                             triggerLabel={
-                                                classification === 'legal_entity'
+                                                classification ===
+                                                'legal_entity'
                                                     ? 'Legal Entity'
                                                     : 'Operating Unit'
                                             }
@@ -1376,69 +1542,101 @@ export default function OrganizationPage({
                                     <aside className="flex min-w-0 flex-col overflow-hidden border-r border-border bg-card/40">
                                         <div className="shrink-0 space-y-2 border-b border-border p-4">
                                             <div className="flex items-center justify-between">
-                                                <p className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                                                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                     Pilih Organisasi
                                                 </p>
-                                                <Badge variant="outline" className="text-[10px]">
-                                                    {filteredOrganizations.length} Total
+                                                <Badge
+                                                    variant="outline"
+                                                    className="text-[10px]"
+                                                >
+                                                    {
+                                                        filteredOrganizations.length
+                                                    }{' '}
+                                                    Total
                                                 </Badge>
                                             </div>
                                             <div className="relative">
-                                                <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+                                                <Search className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
                                                 <Input
                                                     placeholder="Cari nama atau kode..."
                                                     value={organizationSearch}
-                                                    className="pl-8 text-xs bg-background h-8"
+                                                    className="h-8 bg-background pl-8 text-xs"
                                                     onChange={(event) =>
-                                                        setOrganizationSearch(event.target.value)
+                                                        setOrganizationSearch(
+                                                            event.target.value,
+                                                        )
                                                     }
                                                 />
                                             </div>
                                         </div>
-                                        <div className="min-h-0 flex-1 overflow-y-auto space-y-1 p-2">
+                                        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
                                             {filteredOrganizations.length ? (
-                                                filteredOrganizations.map((organization) => {
-                                                    const selected = organization.id === selectedOrganization?.id;
-                                                    const subtitle = organization.legal_entity
-                                                        ? `${organization.legal_entity.company_code} · ${organization.legal_entity.country_code}`
-                                                        : (operatingUnitTypes[
-                                                              organization.operating_unit?.type ?? ''
-                                                          ] ?? organization.operating_unit?.type);
+                                                filteredOrganizations.map(
+                                                    (organization) => {
+                                                        const selected =
+                                                            organization.id ===
+                                                            selectedOrganization?.id;
+                                                        const subtitle =
+                                                            organization.legal_entity
+                                                                ? `${organization.legal_entity.company_code} · ${organization.legal_entity.country_code}`
+                                                                : (operatingUnitTypes[
+                                                                      organization
+                                                                          .operating_unit
+                                                                          ?.type ??
+                                                                          ''
+                                                                  ] ??
+                                                                  organization
+                                                                      .operating_unit
+                                                                      ?.type);
 
-                                                    return (
-                                                        <button
-                                                            key={organization.id}
-                                                            type="button"
-                                                            aria-pressed={selected}
-                                                            onClick={() => setSelectedOrganizationId(organization.id)}
-                                                            className={`group flex w-full items-center justify-between rounded-lg border-l-4 p-3 text-left transition-all ${
-                                                                selected
-                                                                    ? 'border-l-primary bg-primary/10 font-semibold text-primary shadow-2xs'
-                                                                    : 'border-l-transparent text-foreground hover:bg-muted/50'
-                                                            }`}
-                                                        >
-                                                            <div className="flex items-start gap-2.5 min-w-0 flex-1 pr-2">
-                                                                {organization.legal_entity ? (
-                                                                    <Building2 className="size-4 text-primary shrink-0 mt-0.5" />
-                                                                ) : (
-                                                                    <Layers className="size-4 text-primary shrink-0 mt-0.5" />
-                                                                )}
-                                                                <div className="min-w-0 flex-1">
-                                                                    <span className="block truncate text-xs font-semibold leading-tight">
-                                                                        {organization.name}
-                                                                    </span>
-                                                                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground font-normal">
-                                                                        {subtitle}
-                                                                    </span>
+                                                        return (
+                                                            <button
+                                                                key={
+                                                                    organization.id
+                                                                }
+                                                                type="button"
+                                                                aria-pressed={
+                                                                    selected
+                                                                }
+                                                                onClick={() =>
+                                                                    setSelectedOrganizationId(
+                                                                        organization.id,
+                                                                    )
+                                                                }
+                                                                className={`group flex w-full items-center justify-between rounded-lg border-l-4 p-3 text-left transition-all ${
+                                                                    selected
+                                                                        ? 'border-l-primary bg-primary/10 font-semibold text-primary shadow-2xs'
+                                                                        : 'border-l-transparent text-foreground hover:bg-muted/50'
+                                                                }`}
+                                                            >
+                                                                <div className="flex min-w-0 flex-1 items-start gap-2.5 pr-2">
+                                                                    {organization.legal_entity ? (
+                                                                        <Building2 className="mt-0.5 size-4 shrink-0 text-primary" />
+                                                                    ) : (
+                                                                        <Layers className="mt-0.5 size-4 shrink-0 text-primary" />
+                                                                    )}
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <span className="block truncate text-xs leading-tight font-semibold">
+                                                                            {
+                                                                                organization.name
+                                                                            }
+                                                                        </span>
+                                                                        <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">
+                                                                            {
+                                                                                subtitle
+                                                                            }
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                            <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
-                                                        </button>
-                                                    );
-                                                })
+                                                                <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                                                            </button>
+                                                        );
+                                                    },
+                                                )
                                             ) : (
                                                 <p className="p-4 text-center text-xs text-muted-foreground italic">
-                                                    Tidak ada organisasi yang cocok.
+                                                    Tidak ada organisasi yang
+                                                    cocok.
                                                 </p>
                                             )}
                                         </div>
@@ -1449,9 +1647,13 @@ export default function OrganizationPage({
                                         <div className="flex min-w-0 overflow-hidden bg-card">
                                             <OrganizationDetailPage
                                                 key={selectedOrganization.id}
-                                                organization={selectedOrganization}
+                                                organization={
+                                                    selectedOrganization
+                                                }
                                                 canManage={canManage}
-                                                operatingUnitTypes={operatingUnitTypes}
+                                                operatingUnitTypes={
+                                                    operatingUnitTypes
+                                                }
                                             />
                                         </div>
                                     )}
@@ -1463,9 +1665,12 @@ export default function OrganizationPage({
                                             <Building2 className="size-8 text-muted-foreground" />
                                         </EmptyMedia>
                                         <EmptyTitle>
-                                            Belum Ada {classification === 'legal_entity' ? 'Legal Entity' : 'Operating Unit'}
+                                            Belum Ada{' '}
+                                            {classification === 'legal_entity'
+                                                ? 'Legal Entity'
+                                                : 'Operating Unit'}
                                         </EmptyTitle>
-                                        <EmptyDescription className="text-xs text-muted-foreground max-w-sm">
+                                        <EmptyDescription className="max-w-sm text-xs text-muted-foreground">
                                             {classification === 'legal_entity'
                                                 ? 'Buat legal entity pertama agar transaksi resmi dan perpajakan memiliki identitas badan hukum.'
                                                 : 'Buat operating unit bila proses bisnis membutuhkan struktur departemen atau divisi.'}
@@ -1478,17 +1683,21 @@ export default function OrganizationPage({
                 )}
 
                 {isHierarchySection && (
-                    <Card className="shadow-xs border border-border overflow-hidden">
+                    <Card className="overflow-hidden border border-border shadow-xs">
                         <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
-                            <div className="flex items-center justify-between gap-4 w-full">
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                            <div className="flex w-full items-center justify-between gap-4">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
                                         <Network className="size-4" />
                                     </div>
                                     <div className="min-w-0">
-                                        <CardTitle>Hierarchy Organisasi</CardTitle>
+                                        <CardTitle>
+                                            Hierarchy Organisasi
+                                        </CardTitle>
                                         <CardDescription className="mt-0.5 text-sm text-muted-foreground">
-                                            Susun hubungan parent-child hanya untuk proses bisnis yang membutuhkannya.
+                                            Susun hubungan parent-child hanya
+                                            untuk proses bisnis yang
+                                            membutuhkannya.
                                         </CardDescription>
                                     </div>
                                 </div>
@@ -1502,7 +1711,7 @@ export default function OrganizationPage({
                                 )}
                             </div>
                         </CardHeader>
-                        <CardContent className="p-6 space-y-8">
+                        <CardContent className="space-y-8 p-6">
                             {hierarchies.length ? (
                                 hierarchies.map((hierarchy) => {
                                     const version = hierarchy.versions[0];
@@ -1518,12 +1727,16 @@ export default function OrganizationPage({
                                         >
                                             <div className="flex flex-wrap items-start justify-between gap-3">
                                                 <div>
-                                                    <h3 className="font-bold text-base text-foreground">
+                                                    <h3 className="text-base font-bold text-foreground">
                                                         {hierarchy.name}
                                                     </h3>
-                                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                                        Tujuan: {hierarchy.purposes
-                                                            .map((purpose) => purpose.name)
+                                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                                        Tujuan:{' '}
+                                                        {hierarchy.purposes
+                                                            .map(
+                                                                (purpose) =>
+                                                                    purpose.name,
+                                                            )
                                                             .join(' · ') || '—'}
                                                     </p>
                                                 </div>
@@ -1534,57 +1747,79 @@ export default function OrganizationPage({
                                                 </Badge>
                                             </div>
 
-                                            <HierarchyCanvas version={version} />
+                                            <HierarchyCanvas
+                                                version={version}
+                                            />
 
                                             <div className="space-y-3 pt-2">
                                                 <div className="flex items-center justify-between">
-                                                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                                                        Daftar Penempatan Unit Organisasi
+                                                    <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                                        Daftar Penempatan Unit
+                                                        Organisasi
                                                     </p>
                                                     <span className="text-xs text-muted-foreground">
-                                                        {version.nodes.length} Unit Terpasang
+                                                        {version.nodes.length}{' '}
+                                                        Unit Terpasang
                                                     </span>
                                                 </div>
                                                 <div className="grid gap-2.5 md:grid-cols-2 lg:grid-cols-3">
-                                                    {version.nodes.map((node) => (
-                                                        <div
-                                                            key={node.id}
-                                                            className="flex items-center justify-between gap-2 rounded-lg bg-card px-3.5 py-2.5 text-xs border border-border/80 shadow-2xs"
-                                                        >
-                                                            <div className="min-w-0 flex-1">
-                                                                <span className="font-bold text-foreground block truncate">
-                                                                    {node.organization.name}
-                                                                </span>
-                                                                <span className="block text-[11px] text-muted-foreground truncate mt-0.5">
-                                                                    {node.parent_node
-                                                                        ? `Di bawah ${node.parent_node.organization.name}`
-                                                                        : 'Root (Organisasi Puncak)'}
-                                                                </span>
+                                                    {version.nodes.map(
+                                                        (node) => (
+                                                            <div
+                                                                key={node.id}
+                                                                className="flex items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2.5 text-xs shadow-2xs"
+                                                            >
+                                                                <div className="min-w-0 flex-1">
+                                                                    <span className="block truncate font-bold text-foreground">
+                                                                        {
+                                                                            node
+                                                                                .organization
+                                                                                .name
+                                                                        }
+                                                                    </span>
+                                                                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                                                                        {node.parent_node
+                                                                            ? `Di bawah ${node.parent_node.organization.name}`
+                                                                            : 'Root (Organisasi Puncak)'}
+                                                                    </span>
+                                                                </div>
+                                                                {canManage &&
+                                                                    version.status ===
+                                                                        'draft' &&
+                                                                    node.parent_node && (
+                                                                        <RemovePlacementAction
+                                                                            version={
+                                                                                version
+                                                                            }
+                                                                            node={
+                                                                                node
+                                                                            }
+                                                                        />
+                                                                    )}
                                                             </div>
-                                                            {canManage &&
-                                                                version.status === 'draft' &&
-                                                                node.parent_node && (
-                                                                    <RemovePlacementAction
-                                                                        version={version}
-                                                                        node={node}
-                                                                    />
-                                                                )}
-                                                        </div>
-                                                    ))}
+                                                        ),
+                                                    )}
                                                 </div>
                                             </div>
 
-                                            {canManage && version.status === 'draft' && (
-                                                <DraftActions
-                                                    version={version}
-                                                    organizations={organizations}
-                                                />
-                                            )}
-                                            {canManage && version.status === 'published' && (
-                                                <div className="flex justify-end pt-2">
-                                                    <CreateVersionDraftAction version={version} />
-                                                </div>
-                                            )}
+                                            {canManage &&
+                                                version.status === 'draft' && (
+                                                    <DraftActions
+                                                        version={version}
+                                                        organizations={
+                                                            organizations
+                                                        }
+                                                    />
+                                                )}
+                                            {canManage &&
+                                                version.status ===
+                                                    'published' && (
+                                                    <div className="flex justify-end pt-2">
+                                                        <CreateVersionDraftAction
+                                                            version={version}
+                                                        />
+                                                    </div>
+                                                )}
                                         </div>
                                     );
                                 })
@@ -1594,9 +1829,13 @@ export default function OrganizationPage({
                                         <EmptyMedia variant="icon">
                                             <Network className="size-8 text-muted-foreground" />
                                         </EmptyMedia>
-                                        <EmptyTitle>Belum Ada Hierarchy Organisasi</EmptyTitle>
-                                        <EmptyDescription className="text-xs text-muted-foreground max-w-sm">
-                                            Buat hierarchy baru untuk menyusun bagan organigram dan struktur hubungan antar unit bisnis.
+                                        <EmptyTitle>
+                                            Belum Ada Hierarchy Organisasi
+                                        </EmptyTitle>
+                                        <EmptyDescription className="max-w-sm text-xs text-muted-foreground">
+                                            Buat hierarchy baru untuk menyusun
+                                            bagan organigram dan struktur
+                                            hubungan antar unit bisnis.
                                         </EmptyDescription>
                                     </EmptyHeader>
                                 </Empty>

@@ -6,12 +6,16 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** Kontak elektronik party: email, telepon, fax, atau URL. */
+/**
+ * Kontak elektronik party: email, telepon, WhatsApp, fax, atau URL. WhatsApp jenis
+ * tersendiri, bukan telepon berlabel, karena kop dan dokumen menampilkannya terpisah
+ * dari nomor telepon kantor.
+ */
 class ElectronicAddress extends Model
 {
     use HasUlids;
 
-    public const TYPES = ['email', 'phone', 'fax', 'url'];
+    public const TYPES = ['email', 'phone', 'whatsapp', 'fax', 'url'];
 
     protected $fillable = ['tenant_id', 'party_id', 'type', 'value', 'purpose', 'is_primary'];
 

@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Alamat pos pada satu lokasi. `formatted` adalah bentuk tercetak saat alamat
  * disimpan; dokumen resmi menyalinnya supaya perubahan alamat kemudian tidak
  * menulis ulang dokumen lama.
+ *
+ * @property string $formatted
+ * @property string $country_region_code
  */
 class PostalAddress extends Model
 {

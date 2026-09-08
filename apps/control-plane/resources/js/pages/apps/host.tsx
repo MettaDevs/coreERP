@@ -1,7 +1,9 @@
-import { Head, router } from '@inertiajs/react';
 import type { CoreErpTheme } from '@apperp/ui/theme';
+import { Head, router } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { useAppearance } from '@/hooks/use-appearance';
+import { addNotification, isAppNotificationMessage } from '@/lib/notifications';
+import { isPrintMessage, requestPrint } from '@/lib/print-requests';
 
 type HostedApp = {
     id: string;
@@ -68,7 +70,10 @@ function AppFrame({ app }: { app: HostedApp }) {
     const { resolvedAppearance } = useAppearance();
 
     const sendContext = () => {
-        if (loadedEntry.current !== app.contentEntry) return;
+        if (loadedEntry.current !== app.contentEntry) {
+            return;
+        }
+
         const origin = new URL(app.contentEntry, window.location.origin).origin;
         const theme: CoreErpTheme = {
             appearance: resolvedAppearance,
@@ -104,8 +109,55 @@ function AppFrame({ app }: { app: HostedApp }) {
             setState('ready');
             sendContext();
         };
+        // Pemberitahuan dari app masuk ke lonceng Shell. Sumber, origin, dan appId
+        // diperiksa seperti pada `coreerp.ready`; frame lain tidak dapat menyusup.
+        const receiveNotification = (event: MessageEvent) => {
+            if (
+                event.source !== frame.current?.contentWindow ||
+                event.origin !== frameOrigin ||
+                !isAppNotificationMessage(event.data) ||
+                event.data.appId !== app.id
+            ) {
+                return;
+            }
 
+            const { notification } = event.data;
+            addNotification({
+                id: `${app.id}:${notification.id}`,
+                appId: app.id,
+                appName: app.name,
+                level: notification.level ?? 'info',
+                title: notification.title,
+                body: notification.body,
+                href: notification.view
+                    ? `/apps/${encodeURIComponent(app.id)}?view=${encodeURIComponent(notification.view)}`
+                    : `/apps/${encodeURIComponent(app.id)}`,
+            });
+        };
+
+        // Permintaan cetak dari app membuka dialog cetak milik Shell; app hanya menyebut
+        // kode laporan dan parameternya, Core yang memilih layout dan mengantrekan.
+        const receivePrint = (event: MessageEvent) => {
+            if (
+                event.source !== frame.current?.contentWindow ||
+                event.origin !== frameOrigin ||
+                !isPrintMessage(event.data) ||
+                event.data.appId !== app.id
+            ) {
+                return;
+            }
+
+            requestPrint({
+                appId: app.id,
+                appName: app.name,
+                reportCode: `${app.id}.${event.data.report}`,
+                title: event.data.title,
+                parameters: event.data.parameters,
+            });
+        };
         window.addEventListener('message', receiveReady);
+        window.addEventListener('message', receiveNotification);
+        window.addEventListener('message', receivePrint);
         sendContext();
         const refresh = window.setInterval(
             () => router.reload({ only: ['app'] }),
@@ -114,9 +166,17 @@ function AppFrame({ app }: { app: HostedApp }) {
 
         return () => {
             window.removeEventListener('message', receiveReady);
+            window.removeEventListener('message', receiveNotification);
+            window.removeEventListener('message', receivePrint);
             window.clearInterval(refresh);
         };
-    }, [app.contentEntry, app.contextToken, app.id, resolvedAppearance]);
+    }, [
+        app.contentEntry,
+        app.contextToken,
+        app.id,
+        app.name,
+        resolvedAppearance,
+    ]);
 
     useEffect(() => {
         // Proxy yang tidak melayani path app umumnya membalas cepat, tetapi
@@ -145,9 +205,9 @@ function AppFrame({ app }: { app: HostedApp }) {
             />
 
             {state !== 'ready' && (
-                <div className="bg-background absolute inset-0 flex items-center justify-center p-6">
+                <div className="absolute inset-0 flex items-center justify-center bg-background p-6">
                     {state === 'loading' ? (
-                        <p className="text-muted-foreground text-sm">
+                        <p className="text-sm text-muted-foreground">
                             Memuat {app.name}…
                         </p>
                     ) : (
@@ -155,7 +215,7 @@ function AppFrame({ app }: { app: HostedApp }) {
                             <p className="font-medium">
                                 {app.name} belum bisa dimuat
                             </p>
-                            <p className="text-muted-foreground text-sm">
+                            <p className="text-sm text-muted-foreground">
                                 Halaman app tidak merespons. Biasanya ini
                                 berarti layanannya sedang tidak berjalan atau
                                 belum selesai dipasang. Coba muat ulang sebentar

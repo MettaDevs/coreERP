@@ -2775,7 +2775,10 @@
                         "maxLength": 40
                     },
                     "database_name": {
-                        "type": "string",
+                        "type": [
+                            "string",
+                            "null"
+                        ],
                         "pattern": "^[a-z][a-z0-9_]*$",
                         "maxLength": 120
                     },
@@ -3132,7 +3135,6 @@
                     "id",
                     "name",
                     "version",
-                    "database_name",
                     "navigation",
                     "security",
                     "number_sequences"
@@ -3264,7 +3266,10 @@
                         "type": "string"
                     },
                     "database_name": {
-                        "type": "string"
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     },
                     "description": {
                         "type": [

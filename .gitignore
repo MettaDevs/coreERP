@@ -18,3 +18,8 @@ storage/pail/
 # VitePress
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+
+# Kunci SSH lokal, jangan pernah di-commit
+.codex-server-migrate*
+*-ed25519
+*-ed25519.pub

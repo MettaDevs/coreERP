@@ -61,6 +61,23 @@ Saat memberi tugas ke AI, nyatakan kebutuhan ini secara langsung, misalnya: “B
 5. Use SDK `Table`, `Card`, `Badge`, `Empty`, and pagination controls.
 6. Keep end-user copy in everyday Indonesian and explain the action or impact.
 
+## New pages inside Control Plane (Shell)
+
+Two mistakes shipped a page with a doubled header and no way to reach it. Both are invisible in type-check and lint, so check them by hand.
+
+- **Never wrap a Core page in `AppLayout`.** `resources/js/app.tsx` already assigns `AppLayout` as the default Inertia layout for every page outside `auth/` and `welcome`. A page that renders `<AppLayout>` itself gets the header, rail, and sidebar twice — the screenshot looks like a Shell inside a Shell. Return a fragment with `<Head>` and your `<main>`, and pass breadcrumbs through the page property instead:
+
+  ```tsx
+  export default function ReportExports(props: Props) { /* ... */ }
+  ReportExports.layout = {
+      breadcrumbs: [{ title: 'Ekspor laporan', href: '/reports/exports' }] satisfies BreadcrumbItem[],
+  };
+  ```
+
+  Follow `pages/workflow-inbox.tsx` or `pages/settings/number-sequences.tsx`; do not follow older pages that still import `AppLayout` directly.
+- **Every new route needs an entry in `components/app-sidebar.tsx`.** That file is the main Shell navigation the user sees (Dashboard, Organization, Data referensi, Nomor dokumen, ...). `layouts/settings/layout.tsx` is only the sub-navigation of the Profile/Security/Appearance pages; a link placed there alone is unreachable from the rail. Put the item under the existing group it belongs to (admin-only groups are already gated on `system_role`), and add it to the settings sub-nav too only if the page uses that layout.
+- **Verify by walking the rail**, not by opening the URL directly: open the Shell, click through the rail to the new page, and confirm one header and one sidebar. A page reached by typing its URL proves nothing about either rule.
+
 ## Theme bridge
 
 The Shell sends `theme: { appearance: 'light' | 'dark', font: 'poppins' | 'geist' }` in `coreerp.context`. After validating `event.source`, `event.origin`, and `appId`, call `applyCoreErpTheme(event.data.theme)` from `@apperp/ui/theme`. Fonts are self-hosted by the package.

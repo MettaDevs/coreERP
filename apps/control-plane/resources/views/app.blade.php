@@ -36,8 +36,31 @@
 
         @fonts
 
+        @php
+            /*
+             * Berkas halaman ikut diminta di sini supaya peramban mengunduhnya bersamaan
+             * dengan berkas masuk, bukan sesudahnya. Halaman module tidak ikut, dan itu
+             * disengaja.
+             *
+             * Nama halaman module berbentuk `<id module>::<berkas>` dan tidak menyebut
+             * penerbitnya, sedangkan kunci manifest Vite menyebutkan jalur lengkapnya
+             * (`../../modules/<penerbit>/<modul>/ui/Pages/<berkas>.tsx`). Menebak jalur itu
+             * dari nama halaman berarti menaruh susunan folder module di dalam sebuah
+             * template Blade. Lebih dari itu, jalur berawalan `../..` tidak bisa dilayani
+             * server pengembangan Vite tanpa awalan `/@fs/`, sehingga baris yang bekerja
+             * pada `npm run build` justru gagal saat dikembangkan.
+             *
+             * Halaman module memang dimuat malas — itu sebabnya tuan rumahnya wajib punya
+             * pembatas penangguhan — jadi ia diambil pemilih halaman sesudah berkas masuk
+             * berjalan, dengan biaya satu perjalanan jaringan tambahan sekali per halaman.
+             */
+            $berkasHalaman = str_contains($page['component'], '::')
+                ? []
+                : ["resources/js/pages/{$page['component']}.tsx"];
+        @endphp
+
         @viteReactRefresh
-        @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
+        @vite(['resources/css/app.css', 'resources/js/app.tsx', ...$berkasHalaman])
         <x-inertia::head>
             <title>{{ config('app.name', 'Laravel') }}</title>
         </x-inertia::head>

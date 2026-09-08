@@ -7,15 +7,18 @@ on:
       - main
       - master
       - workos
+  # Tanpa daftar cabang. Pull request yang basisnya cabang fitur — pull request
+  # bertumpuk, yang dipakai saat sebuah task bergantung pada task sebelumnya — tidak
+  # mendapat pemeriksaan sama sekali selama daftar ini ada, dan itu tidak terlihat
+  # sebagai kegagalan: halaman pull request-nya hanya kosong.
   pull_request:
-    branches:
-      - develop
-      - main
-      - master
-      - workos
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
@@ -38,6 +41,21 @@ jobs:
           composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
           npm ci
 
+      - name: Copy Environment File
+        run: cp .env.example .env
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      # Impor seperti `@/actions/...` dan `@/routes/...` menunjuk berkas buatan Wayfinder
+      # yang tidak ikut di-commit. Tanpa berkasnya, resolver ESLint tidak menemukan
+      # modulnya dan import/order menggolongkannya berbeda dari yang dilihat pengembang
+      # di mesin sendiri, sehingga alur ini menuntut urutan yang justru ditolak `npm run
+      # lint` lokal. Alur test tidak kena karena `npm run build` membuatnya sebagai efek
+      # samping.
+      - name: Generate Wayfinder Files
+        run: php artisan wayfinder:generate --with-form --no-interaction
+
       - name: Run Pint
         run: composer lint:check
 
@@ -46,6 +64,25 @@ jobs:
 
       - name: Lint Frontend
         run: npm run lint:check
+
+      # ESLint dan Prettier memeriksa bentuk, bukan tipe. Tanpa langkah ini, empat
+      # kesalahan TS2322 berdiri di cabang utama tanpa ada yang menahannya. Berkas
+      # Wayfinder harus sudah dibuat lebih dulu, karena halaman mengimpor tipe dari sana.
+      - name: Check Frontend Types
+        run: npm run types:check
+
+      # Dipindah ke sini dari alur test. Analisa tipe PHP tidak bergantung versi PHP, jadi
+      # menjalankannya di dalam matriks berarti mengerjakan hal yang sama dua kali dengan
+      # hasil yang pasti sama. Pembangunan aset TIDAK ikut pindah: test membutuhkannya.
+      - name: Run Type Analysis
+        run: composer types:check
+
+      # `.agents/skills` dan `.claude/skills` dibaca alat yang berbeda dan isinya sudah
+      # menyimpang diam-diam sekali. Tidak ada test yang gagal karena aturan di satu
+      # salinan hilang di salinan lain.
+      - name: Check skill copies are in sync
+        working-directory: .
+        run: python3 .github/scripts/check-skill-copies.py
 
       # A route under internal/v1 is called by another application. No test fails when
       # one is missing from the contract, so this is the only step that notices.

@@ -1,7 +1,3 @@
-import { Head } from '@inertiajs/react';
-import { Box, Database, PackageCheck } from 'lucide-react';
-
-import Heading from '@/components/heading';
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import { Badge } from '@apperp/ui/badge';
 import {
@@ -11,13 +7,18 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { Head } from '@inertiajs/react';
+import { Box, Database, PackageCheck } from 'lucide-react';
+
+import Heading from '@/components/heading';
 
 type App = {
     id: string;
     name: string;
     version: string;
     status: string;
-    database_name: string;
+    // Null untuk module: ia memakai database Core, jadi tidak punya nama database sendiri.
+    database_name: string | null;
     description: string;
 };
 
@@ -83,7 +84,10 @@ export default function AppCatalog({ apps }: { apps: App[] }) {
                                         <span className="text-muted-foreground">
                                             Database
                                         </span>
-                                        <code>{app.database_name}</code>
+                                        <code>
+                                            {app.database_name ??
+                                                'database Core (module)'}
+                                        </code>
                                     </div>
                                 </CardContent>
                             </Card>

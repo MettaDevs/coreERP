@@ -17,3 +17,9 @@ Schedule::command('workflow-events:publish')
     ->everyMinute()
     ->onOneServer()
     ->withoutOverlapping();
+
+// Hasil ekspor laporan punya masa simpan; lihat config/reporting.php.
+Schedule::command('reporting:purge-exports')
+    ->hourly()
+    ->onOneServer()
+    ->withoutOverlapping();

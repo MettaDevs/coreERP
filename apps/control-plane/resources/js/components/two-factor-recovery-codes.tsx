@@ -1,7 +1,3 @@
-import { Form } from '@inertiajs/react';
-import { Eye, EyeOff, LockKeyhole, RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import AlertError from '@/components/alert-error';
 import { Button } from '@apperp/ui/button';
 import {
     Card,
@@ -10,6 +6,10 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { Form } from '@inertiajs/react';
+import { Eye, EyeOff, LockKeyhole, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import AlertError from '@/components/alert-error';
 import { regenerateRecoveryCodes } from '@/routes/two-factor';
 
 type Props = {

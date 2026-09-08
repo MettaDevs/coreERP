@@ -104,7 +104,7 @@ return new class extends Migration
             $table->ulid('id')->primary();
             $table->foreignUlid('tenant_id')->constrained()->cascadeOnDelete();
             $table->ulid('party_id');
-            // `email`, `phone`, `fax`, atau `url`.
+            // `email`, `phone`, `whatsapp`, `fax`, atau `url`.
             $table->string('type', 20);
             $table->string('value', 250);
             $table->string('purpose', 30)->nullable();

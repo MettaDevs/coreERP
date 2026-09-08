@@ -1,9 +1,3 @@
-import { Head, useForm } from '@inertiajs/react';
-import { Building2, KeyRound, Package } from 'lucide-react';
-import { useState } from 'react';
-
-import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import {
@@ -25,6 +19,11 @@ import { Input } from '@apperp/ui/input';
 import { Spinner } from '@apperp/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
+import { Head, useForm } from '@inertiajs/react';
+import { Building2, KeyRound, Package } from 'lucide-react';
+import { useState } from 'react';
+import PasswordInput from '@/components/password-input';
+import TextLink from '@/components/text-link';
 
 type AppOption = { id: string; name: string; description: string };
 type Props = { passwordRules: string; apps: AppOption[] };

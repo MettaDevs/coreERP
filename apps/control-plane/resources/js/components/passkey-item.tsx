@@ -1,5 +1,3 @@
-import { KeyRound, Trash2 } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Dialog,
@@ -12,6 +10,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@apperp/ui/dialog';
+import { KeyRound, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 import type { Passkey } from '@/types/auth';
 
 type Props = {

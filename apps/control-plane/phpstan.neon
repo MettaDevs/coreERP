@@ -1,6 +1,15 @@
 includes:
     - vendor/larastan/larastan/extension.neon
     - vendor/nesbot/carbon/extension.neon
+    # phpstan-baseline.neon membekukan 348 temuan yang sudah ada sejak commit pertama.
+    # Level 7 tidak pernah hijau, jadi langkah "Run Type Analysis" tidak pernah sampai ke
+    # langkah test, dan tidak ada satu pun pull request yang benar-benar diperiksa. Membekukan
+    # yang lama membuat kode baru tetap diperiksa penuh sejak hari ini.
+    #
+    # Berkas ini hanya boleh menyusut. Menambah baris ke dalamnya berarti menyembunyikan
+    # temuan baru, dan itu ditolak saat peninjauan. Cara menyusutkannya: perbaiki temuannya,
+    # lalu jalankan `composer types:check` — baris yang sudah tidak terpakai akan dilaporkan.
+    - phpstan-baseline.neon
 
 parameters:
     paths:
@@ -9,5 +18,12 @@ parameters:
         - config/
         - database/
         - routes/
+        - ../../modules/
 
     level: 7
+
+    # Kelas module dimuat lewat pemindaian direktori, bukan lewat autoload Composer.
+    # Autoload itu baru dipasang pada fase 2; sampai saat itu, tanpa baris ini setiap
+    # kelas module dilaporkan tidak ditemukan.
+    scanDirectories:
+        - ../../modules/

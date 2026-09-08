@@ -1,0 +1,38 @@
+id: contoh-a
+name: Contoh A
+description: Module contoh untuk menguji penjaga batas. Bukan produk, dan tidak pernah ikut ke edisi pelanggan.
+publisher: apperp
+version: 0.1.0
+
+# internal-fixture, bukan business-app. Module contoh hidup di repo sampai fase 7, jadi ia
+# ada saat bundle edisi dibangun. Tanda inilah yang dipakai F5-04 untuk menolaknya, beserta
+# test yang membuktikan penolakannya. Sebuah menu "Contoh A" di layar pelanggan adalah
+# kegagalan yang tidak boleh mungkin terjadi.
+kind: internal-fixture
+
+requires:
+  core: ^0.1
+depends_on: []
+
+# Awalan tabel dipilih sekali dan tidak berubah. Lihat tabel pemetaan di modules/README.md.
+table_prefix: contoh_a_
+
+# Menu module. Bentuknya sama persis dengan milik app yang masih berjalan sebagai container,
+# dan itu memang tujuannya: yang berubah saat sebuah app menjadi module hanyalah tujuan
+# tautannya, bukan cara menunya dinyatakan maupun cara izin menyaringnya.
+#
+# Tidak ada `ui.image` di sini. Module tidak punya container UI sendiri; halamannya ikut
+# build shell dari folder `ui/`.
+#
+# `id` sebuah entri menu adalah juga jalur rutenya: Core menyusun tautan `/contoh-a/<id>`,
+# dan berkas rute module wajib punya rute dengan jalur itu.
+ui:
+  navigation:
+    rail:
+      - id: master
+        label: Master data
+    sidebar:
+      master:
+        - id: daftar-barang
+          label: Daftar barang
+          permission: contoh-a.barang.read

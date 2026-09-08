@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Solusi lebih murah">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1600" background="#ffffff">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- TITLE + PROBLEM -->
+        <mxCell id="title" value="Client beli sebagian modul: cara yang sekarang vs cara Odoo / ERPNext / Business Central" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1700" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="problem" value="&lt;b&gt;Masalah asal:&lt;/b&gt; Apotek hanya beli Farmasi + Kasir. Praktek dokter hanya beli Registrasi + Rawat Jalan. Dulu satu source untuk semua, jadi kode dan tabel yang tidak dibeli dihapus manual per client, dan client bisa menyalakan fitur yang tidak dibayar." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left;spacingLeft=12;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1700" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- ================= LEFT: CURRENT ================= -->
+        <mxCell id="L" value="SEKARANG: satu proses + satu database per app (pola microservice, mirip Bahmni)" style="swimlane;startSize=36;fontStyle=1;fontSize=14;fillColor=#fff5f5;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="40" y="160" width="820" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="L_gw" value="Web shell / gateway" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="L">
+          <mxGeometry x="310" y="56" width="200" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- app containers -->
+        <mxCell id="L_reg" value="Registrasi" style="swimlane;startSize=30;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="L">
+          <mxGeometry x="20" y="140" width="140" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="L_reg_api" value="API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_reg">
+          <mxGeometry x="10" y="40" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_reg_ui" value="UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_reg">
+          <mxGeometry x="10" y="90" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_reg_db" value="DB" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="L_reg">
+          <mxGeometry x="30" y="140" width="80" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="L_rj" value="Rawat Jalan" style="swimlane;startSize=30;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="L">
+          <mxGeometry x="180" y="140" width="140" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="L_rj_api" value="API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_rj">
+          <mxGeometry x="10" y="40" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_rj_ui" value="UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_rj">
+          <mxGeometry x="10" y="90" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_rj_db" value="DB" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="L_rj">
+          <mxGeometry x="30" y="140" width="80" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="L_far" value="Farmasi" style="swimlane;startSize=30;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="L">
+          <mxGeometry x="340" y="140" width="140" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="L_far_api" value="API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_far">
+          <mxGeometry x="10" y="40" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_far_ui" value="UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_far">
+          <mxGeometry x="10" y="90" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_far_db" value="DB" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="L_far">
+          <mxGeometry x="30" y="140" width="80" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="L_inv" value="Inventory" style="swimlane;startSize=30;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="L">
+          <mxGeometry x="500" y="140" width="140" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="L_inv_api" value="API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_inv">
+          <mxGeometry x="10" y="40" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_inv_ui" value="UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_inv">
+          <mxGeometry x="10" y="90" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_inv_db" value="DB" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="L_inv">
+          <mxGeometry x="30" y="140" width="80" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="L_kas" value="Kasir" style="swimlane;startSize=30;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="L">
+          <mxGeometry x="660" y="140" width="140" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="L_kas_api" value="API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_kas">
+          <mxGeometry x="10" y="40" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_kas_ui" value="UI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="L_kas">
+          <mxGeometry x="10" y="90" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="L_kas_db" value="DB" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="L_kas">
+          <mxGeometry x="30" y="140" width="80" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="L_core" value="Core (proses + DB sendiri): identity, entitlement, katalog, number sequence, reporting engine, workflow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="L">
+          <mxGeometry x="20" y="400" width="780" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="L_cost" value="&lt;b&gt;Biaya yang dibayar tiap hari:&lt;/b&gt;&lt;br&gt;• Per server customer: 5 API + 5 UI + 6 database container + Core&lt;br&gt;• Resep → farmasi → kasir = lompat jaringan, tidak bisa 1 transaksi&lt;br&gt;• Laporan lintas modul = API composition / CQRS, bukan SQL JOIN&lt;br&gt;• 1 fitur = 2 repo, 2 CI, matriks kompatibilitas versi Core × app&lt;br&gt;• IT client on-prem harus paham Docker multi-service" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=10;spacingTop=4;fontSize=12;" vertex="1" parent="L">
+          <mxGeometry x="20" y="480" width="780" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- left edges -->
+        <mxCell id="L_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.1;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="L" source="L_gw" target="L_reg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="L_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.3;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="L" source="L_gw" target="L_rj">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="L_e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="L" source="L_gw" target="L_far">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="L_e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.7;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="L" source="L_gw" target="L_inv">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="L_e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.9;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="L" source="L_gw" target="L_kas">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="L_x1" value="pasien&#xa;REST" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=10;labelBackgroundColor=#ffffff;strokeColor=#b85450;" edge="1" parent="L" source="L_reg_api" target="L_rj_api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="L_x2" value="resep&#xa;event" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=10;labelBackgroundColor=#ffffff;strokeColor=#b85450;" edge="1" parent="L" source="L_rj_api" target="L_far_api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="L_x3" value="stok&#xa;REST" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=10;labelBackgroundColor=#ffffff;strokeColor=#b85450;" edge="1" parent="L" source="L_far_api" target="L_inv_api">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="L_x4" value="tagihan (event)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=1;fontSize=10;labelBackgroundColor=#ffffff;strokeColor=#b85450;" edge="1" parent="L" source="L_far" target="L_kas">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="410" y="370" />
+              <mxPoint x="730" y="370" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ================= RIGHT: MODULAR MONOLITH ================= -->
+        <mxCell id="R" value="LEBIH MURAH: modular monolith dengan manifest (pola Odoo / ERPNext / Business Central)" style="swimlane;startSize=36;fontStyle=1;fontSize=14;fillColor=#f6fbf5;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="920" y="160" width="820" height="640" as="geometry" />
+        </mxCell>
+
+        <mxCell id="R_rt" value="Core runtime: 1 proses Laravel, 1 image, 1 web shell" style="swimlane;startSize=30;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="R">
+          <mxGeometry x="20" y="56" width="780" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="R_reg" value="Registrasi&#xa;(package)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="R_rt">
+          <mxGeometry x="20" y="50" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="R_rj" value="Rawat Jalan&#xa;(package)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="R_rt">
+          <mxGeometry x="180" y="50" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="R_far" value="Farmasi&#xa;(package)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="R_rt">
+          <mxGeometry x="340" y="50" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="R_inv" value="Inventory&#xa;(package)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="R_rt">
+          <mxGeometry x="500" y="50" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="R_kas" value="Kasir&#xa;(package)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;" vertex="1" parent="R_rt">
+          <mxGeometry x="640" y="50" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="R_link" value="rawat-jalan-farmasi (link module, auto_install)&#xa;terpasang otomatis hanya jika keduanya dibeli" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="R_rt">
+          <mxGeometry x="180" y="160" width="290" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="R_core" value="Core: identity, entitlement, katalog modul, number sequence, reporting, workflow (kode yang sama, tetap dipakai)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;" vertex="1" parent="R_rt">
+          <mxGeometry x="20" y="240" width="750" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="R_d1" value="depends" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;fontSize=10;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="R_rt" source="R_rj" target="R_reg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="R_d2" value="depends" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=10;labelBackgroundColor=#ffffff;dashed=1;" edge="1" parent="R_rt" source="R_far" target="R_inv">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="R_d3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=0;entryX=0.5;entryY=1;dashed=1;" edge="1" parent="R_rt" source="R_link" target="R_rj">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="R_d4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=0;entryX=0.5;entryY=1;dashed=1;" edge="1" parent="R_rt" source="R_link" target="R_far">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="R_db" value="1 database per tenant&#xa;tabel milik tiap modul: reg_*, rj_*, far_*, inv_*, kas_*&#xa;modul lain tidak boleh tulis langsung (batas dijaga di kode, seperti Packwerk di Shopify)" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="R">
+          <mxGeometry x="160" y="386" width="500" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="R_e_db" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="R" source="R_rt" target="R_db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="R_gain" value="&lt;b&gt;Yang jadi lebih murah:&lt;/b&gt;&lt;br&gt;• Per server customer: 1 proses + 1 database (+ worker)&lt;br&gt;• Resep → farmasi → kasir = pemanggilan fungsi, 1 transaksi ACID&lt;br&gt;• Laporan lintas modul = SQL JOIN biasa&lt;br&gt;• 1 fitur = 1 PR per package, tanpa matriks versi runtime&lt;br&gt;• Uninstall modul = drop tabel modul itu saja (seperti Odoo / Business Central)" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;spacingTop=4;fontSize=12;" vertex="1" parent="R">
+          <mxGeometry x="20" y="480" width="780" height="140" as="geometry" />
+        </mxCell>
+
+        <!-- ================= BOTTOM: EDITION BUNDLE FLOW ================= -->
+        <mxCell id="B" value="CARA KIRIM KE ON-PREM: hanya modul yang dibeli yang di-build (pola Odoo Enterprise: kode berbayar tidak pernah sampai ke yang tidak bayar)" style="swimlane;startSize=36;fontStyle=1;fontSize=14;fillColor=#fffdf5;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="40" y="850" width="1700" height="470" as="geometry" />
+        </mxCell>
+
+        <mxCell id="B_repo" value="Repo modul (polyrepo tetap boleh)" style="swimlane;startSize=30;fontStyle=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="B">
+          <mxGeometry x="20" y="56" width="300" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="B_p1" value="registrasi  ·  Composer package + UI bundle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="B_repo">
+          <mxGeometry x="20" y="40" width="260" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="B_p2" value="rawat-jalan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="B_repo">
+          <mxGeometry x="20" y="84" width="260" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="B_p3" value="farmasi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="B_repo">
+          <mxGeometry x="20" y="128" width="260" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="B_p4" value="inventory" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="B_repo">
+          <mxGeometry x="20" y="172" width="260" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="B_p5" value="kasir" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="B_repo">
+          <mxGeometry x="20" y="216" width="260" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="B_p6" value="rawat-jalan-farmasi (link)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="B_repo">
+          <mxGeometry x="20" y="260" width="260" height="34" as="geometry" />
+        </mxCell>
+        <mxCell id="B_pn" value="dipublish ke registry package privat, versi semver" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#666666;" vertex="1" parent="B_repo">
+          <mxGeometry x="20" y="300" width="260" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="B_man" value="&lt;b&gt;Manifest edisi customer&lt;/b&gt;&lt;br&gt;&lt;br&gt;apotek-sejahtera:&lt;br&gt;&amp;nbsp;&amp;nbsp;kasir, inventory, farmasi&lt;br&gt;&lt;br&gt;praktek-dr-budi:&lt;br&gt;&amp;nbsp;&amp;nbsp;registrasi, rawat-jalan, kasir" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;fontSize=12;" vertex="1" parent="B">
+          <mxGeometry x="440" y="56" width="300" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="B_ci" value="&lt;b&gt;CI: build image per edisi&lt;/b&gt;&lt;br&gt;composer require hanya package di manifest&lt;br&gt;+ build UI shell dengan modul itu&lt;br&gt;→ 1 image + compose bertanda tangan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;spacingLeft=10;fontSize=12;" vertex="1" parent="B">
+          <mxGeometry x="440" y="270" width="300" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="B_s1" value="&lt;b&gt;Server Apotek Sejahtera&lt;/b&gt;&lt;br&gt;Image: core + kasir + inventory + farmasi&lt;br&gt;Tabel: kas_*, inv_*, far_*&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;Tidak ada registrasi &amp;amp; rawat jalan: kode tidak ada di image, tabel tidak pernah dibuat&lt;/font&gt;" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;fontSize=12;" vertex="1" parent="B">
+          <mxGeometry x="860" y="56" width="400" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="B_s2" value="&lt;b&gt;Server Praktek dr. Budi&lt;/b&gt;&lt;br&gt;Image: core + registrasi + rawat-jalan + kasir&lt;br&gt;Tabel: reg_*, rj_*, kas_*&lt;br&gt;&lt;font color=&quot;#b85450&quot;&gt;Tidak ada farmasi &amp;amp; inventory, link module juga tidak ikut&lt;/font&gt;" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;fontSize=12;" vertex="1" parent="B">
+          <mxGeometry x="860" y="250" width="400" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="B_why" value="&lt;b&gt;Kenapa lebih murah dari cara sekarang:&lt;/b&gt;&lt;br&gt;• Tidak ada hapus manual: yang tidak dibeli tidak pernah di-build&lt;br&gt;• 1 image per edisi, bukan 10+ image per client&lt;br&gt;• Upgrade = ganti 1 image, jalankan migration modul terpasang&lt;br&gt;• Beli modul tambahan = ubah manifest → image baru → migration modul baru saja, data lama aman&lt;br&gt;• Proteksi lisensi cukup &quot;tidak dikirim&quot;. Odoo menambah ping mingguan, itu opsional&lt;br&gt;• Manifest, dependsOn, entitlement, rantai security yang sudah kalian buat tetap dipakai" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;spacingLeft=10;spacingTop=8;fontSize=12;" vertex="1" parent="B">
+          <mxGeometry x="1300" y="56" width="380" height="324" as="geometry" />
+        </mxCell>
+
+        <mxCell id="B_e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="B" source="B_repo" target="B_ci">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="380" y="226" />
+              <mxPoint x="380" y="325" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="B_e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="B" source="B_man" target="B_ci">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="B_e3" value="bundle apotek" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.3;entryX=0;entryY=0.5;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="B" source="B_ci" target="B_s1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="800" y="303" />
+              <mxPoint x="800" y="121" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="B_e4" value="bundle praktek" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.7;entryX=0;entryY=0.5;fontSize=10;labelBackgroundColor=#ffffff;" edge="1" parent="B" source="B_ci" target="B_s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- LEGEND -->
+        <mxCell id="legend" value="Legenda" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#666666;verticalAlign=top;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1340" width="1700" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1" value="" style="rounded=0;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="legend">
+          <mxGeometry x="20" y="30" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg1t" value="Modul / app bisnis" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="legend">
+          <mxGeometry x="60" y="28" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2" value="" style="rounded=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="legend">
+          <mxGeometry x="260" y="30" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg2t" value="Database / hasil yang sampai ke customer" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="legend">
+          <mxGeometry x="300" y="28" width="260" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3" value="" style="rounded=0;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="legend">
+          <mxGeometry x="600" y="30" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg3t" value="Manifest / link module" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="legend">
+          <mxGeometry x="640" y="28" width="180" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4" value="" style="rounded=0;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="legend">
+          <mxGeometry x="860" y="30" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg4t" value="Gateway / build" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="legend">
+          <mxGeometry x="900" y="28" width="160" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg5" value="" style="rounded=0;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="legend">
+          <mxGeometry x="1100" y="30" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg5t" value="Core platform" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="legend">
+          <mxGeometry x="1140" y="28" width="140" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lg6" value="" style="rounded=0;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="legend">
+          <mxGeometry x="1320" y="30" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="lg6t" value="Biaya / yang tidak boleh ada" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" vertex="1" parent="legend">
+          <mxGeometry x="1360" y="28" width="220" height="20" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,24 @@
+{
+    "name": "apperp/contoh-a",
+    "description": "Module contoh untuk menguji penjaga batas. Bukan produk.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Apperp\\ContohA\\": "src/",
+            "Modules\\Apperp\\ContohA\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Apperp\\ContohA\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}

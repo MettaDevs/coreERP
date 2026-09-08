@@ -132,6 +132,7 @@ export default withMermaid({
             { text: 'Penempatan dan mutasi', link: '/apps/management-aset/transaction/penempatan/' },
             { text: 'Proses penyusutan', link: '/apps/management-aset/transaction/penyusutan/' },
             { text: 'Pemeliharaan aset', link: '/apps/management-aset/transaction/pemeliharaan-aset/' },
+            { text: 'Laporan dan ekspor', link: '/apps/management-aset/transaction/laporan/' },
             { text: 'Dokumen siklus aset', link: '/apps/management-aset/transaction/siklus-aset/' },
             { text: 'Monitoring dan layar kosong', link: '/apps/management-aset/transaction/monitoring/' },
           ],
@@ -169,6 +170,7 @@ export default withMermaid({
             { text: 'Standar module', link: '/dev/02-module-standard' },
             { text: 'Rantai keamanan modul transaksi', link: '/dev/19-transaction-security-chain' },
             { text: 'Visual workflow engine', link: '/dev/21-visual-workflow-engine' },
+            { text: 'Dokumen cetak, layout, dan ekspor', link: '/dev/23-document-rendering' },
             { text: 'API dan integration bridge', link: '/dev/04-api-and-integration' },
             { text: 'Integrasi sistem eksternal', link: '/dev/12-external-module-integration' },
             { text: 'Kustomisasi dan addon', link: '/dev/05-customization-and-addons' },
@@ -181,6 +183,7 @@ export default withMermaid({
             { text: 'Number sequence', link: '/dev/14-number-sequences' },
             { text: 'Kalender fiskal', link: '/dev/15-fiscal-calendars' },
             { text: 'Satuan ukur', link: '/dev/16-units-of-measure' },
+            { text: 'Buku alamat', link: '/dev/24-global-address-book' },
           ],
         },
         {
@@ -216,6 +219,16 @@ export default withMermaid({
           text: 'Backlog — bukan desain kanonik',
           items: [
             { text: 'Cara membaca folder ini', link: '/todo/' },
+            {
+              text: 'Pemindahan ke satu runtime',
+              collapsed: false,
+              items: [
+                { text: 'Ikhtisar', link: '/todo/satu-runtime/' },
+                { text: 'Keputusan arsitektur', link: '/todo/satu-runtime/00-keputusan' },
+                { text: 'PRD dan daftar task', link: '/todo/satu-runtime/01-prd' },
+                { text: 'Bukti penjaga batas', link: '/todo/satu-runtime/02-bukti-penjaga' },
+              ],
+            },
             {
               text: 'Audit fondasi terhadap D365',
               collapsed: false,

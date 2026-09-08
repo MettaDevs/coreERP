@@ -31,8 +31,18 @@ class NumberSequenceConcurrencyTest extends TestCase
     /**
      * Reference data seeded by migrations rather than by a seeder. Nothing restores it between tests, so truncating
      * it here would silently break unrelated suites that run afterwards.
+     *
+     * This list must name every table a migration inserts into. When a new one is added and this list is not, the
+     * failure lands in an unrelated test file and reads like that file's bug. The set is greppable:
+     *
+     *     grep -rho "DB::table('[a-z_]*')->insert" database/migrations/ | sort -u
      */
-    protected array $exceptTables = ['number_sequence_profiles', 'hierarchy_purposes'];
+    protected array $exceptTables = [
+        'country_regions',
+        'hierarchy_purposes',
+        'number_sequence_profiles',
+        'party_types',
+    ];
 
     /**
      * DatabaseTruncation commits its data, while the rest of the suite uses RefreshDatabase and would start its

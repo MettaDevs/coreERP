@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Provider;
 
+use App\Support\Modules\ModuleRegistry;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -33,7 +34,17 @@ class AppCatalogRequest extends FormRequest
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:2000'],
             'version' => ['required', 'string', 'max:40', 'regex:/^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$/'],
-            'database_name' => ['required', 'string', 'max:120', 'regex:/^[a-z][a-z0-9_]*$/'],
+            // Hanya app yang berjalan sebagai container sendiri yang punya database
+            // sendiri untuk disebutkan. Module berjalan di dalam runtime Core dan memakai
+            // database Core, jadi menuntutnya menyebutkan nama database berarti menuntut
+            // sebuah karangan. Lihat `berjalanSebagaiContainer()` untuk cara membedakannya.
+            'database_name' => [
+                Rule::requiredIf(fn (): bool => $this->berjalanSebagaiContainer()),
+                'nullable',
+                'string',
+                'max:120',
+                'regex:/^[a-z][a-z0-9_]*$/',
+            ],
             // Path konten UI ditentukan platform dari (app_id, placement), bukan
             // didaftarkan app. Menerima nilai dari app akan membuat dua placement
             // dari app yang sama berebut path yang sama.
@@ -104,6 +115,21 @@ class AppCatalogRequest extends FormRequest
             'workflow_types.*.name' => ['required', 'string', 'max:160'],
             'workflow_types.*.scope' => ['nullable', Rule::in(['tenant', 'legal_entity'])],
             'workflow_types.*.decision_context_schema' => ['required', 'array'],
+
+            // Laporan cetak/ekspor. Dataset tetap milik app; Core hanya mengenal
+            // katalognya. Lihat docs/dev/23-document-rendering.md.
+            'reports' => ['nullable', 'array'],
+            'reports.*.code' => ['required', 'string', 'max:160', 'regex:/^[a-z0-9][a-z0-9.-]*$/'],
+            'reports.*.name' => ['required', 'string', 'max:160'],
+            'reports.*.description' => ['nullable', 'string', 'max:500'],
+            'reports.*.permission' => ['required', 'string', 'max:160'],
+            'reports.*.parameters' => ['nullable', 'array'],
+            'reports.*.parameters.*' => ['required', 'string', 'max:60', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'reports.*.builtin_layouts' => ['required', 'array', 'min:1'],
+            'reports.*.builtin_layouts.*.key' => ['required', 'string', 'max:40', 'regex:/^[a-z0-9-]+$/'],
+            'reports.*.builtin_layouts.*.name' => ['required', 'string', 'max:120'],
+            'reports.*.builtin_layouts.*.description' => ['nullable', 'string', 'max:500'],
+            'reports.*.builtin_layouts.*.format' => ['required', Rule::in(['docx', 'xlsx'])],
         ];
     }
 
@@ -237,6 +263,26 @@ class AppCatalogRequest extends FormRequest
                     break;
                 }
             }
+
+            $reportCodes = $this->collect('reports')->pluck('code')->all();
+            if (count($reportCodes) !== count(array_unique($reportCodes))) {
+                $validator->errors()->add('reports', 'Kode laporan tidak boleh duplikat.');
+            }
+            $permissionCodes = array_flip($this->collect('security.permissions')->pluck('code')->all());
+            foreach ($this->collect('reports') as $index => $report) {
+                if (! str_starts_with((string) ($report['code'] ?? ''), $appId.'.')) {
+                    $validator->errors()->add("reports.$index.code", 'Kode laporan harus memakai ID app sebagai awalan.');
+                }
+                // Permission laporan harus permission yang dideklarasikan app ini; laporan
+                // yang menunjuk hak app lain tidak dapat ditegakkan siapa pun.
+                if (! isset($permissionCodes[$report['permission'] ?? ''])) {
+                    $validator->errors()->add("reports.$index.permission", 'Permission laporan harus salah satu permission app ini.');
+                }
+                $keys = array_column($report['builtin_layouts'] ?? [], 'key');
+                if (count($keys) !== count(array_unique($keys))) {
+                    $validator->errors()->add("reports.$index.builtin_layouts", 'Kunci layout bawaan tidak boleh duplikat.');
+                }
+            }
         }];
     }
 
@@ -263,7 +309,27 @@ class AppCatalogRequest extends FormRequest
         return array_values(array_unique($codes));
     }
 
-    /** @return array{id:string,name:string,description:?string,version:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string} */
+    /**
+     * Apakah app ini berjalan sebagai container sendiri, bukan sebagai module di dalam
+     * runtime Core.
+     *
+     * Pembedanya sengaja bukan bendera baru di manifest: app yang ada sebagai folder di
+     * `modules/` adalah module, sisanya container. Bendera manifest akan menjadi klaim yang
+     * dapat berbohong — sebuah module bisa mengaku container demi lolos pemeriksaan lain —
+     * sedangkan keberadaan folder adalah kenyataan yang sama dengan yang dipakai runtime
+     * untuk memuat module. Satu sumber kebenaran, bukan dua yang bisa berselisih.
+     *
+     * Id kosong dihitung sebagai container supaya manifest tanpa id tidak diam-diam
+     * membebaskan diri dari kewajiban ini; aturan `id` sendiri yang akan melaporkannya.
+     */
+    private function berjalanSebagaiContainer(): bool
+    {
+        $id = $this->string('id')->toString();
+
+        return $id === '' || app(ModuleRegistry::class)->cari($id) === null;
+    }
+
+    /** @return array{id:string,name:string,description:?string,version:string,database_name:?string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string} */
     public function appPayload(): array
     {
         return [
@@ -271,7 +337,9 @@ class AppCatalogRequest extends FormRequest
             'name' => $this->string('name')->trim()->toString(),
             'description' => $this->string('description')->trim()->toString() ?: null,
             'version' => $this->string('version')->toString(),
-            'database_name' => $this->string('database_name')->toString(),
+            // Module menyimpan null, bukan string kosong. Kolom yang kosong tetapi tidak
+            // null masih terbaca sebagai "punya database, namanya belum diisi".
+            'database_name' => $this->string('database_name')->toString() ?: null,
             'has_ui' => $this->boolean('has_ui'),
             'navigation' => $this->navigationPayload(),
             'repository_url' => $this->string('repository_url')->toString() ?: null,
@@ -378,6 +446,24 @@ class AppCatalogRequest extends FormRequest
     }
 
     /** @return list<array{code:string,name:string,scope:string,decision_context_schema:array<string,mixed>}> */
+    /** @return list<array{code:string,name:string,description:?string,permission:string,parameters:list<string>,builtin_layouts:list<array{key:string,name:string,description:?string,format:string}>}> */
+    public function reportsPayload(): array
+    {
+        return array_values($this->collect('reports')->map(fn (array $report): array => [
+            'code' => (string) $report['code'],
+            'name' => (string) $report['name'],
+            'description' => isset($report['description']) ? (string) $report['description'] : null,
+            'permission' => (string) $report['permission'],
+            'parameters' => array_values(array_map('strval', $report['parameters'] ?? [])),
+            'builtin_layouts' => array_values(array_map(fn (array $layout): array => [
+                'key' => (string) $layout['key'],
+                'name' => (string) $layout['name'],
+                'description' => isset($layout['description']) ? (string) $layout['description'] : null,
+                'format' => (string) $layout['format'],
+            ], $report['builtin_layouts'] ?? [])),
+        ])->all());
+    }
+
     public function workflowTypesPayload(): array
     {
         return array_values($this->collect('workflow_types')->map(fn (array $type): array => [

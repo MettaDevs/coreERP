@@ -1,19 +1,19 @@
-import { Form, Head } from '@inertiajs/react';
-import InputError from '@/components/input-error';
-import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
 import { Spinner } from '@apperp/ui/spinner';
+import { Form, Head } from '@inertiajs/react';
+import InputError from '@/components/input-error';
+import PasskeyVerify from '@/components/passkey-verify';
+import PasswordInput from '@/components/password-input';
+import TextLink from '@/components/text-link';
 /* @chisel-registration */
 import { register } from '@/routes';
 /* @end-chisel-registration */
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 /* @chisel-passkeys */
-import PasskeyVerify from '@/components/passkey-verify';
 /* @end-chisel-passkeys */
 
 type Props = {

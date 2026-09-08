@@ -1,7 +1,3 @@
-import { Link, usePage } from '@inertiajs/react';
-import { Boxes, Building2, Grid3X3, PackageSearch } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-
 import { Button } from '@apperp/ui/button';
 import {
     Popover,
@@ -12,6 +8,10 @@ import {
     PopoverTrigger,
 } from '@apperp/ui/popover';
 import { ScrollArea } from '@apperp/ui/scroll-area';
+import { Link, usePage } from '@inertiajs/react';
+import { Boxes, Building2, Grid3X3, PackageSearch } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
 import type { EntitledProduct } from '@/types/auth';
 
 const productIcons: Record<string, LucideIcon> = {

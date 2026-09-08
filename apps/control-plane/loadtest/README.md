@@ -73,3 +73,15 @@ Hapus seluruh data load test:
 ```powershell
 docker compose down -v
 ```
+
+## Uji end-to-end laporan pada stack lokal
+
+`k6/reporting-e2e.js` menjalankan alur laporan lintas app pada stack `erp-dev` yang sudah hidup: daftar tenant baru, login owner, katalog laporan, minta ekspor Excel dan PDF `daftar-work-order`, tunggu worker Core, unduh, lalu memeriksa riwayat hanya berisi milik tenant itu. Tidak butuh k6 di host:
+
+```powershell
+cd apps/control-plane/loadtest
+docker run --rm -i -v "${PWD}\k6:/scripts" -v "${PWD}esults:/results" -e BASE_URL=http://host.docker.internal:8000 -e VUS=3 grafana/k6:0.55.0 run /scripts/reporting-e2e.js
+```
+
+Ringkasannya satu baris JSON (`exports_done`, `queue_to_done_ms`, `failed_checks`) dan disalin ke `results/summary-reporting-<run_id>.json`. Lebih dari lima VU sekaligus menabrak limiter registrasi tenant (`COREERP_REGISTRATION_RATE_LIMIT`, default 5 per menit per IP) karena stack lokal tidak mempercayai `X-Forwarded-For`; registrasi yang ditolak tercatat sebagai `registrasi 201` gagal, bukan sebagai kegagalan laporan.
+

@@ -3,12 +3,14 @@
 namespace Tests\Feature\ControlPlane;
 
 use App\Actions\Onboarding\RegisterBusiness;
+use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\SecurityDuty;
 use App\Models\SecurityPrivilege;
 use App\Models\User;
 use App\Support\LaunchableAppCatalog;
 use Database\Seeders\AppCatalogSeeder;
+use Database\Seeders\ReadOnlyRoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -130,10 +132,10 @@ class SecurityConfigurationDuplicateTest extends TestCase
 
     public function test_the_read_only_role_seeder_grants_read_and_nothing_else(): void
     {
-        $this->seed(\Database\Seeders\ReadOnlyRoleSeeder::class);
+        $this->seed(ReadOnlyRoleSeeder::class);
 
         $membership = $this->owner->activeMembership();
-        $role = \App\Models\Role::query()
+        $role = Role::query()
             ->where('tenant_id', $membership->tenant_id)
             ->where('name', 'Manager Aset')
             ->sole();

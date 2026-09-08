@@ -1,8 +1,3 @@
-import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
-import AppLogo from '@/components/app-logo';
-import AppLogoIcon from '@/components/app-logo-icon';
-import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Avatar, AvatarFallback, AvatarImage } from '@apperp/ui/avatar';
 import { Button } from '@apperp/ui/button';
 import {
@@ -24,6 +19,11 @@ import {
     SheetTrigger,
 } from '@apperp/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
+import { Link, usePage } from '@inertiajs/react';
+import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
+import AppLogo from '@/components/app-logo';
+import AppLogoIcon from '@/components/app-logo-icon';
+import { Breadcrumbs } from '@/components/breadcrumbs';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';

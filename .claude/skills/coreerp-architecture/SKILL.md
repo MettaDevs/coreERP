@@ -33,6 +33,33 @@ The Dynamics reference governs organization, workforce, and responsibility-based
 
 If a requested model conflicts with these rules, stop and report the conflict against the canonical source instead of adding a compatibility layer.
 
+## Two module shapes coexist during the move to one runtime
+
+CoreERP is moving from one process and one database per app to one runtime with modules. Both shapes are
+live at the same time, and judging one by the other's rules is the mistake this repository invites most.
+
+| | App in an `app-erp-*` repository | Module under `modules/` |
+| --- | --- | --- |
+| Process | its own container | the Core runtime |
+| Database | its own | the same tenant database as Core |
+| Table separation | separate databases | a table name prefix, e.g. `aset_` |
+| Calling Core | REST `internal/v1` with an app token | an ordinary function call in-process |
+| Contract required | every surface another app calls | only surfaces reachable from outside the runtime |
+| Its own service token | yes | no |
+
+What holds for **both**, and is never relaxed:
+
+- A module never touches another module's tables. For an app that is enforced by a separate database;
+  for a module it is enforced by tests and static analysis. Say which one is enforcing it — never write
+  that the database engine guards a boundary it does not guard.
+- Every module table carries `tenant_id`, and every query filters on it.
+- Event names, envelopes, and versioning rules do not change.
+
+A pull request that turns an app into a module is a **legitimate exception** to the app rules, not a
+violation. It must name its task number from `docs/todo/satu-runtime/01-prd.md`.
+
+The app rules are **not deleted** while any app still runs on them.
+
 ## Module lifecycle states
 
 | State | Meaning | Valid source of truth |
@@ -46,7 +73,7 @@ Never derive a later state from an earlier state:
 
 - Entitlement is not installation.
 - Installation is not runtime readiness.
-- A manifest entry is not proof that its container or database exists.
+- A manifest entry is not proof that its container or database exists. For a module in the Core runtime there is no container and no database of its own; what must exist is the migration record and the installation row for that tenant.
 - `active` or `trial` entitlement cannot drive UI labelled "installed".
 
 ## Required workflow
@@ -87,6 +114,7 @@ Before adding or changing a Number Sequence reference, manifest, setting, or API
 5. Fiscal reset requires a legal entity in context, because the fiscal calendar belongs to the legal entity and never to an operating unit. Legal-entity scope resolves it from the scope itself. Operating-unit scope is allowed, but the caller must supply the legal entity per request — an operating unit is deliberately shared across legal entities, so it cannot imply one — and that legal entity becomes part of the counter's scope key. Tenant scope cannot use fiscal reset: it names no organization, so the caller's argument would be the only thing deciding the counter's identity.
 6. Anything that splits a counter belongs in the scope key, never only in the period key. The uniqueness index is bounded by period, so a fact that varies the period while the scope key stays constant lets one declared scope hold two counters and issue the same document number twice without the database noticing.
 7. Keep business references in the app manifest. Keep tenant configuration, counter, audit, and issuance in Control Plane. Never grant an app direct database access.
+   A module in the Core runtime shares the connection, so "no direct access" is no longer enforced by the engine: it means the module calls the Core number service and never reads or writes the counter, pool, or reservation tables itself. Sharing the connection is the point — it is what lets a number be issued inside the document's own transaction, so a failed document leaves no gap.
 8. If any of those choices are absent from the request, recommend the smallest safe setting and ask before changing code or documentation as if it were settled.
 
 ### Data policy decision gate

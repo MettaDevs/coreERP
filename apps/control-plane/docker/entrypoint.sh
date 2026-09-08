@@ -9,6 +9,13 @@ set -e
 #
 # Without a scheduler container, number-sequences:recover never runs and expired continuous reservations are never
 # moved to reconciliation_pending, so their pool numbers stay reserved forever.
+# Ownership of storage/app follows www-data on every start. The directory is a shared volume
+# between roles, so anything an earlier root-run process left behind would otherwise block
+# www-data from writing next to it.
+drop_to_www_data() {
+    chown -R www-data:www-data /repo/apps/control-plane/storage/app /repo/apps/control-plane/storage/framework /repo/apps/control-plane/storage/logs 2>/dev/null || true
+}
+
 case "${CONTAINER_ROLE:-web}" in
     web)
         # Konten UI app disajikan same-origin di /apps-content/<placement>/<app>/, dari registry
@@ -26,10 +33,15 @@ case "${CONTAINER_ROLE:-web}" in
     scheduler)
         # schedule:work ticks once a minute in-process. number-sequences:recover also guards itself with
         # onOneServer, which requires a shared cache store (database or redis) — never file or array.
-        exec php artisan schedule:work --no-interaction
+        drop_to_www_data
+        exec runuser -u www-data -- php artisan schedule:work --no-interaction
         ;;
     worker)
-        exec php artisan queue:work --no-interaction --tries=3 --max-time=3600
+        # Same user as Apache's PHP. The worker writes report exports and layout copies into
+        # storage/app, which the web role must then read and serve; a root-owned file there is
+        # invisible to www-data and the download answers 410 for a file that exists.
+        drop_to_www_data
+        exec runuser -u www-data -- php artisan queue:work --no-interaction --tries=3 --max-time=3600
         ;;
     *)
         echo "Unknown CONTAINER_ROLE: ${CONTAINER_ROLE}. Expected web, scheduler, or worker." >&2

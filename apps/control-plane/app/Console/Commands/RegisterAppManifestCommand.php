@@ -92,6 +92,7 @@ class RegisterAppManifestCommand extends Command
             $request->workflowTypesPayload(),
             $request->dataPoliciesPayload(),
             $request->dependenciesPayload(),
+            $request->reportsPayload(),
         );
 
         $this->components->info(sprintf(
@@ -124,7 +125,10 @@ class RegisterAppManifestCommand extends Command
             'name' => $this->stringOption('name') ?? $this->asString($manifest['name'] ?? null) ?: Str::headline($id),
             'description' => $this->stringOption('description') ?? ($manifest['description'] ?? null),
             'version' => $this->asString($manifest['version'] ?? null),
-            'database_name' => $this->asString($manifest['database']['logical_name'] ?? null),
+            // Manifest module tidak punya blok `database`. Yang tidak disebutkan dikirim
+            // sebagai null, bukan string kosong: string kosong tetap gagal pada pola nama
+            // database dan akan menolak module dengan pesan yang menyesatkan.
+            'database_name' => $this->asString($manifest['database']['logical_name'] ?? null) ?: null,
             // Manifest hanya menyatakan bahwa app punya UI, bukan di path mana ia
             // disajikan. Path itu milik platform karena ia bergantung pada
             // placement, yang berbeda antar deployment dari release yang sama.
@@ -136,6 +140,7 @@ class RegisterAppManifestCommand extends Command
             'security' => $manifest['security'] ?? [],
             'number_sequences' => $manifest['number_sequences'] ?? [],
             'workflow_types' => $manifest['workflow_types'] ?? [],
+            'reports' => $manifest['reports'] ?? [],
         ];
     }
 
@@ -173,7 +178,7 @@ class RegisterAppManifestCommand extends Command
         $this->components->twoColumnDetail('<fg=gray>ID</>', $app['id']);
         $this->components->twoColumnDetail('<fg=gray>Nama</>', $app['name']);
         $this->components->twoColumnDetail('<fg=gray>Versi</>', $app['version']);
-        $this->components->twoColumnDetail('<fg=gray>Database</>', $app['database_name']);
+        $this->components->twoColumnDetail('<fg=gray>Database</>', $app['database_name'] ?? 'database Core (module)');
         $this->components->twoColumnDetail('<fg=gray>Punya UI</>', $app['has_ui'] ? 'ya' : 'tidak');
         $this->components->twoColumnDetail('<fg=gray>Entry point</>', (string) count($security['entry_points']));
         $this->components->twoColumnDetail('<fg=gray>Permission</>', (string) count($security['permissions']));
@@ -183,6 +188,7 @@ class RegisterAppManifestCommand extends Command
         $this->components->twoColumnDetail('<fg=gray>Reference nomor</>', (string) count($request->numberSequenceReferencesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Jenis workflow</>', (string) count($request->workflowTypesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Policy data</>', (string) count($request->dataPoliciesPayload()));
+        $this->components->twoColumnDetail('<fg=gray>Laporan</>', (string) count($request->reportsPayload()));
     }
 
     /** Opsi CLI yang kosong dianggap tidak diisi sehingga manifest tetap dipakai. */

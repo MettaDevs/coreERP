@@ -1,12 +1,4 @@
 import {
-    BarChart3,
-    Building2,
-    LayoutDashboard,
-    Package,
-    Settings,
-} from 'lucide-react';
-
-import {
     CommandDialog,
     CommandEmpty,
     CommandGroup,
@@ -14,6 +6,13 @@ import {
     CommandItem,
     CommandList,
 } from '@apperp/ui/command';
+import {
+    BarChart3,
+    Building2,
+    LayoutDashboard,
+    Package,
+    Settings,
+} from 'lucide-react';
 
 type AppCommandPaletteProps = {
     open: boolean;

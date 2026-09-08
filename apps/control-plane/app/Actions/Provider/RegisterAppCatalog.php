@@ -28,7 +28,7 @@ class RegisterAppCatalog
     public function __construct(private AppDependencyGraph $dependencyGraph) {}
 
     /**
-     * @param  array{id:string,name:string,description:?string,version:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string}  $appData
+     * @param  array{id:string,name:string,description:?string,version:string,database_name:?string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string}  $appData
      * @param  array{
      *     entry_points:list<array{code:string,name:string,type:string}>,
      *     permissions:list<array{code:string,name:string,entry_point:string,access:string}>,
@@ -40,9 +40,9 @@ class RegisterAppCatalog
      * @param  list<array{code:string,name:string,protected_permissions:list<string>,requires_legal_entity:bool,requires_operating_unit:bool,allows_descendants:bool}>  $dataPolicies
      * @param  array<string, string>  $dependencies
      */
-    public function handle(array $appData, array $security, array $numberSequenceReferences = [], array $workflowTypes = [], array $dataPolicies = [], array $dependencies = []): CoreApp
+    public function handle(array $appData, array $security, array $numberSequenceReferences = [], array $workflowTypes = [], array $dataPolicies = [], array $dependencies = [], array $reports = []): CoreApp
     {
-        $app = DB::transaction(function () use ($appData, $security, $numberSequenceReferences, $workflowTypes, $dataPolicies, $dependencies): CoreApp {
+        $app = DB::transaction(function () use ($appData, $security, $numberSequenceReferences, $workflowTypes, $dataPolicies, $dependencies, $reports): CoreApp {
             $this->dependencyGraph->assertRegistrable($appData['id'], $appData['version'], $dependencies);
             $app = CoreApp::query()->updateOrCreate(['id' => $appData['id']], $appData);
             $app->dependencies()->sync(
@@ -129,6 +129,24 @@ class RegisterAppCatalog
                 ]);
             }
             DB::table('app_data_policies')->where('app_id', $app->id)->whereNotIn('code', array_column($dataPolicies, 'code'))->delete();
+
+            // Katalog laporan mengikuti manifest apa adanya. Layout unggahan tenant untuk
+            // laporan yang dihapus app tidak ikut dihapus: ia data tenant, dan laporan bisa
+            // kembali di release berikutnya.
+            foreach ($reports as $report) {
+                $existing = DB::table('app_reports')->where('code', $report['code'])->first(['id']);
+                DB::table('app_reports')->updateOrInsert(['code' => $report['code']], [
+                    ...($existing ? [] : ['id' => (string) Str::ulid()]),
+                    'app_id' => $app->id,
+                    'name' => $report['name'],
+                    'description' => $report['description'],
+                    'permission' => $report['permission'],
+                    'parameters' => json_encode($report['parameters'], JSON_THROW_ON_ERROR),
+                    'builtin_layouts' => json_encode($report['builtin_layouts'], JSON_THROW_ON_ERROR),
+                    'updated_at' => now(), 'created_at' => now(),
+                ]);
+            }
+            DB::table('app_reports')->where('app_id', $app->id)->whereNotIn('code', array_column($reports, 'code'))->delete();
 
             return $app;
         });

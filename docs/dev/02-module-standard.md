@@ -121,13 +121,14 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 
 | Blok | Wajib? | Yang terjadi di Core setelah registrasi |
 | --- | --- | --- |
-| `api`, `ui`, `database`, `events` | Ya | Katalog mengenal artifact, database logis, dan kontrak app |
+| `api`, `ui`, `database`, `events` | Ya untuk app yang berjalan sebagai container sendiri | Katalog mengenal artifact, database logis, dan kontrak app. `database.logical_name` hanya wajib bagi app container: module berjalan di dalam runtime Core dan memakai database Core, jadi ia tidak punya nama database sendiri untuk disebutkan dan katalog menyimpannya sebagai kosong |
 | `ui.navigation` | Ya | Menu app muncul di shell Core. Item menu hanya boleh memakai permission `read` milik app yang sama |
 | `security.entry_points` / `permissions` / `privileges` / `duties` | Ya, keempatnya | Duty tersedia untuk disusun admin tenant menjadi security role |
 | `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat admin memberi role ke anggota |
 | `dependsOn` | Tidak, bila app berdiri sendiri | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu. |
 | `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
+| `reports` | Hanya bila app punya dokumen cetak atau ekspor | Laporan muncul di katalog Core; admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Dataset tetap diminta ke app; lihat [dokumen cetak](23-document-rendering.md) |
 
 App tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, app meminta nomor lewat API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`, dengan `idempotency_key` wajib. Detailnya di [Number sequence](14-number-sequences.md).
 
@@ -206,6 +207,142 @@ putusan naming-nya dibuat pada proposal app sebelum migration ditulis; jangan
 menciptakan prefix baru diam-diam.
 
 Di dalam database sendiri, app boleh memakai transaksi, foreign key, dan table desain normal. Semua tabel tenant-scoped membawa `tenant_id`; data dengan konsekuensi hukum/akuntansi membawa `legal_entity_id`; data operasional membawa `org_unit_id` bila ownership terjadi pada operating unit. ID organisasi adalah reference opaque ke Organization service, bukan foreign key lintas database. Lihat [model tenant dan organisasi](01a-tenant-and-org-hierarchy.md).
+
+### Penyaringan tenant
+
+Model module memakai trait `MilikTenant` dan tidak menulis penyaringan tenant sendiri:
+
+```php
+use App\Support\Modules\Contracts\MilikTenant;
+
+final class Barang extends Model
+{
+    use MilikTenant;
+}
+```
+
+Trait itu melakukan tiga hal, dan ketiganya perlu:
+
+| Kejadian | Yang dilakukan |
+| --- | --- |
+| membaca | menyaring `tenant_id` ke tenant aktif; tanpa tenant aktif query **dibatalkan**, bukan dijalankan tanpa saringan |
+| menyimpan baris baru | mengisi `tenant_id` dari tenant aktif bila module tidak menuliskannya |
+| menyimpan dengan `tenant_id` berbeda | membatalkan penyimpanan |
+
+**Jangan menyaring `tenant_id` dengan tangan pada model yang sudah memakai trait ini.** Bukan karena
+berlebihan, tetapi karena query seperti itu tetap benar walau traitnya dicabut — sehingga penjaganya
+berhenti terukur, dan tidak ada test yang gagal ketika perlindungannya hilang.
+
+Penjagaan ini hidup di lapisan model. `DB::table()` melewatinya sepenuhnya, dan itulah sebabnya query
+mentah pada tabel module dilarang.
+
+### Penghapusan lunak
+
+Tidak ada baris yang dihapus fisik. Menghapus berarti mengisi `deleted_at`; baris itu tetap ada di
+tabelnya. Ini berlaku untuk semua tabel, bukan hanya yang menyimpan data berkonsekuensi hukum.
+
+Alasannya bukan sekadar kehati-hatian. Rekam medis elektronik wajib disimpan paling singkat 25 tahun
+sejak kunjungan terakhir menurut Permenkes 24/2022, dan sebuah perintah hapus yang tersedia tetapi
+"tidak boleh dipakai untuk modul tertentu" cepat atau lambat akan dipakai untuk modul yang lupa
+menyatakan penguncinya. Perintah yang tidak ada tidak bisa salah dipakai.
+
+Di layar, tindakan ini bernama **Arsipkan**, bukan Hapus. Permission-nya tetap ber-`access: delete`
+karena itu memang hak yang diberikan.
+
+#### Indeks unik pada kode bisnis wajib parsial
+
+Indeks unik biasa ikut menghitung baris yang sudah diarsipkan. Akibatnya kode yang sudah dihapus tidak
+pernah bisa dipakai lagi, dan pengguna melihat "kode sudah dipakai" untuk kode yang tidak muncul di
+daftar mana pun. Ini gejala yang sangat sulit dilacak karena baris penyebabnya tidak terlihat.
+
+Laravel belum memiliki pembungkus untuk indeks parsial, jadi ia ditulis sebagai SQL langsung:
+
+```php
+Schema::create('aset_m_group', function (Blueprint $table): void {
+    $table->ulid('id')->primary();
+    $table->ulid('tenant_id')->index();
+    $table->string('kode', 50);
+    $table->string('nama', 150);
+    $table->softDeletes();
+    $table->timestamps();
+    // Jangan: $table->unique(['tenant_id', 'kode']);
+});
+
+DB::statement(
+    'CREATE UNIQUE INDEX aset_m_group_tenant_kode_unique '.
+    'ON aset_m_group (tenant_id, kode) WHERE deleted_at IS NULL'
+);
+```
+
+`down()` membuangnya dengan `DROP INDEX aset_m_group_tenant_kode_unique`.
+
+Aturannya: **setiap indeks unik yang memuat kolom kode bisnis pada tabel yang memiliki `deleted_at`
+wajib parsial.** Indeks unik pada identitas teknis—`id`, `creation_key`, pasangan `tenant_id` dengan
+`id`—tetap penuh, karena nilainya memang tidak boleh dipakai ulang oleh siapa pun.
+
+Ini bukan kekhawatiran teoretis. Diukur 8 September 2026 pada PostgreSQL 16 yang dipakai stack lokal,
+memakai `units_of_measure` yang memang sudah memiliki `deleted_at` dan indeks unik penuh: satuan
+diarsipkan, hilang dari daftar, lalu kodenya tidak bisa dipakai lagi.
+
+```
+UPDATE 1
+ terlihat_di_daftar
+--------------------
+                  0
+ERROR:  duplicate key value violates unique constraint "units_of_measure_tenant_id_code_unique"
+DETAIL:  Key (tenant_id, code)=(..., KG) already exists.
+```
+
+Indeks parsial memperbaikinya tanpa melonggarkan apa pun: kode yang sudah diarsipkan bisa dipakai
+ulang, dan dua baris hidup dengan kode sama tetap ditolak dengan pesan yang sama.
+
+Cara memeriksa apakah sebuah repo masih punya pasangan yang salah:
+
+```bash
+grep -rn "softDeletes()" database/migrations/    # tabel yang mengarsipkan
+grep -rn "unique(\['tenant_id', 'kode'\]"      # indeks yang tidak boleh penuh
+```
+
+#### Penyaringan terjadi di lapisan model
+
+Baris terarsip disaring satu kali di model, lewat trait `SoftDeletes` Laravel, bukan diulang pada setiap
+query. Query yang menyaring sendiri boleh ada hanya bila ia memang tidak lewat model, misalnya laporan
+yang menulis SQL langsung, dan pada kasus itu penyaringannya ditulis eksplisit.
+
+Alasannya bukan kerapian. Penyaringan yang diulang harus benar di **setiap** tempat; yang terlewat satu
+tempat memunculkan baris terarsip di satu layar saja, dan itu terbaca sebagai bug data, bukan bug query.
+
+Setiap modul wajib punya satu test yang mengarsipkan satu baris lalu membuktikan baris itu tidak muncul
+di daftar dan tidak bisa diambil lewat detail.
+
+#### Mencabut modul tidak menyentuh data
+
+Perintah pencabutan modul mengubah status pemasangan dan berhenti di situ. Ia tidak memiliki opsi
+penghapusan data dalam bentuk apa pun. Memasang ulang modul yang sama pada tenant yang sama
+mengembalikan datanya seperti sedia kala. Ini bentuk yang sama dengan Business Central, yang mencabut
+ekstensi tanpa menyentuh datanya.
+
+#### `aktif` bukan `deleted_at`
+
+Keduanya sering tertukar dan artinya berbeda:
+
+| Kolom | Arti | Muncul di daftar |
+| --- | --- | --- |
+| `aktif` | ada dan sah, tetapi sedang tidak dipakai untuk transaksi baru | ya, dengan penanda |
+| `deleted_at` | dianggap tidak ada oleh pengguna | tidak |
+
+Master yang tidak boleh dipakai lagi tetapi masih dirujuk transaksi lama memakai `aktif = false`,
+bukan `deleted_at`.
+
+#### Data tumbuh selamanya, dan itu diterima dengan sadar
+
+Karena tidak ada yang dihapus, tabel hanya bertambah. Pemilik app memantau ukuran tabelnya sebagai
+bagian dari tanggung jawab yang sudah disebut di atas, dan angkanya dilaporkan bersama hasil load test,
+bukan ditunggu sampai ada yang mengeluh lambat.
+
+Satu hal yang tidak selesai dengan penghapusan lunak: tenant yang berhenti berlangganan. Datanya tetap
+ada tanpa batas waktu, dan jalan keluarnya—ekspor lengkap yang bisa dibaca sistem lain, atau serah
+terima database—ditulis di kontrak sebelum pelanggan pergi, bukan sesudah.
 
 ## Contract dan dependency
 

@@ -50,6 +50,10 @@ class AppServiceProvider extends ServiceProvider
             fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
         );
         Gate::define(
+            'manage-report-layouts',
+            fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
+        );
+        Gate::define(
             'manage-reference-data',
             fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->canManageAccess() ?? false,
         );
