@@ -88,6 +88,16 @@ final class ModuleRegistry
         ));
     }
 
+    /**
+     * Awalan tabel yang dinyatakan manifest, atau string kosong bila tidak ada.
+     *
+     * @param  array<mixed>  $isi
+     */
+    private function awalanTabel(array $isi): string
+    {
+        return isset($isi['table_prefix']) && is_string($isi['table_prefix']) ? $isi['table_prefix'] : '';
+    }
+
     private function baca(string $berkas): ?ModuleManifest
     {
         try {
@@ -111,13 +121,27 @@ final class ModuleRegistry
             return null;
         }
 
+        // Module tanpa `table_prefix` belum bisa dilayani runtime ini. Tabelnya akan memakai
+        // nama apa adanya dan bertabrakan dengan milik Core — `users` dan `jobs` sudah pasti.
+        // Keadaan ini nyata, bukan hipotetis: modul yang baru ditarik masuk dengan
+        // `git subtree` membawa manifest repo lamanya, dan manifest itu memang belum
+        // menyatakan awalan tabel sampai ia dibentuk ulang.
+        //
+        // Melewatkannya di sini bukan berarti melewatkannya diam-diam.
+        // `ModulSedangDipindahTest` mewajibkan setiap folder yang manifestnya tanpa awalan
+        // tabel terdaftar sebagai modul yang sedang dipindah; folder yang tidak terdaftar
+        // membuat alur merah, bukan menghilang tanpa suara.
+        if ($this->awalanTabel($isi) === '') {
+            return null;
+        }
+
         return new ModuleManifest(
             id: $id,
             nama: isset($isi['name']) && is_string($isi['name']) ? $isi['name'] : $id,
             versi: isset($isi['version']) && is_string($isi['version']) ? $isi['version'] : '0.0.0',
             penerbit: isset($isi['publisher']) && is_string($isi['publisher']) ? $isi['publisher'] : '',
             jenis: isset($isi['kind']) && is_string($isi['kind']) ? $isi['kind'] : 'business-app',
-            awalanTabel: isset($isi['table_prefix']) && is_string($isi['table_prefix']) ? $isi['table_prefix'] : '',
+            awalanTabel: $this->awalanTabel($isi),
             folder: dirname($berkas),
             dependency: $this->dependency($isi),
         );

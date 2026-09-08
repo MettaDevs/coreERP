@@ -2134,6 +2134,131 @@ yang belum dibentuk ulang membawa migration kerangka Laravel yang akan membuat `
 melewatkan penjalanannya sama sekali, sehingga pemeriksaan basi tidak bisa dihitung dan tenggat menjadi
 satu-satunya yang mengakhirinya. Tulis alasannya di tempat pengecualian itu berada.
 
+### F3-25 — Runtime melewatkan modul yang belum menyatakan awalan tabel
+
+Nomornya F3-25 karena nomor tidak dipakai ulang, tetapi tempatnya di sini: **ia dikerjakan sebelum
+F3-01.**
+
+**Kenapa.** F3-00 membuat ketiga penjaga batas mengenal modul yang sedang dipindah, dan itu memang
+diperlukan — tetapi ternyata belum cukup. Diukur dengan menjalankan F3-01 sungguhan: ketiga penjaga
+batas **lulus**, dan **tiga belas test lain justru merah**. Sebabnya bukan penjaga batas sama sekali.
+
+Kehadiran `app.yaml` di dalam subtree saja sudah membuat `ModuleRegistry` menemukan `management-aset`
+sebagai modul, dan sejak detik itu Core memperlakukan modul setengah jadi sebagai modul siap pakai:
+katalog menampilkannya sebagai dapat diluncurkan, dan pendaftaran tenant memasangnya sebagai modul —
+bukan lagi lewat jalur penempatan container — lalu menjalankan seluruh migrationnya, termasuk migration
+kerangka Laravel yang membuat `users`, `jobs`, dan `cache`.
+
+**Berkas.**
+- `apps/control-plane/app/Support/Modules/ModuleRegistry.php`
+- `apps/control-plane/tests/Feature/ControlPlane/ModuleRegistryTest.php`
+- `apps/control-plane/tests/Feature/Boundary/ModulSedangDipindahTest.php`
+
+**Langkah.**
+1. Registry melewatkan manifest yang tidak menyatakan `table_prefix`. Ini bukan aturan yang dikarang
+   untuk keperluan ini: modul tanpa awalan tabel memang belum bisa dilayani, karena tabelnya akan
+   memakai nama apa adanya dan bertabrakan dengan milik Core.
+2. Melewatkan tidak boleh berarti menghilang tanpa suara. Setiap folder yang manifestnya tanpa awalan
+   tabel wajib terdaftar sebagai modul yang sedang dipindah; yang tidak terdaftar membuat alur merah.
+3. Buktikan keduanya bisa gagal.
+
+**Selesai bila.** Modul tanpa `table_prefix` tidak ditemukan registry; modul semacam itu yang tidak
+terdaftar sedang dipindah membuat alur merah dengan pesan yang menyebut namanya; dan pemeriksaan gaya
+frontend tidak lagi merah karena berkas modul yang belum dibentuk ulang.
+
+**Rujukan.** F3-00 pada dokumen ini.
+
+**Bergantung pada.** F3-00.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026.
+
+**Task ini tidak ada dalam rencana, dan cara ia ditemukan yang layak dicatat.** Ia muncul bukan dari
+membaca kode melainkan dari menjalankan F3-01 apa adanya lalu melihat apa yang merah. Yang merah bukan
+yang diperkirakan: penjaga batas — satu-satunya hal yang F3-00 siapkan — justru hijau semua.
+
+**Pelajarannya bukan "F3-00 kurang".** F3-00 mengerjakan persis yang diukurnya dan mengerjakannya dengan
+benar. Yang kurang adalah pengukurannya: saya mengukur pelanggaran **batas** yang dibawa modul itu, dan
+tidak mengukur apa yang berubah pada Core hanya karena ada folder baru yang punya `app.yaml`. Pertanyaan
+"apa yang rusak" dan "apa yang mulai berperilaku lain" adalah dua pertanyaan berbeda, dan yang kedua
+tidak pernah saya ajukan.
+
+**Aturannya memakai fakta yang sudah ada, bukan daftar baru.** `table_prefix` yang belum dinyatakan
+adalah tanda yang sama yang sudah diukur F3-00. Karena itu pengecualiannya berakhir sendiri: begitu F3-04
+memberi modul aset awalan tabelnya, registry menemukannya tanpa ada yang perlu mengingat untuk mencabut
+apa pun.
+
+**Bukti bisa gagal.** Entri `management-aset` dibuang sementara dari daftar modul yang sedang dipindah,
+dengan subtree-nya sudah mendarat:
+
+```
+Module management-aset tidak menyatakan table_prefix dan tidak terdaftar sedang dipindah.
+ModuleRegistry melewatkan module tanpa awalan tabel, jadi module ini tidak akan ditemukan
+siapa pun dan tidak ada yang gagal karenanya — persis kegagalan diam yang paling mahal
+ditemukan belakangan.
+```
+
+Dengan perbaikan ini dan subtree sudah mendarat: **287 test lulus**, dari sebelumnya 13 merah.
+
+**Ada satu lagi yang ikut ketahuan, dan sebabnya sama.** Setelah test hijau, alur `quality` tetap merah:
+Prettier kini memindai `modules/*/*/ui` sejak F2-11, dan 38 berkas modul aset memakai gaya repo asalnya.
+Memformatnya di sini melanggar "jangan ubah apa pun di dalam subtree" dan akan menenggelamkan riwayat
+`blame` 38 berkas tanpa memperbaiki apa pun. Jadi modul yang sedang dipindah dikecualikan lewat
+`.prettierignore`.
+
+Pengecualian itu punya cara berakhir yang sama seperti yang lain: sebuah test menuntut daftar di
+`.prettierignore` **sama persis** dengan daftar modul yang sedang dipindah. Entri yang kurang membuat gaya
+merah; entri yang tertinggal setelah modulnya selesai dipindah juga merah — karena pengecualian yang
+tertinggal membiarkan modul jadi lolos pemeriksaan gaya selamanya, dan tidak ada yang akan menyadarinya.
+
+**Dan setelah gaya hijau, giliran pemeriksaan tipe — lalu analisa statis.** `tsconfig.json` menyertakan `modules` sejak F2-11
+juga, dan UI modul aset masih aplikasi React tersendiri dengan `package.json` serta `node_modules` miliknya
+sendiri — memeriksanya dengan dependensi Core menghasilkan ratusan `TS2307 Cannot find module` yang tidak
+satu pun menunjuk kesalahan sungguhan. Pengecualiannya dipasang di `exclude`. Sesudahnya PHPStan
+memulangkan **560 temuan** dari modul yang sama, semuanya menunjuk keadaan yang memang sedang diperbaiki
+bertahap pada F3-02 sampai F3-05 — dan menenggelamkan temuan sungguhan pada kode Core. Modulnya tetap ada
+di `scanDirectories`, jadi kelasnya tetap dikenali bila kode Core menyebutnya; hanya analisanya yang
+dikecualikan.
+
+Penjaganya digabungkan menjadi satu test bertabel: setiap berkas pengecualian Core wajib mendaftar modul
+yang sama persis. Menambahkan pemeriksaan berikutnya ke tabel itu satu baris.
+
+#### Berhenti menebak: seluruh pemeriksaan yang menjangkau `modules/` didaftar sekali
+
+Tiga putaran pertama dihabiskan dengan menunggu CI merah, memperbaiki satu pemeriksaan, lalu menunggu CI
+merah lagi. Itu boros dan tidak perlu — daftarnya bisa dibaca, bukan ditunggu. Seluruh alur `quality`
+dijalankan di mesin sendiri pada pohon hasil penggabungan, berurutan seperti di CI:
+
+| # | Pemeriksaan | Menjangkau `modules/` | Hasil |
+| --- | --- | --- | --- |
+| 1 | Pint | ya, `pint ../../modules` | lulus apa adanya — gayanya kebetulan sudah cocok |
+| 2 | Prettier | ya, sejak F2-11 | perlu pengecualian |
+| 3 | ESLint | **tidak** | lulus; akan menjadi masalah pada hari ia mencakupnya |
+| 4 | `tsc` | ya, sejak F2-11 | perlu pengecualian |
+| 5 | PHPStan | ya, `paths` memuat `../../modules/` | perlu pengecualian |
+| 6 | salinan skill | tidak | lulus |
+| 7 | cakupan kontrak internal | tidak | lulus |
+| 8 | `npm run build` | lewat pemilih halaman | lulus |
+
+Pelajarannya bukan tentang daftar ini melainkan tentang urutan kerja: **satu pemeriksaan lokal atas
+seluruh alur lebih murah daripada tiga putaran CI**, dan ia menemukan hal yang sama.
+
+**Ini kejadian kelima dari pola yang sama dalam satu task**: sebuah pemeriksaan milik Core yang sudah
+benar mulai menjangkau modul yang belum siap dijangkau. Penjaga batas (F3-00), registry dan katalog
+(task ini), pemeriksaan gaya, pemeriksaan tipe, lalu analisa statis. Yang membedakan kelimanya hanya
+siapa yang memindai;
+polanya sama, dan pertanyaan yang seharusnya saya ajukan sejak awal adalah **"apa saja di Core yang
+memindai `modules/`"** — bukan "apa yang rusak".
+
+Satu yang belum menjangkau dan karenanya belum terlihat: **ESLint**. Ia belum mencakup `modules/` sama
+sekali (dicatat pada F2-11), jadi ia akan menjadi kejadian berikutnya pada hari ia mencakupnya. Daftar
+pengecualiannya sudah bertabel, jadi menambahkannya nanti satu baris.
+
+Satu koreksi atas catatan ini sendiri: kalimat "kejadian ketiga" dan "keempat" di atas ditulis sambil
+menebak siapa yang menyusul, dan tebakannya salah — bukan ESLint melainkan PHPStan. Kalimat yang menebak
+urutan berikutnya memang tidak layak ditulis; yang layak adalah daftarnya.
+
 ### F3-01 — Bawa repo masuk beserta riwayatnya
 
 **Kenapa.** Menyalin folder membuang `git log` dan `git blame` untuk 9.559 baris kode. Riwayat itu satu-
@@ -2155,12 +2280,25 @@ satunya penjelasan kenapa banyak aturan bisnis ditulis seperti sekarang.
 5. Setelah tergabung, tandai repo lama sebagai hanya baca. Repo yang masih bisa ditulis akan menerima
    commit yang kemudian hilang, dan itu bukan kekhawatiran hipotetis.
 
-**Selesai bila.** `git log -- modules/apperp/management-aset` menampilkan 35 commit asli, dan
-`git blame` pada sebuah controller menunjukkan penulis aslinya.
+**Selesai bila.** `git blame` pada sebuah berkas modul menunjukkan commit, penulis, tanggal, dan jalur
+asalnya; dan seluruh commit repo lama ada di dalam graf, terjangkau lewat sisi kedua commit
+penggabungannya.
+
+**Kriteria ini sudah diperbaiki sekali.** Semula ia berbunyi "`git log -- modules/apperp/management-aset`
+menampilkan 35 commit asli". Itu **tidak mungkin** dengan `git subtree add`, dan bukan karena riwayatnya
+hilang: commit lama menyentuh jalur `api/...`, bukan `modules/apperp/management-aset/api/...`, sehingga
+`git log` yang dibatasi jalur tidak bisa mencocokkannya. `--follow` bahkan memulangkan nol. Yang bekerja
+penuh adalah `git blame` — ia memulangkan SHA asli, penulis asli, tanggal asli, dan jalur lama — serta
+`git log <commit penggabungan>^2`. Karena alasan task ini adalah "menjawab kenapa sebuah aturan bisnis
+ditulis begitu", dan `blame` menjawab persis pertanyaan itu, `subtree add` dipertahankan dan kriterianya
+yang dibetulkan.
+
+Catatan angka: repo itu berisi **37** commit saat ditarik, bukan 35. Angka dalam prosa memang menua.
 
 **Rujukan.** Bagian 5.1 dokumen ini.
 
-**Bergantung pada.** F2-05 dan F3-00. Tanpa F3-00, pull request ini merah karena tiga penjaga sekaligus.
+**Bergantung pada.** F2-05, F3-00, dan F3-25. Tanpa F3-00 pull request ini merah karena tiga penjaga
+batas; tanpa F3-25 ia merah karena tiga belas test lain yang tidak ada hubungannya dengan penjaga batas.
 
 ### F3-02 — Buang berkas yang menjadi milik Core
 

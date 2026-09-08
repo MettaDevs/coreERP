@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Boundary;
 
 use DateTimeImmutable;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -45,6 +46,116 @@ class ModulSedangDipindahTest extends TestCase
         }
 
         parent::tearDown();
+    }
+
+    public function test_folder_tanpa_awalan_tabel_wajib_terdaftar_sedang_dipindah(): void
+    {
+        $dipindah = ModulSedangDipindah::bawaan();
+        $akar = dirname(__DIR__, 5).'/modules';
+        $manifest = glob($akar.'/*/*/app.yaml');
+        $manifest = $manifest === false ? [] : $manifest;
+
+        $this->assertNotSame([], $manifest, 'Tidak ada satu pun manifest module yang terbaca; pemindaiannya salah alamat.');
+
+        $hilangDiamDiam = [];
+
+        foreach ($manifest as $berkas) {
+            $isi = (string) file_get_contents($berkas);
+            $namaFolder = basename(dirname($berkas));
+
+            if (preg_match('/^table_prefix:\s*\S/m', $isi) === 1) {
+                continue;
+            }
+
+            if ($dipindah->menandai($namaFolder)) {
+                continue;
+            }
+
+            $hilangDiamDiam[] = $namaFolder;
+        }
+
+        $this->assertSame([], $hilangDiamDiam, sprintf(
+            'Module %s tidak menyatakan table_prefix dan tidak terdaftar sedang dipindah. '.
+            'ModuleRegistry melewatkan module tanpa awalan tabel, jadi module ini tidak akan '.
+            'ditemukan siapa pun dan tidak ada yang gagal karenanya — persis kegagalan diam '.
+            'yang paling mahal ditemukan belakangan. Nyatakan table_prefix, atau daftarkan '.
+            'ia sebagai module yang sedang dipindah beserta tenggatnya.',
+            implode(', ', $hilangDiamDiam),
+        ));
+    }
+
+    /**
+     * Berkas pengecualian, beserta penanda tempat daftarnya dimulai.
+     *
+     * Penanda diperlukan untuk `tsconfig.json`: daftar `include`-nya menyebut pola folder modul
+     * yang sama, dan memindai seluruh berkas akan membaca pola sertakan itu sebagai pengecualian.
+     * Pemindaian karena itu dimulai dari kunci `exclude`.
+     * Untuk `.prettierignore` seluruh berkas memang daftar pengecualian, jadi penandanya kosong.
+     *
+     * @return array<string, array{0: string, 1: string, 2: string}>
+     */
+    public static function berkasPengecualian(): array
+    {
+        return [
+            'prettier' => ['.prettierignore', 'pemeriksaan gaya frontend', ''],
+            'typescript' => ['tsconfig.json', 'pemeriksaan tipe frontend', '"exclude"'],
+            'phpstan' => ['phpstan.neon', 'analisa statis PHP', 'excludePaths'],
+        ];
+    }
+
+    /**
+     * Setiap pemeriksaan Core yang memindai `modules/` harus mengecualikan modul yang sama.
+     *
+     * Ini penjaga atas empat kejadian yang polanya sama: penjaga batas, registry, pemeriksaan
+     * gaya, dan pemeriksaan tipe. Masing-masing benar sendiri-sendiri, dan masing-masing mulai
+     * menjangkau modul yang belum siap dijangkau begitu foldernya mendarat. Yang menyatukannya
+     * satu daftar, dan test ini yang menjaga daftarnya tidak menyimpang di salah satu tempat.
+     *
+     * Dua arah sama pentingnya. Entri yang **kurang** membuat alur merah pada berkas yang memang
+     * belum dibentuk ulang — mengganggu, tapi terlihat. Entri yang **tertinggal** setelah modulnya
+     * selesai dipindah membiarkan modul jadi lolos pemeriksaan selamanya, dan itu tidak terlihat
+     * oleh siapa pun karena tidak ada yang gagal.
+     */
+    #[DataProvider('berkasPengecualian')]
+    public function test_daftar_pengecualian_sama_dengan_daftar_modul_dipindah(string $namaBerkas, string $keterangan, string $penanda): void
+    {
+        $dipindah = array_keys(ModulSedangDipindah::bawaan()->semua());
+        $berkas = dirname(__DIR__, 3).'/'.$namaBerkas;
+
+        $this->assertFileExists($berkas);
+
+        $isi = (string) file_get_contents($berkas);
+
+        if ($penanda !== '') {
+            $mulai = strpos($isi, $penanda);
+            $this->assertNotFalse($mulai, sprintf(
+                'Penanda %s tidak ditemukan pada %s, jadi pemindaian ini tidak mengukur apa pun.',
+                $penanda,
+                $namaBerkas,
+            ));
+            $isi = substr($isi, $mulai);
+        }
+        preg_match_all('#\.\./\.\./modules/[^/"\s]+/([^/"\s]+)#', $isi, $cocok);
+        $diabaikan = array_values(array_unique($cocok[1]));
+
+        sort($dipindah);
+        sort($diabaikan);
+
+        $this->assertSame($dipindah, $diabaikan, sprintf(
+            'Daftar module yang dikecualikan %s (%s) tidak sama dengan daftar module yang sedang dipindah.
+'.
+            'sedang dipindah: %s
+'.
+            'dikecualikan   : %s
+'.
+            'Yang kurang membuat alur merah pada berkas yang memang belum dibentuk ulang. Yang berlebih '.
+            'membiarkan module yang sudah selesai dipindah lolos pemeriksaan selamanya — dan itu tidak '.
+            'terlihat siapa pun, karena tidak ada yang gagal.',
+            $keterangan,
+            $namaBerkas,
+            implode(', ', $dipindah) ?: '(kosong)',
+            implode(', ', $diabaikan) ?: '(kosong)',
+        ));
     }
 
     public function test_tiap_entri_menyebut_alasan_dan_tenggat(): void
