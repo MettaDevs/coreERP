@@ -23,8 +23,8 @@ tidak boleh dilanggar, dan konvensi penamaan branch serta commit.
 
 | Fase | Task | Selesai |
 | --- | --- | --- |
-| 0 — prasyarat: CI hijau, aturan kerja, penghapusan lunak, cabang dikunci | F0-01 sampai F0-06 | F0-01, F0-02, F0-03 selesai; F0-05 terhalang |
-| 1 — penjaga batas dan kerangka modul | F1-01 sampai F1-08 | belum |
+| 0 — prasyarat: CI hijau, aturan kerja, penghapusan lunak | F0-01 sampai F0-06 | F0-01 sampai F0-04 selesai; F0-05 ditutup tanpa dikerjakan; F0-06 menunggu F3-01 |
+| 1 — penjaga batas dan kerangka modul | F1-01 sampai F1-08 | F1-01 sampai F1-03 selesai |
 | 2 — Core menjadi tuan rumah modul | F2-01 sampai F2-11 | belum |
 | 3 — Management Aset pindah | F3-01 sampai F3-24 | belum |
 | 4 — UI menjadi satu build | F4-01 sampai F4-10 | belum |
