@@ -6,8 +6,10 @@ namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 
 use App\Models\TenantMembership;
 use App\Models\User;
+use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 /**
  * Cara test module masuk sebagai pengguna: lewat Core, bukan lewat token.
@@ -86,7 +88,77 @@ trait BerinteraksiDenganKonteksCore
     {
         $this->konfigurasiKlienCore();
 
-        return $this->tenantUjiId = $this->pastikanTenantAda((string) Str::ulid());
+        $tenantId = $this->pastikanTenantAda((string) Str::ulid());
+        $this->pastikanNomorUrutSiap($tenantId);
+
+        return $this->tenantUjiId = $tenantId;
+    }
+
+    /**
+     * Referensi nomor module beserta urutan nomor milik tenant uji.
+     *
+     * Selama penerbitan nomor lewat HTTP, test cukup memalsukan jawabannya dengan `Http::fake`.
+     * Lewat kontrak Core nomornya diterbitkan **sungguhan**, dan itu menuntut profil, referensi,
+     * serta penghitung benar-benar ada untuk tenant ini — persis seperti tenant sungguhan setelah
+     * provisioning.
+     *
+     * Daftarnya dibaca dari `app.yaml` module, bukan ditulis ulang di sini. Daftar kedua akan
+     * menyimpang dari manifestnya pada hari seseorang menambah satu referensi, dan yang menyimpang
+     * gagal dengan pesan "reference tidak dikenal" yang tidak menyebut sebabnya.
+     */
+    private function pastikanNomorUrutSiap(string $tenantId): void
+    {
+        $this->pastikanKatalogModule();
+        $this->seed(NumberSequenceProfileSeeder::class);
+
+        $manifest = Yaml::parseFile(dirname(__DIR__, 2).'/app.yaml');
+        $referensi = $manifest['number_sequences']['references'] ?? [];
+
+        foreach (is_array($referensi) ? $referensi : [] as $baris) {
+            $kode = $baris['code'] ?? null;
+
+            if (! is_string($kode) || $kode === '') {
+                continue;
+            }
+
+            $referensiId = DB::table('app_number_sequence_references')->where('code', $kode)->value('id');
+
+            if ($referensiId === null) {
+                $referensiId = (string) Str::ulid();
+                DB::table('app_number_sequence_references')->insert([
+                    'id' => $referensiId,
+                    'app_id' => 'management-aset',
+                    'code' => $kode,
+                    'name' => $baris['name'] ?? $kode,
+                    'default_prefix' => $baris['default_prefix'] ?? null,
+                    'allowed_scopes' => json_encode($baris['allowed_scopes'] ?? ['tenant'], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::table('tenant_number_sequences')->insertOrIgnore([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $tenantId,
+                'reference_id' => $referensiId,
+                'profile_code' => 'non-continuous-default',
+                'scope_type' => 'tenant',
+                'status' => 'active',
+                'is_continuous' => false,
+                'allow_manual' => false,
+                'reset_period' => 'never',
+                'preallocation_enabled' => false,
+                'preallocation_quantity' => 1,
+                'minimum_number' => 1,
+                'segments' => json_encode([
+                    ['type' => 'constant', 'value' => $baris['default_prefix'] ?? 'NS'],
+                    ['type' => 'constant', 'value' => '-'],
+                    ['type' => 'number', 'length' => 6],
+                ], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 
     /**
