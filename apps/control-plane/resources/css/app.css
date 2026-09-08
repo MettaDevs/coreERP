@@ -4,6 +4,16 @@
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../node_modules/@apperp/ui/dist';
+/*
+ * `@apperp/ui` sekarang satu workspace di repo ini, dan npm mengangkat pemasangannya ke
+ * `node_modules` akar repo sebagai tautan simbolik. Sumber ditulis langsung ke folder
+ * paketnya, bukan lewat tautan itu: satu deklarasi yang menunjuk berkas sungguhan, dan
+ * tidak bergantung pada apakah pemindai Tailwind mau menembus tautan simbolik.
+ *
+ * Kelas milik paket hanya lahir di sini. Tanpa baris ini `npm run build` tetap hijau dan
+ * CSS keluarannya kehilangan setiap kelas yang cuma dipakai komponen paket — misalnya
+ * `.max-h-\[300px\]` milik `command`.
+ */
+@source '../../../../packages/ui/dist';
 
 @custom-variant dark (&:is(.dark *));

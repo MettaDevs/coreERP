@@ -1,0 +1,9 @@
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "name": "coreerp",
+    "private": true,
+    "workspaces": [
+        "apps/control-plane",
+        "packages/ui"
+    ]
+}
