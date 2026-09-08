@@ -2,6 +2,7 @@
 
 namespace App\Actions\Onboarding;
 
+use App\Actions\Modules\InstallModule;
 use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Actions\ReferenceData\ProvisionDefaultUnitsOfMeasure;
 use App\Jobs\DeployAppPlacement;
@@ -14,6 +15,7 @@ use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\AppDependencyGraph;
+use App\Support\Modules\ModuleRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -126,7 +128,22 @@ class RegisterBusiness
             }
 
             DB::afterCommit(function () use ($appIds, $placement, $tenant): void {
+                $registry = app(ModuleRegistry::class);
+
                 foreach ($appIds as $appId) {
+                    // Dua jalur, dipilih dari satu pertanyaan: apakah id ini ada sebagai
+                    // folder di modules/. Bila ya, tidak ada container yang perlu
+                    // ditempatkan — memasangnya berarti menjalankan migration, mencatat
+                    // pemasangan, dan mengisi data awal, semuanya di proses ini juga.
+                    //
+                    // Jalur container dipertahankan selama masih ada app yang belum
+                    // dipindah. Ia dibuang pada fase 7, bukan sekarang.
+                    if ($registry->cari($appId) !== null) {
+                        app(InstallModule::class)->handle($appId, $tenant->id);
+
+                        continue;
+                    }
+
                     $ready = DB::table('app_placements')
                         ->where('app_id', $appId)
                         ->where('placement', $placement)
