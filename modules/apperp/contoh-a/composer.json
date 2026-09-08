@@ -8,7 +8,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Modules\\Apperp\\ContohA\\": "src/"
+            "Modules\\Apperp\\ContohA\\": "src/",
+            "Modules\\Apperp\\ContohA\\Database\\Seeders\\": "database/seeders/"
         }
     },
     "autoload-dev": {

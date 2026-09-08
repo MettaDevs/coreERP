@@ -1340,6 +1340,38 @@ Task ini menggantikan rencana peran database per modul, yang dibatalkan karena a
 
 **Bergantung pada.** F1-03, F2-03.
 
+#### Penanda bawaan menuntut satu kolom, dan itu bagian dari standar
+
+Langkah 3 meminta baris hasil seed diberi penanda. Penandanya adalah kolom `bawaan` pada tabel master
+modul, ditambahkan lewat migration tersendiri pada kedua modul contoh.
+
+Alasan kolom, bukan tebakan dari tanggal: tanpa penanda, sebuah pemulihan atau pembersihan tidak punya
+cara memisahkan baris bawaan dari baris yang diketik pengguna selain menebak, dan menebak berarti suatu
+saat membuang data pelanggan. Kolom ini seharusnya menjadi bagian standar tabel master modul, bukan
+milik modul contoh saja.
+
+#### Seed dijalankan dengan tenant aktif dipasang sementara
+
+Model modul disaring `TenantScope`, dan scope itu **membatalkan** query yang berjalan tanpa tenant aktif.
+Itu memang perilaku yang diinginkan, tapi berarti seeder tidak bisa berjalan begitu saja: pemasang
+menaruh tenant aktif ke wadah selama seed berlangsung, lalu mengembalikannya. Seeder dengan demikian
+memakai model biasa dan ikut tersaring, bukan menulis lewat query mentah yang melewati penjaga.
+
+#### Lima test, dua di luar yang diminta
+
+Selain tiga yang diminta: baris bawaan terbukti bisa dibedakan dari baris pengguna, dan seed **tidak
+dijalankan sama sekali** bila belum ada catatan pemasangan. Yang kedua menutup lubang yang halus — tanpa
+catatan pemasangan tidak ada tempat menandai bahwa data awal sudah diisi, jadi menjalankannya berarti
+mengisi ulang setiap kali dipanggil.
+
+Rangkaian terpanjang menguji urutan yang paling mungkin terjadi pada pelanggan sungguhan: pasang, isi
+data sendiri, nonaktifkan, cabut, pasang lagi. Data pengguna tetap satu baris, baris bawaan tetap dua.
+
+#### Satu jebakan penamaan
+
+`Illuminate\Foundation\Testing\TestCase` sudah memiliki metode `seed()`. Sebuah metode pembantu
+bernama sama pada kelas test gagal fatal, bukan sekadar membingungkan.
+
 ### F2-05 — Perintah pasang, nonaktifkan, dan cabut
 
 **Kenapa.** Ini fitur produk yang menjadi alasan seluruh proyek: modul dapat dipasang dan dicabut per
