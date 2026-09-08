@@ -2162,8 +2162,9 @@ kerangka Laravel yang membuat `users`, `jobs`, dan `cache`.
    tabel wajib terdaftar sebagai modul yang sedang dipindah; yang tidak terdaftar membuat alur merah.
 3. Buktikan keduanya bisa gagal.
 
-**Selesai bila.** Modul tanpa `table_prefix` tidak ditemukan registry, **dan** modul semacam itu yang
-tidak terdaftar sedang dipindah membuat alur merah dengan pesan yang menyebut namanya.
+**Selesai bila.** Modul tanpa `table_prefix` tidak ditemukan registry; modul semacam itu yang tidak
+terdaftar sedang dipindah membuat alur merah dengan pesan yang menyebut namanya; dan pemeriksaan gaya
+frontend tidak lagi merah karena berkas modul yang belum dibentuk ulang.
 
 **Rujukan.** F3-00 pada dokumen ini.
 
@@ -2199,6 +2200,23 @@ ditemukan belakangan.
 ```
 
 Dengan perbaikan ini dan subtree sudah mendarat: **287 test lulus**, dari sebelumnya 13 merah.
+
+**Ada satu lagi yang ikut ketahuan, dan sebabnya sama.** Setelah test hijau, alur `quality` tetap merah:
+Prettier kini memindai `modules/*/*/ui` sejak F2-11, dan 38 berkas modul aset memakai gaya repo asalnya.
+Memformatnya di sini melanggar "jangan ubah apa pun di dalam subtree" dan akan menenggelamkan riwayat
+`blame` 38 berkas tanpa memperbaiki apa pun. Jadi modul yang sedang dipindah dikecualikan lewat
+`.prettierignore`.
+
+Pengecualian itu punya cara berakhir yang sama seperti yang lain: sebuah test menuntut daftar di
+`.prettierignore` **sama persis** dengan daftar modul yang sedang dipindah. Entri yang kurang membuat gaya
+merah; entri yang tertinggal setelah modulnya selesai dipindah juga merah — karena pengecualian yang
+tertinggal membiarkan modul jadi lolos pemeriksaan gaya selamanya, dan tidak ada yang akan menyadarinya.
+
+**Ini kejadian ketiga dari pola yang sama dalam satu task**: sebuah pemeriksaan milik Core yang sudah
+benar mulai menjangkau modul yang belum siap dijangkau. Penjaga batas (F3-00), registry dan katalog
+(task ini), lalu pemeriksaan gaya. Yang membedakan ketiganya hanya siapa yang memindai; polanya sama, dan
+pertanyaannya yang seharusnya saya ajukan sejak awal adalah **"apa saja di Core yang memindai
+`modules/`"** — bukan "apa yang rusak".
 
 ### F3-01 — Bawa repo masuk beserta riwayatnya
 
