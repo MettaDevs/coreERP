@@ -107,14 +107,40 @@
         /* Completeness */
         // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
         "skipLibCheck": true /* Skip type checking all .d.ts files. */,
+        /*
+         * Empat pemetaan terakhir ada karena halaman module berada di luar folder ini.
+         * TypeScript mencari `node_modules` dengan menaiki folder dari berkas yang
+         * mengimpor, dan dari `modules/<penerbit>/<modul>/ui` pendakian itu berakhir di
+         * akar repo — tempat yang tidak punya `node_modules`. Tanpa pemetaan ini, setiap
+         * halaman module gagal pada impor React-nya sendiri.
+         */
         "paths": {
-            "@/*": ["./resources/js/*"]
+            "@/*": ["./resources/js/*"],
+            "@modules/*": ["../../modules/*"],
+            "react": ["./node_modules/@types/react"],
+            "react/*": ["./node_modules/@types/react/*"],
+            "react-dom": ["./node_modules/@types/react-dom"],
+            "react-dom/*": ["./node_modules/@types/react-dom/*"],
+            "@apperp/ui/*": [
+                "./node_modules/@apperp/ui/dist/components/*",
+                "./node_modules/@apperp/ui/dist/*"
+            ]
         },
         "jsx": "react-jsx"
     },
+    /*
+     * Halaman module ikut diperiksa tipenya.
+     *
+     * Berkasnya berada di luar folder proyek ini, dan itu bukan sekadar soal daftar:
+     * tanpa baris `../../modules` di bawah, `npm run types:check` melewatkannya diam-diam
+     * dan sebuah halaman module yang tidak bisa dikompilasi baru ketahuan saat
+     * `npm run build` — di alur CI yang berbeda, dengan pesan yang berbeda pula.
+     */
     "include": [
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
-        "resources/js/**/*.tsx"
+        "resources/js/**/*.tsx",
+        "../../modules/*/*/ui/**/*.ts",
+        "../../modules/*/*/ui/**/*.tsx"
     ]
 }

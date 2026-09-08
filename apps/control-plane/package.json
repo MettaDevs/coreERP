@@ -6,8 +6,8 @@
         "build": "vite build",
         "build:ssr": "vite build && vite build --ssr",
         "dev": "vite",
-        "format": "prettier --write resources/",
-        "format:check": "prettier --check resources/",
+        "format": "prettier --write resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --write \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
+        "format:check": "prettier --check resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --check \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
         "lint": "eslint . --fix",
         "lint:check": "eslint .",
         "types:check": "tsc --noEmit"

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ContohA\Http\Controllers\BarangController;
+use Modules\Apperp\ContohA\Http\Controllers\HalamanBarangController;
 
 /*
  * Dimuat oleh penyedia layanan module ini, bukan oleh Core.
@@ -21,4 +22,14 @@ Route::middleware(['web', 'auth', 'konteks-module:contoh-a'])
     ->name('contoh-a.')
     ->group(function (): void {
         Route::get('barang', [BarangController::class, 'index'])->name('barang.index');
+
+        /*
+         * Jalur layar, dipisah dari jalur JSON di atas.
+         *
+         * Nama jalurnya sama dengan id entri menu pada `app.yaml`, dan itu bukan kebetulan:
+         * Core menyusun tautan sidebar dengan aturan `/<id module>/<id entri menu>`, jadi
+         * mengganti salah satu tanpa yang lain membuat menunya mendarat di 404. Test
+         * `HalamanModuleShellTest` membuktikan keduanya masih sejalan.
+         */
+        Route::get('daftar-barang', HalamanBarangController::class)->name('barang.halaman');
     });

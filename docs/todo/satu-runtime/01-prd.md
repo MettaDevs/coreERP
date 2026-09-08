@@ -1785,6 +1785,68 @@ modul, dan tidak ada elemen `iframe` pada pohon dokumen halaman itu.
 
 **Bergantung pada.** F2-06, F2-10.
 
+#### Tiga berkas yang tidak disebut daftar di atas, dan salah satunya menghentikan halaman
+
+Ditulis 8 September 2026, setelah task ini selesai.
+
+`resources/views/app.blade.php` meminta berkas halaman ke manifest Vite dengan menyusun jalur
+`resources/js/pages/{komponen}.tsx`. Untuk halaman modul, komponennya bernama `contoh-a::Daftar`, dan
+manifest tidak punya kunci itu — halaman modul pertama membalas **500**, bukan layar kosong, dengan pesan
+`Unable to locate file in Vite manifest: resources/js/pages/contoh-a::Daftar.tsx`. Baris permintaan itu
+sekarang dilewati untuk nama berformat `Modul::Halaman`.
+
+Menebak jalurnya dari nama halaman bukan pilihan yang lebih baik. Kunci manifest untuk halaman modul
+berbunyi `../../modules/<penerbit>/<modul>/ui/Pages/<berkas>.tsx`, sedangkan nama halaman sengaja tidak
+menyebut penerbit; lebih dari itu, jalur berawalan `../..` tidak bisa dilayani server pengembangan Vite
+tanpa awalan `/@fs/`, sehingga baris yang bekerja pada `npm run build` justru gagal saat dikembangkan.
+Halaman modul memang dimuat malas, jadi ia diambil pemilih halaman sesudah berkas masuk berjalan.
+
+`app/Http/Middleware/ResolveModuleContext.php` yang membagikan kerangka layar, bukan
+`HandleInertiaRequests`. `Inertia\Middleware` memanggil `share()` **sebelum** meneruskan permintaan,
+sehingga middleware rute belum berjalan saat prop bersama disusun; prop yang dibaca di sana selalu
+kosong, dan halamannya tampil tanpa sidebar tanpa satu pun error.
+
+`resources/views/…` dan `package.json` juga ikut: berkas `ui/` modul berada di luar folder yang diperiksa
+`npm run format:check`, jadi ia tidak pernah diformat siapa pun.
+
+#### Alias Vite ada, tetapi bukan alias yang menyelesaikan masalahnya
+
+Langkah 3 menyebut alias dan izin akses berkas. Izin akses (`server.fs.allow`) memang dibutuhkan. Alias
+`@modules` ditambahkan untuk kode yang menyebut satu berkas modul secara langsung, tetapi pemindaian
+folder pada berkas masuk tetap memakai pola relatif, karena pola `import.meta.glob` diselesaikan saat
+membangun dan bentuk relatif yang pasti dikenali.
+
+Yang justru menghentikan `npm run build` adalah hal yang tidak disebut sama sekali: impor `@apperp/ui`
+**dari dalam berkas modul**. Pencarian `node_modules` menaiki folder dari berkas yang mengimpor, dan dari
+`modules/<penerbit>/<modul>/ui` pendakian itu berakhir di akar repo, yang tidak punya `node_modules`.
+Perbaikannya `resolve.dedupe`, bukan alias — alias akan melewati peta `exports` paket dan menuntut jalur
+`dist/` ditulis tangan. Hal yang sama muncul pada `tsc`, dan di sana perbaikannya pemetaan `paths`.
+
+#### Halaman modul tetap halaman Inertia, dan tuan rumahnya dipasang pemilih halaman
+
+Langkah 1 dan langkah 2 terbaca bertentangan: kalau pemilih halaman memuat berkas modul langsung, tuan
+rumahnya tidak dipakai. Yang dikerjakan: pemilih halaman mengenali nama `Modul::Halaman`, lalu
+membungkus komponen modulnya dengan tuan rumah itu. Jadi controller modul menulis
+`Inertia::render('contoh-a::Daftar', …)` seperti halaman Laravel biasa, sementara tuan rumah tetap
+satu-satunya komponen halaman Inertia yang benar-benar dirender untuk semua modul.
+
+#### Tautan menu modul memakai aturan tetap, bukan kolom manifest baru
+
+Tautan entri menu modul adalah `/<id modul>/<id entri menu>`. Aturan ini mengikat manifest dan berkas rute
+modul tanpa kolom tambahan; sebuah kolom kedua berisi jalur akan menyimpang dari berkas rutenya cepat
+atau lambat, dan penyimpangannya tidak terlihat sampai ada yang mengklik menunya. Test
+`HalamanModuleShellTest` membuktikan setiap tautan menu mendarat pada rute yang terdaftar.
+
+`/apps/<id>` tetap menjadi tautan peluncur produk untuk kedua bentuk. Untuk modul ia meneruskan ke entri
+menu pertama yang boleh dilihat pengguna, karena modul tidak punya penempatan container dan
+`runtimeFor` akan membalas 404.
+
+#### ESLint belum mencakup halaman modul
+
+`eslint .` menolak berkas di luar folder konfigurasinya. Prettier dan `tsc` sudah mencakupnya; ESLint
+belum, dan itu lubang yang perlu ditutup saat modul sungguhan dipindah — bukan sekarang, karena
+memindahkan konfigurasi ESLint ke akar repo menyentuh seluruh berkas frontend Core sekaligus.
+
 ## 10. Fase 3: Management Aset pindah ke dalam Core
 
 Ini fase terbesar. Yang dipindah: 99 berkas PHP, 42 migration yang menghasilkan 45 tabel, 22 berkas test,
