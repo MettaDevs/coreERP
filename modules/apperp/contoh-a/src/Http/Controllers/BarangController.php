@@ -19,8 +19,11 @@ use Modules\Apperp\ContohA\Models\Barang;
  * 1. Module memanggil Core lewat kontrak, bukan lewat kelas Core langsung. `KonteksTenant`,
  *    `KonteksPermintaan`, dan `PenerbitNomor` adalah tiga dari pintu resmi yang didaftar
  *    `CoreServices`; menyentuh kelas Core di luar daftar itu ditolak penjaga batas.
- * 2. Setiap query menyaring `tenant_id`. Tidak ada lagi database terpisah yang menahan
- *    kebocoran, jadi satu query yang lupa menyaring membocorkan data seluruh tenant.
+ * 2. Penyaringan `tenant_id` tidak ditulis di sini sama sekali. `MilikTenant` yang
+ *    menyaring bacaan, mengisi tenant pada baris baru, dan membatalkan penyimpanan yang
+ *    ditujukan ke tenant lain. Yang tidak ditulis tidak bisa salah ditulis — dan penyaringan
+ *    tangan di sini justru membuat penjaganya tidak terukur, karena query tetap benar walau
+ *    penjaganya dicabut.
  * 3. Nomor diterbitkan **di dalam** transaksi dokumen. Ini keuntungan yang membenarkan
  *    seluruh pemindahan: dokumen gagal, nomornya ikut batal, tidak ada lompatan nomor yang
  *    harus dijelaskan ke pemeriksa.
@@ -30,13 +33,12 @@ use Modules\Apperp\ContohA\Models\Barang;
  */
 final class BarangController
 {
-    public function index(KonteksTenant $konteks, KonteksPermintaan $akses): JsonResponse
+    public function index(KonteksPermintaan $akses): JsonResponse
     {
         abort_unless($akses->punyaIzin('contoh-a.barang.read'), 403);
 
         return new JsonResponse([
             'data' => Barang::query()
-                ->where('tenant_id', $konteks->tenantId())
                 ->orderBy('kode')
                 ->get(['id', 'kode', 'nama']),
         ]);
@@ -56,7 +58,6 @@ final class BarangController
 
         $barang = Barang::query()->create([
             'id' => (string) Str::ulid(),
-            'tenant_id' => $tenantId,
             'kode' => $nomor['number'],
             'nama' => 'Barang baru',
         ]);

@@ -1665,6 +1665,72 @@ sebesar itu adalah temuan tersendiri yang belum punya task.
 **Satu baris dokumen ikut jadi salah karenanya.** `docs/dev/02-module-standard.md` menyatakan blok
 `database` wajib tanpa syarat; barisnya diperjelas menjadi wajib hanya untuk app container.
 
+### F2-13 — Penjaga tenant ikut menjaga penulisan
+
+**Kenapa.** `TenantScope` menyaring pembacaan, dan itu memang yang dirancang. Tetapi sebuah scope baca
+tidak pernah melihat baris yang sedang **ditulis**. Sebelum task ini, sebuah modul dapat menyimpan baris
+dengan `tenant_id` milik tenant lain sementara tenant aktif berbeda, dan tidak ada satu pun yang
+menahannya: bukan `NOT NULL`, karena kolomnya terisi; bukan scope, karena scope hanya menyentuh `select`.
+Nilai itu biasanya datang dari permintaan, dan nilai dari permintaan adalah cara paling wajar sebuah
+tenant menulis ke tenant lain. Kebocoran ini bahkan tidak terlihat oleh tenant yang menulis.
+
+**Berkas.**
+- `apps/control-plane/app/Support/Modules/Contracts/MilikTenant.php`
+- `apps/control-plane/tests/Feature/Boundary/TenantScopeBoundaryTest.php`
+- kedua controller modul contoh
+
+**Langkah.**
+1. `MilikTenant` mengisi `tenant_id` sendiri dari tenant aktif bila modul tidak menuliskannya.
+2. `MilikTenant` membatalkan penyimpanan bila `tenant_id` yang tertulis berbeda dari tenant aktif — pada
+   pembuatan maupun pembaruan.
+3. Penyaringan tenant dengan tangan dibuang dari kode modul contoh.
+
+**Selesai bila.** Baris baru mewarisi tenant aktif tanpa modul menuliskannya, penyimpanan ke tenant lain
+dibatalkan, dan **kode modul menjadi lebih pendek, bukan lebih panjang**.
+
+**Rujukan.** Bagian 5.2 dokumen ini.
+
+**Bergantung pada.** F1-04.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026. Task ini tidak ada dalam rencana; ia lahir dari pertanyaan "bagaimana
+tenant scope tetap sederhana tanpa penjaganya melonggar", dan jawabannya ternyata bukan menyederhanakan
+apa pun melainkan menutup separuh penjaga yang belum ada.
+
+**Lubangnya dibuktikan lebih dulu, sebelum ditutup.** Satu test menyimpan baris ber-`tenant_id` tenant
+lain sementara tenant aktif berbeda; ia berhasil tersimpan. Baru setelah itu penjaganya ditulis.
+
+**Penyaringan tangan di modul contoh bukan sekadar berlebihan, ia merusak pengukuran.** Kedua controller
+menulis `->where('tenant_id', $konteks->tenantId())` pada model yang sudah memakai `MilikTenant`. Query
+itu tetap benar walau `MilikTenant` dicabut — jadi penjaganya tidak terukur oleh kode yang justru
+dimaksudkan mencontohkannya. **Ini pola yang sama dengan dua kriteria longgar pada F2-10 dan F2-12: dua
+lapisan yang menjawab pertanyaan sama membuat lapisan pertama tak terukur.** Muncul tiga kali dalam satu
+hari, jadi ia bukan kebetulan.
+
+**Aturan yang menghapus pekerjaan tidak punya alasan untuk dilanggar.** Modul kini tidak menulis
+`tenant_id` sama sekali — tidak pada query, tidak pada penyimpanan. `KonteksTenant` bahkan tidak lagi
+dibutuhkan `RakController`. Yang tidak ditulis tidak bisa salah ditulis.
+
+**Bukti bisa gagal.** Dengan penjaganya dilumpuhkan, ketiga test merah:
+
+```
+test_baris_baru_mewarisi_tenant_aktif_tanpa_module_menuliskannya
+SQLSTATE[23502]: Not null violation: null value in column "tenant_id" of relation
+"contoh_a_m_barang" violates not-null constraint
+
+test_menulis_baris_ke_tenant_lain_dibatalkan
+Penyimpanan ke tenant lain berhasil. Scope hanya menyaring baca, jadi tanpa penjagaan
+tulis sebuah module bisa menanam baris di data tenant lain.
+
+test_memindahkan_baris_ke_tenant_lain_lewat_pembaruan_dibatalkan
+Failed asserting that exception of type "RuntimeException" is thrown.
+```
+
+**Yang masih terbuka.** Penjagaan ini hidup di lapisan model. Modul yang memakai `DB::table(` melewatinya
+sepenuhnya — itu sebabnya penjaga ketiga melarang query mentah pada tabel modul, dan kenapa larangan itu
+tidak boleh dilonggarkan diam-diam saat Management Aset masuk dengan 200 pemanggilannya.
+
 ### F2-08 — Kontrak layanan Core untuk modul
 
 **Kenapa.** Modul butuh satu pintu resmi ke Core. Tanpa itu, tiap modul akan memanggil model Core

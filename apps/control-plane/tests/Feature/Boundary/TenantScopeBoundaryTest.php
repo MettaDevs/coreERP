@@ -89,6 +89,59 @@ class TenantScopeBoundaryTest extends TestCase
         Barang::query()->count();
     }
 
+    public function test_baris_baru_mewarisi_tenant_aktif_tanpa_module_menuliskannya(): void
+    {
+        $this->jadikanTenantAktif($this->tenantSatu);
+
+        $barang = Barang::query()->create([
+            'id' => (string) Str::ulid(),
+            'kode' => 'BRG-BARU',
+            'nama' => 'Tanpa tenant_id',
+        ]);
+
+        $this->assertSame(
+            $this->tenantSatu,
+            DB::table('contoh_a_m_barang')->where('id', $barang->id)->value('tenant_id'),
+            'Baris baru tidak mewarisi tenant aktif; module jadi wajib menuliskannya sendiri, '.
+            'dan yang wajib ditulis tangan cepat atau lambat salah ditulis.'
+        );
+    }
+
+    public function test_menulis_baris_ke_tenant_lain_dibatalkan(): void
+    {
+        $this->jadikanTenantAktif($this->tenantSatu);
+
+        try {
+            Barang::query()->create([
+                'id' => (string) Str::ulid(),
+                'tenant_id' => $this->tenantDua,
+                'kode' => 'BRG-BOCOR',
+                'nama' => 'Ditujukan ke tenant lain',
+            ]);
+            $this->fail('Penyimpanan ke tenant lain berhasil. Scope hanya menyaring baca, '.
+                'jadi tanpa penjagaan tulis sebuah module bisa menanam baris di data tenant lain.');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('tenant aktif', $e->getMessage());
+        }
+
+        $this->assertFalse(
+            DB::table('contoh_a_m_barang')->where('kode', 'BRG-BOCOR')->exists(),
+            'Barisnya tetap tersimpan walau pengecualian dilempar.'
+        );
+    }
+
+    public function test_memindahkan_baris_ke_tenant_lain_lewat_pembaruan_dibatalkan(): void
+    {
+        $this->jadikanTenantAktif($this->tenantSatu);
+        $barang = Barang::query()->firstOrFail();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('tenant aktif');
+
+        $barang->tenant_id = $this->tenantDua;
+        $barang->save();
+    }
+
     public function test_module_tidak_memakai_query_builder_mentah_pada_tabelnya(): void
     {
         $berkasDiperiksa = 0;
