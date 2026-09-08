@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Support\Modules\CoreServices;
 use App\Support\Modules\ModuleRegistry;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,6 +24,10 @@ final class ModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Permukaan Core yang boleh dipanggil module. Daftarnya ada di CoreServices, dan
+        // menambah barisnya adalah keputusan arsitektur, bukan kenyamanan.
+        CoreServices::daftarkan($this->app);
+
         $this->app->singleton(ModuleRegistry::class, static fn (): ModuleRegistry => new ModuleRegistry(
             dirname(base_path(), 2).'/modules',
         ));

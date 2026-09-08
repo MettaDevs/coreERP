@@ -1646,12 +1646,59 @@ langsung dan batasnya kembali kabur.
 3. Perluas aturan analisa statis F1-05: modul hanya boleh menyentuh namespace kontrak, bukan sembarang
    kelas Core.
 
-**Selesai bila.** Modul contoh menerbitkan satu nomor lewat antarmuka ini, dan analisa statis menolak
-modul yang memanggil model Core langsung.
+**Selesai bila.** Modul contoh menerbitkan satu nomor lewat antarmuka ini, dan penjaga batas menolak
+modul yang memanggil kelas Core di luar kontrak.
 
 **Rujukan.** [number sequence](../../dev/14-number-sequences.md), bagian 5.3 dokumen ini.
 
 **Bergantung pada.** F2-02.
+
+#### Penjaganya test pembaca berkas, bukan aturan analisa statis
+
+Langkah 3 menyebut aturan analisa statis. Aturan itu sudah dibuang pada F1-05 karena berlubang; yang
+menggantikannya adalah penjaga yang membaca berkas. Penjaga itulah yang diperluas di sini, dan
+perluasannya menangkap lebih banyak jalur daripada yang bisa dilihat analisa statis.
+
+Aturannya satu kalimat: **modul hanya boleh menyebut `App\Support\Modules\`.** Di situlah kontrak
+berada, dan `TenantScope` juga; keduanya memang permukaan yang dituju modul.
+
+#### Enam antarmuka, bukan lima
+
+Yang keenam, `KonteksTenant`, tidak ada pada rencana. Ia ditambahkan karena pemetaan layanan Core
+disusun dari tiga belas endpoint HTTP, dan penyelesaian tenant tidak pernah lewat HTTP — app lama
+membacanya dari token. Padahal itu hal **pertama** yang dibutuhkan setiap modul.
+
+Seperti `TenantScope`, ia **gagal menutup**: tidak ada tenant aktif berarti pengecualian, bukan null.
+Modul yang menerima null akan meneruskannya ke query, dan query tanpa penyaringan tenant membaca data
+seluruh pelanggan.
+
+#### Dua layanan memang belum ada, dan alasannya berbeda
+
+Direktori organisasi belum pernah punya layanan: ketiga pertanyaannya dijawab langsung di controller
+internal, jadi modul hanya bisa menanyakannya lewat HTTP. Setelah modul berada di proses yang sama,
+pertanyaannya perlu rumah yang bukan controller.
+
+Pencarian tipe dan versi workflow juga hidup di controller. Modul yang memanggilnya lewat HTTP tidak
+pernah perlu tahu caranya; setelah menjadi pemanggilan fungsi, pencariannya harus punya satu rumah —
+bukan disalin ke setiap modul.
+
+#### Yang dikembalikan baris biasa, bukan model Core
+
+Mengembalikan model berarti modul memegang objek Core dan bisa memanggil apa pun padanya, dan batas yang
+dibuat kontrak ini kembali kabur pada baris berikutnya.
+
+#### Dua temuan kecil dari kode yang ada
+
+Tabel `organizations` tidak punya kolom kode, jadi bentuk kembalian direktori disesuaikan dengan
+kenyataan, bukan dengan dugaan. Dan profil nomor yang berurutan bernama `continuous-strict`, bukan
+`continuous-default`; nama yang ditebak akan lolos analisa statis dan gagal hanya saat dijalankan.
+
+#### Jebakan pola yang layak diingat
+
+Pola pencari namespace modul pada penjaga F1-05 juga cocok di tengah `App\Support\Modules\Contracts\`,
+lalu membaca `Contracts` sebagai nama publisher — sebuah modul yang tidak pernah ada. Polanya kini
+menuntut `Modules` berada di awal sebuah nama. Bentuk lengkap berawalan garis miring tetap ditangkap,
+karena justru itu bentuk yang paling mungkin dipakai untuk menembus batas.
 
 ### F2-09 — Penerbitan nomor di dalam transaksi dokumen
 

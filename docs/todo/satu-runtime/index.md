@@ -26,7 +26,7 @@ tidak boleh dilanggar, dan konvensi penamaan branch serta commit.
 | --- | --- | --- |
 | 0 — prasyarat: CI hijau, aturan kerja, penghapusan lunak | F0-01 sampai F0-07 | F0-01 sampai F0-04 selesai; F0-05 ditutup tanpa dikerjakan; F0-06 menunggu F3-01 |
 | 1 — penjaga batas dan kerangka modul | F1-01 sampai F1-08 | selesai |
-| 2 — Core menjadi tuan rumah modul | F2-01 sampai F2-12 | F2-01 sampai F2-07 selesai |
+| 2 — Core menjadi tuan rumah modul | F2-01 sampai F2-12 | F2-01 sampai F2-08 selesai |
 | 3 — Management Aset pindah | F3-01 sampai F3-24 | belum |
 | 4 — UI menjadi satu build | F4-01 sampai F4-10 | belum |
 | 5 — edisi dan bundle on-prem | F5-01 sampai F5-06 | belum |
