@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Models\master;
 
+use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class KelompokHartaFiskal extends Model
 {
     use HasUlids, SoftDeletes;
+    use MilikTenant;
 
     protected $table = 'aset_m_kelompok_harta_fiskal';
 
