@@ -10,10 +10,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ContohA\Models\Barang;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
 use RuntimeException;
-use SplFileInfo;
 use Tests\TestCase;
 
 /**
@@ -23,6 +20,12 @@ use Tests\TestCase;
  * tenant berada di satu tabel, dan satu query yang lupa menyaring mengembalikan baris milik
  * seluruh pelanggan sekaligus. Ini kegagalan paling mahal yang bisa terjadi pada penempatan
  * gabungan, dan database tidak bisa mencegahnya.
+ *
+ * Modul yang sedang dipindah masuk dan belum dibentuk ulang dilewati pada pemeriksaan berkas
+ * di bawah. Ia tetap dipindai penuh oleh pemeriksaan basi di `ModulSedangDipindahTest`, jadi
+ * yang berubah bukan cakupan pemindaiannya melainkan arti hasilnya: selama modulnya masih
+ * melanggar, pengecualian itu sah; begitu ia bersih, pengecualiannya sendiri yang gagal.
+ * Daftarnya, alasannya, dan tenggatnya ada di `ModulSedangDipindah`.
  */
 class TenantScopeBoundaryTest extends TestCase
 {
@@ -91,74 +94,37 @@ class TenantScopeBoundaryTest extends TestCase
 
     public function test_module_tidak_memakai_query_builder_mentah_pada_tabelnya(): void
     {
+        $pemindai = PemindaiModul::padaRepo();
+        $dipindah = ModulSedangDipindah::bawaan();
+
         $berkasDiperiksa = 0;
+        $moduleDiperiksa = 0;
         $pelanggaran = [];
 
-        foreach ($this->berkasPhpModule() as $berkas) {
-            $berkasDiperiksa++;
-            $isi = (string) file_get_contents($berkas->getPathname());
-
-            foreach (['DB::table(', 'DB::select(', 'DB::statement('] as $pola) {
-                if (str_contains($isi, $pola)) {
-                    $pelanggaran[] = $this->jalurRingkas($berkas->getPathname()).' memakai '.$pola;
-                }
+        foreach ($pemindai->folderModul() as $nama => $folder) {
+            if ($dipindah->menandai($nama)) {
+                continue;
             }
+
+            $moduleDiperiksa++;
+            $berkasDiperiksa += count($pemindai->berkasPhp($folder, tanpaMigration: true));
+            $pelanggaran = array_merge($pelanggaran, $pemindai->pelanggaranQueryMentah($folder));
         }
 
+        $this->assertGreaterThan(0, $moduleDiperiksa, 'Tidak ada module yang diperiksa; penjaga ini akan lulus tanpa menguji apa pun.');
         $this->assertGreaterThan(0, $berkasDiperiksa, 'Tidak ada berkas module yang dibaca; penjaga ini tidak menguji apa pun.');
         $this->assertSame([], $pelanggaran, implode("\n", [
             'Kode module memakai query builder mentah pada tabelnya sendiri.',
             'Query mentah melewati global scope tenant, jadi ia tidak tersaring dan tidak ada yang memberi tahu.',
             'Pakai model module; bila memang butuh SQL langsung, saring tenant secara eksplisit dan',
             'daftarkan pengecualiannya di berkas test ini supaya terlihat pada diff.',
+            'Modul yang sedang dipindah masuk dan belum dibentuk ulang punya pintu lain, dengan',
+            'tenggat dan pemeriksaan basi: ModulSedangDipindah.',
         ]));
     }
 
     private function jadikanTenantAktif(string $tenantId): void
     {
         $this->app->instance(TenantScope::KUNCI, $tenantId);
-    }
-
-    /**
-     * Berkas PHP module, kecuali migration.
-     *
-     * Migration memang menulis SQL langsung — indeks unik parsial ditulis begitu — dan ia
-     * berjalan sebelum ada tenant mana pun, jadi tidak masuk akal menuntutnya tersaring.
-     *
-     * @return list<SplFileInfo>
-     */
-    private function berkasPhpModule(): array
-    {
-        $akar = dirname(__DIR__, 5).'/modules';
-        $berkas = [];
-
-        if (! is_dir($akar)) {
-            return [];
-        }
-
-        $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($akar, RecursiveDirectoryIterator::SKIP_DOTS));
-
-        /** @var SplFileInfo $item */
-        foreach ($iterator as $item) {
-            if (! $item->isFile() || $item->getExtension() !== 'php') {
-                continue;
-            }
-
-            if (str_contains(str_replace('\\', '/', $item->getPathname()), '/database/migrations/')) {
-                continue;
-            }
-
-            $berkas[] = $item;
-        }
-
-        return $berkas;
-    }
-
-    private function jalurRingkas(string $jalur): string
-    {
-        $jalur = str_replace('\\', '/', $jalur);
-        $potong = strpos($jalur, '/modules/');
-
-        return $potong === false ? $jalur : substr($jalur, $potong + 1);
     }
 }
