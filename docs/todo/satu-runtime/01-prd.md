@@ -1202,6 +1202,51 @@ dibangun.
 
 **Bergantung pada.** F2-01.
 
+#### Langkah 1 dan 2 sudah dikerjakan pada F1-06
+
+Autoload lewat repositori path ditarik ke fase 1 karena test penjaga tenant tidak bisa berjalan tanpa
+kelas modul dapat dimuat. Yang dikerjakan di sini adalah langkah 3 dan 4, yaitu image-nya.
+
+#### Image menirukan susunan repo, bukan menyalin modul dua kali
+
+Ini keputusan yang menentukan dan tidak disebut task ini. Composer memasang modul lewat tautan simbolik
+`vendor/apperp/contoh-a -> ../../../../modules/apperp/contoh-a`, dan tautan itu hanya sah bila jarak
+antara `vendor` dan `modules` di dalam image sama dengan jarak keduanya di repo.
+
+Dua jalan lain sempat dipertimbangkan dan ditolak:
+
+| Jalan | Kenapa ditolak |
+| --- | --- |
+| Composer menyalin modul ke `vendor` alih-alih menaut | kode modul ada dua salinan di dalam image, dan menyunting salah satunya tidak mengubah yang lain |
+| Menaruh `modules/` di tempat yang kebetulan cocok dengan hitungan tautan | bekerja karena kebetulan, dan berhenti bekerja begitu ada yang memindahkan folder |
+
+Karena itu image memakai `/repo/apps/control-plane` dan `/repo/modules`, persis seperti repo. Akar
+dokumen Apache dan tiga jalur pada skrip masuk container ikut disesuaikan.
+
+#### Dibuktikan di dalam image, bukan di mesin pengembang
+
+```
+lrwxrwxrwx contoh-a -> ../../../../modules/apperp/contoh-a/
+lrwxrwxrwx contoh-b -> ../../../../modules/apperp/contoh-b/
+
+php artisan module:list      -> kedua modul tampil
+class_exists(Modules\Apperp\ContohA\Models\Barang) -> true
+```
+
+#### Yang belum bisa dipastikan
+
+Mode muat-ulang-panas pada skrip pengembangan memasang folder app dari mesin pengembang ke dalam
+container, termasuk `vendor`. Di Windows, tautan modul di dalam `vendor` adalah reparse point, dan
+apakah Docker menerjemahkannya dengan benar **belum diuji**. Folder `modules` kini ikut dipasang supaya
+perubahannya langsung terlihat, tapi bila mode itu bermasalah, jalankan stack tanpa muat-ulang-panas
+sampai ada yang memeriksanya.
+
+#### Berkas di repo `erp-dev` tidak ikut di-commit
+
+Repo itu punya perubahan yang belum di-commit milik pemiliknya, dan mencampurnya dengan pekerjaan ini
+akan menyulitkan keduanya. Yang diubah di sana: konteks pembangunan pada `compose.yaml`, dua pemasangan
+volume penyimpanan, dan tiga pemasangan volume pada mode muat-ulang-panas di `start.ps1`.
+
 ### F2-03 — Migrator per modul
 
 **Kenapa.** Migration modul harus bisa dijalankan sendiri, per tenant, dan riwayatnya dicatat terpisah
@@ -1209,6 +1254,7 @@ supaya menjalankan ulang tidak mengulang yang sudah jalan.
 
 **Berkas.**
 - `apps/control-plane/app/Support/Modules/ModuleMigrator.php`
+- `apps/control-plane/app/Support/Modules/ModuleMigrationRepository.php`
 - `apps/control-plane/app/Console/Commands/ModuleMigrateCommand.php`
 - `apps/control-plane/tests/Feature/ControlPlane/ModuleMigratorTest.php`
 
@@ -1228,6 +1274,41 @@ supaya menjalankan ulang tidak mengulang yang sudah jalan.
 **Rujukan.** Bagian 5.2 dokumen ini.
 
 **Bergantung pada.** F1-04, F2-02.
+
+#### Nama tabel saja tidak cukup; riwayatnya harus disaring per modul
+
+Task ini menyebut tabel riwayat terpisah dengan kolom `module_id`. Kolomnya ada, tapi kolom saja tidak
+menyelesaikan apa pun bila pembacanya tidak menyaringnya.
+
+Nama berkas migration mengikuti pola waktu dan maksud, misalnya
+`2026_09_08_000100_create_m_barang_table`. Dua modul yang ditulis orang berbeda **mudah** menghasilkan
+nama yang sama persis. Tanpa penyaringan `module_id` saat membaca riwayat, migration modul B akan
+terlihat sudah pernah jalan hanya karena modul A punya berkas bernama sama, dan tabelnya tidak pernah
+dibuat. Gejalanya adalah tabel yang hilang tanpa pesan kesalahan apa pun.
+
+Karena itu repositori riwayatnya adalah kelas tersendiri yang menyaring `module_id` pada setiap
+pembacaan, bukan sekadar tabel dengan kolom tambahan.
+
+#### Kenapa riwayat modul tidak boleh menumpang tabel `migrations`
+
+Bila menumpang, mencabut sebuah modul lalu memasangnya lagi akan **melewati seluruh migration-nya**,
+karena riwayatnya masih tercatat di sana, dan tabelnya tidak pernah dibuat ulang. Ini akan muncul
+persis saat pelanggan berlangganan kembali — waktu terburuk untuk menemukannya.
+
+#### Arti opsi tenant berbeda pada dua bentuk penempatan
+
+Perlu ditulis karena mudah disalahpahami sebagai "membuat tabel per tenant":
+
+| Penempatan | Yang dilakukan opsi tenant |
+| --- | --- |
+| Gabungan, bawaan | tabelnya sudah ada untuk semua tenant; opsi ini hanya menandai untuk siapa pemasangan dicatat |
+| Terpisah | migration benar-benar dijalankan di database tenant itu |
+
+#### Enam test
+
+Empat di luar yang diminta, termasuk yang menjaga hal yang baru saja diputuskan: riwayat dua modul tidak
+saling menutupi, perintah menolak modul yang tidak dikenal, dan tabel `migrations` milik Core tidak
+bertambah satu baris pun.
 
 ### F2-04 — Data awal modul, sekali saja
 
@@ -1258,6 +1339,38 @@ Task ini menggantikan rencana peran database per modul, yang dibatalkan karena a
 **Rujukan.** Bagian 5.2 dokumen ini.
 
 **Bergantung pada.** F1-03, F2-03.
+
+#### Penanda bawaan menuntut satu kolom, dan itu bagian dari standar
+
+Langkah 3 meminta baris hasil seed diberi penanda. Penandanya adalah kolom `bawaan` pada tabel master
+modul, ditambahkan lewat migration tersendiri pada kedua modul contoh.
+
+Alasan kolom, bukan tebakan dari tanggal: tanpa penanda, sebuah pemulihan atau pembersihan tidak punya
+cara memisahkan baris bawaan dari baris yang diketik pengguna selain menebak, dan menebak berarti suatu
+saat membuang data pelanggan. Kolom ini seharusnya menjadi bagian standar tabel master modul, bukan
+milik modul contoh saja.
+
+#### Seed dijalankan dengan tenant aktif dipasang sementara
+
+Model modul disaring `TenantScope`, dan scope itu **membatalkan** query yang berjalan tanpa tenant aktif.
+Itu memang perilaku yang diinginkan, tapi berarti seeder tidak bisa berjalan begitu saja: pemasang
+menaruh tenant aktif ke wadah selama seed berlangsung, lalu mengembalikannya. Seeder dengan demikian
+memakai model biasa dan ikut tersaring, bukan menulis lewat query mentah yang melewati penjaga.
+
+#### Lima test, dua di luar yang diminta
+
+Selain tiga yang diminta: baris bawaan terbukti bisa dibedakan dari baris pengguna, dan seed **tidak
+dijalankan sama sekali** bila belum ada catatan pemasangan. Yang kedua menutup lubang yang halus — tanpa
+catatan pemasangan tidak ada tempat menandai bahwa data awal sudah diisi, jadi menjalankannya berarti
+mengisi ulang setiap kali dipanggil.
+
+Rangkaian terpanjang menguji urutan yang paling mungkin terjadi pada pelanggan sungguhan: pasang, isi
+data sendiri, nonaktifkan, cabut, pasang lagi. Data pengguna tetap satu baris, baris bawaan tetap dua.
+
+#### Satu jebakan penamaan
+
+`Illuminate\Foundation\Testing\TestCase` sudah memiliki metode `seed()`. Sebuah metode pembantu
+bernama sama pada kelas test gagal fatal, bukan sekadar membingungkan.
 
 ### F2-05 — Perintah pasang, nonaktifkan, dan cabut
 
@@ -1296,6 +1409,41 @@ dalam bentuk apa pun.
 **Rujukan.** [release dan on-prem](../../dev/03-release-and-on-prem.md), bagian 5.2 dokumen ini.
 
 **Bergantung pada.** F2-04.
+
+#### Bug yang ditemukan test, bukan diperkirakan sebelumnya
+
+`ModuleInstallation` berkunci gabungan, jadi ia tidak punya primary key tunggal. Akibatnya
+`$model->fresh()` **mengembalikan baris yang salah tanpa satu pun peringatan**: ia membangun query dari
+primary key yang tidak ada. Aksi penonaktifan dan pencabutan sempat memakainya, dan hanya satu dari
+tujuh test yang menangkapnya — yang lain memeriksa status lewat query langsung dan lolos.
+
+Pelajarannya untuk seluruh proyek: **model berkunci gabungan tidak boleh memakai pembantu Eloquent yang
+bersandar pada primary key.** Selain `fresh()`, itu termasuk `refresh()`, `find()`, dan `save()` pada
+model yang sudah ada.
+
+#### Pemasangan aman dijalankan dua kali
+
+Memasang modul yang sudah terpasang bukan kesalahan. Ia mengembalikan status ke terpasang tanpa
+menyentuh data dan tanpa mengisi ulang data awal. Ini bukan kenyamanan: pembaruan on-prem dijalankan
+admin pelanggan dengan tangan (bagian 5.7), dan perintah yang meledak bila diulang akan diulang juga,
+lalu ditinggal setengah jalan.
+
+#### Dependency diperiksa terhadap tenant, bukan terhadap katalog
+
+Katalog tahu modul mana bergantung pada modul mana, tapi itu bukan pertanyaannya. Pertanyaannya: adakah
+modul yang **tenant ini** pakai dan akan rusak bila modul ini dicabut. Modul yang bergantung tapi tidak
+dimiliki tenant ini tidak menghalangi apa pun, dan ada test tersendiri untuk itu.
+
+#### Ketiadaan opsi hapus data diuji, bukan hanya dijanjikan
+
+Satu test membaca definisi perintah pencabutan dan menolak setiap opsi yang namanya mengandung `purge`,
+`delete`, `drop`, atau `hapus`. Sebuah janji di dalam komentar tidak menahan siapa pun; test ini menahan.
+
+#### Tujuh test
+
+Rangkaian penuh dijalankan sebagai satu test, bukan dipecah per aksi, karena kesalahannya justru muncul
+di sambungan antar aksi: pasang dua modul untuk dua tenant, ketik data sendiri, nonaktifkan satu,
+aktifkan lagi, cabut. Setiap langkah memeriksa modul lain dan tenant lain ikut tidak terpengaruh.
 
 ### F2-06 — Modul terpasang menggantikan kesiapan penempatan
 

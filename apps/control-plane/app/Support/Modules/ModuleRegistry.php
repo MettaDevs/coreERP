@@ -68,6 +68,26 @@ final class ModuleRegistry
         return $berkas === false ? [] : $berkas;
     }
 
+    /**
+     * Id module lain yang wajib terpasang lebih dulu.
+     *
+     * @param  array<mixed>  $isi
+     * @return list<string>
+     */
+    private function dependency(array $isi): array
+    {
+        $daftar = $isi['depends_on'] ?? [];
+
+        if (! is_array($daftar)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(static fn ($nilai): string => is_string($nilai) ? $nilai : '', $daftar),
+            static fn (string $nilai): bool => $nilai !== '',
+        ));
+    }
+
     private function baca(string $berkas): ?ModuleManifest
     {
         try {
@@ -99,6 +119,7 @@ final class ModuleRegistry
             jenis: isset($isi['kind']) && is_string($isi['kind']) ? $isi['kind'] : 'business-app',
             awalanTabel: isset($isi['table_prefix']) && is_string($isi['table_prefix']) ? $isi['table_prefix'] : '',
             folder: dirname($berkas),
+            dependency: $this->dependency($isi),
         );
     }
 }

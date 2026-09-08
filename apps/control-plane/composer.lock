@@ -8,11 +8,11 @@
     "packages": [
         {
             "name": "apperp/contoh-a",
-            "version": "dev-feat/f1-06-penjaga-tenant",
+            "version": "dev-feat/f2-04-data-awal",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/contoh-a",
-                "reference": "413b2287af97d1875ccb8aee0c9282846d603761"
+                "reference": "e03680f204bbaf27fc56ab203bdec2af2941bf32"
             },
             "require": {
                 "php": "^8.4"
@@ -20,7 +20,8 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "Modules\\Apperp\\ContohA\\": "src/"
+                    "Modules\\Apperp\\ContohA\\": "src/",
+                    "Modules\\Apperp\\ContohA\\Database\\Seeders\\": "database/seeders/"
                 }
             },
             "autoload-dev": {
@@ -39,11 +40,11 @@
         },
         {
             "name": "apperp/contoh-b",
-            "version": "dev-feat/f1-06-penjaga-tenant",
+            "version": "dev-feat/f2-04-data-awal",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/contoh-b",
-                "reference": "9613360e211120f7fb742396a0aee11745530f1a"
+                "reference": "eabcbc85af1042ce652179fc0e8ceb702b750624"
             },
             "require": {
                 "php": "^8.4"
@@ -51,7 +52,8 @@
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "Modules\\Apperp\\ContohB\\": "src/"
+                    "Modules\\Apperp\\ContohB\\": "src/",
+                    "Modules\\Apperp\\ContohB\\Database\\Seeders\\": "database/seeders/"
                 }
             },
             "autoload-dev": {

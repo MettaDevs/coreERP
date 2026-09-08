@@ -13,7 +13,7 @@ set -e
 # between roles, so anything an earlier root-run process left behind would otherwise block
 # www-data from writing next to it.
 drop_to_www_data() {
-    chown -R www-data:www-data /var/www/html/storage/app /var/www/html/storage/framework /var/www/html/storage/logs 2>/dev/null || true
+    chown -R www-data:www-data /repo/apps/control-plane/storage/app /repo/apps/control-plane/storage/framework /repo/apps/control-plane/storage/logs 2>/dev/null || true
 }
 
 case "${CONTAINER_ROLE:-web}" in

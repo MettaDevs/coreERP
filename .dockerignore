@@ -1,0 +1,12 @@
+# Konteks pembangunan image adalah akar repo, jadi berkas ini juga hidup di akar.
+.git
+.github
+docs
+graphify-out
+artifacts
+**/node_modules
+**/vendor
+**/.env
+apps/control-plane/public/build
+apps/control-plane/storage/logs
+apps/control-plane/bootstrap/cache/*.php

@@ -22,7 +22,9 @@ final class Barang extends Model
 
     protected $table = 'contoh_a_m_barang';
 
-    protected $fillable = ['tenant_id', 'kode', 'nama'];
+    protected $fillable = ['tenant_id', 'kode', 'nama', 'bawaan'];
+
+    protected $casts = ['bawaan' => 'boolean'];
 
     protected static function booted(): void
     {

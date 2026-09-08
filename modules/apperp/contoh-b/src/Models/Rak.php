@@ -22,7 +22,9 @@ final class Rak extends Model
 
     protected $table = 'contoh_b_m_rak';
 
-    protected $fillable = ['tenant_id', 'kode', 'nama'];
+    protected $fillable = ['tenant_id', 'kode', 'nama', 'bawaan'];
+
+    protected $casts = ['bawaan' => 'boolean'];
 
     protected static function booted(): void
     {
