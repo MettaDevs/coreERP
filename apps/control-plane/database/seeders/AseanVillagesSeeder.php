@@ -247,7 +247,7 @@ class AseanVillagesSeeder extends Seeder
                 }
             } else {
                 // Multiplier based countries
-                $itemsPerDist = $cfg['items_per_district'] ?? 3;
+                $itemsPerDist = (int) $cfg['items_per_district'];
 
                 foreach ($distList as $distIdx => $dist) {
                     $cleanCode = preg_replace('/[^A-Za-z0-9]/', '', $dist->district_code);
@@ -300,7 +300,7 @@ class AseanVillagesSeeder extends Seeder
                 }
             }
 
-            $this->command?->info("{$cc}: Seeded {$countryVillageCount} villages/subzones ({$cfg['prefix']}).");
+            $this->command->info("{$cc}: Seeded {$countryVillageCount} villages/subzones ({$cfg['prefix']}).");
         }
 
         // Bulk insert in chunks of 250
@@ -308,13 +308,13 @@ class AseanVillagesSeeder extends Seeder
             DB::table('ref_villages')->insert($chunk);
         }
 
-        $this->command?->info("Total {$totalSeeded} ASEAN village records successfully seeded and synchronized.");
+        $this->command->info("Total {$totalSeeded} ASEAN village records successfully seeded and synchronized.");
     }
 
     /**
      * Seeds canonical hierarchy levels & terms for all ASEAN nations.
      */
-    private function seedHierarchyLevels($now): void
+    private function seedHierarchyLevels(string $now): void
     {
         $levels = [
             // Indonesia
@@ -400,18 +400,16 @@ class AseanVillagesSeeder extends Seeder
                 ])
             );
 
-            $iso2 = $iso2Map[$lvl['country_code']] ?? null;
-            if ($iso2) {
-                $lvlIso2 = array_merge($lvl, ['country_code' => $iso2]);
-                DB::table('ref_country_hierarchy_levels')->updateOrInsert(
-                    ['country_code' => $iso2, 'level' => $lvl['level']],
-                    array_merge($lvlIso2, [
-                        'id' => (string) Str::ulid(),
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ])
-                );
-            }
+            $iso2 = $iso2Map[$lvl['country_code']];
+            $lvlIso2 = array_merge($lvl, ['country_code' => $iso2]);
+            DB::table('ref_country_hierarchy_levels')->updateOrInsert(
+                ['country_code' => $iso2, 'level' => $lvl['level']],
+                array_merge($lvlIso2, [
+                    'id' => (string) Str::ulid(),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ])
+            );
         }
     }
 }

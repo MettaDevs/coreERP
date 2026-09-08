@@ -18,6 +18,8 @@ class TimezoneResolverService
     /**
      * Resolve timezone for any administrative division ID by hierarchy traversal.
      * Never uses string/name matching — strictly relies on division ID and parent foreign keys.
+     *
+     * @return array{timezone: string, offset: string, label: string, display_name: string, source_division_id: string, source_division_type: string, source_division_name: string}|null
      */
     public function resolve(string $divisionType, string $divisionId): ?array
     {
@@ -28,6 +30,9 @@ class TimezoneResolverService
         });
     }
 
+    /**
+     * @return array{timezone: string, offset: string, label: string, display_name: string, source_division_id: string, source_division_type: string, source_division_name: string}|null
+     */
     private function resolveDirectOrParent(string $divisionType, string $divisionId): ?array
     {
         // 1. Check direct mapping in ref_administrative_division_timezones
@@ -46,28 +51,28 @@ class TimezoneResolverService
         // 2. Hierarchical fallback traversal
         switch ($divisionType) {
             case 'village':
-                $village = Village::find($divisionId);
+                $village = Village::where('id', $divisionId)->first();
                 if ($village && $village->district_id) {
                     return $this->resolveDirectOrParent('district', $village->district_id);
                 }
                 break;
 
             case 'district':
-                $district = District::find($divisionId);
+                $district = District::where('id', $divisionId)->first();
                 if ($district && $district->regency_id) {
                     return $this->resolveDirectOrParent('regency', $district->regency_id);
                 }
                 break;
 
             case 'regency':
-                $regency = Regency::find($divisionId);
+                $regency = Regency::where('id', $divisionId)->first();
                 if ($regency && $regency->province_id) {
                     return $this->resolveDirectOrParent('province', $regency->province_id);
                 }
                 break;
 
             case 'province':
-                $province = Province::find($divisionId);
+                $province = Province::where('id', $divisionId)->first();
                 if ($province) {
                     if (! empty($province->timezone)) {
                         return $this->formatTimezoneData($province->timezone, $province->id, 'province', $province->name);
@@ -91,7 +96,7 @@ class TimezoneResolverService
                 if ($tzRecord) {
                     $country = Country::where('code', $divisionId)->first();
 
-                    return $this->formatTimezoneData($tzRecord->iana_name, $divisionId, 'country', $country?->name ?? $divisionId);
+                    return $this->formatTimezoneData($tzRecord->iana_name, $divisionId, 'country', $country ? $country->name : $divisionId);
                 }
 
                 // 2. Check ref_administrative_division_timezones
@@ -103,7 +108,7 @@ class TimezoneResolverService
                 if ($countryMapping) {
                     $country = Country::where('code', $divisionId)->first();
 
-                    return $this->formatTimezoneData($countryMapping->timezone, $divisionId, 'country', $country?->name ?? $divisionId);
+                    return $this->formatTimezoneData($countryMapping->timezone, $divisionId, 'country', $country ? $country->name : $divisionId);
                 }
                 $country = Country::where('code', $divisionId)->first();
                 if ($country && ! empty($country->timezone)) {
@@ -111,7 +116,7 @@ class TimezoneResolverService
                 }
                 $inferredCountryTz = $this->inferCountryTimezone($divisionId);
                 if ($inferredCountryTz) {
-                    return $this->formatTimezoneData($inferredCountryTz, $divisionId, 'country', $country?->name ?? $divisionId);
+                    return $this->formatTimezoneData($inferredCountryTz, $divisionId, 'country', $country ? $country->name : $divisionId);
                 }
                 break;
         }
@@ -288,6 +293,8 @@ class TimezoneResolverService
 
     /**
      * Format IANA timezone into structured display metadata with dynamic UTC offset
+     *
+     * @return array{timezone: string, offset: string, label: string, display_name: string, source_division_id: string, source_division_type: string, source_division_name: string}
      */
     public function formatTimezoneData(string $ianaTimezone, string $sourceDivisionId, string $sourceDivisionType, string $sourceDivisionName): array
     {

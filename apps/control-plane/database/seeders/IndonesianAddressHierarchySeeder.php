@@ -80,7 +80,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
         $this->seedIndonesia($now);
     }
 
-    private function seedHierarchyLevels($now): void
+    private function seedHierarchyLevels(string $now): void
     {
         $levels = [
             // Indonesia
@@ -171,11 +171,11 @@ class IndonesianAddressHierarchySeeder extends Seeder
         return 'Asia/Jakarta';
     }
 
-    private function upsertProvince(string $countryCode, string $code, string $name, $now, ?string $ianaTimezone = null): string
+    private function upsertProvince(string $countryCode, string $code, string $name, string $now, ?string $ianaTimezone = null): string
     {
         $iana = $ianaTimezone ?? $this->determineIanaTimezone($countryCode, $code);
         $existing = DB::table('ref_provinces')->where('country_code', $countryCode)->where('code', $code)->first();
-        $id = $existing?->id ?? (string) Str::ulid();
+        $id = $existing ? (string) $existing->id : (string) Str::ulid();
         DB::table('ref_provinces')->updateOrInsert(
             ['country_code' => $countryCode, 'code' => $code],
             ['id' => $id, 'name' => $name, 'timezone' => $iana, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
@@ -190,10 +190,10 @@ class IndonesianAddressHierarchySeeder extends Seeder
         return $id;
     }
 
-    private function upsertRegency(string $provinceId, string $code, string $name, string $type, $now): string
+    private function upsertRegency(string $provinceId, string $code, string $name, string $type, string $now): string
     {
         $existing = DB::table('ref_regencies')->where('province_id', $provinceId)->where('code', $code)->first();
-        $id = $existing?->id ?? (string) Str::ulid();
+        $id = $existing ? (string) $existing->id : (string) Str::ulid();
         DB::table('ref_regencies')->updateOrInsert(
             ['province_id' => $provinceId, 'code' => $code],
             ['id' => $id, 'name' => $name, 'type' => $type, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
@@ -202,10 +202,10 @@ class IndonesianAddressHierarchySeeder extends Seeder
         return $id;
     }
 
-    private function upsertDistrict(string $regencyId, string $code, string $name, $now): string
+    private function upsertDistrict(string $regencyId, string $code, string $name, string $now): string
     {
         $existing = DB::table('ref_districts')->where('regency_id', $regencyId)->where('code', $code)->first();
-        $id = $existing?->id ?? (string) Str::ulid();
+        $id = $existing ? (string) $existing->id : (string) Str::ulid();
         DB::table('ref_districts')->updateOrInsert(
             ['regency_id' => $regencyId, 'code' => $code],
             ['id' => $id, 'name' => $name, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
@@ -214,10 +214,10 @@ class IndonesianAddressHierarchySeeder extends Seeder
         return $id;
     }
 
-    private function upsertVillage(string $districtId, string $code, string $name, string $type, ?string $postal, $now): string
+    private function upsertVillage(string $districtId, string $code, string $name, string $type, ?string $postal, string $now): string
     {
         $existing = DB::table('ref_villages')->where('district_id', $districtId)->where('code', $code)->first();
-        $id = $existing?->id ?? (string) Str::ulid();
+        $id = $existing ? (string) $existing->id : (string) Str::ulid();
         DB::table('ref_villages')->updateOrInsert(
             ['district_id' => $districtId, 'code' => $code],
             ['id' => $id, 'name' => $name, 'type' => $type, 'postal_code' => $postal, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
@@ -226,10 +226,10 @@ class IndonesianAddressHierarchySeeder extends Seeder
         return $id;
     }
 
-    private function upsertStreet(string $villageId, string $rt, string $rw, ?string $name, $now): string
+    private function upsertStreet(string $villageId, string $rt, string $rw, ?string $name, string $now): string
     {
         $existing = DB::table('ref_streets')->where('village_id', $villageId)->where('rt', $rt)->where('rw', $rw)->first();
-        $id = $existing?->id ?? (string) Str::ulid();
+        $id = $existing ? (string) $existing->id : (string) Str::ulid();
         DB::table('ref_streets')->updateOrInsert(
             ['village_id' => $villageId, 'rt' => $rt, 'rw' => $rw],
             ['id' => $id, 'name' => $name, 'active' => true, 'created_at' => $now, 'updated_at' => $now]
@@ -238,7 +238,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
         return $id;
     }
 
-    private function upsertPostalCode(string $countryCode, string $postal, ?string $provinceId, ?string $regencyId, ?string $districtId, ?string $villageId, $now): void
+    private function upsertPostalCode(string $countryCode, string $postal, ?string $provinceId, ?string $regencyId, ?string $districtId, ?string $villageId, string $now): void
     {
         DB::table('ref_postal_codes')->updateOrInsert(
             ['country_code' => $countryCode, 'postal_code' => $postal, 'village_id' => $villageId],
@@ -255,7 +255,7 @@ class IndonesianAddressHierarchySeeder extends Seeder
     }
 
     // ==================== INDONESIA ====================
-    private function seedIndonesia($now): void
+    private function seedIndonesia(string $now): void
     {
         // --- DKI Jakarta ---
         $jkt = $this->upsertProvince('ID', '31', 'DKI Jakarta', $now);

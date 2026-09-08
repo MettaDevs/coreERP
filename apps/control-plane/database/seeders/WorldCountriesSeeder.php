@@ -339,7 +339,7 @@ class WorldCountriesSeeder extends Seeder
         $this->seedMajorHierarchyLevels($now);
     }
 
-    private function seedMajorHierarchyLevels($now): void
+    private function seedMajorHierarchyLevels(string $now): void
     {
         $levels = [
             // Indonesia

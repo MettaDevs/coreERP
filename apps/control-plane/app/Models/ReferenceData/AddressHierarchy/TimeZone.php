@@ -6,6 +6,16 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $iana_name
+ * @property string $display_name
+ * @property string $utc_offset
+ * @property string $country_code
+ * @property bool $is_default
+ * @property bool $active
+ * @property-read Country|null $country
+ */
 class TimeZone extends Model
 {
     use HasUlids;
@@ -27,6 +37,7 @@ class TimeZone extends Model
         'active' => 'boolean',
     ];
 
+    /** @return BelongsTo<Country, $this> */
     public function country(): BelongsTo
     {
         return $this->belongsTo(Country::class, 'country_code', 'code');

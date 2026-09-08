@@ -110,7 +110,7 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                         ->where('country_code', 'ID')
                         ->where('code', $cleanCode)
                         ->first();
-                    $id = $existingProv?->id ?? (string) Str::ulid();
+                    $id = $existingProv ? (string) $existingProv->id : (string) Str::ulid();
                     $stats['new']++;
                 } else {
                     $id = $existing->id;
@@ -226,7 +226,7 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                                 ->where('province_id', $parentProvinceId)
                                 ->where('code', $cleanRegCode)
                                 ->first();
-                            $id = $existingReg?->id ?? (string) Str::ulid();
+                            $id = $existingReg ? (string) $existingReg->id : (string) Str::ulid();
                             $stats['new']++;
                         } else {
                             $id = $existing->id;
@@ -337,7 +337,7 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
                                 ->where('regency_id', $parentRegencyId)
                                 ->where('code', $cleanDistCode)
                                 ->first();
-                            $id = $existingDist?->id ?? (string) Str::ulid();
+                            $id = $existingDist ? (string) $existingDist->id : (string) Str::ulid();
                             $stats['new']++;
                         } else {
                             $id = $existing->id;

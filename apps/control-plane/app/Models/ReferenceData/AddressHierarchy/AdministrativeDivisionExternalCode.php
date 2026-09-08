@@ -6,6 +6,15 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $id
+ * @property string $division_id
+ * @property string $system
+ * @property string $external_code
+ * @property string|null $description
+ * @property string $status
+ * @property-read AdministrativeDivision|null $division
+ */
 final class AdministrativeDivisionExternalCode extends Model
 {
     use HasUlids;
@@ -21,6 +30,7 @@ final class AdministrativeDivisionExternalCode extends Model
         'status',
     ];
 
+    /** @return BelongsTo<AdministrativeDivision, $this> */
     public function division(): BelongsTo
     {
         return $this->belongsTo(AdministrativeDivision::class, 'division_id', 'id');

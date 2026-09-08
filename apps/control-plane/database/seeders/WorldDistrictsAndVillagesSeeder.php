@@ -41,7 +41,7 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
             ->orderBy('ref_regencies.code')
             ->get();
 
-        $this->command?->info("Processing {$regencies->count()} non-ASEAN cities/counties for district and village synchronization.");
+        $this->command->info("Processing {$regencies->count()} non-ASEAN cities/counties for district and village synchronization.");
 
         // Clear existing non-ASEAN districts and villages to allow a clean, uniform sync
         $existingNonAseanRegencyIds = $regencies->pluck('regency_id')->toArray();
@@ -155,11 +155,13 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
             DB::table('ref_villages')->insert($chunk);
         }
 
-        $this->command?->info("Successfully seeded {$districtCounter} districts and {$villageCounter} villages across all 238 world countries.");
+        $this->command->info("Successfully seeded {$districtCounter} districts and {$villageCounter} villages across all 238 world countries.");
     }
 
     /**
      * Country profile mappings with authentic local naming, types, and postal formats.
+     *
+     * @return array<string, array<string, mixed>>
      */
     private function getCountryProfiles(): array
     {
@@ -618,7 +620,7 @@ class WorldDistrictsAndVillagesSeeder extends Seeder
     /**
      * Seeds canonical Level 4 definitions for all world sovereign countries.
      */
-    private function seedWorldHierarchyLevels($now): void
+    private function seedWorldHierarchyLevels(string $now): void
     {
         $worldDefinitions = [
             'CHN' => ['term' => 'Cun / Shequ (村/社区)', 'desc' => 'Tingkat 4: ~690.000 desa dan unit kelurahan urban'],

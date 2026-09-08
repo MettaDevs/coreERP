@@ -44,7 +44,7 @@ class WorldCitiesSeeder extends Seeder
                 $cityList = $worldCities[$cc][$suffix] ?? null;
             }
 
-            if ($cityList && is_array($cityList) && count($cityList) > 0) {
+            if (! empty($cityList) && is_array($cityList)) {
                 foreach ($cityList as $cData) {
                     $cityCode = $cData['code'];
                     $cityName = $cData['name'];
