@@ -671,6 +671,68 @@ pasangan yang salah di repo Core.
 
 **Bergantung pada.** F0-03. Bagian Management Aset bergantung pada F3-01.
 
+#### Catatan pelaksanaan
+
+Bagian Core selesai. Bagian Management Aset (langkah 4) tetap menunggu F3-01 dan tidak disentuh.
+
+**Jumlah tabelnya benar, bentuk keunikannya yang tidak.** Pemeriksaan ulang seluruh migrasi Core —
+`apps/control-plane` beserta `modules/apperp/contoh-a` dan `contoh-b` — menemukan tepat satu tabel yang
+mengarsipkan sekaligus memiliki keunikan penuh pada kode bisnis, yaitu `units_of_measure`. Dugaan PRD
+tepat. Yang berbeda adalah bentuknya: keunikan itu sebuah **UNIQUE constraint** (`pg_constraint.contype
+= 'u'`), bukan indeks unik lepas, karena ia lahir dari `$table->unique([...])`. Resep pada standar app,
+`DROP INDEX`, tidak bisa dipakai di sini — constraint hanya bisa dibuang lewat `ALTER TABLE ... DROP
+CONSTRAINT`. Sebaliknya penggantinya wajib berupa indeks, bukan constraint, karena PostgreSQL tidak
+mengizinkan UNIQUE constraint memiliki klausa `WHERE`. Contoh pada standar app hanya benar untuk tabel
+yang keunikannya memang dibuat dengan `CREATE UNIQUE INDEX` sejak awal, seperti kedua modul contoh.
+
+**Nama indeksnya dipakai ulang.** Ini keputusan sendiri, bukan dari PRD. PostgreSQL menyebut pelanggaran
+indeks unik biasa maupun parsial dengan kalimat yang sama, `duplicate key value violates unique
+constraint "<nama>"`, jadi mempertahankan nama lama membuat pesan yang dilihat pemanggil untuk kasus yang
+memang masih harus ditolak — dua baris hidup dengan kode sama — tidak berubah sama sekali.
+
+**Hasil query langkah 2.** Dijalankan pada `erp-core-db-1` (PostgreSQL 16) terhadap kelima schema yang
+memiliki tabel `units_of_measure`, sebelum migrasi dipasang:
+
+| Schema | Baris | Terarsip | Bentrok arsip vs hidup | Duplikat hidup |
+| --- | --- | --- | --- | --- |
+| `public` | 483 | 0 | 0 | 0 |
+| `coreerp_test` | 0 | 0 | 0 | 0 |
+| `coreerp_t210` | 0 | 0 | 0 | 0 |
+| `coreerp_t212` | 0 | 0 | 0 | 0 |
+| `coreerp_t300` | 0 | 0 | 0 | 0 |
+
+Tidak ada satu pun baris terarsip, jadi tidak ada bentrok yang perlu diputuskan lebih dulu. Nol itu
+memang yang diharapkan, dan alasannya penting: selama keunikan penuh masih berlaku, bentrok semacam itu
+mustahil ada karena keunikan itu sendiri yang melarangnya. Angkanya tetap dicatat sebagai hasil
+pengukuran, bukan sebagai kesimpulan dari membaca migrasi.
+
+**Kriteria selesainya sudah dibuktikan bisa gagal.** Setelah ketiga test hijau, klausa `WHERE deleted_at
+IS NULL` dibuang sehingga indeksnya kembali penuh. Tepat satu test berubah merah — yang mengarsipkan lalu
+memakai ulang kodenya — sementara dua test lain tetap hijau. Itu justru yang diinginkan: kedua test lain
+memang tidak mengukur keparsialan, jadi test yang mengukurnya tidak sedang dijaga lapisan kedua.
+Test-nya juga sengaja membuat baris lewat model langsung, bukan lewat `UnitOfMeasureService` atau request
+HTTP, supaya aturan validasi "kode harus unik" tidak menjawab lebih dulu dan menutupi indeksnya.
+
+**`down()` sengaja bisa gagal, dan kegagalannya sudah dijalankan.** Setelah indeks parsial berlaku,
+sepasang `(tenant_id, code)` boleh dimiliki satu baris hidup dan satu baris terarsip sekaligus.
+Mengembalikan keunikan penuh pada keadaan itu mustahil tanpa memutuskan baris mana yang dibuang, dan itu
+bukan keputusan migrasi. Diuji pada schema terpisah dengan sepasang baris seperti itu, `migrate:rollback`
+gagal dengan `could not create unique index ... Key (tenant_id, code)=(T1, KG) is duplicated`, dan
+gagalnya utuh — indeks parsial tetap terpasang dan baris migrasinya tidak terhapus. Setelah baris
+terarsipnya dibuang, rollback yang sama berjalan dan constraint penuh kembali persis seperti semula.
+
+**Pemeriksaan standar app perlu dibaca per tabel, bukan per berkas.** Kedua `grep` pada standar app
+mencocokkan berkas, bukan tabel, sehingga `2026_07_30_160000_create_unit_of_measure_tables.php` tetap
+muncul di kedua daftar meski pasangan yang salah sudah tidak ada: berkas itu membuat tujuh tabel, dan
+`unique(['tenant_id', 'code'])` yang tersisa milik `uom_classes` dan `uom_systems`, yang tidak punya
+`deleted_at`. Pemeriksaan yang menentukan dijalankan pada database, lewat `pg_index` dan `pg_constraint`,
+bukan lewat `grep`.
+
+**Daftar yang dirujuk langkah 1 tidak ada.** Langkah 1 menyebut "daftar migrasi ber-SQL mentah pada
+bagian 5"; daftar seperti itu tidak ada untuk Core. Yang ada di bagian 5 adalah aturan bahwa migration
+dikecualikan dari penjaga query mentah, karena ia memang menulis SQL langsung dan berjalan sebelum ada
+tenant mana pun. Jadi tidak ada hitungan yang perlu diperbarui.
+
 ### F0-04 — `tsc` masuk ke alur linter
 
 **Kenapa.** Berkas TypeScript diperiksa ESLint dan Prettier, tapi tipenya tidak pernah diperiksa mesin
