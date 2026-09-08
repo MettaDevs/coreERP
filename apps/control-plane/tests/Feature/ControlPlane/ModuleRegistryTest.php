@@ -50,6 +50,31 @@ class ModuleRegistryTest extends TestCase
         $this->assertSame(['sudah-jadi'], array_map(static fn ($m): string => $m->id, $registry->semua()));
     }
 
+    public function test_module_tanpa_awalan_tabel_dilewati(): void
+    {
+        $this->tulisManifest('apperp/berawalan', "id: berawalan
+name: Berawalan
+version: 1.0.0
+publisher: apperp
+table_prefix: awal_
+");
+        $this->tulisManifest('apperp/belum-dibentuk', "id: belum-dibentuk
+name: Belum dibentuk
+version: 0.9.0
+publisher: apperp
+");
+
+        $registry = new ModuleRegistry($this->akarSementara);
+
+        $this->assertSame(
+            ['berawalan'],
+            array_map(static fn ($m): string => $m->id, $registry->semua()),
+            'Module tanpa table_prefix tidak boleh dilayani: tabelnya akan memakai nama apa adanya '.
+            'dan bertabrakan dengan milik Core. Ini keadaan modul yang baru ditarik masuk dan belum '.
+            'dibentuk ulang.'
+        );
+    }
+
     public function test_manifest_rusak_dilewati_tanpa_menjatuhkan_runtime(): void
     {
         $this->tulisManifest('apperp/sehat', "id: sehat\nname: Sehat\nversion: 1.0.0\npublisher: apperp\ntable_prefix: sehat_\n");
