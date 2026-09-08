@@ -1,0 +1,23 @@
+{
+    "name": "apperp/management-aset",
+    "description": "Module Management Aset. Berjalan di dalam runtime CoreERP, bukan sebagai aplikasi tersendiri.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Apperp\\ManagementAset\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}

@@ -4,11 +4,11 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0784283a039bd7175c044d6157febc01",
+    "content-hash": "7be9d4fde6d8b571426f105c56b2b544",
     "packages": [
         {
             "name": "apperp/contoh-a",
-            "version": "dev-feat/f2-04-data-awal",
+            "version": "dev-refactor/f3-03-susunan-modul",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/contoh-a",
@@ -40,7 +40,7 @@
         },
         {
             "name": "apperp/contoh-b",
-            "version": "dev-feat/f2-04-data-awal",
+            "version": "dev-refactor/f3-03-susunan-modul",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/contoh-b",
@@ -65,6 +65,37 @@
                 "proprietary"
             ],
             "description": "Module contoh untuk menguji penjaga batas. Bukan produk.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "apperp/management-aset",
+            "version": "dev-refactor/f3-03-susunan-modul",
+            "dist": {
+                "type": "path",
+                "url": "../../modules/apperp/management-aset",
+                "reference": "ac3f32a75fa838fe68e114c21c1bb80832276f69"
+            },
+            "require": {
+                "php": "^8.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Apperp\\ManagementAset\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Module Management Aset. Berjalan di dalam runtime CoreERP, bukan sebagai aplikasi tersendiri.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -10932,7 +10963,8 @@
     "minimum-stability": "stable",
     "stability-flags": {
         "apperp/contoh-a": 20,
-        "apperp/contoh-b": 20
+        "apperp/contoh-b": 20,
+        "apperp/management-aset": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
