@@ -1,0 +1,6 @@
+# Hasil run bersifat lokal dan berukuran besar.
+results/
+
+# Token konteks yang di-mint untuk run. Meski ditandatangani kunci test, ia tetap
+# kredensial berbentuk bearer token dan tidak perlu masuk repository.
+k6/tenants.json

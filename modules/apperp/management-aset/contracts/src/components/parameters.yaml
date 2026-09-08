@@ -1,0 +1,89 @@
+# Parameter query, path, dan header yang dipakai lintas endpoint.
+RecordId:
+  name: id
+  in: path
+  required: true
+  schema:
+    $ref: '#/components/schemas/Ulid'
+IdempotencyKey:
+  name: Idempotency-Key
+  in: header
+  required: true
+  description: |
+    Kunci stabil per percobaan pembuatan; retry dengan kunci sama tidak menerbitkan nomor baru.
+    Batas 133 karakter: Core membatasi idempotency_key pada 160 dan kunci yang diteruskan ke sana
+    diawali slug resource, sehingga slug master terpanjang (`item-checklist-maintenance`, 26) plus
+    `:` menyisakan 133.
+  schema:
+    type: string
+    maxLength: 133
+    pattern: ^[A-Za-z0-9._:-]+$
+IdempotencyKeyTransaksi:
+  name: Idempotency-Key
+  in: header
+  required: true
+  description: |
+    Sama seperti `IdempotencyKey`, tetapi untuk endpoint transaksi yang slug resource-nya lebih
+    pendek sehingga menyisakan 154 karakter.
+  schema:
+    type: string
+    maxLength: 154
+    pattern: ^[A-Za-z0-9._:-]+$
+Search:
+  name: q
+  in: query
+  description: Mencari pada kode atau nama.
+  schema:
+    type: string
+    maxLength: 100
+ActiveFilter:
+  name: aktif
+  in: query
+  schema:
+    type: boolean
+Page:
+  name: page
+  in: query
+  schema:
+    type: integer
+    minimum: 1
+PerPage:
+  name: per_page
+  in: query
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 20
+PabrikanAsetFilter:
+  name: pabrikan_aset_id
+  in: query
+  description: Membatasi daftar pada satu pabrikan aset.
+  schema:
+    $ref: '#/components/schemas/Ulid'
+JenisAsetFilter:
+  name: jenis_aset_id
+  in: query
+  description: Membatasi daftar pada satu jenis aset.
+  schema:
+    $ref: '#/components/schemas/Ulid'
+ParentLokasiAsetFilter:
+  name: parent_id
+  in: query
+  description: Membatasi daftar pada anak langsung satu lokasi aset.
+  schema:
+    $ref: '#/components/schemas/Ulid'
+TipeLokasiAsetFilter:
+  name: tipe_lokasi_id
+  in: query
+  description: Membatasi daftar pada satu tipe lokasi aset.
+  schema:
+    $ref: '#/components/schemas/Ulid'
+KodeLaporan:
+  name: kode
+  in: path
+  required: true
+  description: Kode laporan seperti pada katalog `GET /laporan`, misalnya `work-order`.
+  schema:
+    type: string
+    pattern: ^[a-z0-9-]+$

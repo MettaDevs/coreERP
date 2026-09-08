@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+@import '@apperp/ui/styles.css';
+@source '../node_modules/@apperp/ui/dist';
+
+* {
+    box-sizing: border-box;
+}
+html,
+body,
+#root {
+    height: 100%;
+}
+/* Halaman yang menggulir isinya sendiri — daftar-detail master, daftar dan rincian work
+   order — mematikan gulir dokumen supaya bar aksinya tetap terlihat di atas. */
+html:has([data-layout='full-height']),
+body:has([data-layout='full-height']) {
+    overflow: hidden;
+}
+body {
+    margin: 0;
+    min-width: 320px;
+}
+main {
+    width: 100%;
+}
