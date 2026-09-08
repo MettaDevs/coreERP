@@ -2212,11 +2212,21 @@ Pengecualian itu punya cara berakhir yang sama seperti yang lain: sebuah test me
 merah; entri yang tertinggal setelah modulnya selesai dipindah juga merah — karena pengecualian yang
 tertinggal membiarkan modul jadi lolos pemeriksaan gaya selamanya, dan tidak ada yang akan menyadarinya.
 
-**Ini kejadian ketiga dari pola yang sama dalam satu task**: sebuah pemeriksaan milik Core yang sudah
+**Dan setelah gaya hijau, giliran pemeriksaan tipe.** `tsconfig.json` menyertakan `modules` sejak F2-11
+juga, dan UI modul aset masih aplikasi React tersendiri dengan `package.json` serta `node_modules` miliknya
+sendiri — memeriksanya dengan dependensi Core menghasilkan ratusan `TS2307 Cannot find module` yang tidak
+satu pun menunjuk kesalahan sungguhan. Pengecualiannya dipasang di `exclude`, dan penjaganya digabungkan
+menjadi satu test bertabel: setiap berkas pengecualian Core wajib mendaftar modul yang sama persis.
+
+**Ini kejadian keempat dari pola yang sama dalam satu task**: sebuah pemeriksaan milik Core yang sudah
 benar mulai menjangkau modul yang belum siap dijangkau. Penjaga batas (F3-00), registry dan katalog
-(task ini), lalu pemeriksaan gaya. Yang membedakan ketiganya hanya siapa yang memindai; polanya sama, dan
-pertanyaannya yang seharusnya saya ajukan sejak awal adalah **"apa saja di Core yang memindai
-`modules/`"** — bukan "apa yang rusak".
+(task ini), pemeriksaan gaya, lalu pemeriksaan tipe. Yang membedakan keempatnya hanya siapa yang memindai;
+polanya sama, dan pertanyaan yang seharusnya saya ajukan sejak awal adalah **"apa saja di Core yang
+memindai `modules/`"** — bukan "apa yang rusak".
+
+Satu yang belum menjangkau dan karenanya belum terlihat: **ESLint**. Ia belum mencakup `modules/` sama
+sekali (dicatat pada F2-11), jadi ia akan menjadi kejadian kelima pada hari ia mencakupnya. Daftar
+pengecualiannya sudah bertabel, jadi menambahkannya nanti satu baris.
 
 ### F3-01 — Bawa repo masuk beserta riwayatnya
 
