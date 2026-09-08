@@ -29,7 +29,7 @@ app-erp-accounting/                 # satu repository app
 └── README.md
 ```
 
-Repository CoreERP ini adalah repository platform. Ia menampung `control-plane`, `provider-console`, dan `web-shell`; ia tidak berisi domain atau database app bisnis.
+Repository CoreERP ini adalah repository platform. Ia menampung `control-plane` dan `provider-console`; ia tidak berisi domain atau database app bisnis. Surface Web Shell — launcher dan halaman tuan rumah app — hidup di dalam UI Control Plane, bukan folder `apps/` tersendiri.
 
 Setiap app menghasilkan artifact terpisah: image API, artifact/image UI, migration, contract, dan manifest. Cloud dapat menyajikan UI lewat CDN/artifact registry; on-prem perpetual menyajikannya dari image static UI yang hanya ada untuk app berlisensi dan didistribusikan dalam bundle release bertanda tangan.
 
