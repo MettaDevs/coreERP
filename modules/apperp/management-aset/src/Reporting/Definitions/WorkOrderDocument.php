@@ -114,9 +114,9 @@ final class WorkOrderDocument implements ReportDefinition
     {
         $request = $context->request();
         $tenant = $context->tenantId;
-        $query = DB::table('tr_pemeliharaan_aset as wo')
-            ->leftJoin('m_tipe_work_order as tipe', fn ($join) => $join->on('tipe.id', '=', 'wo.tipe_work_order_id')->on('tipe.tenant_id', '=', 'wo.tenant_id'))
-            ->leftJoin('m_tingkat_layanan as layanan', fn ($join) => $join->on('layanan.id', '=', 'wo.tingkat_layanan_id')->on('layanan.tenant_id', '=', 'wo.tenant_id'))
+        $query = DB::table('aset_tr_pemeliharaan_aset as wo')
+            ->leftJoin('aset_m_tipe_work_order as tipe', fn ($join) => $join->on('tipe.id', '=', 'wo.tipe_work_order_id')->on('tipe.tenant_id', '=', 'wo.tenant_id'))
+            ->leftJoin('aset_m_tingkat_layanan as layanan', fn ($join) => $join->on('layanan.id', '=', 'wo.tingkat_layanan_id')->on('layanan.tenant_id', '=', 'wo.tenant_id'))
             ->where(['wo.id' => $parameters['id'], 'wo.tenant_id' => $tenant])
             ->whereNull('wo.deleted_at');
         app(OrganizationScope::class)->query($query, $request, 'wo.legal_entity_id', 'wo.responsible_org_unit_id');
@@ -125,14 +125,14 @@ final class WorkOrderDocument implements ReportDefinition
             throw new ReportDataException('Work order tidak ditemukan atau berada di luar unit kerja yang dapat Anda akses.');
         }
 
-        $lines = DB::table('tr_pemeliharaan_aset_details as job')
-            ->leftJoin('tr_penerimaan_aset as aset', fn ($join) => $join->on('aset.id', '=', 'job.asset_id')->on('aset.tenant_id', '=', 'job.tenant_id'))
-            ->leftJoin('m_lokasi_aset as lokasi', fn ($join) => $join->on('lokasi.id', '=', 'job.asset_location_id')->on('lokasi.tenant_id', '=', 'job.tenant_id'))
-            ->leftJoin('m_maintenance_job_type as pekerjaan', fn ($join) => $join->on('pekerjaan.id', '=', 'job.maintenance_job_type_id')->on('pekerjaan.tenant_id', '=', 'job.tenant_id'))
-            ->leftJoin('m_maintenance_job_type_variant as varian', fn ($join) => $join->on('varian.id', '=', 'job.variant_id')->on('varian.tenant_id', '=', 'job.tenant_id'))
-            ->leftJoin('m_trade as keahlian', fn ($join) => $join->on('keahlian.id', '=', 'job.trade_id')->on('keahlian.tenant_id', '=', 'job.tenant_id'))
-            ->leftJoin('m_sebab_kerusakan as sebab', fn ($join) => $join->on('sebab.id', '=', 'job.sebab_kerusakan_id')->on('sebab.tenant_id', '=', 'job.tenant_id'))
-            ->leftJoin('m_tindakan_perbaikan as tindakan', fn ($join) => $join->on('tindakan.id', '=', 'job.tindakan_perbaikan_id')->on('tindakan.tenant_id', '=', 'job.tenant_id'))
+        $lines = DB::table('aset_tr_pemeliharaan_aset_details as job')
+            ->leftJoin('aset_tr_penerimaan_aset as aset', fn ($join) => $join->on('aset.id', '=', 'job.asset_id')->on('aset.tenant_id', '=', 'job.tenant_id'))
+            ->leftJoin('aset_m_lokasi_aset as lokasi', fn ($join) => $join->on('lokasi.id', '=', 'job.asset_location_id')->on('lokasi.tenant_id', '=', 'job.tenant_id'))
+            ->leftJoin('aset_m_maintenance_job_type as pekerjaan', fn ($join) => $join->on('pekerjaan.id', '=', 'job.maintenance_job_type_id')->on('pekerjaan.tenant_id', '=', 'job.tenant_id'))
+            ->leftJoin('aset_m_maintenance_job_type_variant as varian', fn ($join) => $join->on('varian.id', '=', 'job.variant_id')->on('varian.tenant_id', '=', 'job.tenant_id'))
+            ->leftJoin('aset_m_trade as keahlian', fn ($join) => $join->on('keahlian.id', '=', 'job.trade_id')->on('keahlian.tenant_id', '=', 'job.tenant_id'))
+            ->leftJoin('aset_m_sebab_kerusakan as sebab', fn ($join) => $join->on('sebab.id', '=', 'job.sebab_kerusakan_id')->on('sebab.tenant_id', '=', 'job.tenant_id'))
+            ->leftJoin('aset_m_tindakan_perbaikan as tindakan', fn ($join) => $join->on('tindakan.id', '=', 'job.tindakan_perbaikan_id')->on('tindakan.tenant_id', '=', 'job.tenant_id'))
             ->where(['job.tenant_id' => $tenant, 'job.pemeliharaan_aset_id' => $wo->id])
             ->orderBy('job.line_number')
             ->get([
@@ -144,8 +144,8 @@ final class WorkOrderDocument implements ReportDefinition
                 'sebab.nama as sebab_nama', 'tindakan.nama as tindakan_nama',
             ]);
 
-        $checklist = DB::table('tr_pemeliharaan_aset_checklist as cek')
-            ->join('tr_pemeliharaan_aset_details as job', fn ($join) => $join->on('job.id', '=', 'cek.pemeliharaan_aset_detail_id')->on('job.tenant_id', '=', 'cek.tenant_id'))
+        $checklist = DB::table('aset_tr_pemeliharaan_aset_checklist as cek')
+            ->join('aset_tr_pemeliharaan_aset_details as job', fn ($join) => $join->on('job.id', '=', 'cek.pemeliharaan_aset_detail_id')->on('job.tenant_id', '=', 'cek.tenant_id'))
             ->where(['cek.tenant_id' => $tenant, 'job.pemeliharaan_aset_id' => $wo->id])
             ->orderBy('job.line_number')->orderBy('cek.line_number')
             ->get(['cek.*', 'job.line_number as job_line_number']);

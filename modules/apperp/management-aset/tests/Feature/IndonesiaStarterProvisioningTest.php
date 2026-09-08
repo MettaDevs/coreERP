@@ -43,20 +43,20 @@ class IndonesiaStarterProvisioningTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.template_key', 'id:pmk72-2023:starter:v1');
 
-        $this->assertDatabaseCount('m_kelompok_harta_fiskal', 7);
-        $this->assertDatabaseCount('m_profil_penyusutan', 10);
-        $this->assertDatabaseCount('m_buku_penyusutan', 2);
-        $this->assertDatabaseCount('m_tipe_lokasi_aset', 6);
-        $this->assertDatabaseCount('m_kondisi_aset', 5);
-        $this->assertDatabaseCount('m_pabrikan_aset', 68);
-        $this->assertDatabaseCount('m_model_aset', 209);
-        $this->assertDatabaseHas('m_pabrikan_aset', [
+        $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 7);
+        $this->assertDatabaseCount('aset_m_profil_penyusutan', 10);
+        $this->assertDatabaseCount('aset_m_buku_penyusutan', 2);
+        $this->assertDatabaseCount('aset_m_tipe_lokasi_aset', 6);
+        $this->assertDatabaseCount('aset_m_kondisi_aset', 5);
+        $this->assertDatabaseCount('aset_m_pabrikan_aset', 68);
+        $this->assertDatabaseCount('aset_m_model_aset', 209);
+        $this->assertDatabaseHas('aset_m_pabrikan_aset', [
             'tenant_id' => $tenant,
             'creation_key' => 'pabrikan-aset:starter:id:manufacturer-models:indonesia-asia:v1:toyota',
             'nama' => 'Toyota',
             'aktif' => true,
         ]);
-        $this->assertDatabaseHas('m_model_aset', [
+        $this->assertDatabaseHas('aset_m_model_aset', [
             'tenant_id' => $tenant,
             'creation_key' => 'model-aset:starter:id:manufacturer-models:indonesia-asia:v1:toyota:avanza',
             'nama' => 'Avanza',
@@ -64,31 +64,31 @@ class IndonesiaStarterProvisioningTest extends TestCase
             'model_number' => null,
             'aktif' => true,
         ]);
-        $this->assertDatabaseMissing('m_pabrikan_aset', ['tenant_id' => $otherTenant]);
-        $this->assertDatabaseMissing('m_model_aset', ['tenant_id' => $otherTenant]);
-        $this->assertDatabaseCount('m_maintenance_job_type', 7);
-        $this->assertDatabaseCount('m_maintenance_job_type_variant', 42);
-        $this->assertDatabaseCount('m_maintenance_checklist_variable', 1);
-        $this->assertDatabaseCount('m_maintenance_checklist_variable_value', 3);
-        $this->assertDatabaseCount('m_maintenance_checklist_template', 1);
-        $this->assertDatabaseCount('m_maintenance_checklist_template_line', 4);
-        $this->assertDatabaseCount('m_maintenance_job_type_default', 2);
-        $this->assertDatabaseCount('m_sebab_kerusakan', 0);
-        $this->assertDatabaseCount('m_tindakan_perbaikan', 0);
-        $this->assertDatabaseHas('m_kelompok_harta_fiskal', [
+        $this->assertDatabaseMissing('aset_m_pabrikan_aset', ['tenant_id' => $otherTenant]);
+        $this->assertDatabaseMissing('aset_m_model_aset', ['tenant_id' => $otherTenant]);
+        $this->assertDatabaseCount('aset_m_maintenance_job_type', 7);
+        $this->assertDatabaseCount('aset_m_maintenance_job_type_variant', 42);
+        $this->assertDatabaseCount('aset_m_maintenance_checklist_variable', 1);
+        $this->assertDatabaseCount('aset_m_maintenance_checklist_variable_value', 3);
+        $this->assertDatabaseCount('aset_m_maintenance_checklist_template', 1);
+        $this->assertDatabaseCount('aset_m_maintenance_checklist_template_line', 4);
+        $this->assertDatabaseCount('aset_m_maintenance_job_type_default', 2);
+        $this->assertDatabaseCount('aset_m_sebab_kerusakan', 0);
+        $this->assertDatabaseCount('aset_m_tindakan_perbaikan', 0);
+        $this->assertDatabaseHas('aset_m_kelompok_harta_fiskal', [
             'tenant_id' => $tenant,
             'template_key' => 'id:pmk72-2023:kelompok-1:v1',
             'useful_life_years' => 4,
             'straight_line_rate_percent' => 25,
             'reducing_balance_rate_percent' => 50,
         ]);
-        $this->assertDatabaseHas('m_buku_penyusutan', [
+        $this->assertDatabaseHas('aset_m_buku_penyusutan', [
             'tenant_id' => $tenant,
             'creation_key' => 'buku-penyusutan:starter:id:pmk72-2023:buku:fiskal:v1',
             'posting_layer' => 'tax',
             'export_to_backoffice' => false,
         ]);
-        $this->assertDatabaseHas('m_buku_penyusutan', [
+        $this->assertDatabaseHas('aset_m_buku_penyusutan', [
             'tenant_id' => $tenant,
             'creation_key' => 'buku-penyusutan:starter:id:pmk72-2023:buku:komersial:v1',
             'posting_layer' => 'current',
@@ -96,10 +96,10 @@ class IndonesiaStarterProvisioningTest extends TestCase
             'export_to_backoffice' => false,
         ]);
 
-        $classificationId = (string) DB::table('m_kelompok_harta_fiskal')
+        $classificationId = (string) DB::table('aset_m_kelompok_harta_fiskal')
             ->where(['tenant_id' => $tenant, 'template_key' => 'id:pmk72-2023:kelompok-1:v1'])
             ->value('id');
-        DB::table('m_group_aset')->insert([
+        DB::table('aset_m_group_aset')->insert([
             'id' => (string) Str::ulid(),
             'tenant_id' => $tenant,
             'creation_key' => 'group-starter-test',
@@ -112,10 +112,10 @@ class IndonesiaStarterProvisioningTest extends TestCase
         ]);
         // Matriks starter memasang buku komersial, bukan fiskal: tenant baru belum tentu
         // meminta pembukuan pajak, dan buku pertamanya dipakai sebagai dasar pelaporan.
-        $defaultBookId = (string) DB::table('m_buku_penyusutan')
+        $defaultBookId = (string) DB::table('aset_m_buku_penyusutan')
             ->where(['tenant_id' => $tenant, 'posting_layer' => 'current'])
             ->value('id');
-        $profileId = (string) DB::table('m_profil_penyusutan')
+        $profileId = (string) DB::table('aset_m_profil_penyusutan')
             ->where('creation_key', 'profil-penyusutan:starter:id:pmk72-2023:profil:kelompok-1:garis-lurus:v1')
             ->value('id');
 
@@ -123,25 +123,25 @@ class IndonesiaStarterProvisioningTest extends TestCase
             ->assertOk();
 
         $this->assertSame(365, $calls, 'Pengulangan event tidak boleh meminta nomor baru.');
-        $this->assertDatabaseCount('m_kelompok_harta_fiskal', 7);
-        $this->assertDatabaseCount('m_profil_penyusutan', 10);
-        $this->assertDatabaseCount('m_buku_penyusutan', 2);
-        $this->assertDatabaseCount('m_group_buku_penyusutan', 1);
-        $this->assertDatabaseHas('m_group_buku_penyusutan', [
+        $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 7);
+        $this->assertDatabaseCount('aset_m_profil_penyusutan', 10);
+        $this->assertDatabaseCount('aset_m_buku_penyusutan', 2);
+        $this->assertDatabaseCount('aset_m_group_buku_penyusutan', 1);
+        $this->assertDatabaseHas('aset_m_group_buku_penyusutan', [
             'tenant_id' => $tenant,
             'buku_id' => $defaultBookId,
             'depreciation_profile_id' => $profileId,
         ]);
-        $this->assertDatabaseCount('m_tipe_lokasi_aset', 6);
-        $this->assertDatabaseCount('m_kondisi_aset', 5);
-        $this->assertDatabaseCount('m_pabrikan_aset', 68);
-        $this->assertDatabaseCount('m_model_aset', 209);
-        $this->assertDatabaseCount('m_maintenance_job_type', 7);
-        $this->assertDatabaseCount('m_maintenance_job_type_variant', 42);
-        $this->assertDatabaseCount('m_maintenance_checklist_variable_value', 3);
-        $this->assertDatabaseCount('m_maintenance_checklist_template_line', 4);
-        $this->assertDatabaseCount('m_maintenance_job_type_default', 2);
-        $this->assertDatabaseMissing('m_kelompok_harta_fiskal', ['tenant_id' => $otherTenant]);
+        $this->assertDatabaseCount('aset_m_tipe_lokasi_aset', 6);
+        $this->assertDatabaseCount('aset_m_kondisi_aset', 5);
+        $this->assertDatabaseCount('aset_m_pabrikan_aset', 68);
+        $this->assertDatabaseCount('aset_m_model_aset', 209);
+        $this->assertDatabaseCount('aset_m_maintenance_job_type', 7);
+        $this->assertDatabaseCount('aset_m_maintenance_job_type_variant', 42);
+        $this->assertDatabaseCount('aset_m_maintenance_checklist_variable_value', 3);
+        $this->assertDatabaseCount('aset_m_maintenance_checklist_template_line', 4);
+        $this->assertDatabaseCount('aset_m_maintenance_job_type_default', 2);
+        $this->assertDatabaseMissing('aset_m_kelompok_harta_fiskal', ['tenant_id' => $otherTenant]);
     }
 
     public function test_unsigned_provisioning_request_is_rejected(): void
@@ -166,9 +166,9 @@ class IndonesiaStarterProvisioningTest extends TestCase
             ->assertJsonPath('data.skipped', true);
 
         Http::assertNothingSent();
-        $this->assertDatabaseCount('m_kelompok_harta_fiskal', 0);
-        $this->assertDatabaseCount('m_profil_penyusutan', 0);
-        $this->assertDatabaseCount('m_buku_penyusutan', 0);
+        $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 0);
+        $this->assertDatabaseCount('aset_m_profil_penyusutan', 0);
+        $this->assertDatabaseCount('aset_m_buku_penyusutan', 0);
     }
 
     /** @param list<string> $appIds */

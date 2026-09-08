@@ -23,7 +23,7 @@ final class OrganizationScope
         abort_unless($this->allows($request, $legalEntityId, $operatingUnitId), 403, 'Data ini berada di luar unit kerja yang dapat Anda akses.');
     }
 
-    public function assetQuery(mixed $query, Request $request, string $alias = 'tr_penerimaan_aset'): mixed
+    public function assetQuery(mixed $query, Request $request, string $alias = 'aset_tr_penerimaan_aset'): mixed
     {
         return $this->query($query, $request, "{$alias}.legal_entity_id", "{$alias}.responsible_org_unit_id");
     }

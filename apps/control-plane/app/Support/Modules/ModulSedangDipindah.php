@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Boundary;
+namespace App\Support\Modules;
 
 use DateTimeImmutable;
 
@@ -42,6 +42,19 @@ use DateTimeImmutable;
  *
  * Ditulis sebagai konstanta di dalam kode, bukan di berkas setelan, mengikuti pola
  * `PENGECUALIAN` pada penjaga tabel: pengecualian baru wajib terlihat pada diff pull request.
+ */
+/**
+ * Berkas ini pindah dari `tests/` ke kode aplikasi pada F3-04, dan alasannya perlu diketahui.
+ *
+ * F3-25 memakai `table_prefix` yang belum dinyatakan sebagai tanda "module ini belum siap
+ * dilayani". Tanda itu bekerja tepat sampai F3-04, yaitu task yang justru memberi awalan tabel —
+ * dan dengan itu menyalakan module yang tenant_id-nya belum ada, query mentahnya belum diganti,
+ * dan panggilan HTTP-nya belum dibuang. Tanda kesiapan yang ikut berubah karena pekerjaan
+ * setengah jalan bukan tanda kesiapan.
+ *
+ * Sekarang daftar inilah tandanya, dan ia hanya berubah kalau ada yang sengaja mengubahnya.
+ * Karena registry membacanya, ia harus berada di kode aplikasi; penjaga batas membaca daftar
+ * yang sama supaya tidak ada dua daftar yang bisa menyimpang.
  */
 final class ModulSedangDipindah
 {

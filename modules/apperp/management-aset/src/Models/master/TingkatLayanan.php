@@ -10,7 +10,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  */
 class TingkatLayanan extends MasterData
 {
-    protected $table = 'm_tingkat_layanan';
+    protected $table = 'aset_m_tingkat_layanan';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif', 'urutan',

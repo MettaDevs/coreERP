@@ -12,7 +12,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  */
 class ModelAset extends MasterData
 {
-    protected $table = 'm_model_aset';
+    protected $table = 'aset_m_model_aset';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'pabrikan_aset_id', 'jenis_aset_id',

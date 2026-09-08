@@ -4,6 +4,11 @@ description: Kelola klasifikasi, penyusutan, dan maintenance aset perusahaan.
 publisher: apperp
 version: 0.1.0
 kind: business-app
+
+# Seluruh tabel module ini berawalan `aset_`. Awalan inilah yang memisahkan datanya dari
+# data Core dan module lain di dalam satu database yang sama, dan penjaga batas menolak
+# tabel module yang tidak memakainya.
+table_prefix: aset_
 requires:
   core: ^0.1
 depends_on: []

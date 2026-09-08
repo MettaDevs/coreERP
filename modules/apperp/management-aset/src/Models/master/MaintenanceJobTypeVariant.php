@@ -7,7 +7,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 
 class MaintenanceJobTypeVariant extends MasterData
 {
-    protected $table = 'm_maintenance_job_type_variant';
+    protected $table = 'aset_m_maintenance_job_type_variant';
 
     protected $fillable = ['tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif', 'maintenance_job_type_id'];
 

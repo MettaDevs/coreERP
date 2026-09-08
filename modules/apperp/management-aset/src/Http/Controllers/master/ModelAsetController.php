@@ -33,13 +33,13 @@ class ModelAsetController extends MasterDataController
     {
         return [
             new MasterParent(
-                table: 'm_pabrikan_aset',
+                table: 'aset_m_pabrikan_aset',
                 column: 'pabrikan_aset_id',
                 relation: 'pabrikanAset',
                 label: 'pabrikan aset',
             ),
             new MasterParent(
-                table: 'm_jenis_aset',
+                table: 'aset_m_jenis_aset',
                 column: 'jenis_aset_id',
                 relation: 'jenisAset',
                 label: 'jenis aset',
@@ -51,7 +51,7 @@ class ModelAsetController extends MasterDataController
     protected function childMasters(): array
     {
         return [
-            new MasterChild(table: 'tr_penerimaan_aset', column: 'model_aset_id', label: 'aset'),
+            new MasterChild(table: 'aset_tr_penerimaan_aset', column: 'model_aset_id', label: 'aset'),
         ];
     }
 
@@ -66,9 +66,9 @@ class ModelAsetController extends MasterDataController
             return $query;
         }
 
-        $assets = DB::table('tr_penerimaan_aset as asset')
-            ->whereColumn('asset.tenant_id', 'm_model_aset.tenant_id')
-            ->whereColumn('asset.model_aset_id', 'm_model_aset.id')
+        $assets = DB::table('aset_tr_penerimaan_aset as asset')
+            ->whereColumn('asset.tenant_id', 'aset_m_model_aset.tenant_id')
+            ->whereColumn('asset.model_aset_id', 'aset_m_model_aset.id')
             ->whereNull('asset.deleted_at')
             ->whereNotIn('asset.lifecycle_state', ['decommissioned', 'disposed']);
 

@@ -27,7 +27,7 @@ class GroupAsetController extends MasterDataController
         // yang dipakai aset, jadi mengarsipkannya selagi ada aset aktif akan memutus
         // dasar penyusutan aset tersebut.
         return [
-            new MasterChild(table: 'tr_penerimaan_aset', column: 'group_aset_id', label: 'aset'),
+            new MasterChild(table: 'aset_tr_penerimaan_aset', column: 'group_aset_id', label: 'aset'),
         ];
     }
 
@@ -38,7 +38,7 @@ class GroupAsetController extends MasterDataController
             // memastikan ID aktif milik tenant yang sama; daftar nilainya bukan enum PHP.
             'kelompok_harta_fiskal_id' => [
                 'sometimes', 'nullable', 'ulid',
-                Rule::exists('m_kelompok_harta_fiskal', 'id')
+                Rule::exists('aset_m_kelompok_harta_fiskal', 'id')
                     ->where('tenant_id', $tenantId)
                     ->whereNull('deleted_at')
                     ->where('aktif', true),
@@ -53,7 +53,7 @@ class GroupAsetController extends MasterDataController
             // sekarang hanya terekam benar lewat `property_type`.
             'major_type' => ['prohibited'],
             // Lapisan pembukuan adalah sifat buku, bukan sifat group; tempatnya di
-            // `m_buku_penyusutan.posting_layer`, sama seperti Book di F&O. Selama ada di
+            // `aset_m_buku_penyusutan.posting_layer`, sama seperti Book di F&O. Selama ada di
             // sini kolomnya tidak pernah dibaca untuk apa pun, sehingga konfigurator
             // mengisinya lalu menyangka sudah mengatur sesuatu. Menolaknya menunjukkan
             // tempat yang benar, bukan menelan kiriman yang tidak berefek.
@@ -62,7 +62,7 @@ class GroupAsetController extends MasterDataController
             // Lokasi bawaan; hanya nilai awal saat aset diterima, bukan lokasi yang berlaku.
             'asset_location_id' => [
                 'sometimes', 'nullable', 'ulid',
-                Rule::exists('m_lokasi_aset', 'id')
+                Rule::exists('aset_m_lokasi_aset', 'id')
                     ->where('tenant_id', $tenantId)
                     ->whereNull('deleted_at'),
             ],

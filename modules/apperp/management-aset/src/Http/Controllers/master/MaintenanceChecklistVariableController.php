@@ -21,11 +21,11 @@ class MaintenanceChecklistVariableController extends MasterDataController
 
     protected function childMasters(): array
     {
-        return [new MasterChild('m_maintenance_checklist_variable_value', 'variable_id', 'nilai checklist')];
+        return [new MasterChild('aset_m_maintenance_checklist_variable_value', 'variable_id', 'nilai checklist')];
     }
 
     protected function extraPresent(MasterData $record): array
     {
-        return ['values_count' => \DB::table('m_maintenance_checklist_variable_value')->where(['tenant_id' => $record->tenant_id, 'variable_id' => $record->getKey()])->count()];
+        return ['values_count' => \DB::table('aset_m_maintenance_checklist_variable_value')->where(['tenant_id' => $record->tenant_id, 'variable_id' => $record->getKey()])->count()];
     }
 }

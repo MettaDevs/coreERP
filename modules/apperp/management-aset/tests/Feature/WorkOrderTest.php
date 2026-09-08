@@ -34,12 +34,12 @@ class WorkOrderTest extends TestCase
         $seed = $this->seedMasters();
         $workOrder = $this->create($seed)->assertCreated()->assertJsonPath('data.kode', 'PMHA-000001')->json('data');
 
-        $this->assertDatabaseHas('tr_pemeliharaan_aset', [
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset', [
             'id' => $workOrder['id'], 'tenant_id' => $this->tenantId,
             'responsible_org_unit_id' => $this->orgUnitId, 'status' => 'draft', 'version' => 1,
         ]);
         // Lokasi aset disalin ke baris, bukan dibaca ulang lewat aset saat ditampilkan.
-        $this->assertDatabaseHas('tr_pemeliharaan_aset_details', [
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', [
             'pemeliharaan_aset_id' => $workOrder['id'], 'line_number' => 1,
             'asset_id' => $seed['asset'], 'asset_location_id' => $seed['location'],
             'maintenance_job_type_id' => $seed['jobType'], 'trade_id' => $seed['trade'],
@@ -62,12 +62,12 @@ class WorkOrderTest extends TestCase
         // komposit menolak induk lintas tenant sebelum validasi aplikasi sempat berbicara.
         $asing = (string) Str::ulid();
         $seed['asset'] = $this->asset($asing, [
-            'group' => $this->master('m_group_aset', 'Kendaraan', 'GRPA-X', tenant: $asing),
-            'jenis' => $this->master('m_jenis_aset', 'Roda 4', 'JNSA-X', tenant: $asing),
+            'group' => $this->master('aset_m_group_aset', 'Kendaraan', 'GRPA-X', tenant: $asing),
+            'jenis' => $this->master('aset_m_jenis_aset', 'Roda 4', 'JNSA-X', tenant: $asing),
         ], 'AST-LAIN');
 
         $this->create($seed)->assertUnprocessable()->assertJsonValidationErrors('details');
-        $this->assertDatabaseCount('tr_pemeliharaan_aset', 0);
+        $this->assertDatabaseCount('aset_tr_pemeliharaan_aset', 0);
         Http::assertNothingSent();
     }
 
@@ -98,7 +98,7 @@ class WorkOrderTest extends TestCase
             ->deleteJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => 1])->assertConflict();
         $this->withHeaders($this->headers(['management-aset.pemeliharaan-aset.read', 'management-aset.pemeliharaan-aset.archive']))
             ->deleteJson('/api/v1/pemeliharaan-aset/'.$workOrder['id'], ['version' => 2])->assertNoContent();
-        $this->assertSoftDeleted('tr_pemeliharaan_aset', ['id' => $workOrder['id']]);
+        $this->assertSoftDeleted('aset_tr_pemeliharaan_aset', ['id' => $workOrder['id']]);
     }
 
     public function test_permintaan_yang_diulang_mengembalikan_record_yang_sama_tanpa_nomor_baru(): void
@@ -111,7 +111,7 @@ class WorkOrderTest extends TestCase
             ->assertOk()
             ->assertHeader('Idempotent-Replayed', 'true')
             ->assertJsonPath('data.id', $first);
-        $this->assertDatabaseCount('tr_pemeliharaan_aset', 1);
+        $this->assertDatabaseCount('aset_tr_pemeliharaan_aset', 1);
         Http::assertSentCount(1);
     }
 
@@ -135,7 +135,7 @@ class WorkOrderTest extends TestCase
     /**
      * Route `pemeliharaan-aset` tidak boleh lagi jatuh ke dokumen siklus generik. Payload
      * lama yang hanya membawa tanggal dan nilai kini ditolak, dan pembuatan yang sah
-     * menulis ke tabel work order, bukan ke `tr_dokumen_siklus_aset`.
+     * menulis ke tabel work order, bukan ke `aset_tr_dokumen_siklus_aset`.
      */
     public function test_route_pemeliharaan_tidak_lagi_dilayani_dokumen_siklus_generik(): void
     {
@@ -151,8 +151,8 @@ class WorkOrderTest extends TestCase
             ->assertJsonValidationErrors(['tipe_work_order_id', 'details']);
 
         $this->create($this->seedMasters())->assertCreated();
-        $this->assertDatabaseCount('tr_dokumen_siklus_aset', 0);
-        $this->assertDatabaseCount('tr_pemeliharaan_aset', 1);
+        $this->assertDatabaseCount('aset_tr_dokumen_siklus_aset', 0);
+        $this->assertDatabaseCount('aset_tr_pemeliharaan_aset', 1);
     }
 
     private function create(array $seed)
@@ -200,13 +200,13 @@ class WorkOrderTest extends TestCase
     private function seedMasters(): array
     {
         $seed = [
-            'tipe' => $this->master('m_tipe_work_order', 'Korektif', 'TPWO-1'),
-            'layanan' => $this->master('m_tingkat_layanan', 'Mendesak', 'TGLY-1', ['urutan' => 1]),
-            'trade' => $this->master('m_trade', 'Mekanik', 'TRDE-1'),
+            'tipe' => $this->master('aset_m_tipe_work_order', 'Korektif', 'TPWO-1'),
+            'layanan' => $this->master('aset_m_tingkat_layanan', 'Mendesak', 'TGLY-1', ['urutan' => 1]),
+            'trade' => $this->master('aset_m_trade', 'Mekanik', 'TRDE-1'),
             'jobType' => $this->jobType('Ganti ban', 'JOB-1'),
-            'group' => $this->master('m_group_aset', 'Kendaraan', 'GRPA-1'),
-            'jenis' => $this->master('m_jenis_aset', 'Kendaraan roda 4', 'JNSA-1'),
-            'tipeLokasi' => $this->master('m_tipe_lokasi_aset', 'Gudang', 'TLKA-1'),
+            'group' => $this->master('aset_m_group_aset', 'Kendaraan', 'GRPA-1'),
+            'jenis' => $this->master('aset_m_jenis_aset', 'Kendaraan roda 4', 'JNSA-1'),
+            'tipeLokasi' => $this->master('aset_m_tipe_lokasi_aset', 'Gudang', 'TLKA-1'),
         ];
         $seed['location'] = $this->location($seed['tipeLokasi']);
         $seed['asset'] = $this->asset($this->tenantId, $seed, 'AST-WO-1');
@@ -216,13 +216,13 @@ class WorkOrderTest extends TestCase
 
     private function jobType(string $nama, string $kode): string
     {
-        return $this->master('m_maintenance_job_type', $nama, $kode, ['category_code' => 'corrective']);
+        return $this->master('aset_m_maintenance_job_type', $nama, $kode, ['category_code' => 'corrective']);
     }
 
     private function variant(string $jobType, string $kode): string
     {
         $id = (string) Str::ulid();
-        DB::table('m_maintenance_job_type_variant')->insert([
+        DB::table('aset_m_maintenance_job_type_variant')->insert([
             'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(),
             'maintenance_job_type_id' => $jobType, 'kode' => $kode, 'nama' => 'Varian', 'aktif' => true,
             'created_at' => now(), 'updated_at' => now(),
@@ -234,7 +234,7 @@ class WorkOrderTest extends TestCase
     private function location(string $tipeLokasi): string
     {
         $id = (string) Str::ulid();
-        DB::table('m_lokasi_aset')->insert([
+        DB::table('aset_m_lokasi_aset')->insert([
             'id' => $id, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(),
             'kode' => 'LOCA-1', 'nama' => 'Gudang Cakung', 'tipe_lokasi_id' => $tipeLokasi, 'aktif' => true,
             'created_at' => now(), 'updated_at' => now(),
@@ -247,7 +247,7 @@ class WorkOrderTest extends TestCase
     private function asset(string $tenant, array $seed, string $kode): string
     {
         $id = (string) Str::ulid();
-        DB::table('tr_penerimaan_aset')->insert([
+        DB::table('aset_tr_penerimaan_aset')->insert([
             'id' => $id, 'tenant_id' => $tenant, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $kode,
             'nama' => 'Aset work order '.$kode,
             'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,

@@ -10,7 +10,7 @@ class Asset extends Model
 {
     use HasUlids, SoftDeletes;
 
-    protected $table = 'tr_penerimaan_aset';
+    protected $table = 'aset_tr_penerimaan_aset';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id',

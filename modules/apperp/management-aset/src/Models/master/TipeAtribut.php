@@ -21,7 +21,7 @@ class TipeAtribut extends MasterData
      */
     public const NUMERIC_TYPES = ['decimal', 'integer'];
 
-    protected $table = 'm_tipe_atribut';
+    protected $table = 'aset_m_tipe_atribut';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',

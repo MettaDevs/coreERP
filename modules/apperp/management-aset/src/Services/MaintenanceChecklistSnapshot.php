@@ -53,17 +53,17 @@ final class MaintenanceChecklistSnapshot
             'updated_at' => now(),
         ])->all();
 
-        DB::table('tr_pemeliharaan_aset_checklist')
+        DB::table('aset_tr_pemeliharaan_aset_checklist')
             ->where(['tenant_id' => $tenantId, 'pemeliharaan_aset_detail_id' => $jobId])
             ->delete();
-        DB::table('tr_pemeliharaan_aset_checklist')->insert($rows);
+        DB::table('aset_tr_pemeliharaan_aset_checklist')->insert($rows);
 
         return count($rows);
     }
 
     private function defaultTemplateId(string $tenantId, object $job): ?string
     {
-        $asset = DB::table('tr_penerimaan_aset')->where([
+        $asset = DB::table('aset_tr_penerimaan_aset')->where([
             'tenant_id' => $tenantId,
             'id' => $job->asset_id,
         ])->first(['jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'asset_location_id']);
@@ -73,10 +73,10 @@ final class MaintenanceChecklistSnapshot
         }
 
         $tradeName = $job->trade_id
-            ? DB::table('m_trade')->where(['tenant_id' => $tenantId, 'id' => $job->trade_id])->value('nama')
+            ? DB::table('aset_m_trade')->where(['tenant_id' => $tenantId, 'id' => $job->trade_id])->value('nama')
             : null;
 
-        $defaults = DB::table('m_maintenance_job_type_default')
+        $defaults = DB::table('aset_m_maintenance_job_type_default')
             ->where([
                 'tenant_id' => $tenantId,
                 'maintenance_job_type_id' => $job->maintenance_job_type_id,
@@ -128,7 +128,7 @@ final class MaintenanceChecklistSnapshot
         $visited[] = $templateId;
         $result = [];
 
-        $lines = DB::table('m_maintenance_checklist_template_line')
+        $lines = DB::table('aset_m_maintenance_checklist_template_line')
             ->where(['tenant_id' => $tenantId, 'template_id' => $templateId])
             ->orderBy('line_number')
             ->get();

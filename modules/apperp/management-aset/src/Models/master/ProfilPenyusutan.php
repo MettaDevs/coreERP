@@ -22,7 +22,7 @@ class ProfilPenyusutan extends MasterData
 
     public const YEAR_BASIS = ['calendar', 'fiscal'];
 
-    protected $table = 'm_profil_penyusutan';
+    protected $table = 'aset_m_profil_penyusutan';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'keterangan', 'aktif',

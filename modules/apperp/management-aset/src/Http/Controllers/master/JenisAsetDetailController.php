@@ -25,7 +25,7 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
  * tidak ada, dan itu pernyataan yang tidak boleh kita buat kepada yang tidak berhak
  * bertanya.
  *
- * Jumlah atribut tidak diperlakukan begitu. `m_jenis_aset_atribut` adalah milik jenis aset
+ * Jumlah atribut tidak diperlakukan begitu. `aset_m_jenis_aset_atribut` adalah milik jenis aset
  * itu sendiri, disunting di dalam formnya, jadi izin jenis aset sudah cukup.
  */
 class JenisAsetDetailController extends Controller
@@ -37,7 +37,7 @@ class JenisAsetDetailController extends Controller
 
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
         abort_unless(
-            $this->unarchived('m_jenis_aset')->where('tenant_id', $tenantId)->where('id', $jenisAsetId)->exists(),
+            $this->unarchived('aset_m_jenis_aset')->where('tenant_id', $tenantId)->where('id', $jenisAsetId)->exists(),
             404,
         );
 
@@ -45,16 +45,16 @@ class JenisAsetDetailController extends Controller
         $mayReadAssets = in_array('management-aset.aset.read', $permissions, true);
 
         return response()->json(['data' => [
-            'atribut_count' => $this->unarchived('m_jenis_aset_atribut')
+            'atribut_count' => $this->unarchived('aset_m_jenis_aset_atribut')
                 ->where('tenant_id', $tenantId)
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->count(),
-            'maintenance_job_type_count' => $this->unarchived('m_maintenance_job_type_asset_type')
+            'maintenance_job_type_count' => $this->unarchived('aset_m_maintenance_job_type_asset_type')
                 ->where('tenant_id', $tenantId)
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->count(),
             'model_count' => $mayReadModels
-                ? $this->unarchived('m_model_aset')
+                ? $this->unarchived('aset_m_model_aset')
                     ->where('tenant_id', $tenantId)
                     ->where('jenis_aset_id', $jenisAsetId)
                     ->count()
@@ -71,7 +71,7 @@ class JenisAsetDetailController extends Controller
             // yang tidak boleh dilihat pemanggil.
             'asset_count' => $mayReadAssets
                 ? $scope->assetQuery(
-                    $this->unarchived('tr_penerimaan_aset')
+                    $this->unarchived('aset_tr_penerimaan_aset')
                         ->where('tenant_id', $tenantId)
                         ->where('jenis_aset_id', $jenisAsetId),
                     $request,
@@ -83,26 +83,26 @@ class JenisAsetDetailController extends Controller
     /** @return list<array<string, mixed>> */
     private function models(string $tenantId, ?string $jenisAsetId = null): array
     {
-        return $this->unarchived('m_model_aset')
-            ->leftJoin('m_pabrikan_aset as pabrikan', function ($join) use ($tenantId): void {
-                $join->on('pabrikan.id', '=', 'm_model_aset.pabrikan_aset_id')
+        return $this->unarchived('aset_m_model_aset')
+            ->leftJoin('aset_m_pabrikan_aset as pabrikan', function ($join) use ($tenantId): void {
+                $join->on('pabrikan.id', '=', 'aset_m_model_aset.pabrikan_aset_id')
                     ->where('pabrikan.tenant_id', $tenantId)
                     ->whereNull('pabrikan.deleted_at');
             })
-            ->where('m_model_aset.tenant_id', $tenantId)
+            ->where('aset_m_model_aset.tenant_id', $tenantId)
             ->when(
                 $jenisAsetId,
-                fn ($query) => $query->where('m_model_aset.jenis_aset_id', $jenisAsetId),
-                fn ($query) => $query->whereNull('m_model_aset.jenis_aset_id')->where('m_model_aset.aktif', true),
+                fn ($query) => $query->where('aset_m_model_aset.jenis_aset_id', $jenisAsetId),
+                fn ($query) => $query->whereNull('aset_m_model_aset.jenis_aset_id')->where('aset_m_model_aset.aktif', true),
             )
             ->orderBy('pabrikan.nama')
-            ->orderBy('m_model_aset.nama')
+            ->orderBy('aset_m_model_aset.nama')
             ->get([
-                'm_model_aset.id',
+                'aset_m_model_aset.id',
                 'pabrikan.nama as manufacturer',
-                'm_model_aset.nama as model',
-                'm_model_aset.model_number',
-                'm_model_aset.keterangan as description',
+                'aset_m_model_aset.nama as model',
+                'aset_m_model_aset.model_number',
+                'aset_m_model_aset.keterangan as description',
             ])
             ->map(static fn (object $model): array => [
                 'id' => (string) $model->id,

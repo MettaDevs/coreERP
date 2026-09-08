@@ -31,8 +31,8 @@ class JenisAsetController extends MasterDataController
     protected function childMasters(): array
     {
         return [
-            new MasterChild(table: 'm_model_aset', column: 'jenis_aset_id', label: 'model aset'),
-            new MasterChild(table: 'tr_penerimaan_aset', column: 'jenis_aset_id', label: 'aset'),
+            new MasterChild(table: 'aset_m_model_aset', column: 'jenis_aset_id', label: 'model aset'),
+            new MasterChild(table: 'aset_tr_penerimaan_aset', column: 'jenis_aset_id', label: 'aset'),
         ];
     }
 }

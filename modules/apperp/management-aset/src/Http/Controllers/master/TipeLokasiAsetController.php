@@ -21,7 +21,7 @@ class TipeLokasiAsetController extends MasterDataController
     protected function childMasters(): array
     {
         return [
-            new MasterChild(table: 'm_lokasi_aset', column: 'tipe_lokasi_id', label: 'lokasi aset'),
+            new MasterChild(table: 'aset_m_lokasi_aset', column: 'tipe_lokasi_id', label: 'lokasi aset'),
         ];
     }
 }

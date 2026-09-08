@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
+use App\Support\Modules\ModulSedangDipindah;
 use PHPUnit\Framework\TestCase;
 
 /**

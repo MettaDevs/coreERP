@@ -2520,8 +2520,66 @@ kejadian ganda.
    abjad nama berkas. Pastikan urutannya sebelum pemindahan, jangan setelah.
 4. Migration yang isinya kosong dibiarkan apa adanya supaya riwayat migration tenant lama tidak berubah.
 
-**Selesai bila.** Seluruh tabel modul berawalan `aset_`, tidak ada tabel modul tanpa awalan, dan penjaga
-F1-04 lulus untuk modul ini. Jumlah tabelnya dicatat oleh task ini, bukan diasumsikan dari dokumen.
+**Selesai bila.** Seluruh tabel modul berawalan `aset_` dan tidak ada tabel modul tanpa awalan, dibuktikan
+dengan menjalankan migrationnya pada PostgreSQL lalu membandingkan katalognya dengan schema berisi Core
+saja. Jumlah tabelnya dicatat oleh task ini, bukan diasumsikan dari dokumen.
+
+**Kriteria "penjaga F1-04 lulus untuk modul ini" dibuang, karena mustahil dipenuhi di sini.** Penjaga tabel
+melewatkan modul yang sedang dipindah sama sekali — itu asimetri yang sudah diterima sadar pada F3-00,
+sebabnya migration kerangka yang dibawanya. Menuntutnya lulus di sini berarti menuntut modul ini keluar
+dari daftar sebelum `tenant_id`-nya ada. Ia lulus pada F3-05, bukan sekarang.
+
+#### Catatan pelaksanaan
+
+Selesai pada 8 September 2026.
+
+**Jumlahnya 46 tabel**, dibaca dari `pg_tables` setelah migration dijalankan sungguhan, dibandingkan dengan
+schema berisi 93 tabel Core saja. Bukan dihitung dari dokumen. Satu-satunya yang tidak berawalan `m_`,
+`tr_`, atau `t_` memang `processed_core_events`, persis seperti dugaan bagian atas.
+
+**Migration lama sengaja tidak disunting.** Semuanya tetap membuat tabel bernama lama, lalu satu migration
+baru mengganti nama seluruhnya di akhir. Menyunting migration lama akan mengubah riwayat yang sudah
+dijalankan, dan itu melanggar keputusan pemilik produk bahwa setiap perintah pemasangan harus aman
+diulang. Akibatnya langkah 2 pada rencana ini — "lima migration ber-SQL mentah ikut berubah" — tidak
+berlaku: tidak satu pun disentuh.
+
+Angka lima itu sendiri meleset: yang memakai `DB::statement` ada **empat**, ditambah satu yang memakai
+`Schema::rename` untuk enam tabel sekaligus. Semuanya berjalan sebelum penggantian nama, jadi semuanya
+tetap benar apa adanya.
+
+**Daftar tabel dibaca dari katalog, bukan ditulis di dalam migration.** Daftar yang ditulis tangan akan
+tertinggal satu tabel pada hari seseorang menambah migration baru, dan tabel yang tertinggal tidak gagal
+dengan sendirinya — ia diam sampai bertabrakan dengan modul lain. Sebelum memakai pola nama, diperiksa
+bahwa **tidak satu pun dari 93 tabel Core** cocok dengan pola itu.
+
+**656 penyebutan nama tabel di 78 berkas** ikut diganti, dan seluruh 46 nama memang disebut kode — tidak
+ada yang hanya hidup di migration.
+
+**Bukti migration bisa gagal.** Sebuah tabel `aset_m_trade` dibuat lebih dulu, lalu migrationnya dijalankan
+ulang:
+
+```
+2026_09_08_130000_prefix_tabel_modul .. FAIL
+RuntimeException
+Tabel aset_m_trade sudah ada, jadi m_trade tidak bisa diganti namanya. Jalankan migration ini
+pada schema yang belum pernah menerimanya, atau selesaikan penggantian yang setengah jalan.
+```
+
+#### F3-25 harus dibetulkan di sini, dan itu koreksi atas keputusan saya sendiri
+
+F3-25 memakai **`table_prefix` yang belum dinyatakan** sebagai tanda "modul ini belum siap dilayani".
+Tanda itu bekerja tepat sampai task ini — task yang justru memberi awalan tabel. Begitu awalannya
+dinyatakan, registry menyalakan modul yang `tenant_id`-nya belum ada, query mentahnya belum diganti, dan
+panggilan HTTP-nya belum dibuang. Tiga belas test yang sama seperti pada F3-25 merah lagi, dengan sebab
+yang sama persis.
+
+**Tanda kesiapan yang ikut berubah karena pekerjaan setengah jalan bukan tanda kesiapan.** Sekarang yang
+menjadi tanda adalah daftar `ModulSedangDipindah` — ia hanya berubah kalau ada yang sengaja mengubahnya,
+punya tenggat, dan punya pemeriksaan basi. Karena registry membacanya, kelas itu pindah dari `tests/` ke
+`app/Support/Modules/`; penjaga batas membaca daftar yang sama, jadi tetap satu daftar.
+
+`table_prefix` tetap wajib, tapi kembali menjadi apa adanya: modul yang **tidak** sedang dipindah dan tidak
+menyatakan awalan tabel membuat alur merah, bukan menghilang tanpa suara.
 
 **Rujukan.** Bagian 5.2 dokumen ini, [standar app, nama tabel](../../dev/02-module-standard.md).
 

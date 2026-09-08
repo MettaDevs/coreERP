@@ -49,7 +49,7 @@ class ModelAsetTest extends TestCase
             ->deleteJson('/api/v1/model-aset/'.$id)
             ->assertNoContent();
 
-        $this->assertSoftDeleted('m_model_aset', ['id' => $id, 'tenant_id' => $this->tenantId]);
+        $this->assertSoftDeleted('aset_m_model_aset', ['id' => $id, 'tenant_id' => $this->tenantId]);
     }
 
     public function test_retry_is_idempotent_and_tenants_cannot_read_each_others_records(): void
@@ -151,7 +151,7 @@ class ModelAsetTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.asset_count', 0);
 
-        DB::table('tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
+        DB::table('aset_tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
         $this->withHeaders($this->contextHeaders($this->tenantId, $permissions, [
             'data_policies' => ['management-aset.asset-responsibility' => ['all' => true, 'scope_grants' => []]],
         ]))
@@ -167,8 +167,8 @@ class ModelAsetTest extends TestCase
         $active = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
         $decommissioned = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
         $disposed = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
-        DB::table('tr_penerimaan_aset')->where('id', $decommissioned)->update(['lifecycle_state' => 'decommissioned']);
-        DB::table('tr_penerimaan_aset')->where('id', $disposed)->update(['lifecycle_state' => 'disposed']);
+        DB::table('aset_tr_penerimaan_aset')->where('id', $decommissioned)->update(['lifecycle_state' => 'decommissioned']);
+        DB::table('aset_tr_penerimaan_aset')->where('id', $disposed)->update(['lifecycle_state' => 'disposed']);
 
         $permissions = [
             'management-aset.pabrikan-aset.read',
@@ -189,7 +189,7 @@ class ModelAsetTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.asset_count', 1);
 
-        $this->assertDatabaseHas('tr_penerimaan_aset', ['id' => $active, 'lifecycle_state' => 'received']);
+        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $active, 'lifecycle_state' => 'received']);
     }
 
     public function test_model_tidak_dapat_diarsipkan_saat_masih_dipakai_aset(): void
@@ -203,7 +203,7 @@ class ModelAsetTest extends TestCase
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
 
-        DB::table('tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
+        DB::table('aset_tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
 
         $this->withContext(['management-aset.model-aset.archive'])
             ->deleteJson('/api/v1/model-aset/'.$model)
@@ -241,7 +241,7 @@ class ModelAsetTest extends TestCase
     {
         $now = now();
         $id = (string) Str::ulid();
-        DB::table('m_pabrikan_aset')->insert([
+        DB::table('aset_m_pabrikan_aset')->insert([
             'id' => $id,
             'tenant_id' => $this->tenantId,
             'creation_key' => 'pabrikan-'.Str::ulid(),
@@ -258,7 +258,7 @@ class ModelAsetTest extends TestCase
     private function model(string $pabrikanId): string
     {
         $id = (string) Str::ulid();
-        DB::table('m_model_aset')->insert([
+        DB::table('aset_m_model_aset')->insert([
             'id' => $id,
             'tenant_id' => $this->tenantId,
             'creation_key' => 'model-'.Str::ulid(),
@@ -276,10 +276,10 @@ class ModelAsetTest extends TestCase
 
     private function asset(string $pabrikanId, string $modelId, string $legalEntityId, string $operatingUnitId): string
     {
-        $group = $this->reference('m_group_aset', 'group');
-        $jenis = $this->reference('m_jenis_aset', 'jenis');
+        $group = $this->reference('aset_m_group_aset', 'group');
+        $jenis = $this->reference('aset_m_jenis_aset', 'jenis');
         $id = (string) Str::ulid();
-        DB::table('tr_penerimaan_aset')->insert([
+        DB::table('aset_tr_penerimaan_aset')->insert([
             'id' => $id,
             'tenant_id' => $this->tenantId,
             'creation_key' => 'asset-'.Str::ulid(),

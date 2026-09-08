@@ -54,7 +54,7 @@ class DepreciationBookTest extends TestCase
 
         $asset = $this->receive($group, $jenis, ['acquisition_value' => 240000000, 'placed_in_service_on' => '2026-03-20']);
 
-        $books = DB::table('tr_buku_aset')->where('asset_id', $asset)->orderBy('useful_life_periods')->get();
+        $books = DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->orderBy('useful_life_periods')->get();
         $this->assertCount(2, $books, 'satu baris matriks menghasilkan satu buku');
         $this->assertSame([48, 60], $books->pluck('useful_life_periods')->map(fn ($v) => (int) $v)->all());
         // Konvensi `full_month` menarik awal penyusutan ke hari pertama bulan itu.
@@ -65,7 +65,7 @@ class DepreciationBookTest extends TestCase
     {
         $book = $this->master('buku-penyusutan', ['nama' => 'Buku tanpa bridge']);
 
-        $this->assertFalse((bool) DB::table('m_buku_penyusutan')->where('id', $book)->value('export_to_backoffice'));
+        $this->assertFalse((bool) DB::table('aset_m_buku_penyusutan')->where('id', $book)->value('export_to_backoffice'));
     }
 
     public function test_aset_di_bawah_ambang_kapitalisasi_tetap_tercatat_tetapi_tidak_menyusut(): void
@@ -79,8 +79,8 @@ class DepreciationBookTest extends TestCase
         $murah = $this->receive($group, $jenis, ['acquisition_value' => 500000]);
         $mahal = $this->receive($group, $jenis, ['acquisition_value' => 5000000]);
 
-        $this->assertFalse((bool) DB::table('tr_buku_aset')->where('asset_id', $murah)->value('depreciate'));
-        $this->assertTrue((bool) DB::table('tr_buku_aset')->where('asset_id', $mahal)->value('depreciate'));
+        $this->assertFalse((bool) DB::table('aset_tr_buku_aset')->where('asset_id', $murah)->value('depreciate'));
+        $this->assertTrue((bool) DB::table('aset_tr_buku_aset')->where('asset_id', $mahal)->value('depreciate'));
     }
 
     public function test_buku_yang_tidak_disusutkan_menolak_proposal(): void
@@ -91,7 +91,7 @@ class DepreciationBookTest extends TestCase
         $buku = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'depreciation_profile_id' => $profil]);
         $this->matrix($group, [['buku_id' => $buku, 'useful_life_periods' => 48]])->assertOk();
         $asset = $this->receive($group, $jenis, ['acquisition_value' => 500000]);
-        $bookId = DB::table('tr_buku_aset')->where('asset_id', $asset)->value('id');
+        $bookId = DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
 
         $this->withHeaders($this->contextHeaders($this->tenantId, ['management-aset.penyusutan.create']))
             ->postJson('/api/v1/penyusutan/proposal', [
@@ -110,8 +110,8 @@ class DepreciationBookTest extends TestCase
         // Kiriman berikutnya hanya memuat satu baris; sisanya diarsipkan, bukan dihapus.
         $this->matrix($group, [['buku_id' => $satu, 'useful_life_periods' => 240]])->assertOk()->assertJsonCount(1, 'data');
 
-        $this->assertSame(1, DB::table('m_group_buku_penyusutan')->whereNull('deleted_at')->count());
-        $this->assertSame(1, DB::table('m_group_buku_penyusutan')->whereNotNull('deleted_at')->count());
+        $this->assertSame(1, DB::table('aset_m_group_buku_penyusutan')->whereNull('deleted_at')->count());
+        $this->assertSame(1, DB::table('aset_m_group_buku_penyusutan')->whereNotNull('deleted_at')->count());
     }
 
     public function test_matriks_menolak_buku_tanpa_profil_efektif(): void
@@ -123,7 +123,7 @@ class DepreciationBookTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('rows.0.depreciation_profile_id');
 
-        $this->assertSame(0, DB::table('m_group_buku_penyusutan')->where('group_aset_id', $group)->count());
+        $this->assertSame(0, DB::table('aset_m_group_buku_penyusutan')->where('group_aset_id', $group)->count());
     }
 
     public function test_profil_yang_sudah_dipakai_buku_aset_tidak_dapat_diubah(): void
@@ -181,8 +181,8 @@ class DepreciationBookTest extends TestCase
         ]])->assertOk();
         $assetFallback = $this->receive($groupDenganFallback, $jenis, ['acquisition_value' => 1000]);
 
-        $this->assertSame(100.0, (float) DB::table('tr_buku_aset')->where('asset_id', $assetOverride)->value('round_off_depreciation'));
-        $this->assertSame(10.0, (float) DB::table('tr_buku_aset')->where('asset_id', $assetFallback)->value('round_off_depreciation'));
+        $this->assertSame(100.0, (float) DB::table('aset_tr_buku_aset')->where('asset_id', $assetOverride)->value('round_off_depreciation'));
+        $this->assertSame(10.0, (float) DB::table('aset_tr_buku_aset')->where('asset_id', $assetFallback)->value('round_off_depreciation'));
     }
 
     /** @param array<string, mixed> $payload */

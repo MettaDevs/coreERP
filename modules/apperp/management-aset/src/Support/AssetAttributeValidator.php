@@ -22,8 +22,8 @@ final class AssetAttributeValidator
      */
     public function definitions(string $tenantId, string $jenisAsetId): array
     {
-        $rows = DB::table('m_jenis_aset_atribut as link')
-            ->join('m_tipe_atribut as tipe', function ($join): void {
+        $rows = DB::table('aset_m_jenis_aset_atribut as link')
+            ->join('aset_m_tipe_atribut as tipe', function ($join): void {
                 $join->on('tipe.id', '=', 'link.tipe_atribut_id')->on('tipe.tenant_id', '=', 'link.tenant_id');
             })
             ->where(['link.tenant_id' => $tenantId, 'link.jenis_aset_id' => $jenisAsetId])
@@ -51,13 +51,13 @@ final class AssetAttributeValidator
      */
     public function rowsFor(string $tenantId, string $jenisAsetId, array $submitted): array
     {
-        $typeIds = DB::table('m_jenis_aset_atribut')
+        $typeIds = DB::table('aset_m_jenis_aset_atribut')
             ->where(['tenant_id' => $tenantId, 'jenis_aset_id' => $jenisAsetId])
             ->whereNull('deleted_at')
             ->orderBy('tipe_atribut_id')
             ->pluck('tipe_atribut_id');
         if ($typeIds->isNotEmpty()) {
-            DB::table('m_tipe_atribut')
+            DB::table('aset_m_tipe_atribut')
                 ->where('tenant_id', $tenantId)
                 ->whereIn('id', $typeIds->all())
                 ->orderBy('id')
@@ -188,7 +188,7 @@ final class AssetAttributeValidator
             return [];
         }
 
-        return DB::table('m_tipe_atribut_nilai')
+        return DB::table('aset_m_tipe_atribut_nilai')
             ->where('tenant_id', $tenantId)
             ->whereIn('tipe_atribut_id', $typeIds)
             ->whereNull('deleted_at')

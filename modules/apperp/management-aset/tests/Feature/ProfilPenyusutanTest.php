@@ -45,7 +45,7 @@ class ProfilPenyusutanTest extends TestCase
             ->assertJsonPath('data.useful_life_periods', 48);
 
         $this->request('delete', '/api/v1/profil-penyusutan/'.$id)->assertNoContent();
-        $this->assertSoftDeleted('m_profil_penyusutan', ['id' => $id, 'tenant_id' => $this->tenantId]);
+        $this->assertSoftDeleted('aset_m_profil_penyusutan', ['id' => $id, 'tenant_id' => $this->tenantId]);
     }
 
     public function test_daftar_dipaginasi_seperti_master_lain(): void
@@ -81,7 +81,7 @@ class ProfilPenyusutanTest extends TestCase
             ->assertJsonPath('data.manual_schedule.0.amount', 1000)
             ->assertJsonPath('data.manual_schedule.1.amount', 750.5);
 
-        $this->assertDatabaseHas('m_profil_penyusutan', ['id' => $id]);
+        $this->assertDatabaseHas('aset_m_profil_penyusutan', ['id' => $id]);
     }
 
     public function test_kewajiban_field_mengikuti_metode(): void

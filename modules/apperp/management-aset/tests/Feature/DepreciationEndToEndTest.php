@@ -153,7 +153,7 @@ class DepreciationEndToEndTest extends TestCase
         ])->assertOk();
         $asset = $this->receive($group, $jenis, 1000);
 
-        $books = DB::table('tr_buku_aset')->where('asset_id', $asset)->orderBy('useful_life_periods')->pluck('id', 'useful_life_periods');
+        $books = DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->orderBy('useful_life_periods')->pluck('id', 'useful_life_periods');
         $this->fastForward($books[5], 5);
         $this->fastForward($books[10], 5);
 
@@ -162,8 +162,8 @@ class DepreciationEndToEndTest extends TestCase
         $this->assertSame(500.0, $this->netBookValue($books[10]));
 
         // Buku fiskal tidak diekspor, jadi backoffice tidak menjurnal dua kali.
-        $exported = DB::table('tr_export_penyusutan as e')
-            ->join('tr_penyusutan_aset as p', 'p.id', '=', 'e.depreciation_period_id')
+        $exported = DB::table('aset_tr_export_penyusutan as e')
+            ->join('aset_tr_penyusutan_aset as p', 'p.id', '=', 'e.depreciation_period_id')
             ->pluck('p.asset_book_id')->unique();
         $this->assertTrue($exported->contains($books[10]));
         $this->assertFalse($exported->contains($books[5]));
@@ -174,7 +174,7 @@ class DepreciationEndToEndTest extends TestCase
         $book = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200, export: true);
         $this->fastForward($book, 1);
 
-        $payload = json_decode((string) DB::table('tr_export_penyusutan')->value('payload'), true);
+        $payload = json_decode((string) DB::table('aset_tr_export_penyusutan')->value('payload'), true);
         // Barisnya harus benar-benar ada; tanpa ini `null` akan lolos sebagai "tidak
         // membawa akun" dan test berhenti membuktikan apa pun.
         $this->assertIsArray($payload, 'Buku yang mengekspor harus menghasilkan satu baris export.');
@@ -235,7 +235,7 @@ class DepreciationEndToEndTest extends TestCase
                 'asset_book_id' => $milikKita, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31',
             ])->assertNotFound();
 
-        $this->assertSame(3, DB::table('tr_penyusutan_aset')->where('tenant_id', $this->tenantId)->count());
+        $this->assertSame(3, DB::table('aset_tr_penyusutan_aset')->where('tenant_id', $this->tenantId)->count());
     }
 
     public function test_pembalikan_mengembalikan_nilai_buku_tanpa_mengubah_periode_asal(): void
@@ -251,8 +251,8 @@ class DepreciationEndToEndTest extends TestCase
 
         $this->assertSame(1200.0, $this->netBookValue($book));
         // Periode asal tetap final dan tidak ditulis ulang.
-        $this->assertSame('final', DB::table('tr_penyusutan_aset')->where('id', $periodId)->value('status'));
-        $this->assertSame(2, DB::table('tr_penyusutan_aset')->count());
+        $this->assertSame('final', DB::table('aset_tr_penyusutan_aset')->where('id', $periodId)->value('status'));
+        $this->assertSame(2, DB::table('aset_tr_penyusutan_aset')->count());
     }
 
     // ---- penyusun skenario -------------------------------------------------
@@ -290,7 +290,7 @@ class DepreciationEndToEndTest extends TestCase
 
         $asset = $this->receive($group, $jenis, $acquisition, $residual, $placedInService);
 
-        return (string) DB::table('tr_buku_aset')->where('asset_id', $asset)->value('id');
+        return (string) DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
     }
 
     /**
@@ -332,7 +332,7 @@ class DepreciationEndToEndTest extends TestCase
         $id = (string) $proposal->json('data.id');
         $this->finalize($id);
 
-        return (float) DB::table('tr_penyusutan_aset')->where('id', $id)->value('amount');
+        return (float) DB::table('aset_tr_penyusutan_aset')->where('id', $id)->value('amount');
     }
 
     private function finalize(string $periodId): void
@@ -344,17 +344,17 @@ class DepreciationEndToEndTest extends TestCase
 
     private function netBookValue(string $bookId): float
     {
-        return (float) DB::table('tr_buku_aset')->where('id', $bookId)->value('net_book_value');
+        return (float) DB::table('aset_tr_buku_aset')->where('id', $bookId)->value('net_book_value');
     }
 
     private function accumulated(string $bookId): float
     {
-        return (float) DB::table('tr_buku_aset')->where('id', $bookId)->value('accumulated_depreciation');
+        return (float) DB::table('aset_tr_buku_aset')->where('id', $bookId)->value('accumulated_depreciation');
     }
 
     private function startDate(string $bookId): string
     {
-        return substr((string) DB::table('tr_buku_aset')->where('id', $bookId)->value('depreciation_start_on'), 0, 10);
+        return substr((string) DB::table('aset_tr_buku_aset')->where('id', $bookId)->value('depreciation_start_on'), 0, 10);
     }
 
     /** @param array<string, mixed> $payload */

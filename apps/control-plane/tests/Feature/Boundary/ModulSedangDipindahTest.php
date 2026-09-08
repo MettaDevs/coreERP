@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
+use App\Support\Modules\ModulSedangDipindah;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -63,11 +64,11 @@ class ModulSedangDipindahTest extends TestCase
             $isi = (string) file_get_contents($berkas);
             $namaFolder = basename(dirname($berkas));
 
-            if (preg_match('/^table_prefix:\s*\S/m', $isi) === 1) {
+            if ($dipindah->menandai($namaFolder)) {
                 continue;
             }
 
-            if ($dipindah->menandai($namaFolder)) {
+            if (preg_match('/^table_prefix:\s*\S/m', $isi) === 1) {
                 continue;
             }
 

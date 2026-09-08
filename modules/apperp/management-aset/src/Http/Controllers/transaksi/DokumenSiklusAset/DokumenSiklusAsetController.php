@@ -20,7 +20,7 @@ class DokumenSiklusAsetController extends Controller
      * `pemeliharaan-aset` sengaja tidak lagi di sini. Ia dulu sebuah catatan satu baris
      * dan kini menjadi work order dengan baris pekerjaan, checklist, penugasan, dan
      * status pengerjaan sendiri; lihat `transaksi\PemeliharaanAset`. Baris lama pada
-     * `tr_dokumen_siklus_aset` tidak disentuh, hanya tidak lagi dilayani route ini.
+     * `aset_tr_dokumen_siklus_aset` tidak disentuh, hanya tidak lagi dilayani route ini.
      */
     private const TYPES = ['permintaan-pembelian-aset', 'dekomisioning-aset', 'penjualan-aset', 'pemusnahan-aset'];
 
@@ -37,7 +37,7 @@ class DokumenSiklusAsetController extends Controller
     public function index(Request $request, string $type): JsonResponse
     {
         $this->guard($request, $type, 'read');
-        $query = DB::table('tr_dokumen_siklus_aset')->where(['tenant_id' => $this->tenant($request), 'jenis_dokumen' => $type]);
+        $query = DB::table('aset_tr_dokumen_siklus_aset')->where(['tenant_id' => $this->tenant($request), 'jenis_dokumen' => $type]);
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'responsible_org_unit_id');
 
         return response()->json(['data' => $query->latest('created_at')->get()]);
@@ -51,7 +51,7 @@ class DokumenSiklusAsetController extends Controller
         $tenant = $this->tenant($request);
         $data = $request->validate([
             'legal_entity_id' => ['required', 'ulid'], 'responsible_org_unit_id' => ['required', 'ulid'], 'tanggal' => ['required', 'date'],
-            'asset_id' => ['nullable', 'ulid', Rule::exists('tr_penerimaan_aset', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'asset_id' => ['nullable', 'ulid', Rule::exists('aset_tr_penerimaan_aset', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
             'nilai' => ['nullable', 'numeric', 'min:0'], 'keterangan' => ['nullable', 'string', 'max:2000'],
         ]);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
@@ -60,7 +60,7 @@ class DokumenSiklusAsetController extends Controller
         }
         if ($data['asset_id'] ?? null) {
             $asset = app(OrganizationScope::class)->assetQuery(
-                DB::table('tr_penerimaan_aset')->where(['tenant_id' => $tenant, 'id' => $data['asset_id']]),
+                DB::table('aset_tr_penerimaan_aset')->where(['tenant_id' => $tenant, 'id' => $data['asset_id']]),
                 $request,
             )->first();
             abort_unless($asset, 404);
@@ -72,13 +72,13 @@ class DokumenSiklusAsetController extends Controller
                 abort_unless($asset->lifecycle_state === 'decommissioned', 422, 'Aset harus disetujui untuk dekomisioning sebelum dijual atau dimusnahkan.');
             }
         }
-        $existing = DB::table('tr_dokumen_siklus_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first();
+        $existing = DB::table('aset_tr_dokumen_siklus_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first();
         if ($existing) {
             if ($type === 'dekomisioning-aset' && $existing->workflow_instance_id === null) {
                 $this->submitWorkflow($existing, $tenant, $key, $workflow);
             }
 
-            return response()->json(['data' => DB::table('tr_dokumen_siklus_aset')->where('id', $existing->id)->first()], 200, ['Idempotent-Replayed' => 'true']);
+            return response()->json(['data' => DB::table('aset_tr_dokumen_siklus_aset')->where('id', $existing->id)->first()], 200, ['Idempotent-Replayed' => 'true']);
         }
         try {
             $kode = $numbers->issue('management-aset.'.$type, $tenant, $type.':'.$key, (string) $data['legal_entity_id']);
@@ -87,7 +87,7 @@ class DokumenSiklusAsetController extends Controller
         }
         $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'jenis_dokumen' => $type, 'kode' => $kode, 'legal_entity_id' => $data['legal_entity_id'], 'responsible_org_unit_id' => $data['responsible_org_unit_id'], 'asset_id' => $data['asset_id'] ?? null, 'tanggal' => $data['tanggal'], 'status' => $type === 'dekomisioning-aset' ? 'submitted' : 'draft', 'nilai' => $data['nilai'] ?? null, 'keterangan' => $data['keterangan'] ?? null, 'created_at' => now(), 'updated_at' => now()];
         DB::transaction(function () use ($record, $type, $tenant): void {
-            DB::table('tr_dokumen_siklus_aset')->insert($record);
+            DB::table('aset_tr_dokumen_siklus_aset')->insert($record);
             if (in_array($type, ['penjualan-aset', 'pemusnahan-aset'], true)) {
                 $this->dispose($tenant, (string) $record['asset_id'], (string) $record['tanggal']);
             }
@@ -95,7 +95,7 @@ class DokumenSiklusAsetController extends Controller
         if ($type === 'dekomisioning-aset') {
             $this->submitWorkflow((object) $record, $tenant, $key, $workflow);
         }
-        $record = (array) DB::table('tr_dokumen_siklus_aset')->where('id', $record['id'])->first();
+        $record = (array) DB::table('aset_tr_dokumen_siklus_aset')->where('id', $record['id'])->first();
 
         return response()->json(['data' => $record], 201);
     }
@@ -113,10 +113,10 @@ class DokumenSiklusAsetController extends Controller
      */
     private function dispose(string $tenant, string $assetId, string $tanggal): void
     {
-        DB::table('tr_penerimaan_aset')
+        DB::table('aset_tr_penerimaan_aset')
             ->where(['tenant_id' => $tenant, 'id' => $assetId])
             ->update(['lifecycle_state' => 'disposed', 'updated_at' => now()]);
-        DB::table('tr_buku_aset')
+        DB::table('aset_tr_buku_aset')
             ->where(['tenant_id' => $tenant, 'asset_id' => $assetId, 'status' => 'active'])
             ->update(['status' => 'closed', 'closed_on' => $tanggal, 'updated_at' => now()]);
     }
@@ -128,7 +128,7 @@ class DokumenSiklusAsetController extends Controller
         } catch (RuntimeException $exception) {
             abort(503, $exception->getMessage());
         }
-        DB::table('tr_dokumen_siklus_aset')->where('id', $record->id)->update(['workflow_instance_id' => $workflowId, 'updated_at' => now()]);
+        DB::table('aset_tr_dokumen_siklus_aset')->where('id', $record->id)->update(['workflow_instance_id' => $workflowId, 'updated_at' => now()]);
     }
 
     private function guard(Request $request, string $type, string $action): void

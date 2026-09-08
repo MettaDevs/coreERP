@@ -40,7 +40,7 @@ class PemeliharaanAsetController extends Controller
         $this->guard($request, 'read');
         $tenant = $this->tenant($request);
 
-        $query = DB::table('tr_pemeliharaan_aset as wo')
+        $query = DB::table('aset_tr_pemeliharaan_aset as wo')
             ->where('wo.tenant_id', $tenant)->whereNull('wo.deleted_at');
         app(OrganizationScope::class)->query($query, $request, 'wo.legal_entity_id', 'wo.responsible_org_unit_id');
 
@@ -55,7 +55,7 @@ class PemeliharaanAsetController extends Controller
         $tenant = $this->tenant($request);
         $assetId = $request->validate(['asset_id' => ['required', 'ulid']])['asset_id'];
 
-        $assetQuery = DB::table('tr_penerimaan_aset')
+        $assetQuery = DB::table('aset_tr_penerimaan_aset')
             ->where(['tenant_id' => $tenant, 'id' => $assetId])
             ->whereNull('deleted_at');
         app(OrganizationScope::class)->assetQuery($assetQuery, $request);
@@ -64,13 +64,13 @@ class PemeliharaanAsetController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $linkedJobTypes = DB::table('m_maintenance_job_type_asset_type')
+        $linkedJobTypes = DB::table('aset_m_maintenance_job_type_asset_type')
             ->where('tenant_id', $tenant)
             ->distinct()
             ->pluck('job_type_id');
 
-        $data = DB::table('m_maintenance_job_type as pekerjaan')
-            ->join('m_maintenance_job_type_asset_type as relasi', function ($join): void {
+        $data = DB::table('aset_m_maintenance_job_type as pekerjaan')
+            ->join('aset_m_maintenance_job_type_asset_type as relasi', function ($join): void {
                 $join->on('relasi.job_type_id', '=', 'pekerjaan.id')
                     ->on('relasi.tenant_id', '=', 'pekerjaan.tenant_id');
             })
@@ -87,14 +87,14 @@ class PemeliharaanAsetController extends Controller
         // Begitu satu job type mulai dikonfigurasi, pilihan untuk job type tersebut
         // mengikuti relasi F&O dan hanya muncul untuk jenis aset yang sesuai.
         if ($linkedJobTypes->isEmpty()) {
-            $data = DB::table('m_maintenance_job_type')
+            $data = DB::table('aset_m_maintenance_job_type')
                 ->where(['tenant_id' => $tenant, 'aktif' => true])
                 ->whereNull('deleted_at')
                 ->orderBy('kode')
                 ->get(['id', 'kode', 'nama']);
         } else {
             $data = $data->merge(
-                DB::table('m_maintenance_job_type')
+                DB::table('aset_m_maintenance_job_type')
                     ->where(['tenant_id' => $tenant, 'aktif' => true])
                     ->whereNull('deleted_at')
                     ->whereNotIn('id', $linkedJobTypes)
@@ -111,7 +111,7 @@ class PemeliharaanAsetController extends Controller
         $this->guard($request, 'read');
         $workOrder = $this->workOrder($request, $id);
         $workOrder->details = $this->jobLines($this->tenant($request), $id);
-        $workOrder->status_log = DB::table('tr_pemeliharaan_aset_status_log')
+        $workOrder->status_log = DB::table('aset_tr_pemeliharaan_aset_status_log')
             ->where(['tenant_id' => $this->tenant($request), 'pemeliharaan_aset_id' => $id])
             ->orderBy('created_at')->get();
 
@@ -123,7 +123,7 @@ class PemeliharaanAsetController extends Controller
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
-        if ($existing = DB::table('tr_pemeliharaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first()) {
+        if ($existing = DB::table('aset_tr_pemeliharaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first()) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -143,13 +143,13 @@ class PemeliharaanAsetController extends Controller
         try {
             $workOrder = DB::transaction(function () use ($request, $data, $key, $tenant, $kode, $locations): array {
                 $record = $this->header($request, $data, $key, $kode);
-                DB::table('tr_pemeliharaan_aset')->insert($record);
+                DB::table('aset_tr_pemeliharaan_aset')->insert($record);
                 $this->replaceJobLines($record['id'], $tenant, $data['details'], $locations);
 
                 return $record;
             });
         } catch (QueryException $exception) {
-            $existing = DB::table('tr_pemeliharaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first();
+            $existing = DB::table('aset_tr_pemeliharaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first();
             if (! $existing) {
                 throw $exception;
             }
@@ -186,7 +186,7 @@ class PemeliharaanAsetController extends Controller
         $locations = $this->validateLookups($request, $tenant, $data);
 
         $changed = DB::transaction(function () use ($request, $id, $tenant, $version, $data, $locations): int {
-            $updated = DB::table('tr_pemeliharaan_aset')->where([
+            $updated = DB::table('aset_tr_pemeliharaan_aset')->where([
                 'id' => $id, 'tenant_id' => $tenant, 'version' => $version,
             ])->whereNull('deleted_at')->update([
                 ...$this->header($request, $data, '', '', false),
@@ -194,7 +194,7 @@ class PemeliharaanAsetController extends Controller
                 'updated_at' => now(),
             ]);
             if ($updated) {
-                DB::table('tr_pemeliharaan_aset_details')->where(['tenant_id' => $tenant, 'pemeliharaan_aset_id' => $id])->delete();
+                DB::table('aset_tr_pemeliharaan_aset_details')->where(['tenant_id' => $tenant, 'pemeliharaan_aset_id' => $id])->delete();
                 $this->replaceJobLines($id, $tenant, $data['details'], $locations);
             }
 
@@ -219,7 +219,7 @@ class PemeliharaanAsetController extends Controller
         $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
         app(OrganizationScope::class)->require($request, $workOrder->legal_entity_id, $workOrder->responsible_org_unit_id);
 
-        $updated = DB::table('tr_pemeliharaan_aset')->where([
+        $updated = DB::table('aset_tr_pemeliharaan_aset')->where([
             'id' => $id, 'tenant_id' => $this->tenant($request), 'version' => $version,
         ])->whereNull('deleted_at')->update(['deleted_at' => now(), 'version' => $version + 1, 'updated_at' => now()]);
 
@@ -268,20 +268,20 @@ class PemeliharaanAsetController extends Controller
      */
     private function validateLookups(Request $request, string $tenant, array $data): array
     {
-        $this->requireActiveMaster('m_tipe_work_order', $tenant, [$data['tipe_work_order_id']], 'tipe_work_order_id', 'Tipe work order tidak ditemukan atau sudah tidak aktif.');
+        $this->requireActiveMaster('aset_m_tipe_work_order', $tenant, [$data['tipe_work_order_id']], 'tipe_work_order_id', 'Tipe work order tidak ditemukan atau sudah tidak aktif.');
         if ($data['tingkat_layanan_id'] ?? null) {
-            $this->requireActiveMaster('m_tingkat_layanan', $tenant, [$data['tingkat_layanan_id']], 'tingkat_layanan_id', 'Tingkat layanan tidak ditemukan atau sudah tidak aktif.');
+            $this->requireActiveMaster('aset_m_tingkat_layanan', $tenant, [$data['tingkat_layanan_id']], 'tingkat_layanan_id', 'Tingkat layanan tidak ditemukan atau sudah tidak aktif.');
         }
 
         $details = $data['details'];
-        $this->requireActiveMaster('m_maintenance_job_type', $tenant, $this->idsOf($details, 'maintenance_job_type_id'), 'details', 'Jenis pekerjaan maintenance tidak ditemukan atau sudah tidak aktif.');
-        $this->requireActiveMaster('m_trade', $tenant, $this->idsOf($details, 'trade_id'), 'details', 'Bidang keahlian tidak ditemukan atau sudah tidak aktif.');
+        $this->requireActiveMaster('aset_m_maintenance_job_type', $tenant, $this->idsOf($details, 'maintenance_job_type_id'), 'details', 'Jenis pekerjaan maintenance tidak ditemukan atau sudah tidak aktif.');
+        $this->requireActiveMaster('aset_m_trade', $tenant, $this->idsOf($details, 'trade_id'), 'details', 'Bidang keahlian tidak ditemukan atau sudah tidak aktif.');
 
         // Varian harus milik jenis pekerjaan pada baris yang sama; varian dari job type lain
         // akan lolos pemeriksaan keberadaan biasa dan diam-diam salah pasang.
         foreach ($details as $detail) {
             if (($detail['variant_id'] ?? null) !== null) {
-                $matches = DB::table('m_maintenance_job_type_variant')
+                $matches = DB::table('aset_m_maintenance_job_type_variant')
                     ->where([
                         'tenant_id' => $tenant,
                         'id' => $detail['variant_id'],
@@ -293,22 +293,22 @@ class PemeliharaanAsetController extends Controller
                 }
             }
 
-            $jobTypeHasLinks = DB::table('m_maintenance_job_type_asset_type')
+            $jobTypeHasLinks = DB::table('aset_m_maintenance_job_type_asset_type')
                 ->where(['tenant_id' => $tenant, 'job_type_id' => $detail['maintenance_job_type_id']])
                 ->exists();
             if (! $jobTypeHasLinks) {
                 continue;
             }
 
-            $allowed = DB::table('m_maintenance_job_type_asset_type as relasi')
-                ->join('tr_penerimaan_aset as aset', function ($join): void {
+            $allowed = DB::table('aset_m_maintenance_job_type_asset_type as relasi')
+                ->join('aset_tr_penerimaan_aset as aset', function ($join): void {
                     $join->on('aset.jenis_aset_id', '=', 'relasi.jenis_aset_id')
                         ->on('aset.tenant_id', '=', 'relasi.tenant_id');
                 })
                 ->where([
                     'relasi.tenant_id' => $tenant,
                     'relasi.job_type_id' => $detail['maintenance_job_type_id'],
-                    'relasi.jenis_aset_id' => DB::table('tr_penerimaan_aset')
+                    'relasi.jenis_aset_id' => DB::table('aset_tr_penerimaan_aset')
                         ->where(['tenant_id' => $tenant, 'id' => $detail['asset_id']])
                         ->value('jenis_aset_id'),
                     'aset.id' => $detail['asset_id'],
@@ -330,7 +330,7 @@ class PemeliharaanAsetController extends Controller
      */
     private function assetLocations(Request $request, string $tenant, array $ids): array
     {
-        $query = DB::table('tr_penerimaan_aset')->where('tenant_id', $tenant)->whereIn('id', $ids)->whereNull('deleted_at');
+        $query = DB::table('aset_tr_penerimaan_aset')->where('tenant_id', $tenant)->whereIn('id', $ids)->whereNull('deleted_at');
         app(OrganizationScope::class)->assetQuery($query, $request);
         $assets = $query->pluck('asset_location_id', 'id');
         if ($assets->count() !== count($ids)) {
@@ -416,7 +416,7 @@ class PemeliharaanAsetController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ])->all();
-        DB::table('tr_pemeliharaan_aset_details')->insert($rows);
+        DB::table('aset_tr_pemeliharaan_aset_details')->insert($rows);
 
         $snapshot = app(MaintenanceChecklistSnapshot::class);
         foreach ($rows as $row) {
@@ -428,17 +428,17 @@ class PemeliharaanAsetController extends Controller
     private function withLookups(mixed $query, string $tenant): mixed
     {
         return $query
-            ->leftJoin('m_tipe_work_order as tipe', function ($join): void {
+            ->leftJoin('aset_m_tipe_work_order as tipe', function ($join): void {
                 $join->on('tipe.id', '=', 'wo.tipe_work_order_id')->on('tipe.tenant_id', '=', 'wo.tenant_id');
             })
-            ->leftJoin('m_tingkat_layanan as layanan', function ($join): void {
+            ->leftJoin('aset_m_tingkat_layanan as layanan', function ($join): void {
                 $join->on('layanan.id', '=', 'wo.tingkat_layanan_id')->on('layanan.tenant_id', '=', 'wo.tenant_id');
             })
             ->selectSub(
-                DB::table('tr_pemeliharaan_aset_details')
+                DB::table('aset_tr_pemeliharaan_aset_details')
                     ->selectRaw('count(*)')
-                    ->whereColumn('tr_pemeliharaan_aset_details.pemeliharaan_aset_id', 'wo.id')
-                    ->where('tr_pemeliharaan_aset_details.tenant_id', $tenant),
+                    ->whereColumn('aset_tr_pemeliharaan_aset_details.pemeliharaan_aset_id', 'wo.id')
+                    ->where('aset_tr_pemeliharaan_aset_details.tenant_id', $tenant),
                 'jumlah_baris',
             )
             ->addSelect([
@@ -452,20 +452,20 @@ class PemeliharaanAsetController extends Controller
     /** @return Collection<int, object> */
     private function jobLines(string $tenant, string $workOrderId): mixed
     {
-        return DB::table('tr_pemeliharaan_aset_details as job')
-            ->leftJoin('tr_penerimaan_aset as aset', function ($join): void {
+        return DB::table('aset_tr_pemeliharaan_aset_details as job')
+            ->leftJoin('aset_tr_penerimaan_aset as aset', function ($join): void {
                 $join->on('aset.id', '=', 'job.asset_id')->on('aset.tenant_id', '=', 'job.tenant_id');
             })
-            ->leftJoin('m_maintenance_job_type as pekerjaan', function ($join): void {
+            ->leftJoin('aset_m_maintenance_job_type as pekerjaan', function ($join): void {
                 $join->on('pekerjaan.id', '=', 'job.maintenance_job_type_id')->on('pekerjaan.tenant_id', '=', 'job.tenant_id');
             })
-            ->leftJoin('m_trade as keahlian', function ($join): void {
+            ->leftJoin('aset_m_trade as keahlian', function ($join): void {
                 $join->on('keahlian.id', '=', 'job.trade_id')->on('keahlian.tenant_id', '=', 'job.tenant_id');
             })
-            ->leftJoin('m_sebab_kerusakan as sebab', function ($join): void {
+            ->leftJoin('aset_m_sebab_kerusakan as sebab', function ($join): void {
                 $join->on('sebab.id', '=', 'job.sebab_kerusakan_id')->on('sebab.tenant_id', '=', 'job.tenant_id');
             })
-            ->leftJoin('m_tindakan_perbaikan as tindakan', function ($join): void {
+            ->leftJoin('aset_m_tindakan_perbaikan as tindakan', function ($join): void {
                 $join->on('tindakan.id', '=', 'job.tindakan_perbaikan_id')->on('tindakan.tenant_id', '=', 'job.tenant_id');
             })
             ->where(['job.tenant_id' => $tenant, 'job.pemeliharaan_aset_id' => $workOrderId])
@@ -483,7 +483,7 @@ class PemeliharaanAsetController extends Controller
     private function workOrder(Request $request, string $id): object
     {
         $tenant = $this->tenant($request);
-        $query = DB::table('tr_pemeliharaan_aset as wo')
+        $query = DB::table('aset_tr_pemeliharaan_aset as wo')
             ->where(['wo.id' => $id, 'wo.tenant_id' => $tenant])->whereNull('wo.deleted_at');
         app(OrganizationScope::class)->query($query, $request, 'wo.legal_entity_id', 'wo.responsible_org_unit_id');
 

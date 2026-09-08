@@ -25,14 +25,14 @@ class BukuPenyusutanController extends MasterDataController
     protected function childMasters(): array
     {
         return [
-            new MasterChild(table: 'm_group_buku_penyusutan', column: 'buku_id', label: 'baris matriks group'),
-            new MasterChild(table: 'tr_buku_aset', column: 'buku_id', label: 'buku aset'),
+            new MasterChild(table: 'aset_m_group_buku_penyusutan', column: 'buku_id', label: 'baris matriks group'),
+            new MasterChild(table: 'aset_tr_buku_aset', column: 'buku_id', label: 'buku aset'),
         ];
     }
 
     protected function extraRules(string $tenantId, bool $creating): array
     {
-        $profileExists = Rule::exists('m_profil_penyusutan', 'id')
+        $profileExists = Rule::exists('aset_m_profil_penyusutan', 'id')
             ->where('tenant_id', $tenantId)
             ->where('aktif', true)
             ->whereNull('deleted_at');
@@ -64,7 +64,7 @@ class BukuPenyusutanController extends MasterDataController
             return;
         }
 
-        $used = DB::table('tr_buku_aset')
+        $used = DB::table('aset_tr_buku_aset')
             ->where(['tenant_id' => $tenantId, 'buku_id' => $record->getKey()])
             ->exists();
         if ($used) {

@@ -44,11 +44,11 @@ class AssetPlanningTest extends TestCase
         $response = $this->create($jenis)->assertCreated()->assertJsonPath('data.kode', 'PLNA-000001');
         $planId = $response->json('data.id');
 
-        $this->assertDatabaseHas('tr_perencanaan_aset', [
+        $this->assertDatabaseHas('aset_tr_perencanaan_aset', [
             'id' => $planId, 'tenant_id' => $this->tenantId, 'planning_org_unit_id' => $this->orgUnitId,
             'planning_type' => 'regular',
         ]);
-        $this->assertDatabaseHas('tr_perencanaan_aset_details', [
+        $this->assertDatabaseHas('aset_tr_perencanaan_aset_details', [
             'planning_id' => $planId, 'jenis_aset_id' => $jenis, 'asset_name' => 'Laptop kerja',
             'requested_specification' => 'RAM 16 GB, SSD 512 GB', 'quantity' => 2,
         ]);
@@ -63,7 +63,7 @@ class AssetPlanningTest extends TestCase
     {
         $otherTenantType = $this->jenis((string) Str::ulid());
         $this->create($otherTenantType)->assertUnprocessable()->assertJsonValidationErrors('details');
-        $this->assertDatabaseCount('tr_perencanaan_aset', 0);
+        $this->assertDatabaseCount('aset_tr_perencanaan_aset', 0);
         Http::assertNothingSent();
     }
 
@@ -83,7 +83,7 @@ class AssetPlanningTest extends TestCase
             ->deleteJson('/api/v1/perencanaan-aset/'.$plan['id'], ['version' => 1])->assertConflict();
         $this->withHeaders($this->headers(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.archive']))
             ->deleteJson('/api/v1/perencanaan-aset/'.$plan['id'], ['version' => 2])->assertNoContent();
-        $this->assertSoftDeleted('tr_perencanaan_aset', ['id' => $plan['id']]);
+        $this->assertSoftDeleted('aset_tr_perencanaan_aset', ['id' => $plan['id']]);
     }
 
     private function create(string $jenis)
@@ -120,7 +120,7 @@ class AssetPlanningTest extends TestCase
     {
         $type = (string) Str::ulid();
         $now = now();
-        DB::table('m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $tenant, 'creation_key' => 'type-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Laptop kerja', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
+        DB::table('aset_m_jenis_aset')->insert(['id' => $type, 'tenant_id' => $tenant, 'creation_key' => 'type-'.Str::ulid(), 'kode' => 'J'.Str::random(6), 'nama' => 'Laptop kerja', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
 
         return $type;
     }

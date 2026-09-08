@@ -39,17 +39,17 @@ class PelaksanaanController extends Controller
         $tenant = $this->tenant($request);
         $userId = (string) $request->attributes->get('coreerp.user_id');
 
-        $query = DB::table('tr_pemeliharaan_aset_details as job')
-            ->join('tr_pemeliharaan_aset as wo', function ($join): void {
+        $query = DB::table('aset_tr_pemeliharaan_aset_details as job')
+            ->join('aset_tr_pemeliharaan_aset as wo', function ($join): void {
                 $join->on('wo.id', '=', 'job.pemeliharaan_aset_id')->on('wo.tenant_id', '=', 'job.tenant_id');
             })
-            ->leftJoin('tr_penerimaan_aset as aset', function ($join): void {
+            ->leftJoin('aset_tr_penerimaan_aset as aset', function ($join): void {
                 $join->on('aset.id', '=', 'job.asset_id')->on('aset.tenant_id', '=', 'job.tenant_id');
             })
-            ->leftJoin('m_maintenance_job_type as pekerjaan', function ($join): void {
+            ->leftJoin('aset_m_maintenance_job_type as pekerjaan', function ($join): void {
                 $join->on('pekerjaan.id', '=', 'job.maintenance_job_type_id')->on('pekerjaan.tenant_id', '=', 'job.tenant_id');
             })
-            ->leftJoin('m_lokasi_aset as lokasi', function ($join): void {
+            ->leftJoin('aset_m_lokasi_aset as lokasi', function ($join): void {
                 $join->on('lokasi.id', '=', 'job.asset_location_id')->on('lokasi.tenant_id', '=', 'job.tenant_id');
             })
             ->where('job.tenant_id', $tenant)
@@ -102,7 +102,7 @@ class PelaksanaanController extends Controller
         $result = DB::transaction(function () use ($request, $id, $tenant, $target, $input, $current): array {
             // Dikunci ulang di dalam transaksi: antara pembacaan di atas dan penulisan di
             // sini, orang lain dapat memindahkan status yang sama.
-            $locked = DB::table('tr_pemeliharaan_aset')
+            $locked = DB::table('aset_tr_pemeliharaan_aset')
                 ->where(['id' => $id, 'tenant_id' => $tenant])->whereNull('deleted_at')
                 ->lockForUpdate()->first();
             if (! $locked || $locked->status !== $current->status || (int) $locked->version !== (int) $input['version']) {
@@ -110,7 +110,7 @@ class PelaksanaanController extends Controller
             }
             $peringatan = $this->pastikanSyaratTerpenuhi($tenant, $locked, $target);
 
-            $updated = DB::table('tr_pemeliharaan_aset')->where(['id' => $id, 'tenant_id' => $tenant])->update([
+            $updated = DB::table('aset_tr_pemeliharaan_aset')->where(['id' => $id, 'tenant_id' => $tenant])->update([
                 'status' => $target,
                 ...$this->capWaktu($locked, $target),
                 'version' => (int) $locked->version + 1,
@@ -119,7 +119,7 @@ class PelaksanaanController extends Controller
             if ($target === WorkOrderStatus::SELESAI) {
                 $this->simpulkanHasil($tenant, $id);
             }
-            DB::table('tr_pemeliharaan_aset_status_log')->insert([
+            DB::table('aset_tr_pemeliharaan_aset_status_log')->insert([
                 'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'pemeliharaan_aset_id' => $id,
                 'dari_status' => $locked->status, 'ke_status' => $target,
                 'oleh_user_id' => (string) $request->attributes->get('coreerp.user_id'),
@@ -172,7 +172,7 @@ class PelaksanaanController extends Controller
         $this->jobLine($request, $id, $jobId);
 
         $templateId = $request->validate([
-            'template_id' => ['required', 'ulid', Rule::exists('m_maintenance_checklist_template', 'id')
+            'template_id' => ['required', 'ulid', Rule::exists('aset_m_maintenance_checklist_template', 'id')
                 ->where('tenant_id', $tenant)->whereNull('deleted_at')],
         ])['template_id'];
 
@@ -230,7 +230,7 @@ class PelaksanaanController extends Controller
                     throw ValidationException::withMessages(['baris' => 'Pilih alasan di catatan teknisi saat hasil pemeriksaan Tidak dinilai.']);
                 }
 
-                DB::table('tr_pemeliharaan_aset_checklist')->where(['tenant_id' => $tenant, 'id' => $row->id])->update([
+                DB::table('aset_tr_pemeliharaan_aset_checklist')->where(['tenant_id' => $tenant, 'id' => $row->id])->update([
                     'nilai' => $nilai,
                     'result_code' => $resultCode,
                     'tidak_berlaku' => $tidakBerlaku,
@@ -261,16 +261,16 @@ class PelaksanaanController extends Controller
 
         $data = $request->validate([
             'aktual_jam' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
-            'sebab_kerusakan_id' => ['nullable', 'ulid', Rule::exists('m_sebab_kerusakan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
-            'tindakan_perbaikan_id' => ['nullable', 'ulid', Rule::exists('m_tindakan_perbaikan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'sebab_kerusakan_id' => ['nullable', 'ulid', Rule::exists('aset_m_sebab_kerusakan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'tindakan_perbaikan_id' => ['nullable', 'ulid', Rule::exists('aset_m_tindakan_perbaikan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
             'sebab_kerusakan_keterangan' => ['nullable', 'string', 'max:1000'],
             'tindakan_perbaikan_keterangan' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $sebabKeterangan = $this->keteranganPilihan($tenant, 'm_sebab_kerusakan', $data['sebab_kerusakan_id'] ?? null, $data['sebab_kerusakan_keterangan'] ?? null, 'sebab_kerusakan_keterangan');
-        $tindakanKeterangan = $this->keteranganPilihan($tenant, 'm_tindakan_perbaikan', $data['tindakan_perbaikan_id'] ?? null, $data['tindakan_perbaikan_keterangan'] ?? null, 'tindakan_perbaikan_keterangan');
+        $sebabKeterangan = $this->keteranganPilihan($tenant, 'aset_m_sebab_kerusakan', $data['sebab_kerusakan_id'] ?? null, $data['sebab_kerusakan_keterangan'] ?? null, 'sebab_kerusakan_keterangan');
+        $tindakanKeterangan = $this->keteranganPilihan($tenant, 'aset_m_tindakan_perbaikan', $data['tindakan_perbaikan_id'] ?? null, $data['tindakan_perbaikan_keterangan'] ?? null, 'tindakan_perbaikan_keterangan');
 
-        DB::table('tr_pemeliharaan_aset_details')->where([
+        DB::table('aset_tr_pemeliharaan_aset_details')->where([
             'tenant_id' => $tenant,
             'id' => $jobId,
             'pemeliharaan_aset_id' => $id,
@@ -313,7 +313,7 @@ class PelaksanaanController extends Controller
      */
     private function pastikanSyaratTerpenuhi(string $tenant, object $workOrder, string $target): array
     {
-        $jobs = DB::table('tr_pemeliharaan_aset_details')
+        $jobs = DB::table('aset_tr_pemeliharaan_aset_details')
             ->where(['tenant_id' => $tenant, 'pemeliharaan_aset_id' => $workOrder->id])->get();
 
         if ($target === WorkOrderStatus::DIJADWALKAN) {
@@ -323,7 +323,7 @@ class PelaksanaanController extends Controller
             if ($workOrder->dijadwalkan_mulai === null) {
                 throw ValidationException::withMessages(['ke_status' => 'Tanggal mulai terjadwal harus diisi sebelum work order dijadwalkan.']);
             }
-            $tipe = DB::table('m_tipe_work_order')->where(['tenant_id' => $tenant, 'id' => $workOrder->tipe_work_order_id])->first();
+            $tipe = DB::table('aset_m_tipe_work_order')->where(['tenant_id' => $tenant, 'id' => $workOrder->tipe_work_order_id])->first();
             if ($tipe && $tipe->satu_pekerja) {
                 $pelaksana = $jobs->pluck('ditugaskan_ke_user_id')->unique();
                 if ($pelaksana->count() !== 1 || $pelaksana->first() === null) {
@@ -347,7 +347,7 @@ class PelaksanaanController extends Controller
      */
     private function terapkanAturanValidasi(string $tenant, string $target, Collection $jobs): array
     {
-        $aturan = DB::table('m_validasi_status_work_order')
+        $aturan = DB::table('aset_m_validasi_status_work_order')
             ->where(['tenant_id' => $tenant, 'status' => $target, 'aktif' => true])->get();
         if ($aturan->isEmpty()) {
             return [];
@@ -379,7 +379,7 @@ class PelaksanaanController extends Controller
     private function hitungPelanggaran(string $tenant, string $aturan, Collection $jobs): int
     {
         return match ($aturan) {
-            WorkOrderValidation::CHECKLIST => DB::table('tr_pemeliharaan_aset_checklist')
+            WorkOrderValidation::CHECKLIST => DB::table('aset_tr_pemeliharaan_aset_checklist')
                 ->where('tenant_id', $tenant)
                 ->whereIn('pemeliharaan_aset_detail_id', $jobs->pluck('id'))
                 ->where('wajib', true)
@@ -402,11 +402,11 @@ class PelaksanaanController extends Controller
      */
     private function simpulkanHasil(string $tenant, string $workOrderId): void
     {
-        $jobs = DB::table('tr_pemeliharaan_aset_details')
+        $jobs = DB::table('aset_tr_pemeliharaan_aset_details')
             ->where(['tenant_id' => $tenant, 'pemeliharaan_aset_id' => $workOrderId])->pluck('id');
 
         foreach ($jobs as $jobId) {
-            $baris = DB::table('tr_pemeliharaan_aset_checklist')
+            $baris = DB::table('aset_tr_pemeliharaan_aset_checklist')
                 ->where(['tenant_id' => $tenant, 'pemeliharaan_aset_detail_id' => $jobId])
                 ->where('tipe', '!=', 'header')
                 ->get(['result_code', 'tidak_berlaku']);
@@ -421,7 +421,7 @@ class PelaksanaanController extends Controller
                 $berlaku->contains(fn (object $row): bool => $row->result_code === 'none') => 'tidak_dinilai',
                 default => 'lulus',
             };
-            DB::table('tr_pemeliharaan_aset_details')
+            DB::table('aset_tr_pemeliharaan_aset_details')
                 ->where(['tenant_id' => $tenant, 'id' => $jobId])->update(['hasil' => $hasil, 'updated_at' => now()]);
         }
     }
@@ -451,8 +451,8 @@ class PelaksanaanController extends Controller
         if ($row->tipe !== 'variable') {
             return;
         }
-        $sah = DB::table('m_maintenance_checklist_variable_value as nilai')
-            ->join('m_maintenance_checklist_template_line as baris', function ($join): void {
+        $sah = DB::table('aset_m_maintenance_checklist_variable_value as nilai')
+            ->join('aset_m_maintenance_checklist_template_line as baris', function ($join): void {
                 $join->on('baris.variable_id', '=', 'nilai.variable_id')->on('baris.tenant_id', '=', 'nilai.tenant_id');
             })
             ->where(['nilai.tenant_id' => $tenant, 'baris.id' => $row->sumber_id, 'nilai.value' => $nilai])
@@ -479,8 +479,8 @@ class PelaksanaanController extends Controller
             return null;
         }
 
-        return DB::table('m_maintenance_checklist_variable_value as nilai')
-            ->join('m_maintenance_checklist_template_line as baris', function ($join): void {
+        return DB::table('aset_m_maintenance_checklist_variable_value as nilai')
+            ->join('aset_m_maintenance_checklist_template_line as baris', function ($join): void {
                 $join->on('baris.variable_id', '=', 'nilai.variable_id')->on('baris.tenant_id', '=', 'nilai.tenant_id');
             })
             ->where(['nilai.tenant_id' => $tenant, 'baris.id' => $row->sumber_id, 'nilai.value' => $nilai])
@@ -490,13 +490,13 @@ class PelaksanaanController extends Controller
     /** @return Collection<int, object> */
     private function barisChecklist(string $tenant, string $jobId): Collection
     {
-        $rows = DB::table('tr_pemeliharaan_aset_checklist')
+        $rows = DB::table('aset_tr_pemeliharaan_aset_checklist')
             ->where(['tenant_id' => $tenant, 'pemeliharaan_aset_detail_id' => $jobId])
             ->orderBy('line_number')->get();
 
         $sourceIds = $rows->pluck('sumber_id')->filter()->values();
-        $variables = DB::table('m_maintenance_checklist_template_line as baris')
-            ->join('m_maintenance_checklist_variable_value as nilai', function ($join): void {
+        $variables = DB::table('aset_m_maintenance_checklist_template_line as baris')
+            ->join('aset_m_maintenance_checklist_variable_value as nilai', function ($join): void {
                 $join->on('nilai.variable_id', '=', 'baris.variable_id')
                     ->on('nilai.tenant_id', '=', 'baris.tenant_id');
             })
@@ -517,14 +517,14 @@ class PelaksanaanController extends Controller
     {
         $this->workOrder($request, $workOrderId);
 
-        return DB::table('tr_pemeliharaan_aset_details')->where([
+        return DB::table('aset_tr_pemeliharaan_aset_details')->where([
             'tenant_id' => $this->tenant($request), 'id' => $jobId, 'pemeliharaan_aset_id' => $workOrderId,
         ])->firstOrFail();
     }
 
     private function workOrder(Request $request, string $id): object
     {
-        $query = DB::table('tr_pemeliharaan_aset')
+        $query = DB::table('aset_tr_pemeliharaan_aset')
             ->where(['id' => $id, 'tenant_id' => $this->tenant($request)])->whereNull('deleted_at');
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'responsible_org_unit_id');
 

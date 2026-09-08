@@ -23,8 +23,8 @@ class MaintenanceJobTypeController extends MasterDataController
     protected function childMasters(): array
     {
         return [
-            new MasterChild('m_maintenance_job_type_variant', 'maintenance_job_type_id', 'varian job type'),
-            new MasterChild('m_maintenance_job_type_default', 'maintenance_job_type_id', 'default job type'),
+            new MasterChild('aset_m_maintenance_job_type_variant', 'maintenance_job_type_id', 'varian job type'),
+            new MasterChild('aset_m_maintenance_job_type_default', 'maintenance_job_type_id', 'default job type'),
         ];
     }
 

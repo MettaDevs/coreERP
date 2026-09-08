@@ -121,16 +121,22 @@ final class ModuleRegistry
             return null;
         }
 
-        // Module tanpa `table_prefix` belum bisa dilayani runtime ini. Tabelnya akan memakai
-        // nama apa adanya dan bertabrakan dengan milik Core — `users` dan `jobs` sudah pasti.
-        // Keadaan ini nyata, bukan hipotetis: modul yang baru ditarik masuk dengan
-        // `git subtree` membawa manifest repo lamanya, dan manifest itu memang belum
-        // menyatakan awalan tabel sampai ia dibentuk ulang.
+        // Module yang sedang dipindah masuk belum boleh dilayani. Ia masih memakai namespace
+        // repo asalnya, query mentahnya belum diganti, dan tabelnya belum tentu membawa
+        // `tenant_id` — memasangnya untuk tenant sungguhan berarti menaruh data yang tidak
+        // tersaring siapa pun.
         //
-        // Melewatkannya di sini bukan berarti melewatkannya diam-diam.
-        // `ModulSedangDipindahTest` mewajibkan setiap folder yang manifestnya tanpa awalan
-        // tabel terdaftar sebagai modul yang sedang dipindah; folder yang tidak terdaftar
-        // membuat alur merah, bukan menghilang tanpa suara.
+        // Tandanya daftar yang ditulis sengaja, bukan sifat manifest yang kebetulan. F3-25
+        // sempat memakai `table_prefix` yang belum ada sebagai tanda, dan tanda itu runtuh pada
+        // F3-04 — task yang justru memberi awalan tabel, dan dengan itu menyalakan module yang
+        // belum siap. Alasan lengkapnya ada di `ModulSedangDipindah`.
+        if (ModulSedangDipindah::bawaan()->menandai(basename(dirname($berkas)))) {
+            return null;
+        }
+
+        // Module yang **tidak** sedang dipindah wajib menyatakan awalan tabelnya. Tanpa awalan,
+        // tabelnya memakai nama apa adanya dan bertabrakan dengan milik Core. Ini dijaga
+        // `ModulSedangDipindahTest` supaya tidak ada module yang lenyap tanpa suara.
         if ($this->awalanTabel($isi) === '') {
             return null;
         }
