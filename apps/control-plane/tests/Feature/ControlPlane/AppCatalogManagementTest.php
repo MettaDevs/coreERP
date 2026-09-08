@@ -149,6 +149,62 @@ class AppCatalogManagementTest extends TestCase
         ]);
     }
 
+    /**
+     * Module tidak punya database sendiri, jadi katalog tidak boleh menuntut namanya.
+     *
+     * `contoh-a` dipilih karena ia benar-benar ada sebagai folder di `modules/`; itulah
+     * kenyataan yang dipakai validasi untuk membedakan module dari app container, jadi
+     * test ini menempuh jalur yang sama dengan produksi, bukan jalur tiruan.
+     */
+    public function test_module_dapat_didaftarkan_tanpa_menyebutkan_nama_database(): void
+    {
+        $manifest = $this->manifestFor('contoh-a');
+        unset($manifest['database_name']);
+
+        $this->actingAs($this->providerAdmin())
+            ->postJson('/api/v1/provider/apps', $manifest)
+            ->assertCreated()
+            ->assertJsonPath('data.database_name', null);
+
+        $this->assertNull(
+            DB::table('apps')->where('id', 'contoh-a')->value('database_name'),
+            'Nama database yang tidak disebutkan harus tersimpan sebagai null, bukan string kosong.'
+        );
+    }
+
+    /**
+     * Kelonggaran di atas hanya berlaku untuk module.
+     *
+     * App container tetap membutuhkan database sendiri untuk dapat dibuatkan, jadi
+     * melonggarkan aturannya untuk semua orang bukan penyelesaian, melainkan kehilangan
+     * satu-satunya pemeriksaan yang menangkap manifest container yang lupa mengisinya.
+     */
+    public function test_app_container_tetap_ditolak_bila_tidak_menyebutkan_nama_database(): void
+    {
+        $manifest = $this->manifest();
+        unset($manifest['database_name']);
+
+        $this->actingAs($this->providerAdmin())
+            ->postJson('/api/v1/provider/apps', $manifest)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('database_name');
+
+        $this->assertDatabaseMissing('apps', ['id' => 'sample-app']);
+    }
+
+    /**
+     * String kosong bukan cara sah menghindari kewajiban di atas: app container yang
+     * mengirim `database_name: ''` tetap ditolak, sehingga tidak ada baris katalog yang
+     * mengaku punya database tanpa menyebut namanya.
+     */
+    public function test_app_container_ditolak_bila_nama_databasenya_kosong(): void
+    {
+        $this->actingAs($this->providerAdmin())
+            ->postJson('/api/v1/provider/apps', $this->manifest(['database_name' => '']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('database_name');
+    }
+
     public function test_registration_stores_versioned_dependencies_and_returns_them(): void
     {
         $this->availableApp('business-partner', '1.2.0');

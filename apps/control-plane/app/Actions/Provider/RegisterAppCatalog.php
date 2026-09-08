@@ -28,7 +28,7 @@ class RegisterAppCatalog
     public function __construct(private AppDependencyGraph $dependencyGraph) {}
 
     /**
-     * @param  array{id:string,name:string,description:?string,version:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string}  $appData
+     * @param  array{id:string,name:string,description:?string,version:string,database_name:?string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,status:string}  $appData
      * @param  array{
      *     entry_points:list<array{code:string,name:string,type:string}>,
      *     permissions:list<array{code:string,name:string,entry_point:string,access:string}>,

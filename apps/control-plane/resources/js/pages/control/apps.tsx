@@ -17,7 +17,8 @@ type App = {
     name: string;
     version: string;
     status: string;
-    database_name: string;
+    // Null untuk module: ia memakai database Core, jadi tidak punya nama database sendiri.
+    database_name: string | null;
     description: string;
 };
 
@@ -83,7 +84,10 @@ export default function AppCatalog({ apps }: { apps: App[] }) {
                                         <span className="text-muted-foreground">
                                             Database
                                         </span>
-                                        <code>{app.database_name}</code>
+                                        <code>
+                                            {app.database_name ??
+                                                'database Core (module)'}
+                                        </code>
                                     </div>
                                 </CardContent>
                             </Card>

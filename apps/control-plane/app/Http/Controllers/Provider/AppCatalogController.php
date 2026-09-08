@@ -35,7 +35,7 @@ class AppCatalogController extends Controller
         return response()->json(['data' => $this->present($app)], $app->wasRecentlyCreated ? 201 : 200);
     }
 
-    /** @return array{id:string,name:string,description:?string,version:string,status:string,database_name:string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,dependsOn:array<string,string>} */
+    /** @return array{id:string,name:string,description:?string,version:string,status:string,database_name:?string,has_ui:bool,navigation:?array<string,mixed>,repository_url:?string,contract_url:?string,dependsOn:array<string,string>} */
     private function present(CoreApp $app): array
     {
         return [
