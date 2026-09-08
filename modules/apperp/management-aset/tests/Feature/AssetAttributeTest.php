@@ -30,7 +30,7 @@ class AssetAttributeTest extends TestCase
     {
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
-        $this->unitId = (string) Str::ulid();
+        $this->unitId = $this->buatSatuanUji($this->tenantId);
         $unit = fn (string $id): array => [
             'id' => $id, 'code' => 'cm', 'name' => 'Sentimeter', 'symbol' => 'cm', 'decimal_places' => 2,
         ];

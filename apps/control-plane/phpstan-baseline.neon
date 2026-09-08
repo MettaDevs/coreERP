@@ -247,54 +247,6 @@ parameters:
 			path: app/Http/Controllers/AppLaunchManifestController.php
 
 		-
-			message: '#^Anonymous function should return array\{id\: string, code\: string, name\: string, years\: Illuminate\\Support\\Collection\<int, array\{id\: mixed, name\: mixed, starts_on\: mixed, ends_on\: mixed, periods\: mixed\}\>\} but returns array\{id\: string, code\: string, name\: string, years\: Illuminate\\Support\\Collection\<int, array\{id\: string, name\: string, starts_on\: mixed, ends_on\: mixed, periods\: mixed\}\>\}\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
-
-		-
-			message: '#^Anonymous function should return array\{id\: string, name\: string, starts_on\: mixed, ends_on\: mixed, periods\: Illuminate\\Support\\Collection\<int, array\{ordinal\: mixed, name\: mixed, starts_on\: mixed, ends_on\: mixed\}\>\} but returns array\{id\: string, name\: string, starts_on\: mixed, ends_on\: mixed, periods\: Illuminate\\Support\\Collection\<int, array\{ordinal\: mixed, name\: string, starts_on\: mixed, ends_on\: mixed\}\>\}\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
-
-		-
-			message: '#^Cannot call method toDateString\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 4
-			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\FiscalPeriod\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\FiscalYear\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
-
-		-
-			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\FiscalPeriod\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: method.unresolvableReturnType
-			count: 1
-			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
-
-		-
-			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\FiscalYear\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: method.unresolvableReturnType
-			count: 1
-			path: app/Http/Controllers/FiscalCalendar/FiscalCalendarController.php
-
-		-
-			message: '#^Cannot call method toDateString\(\) on string\.$#'
-			identifier: method.nonObject
-			count: 4
-			path: app/Http/Controllers/Internal/FiscalCalendarDirectoryController.php
-
-		-
 			message: '#^Parameter \#4 \$workflowTypes of method App\\Actions\\Provider\\RegisterAppCatalog\:\:handle\(\) expects list\<array\{code\: string, name\: string, scope\: string, decision_context_schema\: array\<string, mixed\>\}\>, array given\.$#'
 			identifier: argument.type
 			count: 1

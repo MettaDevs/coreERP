@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Services\UnitOfMeasureClient;
+use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
 
 final class MaintenanceSetupLinkController extends Controller
 {
@@ -206,7 +206,7 @@ final class MaintenanceSetupLinkController extends Controller
         }
 
         try {
-            return collect(app(UnitOfMeasureClient::class)->resolve($tenant, $ids))
+            return collect(app(DaftarSatuanAset::class)->resolve($tenant, $ids))
                 ->mapWithKeys(fn (array $unit, string $id): array => [$id => $unit['code']])->all();
         } catch (\RuntimeException) {
             throw ValidationException::withMessages(['lines' => 'Satuan tidak ditemukan, tidak aktif, atau belum dapat diperiksa.']);

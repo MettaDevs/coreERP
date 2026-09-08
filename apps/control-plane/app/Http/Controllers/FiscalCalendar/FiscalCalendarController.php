@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\FiscalCalendar\FiscalCalendarRequest;
 use App\Http\Requests\FiscalCalendar\FiscalYearRequest;
 use App\Models\FiscalCalendar;
+use App\Models\FiscalPeriod;
+use App\Models\FiscalYear;
 use App\Models\LegalEntity;
 use App\Models\Organization;
 use Illuminate\Http\JsonResponse;
@@ -35,18 +37,22 @@ class FiscalCalendarController extends Controller
                 'id' => $calendar->id,
                 'code' => $calendar->code,
                 'name' => $calendar->name,
-                'years' => $calendar->years->map(fn ($year): array => [
+                'years' => $calendar->years->map(fn (FiscalYear $year): array => [
                     'id' => $year->id,
                     'name' => $year->name,
                     'starts_on' => $year->starts_on->toDateString(),
                     'ends_on' => $year->ends_on->toDateString(),
-                    'periods' => $year->periods->map(fn ($period): array => [
+                    'periods' => $year->periods->map(fn (FiscalPeriod $period): array => [
                         'ordinal' => $period->ordinal,
                         'name' => $period->name,
                         'starts_on' => $period->starts_on->toDateString(),
                         'ends_on' => $period->ends_on->toDateString(),
-                    ]),
-                ]),
+                        // `->all()` pada kedua map bersarang: `Collection` tidak kovarian, jadi
+                        // koleksi berisi bentuk yang lebih sempit tidak diterima sebagai koleksi
+                        // berisi bentuk yang lebih lebar. Array biasa tidak punya batasan itu, dan
+                        // yang dikirim ke JSON tetap sama persis.
+                    ])->all(),
+                ])->all(),
             ]);
 
         $legalEntities = Organization::query()

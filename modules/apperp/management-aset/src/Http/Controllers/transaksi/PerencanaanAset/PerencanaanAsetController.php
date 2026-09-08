@@ -11,9 +11,9 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
-use Modules\Apperp\ManagementAset\Services\UnitOfMeasureClient;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
 
@@ -51,7 +51,7 @@ class PerencanaanAsetController extends Controller
         return response()->json(['data' => $plan]);
     }
 
-    public function store(Request $request, PenerbitNomorAset $numbers, UnitOfMeasureClient $units): JsonResponse
+    public function store(Request $request, PenerbitNomorAset $numbers, DaftarSatuanAset $units): JsonResponse
     {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
@@ -89,7 +89,7 @@ class PerencanaanAsetController extends Controller
         return response()->json(['data' => $plan], 201);
     }
 
-    public function update(Request $request, string $id, UnitOfMeasureClient $units): JsonResponse
+    public function update(Request $request, string $id, DaftarSatuanAset $units): JsonResponse
     {
         $this->guard($request, 'update');
         $plan = $this->plan($request, $id);
@@ -168,7 +168,7 @@ class PerencanaanAsetController extends Controller
     }
 
     /** @param list<array<string, mixed>> $details */
-    private function validateLookupMasters(string $tenant, array $details, UnitOfMeasureClient $units): array
+    private function validateLookupMasters(string $tenant, array $details, DaftarSatuanAset $units): array
     {
         $ids = array_values(array_unique(array_column($details, 'jenis_aset_id')));
         $count = DB::table('aset_m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', $ids)->where('aktif', true)->whereNull('deleted_at')->count();

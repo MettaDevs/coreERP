@@ -10,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
 use Modules\Apperp\ManagementAset\Models\MasterData;
-use Modules\Apperp\ManagementAset\Services\UnitOfMeasureClient;
+use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use RuntimeException;
 
@@ -171,7 +171,7 @@ class TipeAtributController extends MasterDataController
             return $this->unitCodes[$satuanId];
         }
         try {
-            $units = app(UnitOfMeasureClient::class)->resolve($this->tenantId, [$satuanId]);
+            $units = app(DaftarSatuanAset::class)->resolve($this->tenantId, [$satuanId]);
         } catch (RuntimeException) {
             throw ValidationException::withMessages([
                 'satuan_id' => 'Satuan tidak ditemukan, tidak aktif, atau belum dapat diperiksa.',

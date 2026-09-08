@@ -14,7 +14,7 @@ use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
-use Modules\Apperp\ManagementAset\Services\FiscalCalendarClient;
+use Modules\Apperp\ManagementAset\Services\KalenderFiskalAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AssetAttributeValidator;
@@ -622,7 +622,7 @@ class AssetController extends Controller
         }
 
         try {
-            $fiscal = app(FiscalCalendarClient::class)->resolve($tenantId, $legalEntityId, $placedInService);
+            $fiscal = app(KalenderFiskalAset::class)->resolve($tenantId, $legalEntityId, $placedInService);
         } catch (RuntimeException) {
             return null;
         }

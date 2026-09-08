@@ -39,7 +39,7 @@ class AssetLifecycleTest extends TestCase
         $this->tenantId = $this->buatTenantUji();
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
-        $this->unitId = (string) Str::ulid();
+        $this->unitId = $this->buatSatuanUji($this->tenantId, 'kVA', 'Kilovolt-ampere');
         Http::fake(function ($request) {
             if (str_contains($request->url(), '/units-of-measure')) {
                 return Http::response(['data' => [[
