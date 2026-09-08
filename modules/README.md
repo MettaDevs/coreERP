@@ -18,6 +18,7 @@ modules/
       ├─ composer.json            # package lokal, autoload PSR-4 untuk namespace module
       ├─ src/                     # PHP: Http/, Models/, Services/, Actions/, Providers/
       ├─ database/migrations/     # migration module saja
+      ├─ routes/                  # web.php dan api.php, dimuat penyedia layanan module
       ├─ ui/                      # halaman React, di-import build shell Core
       ├─ tests/                   # Feature/ dan Unit/
       └─ contracts/               # hanya bila ada permukaan yang dipanggil dari luar runtime
