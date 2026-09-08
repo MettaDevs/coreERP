@@ -2,12 +2,14 @@
 
 namespace Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset;
 
+use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 
 class AssetBook extends Model
 {
     use HasUlids;
+    use MilikTenant;
 
     protected $table = 'aset_tr_buku_aset';
 
