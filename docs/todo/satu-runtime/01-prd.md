@@ -1739,6 +1739,33 @@ sesuai keputusan pada bagian 5.2.
 
 **Bergantung pada.** F2-08.
 
+#### Diputuskan: bentuk bersarang diterima
+
+Langkah 1 menuntut keputusan tertulis. Keputusannya: **penerbitan boleh dipanggil dari dalam transaksi
+pemanggil, dan tidak wajib berada di dalamnya.**
+
+Alasannya bukan kompromi. Transaksi milik layanan nomor menjadi savepoint saat pemanggilnya sudah punya
+transaksi, jadi percobaan ulang di dalamnya hanya mundur sampai savepoint — bukan membatalkan dokumen
+yang sedang disusun pemanggil. Sementara mewajibkan pemanggil membuka transaksi lebih dulu akan memaksa
+setiap layar yang sekadar menampilkan nomor berikutnya membuka transaksi tanpa alasan.
+
+#### Testnya menguji invarian, bukan langkah
+
+Yang diperiksa dua hal yang bisa diamati dari luar: nilai berikutnya pada tabel alokasi kembali seperti
+semula, dan **tidak ada baris penerbitan yang selamat** dari transaksi yang gagal. Yang kedua ditambahkan
+karena yang pertama saja bisa hijau pada implementasi yang menyimpan barisnya tapi lupa memajukan
+penghitung.
+
+Sudah dibuktikan bisa gagal: satu `commit` disisipkan di tengah transaksi dokumen untuk menirukan
+penerbitan yang berada di luarnya, dan testnya merah dengan pesan yang benar.
+
+#### Satu test dibuang karena tidak membuktikan yang dijanjikan namanya
+
+Sempat ditulis test bernama "dunia dua database meninggalkan lubang". Ia memakai koneksi kedua, tetapi
+layanan nomornya tetap berjalan di koneksi bawaan, jadi ia mengukur hal yang sama dengan test
+sebelumnya sambil terbaca seolah membandingkan dua dunia. Test yang menjanjikan lebih dari yang
+diukurnya lebih buruk daripada tidak ada test: ia membuat orang berhenti mencari.
+
 ### F2-10 — Konteks permintaan untuk modul
 
 **Kenapa.** Middleware pada app lama memverifikasi token yang diterbitkan Core. Di dalam proses yang sama,
