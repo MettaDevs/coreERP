@@ -25,13 +25,25 @@ export default function TipeAtributNilai({
 
     useEffect(() => {
         let cancelled = false;
-        api<{ data: { nilai: string }[] }>(`/tipe-atribut/${tipeAtributId}/nilai`)
+        api<{ data: { nilai: string }[] }>(
+            `/tipe-atribut/${tipeAtributId}/nilai`,
+        )
             .then((result) => {
                 if (!cancelled)
-                    setRows(result.data.map((row) => ({ nilai: String(row.nilai ?? '') })));
+                    setRows(
+                        result.data.map((row) => ({
+                            nilai: String(row.nilai ?? ''),
+                        })),
+                    );
             })
             .catch((caught) => {
-                if (!cancelled) setError(errorMessage(caught, 'Pilihan nilai belum dapat dimuat.'));
+                if (!cancelled)
+                    setError(
+                        errorMessage(
+                            caught,
+                            'Pilihan nilai belum dapat dimuat.',
+                        ),
+                    );
             });
         return () => {
             cancelled = true;
@@ -50,12 +62,17 @@ export default function TipeAtributNilai({
                 body: JSON.stringify({
                     rows: rows
                         .filter((row) => row.nilai.trim() !== '')
-                        .map((row, index) => ({ nilai: row.nilai.trim(), urutan: index })),
+                        .map((row, index) => ({
+                            nilai: row.nilai.trim(),
+                            urutan: index,
+                        })),
                 }),
             });
             setSaved(true);
         } catch (caught) {
-            setError(errorMessage(caught, 'Pilihan nilai belum dapat disimpan.'));
+            setError(
+                errorMessage(caught, 'Pilihan nilai belum dapat disimpan.'),
+            );
         } finally {
             setSaving(false);
         }
@@ -65,14 +82,14 @@ export default function TipeAtributNilai({
         <div ref={containerRef} className="space-y-3 border-t px-5 py-4">
             <div>
                 <p className="font-semibold">Pilihan nilai</p>
-                <p className="text-sm text-muted-foreground">
-                    Tanpa pilihan, pengguna dapat mengetik bebas. Menambahkan pilihan pertama
-                    mengubah isian aset menjadi dropdown.
+                <p className="text-muted-foreground text-sm">
+                    Tanpa pilihan, pengguna dapat mengetik bebas. Menambahkan
+                    pilihan pertama mengubah isian aset menjadi dropdown.
                 </p>
             </div>
 
             {rows.length === 0 && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                     Belum ada pilihan. Atribut ini saat ini memakai teks bebas.
                 </p>
             )}
@@ -89,7 +106,9 @@ export default function TipeAtributNilai({
                             onChange={(event) =>
                                 setRows((current) =>
                                     current.map((item, i) =>
-                                        i === index ? { nilai: event.target.value } : item,
+                                        i === index
+                                            ? { nilai: event.target.value }
+                                            : item,
                                     ),
                                 )
                             }
@@ -100,7 +119,9 @@ export default function TipeAtributNilai({
                             variant="outline"
                             size="sm"
                             type="button"
-                            onClick={() => setRows(rows.filter((_, i) => i !== index))}
+                            onClick={() =>
+                                setRows(rows.filter((_, i) => i !== index))
+                            }
                         >
                             Hapus
                         </Button>
@@ -108,8 +129,12 @@ export default function TipeAtributNilai({
                 </div>
             ))}
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {saved && <p className="text-sm text-muted-foreground">Pilihan nilai tersimpan.</p>}
+            {error && <p className="text-destructive text-sm">{error}</p>}
+            {saved && (
+                <p className="text-muted-foreground text-sm">
+                    Pilihan nilai tersimpan.
+                </p>
+            )}
 
             {canEdit && (
                 <div className="flex gap-2">
@@ -120,7 +145,11 @@ export default function TipeAtributNilai({
                     >
                         Tambah pilihan
                     </Button>
-                    <Button type="button" disabled={saving} onClick={() => void save()}>
+                    <Button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void save()}
+                    >
                         {saving ? 'Menyimpan…' : 'Simpan pilihan'}
                     </Button>
                 </div>

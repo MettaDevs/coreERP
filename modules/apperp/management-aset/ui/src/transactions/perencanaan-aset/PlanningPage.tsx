@@ -1,12 +1,29 @@
 import { type RefObject, useEffect, useRef, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@apperp/ui/card';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Field, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
+import {
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@apperp/ui/sheet';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import { toast } from 'sonner';
@@ -43,7 +60,9 @@ const emptyDetail = (): Detail => ({
     estimated_unit_price: '0',
 });
 
-const emptyPlan = (): Omit<Plan, 'id' | 'kode' | 'version' | 'status'> & { details: Detail[] } => ({
+const emptyPlan = (): Omit<Plan, 'id' | 'kode' | 'version' | 'status'> & {
+    details: Detail[];
+} => ({
     planned_on: new Date().toISOString().slice(0, 10),
     planning_year: new Date().getFullYear(),
     planning_type: 'regular',
@@ -82,7 +101,12 @@ function AssetDetailRow({
             <div className="flex justify-between">
                 <span className="text-sm font-medium">Baris {index + 1}</span>
                 {canRemove && (
-                    <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={onRemove}
+                    >
                         Hapus
                     </Button>
                 )}
@@ -101,7 +125,9 @@ function AssetDetailRow({
                         onSearchChange={onTypeSearch}
                         onValueChange={(value) =>
                             onChange({
-                                jenis_aset_id: types.find((type) => type.nama === value)?.id ?? '',
+                                jenis_aset_id:
+                                    types.find((type) => type.nama === value)
+                                        ?.id ?? '',
                             })
                         }
                     />
@@ -118,7 +144,9 @@ function AssetDetailRow({
                         portalContainer={portalContainer}
                         onValueChange={(value) =>
                             onChange({
-                                satuan_id: units.find((unit) => unit.nama === value)?.id ?? '',
+                                satuan_id:
+                                    units.find((unit) => unit.nama === value)
+                                        ?.id ?? '',
                             })
                         }
                     />
@@ -130,7 +158,9 @@ function AssetDetailRow({
                         min="0.0001"
                         step="0.0001"
                         value={detail.quantity}
-                        onChange={(event) => onChange({ quantity: event.target.value })}
+                        onChange={(event) =>
+                            onChange({ quantity: event.target.value })
+                        }
                     />
                 </Field>
             </div>
@@ -138,7 +168,11 @@ function AssetDetailRow({
                 <Input
                     label="Spesifikasi yang diminta"
                     value={detail.requested_specification}
-                    onChange={(event) => onChange({ requested_specification: event.target.value })}
+                    onChange={(event) =>
+                        onChange({
+                            requested_specification: event.target.value,
+                        })
+                    }
                     required
                 />
             </Field>
@@ -149,7 +183,9 @@ function AssetDetailRow({
                     min="0"
                     step="0.01"
                     value={detail.estimated_unit_price}
-                    onChange={(event) => onChange({ estimated_unit_price: event.target.value })}
+                    onChange={(event) =>
+                        onChange({ estimated_unit_price: event.target.value })
+                    }
                 />
             </Field>
         </div>
@@ -169,7 +205,9 @@ export default function PlanningPage({
     const [types, setTypes] = useState<AssetType[]>([]);
     const [units, setUnits] = useState<AssetType[]>([]);
     const [typeSearch, setTypeSearch] = useState('');
-    const [editing, setEditing] = useState<(Plan & { details: Detail[] }) | null | undefined>();
+    const [editing, setEditing] = useState<
+        (Plan & { details: Detail[] }) | null | undefined
+    >();
     const [saving, setSaving] = useState(false);
     const sheetContentRef = useRef<HTMLDivElement>(null);
 
@@ -178,7 +216,9 @@ export default function PlanningPage({
             const result = await api<{ data: Plan[] }>('/perencanaan-aset');
             setPlans(result.data);
         } catch (caught) {
-            toast.error(errorMessage(caught, 'Rencana aset belum dapat dimuat.'));
+            toast.error(
+                errorMessage(caught, 'Rencana aset belum dapat dimuat.'),
+            );
         }
     };
 
@@ -217,7 +257,9 @@ export default function PlanningPage({
                 })),
             });
         } catch (caught) {
-            toast.error(errorMessage(caught, 'Rencana aset belum dapat dibuka.'));
+            toast.error(
+                errorMessage(caught, 'Rencana aset belum dapat dibuka.'),
+            );
         }
     };
 
@@ -230,7 +272,9 @@ export default function PlanningPage({
             });
             await load();
         } catch (caught) {
-            toast.error(errorMessage(caught, 'Rencana aset belum dapat diarsipkan.'));
+            toast.error(
+                errorMessage(caught, 'Rencana aset belum dapat diarsipkan.'),
+            );
         }
     };
 
@@ -248,7 +292,9 @@ export default function PlanningPage({
 
     const save = async () => {
         if (!editing || !context.legal_entity_id || !context.org_unit_id) {
-            toast.error('Pilih entitas legal dan unit kerja aktif sebelum membuat rencana.');
+            toast.error(
+                'Pilih entitas legal dan unit kerja aktif sebelum membuat rencana.',
+            );
             return;
         }
         if (
@@ -259,7 +305,9 @@ export default function PlanningPage({
                     detail.requested_specification.trim(),
             )
         ) {
-            toast.error('Pilih jenis aset, satuan, dan isi spesifikasi pada setiap rincian.');
+            toast.error(
+                'Pilih jenis aset, satuan, dan isi spesifikasi pada setiap rincian.',
+            );
             return;
         }
 
@@ -296,7 +344,9 @@ export default function PlanningPage({
             await load();
             toast.success('Rencana aset disimpan.');
         } catch (caught) {
-            toast.error(errorMessage(caught, 'Rencana aset belum dapat disimpan.'));
+            toast.error(
+                errorMessage(caught, 'Rencana aset belum dapat disimpan.'),
+            );
         } finally {
             setSaving(false);
         }
@@ -308,7 +358,9 @@ export default function PlanningPage({
                 <CardTitle>Perencanaan aset</CardTitle>
                 {can('create') && (
                     <CardAction>
-                        <Button onClick={() => setEditing(emptyPlan() as never)}>
+                        <Button
+                            onClick={() => setEditing(emptyPlan() as never)}
+                        >
                             Tambah rencana
                         </Button>
                     </CardAction>
@@ -320,8 +372,8 @@ export default function PlanningPage({
                         <EmptyHeader>
                             <EmptyTitle>Belum ada rencana aset</EmptyTitle>
                             <EmptyDescription>
-                                Rencana dibuat dari jenis aset. Spesifikasi dicatat pada rincian
-                                rencana, bukan pada master.
+                                Rencana dibuat dari jenis aset. Spesifikasi
+                                dicatat pada rincian rencana, bukan pada master.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
@@ -334,22 +386,30 @@ export default function PlanningPage({
                             >
                                 <div>
                                     <p className="font-medium">{plan.kode}</p>
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-muted-foreground text-sm">
                                         {plan.planned_on} ·{' '}
-                                        {plan.planning_type === 'regular' ? 'Reguler' : 'Tambahan'}{' '}
+                                        {plan.planning_type === 'regular'
+                                            ? 'Reguler'
+                                            : 'Tambahan'}{' '}
                                         · Rp{' '}
-                                        {Number(plan.total_estimated_value).toLocaleString('id-ID')}
+                                        {Number(
+                                            plan.total_estimated_value,
+                                        ).toLocaleString('id-ID')}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Badge variant="secondary">
-                                        {plan.status === 'draft' ? 'Draf' : plan.status}
+                                        {plan.status === 'draft'
+                                            ? 'Draf'
+                                            : plan.status}
                                     </Badge>
                                     {can('update') && (
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => void openEdit(plan.id)}
+                                            onClick={() =>
+                                                void openEdit(plan.id)
+                                            }
                                         >
                                             Ubah
                                         </Button>
@@ -388,8 +448,9 @@ export default function PlanningPage({
                     </SheetHeader>
                     {editing && (
                         <div className="space-y-4 p-4">
-                            <p className="text-sm text-muted-foreground">
-                                Unit perencanaan dan penanggung jawab mengikuti konteks aktif Anda.
+                            <p className="text-muted-foreground text-sm">
+                                Unit perencanaan dan penanggung jawab mengikuti
+                                konteks aktif Anda.
                             </p>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <Field>
@@ -402,7 +463,10 @@ export default function PlanningPage({
                                                 ...editing,
                                                 planned_on: event.target.value,
                                                 planning_year: Number(
-                                                    event.target.value.slice(0, 4),
+                                                    event.target.value.slice(
+                                                        0,
+                                                        4,
+                                                    ),
                                                 ),
                                             })
                                         }
@@ -417,7 +481,9 @@ export default function PlanningPage({
                                         onChange={(event) =>
                                             setEditing({
                                                 ...editing,
-                                                planning_year: Number(event.target.value),
+                                                planning_year: Number(
+                                                    event.target.value,
+                                                ),
                                             })
                                         }
                                         required
@@ -440,7 +506,9 @@ export default function PlanningPage({
                                             setEditing({
                                                 ...editing,
                                                 planning_type:
-                                                    value === 'Tambahan' ? 'additional' : 'regular',
+                                                    value === 'Tambahan'
+                                                        ? 'additional'
+                                                        : 'regular',
                                             })
                                         }
                                     />
@@ -452,27 +520,35 @@ export default function PlanningPage({
                                         onChange={(event) =>
                                             setEditing({
                                                 ...editing,
-                                                funding_source: event.target.value,
+                                                funding_source:
+                                                    event.target.value,
                                             })
                                         }
                                     />
                                 </Field>
                             </div>
                             <Field>
-                                <FieldLabel htmlFor="planning-description">Keterangan</FieldLabel>
+                                <FieldLabel htmlFor="planning-description">
+                                    Keterangan
+                                </FieldLabel>
                                 <Textarea
                                     id="planning-description"
                                     rows={6}
                                     className="min-h-36 resize-y"
                                     value={editing.description ?? ''}
                                     onChange={(event) =>
-                                        setEditing({ ...editing, description: event.target.value })
+                                        setEditing({
+                                            ...editing,
+                                            description: event.target.value,
+                                        })
                                     }
                                 />
                             </Field>
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="font-medium">Rincian aset</h3>
+                                    <h3 className="font-medium">
+                                        Rincian aset
+                                    </h3>
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -480,7 +556,10 @@ export default function PlanningPage({
                                         onClick={() =>
                                             setEditing({
                                                 ...editing,
-                                                details: [...editing.details, emptyDetail()],
+                                                details: [
+                                                    ...editing.details,
+                                                    emptyDetail(),
+                                                ],
                                             })
                                         }
                                     >
@@ -497,12 +576,15 @@ export default function PlanningPage({
                                         units={units}
                                         portalContainer={sheetContentRef}
                                         onTypeSearch={setTypeSearch}
-                                        onChange={(change) => updateDetail(index, change)}
+                                        onChange={(change) =>
+                                            updateDetail(index, change)
+                                        }
                                         onRemove={() =>
                                             setEditing({
                                                 ...editing,
                                                 details: editing.details.filter(
-                                                    (_, position) => position !== index,
+                                                    (_, position) =>
+                                                        position !== index,
                                                 ),
                                             })
                                         }
@@ -517,7 +599,11 @@ export default function PlanningPage({
                                 >
                                     Batal
                                 </Button>
-                                <Button type="button" disabled={saving} onClick={() => void save()}>
+                                <Button
+                                    type="button"
+                                    disabled={saving}
+                                    onClick={() => void save()}
+                                >
                                     {saving ? 'Menyimpan…' : 'Simpan'}
                                 </Button>
                             </SheetFooter>

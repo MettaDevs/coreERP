@@ -6,8 +6,16 @@ import { Badge } from '@apperp/ui/badge';
  * kata itu hanya ditulis di sini.
  */
 
-export type Context = { legal_entity_id: string | null; org_unit_id: string | null };
-export type Option = { id: string; kode: string; nama: string; minta_keterangan?: boolean };
+export type Context = {
+    legal_entity_id: string | null;
+    org_unit_id: string | null;
+};
+export type Option = {
+    id: string;
+    kode: string;
+    nama: string;
+    minta_keterangan?: boolean;
+};
 
 export type JobLine = {
     id?: string;
@@ -76,7 +84,10 @@ export type ChecklistRow = {
 /** Label dan warna status. */
 export const STATUS: Record<
     string,
-    { label: string; variant: 'default' | 'secondary' | 'outline' | 'destructive' }
+    {
+        label: string;
+        variant: 'default' | 'secondary' | 'outline' | 'destructive';
+    }
 > = {
     draft: { label: 'Draf', variant: 'outline' },
     dijadwalkan: { label: 'Dijadwalkan', variant: 'secondary' },
@@ -87,7 +98,10 @@ export const STATUS: Record<
 };
 
 /** Tombol transisi yang ditawarkan pada tiap status, beserta hak yang menjaganya. */
-export const TRANSISI: Record<string, { ke: string; label: string; izin: string }[]> = {
+export const TRANSISI: Record<
+    string,
+    { ke: string; label: string; izin: string }[]
+> = {
     draft: [
         { ke: 'dijadwalkan', label: 'Jadwalkan', izin: 'schedule' },
         { ke: 'dibatalkan', label: 'Batalkan', izin: 'schedule' },
@@ -106,7 +120,10 @@ export const TRANSISI: Record<string, { ke: string; label: string; izin: string 
 };
 
 export function StatusBadge({ status }: { status: string }) {
-    const tampilan = STATUS[status] ?? { label: status, variant: 'outline' as const };
+    const tampilan = STATUS[status] ?? {
+        label: status,
+        variant: 'outline' as const,
+    };
 
     return <Badge variant={tampilan.variant}>{tampilan.label}</Badge>;
 }
@@ -135,9 +152,11 @@ export const emptyWorkOrder = (): EditableWorkOrder => ({
 });
 
 // Select memilih berdasarkan label, jadi id dibolak-balik ke nama di dua tempat ini.
-export const labelDari = (option?: Option) => (option ? `${option.kode} · ${option.nama}` : null);
+export const labelDari = (option?: Option) =>
+    option ? `${option.kode} · ${option.nama}` : null;
 export const idDari = (options: Option[], label: string | null) =>
-    options.find((option) => `${option.kode} · ${option.nama}` === label)?.id ?? '';
+    options.find((option) => `${option.kode} · ${option.nama}` === label)?.id ??
+    '';
 
 export const izin = (permissions: string[]) => (action: string) =>
     permissions.includes(`management-aset.pemeliharaan-aset.${action}`);

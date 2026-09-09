@@ -31,5 +31,8 @@ export type PrintRequest = {
 
 export function requestPrint(request: PrintRequest): void {
     if (!shellTersedia()) return;
-    window.parent.postMessage({ type: 'coreerp.print', appId: APP_ID, ...request }, parentOrigin);
+    window.parent.postMessage(
+        { type: 'coreerp.print', appId: APP_ID, ...request },
+        parentOrigin,
+    );
 }

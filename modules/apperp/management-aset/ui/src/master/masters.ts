@@ -40,7 +40,10 @@ export type Permission =
     | 'management-aset.fixed-asset-posting-profiles.read'
     | `management-aset.penyusutan.${'read' | 'create' | 'finalize' | 'correct'}`;
 
-export function permission(resource: MasterResource, action: MasterAction): Permission {
+export function permission(
+    resource: MasterResource,
+    action: MasterAction,
+): Permission {
     return `management-aset.${resource}.${action}`;
 }
 
@@ -89,7 +92,8 @@ export const MASTERS: MasterConfig[] = [
         resource: 'group-aset',
         nav: 'Group aset',
         title: 'Group aset',
-        subtitle: 'Sumbu finansial aset: dasar penyusutan, akun, dan penomoran.',
+        subtitle:
+            'Sumbu finansial aset: dasar penyusutan, akun, dan penomoran.',
         kodeLabel: 'Kode group aset',
         namaLabel: 'Nama group aset',
         singular: 'group aset',
@@ -106,8 +110,14 @@ export const MASTERS: MasterConfig[] = [
                 label: 'Perlakuan pencatatan',
                 type: 'select',
                 options: [
-                    { value: 'fixed_asset', label: 'Aset tetap (masuk neraca)' },
-                    { value: 'inventory_item', label: 'Barang inventaris (tidak masuk neraca)' },
+                    {
+                        value: 'fixed_asset',
+                        label: 'Aset tetap (masuk neraca)',
+                    },
+                    {
+                        value: 'inventory_item',
+                        label: 'Barang inventaris (tidak masuk neraca)',
+                    },
                     { value: 'other', label: 'Lainnya' },
                 ],
                 help: 'Barang inventaris tetap dicatat dan dilacak, tetapi tidak disajikan sebagai aset tetap di neraca.',
@@ -143,7 +153,8 @@ export const MASTERS: MasterConfig[] = [
         nav: 'Model aset',
         showInNavigation: false,
         title: 'Model aset',
-        subtitle: 'Katalog model barang per pabrikan yang dapat dipilih saat menerima aset.',
+        subtitle:
+            'Katalog model barang per pabrikan yang dapat dipilih saat menerima aset.',
         kodeLabel: 'Kode model aset',
         namaLabel: 'Nama model aset',
         singular: 'model aset',
@@ -176,7 +187,8 @@ export const MASTERS: MasterConfig[] = [
         resource: 'pabrikan-aset',
         nav: 'Pabrikan dan model',
         title: 'Pabrikan dan model',
-        subtitle: 'Daftar pabrikan dan model aset yang dapat dipilih saat menerima aset.',
+        subtitle:
+            'Daftar pabrikan dan model aset yang dapat dipilih saat menerima aset.',
         kodeLabel: 'Kode pabrikan aset',
         namaLabel: 'Nama pabrikan aset',
         singular: 'pabrikan aset',
@@ -194,7 +206,8 @@ export const MASTERS: MasterConfig[] = [
         resource: 'analisa-maintenance',
         nav: 'Analisa maintenance',
         title: 'Analisa maintenance',
-        subtitle: 'Kesimpulan analisa yang dapat dipilih pada hasil maintenance.',
+        subtitle:
+            'Kesimpulan analisa yang dapat dipilih pada hasil maintenance.',
         kodeLabel: 'Kode analisa maintenance',
         namaLabel: 'Nama analisa maintenance',
         singular: 'analisa maintenance',
@@ -218,7 +231,10 @@ export const MASTERS: MasterConfig[] = [
                     { value: 'preventive', label: 'Preventif' },
                     { value: 'corrective', label: 'Korektif' },
                     { value: 'service', label: 'Servis' },
-                    { value: 'condition_assessment', label: 'Pemeriksaan kondisi' },
+                    {
+                        value: 'condition_assessment',
+                        label: 'Pemeriksaan kondisi',
+                    },
                 ],
             },
             {
@@ -233,7 +249,8 @@ export const MASTERS: MasterConfig[] = [
         nav: 'Varian job type',
         showInNavigation: false,
         title: 'Varian jenis pekerjaan maintenance',
-        subtitle: 'Pilihan interval atau varian dari jenis pekerjaan maintenance.',
+        subtitle:
+            'Pilihan interval atau varian dari jenis pekerjaan maintenance.',
         kodeLabel: 'Kode varian',
         namaLabel: 'Nama varian',
         singular: 'varian job type',
@@ -250,7 +267,8 @@ export const MASTERS: MasterConfig[] = [
         resource: 'maintenance-job-type-defaults',
         nav: 'Default job type',
         title: 'Default jenis pekerjaan maintenance',
-        subtitle: 'Nilai bawaan yang dapat dipakai saat menyiapkan pekerjaan maintenance.',
+        subtitle:
+            'Nilai bawaan yang dapat dipakai saat menyiapkan pekerjaan maintenance.',
         kodeLabel: 'Kode default',
         namaLabel: 'Nama default',
         singular: 'default job type',
@@ -306,12 +324,46 @@ export const MASTERS: MasterConfig[] = [
                 type: 'reference',
                 resource: 'pabrikan-aset',
             },
-            { name: 'model_aset_id', label: 'Model', type: 'reference', resource: 'model-aset' },
-            { name: 'asset_id', label: 'Aset', type: 'reference', resource: 'aset' },
-            { name: 'hours', label: 'Jam kerja', type: 'number', min: 0, step: 0.01 },
-            { name: 'items_count', label: 'Items', type: 'number', min: 0, step: 1 },
-            { name: 'expenses_count', label: 'Expenses', type: 'number', min: 0, step: 1 },
-            { name: 'fees_count', label: 'Fees', type: 'number', min: 0, step: 1 },
+            {
+                name: 'model_aset_id',
+                label: 'Model',
+                type: 'reference',
+                resource: 'model-aset',
+            },
+            {
+                name: 'asset_id',
+                label: 'Aset',
+                type: 'reference',
+                resource: 'aset',
+            },
+            {
+                name: 'hours',
+                label: 'Jam kerja',
+                type: 'number',
+                min: 0,
+                step: 0.01,
+            },
+            {
+                name: 'items_count',
+                label: 'Items',
+                type: 'number',
+                min: 0,
+                step: 1,
+            },
+            {
+                name: 'expenses_count',
+                label: 'Expenses',
+                type: 'number',
+                min: 0,
+                step: 1,
+            },
+            {
+                name: 'fees_count',
+                label: 'Fees',
+                type: 'number',
+                min: 0,
+                step: 1,
+            },
         ],
     },
     {
@@ -383,7 +435,8 @@ export const MASTERS: MasterConfig[] = [
         resource: 'sebab-kerusakan',
         nav: 'Sebab kerusakan',
         title: 'Sebab kerusakan',
-        subtitle: 'Akar sebab yang dapat dipilih saat pekerjaan maintenance ditutup.',
+        subtitle:
+            'Akar sebab yang dapat dipilih saat pekerjaan maintenance ditutup.',
         kodeLabel: 'Kode sebab kerusakan',
         namaLabel: 'Nama sebab kerusakan',
         singular: 'sebab kerusakan',
@@ -428,7 +481,8 @@ export const MASTERS: MasterConfig[] = [
         resource: 'lokasi-aset',
         nav: 'Lokasi aset',
         title: 'Lokasi aset',
-        subtitle: 'Susun site, gedung, lantai, ruangan, atau area penyimpanan aset.',
+        subtitle:
+            'Susun site, gedung, lantai, ruangan, atau area penyimpanan aset.',
         kodeLabel: 'Kode lokasi aset',
         namaLabel: 'Nama lokasi aset',
         singular: 'lokasi aset',
@@ -479,7 +533,9 @@ export const MASTERS: MasterConfig[] = [
                 type: 'reference',
                 resource: 'reference-data/units-of-measure',
                 help: 'Diambil dari daftar satuan Core, bukan diketik, supaya "cm" berarti hal yang sama di seluruh aplikasi. Ditampilkan di belakang isian saat aset diterima.',
-                visibleWhen: (form) => form.data_type === 'decimal' || form.data_type === 'integer',
+                visibleWhen: (form) =>
+                    form.data_type === 'decimal' ||
+                    form.data_type === 'integer',
             },
             {
                 name: 'min_value',
@@ -487,7 +543,9 @@ export const MASTERS: MasterConfig[] = [
                 type: 'number',
                 step: 0.000001,
                 help: 'Isi bersama nilai maksimum untuk membatasi isian. Kosongkan keduanya bila angka tidak perlu dibatasi.',
-                visibleWhen: (form) => form.data_type === 'decimal' || form.data_type === 'integer',
+                visibleWhen: (form) =>
+                    form.data_type === 'decimal' ||
+                    form.data_type === 'integer',
             },
             {
                 name: 'max_value',
@@ -495,7 +553,9 @@ export const MASTERS: MasterConfig[] = [
                 type: 'number',
                 step: 0.000001,
                 help: 'Isi bersama nilai minimum untuk membatasi isian. Kosongkan keduanya bila angka tidak perlu dibatasi.',
-                visibleWhen: (form) => form.data_type === 'decimal' || form.data_type === 'integer',
+                visibleWhen: (form) =>
+                    form.data_type === 'decimal' ||
+                    form.data_type === 'integer',
             },
         ],
     },
@@ -503,7 +563,8 @@ export const MASTERS: MasterConfig[] = [
         resource: 'buku-penyusutan',
         nav: 'Buku penyusutan',
         title: 'Buku penyusutan',
-        subtitle: 'Buku yang melacak nilai aset, misalnya satu komersial dan satu fiskal.',
+        subtitle:
+            'Buku yang melacak nilai aset, misalnya satu komersial dan satu fiskal.',
         kodeLabel: 'Kode buku penyusutan',
         namaLabel: 'Nama buku penyusutan',
         singular: 'buku penyusutan',
@@ -554,7 +615,8 @@ export const MASTERS: MasterConfig[] = [
         resource: 'profil-penyusutan',
         nav: 'Profil penyusutan',
         title: 'Profil penyusutan',
-        subtitle: 'Aturan penyusutan yang dapat dipakai ulang oleh banyak aset.',
+        subtitle:
+            'Aturan penyusutan yang dapat dipakai ulang oleh banyak aset.',
         kodeLabel: 'Kode profil penyusutan',
         namaLabel: 'Nama profil penyusutan',
         singular: 'profil penyusutan',
@@ -566,7 +628,10 @@ export const MASTERS: MasterConfig[] = [
                 required: true,
                 options: [
                     { value: 'straight_line', label: 'Garis lurus' },
-                    { value: 'straight_line_life_remaining', label: 'Garis lurus sisa umur' },
+                    {
+                        value: 'straight_line_life_remaining',
+                        label: 'Garis lurus sisa umur',
+                    },
                     { value: 'reducing_balance', label: 'Saldo menurun' },
                     { value: 'manual', label: 'Jadwal manual' },
                     { value: 'consumption', label: 'Berdasarkan pemakaian' },
@@ -615,9 +680,11 @@ export const MASTERS: MasterConfig[] = [
                 required: true,
                 min: 1,
                 visibleWhen: (form) =>
-                    ['straight_line', 'straight_line_life_remaining', 'reducing_balance'].includes(
-                        String(form.method),
-                    ),
+                    [
+                        'straight_line',
+                        'straight_line_life_remaining',
+                        'reducing_balance',
+                    ].includes(String(form.method)),
             },
             {
                 name: 'rate_percent',
@@ -640,7 +707,12 @@ export const MASTERS: MasterConfig[] = [
                 fromRecord: (raw) =>
                     Array.isArray(raw)
                         ? raw
-                              .map((row) => String((row as { amount?: unknown }).amount ?? ''))
+                              .map((row) =>
+                                  String(
+                                      (row as { amount?: unknown }).amount ??
+                                          '',
+                                  ),
+                              )
                               .join(', ')
                         : '',
                 toPayload: (value: FieldValue) => {
@@ -669,10 +741,15 @@ export function parentSummaryOf(
 ): ParentSummary | null {
     const summary = record[parent.summaryKey];
 
-    return summary && typeof summary === 'object' ? (summary as ParentSummary) : null;
+    return summary && typeof summary === 'object'
+        ? (summary as ParentSummary)
+        : null;
 }
 
-export function parentIdOf(record: MasterRecord, parent: MasterParentConfig): string {
+export function parentIdOf(
+    record: MasterRecord,
+    parent: MasterParentConfig,
+): string {
     const value = record[parent.field];
 
     return typeof value === 'string' ? value : '';

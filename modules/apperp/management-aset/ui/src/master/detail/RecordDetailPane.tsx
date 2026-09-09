@@ -1,6 +1,9 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
-import { CollapsibleSection, CollapsibleSectionGroup } from '@apperp/ui/collapsible-section';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
@@ -58,23 +61,32 @@ export default function RecordDetailPane({
 }) {
     const readOnly = mode === 'view';
     const sections = useMemo(() => sectionsFor(config), [config]);
-    const allFields = useMemo(() => sections.flatMap((section) => section.fields), [sections]);
+    const allFields = useMemo(
+        () => sections.flatMap((section) => section.fields),
+        [sections],
+    );
 
     const [nama, setNama] = useState(() => record?.nama ?? '');
     const [values, setValues] = useState<Record<string, FieldValue>>(() =>
-        Object.fromEntries(allFields.map((field) => [field.name, valueFrom(record, field)])),
+        Object.fromEntries(
+            allFields.map((field) => [field.name, valueFrom(record, field)]),
+        ),
     );
     const [error, setError] = useState('');
     const creationKey = useRef(newIdempotencyKey());
     const formRef = useRef<HTMLFormElement>(null);
     const [pendingFocus, setPendingFocus] = useState<string | null>(null);
-    const [jenisAsetDetail, setJenisAsetDetail] = useState<JenisAsetDetail | null>(null);
+    const [jenisAsetDetail, setJenisAsetDetail] =
+        useState<JenisAsetDetail | null>(null);
     const [jenisAsetDetailLoading, setJenisAsetDetailLoading] = useState(false);
     const [jenisAsetDetailError, setJenisAsetDetailError] = useState('');
-    const [pabrikanAsetDetail, setPabrikanAsetDetail] = useState<PabrikanAsetDetail | null>(null);
-    const [pabrikanAsetDetailLoading, setPabrikanAsetDetailLoading] = useState(false);
+    const [pabrikanAsetDetail, setPabrikanAsetDetail] =
+        useState<PabrikanAsetDetail | null>(null);
+    const [pabrikanAsetDetailLoading, setPabrikanAsetDetailLoading] =
+        useState(false);
     const [pabrikanAsetDetailError, setPabrikanAsetDetailError] = useState('');
-    const [pabrikanAsetDetailVersion, setPabrikanAsetDetailVersion] = useState(0);
+    const [pabrikanAsetDetailVersion, setPabrikanAsetDetailVersion] =
+        useState(0);
 
     useEffect(() => {
         if (config.resource !== 'jenis-aset' || !record?.id) {
@@ -95,7 +107,10 @@ export default function RecordDetailPane({
             .catch((caught) => {
                 if (!cancelled)
                     setJenisAsetDetailError(
-                        errorMessage(caught, 'Detail jenis aset belum dapat dimuat.'),
+                        errorMessage(
+                            caught,
+                            'Detail jenis aset belum dapat dimuat.',
+                        ),
                     );
             })
             .finally(() => {
@@ -126,7 +141,10 @@ export default function RecordDetailPane({
             .catch((caught) => {
                 if (!cancelled)
                     setPabrikanAsetDetailError(
-                        errorMessage(caught, 'Detail pabrikan belum dapat dimuat.'),
+                        errorMessage(
+                            caught,
+                            'Detail pabrikan belum dapat dimuat.',
+                        ),
                     );
             })
             .finally(() => {
@@ -159,7 +177,11 @@ export default function RecordDetailPane({
         const scope = formRef.current?.querySelector(
             `[data-field-name="${CSS.escape(pendingFocus)}"]`,
         );
-        scope?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea, button')?.focus();
+        scope
+            ?.querySelector<HTMLElement>(
+                'input:not([type="hidden"]), textarea, button',
+            )
+            ?.focus();
         setPendingFocus(null);
     }, [readOnly, pendingFocus]);
 
@@ -173,13 +195,18 @@ export default function RecordDetailPane({
                 // Field yang sedang tersembunyi tidak dikirim, supaya mengganti satu pilihan
                 // tidak diam-diam menyimpan nilai milik pilihan sebelumnya.
                 if (isVisible(field, values))
-                    payload[field.name] = payloadValue(field, values[field.name]);
+                    payload[field.name] = payloadValue(
+                        field,
+                        values[field.name],
+                    );
             }
             const saved = await api<{ data: MasterRecord }>(
                 `/${config.resource}${record ? `/${record.id}` : ''}`,
                 {
                     method: record ? 'PATCH' : 'POST',
-                    headers: record ? undefined : { 'Idempotency-Key': creationKey.current },
+                    headers: record
+                        ? undefined
+                        : { 'Idempotency-Key': creationKey.current },
                     body: JSON.stringify(payload),
                 },
             );
@@ -244,16 +271,30 @@ export default function RecordDetailPane({
             return record ? (
                 <PabrikanModels
                     manufacturer={record}
-                    canReadModels={permissions.includes(permission('model-aset', 'read'))}
-                    canReadJenis={permissions.includes(permission('jenis-aset', 'read'))}
-                    canCreate={permissions.includes(permission('model-aset', 'create'))}
-                    canUpdate={permissions.includes(permission('model-aset', 'update'))}
-                    canArchive={permissions.includes(permission('model-aset', 'archive'))}
-                    canReadAssets={permissions.includes('management-aset.aset.read')}
-                    onChanged={() => setPabrikanAsetDetailVersion((current) => current + 1)}
+                    canReadModels={permissions.includes(
+                        permission('model-aset', 'read'),
+                    )}
+                    canReadJenis={permissions.includes(
+                        permission('jenis-aset', 'read'),
+                    )}
+                    canCreate={permissions.includes(
+                        permission('model-aset', 'create'),
+                    )}
+                    canUpdate={permissions.includes(
+                        permission('model-aset', 'update'),
+                    )}
+                    canArchive={permissions.includes(
+                        permission('model-aset', 'archive'),
+                    )}
+                    canReadAssets={permissions.includes(
+                        'management-aset.aset.read',
+                    )}
+                    onChanged={() =>
+                        setPabrikanAsetDetailVersion((current) => current + 1)
+                    }
                 />
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                     Model dapat ditambahkan setelah pabrikan disimpan.
                 </p>
             );
@@ -261,10 +302,14 @@ export default function RecordDetailPane({
 
         if (section.books) {
             return record ? (
-                <GroupBookMatrix groupId={record.id} canEdit={!readOnly && canEdit} />
+                <GroupBookMatrix
+                    groupId={record.id}
+                    canEdit={!readOnly && canEdit}
+                />
             ) : (
-                <p className="text-sm text-muted-foreground">
-                    Buku penyusutan dapat diatur setelah {config.singular} disimpan.
+                <p className="text-muted-foreground text-sm">
+                    Buku penyusutan dapat diatur setelah {config.singular}{' '}
+                    disimpan.
                 </p>
             );
         }
@@ -275,9 +320,12 @@ export default function RecordDetailPane({
 
         if (section.attributes) {
             return record ? (
-                <JenisAsetAtribut jenisAsetId={record.id} canEdit={!readOnly && canEdit} />
+                <JenisAsetAtribut
+                    jenisAsetId={record.id}
+                    canEdit={!readOnly && canEdit}
+                />
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                     Atribut dapat diatur setelah {config.singular} disimpan.
                 </p>
             );
@@ -293,7 +341,7 @@ export default function RecordDetailPane({
                     canEdit={!readOnly && canEdit}
                 />
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                     Model dapat diatur setelah jenis aset disimpan.
                 </p>
             );
@@ -301,10 +349,14 @@ export default function RecordDetailPane({
 
         if (section.maintenanceJobType) {
             return record ? (
-                <MaintenanceJobTypeDetails jobTypeId={record.id} canEdit={!readOnly && canEdit} />
+                <MaintenanceJobTypeDetails
+                    jobTypeId={record.id}
+                    canEdit={!readOnly && canEdit}
+                />
             ) : (
-                <p className="text-sm text-muted-foreground">
-                    Rincian maintenance dapat diatur setelah jenis pekerjaan disimpan.
+                <p className="text-muted-foreground text-sm">
+                    Rincian maintenance dapat diatur setelah jenis pekerjaan
+                    disimpan.
                 </p>
             );
         }
@@ -316,7 +368,7 @@ export default function RecordDetailPane({
                     canEdit={!readOnly && canEdit}
                 />
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                     Nilai checklist dapat diatur setelah variabel disimpan.
                 </p>
             );
@@ -329,7 +381,7 @@ export default function RecordDetailPane({
                     canEdit={!readOnly && canEdit}
                 />
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                     Baris checklist dapat diatur setelah template disimpan.
                 </p>
             );
@@ -342,7 +394,7 @@ export default function RecordDetailPane({
                     canEdit={!readOnly && canEdit}
                 />
             ) : (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                     Jenis pekerjaan dapat dikaitkan setelah jenis aset disimpan.
                 </p>
             );
@@ -369,7 +421,10 @@ export default function RecordDetailPane({
                             onRequestEdit={enterEdit}
                             onChange={(next) => {
                                 markDirty();
-                                setValues((current) => ({ ...current, [field.name]: next }));
+                                setValues((current) => ({
+                                    ...current,
+                                    [field.name]: next,
+                                }));
                             }}
                         />
                     ))}
@@ -382,7 +437,7 @@ export default function RecordDetailPane({
             id={formId}
             ref={formRef}
             onSubmit={submit}
-            className="flex min-h-0 flex-col [&_[data-readonly]]:rounded-md [&_[data-readonly]]:transition-colors [&_[data-readonly]:hover]:bg-muted/40"
+            className="[&_[data-readonly]:hover]:bg-muted/40 flex min-h-0 flex-col [&_[data-readonly]]:rounded-md [&_[data-readonly]]:transition-colors"
         >
             <div className="shrink-0 border-b px-6 py-4">
                 <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
@@ -392,7 +447,9 @@ export default function RecordDetailPane({
                         <Input
                             id="kode"
                             label={config.kodeLabel}
-                            value={record?.kode ?? 'Dibuat otomatis saat disimpan'}
+                            value={
+                                record?.kode ?? 'Dibuat otomatis saat disimpan'
+                            }
                             disabled
                         />
                     </div>
@@ -407,7 +464,9 @@ export default function RecordDetailPane({
                             required
                             maxLength={150}
                             readOnly={readOnly}
-                            onFocus={readOnly ? () => enterEdit('nama') : undefined}
+                            onFocus={
+                                readOnly ? () => enterEdit('nama') : undefined
+                            }
                             value={nama}
                             onChange={(event) => {
                                 markDirty();
@@ -425,8 +484,9 @@ export default function RecordDetailPane({
                 {(config.parents?.length ?? 0) > 0 && (
                     <Field data-invalid="true" className="mb-4">
                         <FieldError>
-                            Master ini memiliki induk, dan panel detail belum merendernya. Pakai
-                            tampilan daftar sampai dukungan induk ditambahkan.
+                            Master ini memiliki induk, dan panel detail belum
+                            merendernya. Pakai tampilan daftar sampai dukungan
+                            induk ditambahkan.
                         </FieldError>
                     </Field>
                 )}

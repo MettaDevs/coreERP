@@ -1,10 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@apperp/ui/card';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Field } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
+import {
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@apperp/ui/sheet';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
@@ -37,7 +54,9 @@ export default function LifecycleDocumentPage({
     const load = () =>
         api<{ data: Record[] }>('/' + config.resource)
             .then((result) => setRecords(result.data))
-            .catch((caught) => setError(errorMessage(caught, 'Data belum dapat dimuat.')));
+            .catch((caught) =>
+                setError(errorMessage(caught, 'Data belum dapat dimuat.')),
+            );
     useEffect(() => {
         void load();
     }, [config.resource]);
@@ -78,18 +97,25 @@ export default function LifecycleDocumentPage({
             <CardHeader className="border-b px-5 py-3">
                 <CardTitle>{config.title}</CardTitle>
                 <CardAction>
-                    <Button onClick={() => setOpen(true)}>{config.action}</Button>
+                    <Button onClick={() => setOpen(true)}>
+                        {config.action}
+                    </Button>
                 </CardAction>
             </CardHeader>
             <CardContent className="px-0">
-                {error && <p className="px-5 py-3 text-sm text-destructive">{error}</p>}
+                {error && (
+                    <p className="text-destructive px-5 py-3 text-sm">
+                        {error}
+                    </p>
+                )}
                 {!records.length ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada dokumen</EmptyTitle>
                             <EmptyDescription>
-                                Dokumen ini tidak mengharuskan aset sudah diterima, kecuali
-                                transaksi yang memang memilih aset.
+                                Dokumen ini tidak mengharuskan aset sudah
+                                diterima, kecuali transaksi yang memang memilih
+                                aset.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
@@ -102,9 +128,11 @@ export default function LifecycleDocumentPage({
                             >
                                 <div>
                                     <p className="font-medium">{record.kode}</p>
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-muted-foreground text-sm">
                                         {record.tanggal}
-                                        {record.keterangan ? ` — ${record.keterangan}` : ''}
+                                        {record.keterangan
+                                            ? ` — ${record.keterangan}`
+                                            : ''}
                                     </p>
                                 </div>
                                 <span className="text-sm">{record.status}</span>
@@ -126,11 +154,20 @@ export default function LifecycleDocumentPage({
                         }}
                     >
                         <Field>
-                            <Input name="tanggal" label="Tanggal" type="date" required />
+                            <Input
+                                name="tanggal"
+                                label="Tanggal"
+                                type="date"
+                                required
+                            />
                         </Field>
                         {config.needsAsset && (
                             <Field>
-                                <Input name="asset_id" label="ID aset" required />
+                                <Input
+                                    name="asset_id"
+                                    label="ID aset"
+                                    required
+                                />
                             </Field>
                         )}
                         {config.financial && (
@@ -148,7 +185,11 @@ export default function LifecycleDocumentPage({
                             <Input name="keterangan" label="Keterangan" />
                         </Field>
                         <SheetFooter>
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                            >
                                 Batal
                             </Button>
                             <Button type="submit" disabled={saving}>

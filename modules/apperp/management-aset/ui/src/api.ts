@@ -16,15 +16,20 @@ function normalizeValidationErrors(value: unknown): ApiValidationErrors {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
 
     return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).flatMap(([field, messages]) => {
-            const normalized = Array.isArray(messages)
-                ? messages.filter((message): message is string => typeof message === 'string')
-                : typeof messages === 'string'
-                  ? [messages]
-                  : [];
+        Object.entries(value as Record<string, unknown>).flatMap(
+            ([field, messages]) => {
+                const normalized = Array.isArray(messages)
+                    ? messages.filter(
+                          (message): message is string =>
+                              typeof message === 'string',
+                      )
+                    : typeof messages === 'string'
+                      ? [messages]
+                      : [];
 
-            return normalized.length > 0 ? [[field, normalized]] : [];
-        }),
+                return normalized.length > 0 ? [[field, normalized]] : [];
+            },
+        ),
     );
 }
 
@@ -53,7 +58,9 @@ export function newIdempotencyKey(): string {
             webCrypto.getRandomValues(bytes);
             bytes[6] = (bytes[6] & 0x0f) | 0x40;
             bytes[8] = (bytes[8] & 0x3f) | 0x80;
-            const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+            const hex = Array.from(bytes, (byte) =>
+                byte.toString(16).padStart(2, '0'),
+            ).join('');
 
             return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
         } catch {
@@ -88,7 +95,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
         const body = (await response.json().catch(() => null)) as {
             message?: unknown;
             errors?: unknown;
-            error?: { message?: unknown; errors?: unknown; details?: { errors?: unknown } };
+            error?: {
+                message?: unknown;
+                errors?: unknown;
+                details?: { errors?: unknown };
+            };
         } | null;
         const validationErrors = normalizeValidationErrors(
             body?.errors ?? body?.error?.errors ?? body?.error?.details?.errors,

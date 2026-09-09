@@ -47,7 +47,8 @@ export default function MasterDetailPage({
     config: MasterConfig;
     permissions: Permission[];
 }) {
-    const can = (action: MasterAction) => permissions.includes(permission(config.resource, action));
+    const can = (action: MasterAction) =>
+        permissions.includes(permission(config.resource, action));
 
     const [items, setItems] = useState<MasterRecord[]>([]);
     const [total, setTotal] = useState(0);
@@ -64,13 +65,18 @@ export default function MasterDetailPage({
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
     /** Nilainya `undefined` berarti tidak ada tawaran pindah yang tertahan. */
-    const [pendingSelect, setPendingSelect] = useState<string | null | undefined>(undefined);
+    const [pendingSelect, setPendingSelect] = useState<
+        string | null | undefined
+    >(undefined);
     const [archiving, setArchiving] = useState(false);
     /** Dinaikkan untuk membuang suntingan: panel detail dipasang ulang dari data server. */
     const [formNonce, setFormNonce] = useState(0);
 
     const query = useMemo(() => {
-        const params = new URLSearchParams({ per_page: String(PER_PAGE), page: String(page) });
+        const params = new URLSearchParams({
+            per_page: String(PER_PAGE),
+            page: String(page),
+        });
         if (search.trim()) params.set('q', search.trim());
         if (activeFilter !== 'semua') params.set('aktif', activeFilter);
 
@@ -82,13 +88,19 @@ export default function MasterDetailPage({
         try {
             const list = await api<{
                 data: MasterRecord[];
-                meta: { current_page: number; last_page: number; total: number };
+                meta: {
+                    current_page: number;
+                    last_page: number;
+                    total: number;
+                };
             }>(`/${config.resource}?${query}`);
             // Halaman pertama mengganti; halaman berikutnya menambah. Daftar yang hanya
             // tumbuh membuat record yang sedang dipilih tidak mungkin hilang dari bawah
             // kaki pengguna saat ia menggulir.
             setItems((current) =>
-                list.meta.current_page === 1 ? list.data : [...current, ...list.data],
+                list.meta.current_page === 1
+                    ? list.data
+                    : [...current, ...list.data],
             );
             setTotal(list.meta.total);
             setLastPage(list.meta.last_page);
@@ -116,7 +128,8 @@ export default function MasterDetailPage({
     // Pilihan awal jatuh ke record pertama supaya panel detail tidak menyambut dengan layar
     // kosong. Tidak pernah menimpa pilihan yang sudah ada.
     useEffect(() => {
-        if (mode === 'create' || selectedId !== null || items.length === 0) return;
+        if (mode === 'create' || selectedId !== null || items.length === 0)
+            return;
         setSelectedId(items[0].id);
     }, [items, mode, selectedId]);
 
@@ -162,7 +175,9 @@ export default function MasterDetailPage({
     async function archive() {
         if (!selected) return;
         try {
-            await api(`/${config.resource}/${selected.id}`, { method: 'DELETE' });
+            await api(`/${config.resource}/${selected.id}`, {
+                method: 'DELETE',
+            });
             setSelectedId(null);
             setPage(1);
             await load();
@@ -178,10 +193,14 @@ export default function MasterDetailPage({
         // panel detail langsung menerima kode dan nama dari respons yang sama, bukan
         // sempat menerima `record = null` sambil menunggu daftar selesai dimuat.
         setItems((current) => {
-            const existingIndex = current.findIndex((item) => item.id === savedRecord.id);
+            const existingIndex = current.findIndex(
+                (item) => item.id === savedRecord.id,
+            );
             if (existingIndex === -1) return [savedRecord, ...current];
 
-            return current.map((item, index) => (index === existingIndex ? savedRecord : item));
+            return current.map((item, index) =>
+                index === existingIndex ? savedRecord : item,
+            );
         });
         setSelectedId(savedRecord.id);
         // Record baru langsung tetap disunting karena master maintenance biasanya
@@ -202,14 +221,18 @@ export default function MasterDetailPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 border-b bg-background px-4 py-2">
+            <div className="bg-background sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
                 <span className="mr-2 font-semibold">{config.title}</span>
                 {editing ? (
                     <>
                         <Button type="submit" form={FORM_ID} disabled={saving}>
                             {saving ? 'Menyimpan…' : 'Simpan'}
                         </Button>
-                        <Button variant="outline" type="button" onClick={cancelEditing}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={cancelEditing}
+                        >
                             Batal
                         </Button>
                     </>
@@ -307,15 +330,19 @@ export default function MasterDetailPage({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Perubahan belum disimpan</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Perubahan belum disimpan
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Pindah ke {config.singular} lain akan membuang perubahan yang belum Anda
-                            simpan.
+                            Pindah ke {config.singular} lain akan membuang
+                            perubahan yang belum Anda simpan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Tetap di sini</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => commitSelect(pendingSelect ?? null)}>
+                        <AlertDialogAction
+                            onClick={() => commitSelect(pendingSelect ?? null)}
+                        >
                             Buang perubahan
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -325,10 +352,12 @@ export default function MasterDetailPage({
             <AlertDialog open={archiving} onOpenChange={setArchiving}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Arsipkan {selected?.nama}?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Arsipkan {selected?.nama}?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Data ini tidak lagi tampil pada daftar pilihan. Record yang sudah
-                            memakainya tidak berubah.
+                            Data ini tidak lagi tampil pada daftar pilihan.
+                            Record yang sudah memakainya tidak berubah.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

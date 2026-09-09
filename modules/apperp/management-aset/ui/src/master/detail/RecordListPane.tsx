@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@apperp/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { MasterConfig, MasterRecord } from '../masters';
@@ -69,9 +74,14 @@ export default function RecordListPane({
     }, [hasMore, loading, onLoadMore]);
 
     return (
-        <aside className="flex min-h-0 flex-col border-r" aria-label={`Daftar ${config.singular}`}>
+        <aside
+            className="flex min-h-0 flex-col border-r"
+            aria-label={`Daftar ${config.singular}`}
+        >
             <div className="shrink-0 space-y-2 border-b px-4 py-3">
-                <p className="text-sm font-semibold">Daftar {config.singular}</p>
+                <p className="text-sm font-semibold">
+                    Daftar {config.singular}
+                </p>
                 <Input
                     type="search"
                     label="Cari kode atau nama"
@@ -92,7 +102,11 @@ export default function RecordListPane({
                     ariaLabel="Saring berdasarkan status"
                     onValueChange={(item) =>
                         onActiveFilterChange(
-                            item === 'Aktif' ? 'true' : item === 'Tidak aktif' ? 'false' : 'semua',
+                            item === 'Aktif'
+                                ? 'true'
+                                : item === 'Tidak aktif'
+                                  ? 'false'
+                                  : 'semua',
                         )
                     }
                 />
@@ -100,11 +114,11 @@ export default function RecordListPane({
 
             <div className="min-h-0 flex-1 overflow-y-auto">
                 {creating && (
-                    <div className="border-b border-l-2 border-l-primary bg-primary/10 px-4 py-2.5">
-                        <span className="block text-base leading-tight font-semibold text-muted-foreground">
+                    <div className="border-l-primary bg-primary/10 border-b border-l-2 px-4 py-2.5">
+                        <span className="text-muted-foreground block text-base font-semibold leading-tight">
                             Belum disimpan
                         </span>
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                        <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                             {config.title} baru
                         </span>
                     </div>
@@ -113,7 +127,9 @@ export default function RecordListPane({
                 {error ? (
                     <Empty>
                         <EmptyHeader>
-                            <EmptyTitle>Data belum dapat ditampilkan</EmptyTitle>
+                            <EmptyTitle>
+                                Data belum dapat ditampilkan
+                            </EmptyTitle>
                             <EmptyDescription>{error}</EmptyDescription>
                         </EmptyHeader>
                         <Button variant="outline" onClick={onRetry}>
@@ -125,7 +141,8 @@ export default function RecordListPane({
                         <EmptyHeader>
                             <EmptyTitle>Belum ada {config.singular}</EmptyTitle>
                             <EmptyDescription>
-                                Tambahkan data pertama agar pilihan pada bagian lain sudah tersedia.
+                                Tambahkan data pertama agar pilihan pada bagian
+                                lain sudah tersedia.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
@@ -139,16 +156,16 @@ export default function RecordListPane({
                                 type="button"
                                 aria-pressed={selected}
                                 onClick={() => onSelect(item.id)}
-                                className={`w-full border-b px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset focus-visible:outline-none ${
+                                className={`hover:bg-accent/50 focus-visible:ring-primary w-full border-b px-4 py-2.5 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
                                     selected
-                                        ? 'border-l-2 border-l-primary bg-primary/10'
+                                        ? 'border-l-primary bg-primary/10 border-l-2'
                                         : 'border-l-2 border-l-transparent'
                                 }`}
                             >
-                                <span className="block truncate text-base leading-tight font-semibold">
+                                <span className="block truncate text-base font-semibold leading-tight">
                                     {item.kode}
                                 </span>
-                                <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                                <span className="text-muted-foreground mt-0.5 block truncate text-xs">
                                     {item.nama}
                                     {item.aktif ? '' : ' · Tidak aktif'}
                                 </span>
@@ -159,8 +176,10 @@ export default function RecordListPane({
 
                 <div ref={sentinelRef} />
                 {(hasMore || loading) && (
-                    <p className="px-4 py-3 text-xs text-muted-foreground">
-                        {loading ? 'Memuat…' : `${items.length} dari ${total} data`}
+                    <p className="text-muted-foreground px-4 py-3 text-xs">
+                        {loading
+                            ? 'Memuat…'
+                            : `${items.length} dari ${total} data`}
                     </p>
                 )}
             </div>

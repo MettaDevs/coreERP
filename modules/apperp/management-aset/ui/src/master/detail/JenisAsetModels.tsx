@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@apperp/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@apperp/ui/table';
 import { TransferList, type TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../../api';
 import { JenisAsetDetail, JenisAsetModelSummary } from './jenisAsetDetail';
@@ -11,7 +18,9 @@ function itemOf(model: JenisAsetModelSummary): TransferListItem {
         id: model.id,
         label: model.model,
         description:
-            [model.manufacturer, model.model_number].filter(Boolean).join(' - ') || undefined,
+            [model.manufacturer, model.model_number]
+                .filter(Boolean)
+                .join(' - ') || undefined,
     };
 }
 
@@ -48,23 +57,36 @@ export default function JenisAsetModels({
         try {
             await api(`/jenis-aset/${jenisAsetId}/models`, {
                 method: 'PUT',
-                body: JSON.stringify({ model_ids: selected.map((item) => item.id) }),
+                body: JSON.stringify({
+                    model_ids: selected.map((item) => item.id),
+                }),
             });
             setSaved(true);
         } catch (caught) {
-            setSaveError(errorMessage(caught, 'Pabrikan dan model belum dapat disimpan.'));
+            setSaveError(
+                errorMessage(
+                    caught,
+                    'Pabrikan dan model belum dapat disimpan.',
+                ),
+            );
         } finally {
             setSaving(false);
         }
     }
 
     if (loading)
-        return <p className="text-sm text-muted-foreground">Memuat daftar pabrikan dan model...</p>;
-    if (error) return <p className="text-sm text-destructive">{error}</p>;
+        return (
+            <p className="text-muted-foreground text-sm">
+                Memuat daftar pabrikan dan model...
+            </p>
+        );
+    if (error) return <p className="text-destructive text-sm">{error}</p>;
     if (!detail || detail.models === null || detail.available_models === null) {
         return (
             <Empty>
-                <EmptyDescription>Daftar pabrikan dan model belum tersedia.</EmptyDescription>
+                <EmptyDescription>
+                    Daftar pabrikan dan model belum tersedia.
+                </EmptyDescription>
             </Empty>
         );
     }
@@ -72,9 +94,9 @@ export default function JenisAsetModels({
     if (canEdit) {
         return (
             <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                    Pilih model yang boleh dipakai untuk jenis aset ini. Model dan pabrikan tetap
-                    dikelola di master masing-masing.
+                <p className="text-muted-foreground text-sm">
+                    Pilih model yang boleh dipakai untuk jenis aset ini. Model
+                    dan pabrikan tetap dikelola di master masing-masing.
                 </p>
                 <TransferList
                     remaining={remaining}
@@ -90,11 +112,19 @@ export default function JenisAsetModels({
                     remainingEmptyLabel="Semua model aktif sudah terpasang."
                     selectedEmptyLabel="Belum ada model yang dipasang."
                 />
-                {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-                {saved && (
-                    <p className="text-sm text-muted-foreground">Pabrikan dan model tersimpan.</p>
+                {saveError && (
+                    <p className="text-destructive text-sm">{saveError}</p>
                 )}
-                <Button type="button" disabled={saving} onClick={() => void save()}>
+                {saved && (
+                    <p className="text-muted-foreground text-sm">
+                        Pabrikan dan model tersimpan.
+                    </p>
+                )}
+                <Button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void save()}
+                >
                     {saving ? 'Menyimpan...' : 'Simpan pabrikan dan model'}
                 </Button>
             </div>
@@ -128,7 +158,7 @@ export default function JenisAsetModels({
                             <TableCell>
                                 <div className="font-medium">{item.model}</div>
                                 {item.model_number && (
-                                    <div className="text-xs text-muted-foreground">
+                                    <div className="text-muted-foreground text-xs">
                                         {item.model_number}
                                     </div>
                                 )}

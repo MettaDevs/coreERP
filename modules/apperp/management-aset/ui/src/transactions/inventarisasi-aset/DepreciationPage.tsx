@@ -1,10 +1,27 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@apperp/ui/card';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Field } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
+import {
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@apperp/ui/sheet';
 import { api, errorMessage } from '../../api';
 
 type Book = {
@@ -55,7 +72,9 @@ export default function DepreciationPage({
             setPeriods(periodResult.data);
             setError('');
         } catch (caught) {
-            setError(errorMessage(caught, 'Data penyusutan belum dapat dimuat.'));
+            setError(
+                errorMessage(caught, 'Data penyusutan belum dapat dimuat.'),
+            );
         }
     };
     useEffect(() => {
@@ -78,7 +97,9 @@ export default function DepreciationPage({
             setSelected(null);
             await load();
         } catch (caught) {
-            setError(errorMessage(caught, 'Proposal penyusutan belum dapat dibuat.'));
+            setError(
+                errorMessage(caught, 'Proposal penyusutan belum dapat dibuat.'),
+            );
         } finally {
             setSaving(false);
         }
@@ -108,7 +129,9 @@ export default function DepreciationPage({
             setBulkOpen(false);
             await load();
         } catch (caught) {
-            setError(errorMessage(caught, 'Proposal massal belum dapat dijalankan.'));
+            setError(
+                errorMessage(caught, 'Proposal massal belum dapat dijalankan.'),
+            );
         } finally {
             setSaving(false);
         }
@@ -121,10 +144,14 @@ export default function DepreciationPage({
         )
             return;
         try {
-            await api(`/penyusutan/${period.id}/finalisasi`, { method: 'POST' });
+            await api(`/penyusutan/${period.id}/finalisasi`, {
+                method: 'POST',
+            });
             await load();
         } catch (caught) {
-            setError(errorMessage(caught, 'Penyusutan belum dapat difinalisasi.'));
+            setError(
+                errorMessage(caught, 'Penyusutan belum dapat difinalisasi.'),
+            );
         }
     };
     const reverse = async (period: Period) => {
@@ -158,16 +185,25 @@ export default function DepreciationPage({
                     </CardAction>
                 </CardHeader>
                 <CardContent className="px-0">
-                    {error && <p className="px-5 py-3 text-sm text-destructive">{error}</p>}
+                    {error && (
+                        <p className="text-destructive px-5 py-3 text-sm">
+                            {error}
+                        </p>
+                    )}
                     {bulkResult && (
-                        <p className="px-5 py-3 text-sm text-muted-foreground">{bulkResult}</p>
+                        <p className="text-muted-foreground px-5 py-3 text-sm">
+                            {bulkResult}
+                        </p>
                     )}
                     {!books.length ? (
                         <Empty>
                             <EmptyHeader>
-                                <EmptyTitle>Belum ada Asset Book aktif</EmptyTitle>
+                                <EmptyTitle>
+                                    Belum ada Asset Book aktif
+                                </EmptyTitle>
                                 <EmptyDescription>
-                                    Terima aset dengan profil penyusutan agar buku aset dibuat.
+                                    Terima aset dengan profil penyusutan agar
+                                    buku aset dibuat.
                                 </EmptyDescription>
                             </EmptyHeader>
                         </Empty>
@@ -182,19 +218,23 @@ export default function DepreciationPage({
                                         <p className="font-medium">
                                             {book.asset_code} · {book.book_code}
                                         </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {book.profile_name} · {book.method} · {book.frequency}
+                                        <p className="text-muted-foreground text-sm">
+                                            {book.profile_name} · {book.method}{' '}
+                                            · {book.frequency}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <span>
-                                            {book.currency_code} {book.net_book_value}
+                                            {book.currency_code}{' '}
+                                            {book.net_book_value}
                                         </span>
                                         {canCreate && (
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                onClick={() => setSelected(book)}
+                                                onClick={() =>
+                                                    setSelected(book)
+                                                }
                                             >
                                                 Buat proposal
                                             </Button>
@@ -214,9 +254,12 @@ export default function DepreciationPage({
                     {!periods.length ? (
                         <Empty>
                             <EmptyHeader>
-                                <EmptyTitle>Belum ada proposal penyusutan</EmptyTitle>
+                                <EmptyTitle>
+                                    Belum ada proposal penyusutan
+                                </EmptyTitle>
                                 <EmptyDescription>
-                                    Buat proposal dari Asset Book setelah periode siap dihitung.
+                                    Buat proposal dari Asset Book setelah
+                                    periode siap dihitung.
                                 </EmptyDescription>
                             </EmptyHeader>
                         </Empty>
@@ -229,29 +272,40 @@ export default function DepreciationPage({
                                 >
                                     <div>
                                         <p className="font-medium">
-                                            {period.asset_code} · {period.book_code}
+                                            {period.asset_code} ·{' '}
+                                            {period.book_code}
                                         </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {period.period_starts_on} s.d. {period.period_ends_on} ·{' '}
+                                        <p className="text-muted-foreground text-sm">
+                                            {period.period_starts_on} s.d.{' '}
+                                            {period.period_ends_on} ·{' '}
                                             {period.status}
                                         </p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span>
-                                            {period.currency_code} {period.amount}
+                                            {period.currency_code}{' '}
+                                            {period.amount}
                                         </span>
-                                        {period.status === 'proposed' && canFinalize && (
-                                            <Button size="sm" onClick={() => void finalize(period)}>
-                                                Finalisasi
-                                            </Button>
-                                        )}
+                                        {period.status === 'proposed' &&
+                                            canFinalize && (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        void finalize(period)
+                                                    }
+                                                >
+                                                    Finalisasi
+                                                </Button>
+                                            )}
                                         {period.status === 'final' &&
                                             !period.reverses_period_id &&
                                             canCorrect && (
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    onClick={() => void reverse(period)}
+                                                    onClick={() =>
+                                                        void reverse(period)
+                                                    }
                                                 >
                                                     Balikkan
                                                 </Button>
@@ -264,7 +318,10 @@ export default function DepreciationPage({
                 </CardContent>
             </Card>
             {bulkOpen && (
-                <Sheet open onOpenChange={(open) => !open && setBulkOpen(false)}>
+                <Sheet
+                    open
+                    onOpenChange={(open) => !open && setBulkOpen(false)}
+                >
                     <SheetContent side="right">
                         <SheetHeader>
                             <SheetTitle>Proposal seluruh buku</SheetTitle>
@@ -276,11 +333,13 @@ export default function DepreciationPage({
                                 void proposeBulk(event.currentTarget);
                             }}
                         >
-                            <p className="text-sm text-muted-foreground">
-                                Menghitung satu periode untuk seluruh buku aset yang aktif. Buku
-                                yang sudah punya periode ini, sudah habis, atau asetnya sudah
-                                dilepas akan dilewati. Metode berdasarkan pemakaian tidak ikut
-                                karena angka pemakaiannya berbeda tiap aset.
+                            <p className="text-muted-foreground text-sm">
+                                Menghitung satu periode untuk seluruh buku aset
+                                yang aktif. Buku yang sudah punya periode ini,
+                                sudah habis, atau asetnya sudah dilepas akan
+                                dilewati. Metode berdasarkan pemakaian tidak
+                                ikut karena angka pemakaiannya berbeda tiap
+                                aset.
                             </p>
                             <Field>
                                 <Input
@@ -327,7 +386,7 @@ export default function DepreciationPage({
                                 void propose(event.currentTarget);
                             }}
                         >
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-muted-foreground text-sm">
                                 {selected.asset_code} · {selected.book_code} ·{' '}
                                 {selected.profile_name}
                             </p>

@@ -116,7 +116,7 @@ final class PemindaiModul
      *
      * @return list<SplFileInfo>
      */
-    public function berkasPhp(string $folder, bool $tanpaMigration = false): array
+    public function berkasPhp(string $folder, bool $tanpaMigration = false, bool $tanpaTest = false): array
     {
         if (! is_dir($folder)) {
             return [];
@@ -131,7 +131,13 @@ final class PemindaiModul
                 continue;
             }
 
-            if ($tanpaMigration && str_contains(str_replace('\\', '/', $item->getPathname()), '/database/migrations/')) {
+            $jalur = str_replace('\\', '/', $item->getPathname());
+
+            if ($tanpaMigration && str_contains($jalur, '/database/migrations/')) {
+                continue;
+            }
+
+            if ($tanpaTest && str_contains($jalur, '/tests/')) {
                 continue;
             }
 
@@ -143,6 +149,12 @@ final class PemindaiModul
 
     /**
      * Berkas modul yang menyebut namespace modul lain.
+     *
+     * **Test ikut dipindai di sini**, berbeda dari dua penjaga di bawah. Bedanya bukan
+     * ketidakkonsistenan: sebuah test yang menyebut namespace modul lain adalah modul yang
+     * bergantung pada modul lain, persis pelanggaran yang sama seperti di kode produksi, dan
+     * tidak ada satu pun kebutuhan sah yang menuntutnya. Yang dilonggarkan pada dua penjaga
+     * lain adalah hal yang memang tidak punya jalan lain; ini punya.
      *
      * @return list<string>
      */
@@ -167,13 +179,27 @@ final class PemindaiModul
     /**
      * Berkas modul yang menyentuh kelas Core di luar kontrak.
      *
+     * **Berkas test tidak ikut dipindai, dan itu keputusan yang perlu alasannya ditulis.**
+     * Yang dijaga aturan ini adalah kode yang berjalan di produksi: di sanalah menyentuh kelas
+     * Core berarti modul mengikat dirinya pada bentuk dalam Core, dan di sanalah batasnya punya
+     * arti. Test modul membuat tenant, pengguna, dan keanggotaan — ketiganya milik Core, dan
+     * tidak ada satu pun cara membuatnya tanpa menyebut model Core.
+     *
+     * Alternatifnya menambah kontrak yang hanya dipakai test. Itu memperbesar permukaan janji
+     * Core demi sesuatu yang tidak pernah berjalan di produksi, dan permukaan janji yang lebih
+     * besar adalah harga yang dibayar selamanya. Batasnya karena itu ditarik di kode produksi.
+     *
+     * Yang hilang jujur disebut: sebuah test modul kini boleh menyentuh kelas Core mana pun,
+     * termasuk yang kelak berubah bentuk. Test yang rusak karenanya akan terlihat sebagai test
+     * merah, bukan sebagai kebocoran — dan itu jenis kegagalan yang bisa ditunggu.
+     *
      * @return list<string>
      */
     public function pelanggaranKelasCore(string $folder): array
     {
         $pelanggaran = [];
 
-        foreach ($this->berkasPhp($folder) as $berkas) {
+        foreach ($this->berkasPhp($folder, tanpaTest: true) as $berkas) {
             $isi = (string) file_get_contents($berkas->getPathname());
 
             foreach (self::kelasCoreYangDisebut($isi) as $kelas) {
@@ -190,13 +216,20 @@ final class PemindaiModul
      * Migration tidak ikut diperiksa: ia memang menulis SQL langsung dan berjalan sebelum ada
      * tenant mana pun, jadi tidak masuk akal menuntutnya tersaring.
      *
+     * **Test juga tidak, dan alasannya berbeda dari migration.** Test menyemai baris untuk
+     * tenant yang ditentukannya sendiri — termasuk tenant kedua, yang justru dipakai untuk
+     * membuktikan data tenant pertama tidak bocor. Menyimpan baris itu lewat model dibatalkan
+     * `MilikTenant`, karena menulis ke tenant selain tenant aktif memang yang dilarangnya.
+     * Menuntut test memakai model berarti membuat test isolasi tenant mustahil ditulis, yaitu
+     * membuang penjagaan yang paling penting demi menegakkan aturannya.
+     *
      * @return list<string>
      */
     public function pelanggaranQueryMentah(string $folder): array
     {
         $pelanggaran = [];
 
-        foreach ($this->berkasPhp($folder, tanpaMigration: true) as $berkas) {
+        foreach ($this->berkasPhp($folder, tanpaMigration: true, tanpaTest: true) as $berkas) {
             $isi = (string) file_get_contents($berkas->getPathname());
 
             foreach (self::queryMentahYangDipakai($isi) as $pola) {
@@ -240,13 +273,7 @@ final class PemindaiModul
     {
         $pelanggaran = [];
 
-        foreach ($this->berkasPhp($folder) as $berkas) {
-            $jalur = str_replace('\\', '/', $berkas->getPathname());
-
-            if (str_contains($jalur, '/tests/')) {
-                continue;
-            }
-
+        foreach ($this->berkasPhp($folder, tanpaTest: true) as $berkas) {
             $isi = (string) file_get_contents($berkas->getPathname());
 
             foreach (self::lompatanHttpYangDipakai($isi) as $pola) {

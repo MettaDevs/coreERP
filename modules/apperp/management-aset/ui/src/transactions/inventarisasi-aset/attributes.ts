@@ -40,7 +40,8 @@ export function toFieldConfig(definition: AttributeDefinition): FieldConfig {
                 max: numeric(definition.max_value),
                 step: definition.data_type === 'integer' ? 1 : 'any',
                 help:
-                    definition.min_value !== null && definition.max_value !== null
+                    definition.min_value !== null &&
+                    definition.max_value !== null
                         ? `Isi antara ${definition.min_value} dan ${definition.max_value}.`
                         : undefined,
             };

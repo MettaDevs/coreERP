@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
-import { DataTable, type DataTableColumn, type DataTableRowAction } from '@apperp/ui/data-table';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    DataTable,
+    type DataTableColumn,
+    type DataTableRowAction,
+} from '@apperp/ui/data-table';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
@@ -25,18 +34,28 @@ import {
  * Daftar work order. Ia hanya menampilkan dan memilih; menyusun, menjadwalkan, dan
  * mengisi hasil pekerjaan adalah urusan halaman rincian yang punya alamat sendiri.
  */
-export default function WorkOrderListPage({ permissions }: { permissions: string[] }) {
+export default function WorkOrderListPage({
+    permissions,
+}: {
+    permissions: string[];
+}) {
     const can = izin(permissions);
     const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
     const [hanyaPekerjaanSaya, setHanyaPekerjaanSaya] = useState(false);
-    const [pekerjaanSaya, setPekerjaanSaya] = useState<Record<string, unknown>[]>([]);
+    const [pekerjaanSaya, setPekerjaanSaya] = useState<
+        Record<string, unknown>[]
+    >([]);
     const [search, setSearch] = useState('');
     const dapatMengekspor = shellTersedia();
 
     useEffect(() => {
         api<{ data: WorkOrder[] }>('/pemeliharaan-aset')
             .then((result) => setWorkOrders(result.data))
-            .catch((caught) => toast.error(errorMessage(caught, 'Work order belum dapat dimuat.')));
+            .catch((caught) =>
+                toast.error(
+                    errorMessage(caught, 'Work order belum dapat dimuat.'),
+                ),
+            );
     }, []);
 
     useEffect(() => {
@@ -44,7 +63,12 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
         api<{ data: Record<string, unknown>[] }>('/pemeliharaan-aset/saya')
             .then((result) => setPekerjaanSaya(result.data))
             .catch((caught) =>
-                toast.error(errorMessage(caught, 'Daftar pekerjaan Anda belum dapat dimuat.')),
+                toast.error(
+                    errorMessage(
+                        caught,
+                        'Daftar pekerjaan Anda belum dapat dimuat.',
+                    ),
+                ),
             );
     }, [hanyaPekerjaanSaya]);
 
@@ -70,7 +94,11 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
         {
             id: 'kode',
             header: 'Work order',
-            cell: (workOrder) => <span className="font-medium text-primary">{workOrder.kode}</span>,
+            cell: (workOrder) => (
+                <span className="text-primary font-medium">
+                    {workOrder.kode}
+                </span>
+            ),
             sortValue: (workOrder) => workOrder.kode,
             width: 150,
         },
@@ -104,7 +132,8 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
             id: 'status',
             header: 'Status',
             cell: (workOrder) => <StatusBadge status={workOrder.status} />,
-            sortValue: (workOrder) => STATUS[workOrder.status]?.label ?? workOrder.status,
+            sortValue: (workOrder) =>
+                STATUS[workOrder.status]?.label ?? workOrder.status,
             width: 140,
         },
         {
@@ -124,7 +153,9 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
         },
     ];
 
-    const workOrderActions: DataTableRowAction[] = [{ id: 'detail', label: 'Buka rincian' }];
+    const workOrderActions: DataTableRowAction[] = [
+        { id: 'detail', label: 'Buka rincian' },
+    ];
     if (can('update')) workOrderActions.push({ id: 'edit', label: 'Ubah' });
 
     const pekerjaanSayaColumns: DataTableColumn<Record<string, unknown>>[] = [
@@ -132,7 +163,7 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
             id: 'work-order',
             header: 'Work order',
             cell: (job) => (
-                <span className="font-medium text-primary">
+                <span className="text-primary font-medium">
                     {String(job.work_order_kode ?? '—')}
                 </span>
             ),
@@ -193,7 +224,11 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
                 }
             >
                 {can('create') && !hanyaPekerjaanSaya && (
-                    <ActionButton action="create" type="button" onClick={bukaWorkOrderBaru}>
+                    <ActionButton
+                        action="create"
+                        type="button"
+                        onClick={bukaWorkOrderBaru}
+                    >
                         Tambah work order
                     </ActionButton>
                 )}
@@ -220,10 +255,12 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
                     !pekerjaanSaya.length ? (
                         <Empty>
                             <EmptyHeader>
-                                <EmptyTitle>Tidak ada pekerjaan untuk Anda</EmptyTitle>
+                                <EmptyTitle>
+                                    Tidak ada pekerjaan untuk Anda
+                                </EmptyTitle>
                                 <EmptyDescription>
-                                    Pekerjaan muncul di sini setelah dijadwalkan dan ditugaskan
-                                    kepada Anda.
+                                    Pekerjaan muncul di sini setelah dijadwalkan
+                                    dan ditugaskan kepada Anda.
                                 </EmptyDescription>
                             </EmptyHeader>
                         </Empty>
@@ -232,17 +269,24 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
                             columns={pekerjaanSayaColumns}
                             data={pekerjaanSaya}
                             getRowKey={(job) => String(job.id)}
-                            getRowLabel={(job) => String(job.work_order_kode ?? 'pekerjaan')}
+                            getRowLabel={(job) =>
+                                String(job.work_order_kode ?? 'pekerjaan')
+                            }
                             actions={[
                                 { id: 'detail', label: 'Buka rincian' },
                                 { id: 'checklist', label: 'Isi checklist' },
                             ]}
                             onRowClick={(job) => {
-                                if (can('read')) bukaWorkOrder(String(job.pemeliharaan_aset_id));
+                                if (can('read'))
+                                    bukaWorkOrder(
+                                        String(job.pemeliharaan_aset_id),
+                                    );
                             }}
                             onRowAction={(action, job) => {
                                 if (action === 'detail' && can('read'))
-                                    bukaWorkOrder(String(job.pemeliharaan_aset_id));
+                                    bukaWorkOrder(
+                                        String(job.pemeliharaan_aset_id),
+                                    );
                                 if (action === 'checklist')
                                     bukaChecklistJob(
                                         String(job.pemeliharaan_aset_id),
@@ -256,8 +300,9 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
                         <EmptyHeader>
                             <EmptyTitle>Belum ada work order</EmptyTitle>
                             <EmptyDescription>
-                                Work order memuat baris pekerjaan per aset, sehingga satu perintah
-                                kerja dapat mencakup beberapa aset.
+                                Work order memuat baris pekerjaan per aset,
+                                sehingga satu perintah kerja dapat mencakup
+                                beberapa aset.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
@@ -265,9 +310,12 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
                     <div>
                         <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
                             <div className="space-y-1">
-                                <p className="font-semibold">Daftar work order</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {visibleWorkOrders.length} work order ditampilkan
+                                <p className="font-semibold">
+                                    Daftar work order
+                                </p>
+                                <p className="text-muted-foreground text-sm">
+                                    {visibleWorkOrders.length} work order
+                                    ditampilkan
                                 </p>
                             </div>
                             <Input
@@ -276,7 +324,9 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
                                 placeholder="Cari kode, jenis, atau keterangan"
                                 aria-label="Cari work order"
                                 value={search}
-                                onChange={(event) => setSearch(event.target.value)}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
                             />
                         </div>
                         <DataTable
@@ -289,7 +339,8 @@ export default function WorkOrderListPage({ permissions }: { permissions: string
                                 if (can('read')) bukaWorkOrder(workOrder.id);
                             }}
                             onRowAction={(action, workOrder) => {
-                                if (action === 'detail' && can('read')) bukaWorkOrder(workOrder.id);
+                                if (action === 'detail' && can('read'))
+                                    bukaWorkOrder(workOrder.id);
                                 if (action === 'edit' && can('update'))
                                     bukaWorkOrderUbah(workOrder.id);
                             }}

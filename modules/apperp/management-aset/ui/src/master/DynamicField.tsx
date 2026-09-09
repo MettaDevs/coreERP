@@ -1,6 +1,11 @@
 import { ReactNode, RefObject } from 'react';
 import { CircleAlert } from 'lucide-react';
-import { Field, FieldDescription, FieldHint, FieldLabel } from '@apperp/ui/field';
+import {
+    Field,
+    FieldDescription,
+    FieldHint,
+    FieldLabel,
+} from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
@@ -35,7 +40,7 @@ function wrapHint(control: ReactNode, help: string | undefined) {
                 <button
                     type="button"
                     aria-label="Lihat penjelasan"
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground shrink-0"
                 >
                     <CircleAlert className="size-4" />
                 </button>
@@ -63,29 +68,41 @@ export default function DynamicField({
 }) {
     const requestEdit = () => onRequestEdit?.(config.name);
     /** Ditempel pada setiap Field agar mode sunting dapat menaruh fokus di field yang diklik. */
-    const anchor = { 'data-field-name': config.name, 'data-readonly': readOnly || undefined };
+    const anchor = {
+        'data-field-name': config.name,
+        'data-readonly': readOnly || undefined,
+    };
     // `Select` merender penanda required merahnya sendiri. Jangan memasukkan `*`
     // ke teks label karena itu membuat indikator tampil dua kali.
     const label = config.label;
     const inputLabel = config.required ? `${config.label} *` : config.label;
     // Dipanggil tanpa syarat karena hook tidak boleh berada di balik cabang; untuk
     // field selain `reference` sumbernya null sehingga tidak ada permintaan apa pun.
-    const reference = useMasterOptions(config.type === 'reference' ? config.resource : null);
+    const reference = useMasterOptions(
+        config.type === 'reference' ? config.resource : null,
+    );
 
     if (config.type === 'reference') {
-        const selected = reference.options.find((option) => option.id === value);
+        const selected = reference.options.find(
+            (option) => option.id === value,
+        );
 
         return (
             <Field data-invalid={Boolean(reference.error)} {...anchor}>
                 {wrapHint(
-                    <EditShield active={readOnly} label={config.label} onActivate={requestEdit}>
+                    <EditShield
+                        active={readOnly}
+                        label={config.label}
+                        onActivate={requestEdit}
+                    >
                         <Select
                             label={label}
                             required={config.required}
                             items={reference.options.map(optionLabel)}
                             value={selected ? optionLabel(selected) : undefined}
                             placeholder={
-                                config.placeholder ?? `Pilih ${config.label.toLowerCase()}`
+                                config.placeholder ??
+                                `Pilih ${config.label.toLowerCase()}`
                             }
                             searchPlaceholder={`Cari ${config.label.toLowerCase()}`}
                             emptyMessage={`${config.label} tidak ditemukan.`}
@@ -93,8 +110,10 @@ export default function DynamicField({
                             portalContainer={portalContainer}
                             onValueChange={(item) =>
                                 onChange(
-                                    reference.options.find((option) => optionLabel(option) === item)
-                                        ?.id ?? '',
+                                    reference.options.find(
+                                        (option) =>
+                                            optionLabel(option) === item,
+                                    )?.id ?? '',
                                 )
                             }
                         />
@@ -103,7 +122,9 @@ export default function DynamicField({
                 )}
                 {/* Kegagalan memuat pilihan bukan penjelasan, melainkan masalah nyata:
                     tetap tampil, tidak ikut disembunyikan di balik hover. */}
-                {reference.error && <FieldDescription>{reference.error}</FieldDescription>}
+                {reference.error && (
+                    <FieldDescription>{reference.error}</FieldDescription>
+                )}
             </Field>
         );
     }
@@ -113,14 +134,20 @@ export default function DynamicField({
             <Field orientation="horizontal" {...anchor}>
                 {wrapHint(
                     <div className="flex items-center gap-2">
-                        <EditShield active={readOnly} label={config.label} onActivate={requestEdit}>
+                        <EditShield
+                            active={readOnly}
+                            label={config.label}
+                            onActivate={requestEdit}
+                        >
                             <Switch
                                 id={config.name}
                                 checked={Boolean(value)}
                                 onCheckedChange={onChange}
                             />
                         </EditShield>
-                        <FieldLabel htmlFor={config.name}>{config.label}</FieldLabel>
+                        <FieldLabel htmlFor={config.name}>
+                            {config.label}
+                        </FieldLabel>
                     </div>,
                     config.help,
                 )}
@@ -135,14 +162,19 @@ export default function DynamicField({
         return (
             <Field {...anchor}>
                 {wrapHint(
-                    <EditShield active={readOnly} label={config.label} onActivate={requestEdit}>
+                    <EditShield
+                        active={readOnly}
+                        label={config.label}
+                        onActivate={requestEdit}
+                    >
                         <Select
                             label={label}
                             required={config.required}
                             items={options.map((option) => option.label)}
                             value={selected ? selected.label : undefined}
                             placeholder={
-                                config.placeholder ?? `Pilih ${config.label.toLowerCase()}`
+                                config.placeholder ??
+                                `Pilih ${config.label.toLowerCase()}`
                             }
                             searchPlaceholder={`Cari ${config.label.toLowerCase()}`}
                             emptyMessage={`${config.label} tidak ditemukan.`}
@@ -150,7 +182,9 @@ export default function DynamicField({
                             portalContainer={portalContainer}
                             onValueChange={(item) =>
                                 onChange(
-                                    options.find((option) => option.label === item)?.value ?? '',
+                                    options.find(
+                                        (option) => option.label === item,
+                                    )?.value ?? '',
                                 )
                             }
                         />
@@ -171,7 +205,11 @@ export default function DynamicField({
                 {/* Satu perisai untuk seluruh baris, bukan per pilihan: empat tombol
                     transparan berjajar hanya akan menambah empat perhentian tab kosong. */}
                 {wrapHint(
-                    <EditShield active={readOnly} label={config.label} onActivate={requestEdit}>
+                    <EditShield
+                        active={readOnly}
+                        label={config.label}
+                        onActivate={requestEdit}
+                    >
                         <div className="flex flex-wrap gap-3">
                             {options.map((option) => (
                                 <label
@@ -186,7 +224,9 @@ export default function DynamicField({
                                                 checked
                                                     ? [...chosen, option.value]
                                                     : chosen.filter(
-                                                          (item) => item !== option.value,
+                                                          (item) =>
+                                                              item !==
+                                                              option.value,
                                                       ),
                                             )
                                         }
@@ -231,7 +271,11 @@ export default function DynamicField({
             {wrapHint(
                 <Input
                     id={config.name}
-                    label={config.suffix ? `${inputLabel} (${config.suffix})` : inputLabel}
+                    label={
+                        config.suffix
+                            ? `${inputLabel} (${config.suffix})`
+                            : inputLabel
+                    }
                     type={
                         config.type === 'number'
                             ? 'number'

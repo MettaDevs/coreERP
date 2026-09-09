@@ -12,8 +12,17 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { DataTable, type DataTableColumn, type DataTableRowAction } from '@apperp/ui/data-table';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    DataTable,
+    type DataTableColumn,
+    type DataTableRowAction,
+} from '@apperp/ui/data-table';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { api, errorMessage } from '../../api';
 import { MasterRecord, ParentSummary } from '../masters';
 import ModelAsetFormSheet from './ModelAsetFormSheet';
@@ -41,12 +50,20 @@ export default function PabrikanModels({
     onChanged: () => void;
 }) {
     const [items, setItems] = useState<PabrikanModelRecord[]>([]);
-    const [meta, setMeta] = useState<ListMeta>({ current_page: 1, last_page: 1, total: 0 });
+    const [meta, setMeta] = useState<ListMeta>({
+        current_page: 1,
+        last_page: 1,
+        total: 0,
+    });
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [editing, setEditing] = useState<PabrikanModelRecord | null | undefined>(undefined);
-    const [archiving, setArchiving] = useState<PabrikanModelRecord | null>(null);
+    const [editing, setEditing] = useState<
+        PabrikanModelRecord | null | undefined
+    >(undefined);
+    const [archiving, setArchiving] = useState<PabrikanModelRecord | null>(
+        null,
+    );
 
     const load = useCallback(async () => {
         if (!canReadModels) return;
@@ -59,9 +76,10 @@ export default function PabrikanModels({
         });
 
         try {
-            const result = await api<{ data: PabrikanModelRecord[]; meta: ListMeta }>(
-                `/model-aset?${params}`,
-            );
+            const result = await api<{
+                data: PabrikanModelRecord[];
+                meta: ListMeta;
+            }>(`/model-aset?${params}`);
             setItems(result.data);
             setMeta(result.meta);
         } catch (caught) {
@@ -95,13 +113,15 @@ export default function PabrikanModels({
         return (
             <Empty>
                 <EmptyDescription>
-                    Daftar model belum tersedia karena Anda belum memiliki akses untuk membacanya.
+                    Daftar model belum tersedia karena Anda belum memiliki akses
+                    untuk membacanya.
                 </EmptyDescription>
             </Empty>
         );
     }
 
-    const optionLabel = (option: ParentSummary) => `${option.kode} — ${option.nama}`;
+    const optionLabel = (option: ParentSummary) =>
+        `${option.kode} — ${option.nama}`;
     const columns: DataTableColumn<PabrikanModelRecord>[] = [
         {
             id: 'model',
@@ -122,7 +142,11 @@ export default function PabrikanModels({
         {
             id: 'description',
             header: 'Keterangan',
-            cell: (item) => <span className="text-muted-foreground">{item.keterangan || '–'}</span>,
+            cell: (item) => (
+                <span className="text-muted-foreground">
+                    {item.keterangan || '–'}
+                </span>
+            ),
             width: 260,
         },
         {
@@ -157,12 +181,16 @@ export default function PabrikanModels({
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <p className="font-semibold">Model</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                         {meta.total} model ditemukan untuk pabrikan ini.
                     </p>
                 </div>
                 {canCreate && (
-                    <ActionButton action="create" type="button" onClick={() => setEditing(null)}>
+                    <ActionButton
+                        action="create"
+                        type="button"
+                        onClick={() => setEditing(null)}
+                    >
                         Tambah model
                     </ActionButton>
                 )}
@@ -204,7 +232,7 @@ export default function PabrikanModels({
                 />
             )}
             {meta.last_page > 1 && (
-                <div className="flex items-center justify-end gap-3 text-sm text-muted-foreground">
+                <div className="text-muted-foreground flex items-center justify-end gap-3 text-sm">
                     <Button
                         variant="outline"
                         size="sm"
@@ -248,10 +276,12 @@ export default function PabrikanModels({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Arsipkan {archiving?.nama}?</AlertDialogTitle>
+                        <AlertDialogTitle>
+                            Arsipkan {archiving?.nama}?
+                        </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Model ini tidak lagi tampil pada daftar pilihan. Aset yang sudah
-                            memakainya tidak berubah.
+                            Model ini tidak lagi tampil pada daftar pilihan.
+                            Aset yang sudah memakainya tidak berubah.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

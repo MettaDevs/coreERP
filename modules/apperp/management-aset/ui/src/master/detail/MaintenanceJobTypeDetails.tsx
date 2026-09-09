@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@apperp/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@apperp/ui/table';
 import { TransferList, type TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 
@@ -38,7 +45,9 @@ export default function MaintenanceJobTypeDetails({
         setError('');
         try {
             const [variantResult, assetTypeResult] = await Promise.all([
-                api<{ data: Variant[] }>(`/maintenance-job-types/${jobTypeId}/variants`),
+                api<{ data: Variant[] }>(
+                    `/maintenance-job-types/${jobTypeId}/variants`,
+                ),
                 api<{ data: { remaining: Choice[]; selected: Choice[] } }>(
                     `/maintenance-job-types/${jobTypeId}/asset-types`,
                 ),
@@ -47,7 +56,9 @@ export default function MaintenanceJobTypeDetails({
             setRemaining(assetTypeResult.data.remaining.map(choiceItem));
             setSelected(assetTypeResult.data.selected.map(choiceItem));
         } catch (caught) {
-            setError(errorMessage(caught, 'Rincian maintenance belum dapat dimuat.'));
+            setError(
+                errorMessage(caught, 'Rincian maintenance belum dapat dimuat.'),
+            );
         }
     }
 
@@ -80,7 +91,9 @@ export default function MaintenanceJobTypeDetails({
     async function removeVariant(id: string) {
         if (!window.confirm('Arsipkan varian ini?')) return;
         try {
-            await api(`/maintenance-job-type-variants/${id}`, { method: 'DELETE' });
+            await api(`/maintenance-job-type-variants/${id}`, {
+                method: 'DELETE',
+            });
             await load();
         } catch (caught) {
             setError(errorMessage(caught, 'Varian belum dapat diarsipkan.'));
@@ -99,30 +112,45 @@ export default function MaintenanceJobTypeDetails({
             });
             setSaved(true);
         } catch (caught) {
-            setError(errorMessage(caught, 'Relasi jenis aset belum dapat disimpan.'));
+            setError(
+                errorMessage(caught, 'Relasi jenis aset belum dapat disimpan.'),
+            );
         } finally {
             setBusy(false);
         }
     }
 
-    if (error && variants.length === 0 && remaining.length === 0 && selected.length === 0) {
-        return <p className="text-sm text-destructive">{error}</p>;
+    if (
+        error &&
+        variants.length === 0 &&
+        remaining.length === 0 &&
+        selected.length === 0
+    ) {
+        return <p className="text-destructive text-sm">{error}</p>;
     }
 
     return (
         <div className="space-y-7">
             <section className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">Varian jenis pekerjaan maintenance</h3>
+                    <h3 className="font-semibold">
+                        Varian jenis pekerjaan maintenance
+                    </h3>
                     {canEdit && (
                         <div className="flex gap-2">
                             <Input
                                 aria-label="Nama varian baru"
                                 placeholder="Nama varian"
                                 value={variantName}
-                                onChange={(event) => setVariantName(event.target.value)}
+                                onChange={(event) =>
+                                    setVariantName(event.target.value)
+                                }
                             />
-                            <Button type="button" disabled={busy} onClick={() => void addVariant()}>
+                            <Button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void addVariant()}
+                            >
                                 Tambah
                             </Button>
                         </div>
@@ -131,7 +159,8 @@ export default function MaintenanceJobTypeDetails({
                 {variants.length === 0 ? (
                     <Empty>
                         <EmptyDescription>
-                            Belum ada varian. Tambahkan interval seperti mingguan atau tahunan.
+                            Belum ada varian. Tambahkan interval seperti
+                            mingguan atau tahunan.
                         </EmptyDescription>
                     </Empty>
                 ) : (
@@ -141,7 +170,11 @@ export default function MaintenanceJobTypeDetails({
                                 <TableRow>
                                     <TableHead>Kode</TableHead>
                                     <TableHead>Nama</TableHead>
-                                    {canEdit && <TableHead className="w-28">Aksi</TableHead>}
+                                    {canEdit && (
+                                        <TableHead className="w-28">
+                                            Aksi
+                                        </TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -155,7 +188,11 @@ export default function MaintenanceJobTypeDetails({
                                                     type="button"
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => void removeVariant(item.id)}
+                                                    onClick={() =>
+                                                        void removeVariant(
+                                                            item.id,
+                                                        )
+                                                    }
                                                 >
                                                     Arsipkan
                                                 </Button>
@@ -170,9 +207,12 @@ export default function MaintenanceJobTypeDetails({
             </section>
 
             <section className="space-y-3">
-                <h3 className="font-semibold">Jenis aset yang menggunakan pekerjaan ini</h3>
-                <p className="text-sm text-muted-foreground">
-                    Pilih jenis aset yang boleh memakai job type ini saat maintenance dibuat.
+                <h3 className="font-semibold">
+                    Jenis aset yang menggunakan pekerjaan ini
+                </h3>
+                <p className="text-muted-foreground text-sm">
+                    Pilih jenis aset yang boleh memakai job type ini saat
+                    maintenance dibuat.
                 </p>
                 <TransferList
                     remaining={remaining}
@@ -189,15 +229,21 @@ export default function MaintenanceJobTypeDetails({
                     selectedEmptyLabel="Belum ada jenis aset yang dipilih."
                 />
                 {canEdit && (
-                    <Button type="button" disabled={busy} onClick={() => void saveAssetTypes()}>
+                    <Button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void saveAssetTypes()}
+                    >
                         {busy ? 'Menyimpan…' : 'Simpan relasi jenis aset'}
                     </Button>
                 )}
             </section>
             {saved && (
-                <p className="text-sm text-muted-foreground">Perubahan maintenance tersimpan.</p>
+                <p className="text-muted-foreground text-sm">
+                    Perubahan maintenance tersimpan.
+                </p>
             )}
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
     );
 }

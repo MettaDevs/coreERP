@@ -1,18 +1,47 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { CollapsibleSection, CollapsibleSectionGroup } from '@apperp/ui/collapsible-section';
-import { DataTable, type DataTableColumn, type DataTableRowAction } from '@apperp/ui/data-table';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@apperp/ui/card';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
+import {
+    DataTable,
+    type DataTableColumn,
+    type DataTableRowAction,
+} from '@apperp/ui/data-table';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
+import {
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@apperp/ui/sheet';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import DynamicField from '../../master/DynamicField';
-import { FieldConfig, FieldValue, emptyValue, payloadValue } from '../../master/fields';
+import {
+    FieldConfig,
+    FieldValue,
+    emptyValue,
+    payloadValue,
+} from '../../master/fields';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { AttributeDefinition, toFieldConfig } from './attributes';
 
@@ -81,7 +110,12 @@ const CLASSIFICATION: FieldConfig[] = [
         required: true,
         help: 'Menentukan atribut tambahan yang harus diisi.',
     },
-    { name: 'kondisi_aset_id', label: 'Kondisi aset', type: 'reference', resource: 'kondisi-aset' },
+    {
+        name: 'kondisi_aset_id',
+        label: 'Kondisi aset',
+        type: 'reference',
+        resource: 'kondisi-aset',
+    },
 ];
 
 /**
@@ -91,7 +125,12 @@ const CLASSIFICATION: FieldConfig[] = [
  * Halaman All assets di Dynamics 365 memisahkannya dengan alasan yang sama.
  */
 const MANUFACTURER: FieldConfig[] = [
-    { name: 'pabrikan_aset_id', label: 'Pabrikan', type: 'reference', resource: 'pabrikan-aset' },
+    {
+        name: 'pabrikan_aset_id',
+        label: 'Pabrikan',
+        type: 'reference',
+        resource: 'pabrikan-aset',
+    },
     {
         name: 'model_aset_id',
         label: 'Model aset',
@@ -120,7 +159,8 @@ const REFERENCES = [...CLASSIFICATION, ...MANUFACTURER, ...PLACEMENT];
  * menggantinya akan membuat buku yang berjalan tidak lagi cocok dengan groupnya.
  */
 const EDITABLE = REFERENCES.filter(
-    (field) => field.name !== 'group_aset_id' && field.name !== 'asset_location_id',
+    (field) =>
+        field.name !== 'group_aset_id' && field.name !== 'asset_location_id',
 );
 
 /** Nilai awal seluruh isian teks pada form penerimaan. */
@@ -135,7 +175,8 @@ const textDefaults = (context: Context): Record<string, string> => ({
     currency_code: 'IDR',
     receiving_org_unit_id: context.org_unit_id ?? '',
     usage_org_unit_id: context.org_unit_id ?? '',
-    received_by_user_id: context.user_id === null ? '' : String(context.user_id),
+    received_by_user_id:
+        context.user_id === null ? '' : String(context.user_id),
     custodian_user_id: '',
     keterangan: '',
 });
@@ -159,7 +200,10 @@ function money(value: string, currency: string): string {
     return `${currency} ${formatted}`;
 }
 
-const LIFECYCLE: Record<string, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
+const LIFECYCLE: Record<
+    string,
+    { label: string; variant: 'default' | 'secondary' | 'outline' }
+> = {
     received: { label: 'Diterima', variant: 'outline' },
     in_use: { label: 'Digunakan', variant: 'default' },
     decommissioned: { label: 'Didekomisioning', variant: 'secondary' },
@@ -213,28 +257,34 @@ function useGroupBooks(groupId: string) {
 
 function DepreciationPreview({ groupId }: { groupId: string }) {
     const rows = useGroupBooks(groupId);
-    const { options: books } = useMasterOptions(groupId ? 'buku-penyusutan' : null);
-    const { options: profiles } = useMasterOptions(groupId ? 'profil-penyusutan' : null);
+    const { options: books } = useMasterOptions(
+        groupId ? 'buku-penyusutan' : null,
+    );
+    const { options: profiles } = useMasterOptions(
+        groupId ? 'profil-penyusutan' : null,
+    );
 
     if (!groupId) {
         return (
-            <p className="text-sm text-muted-foreground">
-                Pilih group aset terlebih dahulu untuk melihat buku yang akan terbentuk.
+            <p className="text-muted-foreground text-sm">
+                Pilih group aset terlebih dahulu untuk melihat buku yang akan
+                terbentuk.
             </p>
         );
     }
     if (rows === null) {
         return (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
                 Konfigurasi buku group ini belum dapat dibaca.
             </p>
         );
     }
     if (rows.length === 0) {
         return (
-            <p className="text-sm text-destructive">
-                Group ini belum memiliki baris pada matriks group x buku. Aset masih dapat dicatat,
-                tetapi belum dapat ditempatkan sampai matriksnya diisi.
+            <p className="text-destructive text-sm">
+                Group ini belum memiliki baris pada matriks group x buku. Aset
+                masih dapat dicatat, tetapi belum dapat ditempatkan sampai
+                matriksnya diisi.
             </p>
         );
     }
@@ -247,12 +297,17 @@ function DepreciationPreview({ groupId }: { groupId: string }) {
                     (option) => option.id === row.depreciation_profile_id,
                 );
                 const life =
-                    row.useful_life_periods ?? (profile?.useful_life_periods as number | undefined);
+                    row.useful_life_periods ??
+                    (profile?.useful_life_periods as number | undefined);
                 const convention = row.convention
                     ? (CONVENTION_LABEL[row.convention] ?? row.convention)
                     : null;
                 const detail = row.depreciate
-                    ? [profile?.nama, life ? `${life} periode` : null, convention]
+                    ? [
+                          profile?.nama,
+                          life ? `${life} periode` : null,
+                          convention,
+                      ]
                           .filter(Boolean)
                           .join(' · ')
                     : 'Tidak disusutkan';
@@ -265,15 +320,15 @@ function DepreciationPreview({ groupId }: { groupId: string }) {
                         <span className="text-sm font-medium">
                             {book ? book.nama : 'Buku penyusutan'}
                         </span>
-                        <span className="truncate text-sm text-muted-foreground">
+                        <span className="text-muted-foreground truncate text-sm">
                             {detail || 'Aturan diambil dari buku'}
                         </span>
                     </div>
                 );
             })}
             <FieldDescription>
-                Buku dibentuk otomatis saat aset disimpan. Aturannya disalin, jadi perubahan matriks
-                kelak tidak mengubah aset ini.
+                Buku dibentuk otomatis saat aset disimpan. Aturannya disalin,
+                jadi perubahan matriks kelak tidak mengubah aset ini.
             </FieldDescription>
         </div>
     );
@@ -291,19 +346,26 @@ export default function AssetPage({
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
-    const [history, setHistory] = useState<{ asset: Asset; placements: Placement[] } | null>(null);
+    const [history, setHistory] = useState<{
+        asset: Asset;
+        placements: Placement[];
+    } | null>(null);
     const [editing, setEditing] = useState<AssetDetail | null>(null);
-    const [references, setReferences] = useState<Record<string, FieldValue>>(() =>
-        Object.fromEntries(REFERENCES.map((field) => [field.name, ''])),
+    const [references, setReferences] = useState<Record<string, FieldValue>>(
+        () => Object.fromEntries(REFERENCES.map((field) => [field.name, ''])),
     );
     // Seluruh isian dikendalikan state, bukan dibaca dari FormData saat submit. Bagian
     // yang terlipat dilepas dari DOM oleh accordion, sehingga isian tak terkendali akan
     // hilang begitu penggunanya menutup bagiannya.
-    const [values, setValues] = useState<Record<string, string>>(() => textDefaults(context));
+    const [values, setValues] = useState<Record<string, string>>(() =>
+        textDefaults(context),
+    );
     const [parentAssetId, setParentAssetId] = useState('');
     // Atribut diwarisi dari jenis aset, jadi definisinya dibaca ulang tiap jenis berubah.
     const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
-    const [attributeValues, setAttributeValues] = useState<Record<string, FieldValue>>({});
+    const [attributeValues, setAttributeValues] = useState<
+        Record<string, FieldValue>
+    >({});
     const sheetContentRef = useRef<HTMLDivElement>(null);
     const editSheetRef = useRef<HTMLDivElement>(null);
     const typeId = String(references.jenis_aset_id ?? '');
@@ -316,7 +378,11 @@ export default function AssetPage({
     const load = () =>
         api<{ data: Asset[] }>('/aset')
             .then((result) => setAssets(result.data))
-            .catch((caught) => setError(errorMessage(caught, 'Register aset belum dapat dimuat.')));
+            .catch((caught) =>
+                setError(
+                    errorMessage(caught, 'Register aset belum dapat dimuat.'),
+                ),
+            );
 
     useEffect(() => {
         void load();
@@ -329,7 +395,9 @@ export default function AssetPage({
             return;
         }
         let cancelled = false;
-        api<{ data: AttributeDefinition[] }>(`/jenis-aset/${typeId}/atribut-definisi`)
+        api<{ data: AttributeDefinition[] }>(
+            `/jenis-aset/${typeId}/atribut-definisi`,
+        )
             .then((result) => {
                 if (cancelled) return;
                 setAttributes(result.data);
@@ -358,7 +426,11 @@ export default function AssetPage({
         options.find((option) => option.id === String(id ?? ''))?.nama ?? null;
 
     const parentOptions = useMemo(
-        () => assets.map((asset) => ({ id: asset.id, label: `${asset.kode} — ${asset.nama}` })),
+        () =>
+            assets.map((asset) => ({
+                id: asset.id,
+                label: `${asset.kode} — ${asset.nama}`,
+            })),
         [assets],
     );
 
@@ -374,7 +446,9 @@ export default function AssetPage({
     }, [assets, search]);
 
     function resetForm() {
-        setReferences(Object.fromEntries(REFERENCES.map((field) => [field.name, ''])));
+        setReferences(
+            Object.fromEntries(REFERENCES.map((field) => [field.name, ''])),
+        );
         setValues(textDefaults(context));
         setParentAssetId('');
         setAttributeValues({});
@@ -389,10 +463,15 @@ export default function AssetPage({
      */
     async function edit(asset: Asset) {
         try {
-            const detail = (await api<{ data: AssetDetail }>(`/aset/${asset.id}`)).data;
+            const detail = (
+                await api<{ data: AssetDetail }>(`/aset/${asset.id}`)
+            ).data;
             setReferences(
                 Object.fromEntries(
-                    REFERENCES.map((field) => [field.name, String(detail[field.name] ?? '')]),
+                    REFERENCES.map((field) => [
+                        field.name,
+                        String(detail[field.name] ?? ''),
+                    ]),
                 ),
             );
             setValues({
@@ -400,13 +479,18 @@ export default function AssetPage({
                 nama: detail.nama,
                 serial_number: String(detail.serial_number ?? ''),
                 model_number: String(detail.model_number ?? ''),
-                placed_in_service_on: String(detail.placed_in_service_on ?? '').slice(0, 10),
+                placed_in_service_on: String(
+                    detail.placed_in_service_on ?? '',
+                ).slice(0, 10),
                 keterangan: String(detail.keterangan ?? ''),
             });
             setParentAssetId(String(detail.parent_asset_id ?? ''));
             setAttributeValues(
                 Object.fromEntries(
-                    detail.atribut.map((row) => [row.tipe_atribut_id, row.nilai ?? '']),
+                    detail.atribut.map((row) => [
+                        row.tipe_atribut_id,
+                        row.nilai ?? '',
+                    ]),
                 ),
             );
             setEditing(detail);
@@ -461,9 +545,9 @@ export default function AssetPage({
         try {
             setHistory(
                 (
-                    await api<{ data: { asset: Asset; placements: Placement[] } }>(
-                        `/aset/${asset.id}/history`,
-                    )
+                    await api<{
+                        data: { asset: Asset; placements: Placement[] };
+                    }>(`/aset/${asset.id}/history`)
                 ).data,
             );
         } catch (caught) {
@@ -473,16 +557,22 @@ export default function AssetPage({
 
     async function receive() {
         if (!context.legal_entity_id) {
-            setError('Pilih entitas legal aktif di CoreERP sebelum menerima aset.');
+            setError(
+                'Pilih entitas legal aktif di CoreERP sebelum menerima aset.',
+            );
             return;
         }
-        const missing = REFERENCES.find((field) => field.required && !references[field.name]);
+        const missing = REFERENCES.find(
+            (field) => field.required && !references[field.name],
+        );
         if (missing) {
             setError(`Pilih ${missing.label.toLowerCase()} terlebih dahulu.`);
             return;
         }
         if (!values.nama || !values.acquired_on || !values.acquisition_value) {
-            setError('Nama aset, tanggal perolehan, dan nilai perolehan wajib diisi.');
+            setError(
+                'Nama aset, tanggal perolehan, dan nilai perolehan wajib diisi.',
+            );
             return;
         }
         setSaving(true);
@@ -509,11 +599,15 @@ export default function AssetPage({
                     currency_code: values.currency_code,
                     serial_number: values.serial_number || null,
                     model_number: values.model_number || null,
-                    receiving_org_unit_id: values.receiving_org_unit_id || context.org_unit_id,
-                    usage_org_unit_id: values.usage_org_unit_id || context.org_unit_id,
+                    receiving_org_unit_id:
+                        values.receiving_org_unit_id || context.org_unit_id,
+                    usage_org_unit_id:
+                        values.usage_org_unit_id || context.org_unit_id,
                     received_by_user_id:
                         values.received_by_user_id ||
-                        (context.user_id === null ? null : String(context.user_id)),
+                        (context.user_id === null
+                            ? null
+                            : String(context.user_id)),
                     custodian_user_id: values.custodian_user_id || null,
                     residual_value: values.residual_value || null,
                     keterangan: values.keterangan || null,
@@ -530,17 +624,26 @@ export default function AssetPage({
         }
     }
 
-    const referenceField = (field: FieldConfig, portal: typeof sheetContentRef) => (
+    const referenceField = (
+        field: FieldConfig,
+        portal: typeof sheetContentRef,
+    ) => (
         <DynamicField
             key={field.name}
             config={field}
             value={references[field.name]}
-            onChange={(next) => setReferences((current) => ({ ...current, [field.name]: next }))}
+            onChange={(next) =>
+                setReferences((current) => ({ ...current, [field.name]: next }))
+            }
             portalContainer={portal}
         />
     );
 
-    const textField = (name: string, label: string, extra: Record<string, unknown> = {}) => (
+    const textField = (
+        name: string,
+        label: string,
+        extra: Record<string, unknown> = {},
+    ) => (
         <Field>
             <Input
                 label={label}
@@ -572,7 +675,10 @@ export default function AssetPage({
             <Select
                 label="Aset induk"
                 items={parentOptions.map((option) => option.label)}
-                value={parentOptions.find((option) => option.id === parentAssetId)?.label}
+                value={
+                    parentOptions.find((option) => option.id === parentAssetId)
+                        ?.label
+                }
                 placeholder="Tanpa induk"
                 searchPlaceholder="Cari aset induk"
                 emptyMessage="Aset tidak ditemukan."
@@ -580,13 +686,14 @@ export default function AssetPage({
                 portalContainer={portal}
                 onValueChange={(item) =>
                     setParentAssetId(
-                        parentOptions.find((option) => option.label === item)?.id ?? '',
+                        parentOptions.find((option) => option.label === item)
+                            ?.id ?? '',
                     )
                 }
             />
             <FieldDescription>
-                Isi bila aset ini bagian dari aset lain, misalnya mesin yang terpasang pada satu
-                gedung.
+                Isi bila aset ini bagian dari aset lain, misalnya mesin yang
+                terpasang pada satu gedung.
             </FieldDescription>
         </Field>
     );
@@ -609,14 +716,18 @@ export default function AssetPage({
         {
             id: 'serial',
             header: 'Nomor seri',
-            cell: (asset) => <span className="muted">{asset.serial_number || '—'}</span>,
+            cell: (asset) => (
+                <span className="muted">{asset.serial_number || '—'}</span>
+            ),
             width: 160,
         },
         {
             id: 'group',
             header: 'Group aset',
             cell: (asset) => (
-                <span className="muted">{nameOf(groupOptions, asset.group_aset_id) ?? '—'}</span>
+                <span className="muted">
+                    {nameOf(groupOptions, asset.group_aset_id) ?? '—'}
+                </span>
             ),
             width: 180,
         },
@@ -624,7 +735,9 @@ export default function AssetPage({
             id: 'jenis',
             header: 'Jenis aset',
             cell: (asset) => (
-                <span className="muted">{nameOf(typeOptions, asset.jenis_aset_id) ?? '—'}</span>
+                <span className="muted">
+                    {nameOf(typeOptions, asset.jenis_aset_id) ?? '—'}
+                </span>
             ),
             width: 180,
         },
@@ -641,7 +754,8 @@ export default function AssetPage({
         {
             id: 'nilai',
             header: 'Nilai perolehan',
-            cell: (asset) => money(asset.acquisition_value, asset.currency_code),
+            cell: (asset) =>
+                money(asset.acquisition_value, asset.currency_code),
             sortValue: (asset) => Number(asset.acquisition_value),
             align: 'right',
             width: 170,
@@ -660,7 +774,9 @@ export default function AssetPage({
         },
     ];
 
-    const rowActions: DataTableRowAction[] = [{ id: 'history', label: 'Riwayat' }];
+    const rowActions: DataTableRowAction[] = [
+        { id: 'history', label: 'Riwayat' },
+    ];
     if (canUpdate) rowActions.unshift({ id: 'edit', label: 'Ubah' });
 
     const summaryOf = (options: { id: string; nama: string }[], id: unknown) =>
@@ -671,20 +787,26 @@ export default function AssetPage({
             <CardHeader className="min-h-0 border-b px-5 py-3">
                 <CardTitle className="text-base">Inventarisasi aset</CardTitle>
                 <CardAction>
-                    <Button onClick={() => setOpen(true)}>＋ Terima aset</Button>
+                    <Button onClick={() => setOpen(true)}>
+                        ＋ Terima aset
+                    </Button>
                 </CardAction>
             </CardHeader>
             <CardContent className="px-0">
-                {error && <div className="px-5 py-3 text-sm text-destructive">{error}</div>}
+                {error && (
+                    <div className="text-destructive px-5 py-3 text-sm">
+                        {error}
+                    </div>
+                )}
                 <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
                     <div className="space-y-1">
                         <p className="font-semibold">Register aset</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-muted-foreground text-sm">
                             {visible.length} aset ditampilkan
                         </p>
                     </div>
                     <Input
-                        className="w-full sm:w-70"
+                        className="sm:w-70 w-full"
                         type="search"
                         placeholder="Cari kode, nama, atau nomor seri"
                         aria-label="Cari aset"
@@ -696,7 +818,9 @@ export default function AssetPage({
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>
-                                {assets.length ? 'Tidak ada aset yang cocok' : 'Belum ada aset'}
+                                {assets.length
+                                    ? 'Tidak ada aset yang cocok'
+                                    : 'Belum ada aset'}
                             </EmptyTitle>
                             <EmptyDescription>
                                 {assets.length
@@ -713,7 +837,10 @@ export default function AssetPage({
                         getRowLabel={(asset) => asset.kode}
                         actions={rowActions}
                         onRowAction={(action, asset) => {
-                            if (action === 'edit' && asset.lifecycle_state !== 'disposed')
+                            if (
+                                action === 'edit' &&
+                                asset.lifecycle_state !== 'disposed'
+                            )
                                 void edit(asset);
                             if (action === 'history') void showHistory(asset);
                         }}
@@ -728,7 +855,11 @@ export default function AssetPage({
                     if (!next) resetForm();
                 }}
             >
-                <SheetContent ref={sheetContentRef} side="right" className="w-full sm:max-w-2xl">
+                <SheetContent
+                    ref={sheetContentRef}
+                    side="right"
+                    className="w-full sm:max-w-2xl"
+                >
                     <SheetHeader>
                         <SheetTitle>Terima aset</SheetTitle>
                     </SheetHeader>
@@ -739,11 +870,16 @@ export default function AssetPage({
                             void receive();
                         }}
                     >
-                        <CollapsibleSectionGroup defaultValue={['klasifikasi', 'perolehan']}>
+                        <CollapsibleSectionGroup
+                            defaultValue={['klasifikasi', 'perolehan']}
+                        >
                             <CollapsibleSection
                                 value="klasifikasi"
                                 title="Identitas dan klasifikasi"
-                                summary={summaryOf(groupOptions, references.group_aset_id)}
+                                summary={summaryOf(
+                                    groupOptions,
+                                    references.group_aset_id,
+                                )}
                             >
                                 <div className="space-y-4">
                                     {textField('nama', 'Nama aset', {
@@ -787,40 +923,59 @@ export default function AssetPage({
                                 title="Perolehan dan nilai"
                                 summary={
                                     values.acquisition_value
-                                        ? money(values.acquisition_value, values.currency_code)
+                                        ? money(
+                                              values.acquisition_value,
+                                              values.currency_code,
+                                          )
                                         : undefined
                                 }
                             >
                                 <div className="space-y-4">
-                                    {textField('acquired_on', 'Tanggal perolehan', {
-                                        type: 'date',
-                                        required: true,
-                                    })}
+                                    {textField(
+                                        'acquired_on',
+                                        'Tanggal perolehan',
+                                        {
+                                            type: 'date',
+                                            required: true,
+                                        },
+                                    )}
                                     <Field>
                                         <Input
                                             label="Tanggal mulai digunakan"
                                             type="date"
                                             value={values.placed_in_service_on}
                                             onChange={(event) =>
-                                                setValue('placed_in_service_on', event.target.value)
+                                                setValue(
+                                                    'placed_in_service_on',
+                                                    event.target.value,
+                                                )
                                             }
                                         />
                                         <FieldDescription>
-                                            Dasar perhitungan awal penyusutan. Kosong berarti sama
-                                            dengan tanggal perolehan.
+                                            Dasar perhitungan awal penyusutan.
+                                            Kosong berarti sama dengan tanggal
+                                            perolehan.
                                         </FieldDescription>
                                     </Field>
-                                    {textField('acquisition_value', 'Nilai perolehan', {
-                                        type: 'number',
-                                        min: '0',
-                                        step: '0.01',
-                                        required: true,
-                                    })}
-                                    {textField('residual_value', 'Nilai residu', {
-                                        type: 'number',
-                                        min: '0',
-                                        step: '0.01',
-                                    })}
+                                    {textField(
+                                        'acquisition_value',
+                                        'Nilai perolehan',
+                                        {
+                                            type: 'number',
+                                            min: '0',
+                                            step: '0.01',
+                                            required: true,
+                                        },
+                                    )}
+                                    {textField(
+                                        'residual_value',
+                                        'Nilai residu',
+                                        {
+                                            type: 'number',
+                                            min: '0',
+                                            step: '0.01',
+                                        },
+                                    )}
                                     {textField('currency_code', 'Mata uang', {
                                         maxLength: 3,
                                         required: true,
@@ -828,23 +983,41 @@ export default function AssetPage({
                                 </div>
                             </CollapsibleSection>
 
-                            <CollapsibleSection value="penyusutan" title="Penyusutan">
+                            <CollapsibleSection
+                                value="penyusutan"
+                                title="Penyusutan"
+                            >
                                 <DepreciationPreview groupId={groupId} />
                             </CollapsibleSection>
 
                             <CollapsibleSection
                                 value="penempatan"
                                 title="Penempatan"
-                                summary={summaryOf(locationOptions, references.asset_location_id)}
+                                summary={summaryOf(
+                                    locationOptions,
+                                    references.asset_location_id,
+                                )}
                             >
                                 <div className="space-y-4">
                                     {PLACEMENT.map((field) =>
                                         referenceField(field, sheetContentRef),
                                     )}
-                                    {textField('receiving_org_unit_id', 'ID unit penerima')}
-                                    {textField('usage_org_unit_id', 'ID unit pengguna')}
-                                    {textField('received_by_user_id', 'ID penerima')}
-                                    {textField('custodian_user_id', 'ID PIC aset')}
+                                    {textField(
+                                        'receiving_org_unit_id',
+                                        'ID unit penerima',
+                                    )}
+                                    {textField(
+                                        'usage_org_unit_id',
+                                        'ID unit pengguna',
+                                    )}
+                                    {textField(
+                                        'received_by_user_id',
+                                        'ID penerima',
+                                    )}
+                                    {textField(
+                                        'custodian_user_id',
+                                        'ID PIC aset',
+                                    )}
                                 </div>
                             </CollapsibleSection>
 
@@ -852,14 +1025,18 @@ export default function AssetPage({
                                 value="struktur"
                                 title="Struktur"
                                 summary={
-                                    parentOptions.find((option) => option.id === parentAssetId)
-                                        ?.label
+                                    parentOptions.find(
+                                        (option) => option.id === parentAssetId,
+                                    )?.label
                                 }
                             >
                                 {parentField(sheetContentRef)}
                             </CollapsibleSection>
 
-                            <CollapsibleSection value="catatan" title="Keterangan">
+                            <CollapsibleSection
+                                value="catatan"
+                                title="Keterangan"
+                            >
                                 <Field>
                                     <Textarea
                                         rows={3}
@@ -867,7 +1044,10 @@ export default function AssetPage({
                                         placeholder="Keterangan"
                                         value={values.keterangan}
                                         onChange={(event) =>
-                                            setValue('keterangan', event.target.value)
+                                            setValue(
+                                                'keterangan',
+                                                event.target.value,
+                                            )
                                         }
                                     />
                                 </Field>
@@ -875,7 +1055,11 @@ export default function AssetPage({
                         </CollapsibleSectionGroup>
 
                         <SheetFooter>
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                            >
                                 Batal
                             </Button>
                             <Button type="submit" disabled={saving}>
@@ -895,7 +1079,11 @@ export default function AssetPage({
                     }
                 }}
             >
-                <SheetContent ref={editSheetRef} side="right" className="w-full sm:max-w-2xl">
+                <SheetContent
+                    ref={editSheetRef}
+                    side="right"
+                    className="w-full sm:max-w-2xl"
+                >
                     <SheetHeader>
                         <SheetTitle>Koreksi aset {editing?.kode}</SheetTitle>
                     </SheetHeader>
@@ -906,10 +1094,11 @@ export default function AssetPage({
                             void saveEdit();
                         }}
                     >
-                        <p className="text-sm text-muted-foreground">
-                            Group aset dan lokasi tidak dapat diganti di sini. Buku penyusutannya
-                            sudah terbentuk dari matriks group, dan perpindahan lokasi dicatat
-                            sebagai penempatan, bukan koreksi.
+                        <p className="text-muted-foreground text-sm">
+                            Group aset dan lokasi tidak dapat diganti di sini.
+                            Buku penyusutannya sudah terbentuk dari matriks
+                            group, dan perpindahan lokasi dicatat sebagai
+                            penempatan, bukan koreksi.
                         </p>
                         <CollapsibleSectionGroup defaultValue={['klasifikasi']}>
                             <CollapsibleSection
@@ -922,8 +1111,12 @@ export default function AssetPage({
                                         required: true,
                                     })}
                                     {EDITABLE.filter((field) =>
-                                        CLASSIFICATION.some((item) => item.name === field.name),
-                                    ).map((field) => referenceField(field, editSheetRef))}
+                                        CLASSIFICATION.some(
+                                            (item) => item.name === field.name,
+                                        ),
+                                    ).map((field) =>
+                                        referenceField(field, editSheetRef),
+                                    )}
                                 </div>
                             </CollapsibleSection>
 
@@ -934,8 +1127,12 @@ export default function AssetPage({
                             >
                                 <div className="space-y-4">
                                     {EDITABLE.filter((field) =>
-                                        MANUFACTURER.some((item) => item.name === field.name),
-                                    ).map((field) => referenceField(field, editSheetRef))}
+                                        MANUFACTURER.some(
+                                            (item) => item.name === field.name,
+                                        ),
+                                    ).map((field) =>
+                                        referenceField(field, editSheetRef),
+                                    )}
                                     {textField('serial_number', 'Nomor seri')}
                                     {textField('model_number', 'Nomor model')}
                                 </div>
@@ -947,23 +1144,31 @@ export default function AssetPage({
                                     title="Atribut jenis aset"
                                     summary={`${attributes.length} atribut`}
                                 >
-                                    <div className="space-y-4">{attributeFields(editSheetRef)}</div>
+                                    <div className="space-y-4">
+                                        {attributeFields(editSheetRef)}
+                                    </div>
                                 </CollapsibleSection>
                             )}
 
-                            <CollapsibleSection value="perolehan" title="Perolehan dan nilai">
+                            <CollapsibleSection
+                                value="perolehan"
+                                title="Perolehan dan nilai"
+                            >
                                 <Field>
                                     <Input
                                         label="Tanggal mulai digunakan"
                                         type="date"
                                         value={values.placed_in_service_on}
                                         onChange={(event) =>
-                                            setValue('placed_in_service_on', event.target.value)
+                                            setValue(
+                                                'placed_in_service_on',
+                                                event.target.value,
+                                            )
                                         }
                                     />
                                     <FieldDescription>
-                                        Menggeser awal penyusutan selama buku aset belum punya
-                                        periode berjalan.
+                                        Menggeser awal penyusutan selama buku
+                                        aset belum punya periode berjalan.
                                     </FieldDescription>
                                 </Field>
                             </CollapsibleSection>
@@ -972,14 +1177,18 @@ export default function AssetPage({
                                 value="struktur"
                                 title="Struktur"
                                 summary={
-                                    parentOptions.find((option) => option.id === parentAssetId)
-                                        ?.label
+                                    parentOptions.find(
+                                        (option) => option.id === parentAssetId,
+                                    )?.label
                                 }
                             >
                                 {parentField(editSheetRef)}
                             </CollapsibleSection>
 
-                            <CollapsibleSection value="catatan" title="Keterangan">
+                            <CollapsibleSection
+                                value="catatan"
+                                title="Keterangan"
+                            >
                                 <Field>
                                     <Textarea
                                         rows={3}
@@ -987,7 +1196,10 @@ export default function AssetPage({
                                         placeholder="Keterangan"
                                         value={values.keterangan}
                                         onChange={(event) =>
-                                            setValue('keterangan', event.target.value)
+                                            setValue(
+                                                'keterangan',
+                                                event.target.value,
+                                            )
                                         }
                                     />
                                 </Field>
@@ -1021,24 +1233,38 @@ export default function AssetPage({
             >
                 <SheetContent side="right">
                     <SheetHeader>
-                        <SheetTitle>Riwayat aset {history?.asset.kode}</SheetTitle>
+                        <SheetTitle>
+                            Riwayat aset {history?.asset.kode}
+                        </SheetTitle>
                     </SheetHeader>
                     <div className="space-y-3 overflow-y-auto p-4">
                         {history?.placements.map((placement) => (
-                            <div className="rounded border p-3" key={placement.id}>
-                                <p className="font-medium">{placement.effective_on}</p>
-                                <p className="text-sm text-muted-foreground">
+                            <div
+                                className="rounded border p-3"
+                                key={placement.id}
+                            >
+                                <p className="font-medium">
+                                    {placement.effective_on}
+                                </p>
+                                <p className="text-muted-foreground text-sm">
                                     {placement.reason || 'Penempatan aset'}
                                 </p>
                                 <p className="text-sm">
-                                    Unit pengguna: {placement.usage_org_unit_id || 'Belum dipilih'}
+                                    Unit pengguna:{' '}
+                                    {placement.usage_org_unit_id ||
+                                        'Belum dipilih'}
                                 </p>
                                 <p className="text-sm">
-                                    PIC: {placement.custodian_user_id || 'Belum dipilih'}
+                                    PIC:{' '}
+                                    {placement.custodian_user_id ||
+                                        'Belum dipilih'}
                                 </p>
                                 <p className="text-sm">
                                     Lokasi:{' '}
-                                    {nameOf(locationOptions, placement.asset_location_id) ??
+                                    {nameOf(
+                                        locationOptions,
+                                        placement.asset_location_id,
+                                    ) ??
                                         placement.asset_location_id ??
                                         'Belum dipilih'}
                                 </p>

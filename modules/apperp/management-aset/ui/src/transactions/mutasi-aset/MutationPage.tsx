@@ -1,11 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@apperp/ui/card';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
+import {
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@apperp/ui/sheet';
 import { api, errorMessage } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 type Asset = { id: string; kode: string; lifecycle_state: string };
@@ -21,7 +38,9 @@ export default function MutationPage() {
     const load = () =>
         api<{ data: Asset[] }>('/aset')
             .then((x) => setAssets(x.data))
-            .catch((e) => setError(errorMessage(e, 'Aset belum dapat dimuat.')));
+            .catch((e) =>
+                setError(errorMessage(e, 'Aset belum dapat dimuat.')),
+            );
     useEffect(() => {
         void load();
     }, []);
@@ -65,23 +84,30 @@ export default function MutationPage() {
                 </CardAction>
             </CardHeader>
             <CardContent className="px-0">
-                {error && <p className="px-5 py-3 text-sm text-destructive">{error}</p>}
+                {error && (
+                    <p className="text-destructive px-5 py-3 text-sm">
+                        {error}
+                    </p>
+                )}
                 {!assets.length ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada aset</EmptyTitle>
                             <EmptyDescription>
-                                Terima aset terlebih dahulu sebelum memindahkan penggunaan, PIC,
-                                atau lokasi.
+                                Terima aset terlebih dahulu sebelum memindahkan
+                                penggunaan, PIC, atau lokasi.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
                 ) : (
                     <div className="divide-y">
                         {assets.map((asset) => (
-                            <div key={asset.id} className="flex justify-between px-5 py-3">
+                            <div
+                                key={asset.id}
+                                className="flex justify-between px-5 py-3"
+                            >
                                 <span>{asset.kode}</span>
-                                <span className="text-sm text-muted-foreground">
+                                <span className="text-muted-foreground text-sm">
                                     {asset.lifecycle_state}
                                 </span>
                             </div>
@@ -106,7 +132,10 @@ export default function MutationPage() {
                                 label="Aset"
                                 required
                                 items={assets.map((asset) => asset.kode)}
-                                value={assets.find((asset) => asset.id === assetId)?.kode}
+                                value={
+                                    assets.find((asset) => asset.id === assetId)
+                                        ?.kode
+                                }
                                 placeholder="Pilih aset"
                                 searchPlaceholder="Cari kode aset"
                                 emptyMessage="Aset tidak ditemukan."
@@ -114,22 +143,40 @@ export default function MutationPage() {
                                 portalContainer={sheetContentRef}
                                 onValueChange={(item) =>
                                     setAssetId(
-                                        assets.find((asset) => asset.kode === item)?.id ?? '',
+                                        assets.find(
+                                            (asset) => asset.kode === item,
+                                        )?.id ?? '',
                                     )
                                 }
                             />
                         </Field>
                         <Field>
-                            <Input name="effective_on" label="Berlaku sejak" type="date" required />
+                            <Input
+                                name="effective_on"
+                                label="Berlaku sejak"
+                                type="date"
+                                required
+                            />
                         </Field>
                         <Field>
-                            <Input name="reason" label="Alasan mutasi" required />
+                            <Input
+                                name="reason"
+                                label="Alasan mutasi"
+                                required
+                            />
                         </Field>
                         <Field>
-                            <Input name="usage_org_unit_id" label="ID unit pengguna" required />
+                            <Input
+                                name="usage_org_unit_id"
+                                label="ID unit pengguna"
+                                required
+                            />
                         </Field>
                         <Field>
-                            <Input name="custodian_user_id" label="ID PIC aset" />
+                            <Input
+                                name="custodian_user_id"
+                                label="ID PIC aset"
+                            />
                         </Field>
                         <Field>
                             <Select
@@ -137,7 +184,10 @@ export default function MutationPage() {
                                 items={locations.options.map(optionLabel)}
                                 value={
                                     locations.options
-                                        .filter((option) => option.id === locationId)
+                                        .filter(
+                                            (option) =>
+                                                option.id === locationId,
+                                        )
                                         .map(optionLabel)[0]
                                 }
                                 placeholder="Tidak berubah"
@@ -148,7 +198,8 @@ export default function MutationPage() {
                                 onValueChange={(item) =>
                                     setLocationId(
                                         locations.options.find(
-                                            (option) => optionLabel(option) === item,
+                                            (option) =>
+                                                optionLabel(option) === item,
                                         )?.id ?? '',
                                     )
                                 }
@@ -159,7 +210,11 @@ export default function MutationPage() {
                             </FieldDescription>
                         </Field>
                         <SheetFooter>
-                            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setOpen(false)}
+                            >
                                 Batal
                             </Button>
                             <Button type="submit" disabled={saving}>

@@ -11,13 +11,19 @@ use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
  * tenant aktif" dan seluruh perintah berhenti sebelum menyemai apa pun.
  */
 Artisan::command('management-aset:seed-maintenance {tenant? : ULID tenant tujuan} {--tenant= : ULID tenant tujuan (alternatif)} {--template-key=id:maintenance:starter:v1 : Versi template seed}', function (ProvisionIndonesiaStarterData $provisioner, PelaksanaUntukTenant $pelaksana): void {
-    $tenantId = (string) ($this->option('tenant') ?: $this->argument('tenant'));
+    // `option()` dan `argument()` menjanjikan array|bool|float|int|string|null karena harus
+    // melayani setiap bentuk definisi perintah. Ketiga nilai di bawah dideklarasikan sebagai
+    // nilai tunggal, jadi bentuk lain tidak pernah muncul dan diperlakukan sebagai tidak diisi.
+    $opsiTenant = $this->option('tenant');
+    $argumenTenant = $this->argument('tenant');
+    $tenantId = (is_string($opsiTenant) ? $opsiTenant : '') ?: (is_string($argumenTenant) ? $argumenTenant : '');
     if ($tenantId === '') {
         $this->error('Tenant wajib diisi melalui --tenant=<tenant_id>.');
 
         return;
     }
-    $templateKey = (string) $this->option('template-key');
+    $opsiTemplate = $this->option('template-key');
+    $templateKey = is_string($opsiTemplate) ? $opsiTemplate : '';
     $result = $pelaksana->jalankanUntuk(
         $tenantId,
         static fn (): array => $provisioner->maintenanceForTenant($tenantId, $templateKey),

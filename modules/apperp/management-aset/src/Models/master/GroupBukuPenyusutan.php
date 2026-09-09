@@ -19,8 +19,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class GroupBukuPenyusutan extends Model
 {
-    use HasUlids, SoftDeletes;
+    use HasUlids;
     use MilikTenant;
+    use SoftDeletes;
 
     protected $table = 'aset_m_group_buku_penyusutan';
 
@@ -38,11 +39,13 @@ class GroupBukuPenyusutan extends Model
         ];
     }
 
+    /** @return BelongsTo<GroupAset, $this> */
     public function groupAset(): BelongsTo
     {
         return $this->belongsTo(GroupAset::class, 'group_aset_id');
     }
 
+    /** @return BelongsTo<BukuPenyusutan, $this> */
     public function buku(): BelongsTo
     {
         return $this->belongsTo(BukuPenyusutan::class, 'buku_id');

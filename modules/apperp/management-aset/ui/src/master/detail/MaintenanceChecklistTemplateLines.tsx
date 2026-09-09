@@ -6,7 +6,14 @@ import { Field, FieldError, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@apperp/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
 import { ApiError, api, errorMessage } from '../../api';
 
@@ -61,17 +68,20 @@ type LineErrors = Record<number, Record<string, string>>;
 function lineErrorsFrom(caught: unknown): LineErrors {
     if (!(caught instanceof ApiError)) return {};
 
-    return Object.entries(caught.validationErrors).reduce<LineErrors>((result, [key, messages]) => {
-        const match = /^lines\.(\d+)\.([^.]+)$/.exec(key);
-        if (!match) return result;
+    return Object.entries(caught.validationErrors).reduce<LineErrors>(
+        (result, [key, messages]) => {
+            const match = /^lines\.(\d+)\.([^.]+)$/.exec(key);
+            if (!match) return result;
 
-        const index = Number(match[1]);
-        result[index] = {
-            ...result[index],
-            [match[2]]: messages[0] ?? 'Periksa nilai ini.',
-        };
-        return result;
-    }, {});
+            const index = Number(match[1]);
+            result[index] = {
+                ...result[index],
+                [match[2]]: messages[0] ?? 'Periksa nilai ini.',
+            };
+            return result;
+        },
+        {},
+    );
 }
 
 function validationSummary(caught: unknown): string {
@@ -112,21 +122,35 @@ export default function MaintenanceChecklistTemplateLines({
 
     useEffect(() => {
         Promise.all([
-            api<{ data: Line[] }>(`/maintenance-checklist-templates/${templateId}/lines`),
-            api<{ data: Option[] }>('/maintenance-checklist-variables?per_page=100&aktif=true'),
-            api<{ data: Option[] }>('/maintenance-checklist-templates?per_page=100&aktif=true'),
+            api<{ data: Line[] }>(
+                `/maintenance-checklist-templates/${templateId}/lines`,
+            ),
+            api<{ data: Option[] }>(
+                '/maintenance-checklist-variables?per_page=100&aktif=true',
+            ),
+            api<{ data: Option[] }>(
+                '/maintenance-checklist-templates?per_page=100&aktif=true',
+            ),
             api<{ data: Option[] }>('/reference-data/units-of-measure'),
         ])
-            .then(([lineResult, variableResult, templateResult, unitResult]) => {
-                setLines(lineResult.data);
-                setSelectedIndex(null);
-                setCheckedIndexes([]);
-                setVariables(variableResult.data);
-                setTemplates(templateResult.data.filter((item) => item.id !== templateId));
-                setUnits(unitResult.data);
-            })
+            .then(
+                ([lineResult, variableResult, templateResult, unitResult]) => {
+                    setLines(lineResult.data);
+                    setSelectedIndex(null);
+                    setCheckedIndexes([]);
+                    setVariables(variableResult.data);
+                    setTemplates(
+                        templateResult.data.filter(
+                            (item) => item.id !== templateId,
+                        ),
+                    );
+                    setUnits(unitResult.data);
+                },
+            )
             .catch((caught) =>
-                setError(errorMessage(caught, 'Baris checklist belum dapat dimuat.')),
+                setError(
+                    errorMessage(caught, 'Baris checklist belum dapat dimuat.'),
+                ),
             );
     }, [templateId]);
 
@@ -152,17 +176,26 @@ export default function MaintenanceChecklistTemplateLines({
     const changeType = (index: number, type: Line['type']) =>
         update(index, {
             type,
-            instruksi: type === 'template' || type === 'header' ? null : lines[index].instruksi,
-            wajib: type === 'header' || type === 'template' ? false : lines[index].wajib,
+            instruksi:
+                type === 'template' || type === 'header'
+                    ? null
+                    : lines[index].instruksi,
+            wajib:
+                type === 'header' || type === 'template'
+                    ? false
+                    : lines[index].wajib,
             unit_id: type === 'measurement' ? lines[index].unit_id : null,
             unit: type === 'measurement' ? lines[index].unit : null,
             min_value: type === 'measurement' ? lines[index].min_value : null,
             max_value: type === 'measurement' ? lines[index].max_value : null,
             variable_id: type === 'variable' ? lines[index].variable_id : null,
-            nested_template_id: type === 'template' ? lines[index].nested_template_id : null,
+            nested_template_id:
+                type === 'template' ? lines[index].nested_template_id : null,
         });
-    const optionFor = (items: Option[], id: string | null) => items.find((item) => item.id === id);
-    const selected = selectedIndex === null ? null : (lines[selectedIndex] ?? null);
+    const optionFor = (items: Option[], id: string | null) =>
+        items.find((item) => item.id === id);
+    const selected =
+        selectedIndex === null ? null : (lines[selectedIndex] ?? null);
     const lineId = (line: Line) =>
         line.type === 'variable'
             ? (optionFor(variables, line.variable_id)?.kode ?? '—')
@@ -196,7 +229,10 @@ export default function MaintenanceChecklistTemplateLines({
                 validationSummary(caught) ||
                     (firstErrorIndex !== undefined
                         ? 'Periksa kolom yang ditandai merah.'
-                        : errorMessage(caught, 'Baris checklist belum dapat disimpan.')),
+                        : errorMessage(
+                              caught,
+                              'Baris checklist belum dapat disimpan.',
+                          )),
             );
         } finally {
             setSaving(false);
@@ -208,7 +244,11 @@ export default function MaintenanceChecklistTemplateLines({
                 ? [...new Set([...current, index])]
                 : current.filter((item) => item !== index);
             setSelectedIndex((active) =>
-                checked ? index : active === index ? (next.at(-1) ?? null) : active,
+                checked
+                    ? index
+                    : active === index
+                      ? (next.at(-1) ?? null)
+                      : active,
             );
             return next;
         });
@@ -222,9 +262,11 @@ export default function MaintenanceChecklistTemplateLines({
         setCheckedIndexes([index]);
         setSelectedIndex(index);
     }
-    if (error && lines.length === 0) return <p className="text-sm text-destructive">{error}</p>;
+    if (error && lines.length === 0)
+        return <p className="text-destructive text-sm">{error}</p>;
 
-    const allChecked = lines.length > 0 && checkedIndexes.length === lines.length;
+    const allChecked =
+        lines.length > 0 && checkedIndexes.length === lines.length;
     const someChecked = checkedIndexes.length > 0 && !allChecked;
 
     return (
@@ -237,7 +279,10 @@ export default function MaintenanceChecklistTemplateLines({
                             type="button"
                             variant="outline"
                             onClick={() => {
-                                setLines((current) => [...current, newLine(current.length + 1)]);
+                                setLines((current) => [
+                                    ...current,
+                                    newLine(current.length + 1),
+                                ]);
                                 check(lines.length, true);
                             }}
                         >
@@ -249,7 +294,10 @@ export default function MaintenanceChecklistTemplateLines({
                             disabled={checkedIndexes.length === 0}
                             onClick={() => {
                                 setLines((current) =>
-                                    current.filter((_, index) => !checkedIndexes.includes(index)),
+                                    current.filter(
+                                        (_, index) =>
+                                            !checkedIndexes.includes(index),
+                                    ),
                                 );
                                 setCheckedIndexes([]);
                                 setSelectedIndex(null);
@@ -257,7 +305,11 @@ export default function MaintenanceChecklistTemplateLines({
                         >
                             Hapus
                         </Button>
-                        <Button type="button" disabled={saving} onClick={() => void save()}>
+                        <Button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void save()}
+                        >
                             {saving ? 'Menyimpan…' : 'Simpan'}
                         </Button>
                     </div>
@@ -287,8 +339,12 @@ export default function MaintenanceChecklistTemplateLines({
                                                   ? 'indeterminate'
                                                   : false
                                         }
-                                        onClick={(event) => event.stopPropagation()}
-                                        onCheckedChange={(value) => checkAll(value === true)}
+                                        onClick={(event) =>
+                                            event.stopPropagation()
+                                        }
+                                        onCheckedChange={(value) =>
+                                            checkAll(value === true)
+                                        }
                                     />
                                 </TableHead>
                                 <TableHead>Nomor baris</TableHead>
@@ -304,21 +360,35 @@ export default function MaintenanceChecklistTemplateLines({
                                 const rowError = lineErrors[index] ?? {};
                                 const nameError = rowError.nama;
                                 const referenceError =
-                                    rowError.variable_id ?? rowError.nested_template_id;
+                                    rowError.variable_id ??
+                                    rowError.nested_template_id;
                                 return (
                                     <TableRow
-                                        key={item.id ?? `${item.line_number}-${index}`}
-                                        className={`cursor-pointer${active ? ' bg-primary/20' : checked ? ' bg-primary/10' : ''}${Object.keys(rowError).length > 0 ? ' bg-destructive/5' : ''}`}
+                                        key={
+                                            item.id ??
+                                            `${item.line_number}-${index}`
+                                        }
+                                        className={`cursor-pointer${active ? 'bg-primary/20' : checked ? 'bg-primary/10' : ''}${Object.keys(rowError).length > 0 ? 'bg-destructive/5' : ''}`}
                                         aria-selected={active}
-                                        aria-invalid={Object.keys(rowError).length > 0 || undefined}
+                                        aria-invalid={
+                                            Object.keys(rowError).length > 0 ||
+                                            undefined
+                                        }
                                         tabIndex={0}
                                         onClick={() => select(index)}
                                         onKeyDown={(event) => {
                                             // Spasi pada input, textarea, select, atau checkbox di dalam baris
                                             // adalah input pengguna, bukan perintah untuk memilih baris. Handler
                                             // baris hanya bekerja saat fokus keyboard benar-benar berada di baris.
-                                            if (event.target !== event.currentTarget) return;
-                                            if (event.key === 'Enter' || event.key === ' ') {
+                                            if (
+                                                event.target !==
+                                                event.currentTarget
+                                            )
+                                                return;
+                                            if (
+                                                event.key === 'Enter' ||
+                                                event.key === ' '
+                                            ) {
                                                 event.preventDefault();
                                                 select(index);
                                             }
@@ -334,7 +404,9 @@ export default function MaintenanceChecklistTemplateLines({
                                             <Checkbox
                                                 aria-label={`Pilih baris ${index + 1}`}
                                                 checked={checked}
-                                                onClick={(event) => event.stopPropagation()}
+                                                onClick={(event) =>
+                                                    event.stopPropagation()
+                                                }
                                                 onCheckedChange={(value) =>
                                                     check(index, value === true)
                                                 }
@@ -349,7 +421,10 @@ export default function MaintenanceChecklistTemplateLines({
                                                     value={item.line_number}
                                                     onChange={(event) =>
                                                         update(index, {
-                                                            line_number: Number(event.target.value),
+                                                            line_number: Number(
+                                                                event.target
+                                                                    .value,
+                                                            ),
                                                         })
                                                     }
                                                 />
@@ -365,7 +440,10 @@ export default function MaintenanceChecklistTemplateLines({
                                                     ariaLabel={`Jenis baris ${index + 1}`}
                                                     onValueChange={(value) => {
                                                         if (value)
-                                                            changeType(index, typeCode(value));
+                                                            changeType(
+                                                                index,
+                                                                typeCode(value),
+                                                            );
                                                     }}
                                                 />
                                             ) : (
@@ -374,12 +452,16 @@ export default function MaintenanceChecklistTemplateLines({
                                         </TableCell>
                                         <TableCell
                                             className={
-                                                referenceError ? 'text-destructive' : undefined
+                                                referenceError
+                                                    ? 'text-destructive'
+                                                    : undefined
                                             }
                                         >
                                             {lineId(item)}
                                             {referenceError && (
-                                                <FieldError>{referenceError}</FieldError>
+                                                <FieldError>
+                                                    {referenceError}
+                                                </FieldError>
                                             )}
                                         </TableCell>
                                         <TableCell>
@@ -387,7 +469,11 @@ export default function MaintenanceChecklistTemplateLines({
                                                 <div className="space-y-1">
                                                     <Input
                                                         aria-label={`Nama baris ${index + 1}`}
-                                                        aria-invalid={nameError ? true : undefined}
+                                                        aria-invalid={
+                                                            nameError
+                                                                ? true
+                                                                : undefined
+                                                        }
                                                         aria-describedby={
                                                             nameError
                                                                 ? `line-${index}-nama-error`
@@ -396,12 +482,16 @@ export default function MaintenanceChecklistTemplateLines({
                                                         value={item.nama}
                                                         onChange={(event) =>
                                                             update(index, {
-                                                                nama: event.target.value,
+                                                                nama: event
+                                                                    .target
+                                                                    .value,
                                                             })
                                                         }
                                                     />
                                                     {nameError && (
-                                                        <FieldError id={`line-${index}-nama-error`}>
+                                                        <FieldError
+                                                            id={`line-${index}-nama-error`}
+                                                        >
                                                             {nameError}
                                                         </FieldError>
                                                     )}
@@ -427,8 +517,12 @@ export default function MaintenanceChecklistTemplateLines({
                     onChange={(changes) => update(selectedIndex, changes)}
                 />
             )}
-            {saved && <p className="text-sm text-muted-foreground">Baris checklist tersimpan.</p>}
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {saved && (
+                <p className="text-muted-foreground text-sm">
+                    Baris checklist tersimpan.
+                </p>
+            )}
+            {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
     );
 }
@@ -448,7 +542,8 @@ function LineDetails({
     units: Option[];
     onChange: (changes: Partial<Line>) => void;
 }) {
-    const pick = (items: Option[], id: string | null) => items.find((item) => item.id === id);
+    const pick = (items: Option[], id: string | null) =>
+        items.find((item) => item.id === id);
     const picker = (
         items: Option[],
         id: string | null,
@@ -466,18 +561,23 @@ function LineDetails({
                 placeholder={placeholder}
                 ariaLabel={fieldLabel}
                 onValueChange={(value) =>
-                    change(items.find((item) => label(item) === value)?.id ?? null)
+                    change(
+                        items.find((item) => label(item) === value)?.id ?? null,
+                    )
                 }
             />
         ) : (
-            <p className="text-sm">{pick(items, id)?.nama ?? 'Belum dipilih'}</p>
+            <p className="text-sm">
+                {pick(items, id)?.nama ?? 'Belum dipilih'}
+            </p>
         );
     return (
         <section className="space-y-4 rounded-md border p-4">
             <h4 className="font-semibold">Rincian baris</h4>
             {line.type === 'header' && (
-                <p className="text-sm text-muted-foreground">
-                    Header hanya menjadi judul kelompok pemeriksaan dan tidak perlu diisi teknisi.
+                <p className="text-muted-foreground text-sm">
+                    Header hanya menjadi judul kelompok pemeriksaan dan tidak
+                    perlu diisi teknisi.
                 </p>
             )}
             {line.type === 'template' && (
@@ -487,13 +587,18 @@ function LineDetails({
                         line.nested_template_id,
                         'Template checklist',
                         'Pilih template checklist',
-                        (nested_template_id) => onChange({ nested_template_id }),
+                        (nested_template_id) =>
+                            onChange({ nested_template_id }),
                     )}
                 </div>
             )}
             {line.type === 'measurement' && (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <DetailSwitch line={line} canEdit={canEdit} onChange={onChange} />
+                    <DetailSwitch
+                        line={line}
+                        canEdit={canEdit}
+                        onChange={onChange}
+                    />
                     <div>
                         {picker(
                             units,
@@ -503,7 +608,10 @@ function LineDetails({
                             (unit_id) =>
                                 onChange({
                                     unit_id,
-                                    unit: units.find((item) => item.id === unit_id)?.kode ?? null,
+                                    unit:
+                                        units.find(
+                                            (item) => item.id === unit_id,
+                                        )?.kode ?? null,
                                 }),
                         )}
                     </div>
@@ -519,12 +627,20 @@ function LineDetails({
                         canEdit={canEdit}
                         onChange={(max_value) => onChange({ max_value })}
                     />
-                    <DetailInstruction line={line} canEdit={canEdit} onChange={onChange} />
+                    <DetailInstruction
+                        line={line}
+                        canEdit={canEdit}
+                        onChange={onChange}
+                    />
                 </div>
             )}
             {line.type === 'variable' && (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <DetailSwitch line={line} canEdit={canEdit} onChange={onChange} />
+                    <DetailSwitch
+                        line={line}
+                        canEdit={canEdit}
+                        onChange={onChange}
+                    />
                     <div>
                         {picker(
                             variables,
@@ -535,13 +651,25 @@ function LineDetails({
                             true,
                         )}
                     </div>
-                    <DetailInstruction line={line} canEdit={canEdit} onChange={onChange} />
+                    <DetailInstruction
+                        line={line}
+                        canEdit={canEdit}
+                        onChange={onChange}
+                    />
                 </div>
             )}
             {line.type === 'text' && (
                 <div className="grid gap-4 md:grid-cols-2">
-                    <DetailSwitch line={line} canEdit={canEdit} onChange={onChange} />
-                    <DetailInstruction line={line} canEdit={canEdit} onChange={onChange} />
+                    <DetailSwitch
+                        line={line}
+                        canEdit={canEdit}
+                        onChange={onChange}
+                    />
+                    <DetailInstruction
+                        line={line}
+                        canEdit={canEdit}
+                        onChange={onChange}
+                    />
                 </div>
             )}
         </section>
@@ -567,7 +695,11 @@ function DetailSwitch({
         );
     return (
         <Field orientation="horizontal">
-            <Switch id={id} checked={line.wajib} onCheckedChange={(wajib) => onChange({ wajib })} />
+            <Switch
+                id={id}
+                checked={line.wajib}
+                onCheckedChange={(wajib) => onChange({ wajib })}
+            />
             <FieldLabel htmlFor={id}>Wajib diisi</FieldLabel>
         </Field>
     );
@@ -590,7 +722,11 @@ function DetailNumber({
             step="any"
             value={value ?? ''}
             onChange={(event) =>
-                onChange(event.target.value === '' ? null : Number(event.target.value))
+                onChange(
+                    event.target.value === ''
+                        ? null
+                        : Number(event.target.value),
+                )
             }
         />
     ) : (
@@ -612,7 +748,9 @@ function DetailInstruction({
             rows={3}
             placeholder="Cara melakukan pemeriksaan ini"
             value={line.instruksi ?? ''}
-            onChange={(event) => onChange({ instruksi: event.target.value || null })}
+            onChange={(event) =>
+                onChange({ instruksi: event.target.value || null })
+            }
         />
     ) : (
         <p className="text-sm">{line.instruksi ?? '—'}</p>
