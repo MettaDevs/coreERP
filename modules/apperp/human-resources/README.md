@@ -8,7 +8,14 @@ Human Resources menyimpan fakta tenaga kerja: pekerja, jabatan, posisi, dan penu
 2. HR membuat satu pekerja dan menautkannya ke `core_membership_id` dari Core. Email hanya dipakai untuk mencari dan menampilkan anggota.
 3. HR membuat dua posisi, masing-masing berada pada operating unit yang berbeda.
 4. HR membuat dua penugasan aktif untuk pekerja tersebut. Satu posisi hanya dapat diisi satu pekerja pada periode yang sama.
-5. Core dapat memberi role manual per scope, atau automatic rule berbasis posisi. Token aplikasi membawa hasil scope efektif yang ditandatangani.
+5. Core memberi role manual per scope. Konteks dan izin dibaca langsung dari permintaan yang
+   sedang dilayani, bukan dari token yang ditandatangani — module berjalan di dalam proses Core
+   sejak F7-01, jadi tidak ada lagi token yang perlu dipertukarkan.
+
+   **Automatic rule berbasis posisi tidak berjalan sejak F7-01, dan itu kehilangan yang
+   disengaja dicatat, bukan yang terlewat.** Jalur lamanya memanggil Core lewat HTTP, dan Core
+   belum punya kontrak yang menerima penugasan posisi. Penugasan tetap tersimpan; rolenya
+   ditugaskan admin tenant sampai kontraknya ada.
 
 Data HR tidak membuat identity kedua dan tidak membaca database Core. Nomor pekerja, jabatan, dan posisi diterbitkan oleh layanan Number Sequence Core melalui reference `PEGH`, `JABH`, dan `POSH`.
 

@@ -1,9 +1,0 @@
-.env
-.git
-api/.env
-api/node_modules
-api/vendor
-api/storage/logs
-api/bootstrap/cache/*.php
-ui/node_modules
-ui/dist

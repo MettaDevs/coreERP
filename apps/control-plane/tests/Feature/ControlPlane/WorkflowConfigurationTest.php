@@ -308,16 +308,22 @@ class WorkflowConfigurationTest extends TestCase
             'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         config()->set('coreerp.app_context_signing_key', 'workflow-test-key');
+        // `procurement`, bukan `human-resources`. Yang diuji di sini penerima yang **tidak**
+        // dimuat runtime ini, dan human-resources berhenti memenuhi syarat itu pada F7-01 —
+        // sejak ia menjadi module, penjaga di atas justru menahan pengirimannya dan test ini
+        // gagal dengan "An expected request was not recorded". Procurement adalah app terakhir
+        // yang masih berjalan sebagai container; ketika ia menyusul pindah, test ini kehilangan
+        // subjeknya dan harus dibuang bersama jalur HTTP-nya.
         config()->set('coreerp.event_endpoints', [[
             'type' => 'core.workflow.decision.v2',
-            'url' => 'https://hr.test/events',
-            'module' => 'human-resources',
+            'url' => 'https://procurement.test/events',
+            'module' => 'procurement',
         ]]);
-        Http::fake(['https://hr.test/events' => Http::response(['data' => ['accepted' => true]])]);
+        Http::fake(['https://procurement.test/events' => Http::response(['data' => ['accepted' => true]])]);
 
         Artisan::call('workflow-events:publish');
 
-        Http::assertSent(fn ($request): bool => $request->url() === 'https://hr.test/events');
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://procurement.test/events');
         $this->assertNotNull(DB::table('outbox_events')->where('id', $eventId)->value('published_at'));
     }
 

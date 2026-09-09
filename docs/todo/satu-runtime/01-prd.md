@@ -5456,6 +5456,61 @@ misalnya direktori anggota dan unit organisasi, membuktikannya.
 
 **Bergantung pada.** F4-10.
 
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026. **Dua module bisnis kini dilayani bersamaan.**
+
+**Fase 3 memakan berminggu-minggu; ini satu hari.** Bukan karena dikerjakan lebih cepat, melainkan
+karena hampir seluruh keputusannya sudah diambil: bentuk module, kontrak Core, penjaga batas,
+halaman Inertia, rute layar, dan penerbitan nomor di dalam transaksi. Yang tersisa menerapkannya.
+Ukuran yang paling berguna dari `ModulSedangDipindah` ternyata bukan berapa lama ia kosong,
+melainkan berapa lama sebuah entri bertahan — modul aset berbulan-bulan, HR kurang dari sehari.
+
+**Satu langkah fase 3 tidak perlu diulang.** Tabel HR sudah berawalan `hr_` sejak migration
+pertamanya, jadi penggantian nama tabel — bagian yang paling lama pada modul aset — gugur.
+
+**Penjaga tabel merah pada menit pertama, dan itu nilainya.** Begitu subtree mendarat, migration
+kerangka Laravel HR (`cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`) terbaca sebagai
+tabrakan dengan tabel Core. Kerangka itu memang dibuang seluruhnya di langkah berikutnya, tetapi
+tanpa penjaga itu tabrakannya baru muncul saat module dipasang pada tenant sungguhan.
+
+**Angka.** 15 pemanggilan `DB::table()` menjadi nol, digantikan empat model Eloquent — `Worker`,
+`Job`, `Position`, `WorkerPositionAssignment` — yang seluruhnya `HasUlids`, `SoftDeletes`, dan
+`MilikTenant`. Tiga klien HTTP menjadi dua pembungkus kontrak (`PenerbitNomor`,
+`DirektoriOrganisasi`); yang ketiga dibuang tanpa pengganti, lihat di bawah. Kolom `deleted_at`
+ditambahkan migration tersendiri, bukan dengan menyunting migration lama yang sudah pernah
+berjalan di database app lama.
+
+**Test lama dibuang, dan penggantinya menguji sesuatu yang dulu tidak mungkin diuji.**
+`HumanResourcesScopeTest` mencetak JWT sendiri dan menandatanganinya dengan kunci yang ia pasang
+sendiri — jalur yang tidak ada lagi. Penggantinya membuktikan tiga hal pada jalur yang sungguhan:
+lingkup kebijakan data menyaring daftar posisi, daftar pekerja tidak pernah memuat baris tenant
+lain, dan menyimpan atas nama tenant lain dibatalkan sisi tulis `MilikTenant`. Yang kedua **tidak
+pernah bisa diuji sebelumnya**, karena tiap tenant punya databasenya sendiri.
+
+#### Yang hilang, dan menunggu keputusan pemilik
+
+**Sinkronisasi role otomatis berhenti berjalan.** `CoreAccessClient` dulu memanggil Core lewat HTTP
+untuk menerapkan `automatic_role_assignment_rules`: pekerja berakun Core mendapat role beserta
+lingkup unit kerjanya begitu ditugaskan ke sebuah posisi. **Core belum punya kontrak untuk itu** —
+keempat belas antarmuka di `Contracts` tidak satu pun menyentuh penugasan role.
+
+Mempertahankan klien HTTP-nya bukan pilihan yang lebih aman: `services.coreerp` ikut hilang bersama
+kerangka app lama, jadi pemanggilan itu sekarang menembak alamat kosong dan **selalu** melempar —
+setiap penugasan untuk pekerja berakun akan 500, bukan tersimpan. Yang dipilih: penugasannya
+tersimpan, rolenya ditugaskan admin tenant. Yang mengembalikannya adalah antarmuka baru di Core
+yang menerima id keanggotaan, id posisi, id unit kerja, id penugasan, dan status aktif.
+
+**Dua saringan `status = 'active'` hilang**, dan keduanya tidak dapat dipulihkan dari sisi module:
+`DirektoriOrganisasi::unitOperasi()` tidak memulangkan status organisasi, dan `anggotaSatu()` tidak
+memulangkan status keanggotaan. Akibatnya daftar unit kerja dapat memuat organisasi non-aktif, dan
+penautan akun dapat menunjuk keanggotaan yang sudah tidak aktif. Keduanya menuntut kolom tambahan
+pada kontrak Core.
+
+Dua perbedaan kecil yang disengaja: `core-members` kini berurut nama sebelum dipotong 20 — batasnya
+sama, urutannya jadi pasti — dan `created_at`/`updated_at` pada GET kini ISO-8601, sama dengan
+jawaban POST yang memang sudah begitu.
+
 ### F7-02 — Ukur ulang dan ganti proyeksi
 
 **Kenapa.** Prinsip P5. Dokumen keputusan memuat baris proyeksi yang ditandai jelas; sekarang ada angka

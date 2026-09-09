@@ -6,7 +6,14 @@ version: 0.1.0
 kind: business-app
 requires:
   core: ^0.1
-dependsOn: []
+# Peta id module ke rentang versi, bukan daftar. Bentuknya sama dengan yang dibaca
+# katalog provider; dua bentuk untuk satu jawaban pasti menyimpang.
+dependsOn: {}
+
+# Seluruh tabel module ini berawalan `hr_`, dan sudah begitu sejak migration pertamanya —
+# satu-satunya bagian pemindahan modul aset yang tidak perlu diulang di sini. Awalan inilah
+# yang memisahkan datanya dari data Core dan module lain di dalam satu database yang sama.
+table_prefix: hr_
 api:
   image: registry.apperp.local/apps/human-resources-api:0.1.0
   openapi: contracts/openapi.yaml
