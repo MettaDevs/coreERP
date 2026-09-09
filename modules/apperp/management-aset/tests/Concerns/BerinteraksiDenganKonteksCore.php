@@ -66,31 +66,14 @@ trait BerinteraksiDenganKonteksCore
 
     /**
      * Tenant untuk test ini.
-     */
-    /**
-     * Setelan klien HTTP ke Core yang masih tersisa.
      *
-     * Yang masih membacanya tinggal satu: verifikasi tanda tangan pada panggilan balik
-     * penyediaan data awal tenant, yang menjadi event pada F3-11. Penerbitan nomor, kalender
-     * fiskal, satuan, dan workflow sudah lewat kontrak sejak F3-06 sampai F3-09, dan tidak
-     * satu pun dari keempatnya lagi peduli pada setelan ini.
-     *
-     * Sisanya dibuang pada F3-19, bersama seluruh konfigurasi klien HTTP module.
+     * Tidak ada lagi setelan klien HTTP yang perlu dipasang di sini. Keempat pemakainya —
+     * penerbitan nomor, kalender fiskal, satuan, dan workflow — sudah lewat kontrak di dalam
+     * proses sejak F3-06 sampai F3-09, dan pemakai terakhirnya, verifikasi tanda tangan pada
+     * panggilan balik penyediaan tenant, ikut hilang bersama endpointnya di F3-11.
      */
-    protected function konfigurasiKlienCore(): void
-    {
-        config([
-            'services.coreerp.url' => 'http://core.test',
-            'services.coreerp.app_id' => 'management-aset',
-            'services.coreerp.service_token' => 'service-token',
-            'services.coreerp.context_signing_key' => 'test-context-signing-key-32-bytes',
-        ]);
-    }
-
     protected function buatTenantUji(): string
     {
-        $this->konfigurasiKlienCore();
-
         return $this->tenantUjiId = $this->pastikanTenantAda((string) Str::ulid());
     }
 

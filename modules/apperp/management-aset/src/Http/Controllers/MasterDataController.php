@@ -3,18 +3,32 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
+use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\GroupAset;
+use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
+use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariableValue;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
+use Modules\Apperp\ManagementAset\Models\master\ModelAset;
+use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
 use Modules\Apperp\ManagementAset\Models\MasterData;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
+use RuntimeException;
 
 /**
  * Perilaku bersama seluruh master Management Aset: hak akses per resource, batas
@@ -29,6 +43,31 @@ abstract class MasterDataController extends Controller
      * menggeser hak akses.
      */
     protected const APP_ID = 'management-aset';
+
+    /**
+     * Model pemilik tiap tabel yang dapat menjadi anak sebuah master.
+     *
+     * `MasterChild` menyebut anaknya dengan nama tabel, sedangkan penyaringan tenant baru
+     * ikut berjalan bila query berangkat dari model. Peta ini yang menyambung keduanya, dan
+     * ia dapat dibuang begitu `MasterChild` sendiri membawa nama kelas modelnya.
+     *
+     * @var array<string, class-string<Model>>
+     */
+    private const MODEL_ANAK = [
+        'aset_m_buku_penyusutan' => BukuPenyusutan::class,
+        'aset_m_group_aset' => GroupAset::class,
+        'aset_m_group_buku_penyusutan' => GroupBukuPenyusutan::class,
+        'aset_m_jenis_aset_atribut' => JenisAsetAtribut::class,
+        'aset_m_lokasi_aset' => LokasiAset::class,
+        'aset_m_maintenance_checklist_template_line' => MaintenanceChecklistTemplateLine::class,
+        'aset_m_maintenance_checklist_variable_value' => MaintenanceChecklistVariableValue::class,
+        'aset_m_maintenance_job_type_default' => MaintenanceJobTypeDefault::class,
+        'aset_m_maintenance_job_type_variant' => MaintenanceJobTypeVariant::class,
+        'aset_m_model_aset' => ModelAset::class,
+        'aset_m_tipe_atribut_nilai' => TipeAtributNilai::class,
+        'aset_tr_buku_aset' => AssetBook::class,
+        'aset_tr_penerimaan_aset' => Asset::class,
+    ];
 
     /** Slug resource pada route, kode permission, dan reference nomor. */
     abstract protected function resource(): string;
@@ -69,7 +108,7 @@ abstract class MasterDataController extends Controller
             ...$parentFilterRules,
         ]);
 
-        $query = $this->prepareQuery($this->tenantQuery($request), $request);
+        $query = $this->prepareQuery($this->masterQuery(), $request);
         // Perbandingan eksplisit terhadap string kosong, bukan truthiness: pencarian "0"
         // adalah kata kunci yang sah dan tidak boleh diperlakukan sebagai tanpa filter.
         $search = trim((string) ($validated['q'] ?? ''));
@@ -116,7 +155,7 @@ abstract class MasterDataController extends Controller
         $data = $request->validate($this->writeRules($tenantId, creating: true));
         $payload = $this->payload($data);
 
-        if ($existing = $this->creationKeyQuery($tenantId, $creationKey)->first()) {
+        if ($existing = $this->creationKeyQuery($creationKey)->first()) {
             return $this->replay($existing, $payload);
         }
         $this->afterWriteValidation($data, $tenantId, creating: true);
@@ -145,9 +184,9 @@ abstract class MasterDataController extends Controller
                 ]);
             });
         } catch (NumberSequenceException $exception) {
-            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], $exception->status);
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         } catch (QueryException $exception) {
-            $existing = $this->creationKeyQuery($tenantId, $creationKey)->first();
+            $existing = $this->creationKeyQuery($creationKey)->first();
             if (! $existing) {
                 throw $exception;
             }
@@ -212,9 +251,9 @@ abstract class MasterDataController extends Controller
     }
 
     /** @return Builder<MasterData> */
-    private function tenantQuery(Request $request): Builder
+    private function masterQuery(): Builder
     {
-        $query = $this->newQuery()->where('tenant_id', $this->tenantId($request));
+        $query = $this->newQuery();
         foreach ($this->parentMasters() as $parent) {
             $query->with($parent->eagerLoad());
         }
@@ -230,14 +269,14 @@ abstract class MasterDataController extends Controller
      *
      * @return Builder<MasterData>
      */
-    private function creationKeyQuery(string $tenantId, string $creationKey): Builder
+    private function creationKeyQuery(string $creationKey): Builder
     {
-        return $this->newQuery()->withTrashed()->where('tenant_id', $tenantId)->where('creation_key', $creationKey);
+        return $this->newQuery()->withTrashed()->where('creation_key', $creationKey);
     }
 
     private function find(Request $request, string $id, bool $lock = false): MasterData
     {
-        $query = $this->prepareQuery($this->tenantQuery($request), $request);
+        $query = $this->prepareQuery($this->masterQuery(), $request);
 
         return ($lock ? $query->lockForUpdate() : $query)->findOrFail($id);
     }
@@ -256,7 +295,10 @@ abstract class MasterDataController extends Controller
             abort_if($parentId === $record->getKey(), 422, 'Data tidak dapat menjadi induk dirinya sendiri.');
             while ($parentId) {
                 abort_if($parentId === $record->getKey(), 422, 'Lokasi induk tidak boleh membentuk siklus.');
-                $parentId = DB::table($parent->table)->where('tenant_id', $record->tenant_id)->where('id', $parentId)->value($parent->column);
+                // `withTrashed()`: induk yang sudah diarsipkan tetap menjadi mata rantai yang
+                // sah. Menghentikan penelusuran di situ berarti siklus yang melewatinya
+                // lolos, dan record itu masih ditunjuk anaknya.
+                $parentId = $this->newQuery()->withTrashed()->whereKey($parentId)->value($parent->column);
             }
         }
     }
@@ -358,13 +400,13 @@ abstract class MasterDataController extends Controller
     private function unarchivedChild(MasterData $record): ?MasterChild
     {
         foreach ($this->childMasters() as $child) {
-            $referenced = DB::table($child->table)
-                ->where('tenant_id', $record->tenant_id)
-                ->where($child->column, $record->getKey());
-            if (Schema::hasColumn($child->table, 'deleted_at')) {
-                $referenced->whereNull('deleted_at');
-            }
-            if ($referenced->exists()) {
+            $model = self::MODEL_ANAK[$child->table] ?? throw new RuntimeException(
+                'Tabel anak '.$child->table.' belum punya model pada '.static::class.'::MODEL_ANAK.'
+            );
+            // Tanpa pemeriksaan kolom `deleted_at` lagi: model yang memakai soft delete
+            // menyembunyikan baris terarsip sendiri, dan tabel yang tidak mengenalnya
+            // memang tidak punya apa pun untuk disaring.
+            if ($model::query()->where($child->column, $record->getKey())->exists()) {
                 return $child;
             }
         }

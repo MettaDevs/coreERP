@@ -105,6 +105,8 @@ export default withMermaid({
           items: [
             { text: 'Peta modul', link: '/apps/management-aset/arsitektur/' },
             { text: 'Batas tenant dan organisasi', link: '/apps/management-aset/arsitektur/batas-tenant-dan-organisasi' },
+            { text: 'Rancangan scope data', link: '/apps/management-aset/arsitektur/rancangan-scope-data-aset' },
+            { text: 'Struktur fitur', link: '/apps/management-aset/arsitektur/struktur-fitur' },
             { text: 'Integrasi dengan Core', link: '/apps/management-aset/arsitektur/integrasi-core' },
             { text: 'Kontrak', link: '/apps/management-aset/arsitektur/kontrak' },
             { text: 'Database dan migration', link: '/apps/management-aset/arsitektur/database' },

@@ -57,7 +57,6 @@ class DepreciationScaleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->konfigurasiKlienCore();
         $this->tenants = array_map(fn (): string => (string) Str::ulid(), range(1, self::TENANTS));
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();

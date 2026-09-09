@@ -10,6 +10,7 @@ use App\Support\Reporting\PrintIdentityStore;
 use App\Support\Reporting\Rendering\RenderException;
 use App\Support\Reporting\Rendering\RenderPipeline;
 use App\Support\Reporting\ReportCatalog;
+use App\Support\Reporting\SumberLaporan;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -44,7 +45,7 @@ final class RunReportExport implements ShouldQueue
         public readonly string $exportId,
     ) {}
 
-    public function handle(ReportCatalog $catalog, AppReportClient $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities): void
+    public function handle(ReportCatalog $catalog, SumberLaporan $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities): void
     {
         $export = DB::table('report_exports')->where(['tenant_id' => $this->tenantId, 'id' => $this->exportId])->first();
         if ($export === null || $export->status !== ExportStatus::QUEUED) {

@@ -7,6 +7,7 @@ use App\Support\CurrentWorkspace;
 use App\Support\Reporting\AppReportClient;
 use App\Support\Reporting\PrintIdentityStore;
 use App\Support\Reporting\ReportCatalog;
+use App\Support\Reporting\SumberLaporan;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -19,7 +20,7 @@ class ReportController extends Controller
 {
     public function __construct(
         private readonly ReportCatalog $catalog,
-        private readonly AppReportClient $client,
+        private readonly SumberLaporan $client,
         private readonly CurrentWorkspace $workspace,
         private readonly PrintIdentityStore $identities,
     ) {}

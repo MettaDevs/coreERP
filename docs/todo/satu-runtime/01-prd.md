@@ -2653,6 +2653,46 @@ sekaligus terjaga.
 
 **Bergantung pada.** F1-06, F3-04.
 
+#### Catatan pelaksanaan — langkah 3 (sapuan query mentah)
+
+Selesai pada 9 September 2026. Diukur pada repo apa adanya: **207 pemakaian `DB::table(` di 29
+berkas**, bukan "sekitar 207 di 29 berkas" seperti dugaan rencana — angkanya kebetulan tepat.
+Sesudahnya nol, termasuk di listener dan definisi laporan.
+
+**Rencana menyuruh memecahnya menjadi beberapa pull request per area; itu tidak dilakukan.**
+Areanya tetap dipakai sebagai pembagian kerja, tetapi hasilnya satu pull request. Alasannya
+keputusan yang diambil lebih awal soal kuota CI: satu alur per pull request, bukan lima.
+
+**Dua puluh satu tabel ternyata tidak punya model sama sekali.** Rencana mengasumsikan sapuan
+ini hanya mengganti pemanggilan; kenyataannya separuh tabel transaksi hanya pernah disentuh
+lewat nama tabel. Modelnya dibuat lebih dulu, dan itu yang membuat sisanya bisa mekanis.
+
+**Alias tabel utama harus dibuang, dan itu punya akibat yang tidak terduga.** `TenantScope`
+menyisipkan penyaringan dengan **nama tabel yang sebenarnya** lewat `qualifyColumn()`, sehingga
+`from('aset_tr_x as wo')` membuat scope menyebut kolom yang tidak ada. Aliasnya dibuang; tabel
+yang di-join tetap beralias. Konsekuensinya seluruh penyebutan kolom pada query itu ikut
+berubah — dan satu yang terlewat menjadi satu-satunya bug sungguhan dari sapuan ini:
+`where('id', …)` polos pada query yang kemudian disambung dua tabel master ditolak PostgreSQL
+dengan `column reference "id" is ambiguous`. Muncul sebagai 500, bukan sebagai hasil yang
+salah.
+
+**Bacaan dipulangkan lewat `toBase()`.** Scope tetap tersisip, tetapi barisnya tetap objek
+biasa. Ini bukan jalan pintas: menghidupkannya menjadi model membuat cast tanggal dan desimal
+mengubah bentuk jawaban HTTP dan payload ekspor. Yang berubah bentuk tanpa ada yang meminta
+adalah kontrak yang putus diam-diam.
+
+**Kebocoran yang benar-benar ditemukan: satu.** `AssetController::update` menyambung
+`aset_tr_buku_aset` **tanpa menyamakan `tenant_id`** — satu-satunya dari dua puluh sembilan
+join di seluruh modul. Selain itu ada lima operasi tulis yang hanya menyaring `id`; tidak satu
+pun dapat dieksploitasi hari ini karena idnya berasal dari pembacaan yang sudah tersaring pada
+permintaan yang sama. Itulah yang dibuang sapuan ini: bukan kebocoran yang ada, melainkan 207
+tempat yang benar hanya karena seseorang ingat menuliskannya.
+
+**Satu perubahan perilaku yang dibayar sadar.** Baris detail yang dulu disisipkan satu
+`insert()` borongan kini disimpan satu per satu lewat model, supaya penjaga tulis `MilikTenant`
+benar-benar berjalan. Work order lima puluh baris berarti lima puluh perjalanan ke database.
+Ini terlihat di produksi, belum diukur, dan belum tentu harus dibayar — dicatat sebagai utang.
+
 ### F3-26 — Konteks permintaan dihitung sekali, bukan sekali per penanya
 
 **Kenapa.** Diukur pada permintaan daftar module yang paling sederhana — satu tabel, satu tenant, tanpa
@@ -3335,6 +3375,44 @@ baru. Di dalam proses, itu event biasa.
 
 **Bergantung pada.** F3-10.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026. Endpoint, controller, middleware tanda tangan HMAC, dan berkas
+rute panggilan baliknya dihapus seluruhnya.
+
+**Rencana melewatkan hal yang paling menentukan: kapan eventnya dipancarkan.** Versi pertama
+memancarkannya di dalam transaksi pendaftaran usaha, dengan alasan "tenant yang tersimpan pasti
+sudah punya data awalnya". Akibatnya **22 test merah** dengan satu pesan yang sama, `Sequence
+aktif tidak ditemukan untuk aplikasi dan tenant ini`: penyediaan data awal menerbitkan nomor
+sungguhan, dan urutan nomor tenant baru dibuat setelah transaksi ditutup.
+
+Ini pelajaran yang sudah pernah dicatat dan tetap terulang: **memindahkan event ke dalam proses
+mengubah waktunya, bukan hanya jalurnya.** Pada jalur HTTP lama event ini dikirim perintah
+terjadwal berjam-jam kemudian, jadi tidak ada satu pun urutan yang perlu dijaga. Sekarang
+urutannya adalah kodenya.
+
+**Dua lubang tersingkap karenanya, dan keduanya lebih besar daripada task ini.**
+
+1. **Modul yang dipasang di dalam runtime tidak pernah mendapat urutan nomor.** Satu-satunya
+   kode yang membuatnya, `EnsureNumberSequenceDrafts::forReadyTenant`, menuntut adanya baris
+   `app_placements` berstatus siap — dan itu milik app berkontainer. Modul di dalam runtime
+   tidak punya penempatan sama sekali, jadi jalur itu diam-diam tidak menemukan apa pun. Tenant
+   yang membeli modul berakhir tanpa nomor dokumen, dan yang pertama menemukannya bukan
+   pemasangan melainkan dokumen pertama yang gagal disimpan. `InstallModule` sekarang yang
+   membuatnya, sebelum seed, karena seed menerbitkan nomor sungguhan.
+2. **Event dipancarkan per modul yang benar-benar terpasang, bukan sekali untuk seluruh
+   tenant.** Sebuah tenant boleh berhak atas app yang belum berjalan di runtime ini. Dipancarkan
+   sekali dengan seluruh daftar app, listener modul yang **tidak** terpasang ikut menjawab dan
+   menyemai ke tabel yang migrationnya belum pernah dijalankan untuk tenant itu. Waktu jalurnya
+   HTTP keadaan ini tidak pernah muncul: alamat modul yang tidak berjalan memang tidak menjawab.
+
+**Kegagalan penyediaan tidak membatalkan pendaftaran usaha**, sama seperti sebelumnya, karena
+eventnya dipancarkan setelah transaksi ditutup.
+
+**Test tanda tangan diganti test ketiadaan rute.** Yang dulu membuktikan permintaan tanpa tanda
+tangan ditolak 401 kini membuktikan rutenya menjawab 404 — karena "dihapus" dan "masih ada tapi
+tidak dipanggil siapa-siapa" terlihat sama persis dari kode.
+
 ### F3-12 — Laporan dibaca langsung, bukan lewat HTTP
 
 **Kenapa.** Hari ini mesin laporan Core memanggil endpoint modul dengan token pengguna, lalu modul
@@ -3358,6 +3436,36 @@ dokumen work order menghasilkan PDF tanpa permintaan HTTP antar bagian.
 **Rujukan.** [reporting dan replika](../../dev/07-reporting-and-replicas.md), [dokumen cetak](../../dev/23-document-rendering.md).
 
 **Bergantung pada.** F3-10.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Arah kontraknya terbalik dari semua kontrak lain, dan itu menuntut bentuk yang berbeda.**
+`PenerbitNomor`, `KalenderFiskal`, dan `MesinWorkflow` adalah Core yang melayani modul; yang ini
+modul yang melayani Core. Karena itu ia tidak bisa berupa satu binding pada container: ada lebih
+dari satu modul, dan yang menentukan siapa dipanggil adalah `app_id` laporannya. Yang dipakai
+sepasang antarmuka — `PenyediaLaporanModul` yang diisi modul dan `DaftarLaporan` tempat ia
+mendaftar — dengan registry yang **diikat sebagai singleton**. Diikat biasa, tiap pendaftaran
+masuk ke salinan yang langsung dibuang dan Core melihat daftar kosong tanpa satu pun kesalahan.
+
+**Konteks dibawa sebagai argumen, bukan dibaca dari permintaan.** Ekspor laporan berjalan di
+worker antrean yang tidak punya `Request` maupun sesi. Bentuk `$konteks` sengaja sama persis
+dengan yang dulu dibawa token, supaya kode modul yang membacanya tidak perlu diubah.
+
+**Tenant aktif diikat pemanggil, bukan dititipkan ke modul.** Ini bagian dari lubang yang sama
+yang ditemukan F3-11; penutupnya `PelaksanaTenant`, satu-satunya tempat tenant aktif diganti
+sementara. Pola ikat-lalu-pulihkan itu sempat berdiri sendiri di empat tempat.
+
+**`ReportingTest` ternyata menguji Core terhadap modul yang dipalsukan seluruhnya.** Ia
+mengarang definisi laporannya sendiri lewat `Http::fake`, lengkap dengan permission yang
+**berbeda** dari yang dituntut definisi sungguhan. Selama jalurnya HTTP, ketidakcocokan itu tidak
+pernah terlihat karena yang menjawab adalah tiruan buatan test itu sendiri. Sekarang baris
+katalognya datang dari manifest lewat perintah pendaftaran yang sama dengan yang dijalankan admin
+on-prem, dan penyimpangan manifest terhadap kode modul membuat empat test merah.
+
+Kriteria selesainya diuji langsung: mencetak work order sampai jadi berkas, dengan `Http::fake`
+yang mencatat lalu menolak permintaan apa pun kecuali layanan render.
 
 ### F3-13 — Rute modul didaftarkan lewat penyedia layanan
 
@@ -3422,6 +3530,23 @@ untuk modul ini sama persis dengan sebelum pemindahan.
 **Rujukan.** [standar app](../../dev/02-module-standard.md), [rantai keamanan](../../dev/19-transaction-security-chain.md).
 
 **Bergantung pada.** F2-05, F3-13.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026. Perintahnya tidak lagi menerima jalur berkas; ia memakai
+`ModuleRegistry`, dengan `semua()` — bukan `semuaTermasukYangSedangDipindah()` — karena katalog
+adalah daftar yang boleh dipasang untuk tenant, dan modul yang sedang dipindah belum boleh.
+
+**Jalur berkas yang diketik pemakai dibuang karena ia sumber kebenaran kedua.** Yang didaftarkan
+ke katalog bisa berbeda dari yang dimuat runtime, dan tidak ada yang akan menyadarinya.
+
+**`database_name` tidak lagi disalin dari manifest.** Modul berjalan memakai database Core;
+manifest aset masih membawa `database.logical_name` dari masa ia sebuah container, dan
+menyalinnya berarti mencatat nama database yang tidak pernah dibuat siapa pun.
+
+Angka rencana diperiksa ulang terhadap manifest dan cocok. Dibuktikan bisa gagal dengan
+melewatkan satu kelompok manifest — merahnya menyebut `reports` 2 menjadi 0 — dan dengan
+mendaftarkan modul yang masih dalam pemindahan.
 
 ### F3-15 — Test modul pindah dan memakai autentikasi Core
 
@@ -3544,6 +3669,12 @@ berada di akar.
 
 **Bergantung pada.** F3-03.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026. Berkasnya pindah ke `config/` di akar modul, digabung dengan
+awalan `modules.management-aset`, dan keempat pemanggilan `config('management_aset.…')` diganti.
+Nol kunci modul tersisa di akar.
+
 ### F3-18 — Perkakas laporan bawaan ikut pindah
 
 **Kenapa.** Perintah pembuat layout bawaan memakai dua pustaka Office yang hari ini hanya terpasang
@@ -3568,6 +3699,26 @@ yang sama seperti sebelumnya.
 
 **Bergantung pada.** F3-12.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Langkah 1 ternyata sudah terpenuhi tanpa ada yang mencatatnya.** `phpoffice/phpword` dan
+`phpoffice/phpspreadsheet` sudah berada di `require`, bukan `require-dev`.
+
+**Yang belum, dan tidak disebut rencana: perintahnya tidak pernah ada.** `routes/console.php`
+milik modul **tidak dimuat siapa pun**, sehingga `management-aset:seed-maintenance` — yang README
+modul suruh jalankan untuk tenant lama — tidak pernah terdaftar sebagai perintah. Begitu juga
+pembuat layout bawaan. Keduanya sekarang didaftarkan penyedia layanan modul.
+
+**Jalur layoutnya menunjuk folder yang salah.** Perintah itu memakai `resource_path()`, yang di
+dalam runtime Core menunjuk `apps/control-plane/resources/`, bukan folder modul. Sisa dari masa
+modul punya `base_path()` sendiri.
+
+**Tidak ada satu pun test yang menjaga ketiganya.** Dibuktikan dengan merusaknya lebih dulu:
+seluruh suite tetap hijau. `PerkakasModuleTest` ditulis untuk menutupnya, dan ketiga
+kegagalannya diperlihatkan sebelum dipercaya.
+
 ### F3-19 — Buang sisa konfigurasi klien HTTP
 
 **Kenapa.** Setelah empat klien hilang, empat variabel lingkungan dan satu blok konfigurasi menjadi mati.
@@ -3590,6 +3741,17 @@ aktif.
 **Rujukan.** Bagian 5.4 dokumen ini.
 
 **Bergantung pada.** F3-06, F3-07, F3-08, F3-09.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026. `config/services.php` dan `.env.example` milik modul dihapus,
+beserta pembantu test yang memasang setelan klien HTTP. Pencarian `services.coreerp`,
+`COREERP_URL`, `COREERP_APP_ID`, dan `COREERP_SERVICE_TOKEN` di seluruh kode aktif memulangkan
+nol.
+
+`COREERP_APP_CONTEXT_SIGNING_KEY` diberi komentar yang menerangkan kenapa ia justru **tidak**
+boleh ikut dihapus: ia masih menandatangani event yang keluar ke app di luar proses, dan tanpanya
+perintah pengiriman berhenti bekerja tanpa satu pun kesalahan — antreannya hanya menumpuk.
 
 ### F3-20 — Buktikan tidak ada lagi lompatan HTTP
 
@@ -3615,6 +3777,44 @@ pun test modul gagal.
 
 **Bergantung pada.** F3-19.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Yang dilarang bukan kata `Http::`.** Satu-satunya kemunculannya di `src/` modul hari ini ada di
+dalam docblock, jadi penjaga yang mencocokkan teks mentah akan merah karena kalimat sejarah —
+dan orang akan menghapus kalimatnya, bukan memperbaiki apa pun. Berkasnya dibaca sebagai token
+PHP dengan komentar dibuang, dan yang dicari **dua bahan yang keduanya diperlukan sebuah
+lompatan**: klien yang membuka koneksi, dan alamat serta kredensial Core. Salah satu saja cukup
+untuk merah.
+
+**Modul yang sedang dipindah tidak dikecualikan penjaga ini**, berbeda dari tiga penjaga lain.
+Alasannya: penjaga ini adalah kriteria selesai fase yang sedang memindahkan modul itu, jadi
+mengecualikannya berarti hijau justru pada satu-satunya modul yang ia dimaksudkan menilai. Diukur
+dan memang tidak diperlukan — nol pelanggaran apa adanya.
+
+**Dua jebakan ditemukan lewat sabotase, bukan lewat membaca kode.**
+
+1. **Pola versi pertama meleset pada `\Illuminate\Support\Facades\Http::`** — bentuk lengkap
+   tanpa `use`, yaitu justru bentuk yang paling mungkin dipakai menembus batas. Lookbehind-nya
+   menolak garis miring terbalik.
+2. **`Http::assertNothingSent()` tidak bekerja ketika penangan `Http::fake()` melempar.** Laravel
+   baru mencatat pasangan permintaan-jawaban setelah penanganya memulangkan sesuatu, sehingga
+   permintaan yang penanganya melempar tidak pernah tercatat. Versi pertama test alur hijau
+   padahal dua permintaan HTTP sungguhan keluar. Penggantinya: penangan mencatat alamatnya
+   sebelum melempar, dan daftar itu yang diperiksa.
+
+**Kalender fiskal diperiksa lewat akibatnya**, karena modul menelan kegagalan pembacaannya dan
+jatuh ke tahun kalender tanpa kesalahan apa pun. Tahun buku Juli–Juni menaruh awal penyusutan
+pada tanggal yang berbeda lima bulan dari fallback-nya; itu yang di-assert.
+
+**Kode kesalahan jaringan pada `NumberSequenceException` dibuang**, dan penggantinya membuat 503
+**tidak bisa ditulis** lagi, bukan sekadar berhenti dipakai.
+
+Tersisa dan dicatat: `KalenderFiskalCore::periode()` menjalankan pencarian periode yang sama
+untuk ketiga kalinya tanpa memakai `FiscalCalendarService`, dan penyatuan
+`InternalWorkflowInstanceController` yang diserahkan F3-09 ke sini belum dikerjakan.
+
 ### F3-21 — Penyedia layanan modul
 
 **Kenapa.** Empat task pada fase ini menyerahkan pekerjaan kepada "penyedia layanan modul", tapi tidak
@@ -3638,6 +3838,16 @@ dalam folder modul.
 **Rujukan.** Bagian 5.1 dokumen ini.
 
 **Bergantung pada.** F3-03.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026. Penyedia layanan modul sudah dibuat lebih awal bersama F3-13;
+yang diselesaikan di sini sisa kerangkanya. `src/Providers/AppServiceProvider.php` dilebur ke
+`ModuleServiceProvider` — isinya satu blok, dan penyedia kedua yang tidak menambah apa pun hanya
+memperpanjang rantai nama kerangka lama.
+
+`api/` dikosongkan kecuali `Dockerfile`, yang **masih dirujuk** `loadtest/docker-compose.yml`.
+Ia dibiarkan beserta komentar yang menerangkan kenapa, dan nasibnya menunggu F7-03.
 
 ### F3-22 — Namespace test modul dan pendaftaran suite
 
@@ -3704,6 +3914,27 @@ kontrak pada alur lint akan menunjuk berkas yang tidak jelas statusnya.
 
 **Bergantung pada.** F3-13.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Keputusan langkah 1: berkas di `contracts/` adalah dokumentasi, bukan kontrak yang dijaga CI.**
+Kontrak adalah janji kepada kode yang tidak kita kendalikan; setelah modul masuk ke dalam
+runtime, satu-satunya pemanggil rutenya adalah antarmukanya sendiri, dibangun dan dirilis
+bersama. Permukaan yang benar-benar melewati batas berpindah ke kontrak PHP di dalam proses.
+
+**Pemeriksa cakupannya dihapus, dan dua alasannya masing-masing sudah cukup:** tidak ada alur CI
+yang memanggilnya — langkah di `lint.yml` berjalan dengan `working-directory: apps/control-plane`
+sehingga yang dijalankan salinan Core — dan ia sudah tidak bisa dijalankan sama sekali sejak
+`api/artisan` hilang.
+
+`deploy/` dihapus. `loadtest/` dibekukan sampai F7-03 dengan status tertulis di README-nya.
+Dokumentasi modul dipindahkan ke `docs/apps/`.
+
+**Dua puluh dua berkas keluaran alat ternyata ikut ter-commit** di `ui/graphify-out/` dan
+`loadtest/graphify-out/`, karena pola `.gitignore`-nya berjangkar di akar repo. Dihapus dan
+polanya diperbaiki.
+
 ### F3-24 — Stack pengembangan tetap menyala selama pemindahan
 
 **Kenapa.** Prinsip P3. Skrip pengembangan menyentuh modul lewat empat jalur: pemasangan volume
@@ -3728,6 +3959,25 @@ halaman modul terbuka.
 **Rujukan.** [pengembangan lokal](../../dev/11-local-docker-development.md).
 
 **Bergantung pada.** F3-13.
+
+#### Catatan pelaksanaan
+
+Selesai sebagian pada 9 September 2026, dan bagian yang belum terbukti disebut di bawah.
+
+**Rencana salah menebak jalurnya.** Skrip pengembangan tidak pernah merujuk folder modul: ia
+menemukan app lewat glob `../app-erp-*`, yaitu repo lama yang terpisah. Yang benar-benar rusak
+justru milik Core sendiri:
+
+1. **Konteks build compose menunjuk folder app**, padahal `Dockerfile` menyalin `modules/` dari
+   akar repo. Pembangunannya gagal pada baris `COPY` pertama.
+2. **Pemasangan volume hot-reload masih `/var/www/html`**, padahal `Dockerfile` sudah lama
+   memakai `/repo/apps/control-plane`. Folder `modules/` juga ikut dipasang supaya perubahan
+   kode modul langsung terlihat.
+3. **`core-renderer` tidak pernah ada di compose**, padahal `config/reporting.php` menyebut nama
+   servis itu. Artinya stack pengembangan memang tidak pernah bisa mencetak PDF.
+
+**Belum terbukti:** stack-nya belum pernah dinyalakan dengan Docker. Yang diverifikasi hanya
+`docker compose config` lulus.
 
 ## 11. Fase 4: UI menjadi satu build
 

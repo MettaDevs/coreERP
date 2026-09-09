@@ -4,6 +4,8 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterLinkController;
+use Modules\Apperp\ManagementAset\Models\master\JenisAset;
+use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
 
 /**
  * Atribut yang menempel pada satu jenis aset. Aset mewarisi daftar ini dari jenisnya,
@@ -16,9 +18,9 @@ class JenisAsetAtributController extends MasterLinkController
         return 'jenis-aset';
     }
 
-    protected function ownerTable(): string
+    protected function ownerModel(): string
     {
-        return 'aset_m_jenis_aset';
+        return JenisAset::class;
     }
 
     protected function ownerColumn(): string
@@ -26,9 +28,9 @@ class JenisAsetAtributController extends MasterLinkController
         return 'jenis_aset_id';
     }
 
-    protected function table(): string
+    protected function model(): string
     {
-        return 'aset_m_jenis_aset_atribut';
+        return JenisAsetAtribut::class;
     }
 
     protected function rowRules(string $tenantId): array

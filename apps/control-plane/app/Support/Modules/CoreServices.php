@@ -10,13 +10,16 @@ use App\Services\Modules\KalenderFiskalCore;
 use App\Services\Modules\KonteksTenantPermintaan;
 use App\Services\Modules\MesinWorkflowCore;
 use App\Services\Modules\PenerbitNomorCore;
+use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\DaftarSatuan;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use App\Support\Modules\Contracts\KalenderFiskal;
 use App\Support\Modules\Contracts\KonteksPermintaan;
 use App\Support\Modules\Contracts\KonteksTenant;
 use App\Support\Modules\Contracts\MesinWorkflow;
+use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Support\Reporting\DaftarLaporanModul;
 use Illuminate\Contracts\Foundation\Application;
 
 /**
@@ -46,12 +49,40 @@ final class CoreServices
         // sesi untuk yang satu, atribut permintaan untuk yang lain — dan pintu yang
         // jawabannya bergantung pada bagian mana yang dipanggil bukan pintu yang jelas.
         KonteksPermintaan::class => ModuleRequestContext::class,
+        // Satu-satunya pintu module untuk menjalankan sesuatu di luar permintaan HTTP:
+        // perintah artisan, pekerja antrean, dan test yang memanggil layanannya langsung.
+        // Tanpa ini module harus menyebut kelas Core yang menyimpan tenant aktif, dan
+        // batas yang berbunyi satu kalimat langsung runtuh.
+        PelaksanaUntukTenant::class => PelaksanaTenant::class,
+    ];
+
+    /**
+     * Kontrak yang **module** penuhi untuk Core, bukan sebaliknya.
+     *
+     * Dipisahkan dari `PEMETAAN` karena cara mengikatnya berbeda dan bedanya menentukan
+     * apakah ia bekerja sama sekali: yang di atas dibuat baru tiap kali dipakai, sedangkan
+     * daftar isian harus satu benda untuk seluruh proses. Diikat dengan `bind`, tiap
+     * pendaftaran dari penyedia layanan module akan masuk ke salinan yang langsung dibuang,
+     * dan Core melihat daftar kosong tanpa satu pun kesalahan.
+     *
+     * Alias dipasang ke arah kelas Core-nya, bukan sebaliknya, supaya Core yang membaca
+     * daftar dan module yang mengisinya benar-benar memegang benda yang sama.
+     *
+     * @var array<class-string, class-string>
+     */
+    public const PEMETAAN_TUNGGAL = [
+        DaftarLaporan::class => DaftarLaporanModul::class,
     ];
 
     public static function daftarkan(Application $app): void
     {
         foreach (self::PEMETAAN as $antarmuka => $pelaksana) {
             $app->bind($antarmuka, $pelaksana);
+        }
+
+        foreach (self::PEMETAAN_TUNGGAL as $antarmuka => $pelaksana) {
+            $app->singleton($pelaksana);
+            $app->alias($pelaksana, $antarmuka);
         }
     }
 }

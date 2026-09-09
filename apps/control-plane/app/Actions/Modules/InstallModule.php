@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Modules;
 
+use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Models\ModuleInstallation;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleMigrator;
@@ -17,7 +18,8 @@ use RuntimeException;
  *
  * Urutannya tidak boleh ditukar. Migration lebih dulu, karena seed menulis ke tabel yang
  * dibuatnya. Catatan pemasangan sebelum seed, karena seed membaca `seeded_at` dari catatan
- * itu untuk memutuskan apakah ia perlu berjalan.
+ * itu untuk memutuskan apakah ia perlu berjalan. Urutan nomor sebelum seed, karena seed
+ * menerbitkan nomor sungguhan.
  *
  * Memasang module yang sudah terpasang **bukan kesalahan**. Ia mengembalikan status ke
  * terpasang tanpa menyentuh data dan tanpa mengisi ulang data awal, sehingga perintah ini
@@ -30,6 +32,7 @@ final class InstallModule
         private readonly ModuleRegistry $registry,
         private readonly ModuleMigrator $migrator,
         private readonly ModuleSeeder $seeder,
+        private readonly EnsureNumberSequenceDrafts $urutanNomor,
     ) {}
 
     public function handle(string $moduleId, string $tenantId): ModuleInstallation
@@ -55,6 +58,20 @@ final class InstallModule
             'created_at' => now(),
             'updated_at' => now(),
         ]], ['tenant_id', 'module_id'], ['version', 'status', 'disabled_at', 'uninstalled_at', 'updated_at']);
+
+        // Urutan nomor tenant untuk module ini, dan ini menutup lubang yang tidak terlihat
+        // sampai module pertama benar-benar dipasang dari dalam runtime.
+        //
+        // Satu-satunya jalur yang membuat urutan nomor sebuah app — `forReadyTenant` —
+        // menuntut adanya baris `app_placements` yang berstatus siap. Baris itu milik app
+        // berkontainer; module yang berjalan di dalam runtime ini tidak punya penempatan sama
+        // sekali, jadi jalur itu diam-diam tidak menemukan apa-apa dan tidak membuat satu pun
+        // urutan. Tenant yang membeli module lalu berakhir tanpa nomor dokumen, dan yang
+        // pertama menemukannya bukan pemasangan melainkan dokumen pertama yang gagal disimpan
+        // dengan "Sequence aktif tidak ditemukan untuk aplikasi dan tenant ini".
+        //
+        // Letaknya sebelum seed karena seed module menerbitkan nomor sungguhan.
+        $this->urutanNomor->forTenantAndApp($tenantId, $module->id);
 
         $this->seeder->jalankan($module, $tenantId);
 

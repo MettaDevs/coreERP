@@ -4,7 +4,7 @@
 
 `tr_dokumen_siklus_aset.workflow_instance_id` mengikat usulan dekomisioning ke workflow CoreERP. `processed_core_events` adalah inbox idempoten: event keputusan yang sama hanya mengubah status sekali. Kedua tabel tetap berada di database Aset; CoreERP tidak mengaksesnya langsung.
 
-Migration app berada di `migrations/` dan dijalankan oleh Laravel API melalui `api/app/Providers/AppServiceProvider.php`.
+Migration module berada di `migrations/` dan dijalankan `ModuleMigrator` milik Core, bukan didaftarkan penyedia layanan module. Pencatatannya per module supaya pemasangan dan pencabutan per tenant bisa dilacak.
 
 Database ini hanya dimiliki Management Aset. Referensi tenant dan unit organisasi disimpan sebagai ID opaque; tidak ada foreign key atau query ke database Core.
 

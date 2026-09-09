@@ -4,10 +4,10 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
@@ -53,11 +53,10 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
     {
         $jobTypeId = $data['maintenance_job_type_id'] ?? $record?->maintenance_job_type_id;
         $variantId = array_key_exists('variant_id', $data) ? $data['variant_id'] : $record?->variant_id;
-        if ($variantId !== null && ! DB::table('aset_m_maintenance_job_type_variant')->where([
-            'tenant_id' => $tenantId,
-            'id' => $variantId,
-            'maintenance_job_type_id' => $jobTypeId,
-        ])->whereNull('deleted_at')->exists()) {
+        if ($variantId !== null && ! MaintenanceJobTypeVariant::query()
+            ->whereKey($variantId)
+            ->where('maintenance_job_type_id', $jobTypeId)
+            ->exists()) {
             abort(422, 'Varian job type harus berasal dari jenis pekerjaan yang dipilih.');
         }
     }

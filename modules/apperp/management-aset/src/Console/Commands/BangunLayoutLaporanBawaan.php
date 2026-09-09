@@ -32,8 +32,15 @@ class BangunLayoutLaporanBawaan extends Command
 
     public function handle(): int
     {
-        $this->workOrderDocx(resource_path('laporan/work-order/standar.docx'));
-        $this->workOrderListXlsx(resource_path('laporan/daftar-work-order/standar.xlsx'));
+        // Jalur dihitung dari folder module, bukan dari `resource_path()`. Alasannya sama
+        // seperti pada `Reporting\Layouts\BuiltinLayout`: di dalam runtime Core,
+        // `resource_path()` menunjuk `resources/` milik **Core**, jadi perintah ini akan
+        // menulis layout module ke folder Core — berhasil tanpa keluhan, lalu berkas yang
+        // sungguh dibaca saat mencetak tetap yang lama.
+        $laporan = dirname(__DIR__, 3).'/resources/laporan';
+
+        $this->workOrderDocx($laporan.'/work-order/standar.docx');
+        $this->workOrderListXlsx($laporan.'/daftar-work-order/standar.xlsx');
         $this->info('Layout bawaan dibangun ulang.');
 
         return self::SUCCESS;
