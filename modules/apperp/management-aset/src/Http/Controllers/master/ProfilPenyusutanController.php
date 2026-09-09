@@ -2,13 +2,13 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\MasterData;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
 /**
@@ -86,8 +86,7 @@ class ProfilPenyusutanController extends MasterDataController
             return;
         }
 
-        $used = DB::table('aset_tr_buku_aset')
-            ->where('tenant_id', $tenantId)
+        $used = AssetBook::query()
             ->where(fn ($query) => $query
                 ->where('depreciation_profile_id', $record->getKey())
                 ->orWhere('alternative_profile_id', $record->getKey()))

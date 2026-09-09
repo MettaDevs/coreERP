@@ -10,10 +10,12 @@ use App\Support\Reporting\LayoutRef;
 use App\Support\Reporting\LayoutStore;
 use App\Support\Reporting\PrintIdentityStore;
 use App\Support\Reporting\ReportCatalog;
+use App\Support\Reporting\SumberLaporan;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use stdClass;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
@@ -29,7 +31,7 @@ class ReportLayoutController extends Controller
     public function __construct(
         private readonly ReportCatalog $catalog,
         private readonly LayoutStore $layouts,
-        private readonly AppReportClient $client,
+        private readonly SumberLaporan $client,
         private readonly CurrentWorkspace $workspace,
         private readonly PrintIdentityStore $identities,
     ) {}
@@ -144,7 +146,7 @@ class ReportLayoutController extends Controller
         return $this->listing($request, $membership, $report);
     }
 
-    /** @return array{0: TenantMembership, 1: object} */
+    /** @return array{0: TenantMembership, 1: stdClass} */
     private function report(Request $request, string $code): array
     {
         $membership = $this->currentMembership($request);
@@ -156,7 +158,7 @@ class ReportLayoutController extends Controller
         return [$membership, $report];
     }
 
-    private function listing(Request $request, TenantMembership $membership, object $report): JsonResponse
+    private function listing(Request $request, TenantMembership $membership, stdClass $report): JsonResponse
     {
         $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
 
@@ -167,7 +169,7 @@ class ReportLayoutController extends Controller
     }
 
     /** @return list<string> */
-    private function knownKeys(Request $request, TenantMembership $membership, object $report): array
+    private function knownKeys(Request $request, TenantMembership $membership, stdClass $report): array
     {
         $definition = AppReportClient::guard(fn () => $this->client->definition(
             $report, $membership, $this->workspace->legalEntity($request, $membership)?->id, $this->workspace->operatingUnit($request, $membership)?->id,

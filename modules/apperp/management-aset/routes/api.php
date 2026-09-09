@@ -3,7 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ManagementAset\Http\Controllers\ContextController;
 use Modules\Apperp\ManagementAset\Http\Controllers\HealthController;
-use Modules\Apperp\ManagementAset\Http\Controllers\laporan\LaporanInternalController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\AnalisaMaintenanceController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\BukuPenyusutanController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\GroupAsetController;
@@ -76,15 +75,9 @@ $masters = [
 
 Route::get('v1/health', HealthController::class);
 
-// Laporan: dipanggil Core dengan token konteks pengguna yang meminta cetak, sehingga
-// permission dan scope organisasi ditegakkan seperti request biasa. Layout, antrean
-// ekspor, dan render ada di Core; app hanya menyerahkan definisi, layout bawaan, dan
-// dataset. Lihat docs/dev/23-document-rendering.md di repository CoreERP.
-Route::prefix('internal/v1/laporan')->middleware('konteks-module:management-aset')->group(function (): void {
-    Route::get('{kode}', [LaporanInternalController::class, 'show']);
-    Route::get('{kode}/layouts/{key}', [LaporanInternalController::class, 'builtinLayout']);
-    Route::post('{kode}/dataset', [LaporanInternalController::class, 'dataset']);
-});
+// Tidak ada lagi rute `internal/v1/laporan`. Mesin laporan Core membaca definisi, layout
+// bawaan, dan dataset module ini lewat `Reporting\PenyediaLaporan` di dalam proses yang
+// sama; tiga rute yang dulu ada di sini beserta controller-nya dihapus pada F3-12.
 
 Route::prefix('v1')->middleware('konteks-module:management-aset')->group(function () use ($masters): void {
     Route::get('context', ContextController::class);

@@ -2,10 +2,10 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Support\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Tests\TestCase;
@@ -14,37 +14,14 @@ class IndonesiaStarterProvisioningTest extends TestCase
 {
     use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
-    private string $signingKey = 'test-context-signing-key-32-bytes';
-
-    protected function setUp(): void
+    public function test_event_tenant_baru_aman_diulang_dan_tidak_menyeberang_tenant(): void
     {
-        parent::setUp();
-        config([
-            'services.coreerp.context_signing_key' => $this->signingKey,
-            'services.coreerp.app_id' => 'management-aset',
-            'services.coreerp.url' => 'http://core.test',
-            'services.coreerp.service_token' => 'service-token',
-        ]);
-    }
-
-    public function test_signed_tenant_event_is_idempotent_and_does_not_cross_tenants(): void
-    {
-        $calls = 0;
-        Http::fake(function (HttpRequest $request) use (&$calls) {
-            $calls++;
-
-            return Http::response(['data' => ['number' => 'SEED'.str_pad((string) $calls, 5, '0', STR_PAD_LEFT)]], 200);
-        });
-
         // Tenant dibuat lewat trait supaya urutan nomornya ikut disiapkan; penyediaan data awal
-        // menerbitkan nomor sungguhan sekarang, dan tenant tanpa urutan nomor ditolak Core.
+        // menerbitkan nomor sungguhan, dan tenant tanpa urutan nomor ditolak Core.
         $tenant = $this->buatTenantUji();
         $otherTenant = $this->buatTenantUji();
-        $body = $this->eventBody($tenant);
 
-        $this->call('POST', '/api/modules/management-aset/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
-            ->assertOk()
-            ->assertJsonPath('data.template_key', 'id:pmk72-2023:starter:v1');
+        $this->pancarkan($tenant);
 
         $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 7);
         $this->assertDatabaseCount('aset_m_profil_penyusutan', 10);
@@ -128,8 +105,7 @@ class IndonesiaStarterProvisioningTest extends TestCase
         // tanpa menerbitkan apa pun, dan itu justru yang benar.
         $sebelumDiulang = $this->jumlahNomorTerbit();
 
-        $this->call('POST', '/api/modules/management-aset/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
-            ->assertOk();
+        $this->pancarkan($tenant);
 
         $this->assertSame($sebelumDiulang, $this->jumlahNomorTerbit(), 'Pengulangan event menerbitkan nomor baru.');
         $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 7);
@@ -153,7 +129,15 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $this->assertDatabaseMissing('aset_m_kelompok_harta_fiskal', ['tenant_id' => $otherTenant]);
     }
 
-    public function test_unsigned_provisioning_request_is_rejected(): void
+    /**
+     * Pintu HTTP-nya benar-benar tertutup, bukan sekadar tidak dipakai lagi.
+     *
+     * Rute lama memverifikasi tanda tangan HMAC, dan permintaan tanpa tanda tangan dijawab 401.
+     * Sesudah penyediaan menjadi event di dalam proses, rutenya dihapus — tetapi "dihapus" dan
+     * "masih ada tetapi tidak dipanggil siapa-siapa" terlihat sama persis dari kode. Yang
+     * membedakannya hanya pemeriksaan seperti ini.
+     */
+    public function test_endpoint_provisioning_lama_sudah_tidak_ada(): void
     {
         $this->postJson('/api/modules/management-aset/internal/v1/provisioning/tenant', [
             'id' => (string) Str::ulid(),
@@ -162,17 +146,12 @@ class IndonesiaStarterProvisioningTest extends TestCase
             'tenant_id' => (string) Str::ulid(),
             'correlation_id' => (string) Str::ulid(),
             'data' => ['app_ids' => ['management-aset']],
-        ])->assertUnauthorized();
+        ])->assertNotFound();
     }
 
-    public function test_event_for_another_app_is_acknowledged_without_partial_seed(): void
+    public function test_event_untuk_module_lain_dilewati_tanpa_data_separuh(): void
     {
-        Http::fake();
-        $body = $this->eventBody((string) Str::ulid(), ['human-resources']);
-
-        $this->call('POST', '/api/modules/management-aset/internal/v1/provisioning/tenant', [], [], [], $this->eventServer($body), $body)
-            ->assertOk()
-            ->assertJsonPath('data.skipped', true);
+        $this->pancarkan((string) Str::ulid(), ['human-resources']);
 
         $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
         $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 0);
@@ -180,28 +159,30 @@ class IndonesiaStarterProvisioningTest extends TestCase
         $this->assertDatabaseCount('aset_m_buku_penyusutan', 0);
     }
 
-    /** @param list<string> $appIds */
-    private function eventBody(string $tenantId, array $appIds = ['management-aset']): string
+    /**
+     * Memancarkan event tenant baru dengan tenant aktif terikat, seperti Core memancarkannya.
+     *
+     * Ikatan tenantnya bukan hiasan: listener menyemai lewat model module, dan penyaringan
+     * tenant model gagal-menutup — tanpa ikatan itu penyediaan melempar, bukan menyemai ke
+     * tenant yang salah. `event()` telanjang di sini akan membuat test menempuh keadaan yang
+     * tidak pernah dipakai produksi.
+     *
+     * Yang dipakai `PelaksanaUntukTenant`, sebuah kontrak, bukan `PengirimEventModul` milik
+     * Core. Keduanya melakukan hal yang sama, dan itu memang kelemahan yang diterima sadar:
+     * test ini jadi meniru pengirimnya alih-alih memanggilnya, sehingga perubahan pada
+     * pengirim tidak akan terlihat di sini. Yang menutup celah itu test pendaftaran usaha di
+     * Core, yang memanggil pengirim sungguhan. Sebagai gantinya, seluruh berkas module berhenti
+     * menyebut kelas Core di luar kontrak — syarat modul ini keluar dari daftar pemindahan.
+     *
+     * @param  list<string>  $appIds
+     */
+    private function pancarkan(string $tenantId, array $appIds = ['management-aset']): void
     {
-        return json_encode([
-            'id' => (string) Str::ulid(),
-            'type' => 'core.tenant.provisioned.v1',
-            'occurred_at' => now()->toIso8601String(),
-            'tenant_id' => $tenantId,
-            'correlation_id' => $tenantId,
-            'data' => ['app_ids' => $appIds],
-        ], JSON_THROW_ON_ERROR);
-    }
-
-    /** @return array<string, string> */
-    private function eventServer(string $body): array
-    {
-        $timestamp = (string) now()->timestamp;
-
-        return [
-            'HTTP_X_COREERP_EVENT_TIMESTAMP' => $timestamp,
-            'HTTP_X_COREERP_EVENT_SIGNATURE' => hash_hmac('sha256', $timestamp.'.'.$body, $this->signingKey),
-            'CONTENT_TYPE' => 'application/json',
-        ];
+        app(PelaksanaUntukTenant::class)->jalankanUntuk(
+            $tenantId,
+            static fn (): bool => event(
+                new TenantDisiapkan((string) Str::ulid(), $tenantId, $tenantId, null, ['app_ids' => $appIds]),
+            ) !== null,
+        );
     }
 }

@@ -2,11 +2,12 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterLinkController;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\GroupAset;
+use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 
 /**
@@ -24,9 +25,9 @@ class GroupBukuPenyusutanController extends MasterLinkController
         return 'group-aset';
     }
 
-    protected function ownerTable(): string
+    protected function ownerModel(): string
     {
-        return 'aset_m_group_aset';
+        return GroupAset::class;
     }
 
     protected function ownerColumn(): string
@@ -34,9 +35,9 @@ class GroupBukuPenyusutanController extends MasterLinkController
         return 'group_aset_id';
     }
 
-    protected function table(): string
+    protected function model(): string
     {
-        return 'aset_m_group_buku_penyusutan';
+        return GroupBukuPenyusutan::class;
     }
 
     protected function rowRules(string $tenantId): array
@@ -71,10 +72,8 @@ class GroupBukuPenyusutanController extends MasterLinkController
             fn (array $row): ?string => $row['buku_id'] ?? null,
             $rows,
         )));
-        $books = DB::table('aset_m_buku_penyusutan')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('id', $bookIds)
-            ->whereNull('deleted_at')
+        $books = BukuPenyusutan::query()
+            ->whereKey($bookIds)
             ->get(['id', 'depreciation_profile_id', 'alternative_profile_id'])
             ->keyBy('id');
 
@@ -92,11 +91,9 @@ class GroupBukuPenyusutanController extends MasterLinkController
                 }
             }
         }
-        $profiles = DB::table('aset_m_profil_penyusutan')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('id', array_values(array_unique($profileIds)))
+        $profiles = ProfilPenyusutan::query()
+            ->whereKey(array_values(array_unique($profileIds)))
             ->where('aktif', true)
-            ->whereNull('deleted_at')
             ->get([
                 'id', 'method', 'frequency', 'convention', 'useful_life_periods', 'rate_percent',
                 'effective_from', 'effective_to',

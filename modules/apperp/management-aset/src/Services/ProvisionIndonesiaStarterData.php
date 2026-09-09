@@ -2,11 +2,33 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
+use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\GroupAset;
+use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
+use Modules\Apperp\ManagementAset\Models\master\KondisiAset;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplate;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariable;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariableValue;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobType;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
+use Modules\Apperp\ManagementAset\Models\master\ModelAset;
+use Modules\Apperp\ManagementAset\Models\master\PabrikanAset;
+use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\SebabKerusakan;
+use Modules\Apperp\ManagementAset\Models\master\TindakanPerbaikan;
+use Modules\Apperp\ManagementAset\Models\master\TingkatLayanan;
+use Modules\Apperp\ManagementAset\Models\master\TipeLokasiAset;
+use Modules\Apperp\ManagementAset\Models\master\TipeWorkOrder;
+use Modules\Apperp\ManagementAset\Models\master\Trade;
+use Modules\Apperp\ManagementAset\Models\master\ValidasiStatusWorkOrder;
 use Modules\Apperp\ManagementAset\Support\WorkOrderValidation;
 
 final class ProvisionIndonesiaStarterData
@@ -25,7 +47,7 @@ final class ProvisionIndonesiaStarterData
             throw new InvalidArgumentException('Tenant tidak valid.');
         }
 
-        $template = config('management_aset.indonesia_starter');
+        $template = config('modules.management-aset.indonesia_starter');
         $selectedTemplateKey = $templateKey ?? (is_array($template) ? ($template['template_key'] ?? null) : null);
         if (! is_array($template) || $selectedTemplateKey !== ($template['template_key'] ?? null)) {
             throw new LogicException('Template starter Indonesia tidak tersedia.');
@@ -37,14 +59,14 @@ final class ProvisionIndonesiaStarterData
         $mappings = $this->seedDefaultBookMappings($tenantId, $classifications, $profiles, $books);
         $locationTypes = $this->seedOptionalMasters(
             $tenantId,
-            'aset_m_tipe_lokasi_aset',
+            TipeLokasiAset::class,
             'management-aset.tipe-lokasi-aset',
             'tipe-lokasi-aset',
             $template['location_types'],
         );
         $conditions = $this->seedOptionalMasters(
             $tenantId,
-            'aset_m_kondisi_aset',
+            KondisiAset::class,
             'management-aset.kondisi-aset',
             'kondisi-aset',
             $template['conditions'],
@@ -72,7 +94,7 @@ final class ProvisionIndonesiaStarterData
         if (! Str::isUlid($tenantId)) {
             throw new InvalidArgumentException('Tenant tidak valid.');
         }
-        $maintenance = config('management_aset.indonesia_starter.maintenance');
+        $maintenance = config('modules.management-aset.indonesia_starter.maintenance');
         $selectedTemplateKey = $templateKey ?? ($maintenance['template_key'] ?? null);
         if (! is_array($maintenance) || $selectedTemplateKey !== ($maintenance['template_key'] ?? null)) {
             throw new LogicException('Template maintenance Indonesia tidak tersedia.');
@@ -99,7 +121,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($template['work_order_types'] ?? [] as $item) {
             $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_tipe_work_order',
+                TipeWorkOrder::class,
                 'management-aset.tipe-work-order',
                 'tipe-work-order:starter:'.$item['template_key'],
                 [
@@ -115,7 +137,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($template['service_levels'] ?? [] as $item) {
             $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_tingkat_layanan',
+                TingkatLayanan::class,
                 'management-aset.tingkat-layanan',
                 'tingkat-layanan:starter:'.$item['template_key'],
                 [
@@ -131,7 +153,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($template['trades'] ?? [] as $item) {
             $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_trade',
+                Trade::class,
                 'management-aset.trade',
                 'trade:starter:'.$item['template_key'],
                 [
@@ -146,7 +168,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($template['fault_causes'] ?? [] as $item) {
             $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_sebab_kerusakan',
+                SebabKerusakan::class,
                 'management-aset.sebab-kerusakan',
                 'sebab-kerusakan:starter:'.$item['template_key'],
                 ['nama' => $item['name'], 'keterangan' => $item['description'] ?? null, 'aktif' => true],
@@ -157,7 +179,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($template['repair_actions'] ?? [] as $item) {
             $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_tindakan_perbaikan',
+                TindakanPerbaikan::class,
                 'management-aset.tindakan-perbaikan',
                 'tindakan-perbaikan:starter:'.$item['template_key'],
                 ['nama' => $item['name'], 'keterangan' => $item['description'] ?? null, 'aktif' => true],
@@ -175,7 +197,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($template['job_types'] ?? [] as $item) {
             $jobTypes[$item['template_key']] = $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_maintenance_job_type',
+                MaintenanceJobType::class,
                 'management-aset.maintenance-job-types',
                 'maintenance-job-types:starter:'.$item['template_key'],
                 [
@@ -193,7 +215,7 @@ final class ProvisionIndonesiaStarterData
             foreach ($template['variants'] ?? [] as $item) {
                 $variants[$jobTypeKey][$item['template_key']] = $this->ensureNumberedMaster(
                     $tenantId,
-                    'aset_m_maintenance_job_type_variant',
+                    MaintenanceJobTypeVariant::class,
                     'management-aset.maintenance-job-type-variants',
                     'maintenance-job-type-variants:starter:'.$jobTypeKey.':'.$item['template_key'],
                     [
@@ -210,7 +232,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($template['checklist_variables'] ?? [] as $item) {
             $variableId = $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_maintenance_checklist_variable',
+                MaintenanceChecklistVariable::class,
                 'management-aset.maintenance-checklist-variables',
                 'maintenance-checklist-variables:starter:'.$item['template_key'],
                 ['nama' => $item['name'], 'keterangan' => $item['description'] ?? null, 'aktif' => true],
@@ -223,7 +245,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($template['checklist_templates'] ?? [] as $item) {
             $templateId = $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_maintenance_checklist_template',
+                MaintenanceChecklistTemplate::class,
                 'management-aset.maintenance-checklist-templates',
                 'maintenance-checklist-templates:starter:'.$item['template_key'],
                 ['nama' => $item['name'], 'keterangan' => $item['description'] ?? null, 'aktif' => true],
@@ -241,7 +263,7 @@ final class ProvisionIndonesiaStarterData
             }
             $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_maintenance_job_type_default',
+                MaintenanceJobTypeDefault::class,
                 'management-aset.maintenance-job-type-defaults',
                 'maintenance-job-type-defaults:starter:'.$item['template_key'],
                 [
@@ -286,21 +308,17 @@ final class ProvisionIndonesiaStarterData
     {
         $dibuat = 0;
         foreach ($items as $item) {
-            $ada = DB::table('aset_m_validasi_status_work_order')->where([
-                'tenant_id' => $tenantId, 'status' => $item['status'], 'aturan' => $item['aturan'],
+            $ada = ValidasiStatusWorkOrder::query()->where([
+                'status' => $item['status'], 'aturan' => $item['aturan'],
             ])->exists();
             if ($ada) {
                 continue;
             }
-            DB::table('aset_m_validasi_status_work_order')->insert([
-                'id' => (string) Str::ulid(),
-                'tenant_id' => $tenantId,
+            $this->simpan(ValidasiStatusWorkOrder::class, $tenantId, [
                 'status' => $item['status'],
                 'aturan' => $item['aturan'],
                 'aktif' => (bool) ($item['aktif'] ?? true),
                 'keparahan' => $item['keparahan'] ?? WorkOrderValidation::ERROR,
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
             $dibuat++;
         }
@@ -312,16 +330,15 @@ final class ProvisionIndonesiaStarterData
     private function ensureChecklistValues(string $tenantId, string $variableId, array $items): void
     {
         foreach ($items as $item) {
-            $exists = DB::table('aset_m_maintenance_checklist_variable_value')->where([
-                'tenant_id' => $tenantId, 'variable_id' => $variableId, 'line_number' => $item['line_number'],
+            $exists = MaintenanceChecklistVariableValue::query()->where([
+                'variable_id' => $variableId, 'line_number' => $item['line_number'],
             ])->exists();
             if ($exists) {
                 continue;
             }
-            DB::table('aset_m_maintenance_checklist_variable_value')->insert([
-                'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'variable_id' => $variableId,
+            $this->simpan(MaintenanceChecklistVariableValue::class, $tenantId, [
+                'variable_id' => $variableId,
                 'line_number' => $item['line_number'], 'value' => $item['value'], 'result_code' => $item['result_code'],
-                'created_at' => now(), 'updated_at' => now(),
             ]);
         }
     }
@@ -330,20 +347,19 @@ final class ProvisionIndonesiaStarterData
     private function ensureChecklistTemplateLines(string $tenantId, string $templateId, array $items, array $variables = []): void
     {
         foreach ($items as $item) {
-            $exists = DB::table('aset_m_maintenance_checklist_template_line')->where([
-                'tenant_id' => $tenantId, 'template_id' => $templateId, 'line_number' => $item['line_number'],
+            $exists = MaintenanceChecklistTemplateLine::query()->where([
+                'template_id' => $templateId, 'line_number' => $item['line_number'],
             ])->exists();
             if ($exists) {
                 continue;
             }
-            DB::table('aset_m_maintenance_checklist_template_line')->insert([
-                'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'template_id' => $templateId,
+            $this->simpan(MaintenanceChecklistTemplateLine::class, $tenantId, [
+                'template_id' => $templateId,
                 'line_number' => $item['line_number'], 'type' => $item['type'],
                 'variable_id' => isset($item['variable_key']) ? ($variables[$item['variable_key']] ?? null) : null,
                 'nested_template_id' => null, 'unit' => $item['unit'] ?? null, 'nama' => $item['name'],
                 'instruksi' => $item['instructions'] ?? null,
                 'wajib' => (bool) ($item['mandatory'] ?? false),
-                'created_at' => now(), 'updated_at' => now(),
             ]);
         }
     }
@@ -406,7 +422,7 @@ final class ProvisionIndonesiaStarterData
             ];
             $ids[$item['template_key']] = $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_profil_penyusutan',
+                ProfilPenyusutan::class,
                 'management-aset.profil-penyusutan',
                 'profil-penyusutan:starter:'.$item['template_key'],
                 $values,
@@ -437,7 +453,7 @@ final class ProvisionIndonesiaStarterData
             ];
             $ids[$item['template_key']] = $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_buku_penyusutan',
+                BukuPenyusutan::class,
                 'management-aset.buku-penyusutan',
                 'buku-penyusutan:starter:'.$item['template_key'],
                 $values,
@@ -467,14 +483,13 @@ final class ProvisionIndonesiaStarterData
             return 0;
         }
 
-        $straightLineProfiles = collect(config('management_aset.indonesia_starter.profiles', []))
+        $straightLineProfiles = collect(config('modules.management-aset.indonesia_starter.profiles', []))
             ->filter(fn (array $profile): bool => $profile['method'] === 'straight_line')
             ->keyBy('classification_key');
         $created = 0;
-        DB::table('aset_m_group_aset')
-            ->where('tenant_id', $tenantId)
+        GroupAset::query()
             ->whereNotNull('kelompok_harta_fiskal_id')
-            ->whereNull('deleted_at')
+            ->toBase()
             ->get(['id', 'kelompok_harta_fiskal_id'])
             ->each(function (object $group) use ($tenantId, $classifications, $profiles, $straightLineProfiles, $defaultBookId, &$created): void {
                 $classificationKey = array_search($group->kelompok_harta_fiskal_id, $classifications, true);
@@ -484,16 +499,16 @@ final class ProvisionIndonesiaStarterData
                     return;
                 }
 
-                $exists = DB::table('aset_m_group_buku_penyusutan')
-                    ->where(['tenant_id' => $tenantId, 'group_aset_id' => $group->id, 'buku_id' => $defaultBookId])
+                // `withTrashed`: baris matriks yang sengaja diarsipkan tidak boleh dibuat
+                // ulang, dan tanpa itu penyisipannya melanggar kunci uniknya.
+                $exists = GroupBukuPenyusutan::withTrashed()
+                    ->where(['group_aset_id' => $group->id, 'buku_id' => $defaultBookId])
                     ->exists();
                 if ($exists) {
                     return;
                 }
 
-                DB::table('aset_m_group_buku_penyusutan')->insert([
-                    'id' => (string) Str::ulid(),
-                    'tenant_id' => $tenantId,
+                $this->simpan(GroupBukuPenyusutan::class, $tenantId, [
                     'group_aset_id' => $group->id,
                     'buku_id' => $defaultBookId,
                     'depreciation_profile_id' => $profileId,
@@ -502,8 +517,6 @@ final class ProvisionIndonesiaStarterData
                     'convention' => 'full_month',
                     'depreciate' => true,
                     'round_off_depreciation' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
                 ]);
                 $created++;
             });
@@ -511,14 +524,17 @@ final class ProvisionIndonesiaStarterData
         return $created;
     }
 
-    /** @param list<array<string, mixed>> $items */
-    private function seedOptionalMasters(string $tenantId, string $table, string $reference, string $resource, array $items): int
+    /**
+     * @param  class-string<Model>  $model
+     * @param  list<array<string, mixed>>  $items
+     */
+    private function seedOptionalMasters(string $tenantId, string $model, string $reference, string $resource, array $items): int
     {
         $created = 0;
         foreach ($items as $item) {
             $this->ensureNumberedMaster(
                 $tenantId,
-                $table,
+                $model,
                 $reference,
                 $resource.':starter:'.$item['template_key'],
                 [
@@ -541,7 +557,7 @@ final class ProvisionIndonesiaStarterData
         foreach ($catalog['manufacturers'] ?? [] as $manufacturer) {
             $manufacturerId = $this->ensureNumberedMaster(
                 $tenantId,
-                'aset_m_pabrikan_aset',
+                PabrikanAset::class,
                 'management-aset.pabrikan-aset',
                 'pabrikan-aset:starter:'.$catalogKey.':'.$manufacturer['template_key'],
                 [
@@ -554,7 +570,7 @@ final class ProvisionIndonesiaStarterData
             foreach ($manufacturer['models'] ?? [] as $model) {
                 $this->ensureNumberedMaster(
                     $tenantId,
-                    'aset_m_model_aset',
+                    ModelAset::class,
                     'management-aset.model-aset',
                     'model-aset:starter:'.$catalogKey.':'.$manufacturer['template_key'].':'.$model['template_key'],
                     [
@@ -573,30 +589,27 @@ final class ProvisionIndonesiaStarterData
     /** @param array<string, mixed> $values */
     private function ensureReference(string $tenantId, string $templateKey, array $values): string
     {
-        $existing = DB::table('aset_m_kelompok_harta_fiskal')
-            ->where(['tenant_id' => $tenantId, 'template_key' => $templateKey])
-            ->first();
+        // `withTrashed` pada seluruh pembacaan di sini: referensi yang sudah diarsipkan
+        // justru harus ditemukan, karena barisnya dihidupkan kembali, bukan dibuat ulang.
+        $existing = KelompokHartaFiskal::withTrashed()
+            ->where('template_key', $templateKey)
+            ->toBase()->first();
         if ($existing) {
             $this->assertSame($existing, $values, 'referensi fiskal '.$templateKey);
             if ($existing->deleted_at !== null) {
-                DB::table('aset_m_kelompok_harta_fiskal')->where('id', $existing->id)->update(['deleted_at' => null, 'updated_at' => now()]);
+                KelompokHartaFiskal::withTrashed()->where('id', $existing->id)->update(['deleted_at' => null, 'updated_at' => now()]);
             }
 
             return $existing->id;
         }
 
-        $id = (string) Str::ulid();
         try {
-            DB::table('aset_m_kelompok_harta_fiskal')->insert([
-                'id' => $id,
-                'tenant_id' => $tenantId,
+            $id = $this->simpan(KelompokHartaFiskal::class, $tenantId, [
                 'template_key' => $templateKey,
                 ...$values,
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
         } catch (QueryException $exception) {
-            $existing = DB::table('aset_m_kelompok_harta_fiskal')->where(['tenant_id' => $tenantId, 'template_key' => $templateKey])->first();
+            $existing = KelompokHartaFiskal::withTrashed()->where('template_key', $templateKey)->toBase()->first();
             if (! $existing) {
                 throw $exception;
             }
@@ -608,10 +621,15 @@ final class ProvisionIndonesiaStarterData
         return $id;
     }
 
-    /** @param array<string, mixed> $values */
-    private function ensureNumberedMaster(string $tenantId, string $table, string $reference, string $creationKey, array $values, ?int &$created = null): string
+    /**
+     * @param  class-string<Model>  $model
+     * @param  array<string, mixed>  $values
+     */
+    private function ensureNumberedMaster(string $tenantId, string $model, string $reference, string $creationKey, array $values, ?int &$created = null): string
     {
-        $existing = DB::table($table)->where(['tenant_id' => $tenantId, 'creation_key' => $creationKey])->first();
+        // `withTrashed`: record starter yang sengaja diarsipkan tenant harus tetap dikenali
+        // sebagai sudah ada, kalau tidak seed berikutnya membangkitkannya kembali.
+        $existing = $model::withTrashed()->where('creation_key', $creationKey)->toBase()->first();
         if ($existing) {
             // Master starter boleh disesuaikan tenant. Key yang sama berarti
             // record sudah pernah dimaterialisasi; jangan menghapus perubahan
@@ -620,28 +638,48 @@ final class ProvisionIndonesiaStarterData
         }
 
         $code = $this->numbers->issue($reference, $tenantId, $creationKey);
-        $id = (string) Str::ulid();
         try {
-            DB::table($table)->insert([
-                'id' => $id,
-                'tenant_id' => $tenantId,
+            $id = $this->simpan($model, $tenantId, [
                 'creation_key' => $creationKey,
                 'kode' => $code,
                 ...$values,
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
             if ($created !== null) {
                 $created++;
             }
         } catch (QueryException $exception) {
-            $existing = DB::table($table)->where(['tenant_id' => $tenantId, 'creation_key' => $creationKey])->first();
+            $existing = $model::withTrashed()->where('creation_key', $creationKey)->toBase()->first();
             if (! $existing) {
                 throw $exception;
             }
 
             return $existing->id;
         }
+
+        return $id;
+    }
+
+    /**
+     * Menyimpan satu baris master lewat modelnya.
+     *
+     * `tenant_id` tetap ditulis walau `MilikTenant` sanggup mengisinya sendiri. Penyediaan
+     * data awal menerima tenant sebagai argumen, bukan dari permintaan HTTP, jadi
+     * menuliskannya membuat trait itu membatalkan penyimpanan ketika tenant yang diminta
+     * berbeda dari tenant aktif — persis keadaan yang paling mahal bila lolos diam-diam.
+     *
+     * @param  class-string<Model>  $model
+     * @param  array<string, mixed>  $values
+     */
+    private function simpan(string $model, string $tenantId, array $values): string
+    {
+        $id = (string) Str::ulid();
+        (new $model)->forceFill([
+            'id' => $id,
+            'tenant_id' => $tenantId,
+            ...$values,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ])->save();
 
         return $id;
     }

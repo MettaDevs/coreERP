@@ -1,5 +1,30 @@
 # Load test Management Aset
 
+## Status: dibekukan sampai F7-03
+
+**Isi folder ini tidak dapat dijalankan hari ini, dan itu disengaja.** Ia menguji module
+saat ia masih aplikasi tersendiri dengan container, database, dan tiruan Core sendiri.
+Setelah module masuk ke dalam runtime Core, tiga hal yang dijadikan pijakannya sudah
+tidak ada:
+
+- `docker-compose.yml` membangun `api/Dockerfile`, sedangkan `api/composer.json`,
+  `api/composer.lock`, dan `bootstrap/cache` yang disebut Dockerfile itu sudah dibuang
+  saat module dibentuk ulang. Pembangunannya gagal pada baris `COPY` pertama.
+- Perintah migrasinya memanggil `sh /coreerp/migrate.sh`, dan `deploy/migrate.sh` yang
+  menjadi sumbernya sudah dihapus.
+- `stub-core/` meniru Number Sequence Core lewat HTTP. Di dalam satu runtime, nomor
+  diterbitkan proses yang sama, jadi tiruan itu tidak lagi mewakili apa pun.
+
+**Kapan dibereskan.** F7-03 pada `docs/todo/satu-runtime/01-prd.md` menggabungkan folder
+ini dengan `apps/control-plane/loadtest/` menjadi satu stack yang menjalankan runtime
+sungguhan, tanpa tiruan Core. Sampai saat itu berkasnya sengaja dibiarkan utuh: skenario
+k6, `verify.sql`, dan angka hasil yang tercatat di bawah adalah satu-satunya catatan
+tertulis tentang perilaku module di bawah beban, dan menulis ulangnya dari nol lebih mahal
+daripada memindahkannya.
+
+**Yang di bawah ini menggambarkan stack lama.** Perintahnya jangan disalin apa adanya.
+
+
 Test feature menjalankan satu request pada satu proses terhadap SQLite. Ia tidak dapat melihat koneksi habis, nomor ganda, batas tenant yang bocor hanya saat request saling menyela, atau idempotency key yang berlomba dengan dirinya sendiri. Direktori ini menutup celah itu.
 
 Gate-nya ada di `.claude/skills/coreerp-architecture/SKILL.md` bagian **Module completion gate: concurrency and load**.

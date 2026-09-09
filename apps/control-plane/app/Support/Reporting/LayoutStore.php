@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use stdClass;
 
 /**
  * Katalog layout satu laporan untuk satu tenant: layout bawaan dari release app
@@ -25,7 +26,7 @@ final class LayoutStore
 
     public function __construct(
         private readonly LayoutInspector $inspector,
-        private readonly AppReportClient $client,
+        private readonly SumberLaporan $client,
     ) {}
 
     /**
@@ -35,7 +36,7 @@ final class LayoutStore
      *
      * @return list<array<string, mixed>>
      */
-    public function list(object $report, string $tenantId, ?string $legalEntityId): array
+    public function list(stdClass $report, string $tenantId, ?string $legalEntityId): array
     {
         $defaultRef = $this->defaultRef($report, $tenantId, $legalEntityId);
         $builtin = array_map(fn (array $layout): array => [
@@ -76,7 +77,7 @@ final class LayoutStore
      * bawaan pertama. Pilihan yang menunjuk layout yang sudah dihapus diabaikan, bukan
      * dilempar, supaya tombol cetak tidak pernah mati karena admin menghapus satu layout.
      */
-    public function defaultRef(object $report, string $tenantId, ?string $legalEntityId): string
+    public function defaultRef(stdClass $report, string $tenantId, ?string $legalEntityId): string
     {
         $candidates = DB::table('report_layout_defaults')
             ->where(['tenant_id' => $tenantId, 'report_code' => $report->code])
@@ -95,7 +96,7 @@ final class LayoutStore
         return $first ? LayoutRef::BUILTIN_PREFIX.$first['key'] : '';
     }
 
-    public function exists(object $report, string $tenantId, ?string $legalEntityId, string $ref): bool
+    public function exists(stdClass $report, string $tenantId, ?string $legalEntityId, string $ref): bool
     {
         if (LayoutRef::isBuiltin($ref)) {
             return $this->builtin($report, $ref) !== null;
@@ -109,7 +110,7 @@ final class LayoutStore
      * release lalu disimpan di disk laporan, supaya worker tidak memanggil app untuk
      * berkas yang sama berulang kali. Pemanggil wajib memanggil {@see LayoutFile::cleanup()}.
      */
-    public function resolve(object $report, string $tenantId, ?string $legalEntityId, string $ref, TenantMembership $membership, ?string $orgUnitId): LayoutFile
+    public function resolve(stdClass $report, string $tenantId, ?string $legalEntityId, string $ref, TenantMembership $membership, ?string $orgUnitId): LayoutFile
     {
         $disk = $this->disk();
         if (LayoutRef::isBuiltin($ref)) {
@@ -133,7 +134,7 @@ final class LayoutStore
     }
 
     /** Nama layout untuk ditampilkan pada riwayat ekspor. */
-    public function name(object $report, string $tenantId, ?string $legalEntityId, string $ref): string
+    public function name(stdClass $report, string $tenantId, ?string $legalEntityId, string $ref): string
     {
         if (LayoutRef::isBuiltin($ref)) {
             return $this->builtin($report, $ref)['name'] ?? $ref;
@@ -142,7 +143,7 @@ final class LayoutStore
         return (string) ($this->uploadedQuery($report->code, $tenantId, $legalEntityId)->where('id', $ref)->value('name') ?? $ref);
     }
 
-    public function format(object $report, string $tenantId, ?string $legalEntityId, string $ref): ?string
+    public function format(stdClass $report, string $tenantId, ?string $legalEntityId, string $ref): ?string
     {
         if (LayoutRef::isBuiltin($ref)) {
             return $this->builtin($report, $ref)['format'] ?? null;
@@ -157,7 +158,7 @@ final class LayoutStore
      * @param  list<string>  $knownKeys
      * @return array{layout: array<string, mixed>, unknown_placeholders: list<string>}
      */
-    public function store(object $report, string $tenantId, ?string $legalEntityId, ?int $userId, UploadedFile $file, string $name, ?string $description, array $knownKeys): array
+    public function store(stdClass $report, string $tenantId, ?string $legalEntityId, ?int $userId, UploadedFile $file, string $name, ?string $description, array $knownKeys): array
     {
         $format = $this->inspector->format($file->getRealPath(), $file->getClientOriginalName());
         $unknown = $this->inspector->unknownPlaceholders($file->getRealPath(), $format, $knownKeys);
@@ -188,7 +189,7 @@ final class LayoutStore
      * @param  list<string>  $knownKeys
      * @return array{layout: object, unknown_placeholders: list<string>}
      */
-    public function update(object $report, string $tenantId, ?string $legalEntityId, string $id, ?string $name, ?string $description, bool $descriptionGiven, ?UploadedFile $file, array $knownKeys): array
+    public function update(stdClass $report, string $tenantId, ?string $legalEntityId, string $id, ?string $name, ?string $description, bool $descriptionGiven, ?UploadedFile $file, array $knownKeys): array
     {
         $row = $this->uploadedQuery($report->code, $tenantId, $legalEntityId)->where('id', $id)->first();
         abort_if($row === null, 404);
@@ -218,7 +219,7 @@ final class LayoutStore
         ];
     }
 
-    public function delete(object $report, string $tenantId, ?string $legalEntityId, string $id): void
+    public function delete(stdClass $report, string $tenantId, ?string $legalEntityId, string $id): void
     {
         $row = $this->uploadedQuery($report->code, $tenantId, $legalEntityId)->where('id', $id)->first();
         abort_if($row === null, 404);
@@ -233,7 +234,7 @@ final class LayoutStore
     }
 
     /** `ref` kosong menghapus pilihan pada lingkup itu sehingga kembali ke bawaan. */
-    public function setDefault(object $report, string $tenantId, ?string $contextLegalEntityId, ?string $ref, ?string $scopeLegalEntityId): void
+    public function setDefault(stdClass $report, string $tenantId, ?string $contextLegalEntityId, ?string $ref, ?string $scopeLegalEntityId): void
     {
         $scopeKey = $scopeLegalEntityId ?? self::TENANT_SCOPE;
         $where = ['tenant_id' => $tenantId, 'report_code' => $report->code, 'scope_key' => $scopeKey];
@@ -255,7 +256,7 @@ final class LayoutStore
     }
 
     /** Sidik jari release yang sedang melayani app: berubah setiap image API diganti. */
-    private function releaseKey(object $report): string
+    private function releaseKey(stdClass $report): string
     {
         $image = DB::table('app_placements as placements')
             ->join('app_releases as releases', function ($join): void {
@@ -271,7 +272,7 @@ final class LayoutStore
     }
 
     /** @return array{key:string,name:string,description:?string,format:string}|null */
-    private function builtin(object $report, string $ref): ?array
+    private function builtin(stdClass $report, string $ref): ?array
     {
         foreach ($report->builtin_layouts as $layout) {
             if (LayoutRef::BUILTIN_PREFIX.$layout['key'] === $ref) {

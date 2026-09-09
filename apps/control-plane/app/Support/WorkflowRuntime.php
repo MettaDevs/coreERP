@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\TenantMembership;
 use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
+use App\Support\Modules\PengirimEventModul;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -11,7 +12,10 @@ use Illuminate\Validation\ValidationException;
 
 class WorkflowRuntime
 {
-    public function __construct(private readonly ParameterWorkflow $parameter) {}
+    public function __construct(
+        private readonly ParameterWorkflow $parameter,
+        private readonly PengirimEventModul $pengirim,
+    ) {}
 
     /** @param array<string, mixed> $data */
     public function submit(string $tenantId, object $type, object $version, string $idempotencyKey, array $data): object
@@ -280,7 +284,15 @@ class WorkflowRuntime
         // memperbarui dokumennya pada transaksi yang sama, sehingga instance yang `approved`
         // tidak pernah berpasangan dengan dokumen yang masih `submitted`. Konsekuensinya
         // seimbang dan diterima: listener yang melempar membatalkan keputusannya juga.
-        event(new KeputusanWorkflowDiambil($idEvent, $tenantId, $idKorelasi, $legalEntityId === null ? null : (string) $legalEntityId, $isi));
+        //
+        // Dipancarkan lewat `PengirimEventModul`, bukan `event()`, supaya tenant aktif terikat
+        // selama listener berjalan. Keputusan diambil di controller Core, yang tidak melewati
+        // middleware rute module — jadi tanpa ini setiap query model module di dalam listener
+        // melempar "tanpa tenant aktif", dan kegagalannya membatalkan keputusan yang sah.
+        $this->pengirim->kirim(
+            new KeputusanWorkflowDiambil($idEvent, $tenantId, $idKorelasi, $legalEntityId === null ? null : (string) $legalEntityId, $isi),
+            $tenantId,
+        );
     }
 
     /**

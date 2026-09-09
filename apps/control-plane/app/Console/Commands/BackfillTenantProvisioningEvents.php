@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Support\Modules\Contracts\TenantDisiapkan;
+use App\Support\Modules\PengirimEventModul;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -11,6 +13,11 @@ class BackfillTenantProvisioningEvents extends Command
     protected $signature = 'tenant-provisioning:backfill {--tenant=* : Batasi ke satu atau beberapa tenant ULID}';
 
     protected $description = 'Buat event provisioning yang idempoten untuk tenant lama.';
+
+    public function __construct(private readonly PengirimEventModul $pengirim)
+    {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -57,8 +64,9 @@ class BackfillTenantProvisioningEvents extends Command
                 continue;
             }
 
+            $idEvent = (string) Str::ulid();
             DB::table('outbox_events')->insert([
-                'id' => (string) Str::ulid(),
+                'id' => $idEvent,
                 'tenant_id' => $tenant->id,
                 'type' => 'core.tenant.provisioned.v1',
                 'correlation_id' => $tenant->id,
@@ -68,6 +76,15 @@ class BackfillTenantProvisioningEvents extends Command
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            // Module di dalam runtime ini tidak akan pernah menerima baris outbox tadi: yang
+            // mengirimnya lewat HTTP sengaja melewatkan penerima yang berada di dalam proses.
+            // Tanpa pemancaran di sini, backfill hanya menghasilkan baris yang ditandai
+            // terkirim tanpa ada yang menyiapkan data awalnya — tenant lama tetap kosong.
+            $this->pengirim->kirim(
+                new TenantDisiapkan($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => $appIds]),
+                (string) $tenant->id,
+            );
             $created++;
         }
 

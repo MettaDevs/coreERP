@@ -271,22 +271,10 @@ parameters:
 			path: app/Http/Controllers/Reporting/ReportExportController.php
 
 		-
-			message: '#^Access to an undefined property object\:\:\$parameters\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Reporting/ReportExportController.php
-
-		-
 			message: '#^Access to an undefined property object\:\:\$status\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Reporting/ReportExportController.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$code\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/Reporting/ReportLayoutController.php
 
 		-
 			message: '#^Method App\\Http\\Controllers\\Reporting\\ReportLayoutController\:\:knownKeys\(\) should return list\<string\> but returns array\<string\>\.$#'
@@ -561,30 +549,6 @@ parameters:
 		-
 			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
 			identifier: property.notFound
-			count: 5
-			path: app/Support/Reporting/AppReportClient.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$app_name\.$#'
-			identifier: property.notFound
-			count: 6
-			path: app/Support/Reporting/AppReportClient.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$code\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Support/Reporting/AppReportClient.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Support/Reporting/ExportQueue.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$code\.$#'
-			identifier: property.notFound
 			count: 1
 			path: app/Support/Reporting/ExportQueue.php
 
@@ -620,12 +584,6 @@ parameters:
 
 		-
 			message: '#^Access to an undefined property object\:\:\$layout_ref\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Support/Reporting/ExportQueue.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Support/Reporting/ExportQueue.php
@@ -677,30 +635,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: app/Support/Reporting/LayoutInspector.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Support/Reporting/LayoutStore.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$app_version\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Support/Reporting/LayoutStore.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$builtin_layouts\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Support/Reporting/LayoutStore.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$code\.$#'
-			identifier: property.notFound
-			count: 14
-			path: app/Support/Reporting/LayoutStore.php
 
 		-
 			message: '#^Access to an undefined property object\:\:\$created_at\.$#'
@@ -839,24 +773,6 @@ parameters:
 			identifier: arrayValues.list
 			count: 1
 			path: app/Support/Reporting/Rendering/XlsxTemplateRenderer.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$app_id\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Support/Reporting/ReportCatalog.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$code\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Support/Reporting/ReportCatalog.php
-
-		-
-			message: '#^Access to an undefined property object\:\:\$permission\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Support/Reporting/ReportCatalog.php
 
 		-
 			message: '#^Method App\\Support\\Reporting\\ReportCatalog\:\:forMembership\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{code\: mixed, app_id\: mixed, app_name\: string, name\: mixed, description\: mixed, permission\: mixed, parameters\: mixed, can_run\: bool, \.\.\.\}\>\.$#'
@@ -1079,7 +995,6 @@ parameters:
 			identifier: variable.undefined
 			count: 1
 			path: database/migrations/2026_08_03_120000_add_tenant_security_configuration.php
-
 
 		-
 			message: '#^Using nullsafe method call on non\-nullable type Illuminate\\Console\\Command\. Use \-\> instead\.$#'

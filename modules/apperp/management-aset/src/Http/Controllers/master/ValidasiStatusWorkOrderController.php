@@ -6,9 +6,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Models\master\ValidasiStatusWorkOrder;
 use Modules\Apperp\ManagementAset\Support\WorkOrderValidation;
 
 /**
@@ -26,13 +26,12 @@ class ValidasiStatusWorkOrderController extends Controller
     {
         $this->guard($request, 'read');
 
-        return response()->json(['data' => $this->aturan($this->tenant($request))]);
+        return response()->json(['data' => $this->aturan()]);
     }
 
     public function replace(Request $request): JsonResponse
     {
         $this->guard($request, 'update');
-        $tenant = $this->tenant($request);
         $data = $request->validate([
             'aturan' => ['present', 'array', 'max:100'],
             'aturan.*.status' => ['required', Rule::in(WorkOrderValidation::statusTervalidasi())],
@@ -41,18 +40,15 @@ class ValidasiStatusWorkOrderController extends Controller
             'aturan.*.keparahan' => ['required', Rule::in(WorkOrderValidation::KEPARAHAN)],
         ]);
 
-        DB::transaction(function () use ($tenant, $data): void {
+        DB::transaction(function () use ($data): void {
             foreach ($data['aturan'] as $baris) {
                 // Baris yang belum ada tetap dibuat: tenant lama dapat saja disemai sebelum
                 // satu aturan diperkenalkan, dan layar tidak boleh menolak menyimpannya.
-                DB::table('aset_m_validasi_status_work_order')->updateOrInsert(
-                    ['tenant_id' => $tenant, 'status' => $baris['status'], 'aturan' => $baris['aturan']],
+                ValidasiStatusWorkOrder::query()->updateOrCreate(
+                    ['status' => $baris['status'], 'aturan' => $baris['aturan']],
                     [
-                        'id' => (string) Str::ulid(),
                         'aktif' => filter_var($baris['aktif'], FILTER_VALIDATE_BOOL),
                         'keparahan' => $baris['keparahan'],
-                        'created_at' => now(),
-                        'updated_at' => now(),
                     ],
                 );
             }
@@ -62,10 +58,9 @@ class ValidasiStatusWorkOrderController extends Controller
     }
 
     /** @return Collection<int, object> */
-    private function aturan(string $tenant): mixed
+    private function aturan(): mixed
     {
-        return DB::table('aset_m_validasi_status_work_order')
-            ->where('tenant_id', $tenant)
+        return ValidasiStatusWorkOrder::query()
             ->orderBy('status')->orderBy('aturan')
             ->get(['id', 'status', 'aturan', 'aktif', 'keparahan']);
     }
@@ -76,10 +71,5 @@ class ValidasiStatusWorkOrderController extends Controller
             in_array('management-aset.'.self::RESOURCE.'.'.$action, $request->attributes->get('coreerp.permissions', []), true),
             403,
         );
-    }
-
-    private function tenant(Request $request): string
-    {
-        return (string) $request->attributes->get('coreerp.tenant_id');
     }
 }

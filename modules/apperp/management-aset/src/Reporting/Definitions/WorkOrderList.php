@@ -2,7 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
-use Illuminate\Support\Facades\DB;
+use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetDetail;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
 use Modules\Apperp\ManagementAset\Reporting\ReportData;
@@ -87,41 +88,40 @@ final class WorkOrderList implements ReportDefinition
 
     public function data(ReportContext $context, array $parameters): ReportData
     {
-        $tenant = $context->tenantId;
-        $query = DB::table('aset_tr_pemeliharaan_aset as wo')
-            ->leftJoin('aset_m_tipe_work_order as tipe', fn ($join) => $join->on('tipe.id', '=', 'wo.tipe_work_order_id')->on('tipe.tenant_id', '=', 'wo.tenant_id'))
-            ->leftJoin('aset_m_tingkat_layanan as layanan', fn ($join) => $join->on('layanan.id', '=', 'wo.tingkat_layanan_id')->on('layanan.tenant_id', '=', 'wo.tenant_id'))
-            ->where('wo.tenant_id', $tenant)
-            ->whereNull('wo.deleted_at');
-        app(OrganizationScope::class)->query($query, $context->request(), 'wo.legal_entity_id', 'wo.responsible_org_unit_id');
+        // Tabel utamanya tidak diberi alias, dan itu keharusan bukan selera: penyaringan tenant
+        // disisipkan scope dengan nama tabel yang sebenarnya, sehingga alias pada tabel utama
+        // membuat kolom yang disebut scope tidak ada. Tabel yang di-join tetap beralias.
+        $query = PemeliharaanAset::query()
+            ->leftJoin('aset_m_tipe_work_order as tipe', fn ($join) => $join->on('tipe.id', '=', 'aset_tr_pemeliharaan_aset.tipe_work_order_id')->on('tipe.tenant_id', '=', 'aset_tr_pemeliharaan_aset.tenant_id'))
+            ->leftJoin('aset_m_tingkat_layanan as layanan', fn ($join) => $join->on('layanan.id', '=', 'aset_tr_pemeliharaan_aset.tingkat_layanan_id')->on('layanan.tenant_id', '=', 'aset_tr_pemeliharaan_aset.tenant_id'));
+        app(OrganizationScope::class)->query($query, $context->request(), 'aset_tr_pemeliharaan_aset.legal_entity_id', 'aset_tr_pemeliharaan_aset.responsible_org_unit_id');
         if (! empty($parameters['status'])) {
-            $query->where('wo.status', $parameters['status']);
+            $query->where('aset_tr_pemeliharaan_aset.status', $parameters['status']);
         }
         if (! empty($parameters['dari'])) {
-            $query->where('wo.created_at', '>=', $parameters['dari'].' 00:00:00');
+            $query->where('aset_tr_pemeliharaan_aset.created_at', '>=', $parameters['dari'].' 00:00:00');
         }
         if (! empty($parameters['sampai'])) {
-            $query->where('wo.created_at', '<=', $parameters['sampai'].' 23:59:59');
+            $query->where('aset_tr_pemeliharaan_aset.created_at', '<=', $parameters['sampai'].' 23:59:59');
         }
 
+        // Penyaringan tenant pada ketiga subquery ini datang dari scope model detailnya, bukan
+        // dari `where` yang ditulis tangan seperti sebelumnya.
+        $ringkasan = fn (string $ekspresi) => PemeliharaanAsetDetail::query()
+            ->selectRaw($ekspresi)
+            ->whereColumn('aset_tr_pemeliharaan_aset_details.pemeliharaan_aset_id', 'aset_tr_pemeliharaan_aset.id');
+
+        // `toBase()` dipakai supaya barisnya tetap objek biasa, bukan model. Scope tenant sudah
+        // disisipkan sebelum ini, jadi yang dilewati hanya penghidupan model — dan itu memang
+        // yang diinginkan: dataset laporan membaca nilai apa adanya, sedangkan cast model akan
+        // mengubah kolom tanggal menjadi objek yang tidak diterima pemformatnya di bawah.
         $rows = $query
-            ->selectSub(
-                DB::table('aset_tr_pemeliharaan_aset_details as d')->selectRaw('count(*)')
-                    ->whereColumn('d.pemeliharaan_aset_id', 'wo.id')->where('d.tenant_id', $tenant),
-                'jumlah_baris',
-            )
-            ->selectSub(
-                DB::table('aset_tr_pemeliharaan_aset_details as d')->selectRaw('coalesce(sum(d.estimasi_jam), 0)')
-                    ->whereColumn('d.pemeliharaan_aset_id', 'wo.id')->where('d.tenant_id', $tenant),
-                'estimasi_jam',
-            )
-            ->selectSub(
-                DB::table('aset_tr_pemeliharaan_aset_details as d')->selectRaw('coalesce(sum(d.aktual_jam), 0)')
-                    ->whereColumn('d.pemeliharaan_aset_id', 'wo.id')->where('d.tenant_id', $tenant),
-                'aktual_jam',
-            )
-            ->addSelect(['wo.*', 'tipe.nama as tipe_nama', 'layanan.nama as layanan_nama'])
-            ->orderBy('wo.kode')
+            ->selectSub($ringkasan('count(*)'), 'jumlah_baris')
+            ->selectSub($ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.estimasi_jam), 0)'), 'estimasi_jam')
+            ->selectSub($ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.aktual_jam), 0)'), 'aktual_jam')
+            ->addSelect(['aset_tr_pemeliharaan_aset.*', 'tipe.nama as tipe_nama', 'layanan.nama as layanan_nama'])
+            ->orderBy('aset_tr_pemeliharaan_aset.kode')
+            ->toBase()
             ->get();
 
         return new ReportData(

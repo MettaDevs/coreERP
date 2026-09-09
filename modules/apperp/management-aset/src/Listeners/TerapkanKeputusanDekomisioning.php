@@ -3,9 +3,11 @@
 namespace Modules\Apperp\ManagementAset\Listeners;
 
 use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Modules\Apperp\ManagementAset\Models\support\ProcessedCoreEvent;
+use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
 
 /**
  * Menerapkan keputusan dekomisioning ke dokumen dan asetnya.
@@ -61,8 +63,7 @@ class TerapkanKeputusanDekomisioning
         // berikutnya akan dilewati diam-diam. Controller lama tidak punya masalah ini karena
         // `abort` di dalamnya membatalkan transaksi beserta baris dedupnya; listener yang
         // melempar akan membatalkan keputusan Core, jadi jalan itu tertutup di sini.
-        $dokumen = DB::table('aset_tr_dokumen_siklus_aset')->where([
-            'tenant_id' => $event->tenantId,
+        $dokumen = DokumenSiklusAset::query()->where([
             'id' => $documentId,
             'jenis_dokumen' => 'dekomisioning-aset',
         ])->lockForUpdate()->first();
@@ -91,7 +92,12 @@ class TerapkanKeputusanDekomisioning
             return;
         }
 
-        $sudahPernah = DB::table('aset_processed_core_events')->insertOrIgnore([
+        // `tenant_id` ditulis eksplisit karena `insertOrIgnore` tidak membuat instance model,
+        // sehingga pengisian otomatis oleh trait tenant tidak berjalan. Alasan memakai
+        // `insertOrIgnore` alih-alih menyimpan lalu menangkap pelanggaran unique ada di
+        // docblock `ProcessedCoreEvent`: pada PostgreSQL statement yang gagal membatalkan
+        // seluruh transaksi, dan transaksi ini adalah transaksi keputusan Core.
+        $sudahPernah = ProcessedCoreEvent::query()->insertOrIgnore([
             'id' => (string) Str::ulid(),
             'tenant_id' => $event->tenantId,
             'event_id' => $event->idEvent,
@@ -104,7 +110,7 @@ class TerapkanKeputusanDekomisioning
             return;
         }
 
-        DB::table('aset_tr_dokumen_siklus_aset')->where('id', $dokumen->id)
+        DokumenSiklusAset::query()->whereKey($dokumen->id)
             ->update(['status' => $keputusan, 'updated_at' => now()]);
 
         if ($keputusan !== 'approved') {
@@ -113,8 +119,8 @@ class TerapkanKeputusanDekomisioning
 
         // Aset yang sudah dilepas tidak ditarik kembali menjadi terdekomisioning: pelepasan
         // adalah akhir masa hidupnya, dan persetujuan yang datang belakangan tidak membatalkannya.
-        DB::table('aset_tr_penerimaan_aset')
-            ->where(['tenant_id' => $event->tenantId, 'id' => $dokumen->asset_id])
+        Asset::query()
+            ->whereKey($dokumen->asset_id)
             ->whereNotIn('lifecycle_state', ['disposed'])
             ->update(['lifecycle_state' => 'decommissioned', 'updated_at' => now()]);
     }

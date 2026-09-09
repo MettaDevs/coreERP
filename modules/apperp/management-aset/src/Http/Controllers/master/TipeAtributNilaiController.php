@@ -2,9 +2,11 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterLinkController;
+use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
+use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetAttribute;
 
 /**
  * Pilihan nilai untuk atribut bertipe daftar tetap, disunting di dalam form atributnya.
@@ -16,9 +18,9 @@ class TipeAtributNilaiController extends MasterLinkController
         return 'tipe-atribut';
     }
 
-    protected function ownerTable(): string
+    protected function ownerModel(): string
     {
-        return 'aset_m_tipe_atribut';
+        return TipeAtribut::class;
     }
 
     protected function ownerColumn(): string
@@ -26,9 +28,9 @@ class TipeAtributNilaiController extends MasterLinkController
         return 'tipe_atribut_id';
     }
 
-    protected function table(): string
+    protected function model(): string
     {
-        return 'aset_m_tipe_atribut_nilai';
+        return TipeAtributNilai::class;
     }
 
     protected function rowRules(string $tenantId): array
@@ -56,9 +58,7 @@ class TipeAtributNilaiController extends MasterLinkController
 
     protected function afterRowsValidated(string $tenantId, string $ownerId, array $rows): void
     {
-        $dataType = DB::table('aset_m_tipe_atribut')
-            ->where(['tenant_id' => $tenantId, 'id' => $ownerId])
-            ->value('data_type');
+        $dataType = TipeAtribut::query()->whereKey($ownerId)->value('data_type');
         if ($dataType !== 'string') {
             throw ValidationException::withMessages([
                 'rows' => 'Pilihan nilai hanya dapat dipakai untuk tipe data teks.',
@@ -69,8 +69,8 @@ class TipeAtributNilaiController extends MasterLinkController
         }
 
         $allowed = collect($rows)->pluck('nilai')->map(fn (mixed $value): string => trim((string) $value))->unique()->values();
-        $conflicts = DB::table('aset_tr_aset_atribut')
-            ->where(['tenant_id' => $tenantId, 'tipe_atribut_id' => $ownerId])
+        $conflicts = AssetAttribute::query()
+            ->where('tipe_atribut_id', $ownerId)
             ->whereNotNull('nilai_text')
             ->whereNotIn('nilai_text', $allowed->all());
         if (! $conflicts->exists()) {

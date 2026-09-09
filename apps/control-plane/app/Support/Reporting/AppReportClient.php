@@ -12,6 +12,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use stdClass;
 
 /**
  * Klien Core ke endpoint laporan milik app (`internal/v1/laporan/...`).
@@ -34,7 +35,7 @@ final class AppReportClient
      *
      * @return array{fields: list<array{key:string,label:string,table:?string}>, parameters: list<string>}
      */
-    public function definition(object $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): array
+    public function definition(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): array
     {
         $response = $this->request($report, $membership, $legalEntityId, $orgUnitId)
             ->get($this->url($report, ''));
@@ -47,7 +48,7 @@ final class AppReportClient
     }
 
     /** Isi berkas layout bawaan yang ikut release app. */
-    public function builtinLayout(object $report, string $key, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): string
+    public function builtinLayout(stdClass $report, string $key, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): string
     {
         $response = $this->request($report, $membership, $legalEntityId, $orgUnitId)
             ->get($this->url($report, '/layouts/'.rawurlencode($key)));
@@ -59,7 +60,7 @@ final class AppReportClient
     }
 
     /** @param array<string, mixed> $parameters */
-    public function dataset(object $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, array $parameters): ReportData
+    public function dataset(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, array $parameters): ReportData
     {
         $response = $this->request($report, $membership, $legalEntityId, $orgUnitId)
             ->post($this->url($report, '/dataset'), ['parameter' => (object) $parameters]);
@@ -68,7 +69,7 @@ final class AppReportClient
         return ReportData::fromArray(is_array($body['data'] ?? null) ? $body['data'] : []);
     }
 
-    private function request(object $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): PendingRequest
+    private function request(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): PendingRequest
     {
         $token = $this->tokens->issue(
             $membership,
@@ -85,7 +86,7 @@ final class AppReportClient
             ->timeout((int) config('reporting.app_timeout'));
     }
 
-    private function url(object $report, string $suffix): string
+    private function url(stdClass $report, string $suffix): string
     {
         $base = $this->baseUrl($report);
         $localCode = substr($report->code, strlen($report->app_id) + 1);
@@ -97,7 +98,7 @@ final class AppReportClient
      * Alamat API app: override dari konfigurasi, atau nama service API pada release
      * yang terpasang. Pada Compose nama service dapat di-resolve dari container Core.
      */
-    private function baseUrl(object $report): string
+    private function baseUrl(stdClass $report): string
     {
         $configured = config('reporting.app_api_endpoints')[$report->app_id] ?? null;
         if (is_string($configured) && $configured !== '') {
@@ -120,7 +121,7 @@ final class AppReportClient
     }
 
     /** @return array<string, mixed> */
-    private function json(Response $response, object $report): array
+    private function json(Response $response, stdClass $report): array
     {
         if ($response->status() === 403) {
             throw new RenderException("{$report->app_name} menolak permintaan: Anda tidak berhak membaca data laporan ini.");
@@ -139,7 +140,7 @@ final class AppReportClient
     }
 
     /** Membungkus kegagalan koneksi menjadi pesan untuk pengguna. */
-    public static function guard(callable $call, object $report): mixed
+    public static function guard(callable $call, stdClass $report): mixed
     {
         try {
             return $call();

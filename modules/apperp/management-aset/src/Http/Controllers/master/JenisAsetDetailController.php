@@ -2,12 +2,14 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Models\master\JenisAset;
+use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeAssetType;
+use Modules\Apperp\ManagementAset\Models\master\ModelAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 
 /**
@@ -36,26 +38,20 @@ class JenisAsetDetailController extends Controller
         abort_unless(in_array('management-aset.jenis-aset.read', $permissions, true), 403);
 
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
-        abort_unless(
-            $this->unarchived('aset_m_jenis_aset')->where('tenant_id', $tenantId)->where('id', $jenisAsetId)->exists(),
-            404,
-        );
+        abort_unless(JenisAset::query()->whereKey($jenisAsetId)->exists(), 404);
 
         $mayReadModels = in_array('management-aset.model-aset.read', $permissions, true);
         $mayReadAssets = in_array('management-aset.aset.read', $permissions, true);
 
         return response()->json(['data' => [
-            'atribut_count' => $this->unarchived('aset_m_jenis_aset_atribut')
-                ->where('tenant_id', $tenantId)
+            'atribut_count' => JenisAsetAtribut::query()
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->count(),
-            'maintenance_job_type_count' => $this->unarchived('aset_m_maintenance_job_type_asset_type')
-                ->where('tenant_id', $tenantId)
+            'maintenance_job_type_count' => MaintenanceJobTypeAssetType::query()
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->count(),
             'model_count' => $mayReadModels
-                ? $this->unarchived('aset_m_model_aset')
-                    ->where('tenant_id', $tenantId)
+                ? ModelAset::query()
                     ->where('jenis_aset_id', $jenisAsetId)
                     ->count()
                 : null,
@@ -71,25 +67,31 @@ class JenisAsetDetailController extends Controller
             // yang tidak boleh dilihat pemanggil.
             'asset_count' => $mayReadAssets
                 ? $scope->assetQuery(
-                    $this->unarchived('aset_tr_penerimaan_aset')
-                        ->where('tenant_id', $tenantId)
-                        ->where('jenis_aset_id', $jenisAsetId),
+                    Asset::query()->where('jenis_aset_id', $jenisAsetId),
                     $request,
                 )->count()
                 : null,
         ]]);
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * Daftar model, terurut menurut nama pabrikannya.
+     *
+     * Pabrikan tetap di-`join`, bukan dimuat sebagai relasi: urutannya ditentukan kolom
+     * milik pabrikan, dan itu tidak dapat dilakukan setelah baris terlanjur terambil.
+     * Tabel yang di-`join` berada di luar jangkauan scope tenant, jadi penyaringan tenant
+     * dan soft delete pabrikan ditulis di klausa `join` — persis seperti sebelumnya.
+     *
+     * @return list<array<string, mixed>>
+     */
     private function models(string $tenantId, ?string $jenisAsetId = null): array
     {
-        return $this->unarchived('aset_m_model_aset')
+        return ModelAset::query()
             ->leftJoin('aset_m_pabrikan_aset as pabrikan', function ($join) use ($tenantId): void {
                 $join->on('pabrikan.id', '=', 'aset_m_model_aset.pabrikan_aset_id')
                     ->where('pabrikan.tenant_id', $tenantId)
                     ->whereNull('pabrikan.deleted_at');
             })
-            ->where('aset_m_model_aset.tenant_id', $tenantId)
             ->when(
                 $jenisAsetId,
                 fn ($query) => $query->where('aset_m_model_aset.jenis_aset_id', $jenisAsetId),
@@ -112,20 +114,5 @@ class JenisAsetDetailController extends Controller
                 'description' => $model->description,
             ])
             ->all();
-    }
-
-    /**
-     * Baris terarsip tidak ikut dihitung. Pemeriksaan kolomnya mengikuti pola
-     * `MasterDataController::unarchivedChild()` supaya tabel yang belum mengenal soft
-     * delete tidak membuat kueri ini gagal.
-     */
-    private function unarchived(string $table): Builder
-    {
-        $query = DB::table($table);
-        if (Schema::hasColumn($table, 'deleted_at')) {
-            $query->whereNull($table.'.deleted_at');
-        }
-
-        return $query;
     }
 }
