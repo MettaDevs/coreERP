@@ -1,0 +1,151 @@
+name: release
+
+# Membangun image edisi dari cabang utama, memberinya sidik jari, dan mendorongnya ke registry.
+#
+# Sebelum alur ini, tidak satu pun repo membangun atau menerbitkan image: bundle edisi harus
+# dibangun di laptop seseorang. Image yang dibangun di laptop tidak punya asal-usul yang bisa
+# ditelusuri — tidak ada yang tahu commit mana yang masuk ke dalamnya, dan tidak ada yang bisa
+# membuktikan ia lulus pemeriksaan kebocoran.
+#
+# **Yang dibangun tetap satu image per edisi, bukan satu image untuk semua.** Sebuah image
+# "lengkap" yang lalu dipangkas per pelanggan akan menyimpan module yang dibuang di lapisan
+# sebelumnya, dan lapisan itu ikut terkirim. Yang dimaksud "satu image" pada rencana adalah satu
+# per rilis — menggantikan pasangan image API dan UI yang dulu wajib ada — bukan satu untuk
+# seluruh pelanggan.
+#
+# **Bundle edisi dibuat dari image yang sudah lulus, bukan dibangun ulang.** Karena itu urutannya
+# bangun, periksa kebocoran, baru dorong: image yang gagal pemeriksaan tidak pernah sampai ke
+# registry, dan yang di registry tidak perlu dipercaya begitu saja.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  terbitkan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: core_erp
+          POSTGRES_USER: core_erp
+          POSTGRES_PASSWORD: core_erp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U core_erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: core_erp
+      DB_USERNAME: core_erp
+      DB_PASSWORD: core_erp
+      REGISTRY: ghcr.io
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        working-directory: apps/control-plane
+
+      - name: Copy Environment File
+        run: cp .env.example .env
+        working-directory: apps/control-plane
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+        working-directory: apps/control-plane
+
+      - name: Baca Application Key
+        run: |
+          echo "APP_KEY=$(grep '^APP_KEY=' apps/control-plane/.env | cut -d= -f2-)" >> "$GITHUB_ENV"
+
+      # Daftar edisi dibaca dari folder, bukan ditulis di sini. Sebuah edisi baru yang tidak ikut
+      # terbangun adalah kegagalan yang tidak berbunyi: pelanggannya baru tahu saat memutakhirkan.
+      - name: Kumpulkan daftar edisi
+        id: edisi
+        run: |
+          daftar="$(cd editions && ls *.yaml | sed 's/\.yaml$//' | tr '\n' ' ')"
+          [ -n "${daftar// /}" ] || { echo "::error::Tidak satu pun manifest edisi di editions/."; exit 1; }
+          echo "daftar=$daftar" >> "$GITHUB_OUTPUT"
+          echo "Edisi yang akan dibangun: $daftar"
+
+      - name: Bangun dan periksa tiap edisi
+        run: |
+          for edisi in ${{ steps.edisi.outputs.daftar }}; do
+            echo "::group::$edisi"
+            bash scripts/build-edition.sh "$edisi" "coreerp-edisi:$edisi"
+
+            PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d postgres \
+              -c "drop database if exists $DB_DATABASE" -c "create database $DB_DATABASE"
+
+            bash scripts/verify-edition.sh "$edisi" "coreerp-edisi:$edisi"
+            echo "::endgroup::"
+          done
+
+      # Penjaga atas larangan penandaan di bawah, dan ia sengaja berjalan **sebelum** apa pun
+      # didorong: memeriksanya sesudah mendorong berarti memeriksanya terlambat. Ia membaca
+      # alur ini sendiri, sehingga tag bergerak yang ditambahkan kelak tertangkap di sini,
+      # bukan pada server pelanggan berbulan-bulan kemudian.
+      - name: Tolak tag yang bergerak
+        run: |
+          if grep -nE 'docker (tag|push)[^\n]*:(latest|stable|main|edge)\b' .github/workflows/release.yml; then
+            echo "::error::Alur ini mendorong tag yang bergerak. Penempatan hanya boleh menunjuk digest atau SHA."
+            exit 1
+          fi
+          echo "Tidak ada tag bergerak."
+
+      # `docker login` langsung, bukan action pihak ketiga. Alur ini memegang izin
+      # `packages: write`, dan satu action tambahan berarti satu pihak lagi yang dipercaya
+      # memegang token itu. Perintahnya sendiri dua baris, dan token dioper lewat stdin supaya
+      # tidak pernah muncul di daftar proses.
+      - name: Masuk ke registry
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+      # Penandaan memakai SHA commit, bukan awalan versi yang bergerak.
+      #
+      # `latest` dan sejenisnya dilarang untuk penempatan, dan larangan itu bukan gaya: dua server
+      # pelanggan yang menarik tag yang sama pada hari berbeda mendapat isi yang berbeda, dan
+      # ketika salah satunya bermasalah tidak ada cara mengetahui versi mana yang sedang berjalan
+      # di sana. Sidik jari yang dicatat catatan rilis adalah digest, dan digest hanya menunjuk
+      # satu isi selamanya.
+      - name: Dorong dan catat sidik jarinya
+        run: |
+          for edisi in ${{ steps.edisi.outputs.daftar }}; do
+            tujuan="$REGISTRY/${GITHUB_REPOSITORY,,}/edisi-$edisi:${GITHUB_SHA}"
+            docker tag "coreerp-edisi:$edisi" "$tujuan"
+            docker push "$tujuan"
+
+            digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$tujuan")"
+            echo "$edisi -> $digest" >> "$GITHUB_STEP_SUMMARY"
+          done
+

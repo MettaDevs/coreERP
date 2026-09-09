@@ -5274,6 +5274,38 @@ berjalan.
 
 **Bergantung pada.** F5-04.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Langkah 1 sudah terpenuhi sebelum task ini dimulai, dan itu perlu dicatat supaya tidak
+dikerjakan dua kali.** `phpunit.xml` memuat suite `Module` yang menyapu `modules/*/*/tests`, dan
+alur test menjalankan `php artisan test --parallel` — satu perintah, Core dan seluruh module.
+Yang membuatnya begitu bukan task ini melainkan F3-16, waktu test module pindah dari SQLite
+miliknya sendiri ke PostgreSQL yang sama dengan Core.
+
+**Langkah 2 dikerjakan di tempat lain daripada yang tertulis, dan itu keputusan.** Rencananya
+mengubah `validate_app_repository.py` di repo `app-erp-ci-workflows` menjadi pemeriksa susunan
+module. Berkas itu ada di repo lain dan **tidak satu pun alur di repo ini memanggilnya** —
+`grep -rn "validate-app-repository" .github/` kosong. Ia peninggalan masa tiap app punya repo
+sendiri. Mengubahnya di sana berarti menulis pemeriksa yang tidak dijalankan siapa pun, yaitu
+bentuk pemeriksa yang berulang kali ditolak repo ini: hijau tanpa memeriksa apa pun.
+
+Aturannya karena itu dipasang sebagai penjaga batas di
+`apps/control-plane/tests/Feature/Boundary/`, tempat seluruh penjaga susunan lain sudah tinggal
+dan tempat ia benar-benar berjalan pada tiap pull request.
+
+**Aturan keempat rencana sengaja tidak dipasang.** "Kontrak ada bila memang ada permukaan yang
+dipanggil dari luar runtime" belum punya batas yang jelas sesudah fase 3: hampir tidak ada lagi
+permukaan yang dipanggil dari luar proses. Aturan yang batasnya belum jelas lebih berbahaya
+sebagai penjaga daripada sebagai catatan — ia akan merah pada hal yang benar dan orang akan
+belajar melonggarkannya.
+
+**Langkah 3 sebagian di luar repo ini.** Syarat lama tentang Dockerfile per app, potongan
+compose, dan skrip migrasi per app hidup di `app-erp-ci-workflows` dan tidak lagi berlaku sejak
+app menjadi module. Karena repo ini tidak memanggilnya, pembuangannya adalah pekerjaan di repo
+itu — dicatat, bukan dikerjakan diam-diam dari sini.
+
 ### F6-05 — Alur bangun dan terbit image
 
 **Kenapa.** Tidak ada satu pun repo yang membangun dan mendorong image hari ini. Tanpa ini, bundle edisi
@@ -5294,6 +5326,43 @@ harus dibangun di laptop.
 **Rujukan.** [CI/CD](../../dev/22-ci-cd.md).
 
 **Bergantung pada.** F6-04.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026, dengan satu bagian yang baru bisa terbukti pada penggabungan
+pertama ke `main`.
+
+**"Satu image" dibaca sebagai satu per rilis, bukan satu untuk semua pelanggan.** Membangun satu
+image lengkap lalu memangkasnya per pelanggan akan menyimpan module yang dibuang di lapisan
+sebelumnya, dan lapisan itu ikut terkirim — persis kebocoran yang dijaga F5-04. Yang digantikan
+"satu image" adalah pasangan image API dan UI yang dulu wajib ada, bukan pemisahan per edisi.
+
+**Urutannya bangun, periksa kebocoran, baru dorong.** Dengan begitu image yang gagal pemeriksaan
+tidak pernah sampai ke registry, dan yang ada di registry tidak perlu dipercaya begitu saja.
+Inilah yang dimaksud langkah 2: bundle dibuat dari image yang sudah lulus, bukan dibangun ulang
+di laptop.
+
+**Langkah 3 menjadi penjaga, bukan kesepakatan.** Awalan versi yang bergerak dilarang untuk
+penempatan: dua server pelanggan yang menarik `latest` pada hari berbeda mendapat isi yang
+berbeda, dan ketika salah satunya bermasalah tidak ada cara mengetahui versi mana yang sedang
+berjalan di sana. Larangan itu dijaga satu langkah di dalam alur yang membaca alur itu sendiri,
+dan langkah itu berjalan **sebelum** apa pun didorong — memeriksanya sesudah berarti
+memeriksanya terlambat. Polanya dibuktikan dua arah: hijau pada berkas apa adanya, merah pada
+baris `docker push repo/x:latest` buatan.
+
+**Yang belum terbukti.** Langkah `docker push` sendiri baru berjalan pada penggabungan pertama
+ke `main`. Sampai itu terjadi, yang terbukti bagian bangun dan periksanya — dan itu berjalan
+pada tiap pull request lewat alur edisi, jadi bukan bagian yang berdiri tanpa bukti.
+
+**Login ke registry memakai `docker login` langsung, bukan action pihak ketiga.** Alur ini
+memegang izin `packages: write`, dan satu action tambahan berarti satu pihak lagi yang dipercaya
+memegang token itu. Perintahnya dua baris, dan tokennya dioper lewat stdin supaya tidak muncul di
+daftar proses.
+
+**Dokumen CI diberi bagian "yang benar-benar ada hari ini" di paling atas**, dan sisa dokumen —
+yang menggambarkan target Forgejo, Harbor, dan Dokploy beserta dunia polyrepo — dibiarkan sebagai
+rencana yang ditandai. Yang berbahaya bukan rencana yang belum terwujud, melainkan dokumen yang
+tidak membedakan keduanya.
 
 ## 14. Fase 7: modul kedua, pengukuran, dan pembersihan
 
