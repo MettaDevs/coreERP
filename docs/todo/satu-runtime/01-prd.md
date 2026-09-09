@@ -4966,16 +4966,39 @@ kembali ke berkas sungguhan: kedua manifest edisi yang ikut ter-commit harus tet
 
 #### Catatan pelaksanaan
 
-**Belum dikerjakan: Docker tidak berjalan di mesin ini.** `docker version` gagal menghubungi
-daemon-nya.
+Selesai pada 9 September 2026. **Dibuktikan di CI, bukan di laptop.** Docker lokal mati sepanjang
+pengerjaan; penilaian pertama — bahwa task ini karena itu tidak bisa dibuktikan — keliru, dan
+dicatat di sini supaya tidak diulang. Image edisi memang tidak dibangun di mesin pengembang: ia
+dibangun runner CI, dan di sanalah ia akan dibangun seterusnya. Alur `edition` pada pull request
+yang membawa perubahan ini yang menjadi buktinya.
 
-Task ini bisa saja ditulis tanpa dijalankan — Dockerfile yang menerima daftar modul sebagai
-argumen bangun bukan kode yang sulit. Yang tidak bisa dilakukan adalah membuktikannya, dan
-kriteria selesainya berbunyi "image edisi apotek berhasil dibangun dan menyala". Repo ini sudah
-sekali membayar mahal untuk perubahan Docker yang tidak pernah dijalankan; menambah satu lagi
-berarti menaruh berkas yang tampak selesai di jalur rilis pelanggan tanpa satu pun bukti.
+**`MODUL` punya tiga nilai, dan bawaannya sengaja bukan daftar kosong.** `semua` berarti seluruh
+module, persis seperti sebelum edisi ada — bentuk yang dipakai `compose.yaml` erp-dev dan yang
+harus tetap bekerja. `""` berarti Core saja, dan itu edisi yang sah. Kalau "tanpa argumen"
+diartikan Core saja, setiap pemanggilan lama diam-diam menghasilkan image yang berbeda isinya.
 
-Yang dibutuhkan untuk melanjutkan: Docker Desktop menyala.
+**Kendala yang menentukan seluruh bentuknya**: `composer.json` me-`require` ketiga module sebagai
+paket path. Membuang folder module **sebelum** pemasangan membuat `composer install` gagal;
+membuangnya **sesudah** meninggalkan nama dan namespace module di `vendor/composer/installed.json`
+dan `autoload_psr4.php`. Yang kedua tetap kebocoran — klaimnya "tidak ada", bukan "kodenya tidak
+ada". Jadi `composer.json` dan `composer.lock` ikut dipangkas sebelum pemasangan.
+
+**`composer update --lock` tidak bisa dipakai, dan itu dicoba lebih dulu.** Ia menyematkan setiap
+paket yang sudah ada di lock, sehingga paket yang baru dibuang dari `require` justru ditolak
+karena stability flag `@dev`-nya ikut hilang. Yang benar `composer remove --no-install`: ia
+menyunting `require`, menjalankan update terbatas pada paket itu saja, lalu menulis ulang lock
+beserta `content-hash`-nya.
+
+**Satu temuan yang sudah ada sebelum task ini, dan tidak ada hubungannya dengan edisi.** Tahap
+aset tidak pernah punya `modules/` sama sekali, jadi glob halaman module di `resources/js/app.tsx`
+dan `@source` Tailwind tidak pernah cocok apa pun: image release selama ini dibangun **tanpa
+halaman module**. Sekarang folder itu ada di tahap aset, dan hanya berisi module yang dibeli.
+
+**Tahap antara boleh kotor, tahap akhir tidak.** Konteks pembangunan masih memuat ketiga module,
+dan `COPY . .` di tahap `vendor` menaruhnya kembali; pemangkasannya karena itu dijalankan dua
+kali, yang kedua dari hasil simpanan supaya tidak ada penyelesaian dependency kedua. Yang
+menentukan bukan apa yang sempat ada, melainkan apa yang tersalin ke tahap akhir — dan tahap akhir
+mengambil seluruh pohonnya dari tahap yang sudah dipangkas, bukan dari konteks.
 
 ### F5-04 — Pemeriksaan kebocoran modul
 
@@ -5005,14 +5028,53 @@ bukan dijanjikan. Ini pemeriksaan yang membuat seluruh model lisensi berdiri.
 
 #### Catatan pelaksanaan
 
-**Belum dikerjakan, dengan sebab yang sama seperti F5-03**: seluruh langkahnya membangun image
-dan memeriksa isinya, dan Docker tidak berjalan di mesin ini. Sebuah skrip pemeriksa kebocoran
-yang belum pernah dijalankan adalah bentuk paling berbahaya dari pemeriksa yang hijau tanpa
-menguji apa pun — dan seluruh model lisensi berdiri di atasnya.
+Selesai pada 9 September 2026, dan **ia menemukan kebocoran sungguhan pada percobaan pertama.**
 
-**Langkah 5 sudah dikerjakan lebih awal pada F5-02.** Modul ber-`kind: internal-fixture` ditolak
-`EditionResolver`, dan penolakannya diuji. Ia ditaruh di sana, bukan di skrip, karena resolver
-yang membaca `kind` tiap modul — skrip hanya menerima daftar yang sudah dihitung.
+**Dua keputusan yang menentukan apakah pemeriksa ini berarti.**
+
+Pertama, daftar module dihitung **di luar image**. Kalau ia dibaca dari dalam, image yang bocor
+menghitung dirinya sendiri sebagai benar — dan pemeriksanya hijau justru pada kasus yang ia
+dimaksudkan untuk menangkap.
+
+Kedua, pemeriksaan tabel menjalankan `module:migrate` untuk tiap module yang **ada di dalam
+image** lebih dulu. Tabel module dibuat perintah itu, bukan `migrate`; sebuah database yang hanya
+dimigrasi Core tidak akan pernah punya tabel module, dan pemeriksaan yang berdasar itu selalu
+hijau tanpa memeriksa apa pun. Langkah 2 seperti tertulis akan menghasilkan pemeriksa yang tidak
+memeriksa.
+
+**Jalur bundel mencari bentuk rute dan nama halaman, bukan id module telanjang.** Id telanjang
+juga muncul di kode Core yang sah — `product-launcher.tsx` memetakan ikon per produk dengan id
+yang ditulis tangan — sehingga edisi Core-saja akan dinyatakan bocor karena berkas milik Core.
+Yang dicari `"<id>::"` (awalan nama halaman Inertia module) dan `"/<id>/"` (awalan rute layar dan
+API-nya); keduanya hanya bisa lahir dari kode module, dan keduanya yang dituntut langkah 3. Peta
+ikon yang menuliskan id produk di dalam kode Core tetap sebuah cacat yang akan menggigit pada
+module kedua; ia dicatat sebagai pekerjaan tersendiri, bukan ditutup dengan melonggarkan
+pemeriksa.
+
+**Langkah 4 menjadi langkah CI, bukan catatan manual.** Rencananya menyuruh menambah satu module
+ke daftar, menjalankan, mencatat pesannya, lalu mengembalikan — sebuah pembuktian yang berlaku
+sekali dan tidak pernah diulang. Yang dipasang: `--anggap-tidak-dibeli`, yang memperlakukan module
+yang **memang dibeli** seolah terlarang, dan satu langkah alur yang gagal bila pemeriksanya justru
+hijau. Sejak itu, setiap pull request mengulang pembuktiannya.
+
+**Yang ditemukan percobaan pertama.** `Dockerfile` ikut tersalin bersama pohon app ke dalam image
+akhir, dan komentarnya menyebut namespace module contoh secara harfiah. Pemeriksanya merah, dan ia
+benar. Yang salah bukan komentarnya: sebuah image runtime tidak punya keperluan apa pun dengan
+resep yang membangunnya, dan selama berkas itu ikut, setiap kalimat yang ditulis di sana menjadi
+calon kebocoran berikutnya. Dibereskan dua lapis — komentarnya tidak lagi mengeja namespace, dan
+berkasnya dibuang dari image — karena lapis pertama sendirian bergantung pada disiplin orang.
+
+Suite test Core dan module juga tidak lagi ikut ke image. Sesudah metadata Composer dipangkas, ia
+satu-satunya tempat tersisa yang menyebut namespace module secara harfiah; ia juga memang bukan
+bagian dari runtime.
+
+**Yang dibuktikan alur hijaunya**, pada dua edisi sekaligus: berkas dan namespace bersih, tabel
+bersih sesudah seluruh module yang dibeli dimigrasikan, bundel bersih — lalu pemeriksanya sendiri
+dibuat merah dengan sengaja dan memang merah.
+
+**Langkah 5 dikerjakan lebih awal pada F5-02.** Module ber-`kind: internal-fixture` ditolak
+`EditionResolver`, dan penolakannya diuji. Ia ditaruh di sana, bukan di skrip, karena resolver yang
+membaca `kind` tiap module — skrip hanya menerima daftar yang sudah dihitung.
 
 ### F5-05 — Catatan rilis berbentuk satu image
 
