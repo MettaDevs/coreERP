@@ -49,6 +49,15 @@ jobs:
     # dipakai penerbitan nomor (lockForUpdate, FOR UPDATE SKIP LOCKED) berubah menjadi
     # string kosong di SQLite, sehingga test tidak membuktikan apa pun. Alasannya
     # ditulis juga di apps/control-plane/phpunit.xml.
+    #
+    # Database test tidak perlu tahan mati listrik. Ia dibuat, dipakai beberapa menit, lalu
+    # dibuang bersama runnernya — jadi seluruh jaminan durabilitas PostgreSQL di sini dibayar
+    # tanpa pernah dipakai. Data directory ditaruh di RAM lewat tmpfs.
+    #
+    # `PGDATA` sengaja menunjuk subfolder di dalam mount, bukan mount itu sendiri: entrypoint
+    # postgres menjalankan initdb hanya bila foldernya kosong dan kepemilikannya benar, dan
+    # sebuah tmpfs yang dipasang langsung sebagai data directory gagal pada salah satu dari
+    # keduanya tergantung versi Docker.
     services:
       postgres:
         image: postgres:16-alpine
@@ -56,9 +65,11 @@ jobs:
           POSTGRES_DB: core_erp
           POSTGRES_USER: core_erp
           POSTGRES_PASSWORD: core_erp
+          PGDATA: /var/lib/postgresql/data/pgdata
         ports:
           - 5432:5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw
           --health-cmd "pg_isready -U core_erp"
           --health-interval 5s
           --health-timeout 5s
@@ -128,6 +139,21 @@ jobs:
       # ulang alur ini atau menjalankan satu berkas test di mesin sendiri.
       - name: Create Test Schema
         run: PGPASSWORD=$DB_TEST_PASSWORD psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" -c "CREATE SCHEMA IF NOT EXISTS $DB_TEST_SCHEMA;"
+
+      # Melengkapi tmpfs di atas: yang tersisa dari biaya durabilitas setelah data directory
+      # berada di RAM. Ketiganya `sighup`, jadi cukup dimuat ulang tanpa merestart server.
+      #
+      # Ini **hanya** untuk database yang umurnya sepanjang satu job CI. Menyalakannya di mesin
+      # sungguhan berarti kehilangan data pada mati listrik, dan `full_page_writes=off`
+      # merusak database pada mati listrik di tengah penulisan halaman.
+      - name: Relax Test Database Durability
+        run: |
+          PGPASSWORD=$DB_TEST_PASSWORD psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" -c "
+            ALTER SYSTEM SET fsync = off;
+            ALTER SYSTEM SET synchronous_commit = off;
+            ALTER SYSTEM SET full_page_writes = off;
+            SELECT pg_reload_conf();
+          "
 
       # `--parallel`, bukan serial. Terukur di mesin pengembang pada keadaan yang sama:
       # 9 menit 3 detik menjadi 1 menit 27 detik untuk 499 test yang sama — tidak satu pun
