@@ -19,8 +19,7 @@ class BootstrapLocalAppRuntimeCommand extends Command
         {manifest : Path app.yaml yang sudah didaftarkan ke katalog}
         {--placement=pooled-primary}
         {--profile=pooled}
-        {--api-image=}
-        {--ui-image=}
+        {--edition-image=}
         {--compose-project=erp}
         {--compose-file=compose.yaml}
         {--api-service=}
@@ -59,27 +58,27 @@ class BootstrapLocalAppRuntimeCommand extends Command
             'version' => $manifest['version'] ?? null,
             'placement' => $this->option('placement'),
             'profile' => $this->option('profile'),
-            'api_image' => $this->option('api-image'),
-            'ui_image' => $this->option('ui-image'),
+            'edition_image' => $this->option('edition-image'),
             'compose_project' => $this->option('compose-project'),
             'compose_file' => $this->option('compose-file'),
-            'api_service' => $this->option('api-service'),
-            'ui_service' => $this->option('ui-service'),
-            'database_service' => $this->option('database-service'),
+            'api_service' => $this->namaLayanan($this->option('api-service')),
+            'ui_service' => $this->namaLayanan($this->option('ui-service')),
+            'database_service' => $this->namaLayanan($this->option('database-service')),
         ];
-        $identifier = ['required', 'string', 'max:120', 'regex:/^[a-z0-9][a-z0-9-]*$/'];
+        $identifier = ['string', 'max:120', 'regex:/^[a-z0-9][a-z0-9-]*$/'];
         $validator = Validator::make($payload, [
             'app_id' => ['required', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
             'version' => ['required', 'string', 'max:40'],
-            'placement' => $identifier,
+            'placement' => ['required', ...$identifier],
             'profile' => ['required', 'in:pooled,isolated'],
-            'api_image' => ['required', 'string', 'max:500', 'regex:/^.+@sha256:[a-f0-9]{64}$/'],
-            'ui_image' => ['required', 'string', 'max:500', 'regex:/^.+@sha256:[a-f0-9]{64}$/'],
-            'compose_project' => $identifier,
+            'edition_image' => ['required', 'string', 'max:500', 'regex:/^.+@sha256:[a-f0-9]{64}$/'],
+            'compose_project' => ['required', ...$identifier],
             'compose_file' => ['required', 'string', 'max:120', 'regex:#^(?!.*\.\.)[A-Za-z0-9_./-]+\.ya?ml$#'],
-            'api_service' => $identifier,
-            'ui_service' => $identifier,
-            'database_service' => $identifier,
+            // Nama layanan hanya diisi untuk app yang masih berjalan sebagai container
+            // sendiri; runtime satu image tidak punya layanan terpisah untuk disebut.
+            'api_service' => ['nullable', ...$identifier],
+            'ui_service' => ['nullable', ...$identifier],
+            'database_service' => ['nullable', ...$identifier],
         ]);
 
         if ($validator->fails()) {
@@ -112,8 +111,7 @@ class BootstrapLocalAppRuntimeCommand extends Command
             $release->fill([
                 'id' => $release->id ?: (string) Str::ulid(),
                 'manifest_sha256' => hash_file('sha256', $manifestPath),
-                'api_image' => $data['api_image'],
-                'ui_image' => $data['ui_image'],
+                'edition_image' => $data['edition_image'],
                 'bundle_path' => "local/{$app->id}/{$app->version}",
                 'compose_file' => $data['compose_file'],
                 'compose_project' => $data['compose_project'],
@@ -207,5 +205,13 @@ class BootstrapLocalAppRuntimeCommand extends Command
         $this->components->warn('Jalankan app:render-proxy-config agar path ini dilayani reverse proxy.');
 
         return self::SUCCESS;
+    }
+
+    /** Nama layanan yang tidak disebutkan dicatat sebagai null, bukan string kosong. */
+    private function namaLayanan(?string $nilai): ?string
+    {
+        $nama = trim($nilai ?? '');
+
+        return $nama === '' ? null : $nama;
     }
 }

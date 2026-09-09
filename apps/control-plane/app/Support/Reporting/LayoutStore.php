@@ -255,7 +255,7 @@ final class LayoutStore
         ]);
     }
 
-    /** Sidik jari release yang sedang melayani app: berubah setiap image API diganti. */
+    /** Sidik jari release yang sedang melayani app: berubah setiap image edisi diganti. */
     private function releaseKey(stdClass $report): string
     {
         $image = DB::table('app_placements as placements')
@@ -266,7 +266,7 @@ final class LayoutStore
             ->where('placements.app_id', $report->app_id)
             ->where('placements.runtime_status', 'ready')
             ->orderByDesc('placements.updated_at')
-            ->value('releases.api_image');
+            ->value('releases.edition_image');
 
         return substr(sha1((string) $image), 0, 12);
     }

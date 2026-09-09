@@ -4872,6 +4872,24 @@ dibangun.
 
 **Bergantung pada.** Tidak ada.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Edisi kedua sengaja kosong, dan itu bukan contoh yang kurang lengkap.** Katalog hari ini baru
+punya satu modul bisnis, jadi perbedaan "dibeli" dan "tidak dibeli" hanya bisa ditunjukkan
+dengan pasangan berisi dan tanpa isi. Edisi Core saja justru pemeriksaan kebocoran yang paling
+tajam yang bisa dibuat sekarang: **apa pun** jejak modul aset di dalam image-nya — namespace di
+berkas PHP, tabel berawalan `aset_`, atau rute modul di bundel — adalah cacat, tanpa perlu
+memperdebatkan apakah ia "seharusnya" ada. Edisi apotek menjadi pembandingnya, tempat jejak itu
+justru wajib ada.
+
+`README.md` di folder yang sama menjelaskan bentuknya dan — yang lebih penting — menyebutkan apa
+yang **tidak** ditulis di manifest: dependency, modul penghubung, dan penolakan bahan uji
+seluruhnya dihitung mesin. Daftar dependency yang ditulis tangan akan ketinggalan pada hari
+sebuah modul menambah dependency baru, dan ketinggalannya muncul sebagai image yang gagal
+menyala di server pelanggan.
+
 ### F5-02 — Penghitung dependency edisi
 
 **Kenapa.** Daftar modul yang dibeli belum lengkap. Dependency dan modul penghubung harus ikut, dan modul
@@ -4895,6 +4913,38 @@ penghubung ikut hanya ketika kedua sisinya ada.
 
 **Bergantung pada.** F5-01.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Langkah 1 tidak bisa dikerjakan seperti tertulis.** `AppDependencyGraph` membaca tabel `apps`,
+sedangkan image edisi dibangun di CI tanpa database sama sekali; memakainya berarti perintah yang
+gagal di sana dengan pesan yang tidak menyebut edisi sedikit pun. Sumber kebenaran dependency di
+`EditionResolver` karena itu `depends_on` pada tiap `app.yaml` — berkas yang ikut di dalam repo,
+dan yang sama dengan yang dibaca runtime. Tidak ada sumber kedua.
+
+**Aturan modul penghubung dibuat eksplisit, karena belum ada satu pun di repo.** Ia dikenali dari
+`kind: link`, dan dua sifatnya diuji terpisah: ia ikut **hanya** bila seluruh sisi yang
+dihubungkannya sudah terpilih, dan ia **tidak pernah** menarik sisinya masuk. Sifat kedua yang
+paling mudah salah: kalau penghubung menarik sisinya, membeli satu integrasi diam-diam membeli
+dua modul yang tidak dibayar pelanggan — dan itu terlihat sebagai image yang lebih besar, bukan
+sebagai kesalahan.
+
+Penghubung berlapis — penghubung yang bergantung pada penghubung lain — ikut diuji, karena sekali
+jalan akan melewatkannya dan yang terlewat tidak berbunyi: image tetap terbangun, hanya
+integrasinya yang diam-diam tidak ada.
+
+**Dua hal ditolak, bukan disaring diam-diam**: id yang tidak ada di repo, dan modul
+ber-`kind: internal-fixture`. Menyaring tanpa suara menghasilkan image yang berhasil dibangun dan
+kekurangan modul yang dibayar pelanggan. Penolakan bahan uji adalah langkah 5 F5-04 yang
+dikerjakan lebih awal — tempatnya memang di sini, karena resolver yang tahu `kind` tiap modul.
+
+**Seluruh aturannya dibuktikan pada modul buatan di folder sementara**, bukan pada repo apa
+adanya. Katalog hari ini tidak punya rantai dependency yang dalam maupun modul penghubung, jadi
+menunggu repo bertambah berarti aturan ini baru diketahui bekerja pada saat ia pertama kali harus
+bekerja — yaitu pada image pertama yang dikirim ke pelanggan. Satu test terakhir menghubungkannya
+kembali ke berkas sungguhan: kedua manifest edisi yang ikut ter-commit harus tetap sah hari ini.
+
 ### F5-03 — Image per edisi
 
 **Kenapa.** Tidak ada satu pun Dockerfile hari ini yang sadar modul; semuanya menyalin seluruh repo.
@@ -4913,6 +4963,19 @@ penghubung ikut hanya ketika kedua sisinya ada.
 **Rujukan.** Bagian 5.6 dokumen ini.
 
 **Bergantung pada.** F5-02.
+
+#### Catatan pelaksanaan
+
+**Belum dikerjakan: Docker tidak berjalan di mesin ini.** `docker version` gagal menghubungi
+daemon-nya.
+
+Task ini bisa saja ditulis tanpa dijalankan — Dockerfile yang menerima daftar modul sebagai
+argumen bangun bukan kode yang sulit. Yang tidak bisa dilakukan adalah membuktikannya, dan
+kriteria selesainya berbunyi "image edisi apotek berhasil dibangun dan menyala". Repo ini sudah
+sekali membayar mahal untuk perubahan Docker yang tidak pernah dijalankan; menambah satu lagi
+berarti menaruh berkas yang tampak selesai di jalur rilis pelanggan tanpa satu pun bukti.
+
+Yang dibutuhkan untuk melanjutkan: Docker Desktop menyala.
 
 ### F5-04 — Pemeriksaan kebocoran modul
 
@@ -4940,6 +5003,17 @@ bukan dijanjikan. Ini pemeriksaan yang membuat seluruh model lisensi berdiri.
 
 **Bergantung pada.** F5-03.
 
+#### Catatan pelaksanaan
+
+**Belum dikerjakan, dengan sebab yang sama seperti F5-03**: seluruh langkahnya membangun image
+dan memeriksa isinya, dan Docker tidak berjalan di mesin ini. Sebuah skrip pemeriksa kebocoran
+yang belum pernah dijalankan adalah bentuk paling berbahaya dari pemeriksa yang hijau tanpa
+menguji apa pun — dan seluruh model lisensi berdiri di atasnya.
+
+**Langkah 5 sudah dikerjakan lebih awal pada F5-02.** Modul ber-`kind: internal-fixture` ditolak
+`EditionResolver`, dan penolakannya diuji. Ia ditaruh di sana, bukan di skrip, karena resolver
+yang membaca `kind` tiap modul — skrip hanya menerima daftar yang sudah dihitung.
+
 ### F5-05 — Catatan rilis berbentuk satu image
 
 **Kenapa.** Catatan rilis hari ini mewajibkan dua sidik jari image, yaitu API dan UI, ditambah tiga nama
@@ -4966,6 +5040,59 @@ laporan yang akan gagal karena alasan yang tidak terlihat berhubungan.
 
 **Bergantung pada.** F5-03.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Daftar berkas di atas menyebut satu berkas test yang keliru.** `AppCatalogManagementTest`
+tidak menyentuh bentuk rilis sama sekali — tidak ada `release`, `image`, maupun `service` di
+dalamnya. Yang mengunci bentuk lama `AppReleaseRegistrationTest`, dan itu yang diperbarui.
+
+**Yang terjadi pada baris rilis lama.** Tidak ada yang dihapus. `edition_image` diisi dari
+`api_image`: image API adalah image yang benar-benar menjalankan kode app, sedangkan image UI
+hanya membawa berkas statis yang kini ikut ke dalam image edisi. Digest UI **tidak** dipindahkan
+ke kolom mana pun — ia menunjuk artifact yang tidak dibangun lagi, dan menyimpan sidik jari
+sesuatu yang tidak bisa ditarik siapa pun hanya menunda pertanyaannya. Alasannya ditulis di
+docblock migration, bukan hanya di sini.
+
+**Idempotensi dibuktikan, bukan diasumsikan**: `down()`, sisipkan satu baris bentuk lama, `up()`,
+lalu `up()` sekali lagi — seluruhnya di dalam transaksi yang di-rollback. Jalan kedua tidak
+mengubah nilai dan tidak gagal. Ini syarat yang tidak boleh ditawar: pembaruan on-prem dijalankan
+admin pelanggan yang tidak punya cara tahu apakah sebuah perintah sudah pernah jalan.
+
+**Ketiga nama layanan dilonggarkan, bukan dibuang**, karena `DeployAppPlacement` dan
+`app:render-proxy-config` masih membacanya untuk app yang memang berjalan sebagai container.
+
+**Melonggarkannya membuka satu lubang, dan lubang itu ditutup di tempat yang sama.** Sejak
+kolomnya nullable, sebuah rilis yang didaftarkan tanpa nama layanan akan membuat
+`DeployAppPlacement` menyusun `docker compose pull` dengan nama kosong — gagal jauh dari
+sebabnya, sebagai perintah Compose yang aneh dan bukan sebagai rilis yang kurang lengkap.
+PHPStan tidak menangkapnya karena properti Eloquent-nya `mixed`. Jalur itu sekarang menolak
+lebih dulu dengan pesan yang menyebut app, versi, dan kolom mana yang kosong.
+
+**Penjagaan itu tidak punya test, dan itu disebutkan di sini karena memang begitu keadaannya.**
+Jalur penempatan container tidak punya harness test sama sekali hari ini — dua test yang
+menyebut `DeployAppPlacement` hanya membuktikan job-nya diantrekan, bukan apa yang dikerjakannya.
+Membangun harness-nya berarti menyiapkan entitlement, penempatan, konfigurasi akar rilis, dan
+proses palsu untuk jalur yang seluruhnya dibuang pada fase 7. Yang dipilih: penjagaannya dipasang
+sekarang karena ia murah dan gagal dengan keras, dan ketiadaan testnya ditulis di sini alih-alih
+diam-diam dianggap tertutup.
+
+**Berkas lain yang ikut berubah karena menyentuh bentuk rilis**: `AppReleaseController::present()`,
+`LayoutStore::releaseKey()` — tanpa yang terakhir query-nya menunjuk kolom yang tidak ada lagi dan
+seluruh ekspor laporan mati — `contracts/openapi.json`, `loadtest/prepare.sh`, dan
+`docs/dev/13-publishing-an-app-release.md`.
+
+**`ReportingTest` memakai `app:bootstrap-local-runtime` hanya sebagai persiapan.** Ia tidak
+menguji bentuk rilis sama sekali; laporan baru bisa jalan setelah ada baris release dan penempatan
+siap. Yang berubah di sana hanya cara memanggil perintahnya. Alasan itu ditulis sebagai docblock
+di atas `bootstrapRuntime()` supaya peninjau tidak mencarinya.
+
+**Dua temuan yang ditinggalkan.** `loadtest/prepare.sh` sudah rusak sebelum task ini — barisnya
+masih memanggil `app:register-manifest` dengan jalur berkas, yang tidak diterima lagi sejak F3-30.
+Dan `docs/dev/22-ci-cd.md` masih memuat contoh payload bentuk lama; berkas CI sedang disentuh task
+lain, jadi risiko benturannya lebih besar daripada nilainya.
+
 ### F5-06 — Bundle dan pemasangan di server pelanggan
 
 **Kenapa.** Ini bagian yang belum pernah dibangun sama sekali, dan satu-satunya alasan seluruh arsitektur
@@ -4989,6 +5116,11 @@ tanpa npm, lalu berhasil dimutakhirkan ke versi berikutnya dan dikembalikan lagi
 **Rujukan.** [release dan on-prem](../../dev/03-release-and-on-prem.md).
 
 **Bergantung pada.** F5-04, F5-05.
+
+#### Catatan pelaksanaan
+
+**Belum dikerjakan.** Ia bergantung pada F5-04, dan kriteria selesainya menuntut pemasangan di
+mesin virtual bersih — dua hal yang tidak tersedia di sesi ini.
 
 ## 13. Fase 6: dev stack dan CI
 

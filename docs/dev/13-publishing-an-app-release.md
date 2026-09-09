@@ -44,16 +44,18 @@ Payload release minimum:
 {
   "version": "1.0.0",
   "manifest_sha256": "<64-character-sha256>",
-  "api_image": "registry.example/app-api@sha256:<64-character-sha256>",
-  "ui_image": "registry.example/app-ui@sha256:<64-character-sha256>",
+  "edition_image": "registry.example/edition@sha256:<64-character-sha256>",
   "bundle_path": "app-key/1.0.0",
   "compose_file": "compose.yaml",
-  "compose_project": "app-key",
-  "api_service": "app-api",
-  "ui_service": "app-ui",
-  "database_service": "app-db"
+  "compose_project": "app-key"
 }
 ```
+
+Satu image edisi menggantikan pasangan `api_image` dan `ui_image`: module berjalan di dalam
+runtime Core dan UI-nya ikut dibangun ke dalam shell, jadi hanya ada satu artifact yang bisa
+disebut sidik jarinya. `api_service`, `ui_service`, dan `database_service` masih boleh
+dikirim, tetapi tidak lagi wajib — ketiganya hanya berarti untuk app yang masih berjalan
+sebagai container sendiri.
 
 `bundle_path` selalu relatif terhadap `COREERP_RELEASE_ROOT`, yaitu lokasi artifact yang sudah dibuat CI dan tersedia untuk worker deployment. Bundle berisi Compose lengkap, termasuk service database. Image API wajib membawa skrip `deploy/migrate.sh` pada `/coreerp/migrate.sh`; worker menjalankannya setelah database sehat dan sebelum API/UI dinyalakan. Bundle bukan path source repository developer.
 
