@@ -123,16 +123,23 @@ WORKDIR /repo
 COPY --from=vendor /repo/apps/control-plane ./apps/control-plane
 COPY --from=vendor /repo/modules ./modules
 COPY --from=assets /repo/apps/control-plane/public/build ./apps/control-plane/public/build
-# Suite test tidak ikut ke server pelanggan. Ia bukan bagian dari runtime — dan sesudah metadata
-# Composer dipangkas, ia satu-satunya tempat tersisa di Core yang menyebut namespace module
-# secara harfiah: penjaga batas menguji dirinya dengan kode palsu bernama `Modules\Apperp\ContohA`
-# dan `Modules\Apperp\ContohB`, dan beberapa test Core mengimpor
-# `Modules\Apperp\ManagementAset\Tests\...`. Nama itu terbaca sebagai jejak module yang tidak
-# dibeli, dan pemeriksaan kebocoran memang mencarinya.
+# Berkas yang hanya dipakai saat membangun tidak ikut ke server pelanggan. Ada dua kelompok, dan
+# keduanya dibuang karena alasan yang sama sekaligus berbeda tingkatnya.
 #
-# `tests/` milik module ikut dibuang dengan alasan yang sama, sebelum ada module yang menulis
-# test batas yang menyebut nama tetangganya.
-RUN rm -rf apps/control-plane/tests modules/*/*/tests
+# **Suite test.** Ia bukan bagian dari runtime, dan sesudah metadata Composer dipangkas ia
+# satu-satunya tempat tersisa di Core yang menyebut namespace module secara harfiah: penjaga batas
+# menguji dirinya dengan kode palsu bernama seperti module contoh, dan beberapa test Core mengimpor
+# namespace test module aset. Nama itu terbaca sebagai jejak module yang tidak dibeli, dan
+# pemeriksaan kebocoran memang mencarinya. `tests/` milik module ikut dibuang dengan alasan yang
+# sama, sebelum ada module yang menulis test batas yang menyebut nama tetangganya.
+#
+# **Resep pembangunannya sendiri.** `Dockerfile` ikut tersalin bersama pohon app, dan komentarnya
+# menyebut nama module — termasuk yang tidak dibeli. Itu ditemukan alur `edition` pada percobaan
+# pertama, dan yang salah bukan komentarnya: sebuah image runtime tidak punya keperluan apa pun
+# dengan resep yang membangunnya, dan selama berkas itu ikut, setiap kalimat yang ditulis di sini
+# menjadi calon kebocoran berikutnya. Komentar di atas karena itu tidak lagi mengeja namespace-nya,
+# dan berkasnya tetap dibuang — dua lapis, karena yang pertama bergantung pada disiplin orang.
+RUN rm -rf apps/control-plane/tests modules/*/*/tests     && rm -f apps/control-plane/Dockerfile apps/control-plane/.dockerignore
 # Susunan repo ditirukan di bawah /var/www/repo supaya `../../modules/*/*` tetap menunjuk
 # tempat yang benar dari dalam vendor.
 RUN mkdir -p /var/www && ln -s /repo /var/www/repo
