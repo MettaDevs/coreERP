@@ -2268,6 +2268,12 @@ export default function AddressSetup({
                 {/* TOOLBAR — Read-only mode: semua aksi CRUD disembunyikan sementara */}
                 <AddressToolbar
                     title={pageHeaderTitle}
+                    newLabel={newButtonLabel}
+                    onNew={handleNew}
+                    onDelete={handleDelete}
+                    onSave={handleSave}
+                    onExternalCodes={openExternalCodesModal}
+                    onTranslations={openTranslationsModal}
                     onFilterToggle={
                         ['parameters', 'addressFormat'].includes(activeSection)
                             ? undefined
@@ -2283,8 +2289,8 @@ export default function AddressSetup({
                     showSearch={false}
                     canDelete={false}
                     canManageRelations={false}
-                    isSaving={false}
-                    isDeleting={false}
+                    isSaving={isSaving}
+                    isDeleting={isDeleting}
                 />
 
                 {/* FILTER BAR (Below Toolbar for hierarchy entities) */}
