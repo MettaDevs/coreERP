@@ -3,10 +3,10 @@ name: linter
 on:
   push:
     branches:
-      - develop
+      # Hanya cabang yang benar-benar ada. `develop`, `master`, dan `workos` sempat
+      # tercantum di sini tanpa pernah ada di remote — sisa cetakan yang tidak melakukan
+      # apa-apa selain membuat pembacanya mengira ada alur rilis yang tidak pernah ada.
       - main
-      - master
-      - workos
   # Tanpa daftar cabang. Pull request yang basisnya cabang fitur — pull request
   # bertumpuk, yang dipakai saat sebuah task bergantung pada task sebelumnya — tidak
   # mendapat pemeriksaan sama sekali selama daftar ini ada, dan itu tidak terlihat
@@ -23,6 +23,11 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
+
+    # Alasan yang sama seperti pada alur tests: job yang menggantung berjalan enam jam pada
+    # batas bawaan GitHub, dan kuota paket gratis dipakai bersama seluruh pemeriksaan lain.
+    timeout-minutes: 20
+
     defaults:
       run:
         working-directory: apps/control-plane
