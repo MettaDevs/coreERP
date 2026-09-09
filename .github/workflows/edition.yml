@@ -1,0 +1,125 @@
+name: edition
+
+# Membangun dua image edisi dan membuktikan modul yang tidak dibeli tidak ada di dalamnya.
+#
+# Alur ini terpisah dari `tests.yml` dengan sengaja. Ia membangun image — pekerjaan yang jauh
+# lebih lambat daripada suite test — dan yang dijaganya juga berbeda jenisnya: `tests.yml`
+# menjawab "apakah kodenya benar", alur ini menjawab "apakah yang dikirim ke pelanggan hanya
+# yang dibayarnya". Menggabungkannya membuat setiap perubahan satu baris PHP ikut menunggu dua
+# image selesai dibangun.
+#
+# Dua edisi dibangun, bukan satu, dan itu bukan kelengkapan: `praktek-dr-budi` tidak membeli
+# satu pun modul, sehingga **apa pun** jejak modul di dalam image-nya adalah cacat tanpa perlu
+# diperdebatkan. `apotek-sejahtera` menjadi pembandingnya, tempat jejak itu justru wajib ada.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  edisi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: core_erp
+          POSTGRES_USER: core_erp
+          POSTGRES_PASSWORD: core_erp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U core_erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: core_erp
+      DB_USERNAME: core_erp
+      DB_PASSWORD: core_erp
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # PHP dibutuhkan di runner, bukan hanya di dalam image: daftar modul sebuah edisi dihitung
+      # `edition:resolve` di luar image. Menghitungnya dari dalam image berarti image yang bocor
+      # menilai dirinya sendiri.
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        working-directory: apps/control-plane
+
+      - name: Copy Environment File
+        run: cp .env.example .env
+        working-directory: apps/control-plane
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+        working-directory: apps/control-plane
+
+      # Dipakai `verify-edition.sh` saat menjalankan migration dari dalam image.
+      - name: Baca Application Key
+        run: |
+          echo "APP_KEY=$(grep '^APP_KEY=' apps/control-plane/.env | cut -d= -f2-)" >> "$GITHUB_ENV"
+
+      - name: Bangun edisi apotek-sejahtera
+        run: bash scripts/build-edition.sh apotek-sejahtera coreerp-edisi:apotek-sejahtera
+
+      - name: Bangun edisi praktek-dr-budi
+        run: bash scripts/build-edition.sh praktek-dr-budi coreerp-edisi:praktek-dr-budi
+
+      - name: Periksa kebocoran, edisi apotek-sejahtera
+        run: bash scripts/verify-edition.sh apotek-sejahtera coreerp-edisi:apotek-sejahtera
+
+      # Database dibuang dan dibuat ulang di antara dua pemeriksaan. Tanpa itu, tabel yang
+      # dibuat pemeriksaan pertama masih ada saat yang kedua berjalan, dan edisi Core-saja akan
+      # dinyatakan bocor karena tabel milik pemeriksaan sebelumnya.
+      - name: Kosongkan database
+        run: |
+          PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d postgres \
+            -c "drop database if exists $DB_DATABASE" -c "create database $DB_DATABASE"
+
+      - name: Periksa kebocoran, edisi praktek-dr-budi
+        run: bash scripts/verify-edition.sh praktek-dr-budi coreerp-edisi:praktek-dr-budi
+
+      # Langkah ini yang membuat kedua langkah di atas berarti. Sebuah pemeriksa kebocoran yang
+      # belum pernah gagal tidak dapat dibedakan dari pemeriksa yang tidak memeriksa apa pun,
+      # dan yang kedua jauh lebih berbahaya karena ia mengakhiri pencarian.
+      #
+      # Modul yang **memang dibeli** edisi apotek diperlakukan seolah tidak dibeli. Pemeriksanya
+      # harus merah; kalau ia hijau, alur ini gagal di sini.
+      - name: Buktikan pemeriksanya bisa merah
+        run: |
+          set +e
+          keluaran="$(bash scripts/verify-edition.sh apotek-sejahtera coreerp-edisi:apotek-sejahtera --anggap-tidak-dibeli management-aset 2>&1)"
+          kode=$?
+          set -e
+          echo "$keluaran"
+          if [ "$kode" -eq 0 ]; then
+            echo "::error::Pemeriksa kebocoran hijau padahal modul yang dibeli diperlakukan sebagai terlarang. Ia tidak memeriksa apa pun."
+            exit 1
+          fi
+          echo "Pemeriksa gagal seperti yang diharapkan, dengan kode keluar $kode."
