@@ -50,7 +50,7 @@ api/app/
 
 Di luar folder itu ada tiga controller yang melayani platform: `ContextController`, `HealthController`, dan `ReferenceDataController`.
 
-`Services/` berisi hal yang berbicara keluar (`NumberSequenceClient`, `WorkflowClient`, `FiscalCalendarClient`, `UnitOfMeasureClient`) dan `DepreciationCalculator`. `Support/` berisi aturan murni: `OrganizationScope`, `WorkOrderStatus`, `AssetAttributeValidator`. `Reporting/` berisi definisi dan dataset laporan yang diminta Core; layout, render, dan antrean ekspornya milik Core. Lihat [Laporan dan ekspor](/apps/management-aset/transaction/laporan/).
+`Services/` berisi pembungkus tipis di atas kontrak Core (`PenerbitNomorAset`, `PersetujuanAset`, `KalenderFiskalAset`, `DaftarSatuanAset`) dan `DepreciationCalculator`. Keempat pembungkus itu dulu klien HTTP; yang tersisa dari perannya sekarang hanya menerjemahkan kegagalan Core menjadi kegagalan yang berarti bagi pemanggil module. `Support/` berisi aturan murni: `OrganizationScope`, `WorkOrderStatus`, `AssetAttributeValidator`. `Reporting/` berisi definisi dan dataset laporan yang diminta Core; layout, render, dan antrean ekspornya milik Core. Lihat [Laporan dan ekspor](/apps/management-aset/transaction/laporan/).
 
 Kalau Anda menaruh aturan bisnis di controller padahal ia dipakai lebih dari satu tempat, ia akan menyimpang. Contoh yang sudah benar: status work order dikumpulkan di `WorkOrderStatus`, bukan disebar sebagai pemeriksaan di tiap endpoint.
 

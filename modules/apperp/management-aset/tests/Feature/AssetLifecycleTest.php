@@ -28,8 +28,6 @@ class AssetLifecycleTest extends TestCase
 
     private string $orgUnitId;
 
-    private int $issued = 0;
-
     /** Satuan milik Core; tipe atribut merujuknya, tidak mengetik kodenya sendiri. */
     private string $unitId;
 
@@ -40,16 +38,11 @@ class AssetLifecycleTest extends TestCase
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
         $this->unitId = $this->buatSatuanUji($this->tenantId, 'kVA', 'Kilovolt-ampere');
-        Http::fake(function ($request) {
-            if (str_contains($request->url(), '/units-of-measure')) {
-                return Http::response(['data' => [[
-                    'id' => $this->unitId, 'code' => 'kVA', 'name' => 'Kilovolt-ampere',
-                    'symbol' => 'kVA', 'decimal_places' => 2,
-                ]]]);
-            }
 
-            return Http::response(['data' => ['number' => 'NS-'.str_pad((string) ++$this->issued, 6, '0', STR_PAD_LEFT)]]);
-        });
+        // Pemalsuan HTTP yang dulu ada di sini sudah tidak dipakai siapa pun: satuan dan nomor
+        // datang dari kontrak Core sejak F3-06 dan F3-08. Gantinya penjaga yang berlawanan arah
+        // — permintaan HTTP apa pun yang tersisa akan menggagalkan test, bukan dijawab palsu.
+        Http::preventStrayRequests();
     }
 
     public function test_aset_menyimpan_snapshot_versi_fiskal_saat_diterima(): void

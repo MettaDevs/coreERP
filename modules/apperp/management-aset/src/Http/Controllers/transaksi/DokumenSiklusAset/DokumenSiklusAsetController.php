@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
-use Modules\Apperp\ManagementAset\Services\WorkflowClient;
+use Modules\Apperp\ManagementAset\Services\PersetujuanAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
 
@@ -29,7 +29,7 @@ class DokumenSiklusAsetController extends Controller
         return $this->index($request, $this->typeFromRequest($request));
     }
 
-    public function storeByRoute(Request $request, PenerbitNomorAset $numbers, WorkflowClient $workflow): JsonResponse
+    public function storeByRoute(Request $request, PenerbitNomorAset $numbers, PersetujuanAset $workflow): JsonResponse
     {
         return $this->store($request, $this->typeFromRequest($request), $numbers, $workflow);
     }
@@ -43,7 +43,7 @@ class DokumenSiklusAsetController extends Controller
         return response()->json(['data' => $query->latest('created_at')->get()]);
     }
 
-    public function store(Request $request, string $type, PenerbitNomorAset $numbers, WorkflowClient $workflow): JsonResponse
+    public function store(Request $request, string $type, PenerbitNomorAset $numbers, PersetujuanAset $workflow): JsonResponse
     {
         $this->guard($request, $type, 'create');
         $key = (string) $request->header('Idempotency-Key');
@@ -74,26 +74,41 @@ class DokumenSiklusAsetController extends Controller
         }
         $existing = DB::table('aset_tr_dokumen_siklus_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first();
         if ($existing) {
+            // Perbaikan untuk dokumen yang dibuat **sebelum** pengajuan berada di dalam
+            // transaksi. Waktu itu penyimpanan bisa berhasil sementara pengajuannya gagal,
+            // dan dokumen tertinggal berstatus `submitted` tanpa instance mana pun. Dokumen
+            // baru tidak bisa lagi berada pada keadaan itu; barisnya dipertahankan karena
+            // dokumen lama masih ada di database pelanggan.
             if ($type === 'dekomisioning-aset' && $existing->workflow_instance_id === null) {
-                $this->submitWorkflow($existing, $tenant, $key, $workflow);
+                $this->submitWorkflow($existing, $tenant, (string) $existing->legal_entity_id, $key, $workflow);
             }
 
             return response()->json(['data' => DB::table('aset_tr_dokumen_siklus_aset')->where('id', $existing->id)->first()], 200, ['Idempotent-Replayed' => 'true']);
         }
+        $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'jenis_dokumen' => $type, 'legal_entity_id' => $data['legal_entity_id'], 'responsible_org_unit_id' => $data['responsible_org_unit_id'], 'asset_id' => $data['asset_id'] ?? null, 'tanggal' => $data['tanggal'], 'status' => $type === 'dekomisioning-aset' ? 'submitted' : 'draft', 'nilai' => $data['nilai'] ?? null, 'keterangan' => $data['keterangan'] ?? null, 'created_at' => now(), 'updated_at' => now()];
         try {
-            $kode = $numbers->issue('management-aset.'.$type, $tenant, $type.':'.$key, (string) $data['legal_entity_id']);
+            // Nomor, dokumen, dan pengajuan persetujuan pada satu transaksi.
+            //
+            // Ketiganya dulu berdiri sendiri-sendiri karena dua di antaranya berjalan lewat
+            // HTTP dan tidak mungkin ikut transaksi. Akibatnya dua keadaan setengah jadi yang
+            // harus dijelaskan ke pemeriksa: nomor yang terbit untuk dokumen yang tidak jadi
+            // ada, dan dokumen dekomisioning yang menunggu persetujuan yang tidak pernah
+            // diajukan. Keduanya tidak mungkin lagi terjadi setelah Core berada di proses yang
+            // sama — dan itu alasan terkuat seluruh pemindahan ini ada.
+            $record = DB::transaction(function () use ($record, $type, $tenant, $key, $numbers, $workflow, $data): array {
+                $record['kode'] = $numbers->issue('management-aset.'.$type, $tenant, $type.':'.$key, (string) $data['legal_entity_id']);
+                DB::table('aset_tr_dokumen_siklus_aset')->insert($record);
+                if (in_array($type, ['penjualan-aset', 'pemusnahan-aset'], true)) {
+                    $this->dispose($tenant, (string) $record['asset_id'], (string) $record['tanggal']);
+                }
+                if ($type === 'dekomisioning-aset') {
+                    $this->submitWorkflow((object) $record, $tenant, (string) $data['legal_entity_id'], $key, $workflow);
+                }
+
+                return $record;
+            });
         } catch (NumberSequenceException $e) {
             return response()->json(['error' => ['code' => $e->errorCode, 'message' => $e->getMessage()]], $e->status);
-        }
-        $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'jenis_dokumen' => $type, 'kode' => $kode, 'legal_entity_id' => $data['legal_entity_id'], 'responsible_org_unit_id' => $data['responsible_org_unit_id'], 'asset_id' => $data['asset_id'] ?? null, 'tanggal' => $data['tanggal'], 'status' => $type === 'dekomisioning-aset' ? 'submitted' : 'draft', 'nilai' => $data['nilai'] ?? null, 'keterangan' => $data['keterangan'] ?? null, 'created_at' => now(), 'updated_at' => now()];
-        DB::transaction(function () use ($record, $type, $tenant): void {
-            DB::table('aset_tr_dokumen_siklus_aset')->insert($record);
-            if (in_array($type, ['penjualan-aset', 'pemusnahan-aset'], true)) {
-                $this->dispose($tenant, (string) $record['asset_id'], (string) $record['tanggal']);
-            }
-        });
-        if ($type === 'dekomisioning-aset') {
-            $this->submitWorkflow((object) $record, $tenant, $key, $workflow);
         }
         $record = (array) DB::table('aset_tr_dokumen_siklus_aset')->where('id', $record['id'])->first();
 
@@ -121,12 +136,16 @@ class DokumenSiklusAsetController extends Controller
             ->update(['status' => 'closed', 'closed_on' => $tanggal, 'updated_at' => now()]);
     }
 
-    private function submitWorkflow(object $record, string $tenant, string $key, WorkflowClient $workflow): void
+    private function submitWorkflow(object $record, string $tenant, string $legalEntityId, string $key, PersetujuanAset $workflow): void
     {
         try {
-            $workflowId = $workflow->submit($tenant, 'dekomisioning:'.$key, $record->id, $record->asset_id, []);
+            $workflowId = $workflow->ajukanDekomisioning($tenant, $legalEntityId, $key, (string) $record->id, (string) $record->asset_id);
         } catch (RuntimeException $exception) {
-            abort(503, $exception->getMessage());
+            // 422, bukan 503. Core berada di proses yang sama, jadi "layanan persetujuan belum
+            // dapat dihubungi" tidak pernah lagi benar. Yang tersisa adalah permintaan yang
+            // memang belum bisa dipenuhi — paling sering karena tenant ini belum menyalakan
+            // alur persetujuan dekomisioning untuk entitas legalnya.
+            abort(422, $exception->getMessage());
         }
         DB::table('aset_tr_dokumen_siklus_aset')->where('id', $record->id)->update(['workflow_instance_id' => $workflowId, 'updated_at' => now()]);
     }

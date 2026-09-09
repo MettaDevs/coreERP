@@ -252,4 +252,68 @@ class WorkflowConfigurationTest extends TestCase
         Http::assertNothingSent();
         $this->assertNull(DB::table('outbox_events')->where('id', $eventId)->value('published_at'));
     }
+
+    /**
+     * Penerima yang kodenya berjalan di runtime ini tidak dikirimi HTTP.
+     *
+     * Sejak F3-09, module yang dimuat runtime ini menerima keputusan sebagai event, di dalam
+     * transaksi keputusannya. Mengirimkannya lagi lewat HTTP berarti satu permintaan ke alamat
+     * yang sudah tidak ada, lalu sebuah kegagalan koneksi yang tercatat sebagai masalah padahal
+     * keputusannya justru sudah sampai.
+     *
+     * Barisnya tetap ditandai terkirim. Baris yang tidak pernah ditandai akan diambil ulang
+     * setiap kali perintah ini berjalan, selamanya, dan antrean yang tidak pernah menyusut
+     * menyembunyikan baris yang benar-benar gagal terkirim.
+     */
+    public function test_publisher_skips_an_endpoint_served_inside_this_runtime(): void
+    {
+        $eventId = (string) Str::ulid();
+        DB::table('outbox_events')->insert([
+            'id' => $eventId, 'tenant_id' => $this->owner->activeMembership()->tenant_id,
+            'correlation_id' => (string) Str::ulid(),
+            'type' => 'core.workflow.decision.v2', 'payload' => json_encode(['decision' => 'approved'], JSON_THROW_ON_ERROR),
+            'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        config()->set('coreerp.app_context_signing_key', 'workflow-test-key');
+        config()->set('coreerp.event_endpoints', [[
+            'type' => 'core.workflow.decision.v2',
+            'url' => 'https://aset.test/events',
+            'module' => 'management-aset',
+        ]]);
+        Http::fake(['https://aset.test/events' => Http::response(['data' => ['accepted' => true]])]);
+
+        Artisan::call('workflow-events:publish');
+
+        Http::assertNothingSent();
+        $this->assertNotNull(DB::table('outbox_events')->where('id', $eventId)->value('published_at'));
+    }
+
+    /**
+     * Penerima di luar proses tetap dikirimi, walaupun namanya disebut.
+     *
+     * Ini sisi lain penjaga di atas, dan ia yang menahannya dari terlalu banyak menyapu: nama
+     * module yang **tidak** dimuat runtime ini bukan alasan untuk berhenti mengirim.
+     */
+    public function test_publisher_still_sends_to_a_module_this_runtime_does_not_load(): void
+    {
+        $eventId = (string) Str::ulid();
+        DB::table('outbox_events')->insert([
+            'id' => $eventId, 'tenant_id' => $this->owner->activeMembership()->tenant_id,
+            'correlation_id' => (string) Str::ulid(),
+            'type' => 'core.workflow.decision.v2', 'payload' => json_encode(['decision' => 'approved'], JSON_THROW_ON_ERROR),
+            'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        config()->set('coreerp.app_context_signing_key', 'workflow-test-key');
+        config()->set('coreerp.event_endpoints', [[
+            'type' => 'core.workflow.decision.v2',
+            'url' => 'https://hr.test/events',
+            'module' => 'human-resources',
+        ]]);
+        Http::fake(['https://hr.test/events' => Http::response(['data' => ['accepted' => true]])]);
+
+        Artisan::call('workflow-events:publish');
+
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://hr.test/events');
+        $this->assertNotNull(DB::table('outbox_events')->where('id', $eventId)->value('published_at'));
+    }
 }

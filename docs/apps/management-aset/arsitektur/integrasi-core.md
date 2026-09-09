@@ -28,15 +28,18 @@ Yang perlu dipahami:
 
 ### Persetujuan
 
-Dokumen dekomisioning dikirim ke workflow Core lewat `WorkflowClient`. App tidak tahu siapa approver-nya dan tidak boleh tahu — itu dikonfigurasi admin tenant di Core.
+Dokumen dekomisioning diajukan ke workflow Core lewat kontrak `MesinWorkflow`, bukan lewat HTTP. App tidak tahu siapa approver-nya dan tidak boleh tahu — itu dikonfigurasi admin tenant di Core.
+
+Pengajuan berjalan **di dalam transaksi yang menyimpan dokumennya**. Kalau alur persetujuan belum disiapkan untuk entitas legal tersebut, dokumennya tidak jadi dibuat dan nomornya tidak jadi terbit; jawabannya 422, bukan 503.
 
 ## Yang dikirim Core ke app
 
-Semuanya masuk lewat `POST /api/internal/v1/...` dan diverifikasi middleware `coreerp-event` sebelum isinya diproses.
+Sisanya masuk lewat `POST /api/internal/v1/...` dan diverifikasi middleware `coreerp-event` sebelum isinya diproses.
+
+Keputusan workflow **tidak lagi** lewat jalur ini. Ia datang sebagai event Laravel `KeputusanWorkflowDiambil` yang didengarkan `TerapkanKeputusanDekomisioning`, dan listenernya berjalan di dalam transaksi keputusan Core — dokumen dan instance workflow berpindah status bersama-sama atau tidak sama sekali.
 
 | Event | Endpoint penerima | Akibatnya |
 | --- | --- | --- |
-| `core.workflow.decision.v2` | `/internal/v1/workflow-events` | Aset menjadi `decommissioned` kalau disetujui |
 | `core.tenant.provisioned.v1` | `/internal/v1/provisioning/tenant` | Master dasar Indonesia diisi |
 
 ### Tanda tangan
@@ -104,7 +107,8 @@ Untuk tenant lama yang sudah ada sebelum event ini dibuat, Core menyediakan peri
 | Berkas | Isinya |
 | --- | --- |
 | `api/app/Services/NumberSequenceClient.php` | Permintaan nomor |
-| `api/app/Services/WorkflowClient.php` | Pengiriman untuk persetujuan |
+| `src/Services/PersetujuanAset.php` | Pengajuan persetujuan lewat kontrak Core |
+| `src/Listeners/TerapkanKeputusanDekomisioning.php` | Penerapan keputusan persetujuan |
 | `api/app/Services/FiscalCalendarClient.php` | Tahun buku |
 | `api/app/Services/UnitOfMeasureClient.php` | Satuan |
 | `api/app/Http/Controllers/ReferenceDataController.php` | Endpoint referensi yang meneruskan satuan dan kelompok fiskal |

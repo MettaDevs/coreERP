@@ -26,15 +26,16 @@ Jadi tidak ada jalan menjual aset yang persetujuan penghentiannya belum keluar.
 
 ## Persetujuan datang dari Core, bukan dari sini
 
-Dokumen dekomisioning tidak menyetujui dirinya sendiri. Saat dibuat, app mengirimkannya ke workflow milik Core lewat `WorkflowClient`, lalu menunggu.
+Dokumen dekomisioning tidak menyetujui dirinya sendiri. Saat dibuat, app mengajukannya ke workflow milik Core lewat kontrak `MesinWorkflow`, lalu menunggu.
 
-Core menjalankan alur persetujuan yang dikonfigurasi admin tenant — siapa approver-nya, berapa tahap, dan sebagainya — dan mengirim keputusannya kembali sebagai event bertanda tangan `core.workflow.decision.v2`.
+Core menjalankan alur persetujuan yang dikonfigurasi admin tenant — siapa approver-nya, berapa tahap, dan sebagainya — lalu memancarkan keputusannya sebagai event `KeputusanWorkflowDiambil`. Amplop `core.workflow.decision.v2` tetap ditulis ke outbox untuk penerima yang berada di luar proses.
 
 Yang perlu dipahami saat menulis kode di sini:
 
 - App **tidak tahu dan tidak boleh tahu** siapa approver-nya. Itu urusan Core.
 - Keputusan bisa datang **berhari-hari kemudian**. Karena itu id korelasi disimpan pada dokumen sejak awal — membacanya dari permintaan yang sedang berjalan tidak mungkin, karena permintaan itu sudah lama selesai.
-- Event diverifikasi tanda tangannya lewat middleware `coreerp-event` sebelum isinya diproses.
+- Pengaju **tidak bisa menyetujui dokumennya sendiri**. Yang menegakkannya Core, dan itu berlaku karena pengajunya benar-benar dicatat saat pengajuan.
+- Keputusan yang sama tidak diterapkan dua kali: `aset_processed_core_events` menyimpan id event yang sudah diproses.
 
 Setelah `approved` diterima, aset menjadi `decommissioned`.
 
@@ -44,7 +45,7 @@ Setelah `approved` diterima, aset menjadi `decommissioned`.
 
 **Pembuatan dokumen idempoten.** Sama seperti master: `Idempotency-Key` wajib, kunci yang sama mengembalikan dokumen yang sama.
 
-**Kalau dokumen dekomisioning sudah ada tetapi belum terkirim ke workflow, pengiriman diulang.** Ini menutup celah kalau proses gagal di antara menyimpan dokumen dan mengirimkannya — dokumennya tidak menggantung selamanya tanpa persetujuan.
+**Dokumen dekomisioning dan pengajuannya lahir bersama-sama.** Keduanya satu transaksi: kalau pengajuannya gagal, dokumennya tidak jadi dibuat dan nomornya tidak jadi terbit. Pengulangan pengiriman tetap ada untuk dokumen lama yang sempat tersimpan tanpa instance, dari masa pengajuan masih berjalan di luar transaksi.
 
 **Aset menjadi `disposed` hanya di langkah pelepasan.** Membuat dokumen penjualan tidak langsung membuat asetnya lepas; statusnya berubah saat pelepasan benar-benar dicatat.
 
@@ -59,8 +60,8 @@ Jangan menulis kontraknya sebelum perilakunya diputuskan; kontrak yang mendahulu
 | Berkas | Isinya |
 | --- | --- |
 | `api/app/Http/Controllers/transaksi/DokumenSiklusAset/DokumenSiklusAsetController.php` | Keempat jenis dokumen |
-| `api/app/Http/Controllers/transaksi/DekomisioningAset/WorkflowDecisionController.php` | Penerima keputusan workflow |
-| `api/app/Services/WorkflowClient.php` | Pengiriman ke Core |
+| `src/Listeners/TerapkanKeputusanDekomisioning.php` | Penerapan keputusan workflow |
+| `src/Services/PersetujuanAset.php` | Pengajuan ke Core lewat kontrak |
 | `api/app/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — rutenya ada, isinya belum dikerjakan |
 | `contracts/asyncapi.yaml` | Kontrak event yang diterima |
 | `ui/src/transactions/_shared/LifecycleDocumentPage.tsx` | Layar, satu untuk semua jenis |

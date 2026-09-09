@@ -3,7 +3,6 @@
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -20,7 +19,10 @@ class AssetRegisterTest extends TestCase
     {
         parent::setUp();
         $this->tenantId = $this->buatTenantUji();
-        Http::fake(['core.test/*' => Http::response(['data' => ['number' => $this->awalanNomor('management-aset.aset').'-000001']], 200)]);
+
+        // Tidak ada lagi `Http::fake` di sini. Nomor, kalender fiskal, dan satuan sudah lewat
+        // kontrak Core sejak F3-06 sampai F3-08, dan workflow menyusul pada F3-09; sebuah
+        // pemalsuan yang tidak dipakai siapa pun hanya menyembunyikan permintaan yang tersisa.
     }
 
     public function test_direct_receipt_keeps_receiver_usage_unit_and_custodian_separate(): void
@@ -94,38 +96,125 @@ class AssetRegisterTest extends TestCase
         $this->assertNotContains($crossSecond, array_column($data, 'id'));
     }
 
-    public function test_approved_decommissioning_event_stops_asset_use_once(): void
+    /**
+     * Satu dokumen dekomisioning diajukan lalu disetujui, tanpa satu pun permintaan HTTP.
+     *
+     * Ini kriteria selesai F3-09, dan bentuk testnya sengaja berubah total dari pendahulunya.
+     *
+     * Test lama memalsukan Core dua kali: `Http::fake` memulangkan sebuah id instance karangan
+     * untuk pengajuan, lalu test menyusun sendiri amplop keputusan dan mengirimkannya ke rute
+     * panggilan balik module. Yang dibuktikannya cuma satu — module bisa membaca amplop yang
+     * ditulis test itu sendiri. Tidak ada workflow yang pernah berjalan, tidak ada tugas yang
+     * pernah menunggu, dan tidak ada seorang pun yang pernah menyetujui apa pun.
+     *
+     * Yang di sini menempuh jalur sungguhan dari ujung ke ujung: sebuah alur persetujuan
+     * terbit untuk entitas legalnya, pengaju membuat dokumen, Core membuat tugas untuk
+     * pemeriksa, pemeriksa menyetujui lewat layar Core, lalu keputusan itu sampai ke dokumen
+     * module tanpa melewati satu baris HTTP pun.
+     *
+     * `preventStrayRequests()` yang membuat kalimat terakhir bisa gagal. Tanpa itu, sebuah
+     * permintaan HTTP yang tersisa akan keluar diam-diam dan test tetap hijau.
+     */
+    public function test_dekomisioning_diajukan_lalu_disetujui_tanpa_permintaan_http(): void
     {
-        $workflowId = (string) Str::ulid();
-        Http::swap(new Factory);
-        Http::fake(fn ($request) => str_contains($request->url(), 'workflow-instances')
-            ? Http::response(['data' => ['id' => $workflowId]], 201)
-            : Http::response(['data' => ['number' => $this->awalanNomor('management-aset.aset').'-000001']], 200));
+        Http::preventStrayRequests();
+
+        $this->sebagaiPenggunaBernama('pemeriksa', $this->tenantId, []);
+        $idPemeriksa = $this->idKeanggotaan('pemeriksa', $this->tenantId);
+
         $assetId = $this->receive();
         $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
-        $document = $this->sebagaiPengguna($this->tenantId, ['management-aset.dekomisioning-aset.create'])
-            ->withHeader('Idempotency-Key', 'decommission-1')->postJson('/api/modules/management-aset/v1/dekomisioning-aset', [
-                'legal_entity_id' => $asset->legal_entity_id, 'responsible_org_unit_id' => $asset->responsible_org_unit_id,
+        $this->siapkanWorkflowDekomisioning($this->tenantId, (string) $asset->legal_entity_id, $idPemeriksa);
+
+        $dokumen = $this->sebagaiPenggunaBernama('pengaju', $this->tenantId, ['management-aset.dekomisioning-aset.create'])
+            ->withHeader('Idempotency-Key', 'decommission-1')
+            ->postJson('/api/modules/management-aset/v1/dekomisioning-aset', [
+                'legal_entity_id' => $asset->legal_entity_id,
+                'responsible_org_unit_id' => $asset->responsible_org_unit_id,
                 'tanggal' => '2026-08-03', 'asset_id' => $assetId,
             ])->assertCreated()->json('data');
 
-        $event = ['id' => (string) Str::ulid(), 'type' => 'core.workflow.decision.v2', 'tenant_id' => $this->tenantId,
-            'correlation_id' => $document['id'], 'data' => [
-                'workflow_instance_id' => $workflowId, 'workflow_type' => 'management-aset.dekomisioning-aset-verification',
-                'decision' => 'approved', 'source_document_type' => 'dekomisioning-aset', 'source_document_id' => $document['id'],
-                'decision_context' => ['asset_id' => $assetId],
-            ]];
-        $body = json_encode($event, JSON_THROW_ON_ERROR);
-        $timestamp = (string) now()->timestamp;
-        $headers = [
-            'CONTENT_TYPE' => 'application/json', 'HTTP_X_COREERP_EVENT_TIMESTAMP' => $timestamp,
-            'HTTP_X_COREERP_EVENT_SIGNATURE' => hash_hmac('sha256', $timestamp.'.'.$body, 'test-context-signing-key-32-bytes'),
-        ];
-        $this->call('POST', '/api/modules/management-aset/internal/v1/workflow-events', [], [], [], $headers, $body)->assertOk();
-        $this->call('POST', '/api/modules/management-aset/internal/v1/workflow-events', [], [], [], $headers, $body)->assertOk();
+        // Dokumen dan instance lahir bersama-sama. Sebelum F3-09 keduanya bisa terpisah:
+        // dokumen tersimpan, pengajuannya gagal, dan barisnya menunggu persetujuan yang tidak
+        // pernah diajukan siapa pun.
+        $this->assertNotNull($dokumen['workflow_instance_id']);
+        $this->assertSame('submitted', $dokumen['status']);
 
+        $tugas = $this->tugasMenunggu($this->tenantId, $idPemeriksa);
+        $this->assertNotNull($tugas, 'Tidak ada tugas persetujuan yang menunggu pemeriksa.');
+
+        $this->sebagaiPenggunaBernama('pemeriksa', $this->tenantId, [])
+            ->post('/workflow-inbox/'.$tugas->id.'/decision', ['decision' => 'approve'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('aset_tr_dokumen_siklus_aset', ['id' => $dokumen['id'], 'status' => 'approved']);
         $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $assetId, 'lifecycle_state' => 'decommissioned']);
+        $this->assertDatabaseHas('workflow_instances', ['id' => $dokumen['workflow_instance_id'], 'status' => 'approved']);
         $this->assertDatabaseCount('aset_processed_core_events', 1);
+    }
+
+    /**
+     * Alur tanpa langkah persetujuan selesai seketika, dan dokumennya ikut selesai.
+     *
+     * Graf Mulai → Selesai sah dan bisa diterbitkan admin; sebuah kondisi yang langsung menuju
+     * Selesai menghasilkan bentuk yang sama. Instancenya `approved` **pada saat pengajuan**,
+     * jadi keputusannya sampai ke listener sebelum pemanggil sempat menuliskan id instance ke
+     * dokumen.
+     *
+     * Selama pengiriman keputusan berjalan lewat perintah terjadwal, urutan ini tidak pernah
+     * muncul: keputusan baru dikirim berjam-jam kemudian, saat idnya sudah tersimpan. Ia hanya
+     * terlihat setelah pengirimannya menjadi seketika — dan tanpa test ini, dokumennya akan
+     * menggantung pada `submitted` sementara instancenya sudah `approved`.
+     */
+    public function test_alur_tanpa_langkah_persetujuan_langsung_menyelesaikan_dokumennya(): void
+    {
+        Http::preventStrayRequests();
+
+        $assetId = $this->receive();
+        $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
+        $this->siapkanWorkflowDekomisioning($this->tenantId, (string) $asset->legal_entity_id, null);
+
+        $dokumen = $this->sebagaiPengguna($this->tenantId, ['management-aset.dekomisioning-aset.create'])
+            ->withHeader('Idempotency-Key', 'decommission-langsung')
+            ->postJson('/api/modules/management-aset/v1/dekomisioning-aset', [
+                'legal_entity_id' => $asset->legal_entity_id,
+                'responsible_org_unit_id' => $asset->responsible_org_unit_id,
+                'tanggal' => '2026-08-03', 'asset_id' => $assetId,
+            ])->assertCreated()->json('data');
+
+        $this->assertSame('approved', $dokumen['status']);
+        $this->assertNotNull($dokumen['workflow_instance_id']);
+        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $assetId, 'lifecycle_state' => 'decommissioned']);
+    }
+
+    /**
+     * Dokumen dan nomornya ikut batal ketika alur persetujuannya belum disiapkan.
+     *
+     * Dulu pengajuan berjalan setelah dokumen tersimpan dan di luar transaksinya, jadi tenant
+     * yang belum menyalakan alur persetujuan tetap mendapat dokumen — berstatus `submitted`,
+     * bernomor, dan menunggu sesuatu yang tidak pernah ada. Nomornya ikut terpakai.
+     *
+     * Jawabannya juga bukan lagi 503. Core berada di proses yang sama, jadi "layanan
+     * persetujuan belum dapat dihubungi" tidak pernah lagi benar.
+     */
+    public function test_dokumen_batal_ketika_alur_persetujuan_belum_disiapkan(): void
+    {
+        Http::preventStrayRequests();
+
+        $assetId = $this->receive();
+        $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
+        $sebelum = $this->jumlahNomorTerbit();
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.dekomisioning-aset.create'])
+            ->withHeader('Idempotency-Key', 'decommission-tanpa-workflow')
+            ->postJson('/api/modules/management-aset/v1/dekomisioning-aset', [
+                'legal_entity_id' => $asset->legal_entity_id,
+                'responsible_org_unit_id' => $asset->responsible_org_unit_id,
+                'tanggal' => '2026-08-03', 'asset_id' => $assetId,
+            ])->assertStatus(422);
+
+        $this->assertSame(0, DB::table('aset_tr_dokumen_siklus_aset')->count(), 'Dokumen tersimpan padahal pengajuannya gagal.');
+        $this->assertSame($sebelum, $this->jumlahNomorTerbit(), 'Nomor tetap terbit padahal dokumennya batal.');
     }
 
     /**

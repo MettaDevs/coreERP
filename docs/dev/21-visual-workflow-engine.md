@@ -87,7 +87,15 @@ graph LR
 
 ## 3. Integrasi Pemanggilan dari App Bisnis
 
-App bisnis memicu alur persetujuan melalui service client internal `WorkflowClient`:
+::: warning Sudah berubah untuk modul di dalam runtime
+Contoh di bawah menggambarkan app yang berjalan sebagai proses tersendiri. Modul yang dimuat
+runtime yang sama mengajukan lewat kontrak `App\Support\Modules\Contracts\MesinWorkflow` dan
+menerima keputusannya sebagai event `KeputusanWorkflowDiambil`, bukan lewat HTTP; lihat F3-09
+pada `docs/todo/satu-runtime/01-prd.md`. Jalur HTTP di bawah tetap berlaku untuk app di luar
+proses.
+:::
+
+App bisnis di luar proses memicu alur persetujuan melalui service client internal `WorkflowClient`:
 
 ```php
 namespace App\Services;

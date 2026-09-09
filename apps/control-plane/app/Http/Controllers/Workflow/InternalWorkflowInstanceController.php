@@ -62,7 +62,11 @@ class InternalWorkflowInstanceController extends Controller
             ->when(($type->scope ?? 'legal_entity') === 'tenant', fn ($query) => $query->whereNull('configurations.legal_entity_id'))
             ->where('configurations.enabled', true)->where('versions.status', 'published')
             ->where(fn ($query) => $query->whereNull('versions.effective_from')->orWhere('versions.effective_from', '<=', today()))
-            ->orderByDesc('versions.effective_from')->first();
+            // `versions.*`, bukan `*`: pada join ini kedua tabel punya kolom `id`, dan yang
+            // belakangan menimpa yang duluan — instance jadi menunjuk id konfigurasi sebagai
+            // versinya dan ditolak kunci asing. Ditemukan pada F3-09, ketika jalur yang sama
+            // dijalankan sungguhan untuk pertama kalinya.
+            ->orderByDesc('versions.effective_from')->first(['versions.*']);
 
         abort_unless($version, 409, 'Belum ada workflow aktif untuk dokumen ini.');
         try {

@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset;
 
+use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Modules\Apperp\ManagementAset\Http\Middleware\VerifyCoreErpEvent;
+use Modules\Apperp\ManagementAset\Listeners\TerapkanKeputusanDekomisioning;
 use Modules\Apperp\ManagementAset\Providers\AppServiceProvider;
 
 /**
@@ -47,10 +50,14 @@ final class ModuleServiceProvider extends ServiceProvider
         // gagal — rutenya memang belum dimuat siapa pun waktu itu. Rumah yang benar untuknya
         // adalah penyedia layanan module ini.
         //
-        // Kedua rute yang memakainya berhenti masuk akal begitu module berada di proses yang
-        // sama: keputusan workflow menjadi event Laravel pada F3-09, penyediaan data awal
-        // tenant pada F3-11. Alias ini ikut dibuang di sana.
+        // Tersisa satu rute yang memakainya — penyediaan data awal tenant — dan itu menjadi
+        // event pada F3-11. Alias ini ikut dibuang di sana.
         $this->app['router']->aliasMiddleware('coreerp-event', VerifyCoreErpEvent::class);
+
+        // Keputusan persetujuan tidak lagi datang sebagai permintaan HTTP. Listener ini
+        // berjalan di dalam transaksi keputusan Core, jadi dokumen dan instance workflow
+        // berpindah status bersama-sama.
+        Event::listen(KeputusanWorkflowDiambil::class, TerapkanKeputusanDekomisioning::class);
 
         $this->app->booted(function (): void {
             // Grup `web` diperlukan, bukan pilihan gaya: konteks module dibaca dari sesi Core

@@ -14,6 +14,11 @@ return [
         'password' => env('COREERP_PROVIDER_PASSWORD'),
     ],
     'app_context_signing_key' => env('COREERP_APP_CONTEXT_SIGNING_KEY'),
+    // Penerima event Core yang berjalan sebagai proses tersendiri. Tiap baris:
+    // `{"type": "...", "url": "...", "module": "..."}`. Kunci `module` opsional dan berisi id
+    // module; bila module dengan id itu dimuat runtime ini, `workflow-events:publish` berhenti
+    // mengirim HTTP ke sana — module tersebut sudah menerima eventnya langsung, di dalam
+    // transaksi keputusannya. Baris tanpa `module` selalu dianggap di luar proses.
     'event_endpoints' => json_decode((string) env('COREERP_EVENT_ENDPOINTS', '[]'), true) ?: [],
 
     // Requests per minute per app+tenant on the internal number sequence API. Sized for normal document traffic,
