@@ -18,7 +18,7 @@ import { Switch } from '@apperp/ui/switch';
 import { FileOutput } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errorMessage } from '../../api';
-import { requestPrint, shellTersedia } from '../../shell';
+import { requestPrint } from '../../print';
 import {
     STATUS,
     StatusBadge,
@@ -46,7 +46,6 @@ export default function WorkOrderListPage({
         Record<string, unknown>[]
     >([]);
     const [search, setSearch] = useState('');
-    const dapatMengekspor = shellTersedia();
 
     useEffect(() => {
         api<{ data: WorkOrder[] }>('/pemeliharaan-aset')
@@ -232,7 +231,7 @@ export default function WorkOrderListPage({
                         Tambah work order
                     </ActionButton>
                 )}
-                {dapatMengekspor && !hanyaPekerjaanSaya && (
+                {!hanyaPekerjaanSaya && (
                     <Button
                         type="button"
                         variant="outline"

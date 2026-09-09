@@ -16,4 +16,15 @@
  */
 @source '../../../../packages/ui/dist';
 
+/*
+ * Halaman module. Pemindaian otomatis Tailwind berhenti di akar proyek ini, sedangkan
+ * halaman module ada di `modules/<penerbit>/<module>/ui`. Tanpa baris ini `npm run build`
+ * tetap hijau dan setiap kelas yang hanya dipakai layar module hilang dari CSS — kegagalan
+ * yang tidak berbunyi, dan baru terlihat sebagai halaman yang tata letaknya berantakan.
+ *
+ * Ditulis sebagai satu pola untuk semua module, bukan satu baris per module: daftar yang
+ * harus ditambah setiap kali module baru mendarat adalah daftar yang akan terlupa.
+ */
+@source '../../../../modules/*/*/ui';
+
 @custom-variant dark (&:is(.dark *));

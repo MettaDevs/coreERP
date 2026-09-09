@@ -17,6 +17,13 @@ import type { ComponentType, ReactNode } from 'react';
  *   halaman terpasang, jadi ia tidak bisa ditangkap `try`/`catch` di sekitar `render`.
  *   Hanya komponen kelas dengan `componentDidCatch` yang menangkapnya.
  *
+ * **Kenapa berkas ini tidak tinggal di `pages/`.** Ia bukan halaman Inertia melainkan
+ * pembungkus yang dipakai pemilih halaman, sedangkan pola glob halaman shell di `app.tsx`
+ * menyapu seluruh isi folder itu sebagai titik masuk malas. Selama ia di sana, `app.tsx`
+ * mengimpornya secara statis sekaligus menyapunya secara dinamis, dan setiap build mencetak
+ * `INEFFECTIVE_DYNAMIC_IMPORT`. Peringatan yang selalu muncul adalah peringatan yang berhenti
+ * dibaca orang.
+ *
  * Ini yang menggantikan `pages/apps/host.tsx`. Perbedaan yang paling penting bukan soal
  * gaya: iframe memuat aplikasi React kedua beserta salinan React dan `@apperp/ui`-nya
  * sendiri, sedangkan yang di sini berbagi satu React, satu tema, dan satu riwayat

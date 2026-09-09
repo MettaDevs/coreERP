@@ -16,26 +16,11 @@ import {
     MasterAction,
     MasterConfig,
     MasterRecord,
-    MasterResource,
     Permission,
     permission,
 } from '../masters';
 import RecordDetailPane, { DetailMode } from './RecordDetailPane';
 import RecordListPane from './RecordListPane';
-
-/**
- * Master yang sudah memakai tata letak daftar-detail. Selama daftar ini belum memuat
- * seluruh master, `MasterPage` tetap hidup berdampingan; ketika semuanya sudah pindah,
- * yang dihapus adalah daftar ini beserta `MasterPage`.
- */
-export const DETAIL_LAYOUT_RESOURCES: MasterResource[] = [
-    'group-aset',
-    'jenis-aset',
-    'pabrikan-aset',
-    'maintenance-job-types',
-    'maintenance-checklist-variables',
-    'maintenance-checklist-templates',
-];
 
 const FORM_ID = 'master-detail-form';
 const PER_PAGE = 20;

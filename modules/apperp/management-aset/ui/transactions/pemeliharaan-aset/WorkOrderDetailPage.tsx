@@ -18,7 +18,7 @@ import { Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import EditShield from '../../_shared/EditShield';
-import { requestPrint, shellTersedia } from '../../shell';
+import { requestPrint } from '../../print';
 import {
     ChecklistRow,
     Context,
@@ -30,6 +30,7 @@ import {
     WorkOrder,
     bukaDaftar,
     bukaWorkOrder,
+    bukaWorkOrderUbah,
     bukaChecklistJob,
     emptyJob,
     emptyWorkOrder,
@@ -512,10 +513,6 @@ export default function WorkOrderDetailPage({
     checklistJobId?: string;
 }) {
     const can = izin(permissions);
-    // Cetak dikerjakan Core lewat Shell: dialog, layout, dan antreannya bukan milik app
-    // ini. Hak membaca work order sudah dipunyai karena halaman ini terbuka; Core dan
-    // app memeriksanya lagi saat dataset diminta.
-    const dapatMencetak = shellTersedia();
     const [record, setRecord] = useState<EditableWorkOrder | undefined>(
         mode === 'create' ? emptyWorkOrder() : undefined,
     );
@@ -871,7 +868,7 @@ export default function WorkOrderDetailPage({
         can('execute') && (status === 'dikerjakan' || status === 'selesai');
     const mintaSunting = () => {
         if (!dapatDisunting || editing || !record.id) return;
-        window.location.hash = `#/pemeliharaan-aset/${record.id}/ubah`;
+        bukaWorkOrderUbah(record.id);
     };
 
     const updateJob = (jobId: string | undefined, change: Partial<JobLine>) =>
@@ -1158,7 +1155,7 @@ export default function WorkOrderDetailPage({
                                         {transisi.label}
                                     </Button>
                                 ))}
-                        {record.id && dapatMencetak && (
+                        {record.id && (
                             <Button
                                 type="button"
                                 variant="outline"

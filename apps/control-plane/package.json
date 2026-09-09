@@ -12,7 +12,8 @@
         "format:check": "npm run ui:build && prettier --check resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --check \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
         "lint": "npm run ui:build && eslint . --fix",
         "lint:check": "npm run ui:build && eslint .",
-        "types:check": "npm run ui:build && tsc --noEmit"
+        "types:check": "npm run ui:build && tsc --noEmit",
+        "bundle:check": "node scripts/periksa-bundel.mjs"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",

@@ -111,6 +111,13 @@ final class ModuleServiceProvider extends ServiceProvider
             Route::middleware(['web', 'auth'])
                 ->prefix('api/modules/management-aset')
                 ->group(dirname(__DIR__).'/routes/api.php');
+
+            // Rute layar, terpisah dari rute JSON di atas dan tanpa awalan `api`.
+            //
+            // Ia dimuat di sini dan bukan oleh Core karena alamat layarnya milik module:
+            // Core hanya menyusun tautan sidebar dengan aturan `/<id module>/<id entri menu>`
+            // dari manifest, dan module yang memutuskan apa yang terjadi di alamat itu.
+            Route::group([], dirname(__DIR__).'/routes/web.php');
         });
     }
 }

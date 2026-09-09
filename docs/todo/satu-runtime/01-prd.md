@@ -4494,6 +4494,36 @@ sudah begitu sebelum task ini dan tidak diubah di sini; yang pertama wilayah F4-
 
 **Bergantung pada.** F4-02.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Langkah 3 dan sebagian langkah 4 ternyata sudah ada.** `resolve.alias` untuk `@modules` dan
+`server.fs.allow` dipasang F2-11 waktu module contoh mendarat, jadi yang tersisa hanya sumber
+pemindaian Tailwind. Ia ditulis sebagai satu pola untuk semua module —
+`@source '../../../../modules/*/*/ui'` — bukan satu baris per module: daftar yang harus ditambah
+setiap kali module baru mendarat adalah daftar yang akan terlupa, dan lupanya tidak berbunyi. CSS
+tetap hijau, hanya kelas milik layar module yang hilang.
+
+**Yang ikut dibuang selain yang tertulis.** `index.html`, `main.tsx`, `tsconfig.json`,
+`package-lock.json`, `.prettierrc.json`, `.dockerignore`, dan `vendor/apperp-ui.tgz` — sisa
+terakhir berkas `.tgz` di repo, yang pada F4-02 sengaja ditinggalkan karena foldernya masih
+proyek Vite tersendiri. Kriteria "tidak ada berkas `.tgz` di repo" baru benar-benar terpenuhi di
+sini.
+
+**Tiga aturan pada `ui/styles.css` dibuang setelah dibuktikan tidak mengubah apa pun**, bukan
+setelah diperkirakan: `* { box-sizing: border-box }` dan `body { margin: 0 }` sudah disetel
+preflight Tailwind dengan nilai yang sama persis, dan `#root` menunjuk elemen yang tidak ada lagi
+karena shell memasang aplikasinya di `#app`.
+
+**Yang tersisa di berkas itu berlaku untuk seluruh dokumen, dan itu diketahui, bukan terlewat.**
+Begitu satu potongan module termuat, `styles.css` ikut termuat dan tidak pernah dilepas lagi;
+`body { min-width: 320px }` dan `main { width: 100% }` sejak itu berlaku juga pada halaman shell.
+Aturan `:has()` memang harus begitu — ia menyetel `html` dan `body` berdasarkan isinya.
+Menyempitkan dua aturan sisanya adalah perbaikan yang benar, tetapi ia menggeser tata letak dan
+menuntut pemeriksaan di peramban, jadi ia tidak dititipkan pada pull request yang katanya tidak
+mengubah perilaku.
+
 ### F4-04 — Perutean modul memakai rute shell
 
 **Kenapa.** Perutean hash di UI modul ada karena satu image harus bisa disajikan di bawah awalan mana pun.
@@ -4516,6 +4546,41 @@ Setelah UI menyatu, awalan itu tidak ada lagi.
 **Rujukan.** Bagian 5.5 dokumen ini.
 
 **Bergantung pada.** F4-03.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Alamatnya rute module, bukan rute shell, dan itu koreksi terhadap daftar berkas di atas.**
+Daftar itu menyebut `apps/control-plane/routes/web.php`; yang benar
+`modules/apperp/management-aset/routes/web.php`. Bentuk ini sudah ditetapkan F3-13 dan dipakai
+module contoh: module memiliki alamat layarnya sendiri, dan Core hanya menyusun tautan sidebar
+dengan aturan `/<id module>/<id entri menu>`. Menaruh rute layar module di `routes/web.php` Core
+berarti Core harus tahu nama halaman Inertia tiap module — satu hal lagi yang bisa menyimpang
+tanpa ada yang gagal.
+
+Rutenya satu: `GET /management-aset/{view}/{sisa?}` dengan `where('sisa', '.*')`. Pola itu bukan
+gaya — tanpanya Laravel berhenti pada garis miring pertama, dan `/pemeliharaan-aset/<id>/ubah`
+tidak pernah sampai.
+
+**Id entri menu dan izinnya dibaca dari `app.yaml` apa adanya.** Menuliskan ulang 33 id di
+controller berarti dua daftar yang akan menyimpang, dan penyimpangannya muncul sebagai menu yang
+mendarat di 404 — atau lebih buruk, sebagai layar yang terbuka tanpa izin yang seharusnya
+menjaganya. Id yang tidak ada di manifest dijawab **404, bukan 403**: bedanya penting justru saat
+menu dan rute sedang tidak sejalan, karena 403 terbaca sebagai masalah hak akses dan menghabiskan
+waktu orang di tempat yang salah. Entri tanpa `permission` pada manifest juga ditutup — ia
+dianggap salah tulis, bukan layar yang terbuka untuk semua orang.
+
+**Satu jebakan pemecahan potongan yang tidak terlihat dari kode.** `DETAIL_LAYOUT_RESOURCES`
+diekspor dari `MasterDetailPage.tsx`, dan `App.tsx` menyebutnya untuk memilih layar. Selama
+konstanta itu tinggal di sana, menyebutnya menarik seluruh 53 kB halaman itu ke potongan induk
+dan pemuatan malasnya tidak menghemat apa pun. Konstantanya dipindah ke `master/masters.ts`.
+
+**Perilaku yang berubah, dicatat karena memang berubah.** Layar tunggu "Menyiapkan akses
+aplikasi…" dan layar galat "Aplikasi belum dapat dibuka" hilang: izin datang bersama halaman,
+jadi tidak ada lagi yang bisa gagal di situ. Penggantinya penangguhan singkat selama potongan
+menu diunduh. Kunjungan Inertia juga mengembalikan gulir ke atas, sedangkan penggantian hash
+tidak; `preserveScroll` sengaja tidak dipasang karena itu keputusan tersendiri.
 
 ### F4-05 — Buang jabat tangan antar bingkai
 
@@ -4544,6 +4609,27 @@ bekerja.
 
 **Bergantung pada.** F4-04.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Langkah 2 tidak dikerjakan sebagai "pemanggilan fungsi biasa", dan alasannya menentukan.**
+Impor `@/lib/print-requests` dari folder module akan berhasil dibangun — keduanya satu build —
+dan justru itu bahayanya: module berhenti bisa dicabut ke repo lain, dan tidak ada satu pun
+pemeriksaan yang gagal saat itu terjadi. Aturan module (hanya boleh menyebut `@apperp/ui` dan
+React) tetap utuh bila jalurnya sebuah event peramban.
+
+Module karena itu melempar `CustomEvent('coreerp:print')` pada `window`, dan komponen shell
+`jembatan-cetak-module.tsx` menampungnya. **Pemeriksa bentuk pesan dipertahankan** — jawaban
+untuk langkah 4 — dan dipakai apa adanya oleh jalur baru: isi `detail` datang dari kode module,
+dan pemeriksa itu yang menahan bentuk yang menyimpang supaya tidak sampai ke dialog cetak sebagai
+parameter yang setengah benar. Penanda jenis disisipkan sisi shell, bukan dituntut dari module:
+sebuah event bernama `coreerp:print` sudah menyebutkan jenisnya pada namanya.
+
+Pemberitahuan tidak ikut dipindah karena UI module memang tidak pernah mengirimnya; hanya dua
+jenis pesan yang benar-benar ada di sana — siap dan cetak. Jalur `postMessage` untuk
+pemberitahuan tetap hidup di `pages/apps/host.tsx` selama masih ada app berkontainer.
+
 ### F4-06 — Panggilan API modul memakai sesi
 
 **Kenapa.** Pembungkus permintaan di UI modul menyusun alamat relatif terhadap dokumen dan menyertakan
@@ -4566,6 +4652,25 @@ token pembawa. Keduanya hanya masuk akal ketika UI disajikan di bawah awalan pen
 
 **Bergantung pada.** F4-05.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+Bentuk CSRF-nya diperiksa di sumbernya, bukan disalin dari ingatan.
+`PreventRequestForgery::getTokenFromRequest()` pada Laravel 13.19.0 yang terpasang membaca
+`_token`, lalu `X-CSRF-TOKEN`, lalu — bila keduanya kosong — `X-XSRF-TOKEN` yang **didekripsi**.
+Cookie `XSRF-TOKEN` dienkripsi di jalan keluar oleh `EncryptCookies`, jadi mengirim isinya apa
+adanya sebagai `X-XSRF-TOKEN` adalah yang benar; `X-CSRF-TOKEN` menunggu token sesi mentah yang
+tidak pernah sampai ke peramban.
+
+Header `Accept: application/json` sempat dicurigai perlu karena rutenya kini di grup `web`, lalu
+tidak dipasang: `bootstrap/app.php` sudah memaksa render JSON untuk `api/*`, dan menambahkannya
+berarti mengubah perilaku tanpa sebab.
+
+`ContextController` beserta rute `v1/context` dihapus — daftar berkas di atas menyebutnya, dan
+ini tempatnya. Izin kini datang bersama halaman, jadi tidak ada lagi perjalanan jaringan kedua
+sebelum layar tahu tombol mana yang boleh tampil.
+
 ### F4-07 — Ganti bingkai dengan komponen
 
 **Kenapa.** Ini langkah yang menghapus iframe.
@@ -4587,6 +4692,34 @@ token pembawa. Keduanya hanya masuk akal ketika UI disajikan di bawah awalan pen
 **Rujukan.** Bagian 5.5 dokumen ini.
 
 **Bergantung pada.** F4-06.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026, dan sebagian besarnya ternyata sudah dikerjakan F2-11.
+
+`LaunchableAppCatalog::tautanMenu()` sudah menyusun `/<module>/<entri>` untuk module dan
+`/apps/<id>?view=<entri>` untuk app berkontainer, dan rute `apps/{app}` sudah meneruskan module
+ke entri menu pertama yang boleh dilihat penggunanya. Begitu modul aset menjadi dilayani pada
+F3-30 dan rute layarnya ada, jalur bingkai tidak pernah lagi terpilih untuknya. Sidebar, penanda
+entri aktif, dan penyaringan izin datang dari `kerangkaModule()` yang sama.
+
+**`pages/apps/host.tsx` tidak dihapus, dan itu keputusan.** Daftar berkas di atas menyuruh
+menghapusnya, tetapi app berkontainer — HR dan procurement — baru dipindah pada fase 7, dan
+`TenantRegistrationInstallsModulesTest` sengaja menjaga jalur itu tetap hidup. Kriteria keluar
+fase ini berbunyi "tidak ada elemen `iframe` pada halaman **modul**", dan halaman modul memang
+tidak memakainya. Menghapus jalur containernya sekarang berarti mematikan produk yang masih
+dipakai demi memenuhi kalimat yang tidak menuntutnya.
+
+Muat ulang berkala empat menit juga tinggal di `host.tsx` bersama jalur itu; ia menyegarkan token
+lima menit yang hanya ada di sana. Halaman module tidak punya token dan tidak punya pemuatan
+ulang berkala.
+
+Yang dibuktikan `LayarManagementAsetTest`, pada modul produk yang sungguhan dan bukan pada module
+contoh: tautan menu menunjuk rute module, layar dirender sebagai halaman Inertia module, ruas
+sesudah id menu sampai ke halaman, id tak dikenal 404, pengguna tanpa izin 403 dan tidak melihat
+menunya, sidebar ikut terkirim, dan berkas halamannya tidak memuat `iframe` — dengan pemeriksaan
+terakhir dibuat bisa gagal lebih dulu, karena halaman bingkai lama masih ada di repo dan masih
+memuat elemen itu.
 
 ### F4-08 — Buang jalur konten dan proxy
 
@@ -4612,6 +4745,20 @@ hanya untuk mengarahkan permintaan ke container UI per app.
 
 **Bergantung pada.** F4-07.
 
+#### Catatan pelaksanaan
+
+**Sengaja tidak dikerjakan pada fase ini.** Alasannya sama dengan alasan `pages/apps/host.tsx`
+tetap ada: perintah pembuat konfigurasi proxy, `AppContentPath`, dan dua modul Apache melayani
+app berkontainer, dan app berkontainer baru dibuang pada fase 7. Menghapusnya sekarang berarti
+permintaan ke UI app yang belum dipindah tidak lagi menemukan tujuannya — kegagalan di produk
+yang masih dipakai, ditukar dengan kerapian yang bisa menunggu.
+
+F4-09 sudah menuliskan syarat itu untuk dirinya sendiri ("pertahankan kelasnya bila masih ada app
+di luar proses"); syarat yang sama berlaku di sini, dan ia tidak tertulis hanya karena daftar
+berkasnya disusun dengan anggapan fase 4 dan fase 7 berdekatan.
+
+**Dikerjakan pada fase 7 bersama pembuangan jalur container.**
+
 ### F4-09 — Token konteks tinggal untuk event
 
 **Kenapa.** Kunci penandatangan dipakai dua hal: token konteks untuk bingkai dan HMAC event keluar.
@@ -4634,6 +4781,16 @@ tersisa.
 
 **Bergantung pada.** F4-07.
 
+#### Catatan pelaksanaan
+
+**Keputusannya: kelasnya dipertahankan**, sesuai langkah 1. Masih ada app di luar proses — HR dan
+procurement belum dipindah — dan `apps/{app}` masih menerbitkan token untuk keduanya. Yang berubah
+hanya siapa yang memakainya: sejak F3-30, modul aset tidak lagi lewat jalur itu sama sekali.
+
+Kunci penandatangan karena itu masih punya dua pemakai, bukan satu, dan pemakai keduanya hilang
+pada fase 7. Mencatat keputusannya di sini adalah keseluruhan pekerjaan task ini; tidak ada kode
+yang perlu diubah untuk itu.
+
 ### F4-10 — Ukur bundel dan buktikan tidak ada penggandaan
 
 **Kenapa.** Prinsip P5. Ini angka yang menggantikan klaim penghematan pada dokumen keputusan.
@@ -4654,6 +4811,41 @@ di lebih dari satu potongan.
 **Rujukan.** [keputusan satu runtime](00-keputusan.md).
 
 **Bergantung pada.** F4-07.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Langkah 4 tidak bisa dikerjakan seperti tertulis: tidak ada baris proyeksi bundel pada dokumen
+keputusan.** Yang ada di sana angka RAM, database, dan container. Jadi yang ditambahkan bagian
+baru berisi angka terukur, bukan penggantian baris yang tidak pernah ada.
+
+**Cara mengukurnya dibuat bisa diulang siapa pun**: bangun dengan halaman module, bangun sekali
+lagi tanpa halaman module, selisihkan seluruh isi `public/build/assets`. Angkanya ada di
+[dokumen keputusan](00-keputusan.md).
+
+**Pemeriksa React tunggal membaca isi potongan, bukan namanya.** Nama potongan disusun alat
+pembangun dan berubah kapan saja. Yang diperiksa: di antara potongan yang membawa penanda
+implementasi React, tepat satu yang tidak mengimpor potongan React lain. Ia dibuktikan bisa merah
+dengan menaruh satu potongan palsu berisi penanda itu di folder aset, dan ia juga gagal bila
+penandanya tidak ditemukan sama sekali — pemeriksa yang tidak menemukan apa pun tidak boleh
+dianggap hijau. Percobaan pertama memakai penanda pesan galat ringkas React dan **salah**: string
+itu ada di react-dom tetapi tidak di React inti, sehingga pemeriksanya melaporkan nol pembawa pada
+bundel yang sebenarnya benar.
+
+Dipasang sebagai `npm run bundle:check` dan sebagai langkah CI tepat sesudah `Build Assets`.
+
+**Satu peringatan build yang selalu muncul ikut dibereskan.** `pages/modules/host.tsx` diimpor
+statis oleh `app.tsx` sekaligus tersapu pola glob halaman shell, dan setiap build mencetak
+`INEFFECTIVE_DYNAMIC_IMPORT`. Berkas itu memang bukan halaman Inertia; ia dipindah ke
+`resources/js/lib/halaman-module.tsx` dan peringatannya hilang. Peringatan yang selalu muncul
+adalah peringatan yang berhenti dibaca orang.
+
+**Satu temuan yang tidak dibereskan di sini.** ESLint tidak menjangkau satu pun berkas UI module:
+setelannya berakar di `apps/control-plane`, dan `modules/*/*/ui` berada di luar jangkauannya. 47
+berkas karena itu tidak dijaga aturan lint mana pun, sementara Prettier dan `tsc` sudah
+menjangkaunya. Memperluas jangkauannya di akhir fase berarti membuka temuan yang tidak sempat
+ditinjau; dicatat sebagai pekerjaan tersendiri.
 
 ## 12. Fase 5: edisi dan bundle on-prem
 

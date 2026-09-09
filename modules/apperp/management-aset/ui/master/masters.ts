@@ -754,3 +754,22 @@ export function parentIdOf(
 
     return typeof value === 'string' ? value : '';
 }
+
+/**
+ * Master yang sudah memakai tata letak daftar-detail. Selama daftar ini belum memuat
+ * seluruh master, `MasterPage` tetap hidup berdampingan; ketika semuanya sudah pindah,
+ * yang dihapus adalah daftar ini beserta `MasterPage`.
+ *
+ * Daftarnya tinggal di berkas konfigurasi ini, bukan di `MasterDetailPage`, karena
+ * pemilih halaman membacanya untuk memutuskan berkas mana yang dimuat. Selama ia diekspor
+ * dari halamannya sendiri, menyebutnya berarti ikut menarik seluruh halaman itu ke
+ * potongan induk, dan pemuatan malas per menu kehilangan gunanya.
+ */
+export const DETAIL_LAYOUT_RESOURCES: MasterResource[] = [
+    'group-aset',
+    'jenis-aset',
+    'pabrikan-aset',
+    'maintenance-job-types',
+    'maintenance-checklist-variables',
+    'maintenance-checklist-templates',
+];

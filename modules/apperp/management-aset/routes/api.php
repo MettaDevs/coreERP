@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Apperp\ManagementAset\Http\Controllers\ContextController;
 use Modules\Apperp\ManagementAset\Http\Controllers\HealthController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\AnalisaMaintenanceController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\BukuPenyusutanController;
@@ -80,7 +79,9 @@ Route::get('v1/health', HealthController::class);
 // sama; tiga rute yang dulu ada di sini beserta controller-nya dihapus pada F3-12.
 
 Route::prefix('v1')->middleware('konteks-module:management-aset')->group(function () use ($masters): void {
-    Route::get('context', ContextController::class);
+    // Tidak ada lagi rute `v1/context`. Izin dan konteks dikirim bersama halaman oleh
+    // `HalamanModulController`, jadi layar tidak lagi menunggu satu perjalanan jaringan
+    // sebelum tahu tombol mana yang boleh tampil. Dibuang pada F4-06 bersama controllernya.
     Route::get('reference-data/units-of-measure', [ReferenceDataController::class, 'unitsOfMeasure']);
     Route::get('reference-data/kelompok-harta-fiskal', [ReferenceDataController::class, 'fiscalClassifications']);
 
