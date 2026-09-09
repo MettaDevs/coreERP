@@ -3074,6 +3074,173 @@ permintaan HTTP" bisa gagal.
 
 **Bergantung pada.** F2-06, F3-05.
 
+### F3-28 — Pengaju menyetujui dokumennya sendiri menjadi parameter, bukan aturan mesin
+
+**Kenapa.** F3-09 menyalakan sebuah penjaga yang selama ini mati. `initiator_membership_id` tidak pernah
+terisi karena tidak ada pemanggil yang mengirimnya, jadi `abort_if` di dalam `WorkflowRuntime::decide()`
+tidak pernah sekali pun berbunyi. Begitu pengajunya benar-benar tercatat, penjaga itu mulai bekerja —
+dan bentuknya keliru untuk sebuah produk.
+
+Tiga hal membuatnya lebih dari sekadar kebijakan yang terlalu ketat:
+
+1. **Rangkap jabatan adalah keadaan biasa**, bukan pengecualian. Pada organisasi kecil satu orang
+   mengajukan sekaligus menyetujui karena memang tidak ada orang kedua.
+2. **Mesin ini tidak punya delegasi, eskalasi, maupun penugasan ulang oleh admin.** Sebuah tugas yang
+   jatuh ke pengajunya sendiri karena itu tidak bisa diselesaikan siapa pun, selamanya. Aturan yang ketat
+   berubah menjadi jalan buntu.
+3. **Sumber rancangannya sendiri tidak melakukannya.** Dynamics 365 Finance & Operations menaruh ini
+   sebagai parameter — `Disallow approval by submitter` pada
+   `System administration > Workflow > Workflow parameters > General > Approver` — dan bawaannya **No**:
+   pengaju boleh menyetujui kecuali tenant melarang.
+
+**Berkas.**
+- `apps/control-plane/database/migrations/2026_09_09_090000_create_workflow_parameters.php` (baru)
+- `apps/control-plane/app/Support/DefinisiParameterWorkflow.php` (baru)
+- `apps/control-plane/app/Support/ParameterWorkflow.php` (baru)
+- `apps/control-plane/app/Support/WorkflowRuntime.php`
+- `apps/control-plane/app/Http/Controllers/Workflow/WorkflowConfigurationController.php`
+- `apps/control-plane/resources/js/pages/settings/workflows.tsx`
+
+**Langkah.**
+1. Parameter per tenant, bawaannya mengikuti D365: pengaju boleh menyetujui.
+2. Penegakan di **waktu penugasan**, bukan hanya di waktu keputusan.
+3. Persetujuan oleh pengajunya sendiri selalu tercatat pada `workflow_history`.
+
+**Selesai bila.** Sebuah tenant dapat menyalakan dan mematikan larangannya lewat layar Core, dan kedua
+keadaan itu terbukti mengubah perilaku mesin.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Bawaannya dibalik, dan itu keputusan pemilik produk.** Perilaku sebelumnya melarang tanpa syarat;
+sekarang mengizinkan kecuali dilarang. Alasan yang diberikan: D365 adalah sumber kebenaran rancangan
+sejak awal, dan menyimpang dari bawaannya berarti dua sistem yang mirip menjawab berbeda untuk
+pertanyaan yang sama. Ini melonggarkan sebuah kontrol, jadi ia dicatat di sini sebagai keputusan, bukan
+sebagai detail penerapan.
+
+**Penegakannya pindah ke waktu penugasan.** Menolak saat keputusan berarti tugasnya tetap terbentuk lalu
+tidak bisa diklik siapa pun — dan tanpa delegasi, tidak ada yang bisa memindahkannya. Sekarang pengaju
+disaring dari daftar penerima; kalau daftarnya habis karena itu, dokumennya ditolak sekarang juga dengan
+alasan yang menyebut sebabnya, bukan menggantung.
+
+**Rancangan pertama tidak scalable, dan itu ditemukan lewat satu pertanyaan: "kalau ada 100 parameter
+lain, apakah bentuk ini bertahan?"** Jawabannya tidak. Bentuk pertama menuntut tiga suntingan untuk
+setiap parameter baru — satu kolom pada skema, satu method pembaca, dan satu blok pada layar. Untuk satu
+parameter itu tidak terasa; untuk empat puluh — jumlah yang dimiliki D365 hari ini — itu empat puluh
+migration yang harus berhasil di server setiap pelanggan yang menjalankan pembaruannya sendiri.
+
+Yang diubah: penyimpanan menjadi **baris per kode**, dan sebuah registry
+(`DefinisiParameterWorkflow`) memegang kode, tipe, bawaan, dan kalimatnya. Pembacanya generik, dan layar
+settings merender dirinya dari registry. Parameter baru sekarang berarti **satu entri registry dan satu
+titik penegakan** — nol migration, nol perubahan pada layar.
+
+**Yang sengaja tidak ikut digeneralisir: `if` di dalam mesin.** Sebuah parameter berarti sesuatu yang
+spesifik pada titik yang spesifik. Menyatukan seluruhnya di bawah satu "penerap parameter" berarti
+menanam mesin aturan di dalam mesin workflow, dan mesin aturan yang tidak diminta siapa pun adalah cara
+tercepat membuat kode ini berhenti bisa dibaca. Registry menghapus biaya **mengelola** parameter; ia
+tidak berpura-pura menghapus biaya **memikirkan** artinya.
+
+**Penyimpanannya tidak meniru D365, dan itu disengaja.** Tabel parameter di F&O lebar — satu kolom per
+parameter. Bentuk itu masuk akal di sana karena generator kode dan perancang formulirnya membuat biaya
+satu field mendekati nol. Di sini biayanya tiga berkas. Meniru bentuknya berarti meniru keputusan yang
+dibuat untuk perkakas yang tidak kita punya.
+
+**Satu klaim di komentar saya sendiri ternyata salah, dan testnya yang menangkap.** Kolom nilainya
+mula-mula `json`, dengan komentar yang mengklaim ia bisa disaring — "tenant mana saja yang melarangnya".
+Tipe `json` di PostgreSQL **tidak punya operator kesetaraan sama sekali**; querinya gagal dengan
+`operator does not exist: json = unknown`. Diganti `jsonb`. Komentar yang menjanjikan sesuatu tentang
+database lebih baik ditulis setelah querinya dijalankan sekali.
+
+**Empat penjaga dibuktikan bisa merah:**
+
+```
+Failed asserting that two strings are identical.
+-'rejected'
++'pending'
+```
+— dengan penyaringan pengaju di waktu penugasan dilepas.
+
+```
+Failed asserting that actual size 2 matches expected size 1.
+```
+— penyaringan yang terlalu lebar: penerima kedua ikut terbuang.
+
+```
+Pengaju tidak dapat menyetujui dokumennya sendiri.
+```
+— dengan penjaga keputusan dikembalikan menjadi tanpa syarat.
+
+```
+Parameter yang terdaftar tidak muncul pada payload layar.
+Failed asserting that null is not null.
+```
+— dengan payload dikembalikan menjadi peta nama-ke-nilai; layarnya harus menulis tiap parameter dengan
+tangan lagi.
+
+**Bentuk ini dibandingkan dengan tiga sistem lain sebelum dianggap selesai, dan satu di antaranya
+mengubahnya.**
+
+- **Camunda** menegaskan bahwa diagram tidak bisa menjamin apa pun: *"the two or more tasks needed to
+  ultimately approve must not be completed by one and the same person. When executing such patterns, you
+  must enforce that with the workflow engine."* Pola komunitasnya persis penyaringan yang dipakai di
+  sini — mengurangi pengaju dari daftar calon penerima
+  (`candidateUsers = "#{GROUPS.APPROVER.getUsers() - UserTask_1.assignee.getUser()}"`). Jadi memindahkan
+  penegakan ke waktu penugasan bukan improvisasi; itu cara mesin workflow khusus melakukannya.
+- **SAP SuccessFactors** memperlakukannya sebagai sesuatu yang **dinyalakan**, bukan bawaan: ada artikel
+  basis pengetahuan tersendiri berjudul "Enabling Four-Eyes Principle on Workflow Step Approvals".
+- **GitLab** adalah peringatan untuk sisi penyimpanannya. Tabel `application_settings` mereka kini
+  **lebih dari 220 kolom**, dan isu terbukanya menyebut persis masalah yang dihindari bentuk baris per
+  kode: *"Adding a new setting requires exclusive lock on the table."* Untuk kita itu lebih berat
+  daripada untuk mereka — migration kita dijalankan admin pelanggan di server sendiri, bukan oleh tim
+  yang mengawasinya. Kelemahan key-value yang mereka sebut, *"how to handle different types of
+  settings"*, justru yang dijawab registry.
+
+**Yang berubah karena perbandingan itu: perubahan parameternya sekarang diaudit.** Versi pertama hanya
+menyimpan `updated_at` — tidak ada siapa yang mengubah, dari nilai apa ke apa. Itu meniadakan gunanya
+sendiri: seorang pemeriksa yang menemukan dokumen disetujui pengajunya sendiri tidak punya cara
+mengetahui apakah larangannya memang mati saat itu, atau baru dimatikan sesudahnya. D365 memperlakukan
+override pemisahan tugas dengan cara sebaliknya — dicatat permanen sebagai bagian jejak audit.
+
+Barisnya ditulis ke `access_audit_events` yang sudah ada, bukan ke tabel baru, dengan aksi
+`workflow.parameter.updated`. Aktornya **parameter wajib** pada `simpan()`, mengikuti pelajaran yang sama
+dari F3-09: yang opsional bisa lupa diisi tanpa ada yang memberi tahu. Sakelar yang ditekan ke posisi
+yang sudah ditempatinya tidak dicatat — jejak yang penuh baris tanpa peristiwa adalah jejak yang berhenti
+dibaca orang. Kedua sifat itu dijaga test yang sudah dibuktikan merah:
+
+```
+Failed asserting that 2 is identical to 1.
+```
+
+**Harga bentuk baris per kode dibayar di satu tempat: penegakan tipe pindah dari database ke pembaca.**
+Kolomnya `jsonb`, dan database tidak menolak apa pun — `"mungkin"` masuk dengan senang hati. Tanpa
+pemeriksaan saat baca, kalimat "tipenya hidup di registry" cuma komentar. Pembacanya sekarang menolak
+nilai yang tidak sesuai tipe yang dijanjikan.
+
+Satu catatan jujur tentang penjaga itu: tipe kembalian `bool` sudah menolaknya sendiri, jadi yang
+ditambahkan pemeriksaan eksplisitnya adalah **pesannya**, bukan penangkapannya. PHP mengatakan
+"Return value must be of type bool, string returned" sambil menunjuk method privat; yang dibutuhkan
+pembaca log adalah nama parameternya dan apa yang dijanjikan registry untuknya.
+
+**Yang belum dikerjakan.**
+
+- **`Use final approver`.** D365 punya jalan ketiga yang tidak kita punya: alih-alih memblokir, ia
+  **menambah** satu persetujuan ketika pengaju ikut menyetujui. Itu jawaban yang lebih baik daripada
+  memilih antara "boleh" dan "buntu", dan ia fitur tersendiri — sebuah langkah persetujuan yang
+  disisipkan mesin, bukan sebuah sakelar.
+- **Delegasi dan eskalasi.** Selama keduanya belum ada, larangan apa pun pada penugasan berpotensi
+  menghabiskan daftar penerima. Yang menahannya sekarang cuma penolakan beserta alasannya.
+- **Lingkup per entitas legal.** Parameternya per tenant. Konfigurasi workflow sendiri sudah ber-scope
+  entitas legal, jadi tenant dengan tata kelola berbeda antar entitas belum terlayani.
+
+**Rujukan.** [Workflow FAQ D365 F&O](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/fin-ops/organization-administration/workflow-faq),
+[Configure approval processes](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/fin-ops/organization-administration/configure-approval-process-workflow),
+[Camunda — modeling with situation patterns](https://docs.camunda.io/docs/components/best-practices/modeling/modeling-with-situation-patterns/),
+[SAP — Enabling Four-Eyes Principle on Workflow Step Approvals](https://userapps.support.sap.com/sap/support/knowledge/en/2787479),
+[GitLab — discuss application settings table design](https://gitlab.com/gitlab-org/gitlab/-/issues/205669).
+
+**Bergantung pada.** F3-09.
+
 ### F3-10 — Konteks dan izin dari Core, bukan dari token
 
 **Kenapa.** Ini perubahan perilaku terbesar di seluruh proyek. Middleware `RequireCoreErpContext`

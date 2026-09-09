@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\User;
 use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
+use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -40,6 +41,10 @@ class AppServiceProvider extends ServiceProvider
          */
         $this->app->scoped(CurrentWorkspace::class);
         $this->app->scoped(DataPolicyAccessResolver::class);
+
+        // Alasan yang sama untuk parameter workflow: jawabannya tidak berubah di tengah satu
+        // permintaan, dan sebuah workflow bercabang akan menanyakannya berkali-kali.
+        $this->app->scoped(ParameterWorkflow::class);
     }
 
     /**

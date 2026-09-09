@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class WorkflowRuntime
 {
+    public function __construct(private readonly ParameterWorkflow $parameter) {}
+
     /** @param array<string, mixed> $data */
     public function submit(string $tenantId, object $type, object $version, string $idempotencyKey, array $data): object
     {
@@ -56,7 +58,18 @@ class WorkflowRuntime
 
             $instance = DB::table('workflow_instances')->where('id', $workItem->instance_id)->where('tenant_id', $actor->tenant_id)->lockForUpdate()->first();
             abort_unless($instance && $instance->status === 'pending', 409, 'Permintaan ini sudah selesai.');
-            abort_if($instance->initiator_membership_id !== null && $instance->initiator_membership_id === $actor->id, 403, 'Pengaju tidak dapat menyetujui dokumennya sendiri.');
+            // Pengaju yang menyetujui dokumennya sendiri: dilarang atau tidak, tenant yang
+            // memutuskan. Dulu ini aturan mati di sini, dan aturan mati itu jalan buntu untuk
+            // organisasi yang penggunanya rangkap jabatan — mesin ini tidak punya delegasi
+            // maupun eskalasi, jadi tugas yang jatuh ke pengajunya sendiri tidak akan pernah
+            // bisa diselesaikan siapa pun. Bentuk parameternya mengikuti D365 F&O.
+            //
+            // Penjaga di sini pertahanan lapis kedua. Lapis pertama ada di penugasan: pengaju
+            // tidak pernah masuk daftar penerima ketika tenant melarangnya, sehingga tugas yang
+            // tidak bisa diklik tidak pernah terbentuk.
+            $olehPengaju = $instance->initiator_membership_id !== null && $instance->initiator_membership_id === $actor->id;
+            $larangan = $this->parameter->boolean((string) $actor->tenant_id, DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU);
+            abort_if($olehPengaju && $larangan, 403, 'Pengaju tidak dapat menyetujui dokumennya sendiri.');
 
             $element = DB::table('workflow_elements')->where('id', $workItem->element_id)->where('version_id', $instance->configuration_version_id)->first();
             abort_unless($element, 409, 'Langkah workflow tidak ditemukan.');
@@ -67,7 +80,12 @@ class WorkflowRuntime
 
             $status = $decision === 'reject' ? 'rejected' : ($isApproval ? 'approved' : 'completed');
             DB::table('workflow_work_items')->where('id', $workItem->id)->update(['status' => $status, 'completed_at' => now(), 'updated_at' => now()]);
-            $this->history($actor->tenant_id, $instance->id, $status, array_filter(['comment' => $comment, 'element' => $element->key]), $actor->id);
+            // Dicatat apa pun kebijakannya. Yang membuat "pengaju boleh menyetujui" bisa
+            // dipertanggungjawabkan bukan izinnya, melainkan jejaknya: pemeriksa harus bisa
+            // menemukan dokumen mana saja yang disetujui pengajunya sendiri tanpa membandingkan
+            // dua tabel.
+            $rincian = array_filter(['comment' => $comment, 'element' => $element->key]);
+            $this->history($actor->tenant_id, $instance->id, $status, $olehPengaju ? $rincian + ['oleh_pengaju' => true] : $rincian, $actor->id);
 
             $policy = (string) ($config['completion_policy'] ?? 'single');
             $items = DB::table('workflow_work_items')->where('instance_id', $instance->id)->where('element_id', $element->id)->get();
@@ -123,10 +141,18 @@ class WorkflowRuntime
         }
 
         $config = json_decode($element->configuration, true, 512, JSON_THROW_ON_ERROR);
-        $membershipIds = $this->assignees($tenantId, $config);
+        $calon = $this->assignees($tenantId, $config);
+        $membershipIds = $this->tanpaPengaju($tenantId, $instanceId, $calon);
         if ($membershipIds->isEmpty()) {
+            // Dua sebab yang berbeda, dan bedanya penting bagi yang membacanya: tidak ada
+            // penerima sama sekali adalah konfigurasi yang salah, sedangkan penerima yang habis
+            // karena disaring adalah kebijakan yang bertabrakan dengan susunan orangnya. Pesan
+            // yang sama untuk keduanya menyuruh admin memperbaiki hal yang tidak rusak.
+            $alasan = $calon->isEmpty()
+                ? 'Tidak ada penerima tugas aktif.'
+                : 'Satu-satunya penerima tugas adalah pengajunya sendiri, dan tenant ini melarang pengaju menyetujui dokumennya sendiri.';
             $instance = DB::table('workflow_instances')->where('id', $instanceId)->first();
-            $this->finish($tenantId, $instance, 'rejected', 'Tidak ada penerima tugas aktif.', null);
+            $this->finish($tenantId, $instance, 'rejected', $alasan, null);
 
             return;
         }
@@ -257,7 +283,41 @@ class WorkflowRuntime
         event(new KeputusanWorkflowDiambil($idEvent, $tenantId, $idKorelasi, $legalEntityId === null ? null : (string) $legalEntityId, $isi));
     }
 
-    /** @return Collection<int, string> */
+    /**
+     * Membuang pengaju dari daftar penerima tugas ketika tenant melarangnya menyetujui.
+     *
+     * Penyaringan dilakukan **saat penugasan**, bukan hanya saat keputusan. Bedanya nyata:
+     * menolak saat keputusan berarti tugas tetap terbentuk lalu tidak bisa diklik siapa pun,
+     * dan mesin ini tidak punya delegasi untuk memindahkannya. Menyaring lebih dulu membuat
+     * keadaan itu muncul sebagai penolakan berikut alasannya, pada saat pengajuan.
+     *
+     * Idnya baru dicari kalau larangannya memang menyala, jadi jalur bawaan tidak membayar satu
+     * query pun untuk aturan yang tidak dipakai tenant tersebut.
+     *
+     * @param  Collection<int, string>  $calon
+     * @return Collection<int, string>
+     */
+    private function tanpaPengaju(string $tenantId, string $instanceId, Collection $calon): Collection
+    {
+        // Dinamai lebih dulu, tidak dibaca langsung di dalam kondisi. Parameternya berbunyi
+        // "larang", sedangkan kondisi di sini menanyakan "lewati penyaringan" — menuliskannya
+        // sebagai satu negasi di tengah `||` adalah bentuk yang paling mudah dibalik keliru
+        // oleh orang berikutnya.
+        $larangan = $this->parameter->boolean($tenantId, DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU);
+
+        if ($calon->isEmpty() || ! $larangan) {
+            return $calon;
+        }
+
+        $pengaju = DB::table('workflow_instances')->where('id', $instanceId)->value('initiator_membership_id');
+
+        if (! is_string($pengaju) || $pengaju === '') {
+            return $calon;
+        }
+
+        return $calon->reject(static fn (string $id): bool => $id === $pengaju)->values();
+    }
+
     /** @param array<string, mixed> $config @return Collection<int, string> */
     private function assignees(string $tenantId, array $config): Collection
     {
