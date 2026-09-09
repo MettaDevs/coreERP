@@ -3979,6 +3979,171 @@ justru milik Core sendiri:
 **Belum terbukti:** stack-nya belum pernah dinyalakan dengan Docker. Yang diverifikasi hanya
 `docker compose config` lulus.
 
+### F3-29 — Modul aset ikut analisa tipe statis
+
+**Kenapa.** Modul ini tidak pernah dianalisa PHPStan. Pengecualiannya dipasang pada F3-01, waktu
+modulnya baru ditarik masuk dan masih membawa kerangka repo lamanya — benar saat itu, karena
+ratusan temuan dari keadaan yang memang sedang diperbaiki akan menenggelamkan temuan sungguhan
+pada kode Core.
+
+Alasan itu habis pada 9 September 2026: modul lulus kelima penjaga batas, lulus pemeriksaan tipe
+frontend, dan lulus pemeriksaan gaya. Yang tersisa hanya analisa tipe PHP, dan itulah satu-satunya
+pengecualian yang masih menyala.
+
+**Yang dibeli dengan mengerjakannya.** Kelompok temuan terbesar adalah properti model yang tidak
+dinyatakan. Selama itu terbuka, `$record->alternatve_profile_id` — satu huruf hilang — memulangkan
+`null` tanpa satu pun kesalahan; halamannya tampil, angkanya kosong, dan tidak ada yang gagal. Pada
+sistem multi-tenant, kesalahan yang menyamar sebagai "datanya memang kosong" adalah yang paling
+lama tidak ketahuan.
+
+**Angka terukur, 9 September 2026.** 405 temuan di 86 berkas, seluruhnya di modul; Core nol.
+
+| Jumlah | Jenis | Artinya |
+| --- | --- | --- |
+| 152 | `property.notFound` | model tidak menyatakan kolomnya |
+| 73 | `missingType.iterableValue` | `array` tanpa tipe isi |
+| 55 | `missingType.generics` | relasi Eloquent tanpa model tujuan |
+| 40 | `argument.type` | yang dioper tidak cocok dengan yang diminta |
+| 36 | `offsetAccess.notFound` | kunci array yang belum tentu ada |
+| 13 | `argument.templateType` | tipe template tidak dapat diselesaikan |
+| 9 | `return.type` | tanda tangan menjanjikan yang tidak selalu dipulangkan |
+| 8 | `missingType.return` | metode test tanpa tipe kembalian |
+| 19 | sisanya | tersebar |
+
+Empat kelompok teratas — **320 dari 405** — adalah anotasi yang belum ditulis, bukan kode yang
+salah. Memperbaikinya berarti menuliskan apa yang sudah benar supaya mesin ikut memeriksanya.
+
+**Berkas.**
+- `modules/apperp/management-aset/src/` (86 berkas dengan temuan; mayoritas model dan controller)
+- `modules/apperp/management-aset/tests/` (ikut dianalisa)
+- `apps/control-plane/app/Support/Modules/ModulTanpaAnalisaTipe.php` (entrinya dibuang di akhir)
+- `apps/control-plane/phpstan.neon` (pengecualiannya dibuang di akhir)
+
+**Langkah.**
+1. Anotasi `@property` pada model, diambil dari **migration**, bukan dari `$fillable` maupun
+   tebakan. Perhatikan `casts()`: `decimal:n` dipulangkan sebagai `string`, `boolean` sebagai
+   `bool`, `date`/`datetime` sebagai `Carbon`, dan kolom nullable ditulis `?tipe`. Perhatikan juga
+   `2026_09_08_130000_prefix_tabel_modul.php` mengganti nama seluruh tabel dari `m_*`/`tr_*`
+   menjadi `aset_*`, jadi nama tabel di model tidak akan ditemukan di satu pun `Schema::create`.
+2. Generic relasi Eloquent dan tipe isi array.
+3. Sisanya, yang menuntut membaca alur: `argument.type`, `return.type`, `offsetAccess.notFound`.
+4. Buang entri modul dari `ModulTanpaAnalisaTipe` dan dari `phpstan.neon`; keduanya sekaligus,
+   karena `ModulTanpaAnalisaTipeTest` menuntut keduanya sama.
+
+Bisa dikerjakan paralel per area, seperti sapuan query mentah pada F3-05 langkah 3 — pembagian per
+folder controller, dengan model dikerjakan lebih dulu karena sisanya bergantung padanya.
+
+**Aturan yang mengikat.**
+- Dilarang `@phpstan-ignore` dalam bentuk apa pun, `assert()`, `@var` inline, cast pembungkam, dan
+  melebarkan tipe supaya temuannya hilang. Perbaiki sebabnya.
+- `phpstan-baseline.neon` **hanya boleh menyusut**. Menambah baris ke sana berarti menyembunyikan
+  temuan, dan itu ditolak saat peninjauan.
+- Perilaku tidak boleh berubah. Bila sebuah temuan hanya bisa dibereskan dengan mengubah perilaku,
+  catat dan tinggalkan — jangan diam-diam mengubahnya.
+
+**Satu jebakan yang sudah memakan korban.** Anotasi `@property` yang **salah** lebih berbahaya
+daripada tidak ada anotasi: ia membuat analisa statis meyakinkan sekaligus keliru. Untuk tiap model
+yang dianotasi, buktikan sekali bahwa anotasinya bisa salah — ganti sementara satu tipe menjadi
+tipe yang keliru, pastikan PHPStan menemukannya, kembalikan.
+
+**Satu keputusan yang sudah diambil dan jangan diulang.** Temuan `withTrashed()` pada
+`Builder<Model>` di `MasterLinkController` sempat dibereskan dengan membuat kelas abstrak bersama
+`DataPenghubung` yang diwarisi ketiga model penghubung. Itu **dibatalkan**: `ModelModuleMilikTenantTest`
+mencocokkan `extends (Model|Authenticatable|Pivot)`, sehingga ketiga model yang menulis
+`extends DataPenghubung` berhenti diperiksa penjaga tenant sama sekali — hijau, tetapi tidak
+dilihat. Menukar satu temuan tipe dengan satu lubang penjaga yang senyap adalah pertukaran yang
+salah arah.
+
+Kalau kelas induk bersama benar-benar dibutuhkan nanti, **penjaganya harus diperbaiki lebih dulu**
+supaya ia mengikuti kelas induk milik modul: pewarisan boleh, tetapi tidak pernah tak terlihat.
+
+Pembatalan itu meninggalkan satu hal yang kembali tidak tertulis di mana pun: **model tabel
+penghubung wajib mengenal soft delete**, karena `MasterLinkController` mengganti himpunan baris
+dengan menghidupkan kembali baris yang identitasnya sama, bukan menyisipkan yang kedua. Task ini
+harus menuliskan syarat itu di suatu tempat yang bisa gagal — anotasi pada kontrak `model()`, atau
+sebuah penjaga tersendiri.
+
+**Batas memori perlu dinaikkan, dan ini menggigit di langkah pertama.** `composer types:check`
+menjalankan PHPStan dengan `--memory-limit=512M`. Angka itu cukup **karena** modul dikecualikan;
+saat pengecualiannya dilepas untuk mengukur, 86 berkas tambahan beserta seluruh grafik tipe Eloquent
+tidak muat dan analisanya berhenti. Pengukurannya memakai `--memory-limit=1G`. Naikkan setelan yang
+ter-commit itu di awal task, bukan setelah menemui kegagalan yang pesannya tidak menyebut modul sama
+sekali.
+
+**Selesai bila.** `composer types:check` hijau dengan modul **tidak** lagi dikecualikan, entri
+`management-aset` hilang dari `ModulTanpaAnalisaTipe` dan `phpstan.neon`, dan
+`ModulTanpaAnalisaTipeTest` tetap hijau dengan daftar kosong.
+
+**Tenggat.** 31 Desember 2026, sebagaimana tertulis pada entrinya.
+
+**Rujukan.** `App\Support\Modules\ModulTanpaAnalisaTipe`, catatan pelaksanaan F3-05 langkah 3.
+
+**Bergantung pada.** F3-05, F3-20.
+
+### F3-30 — Modul aset keluar dari daftar pemindahan
+
+**Kenapa.** Ini kriteria keluar fase 3 yang sebenarnya. Selama entrinya ada di
+`ModulSedangDipindah`, modul **dimuat tetapi tidak dilayani**: ia tidak masuk katalog, tidak
+dipasang lewat `InstallModule`, dan tidak mendapat urutan nomor lewat pendaftaran usaha. Lima
+penjaga batas juga tetap mengecualikannya, jadi perlindungan yang sudah dilewatinya tidak
+benar-benar menjaganya.
+
+**Yang sudah terbukti pada 9 September 2026.** Pemindaian penuh atas foldernya menemukan **nol**
+pelanggaran: namespace, kelas Core di luar kontrak, query builder mentah, dan lompatan HTTP.
+Pemeriksaan basi `ModulSedangDipindahTest` sudah menyala dan menuntut entrinya dibuang. Kode
+produksi modul juga sudah nol menyebut kelas Core di luar kontrak.
+
+**Kenapa belum dikerjakan, dan ini bagian yang penting.** Entrinya sempat dibuang, dan hasilnya
+**84 test Core merah**. Sebabnya bukan modul, melainkan akibat berantai dari modul yang tiba-tiba
+**dilayani**:
+
+1. `ModuleRegistry::semua()` mulai memulangkan `management-aset`.
+2. `RegisterBusiness` karena itu memanggil `InstallModule` untuknya pada setiap pendaftaran usaha.
+3. `InstallModule` membuat urutan nomor lalu memancarkan `TenantDisiapkan`.
+4. Listener modul menyemai data awal Indonesia, dan penyemaian itu **menerbitkan nomor sungguhan**.
+5. Fixture katalog test Core — `AppCatalogSeeder`, yang membaca `config('coreerp.app_catalog')` —
+   tidak membawa referensi nomor modul, jadi tidak ada urutan yang bisa dibuat.
+6. Setiap test yang mendaftarkan usaha gagal dengan `Sequence aktif tidak ditemukan untuk aplikasi
+   dan tenant ini`.
+
+Ini bukan cacat pada modul dan bukan cacat pada `InstallModule`. Ini fixture test Core yang
+menggambarkan modul sebagai katalog kecil buatan tangan, sementara modulnya kini app yang
+benar-benar dapat dipasang.
+
+**Berkas.**
+- `apps/control-plane/app/Support/Modules/ModulSedangDipindah.php` (entrinya dibuang)
+- `apps/control-plane/database/seeders/AppCatalogSeeder.php` dan sumber katalognya
+- `apps/control-plane/tsconfig.json` dan `apps/control-plane/.prettierignore` (pengecualiannya dibuang)
+- `apps/control-plane/tests/Feature/Boundary/NoInternalHttpTest.php` (satu test dibuang bersama
+  entri terakhir; ia sudah menuliskan sendiri kapan)
+
+**Langkah.**
+1. Fixture katalog test Core mendaftarkan manifest modul apa adanya — termasuk 29 referensi
+   nomornya — bukan daftar kecil yang ditulis tangan. Jalur pendaftarannya sudah ada dan sudah
+   dipakai `ReportingTest`: perintah `app:register-manifest` yang sama dengan yang dijalankan admin
+   on-prem. Dua sumber kebenaran untuk katalog adalah dua sumber yang akan menyimpang.
+2. Buang entri `management-aset` dari `ModulSedangDipindah`, dan bersamanya pengecualian pada
+   `tsconfig.json` serta `.prettierignore`. Ketiganya dijaga sama oleh `ModulSedangDipindahTest`.
+3. Buang `test_module_yang_sedang_dipindah_ikut_dipindai` pada `NoInternalHttpTest`; test itu
+   gagal dengan sengaja begitu daftarnya kosong, dan pesannya menyuruh membuangnya.
+4. Periksa akibat lain dari modul yang menjadi dilayani — setidaknya jumlah baris katalog,
+   `ModuleReadinessTest`, dan test peluncuran produk.
+
+**Yang sudah diukur dan tidak perlu diulang.**
+- **TypeScript: nol error.** 47 berkas UI modul lolos apa adanya di bawah `tsconfig.json` Core.
+- **Prettier: 38 berkas** perlu diformat; sudah dikerjakan pada pull request yang menutup fase 3,
+  jadi pengecualiannya tinggal dibuang.
+- **Analisa tipe PHP tidak menghalangi task ini.** Pengecualiannya sudah dipisahkan ke
+  `ModulTanpaAnalisaTipe` dengan tenggatnya sendiri; lihat F3-29.
+
+**Selesai bila.** Entri `management-aset` hilang dari `ModulSedangDipindah`, kelima penjaga batas
+memindainya tanpa pengecualian, seluruh suite hijau, dan `php artisan module:list` menampilkannya
+sebagai module yang dilayani.
+
+**Rujukan.** Catatan pelaksanaan F3-05 langkah 3, `App\Support\Modules\ModulSedangDipindah`.
+
+**Bergantung pada.** F3-05, F3-14, F3-20.
+
 ## 11. Fase 4: UI menjadi satu build
 
 **Kriteria keluar.** Tidak ada elemen `iframe` pada halaman modul, React hanya termuat sekali, dan

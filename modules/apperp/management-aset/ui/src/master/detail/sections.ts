@@ -39,7 +39,11 @@ export type DetailSection = {
  * `extraFields`. Di sini keduanya dibungkus sebagai field biasa supaya seluruh panel
  * detail berjalan lewat satu jalur render, termasuk perlakuan mode bacanya.
  */
-const KETERANGAN: FieldConfig = { name: 'keterangan', label: 'Keterangan', type: 'textarea' };
+const KETERANGAN: FieldConfig = {
+    name: 'keterangan',
+    label: 'Keterangan',
+    type: 'textarea',
+};
 const AKTIF: FieldConfig = {
     name: 'aktif',
     label: 'Data aktif dan dapat dipilih',
@@ -47,7 +51,9 @@ const AKTIF: FieldConfig = {
 };
 
 export function sectionsFor(config: MasterConfig): DetailSection[] {
-    const byName = new Map((config.extraFields ?? []).map((field) => [field.name, field]));
+    const byName = new Map(
+        (config.extraFields ?? []).map((field) => [field.name, field]),
+    );
     const pick = (...names: string[]) =>
         names
             .map((name) => byName.get(name))
@@ -78,7 +84,13 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
 
     if (config.resource === 'jenis-aset') {
         return [
-            { id: 'umum', title: 'Umum', defaultOpen: true, counters: true, fields: [] },
+            {
+                id: 'umum',
+                title: 'Umum',
+                defaultOpen: true,
+                counters: true,
+                fields: [],
+            },
             {
                 id: 'job-maintenance',
                 title: 'Jenis pekerjaan maintenance',
@@ -92,8 +104,18 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 placeholder:
                     'Counter aset (misalnya jam pakai atau suhu) belum dapat dipasang di sini. Fitur ini menyusul setelah master counter aset dan relasinya ke jenis aset dibangun.',
             },
-            { id: 'atribut', title: 'Tipe atribut', attributes: true, fields: [] },
-            { id: 'models', title: 'Pabrikan dan model', models: true, fields: [] },
+            {
+                id: 'atribut',
+                title: 'Tipe atribut',
+                attributes: true,
+                fields: [],
+            },
+            {
+                id: 'models',
+                title: 'Pabrikan dan model',
+                models: true,
+                fields: [],
+            },
             {
                 id: 'kondisi-aset',
                 title: 'Kondisi aset',
@@ -118,9 +140,17 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
                 id: 'general',
                 title: 'General',
                 defaultOpen: true,
-                fields: pick('category_code', 'maintenance_downtime_activities'),
+                fields: pick(
+                    'category_code',
+                    'maintenance_downtime_activities',
+                ),
             },
-            { id: 'description', title: 'Description', defaultOpen: true, fields: [KETERANGAN] },
+            {
+                id: 'description',
+                title: 'Description',
+                defaultOpen: true,
+                fields: [KETERANGAN],
+            },
             { id: 'status', title: 'Status', fields: [AKTIF] },
         ];
     }
@@ -173,7 +203,12 @@ export function sectionsFor(config: MasterConfig): DetailSection[] {
     // Master lain belum memakai tata letak ini. Bentuk cadangan ini ada supaya menambah
     // satu master ke daftar tidak langsung membuat halaman kosong.
     return [
-        { id: 'umum', title: 'Umum', defaultOpen: true, fields: [...(config.extraFields ?? [])] },
+        {
+            id: 'umum',
+            title: 'Umum',
+            defaultOpen: true,
+            fields: [...(config.extraFields ?? [])],
+        },
         { id: 'lain', title: 'Lain-lain', fields: [KETERANGAN, AKTIF] },
     ];
 }
@@ -196,20 +231,32 @@ export function summaryFor(
         if (value === '' || value === null || value === undefined) continue;
 
         if (field.type === 'select') {
-            const label = field.options?.find((option) => option.value === value)?.label;
+            const label = field.options?.find(
+                (option) => option.value === value,
+            )?.label;
             if (label) parts.push(label);
-        } else if (field.type === 'multiselect' && Array.isArray(value) && value.length > 0) {
+        } else if (
+            field.type === 'multiselect' &&
+            Array.isArray(value) &&
+            value.length > 0
+        ) {
             parts.push(
                 value
                     .map(
                         (item) =>
-                            field.options?.find((option) => option.value === item)?.label ?? item,
+                            field.options?.find(
+                                (option) => option.value === item,
+                            )?.label ?? item,
                     )
                     .join(', '),
             );
         } else if (field.type === 'boolean') {
             parts.push(value ? 'Aktif' : 'Tidak aktif');
-        } else if (field.type === 'number' || field.type === 'text' || field.type === 'date') {
+        } else if (
+            field.type === 'number' ||
+            field.type === 'text' ||
+            field.type === 'date'
+        ) {
             parts.push(`${field.label}: ${String(value)}`);
         }
     }

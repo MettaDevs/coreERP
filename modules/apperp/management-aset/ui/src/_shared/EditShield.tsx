@@ -30,7 +30,7 @@ export default function EditShield({
             <button
                 type="button"
                 aria-label={`Ubah ${label.toLowerCase()}`}
-                className="absolute inset-0 z-10 cursor-text rounded-md focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                className="focus-visible:ring-ring/50 absolute inset-0 z-10 cursor-text rounded-md focus-visible:outline-none focus-visible:ring-2"
                 onClick={onActivate}
             />
         </div>

@@ -6,7 +6,12 @@ import { JenisAsetDetail } from './jenisAsetDetail';
  * seksi sendiri di panel ini yang menjelaskan statusnya; kotaknya tetap ada supaya
  * bentuk halaman tidak berubah begitu fiturnya menyusul.
  */
-const BELUM_TERSEDIA = ['Counter', 'Templat kondisi', 'Baris setup', 'Pabrikan'];
+const BELUM_TERSEDIA = [
+    'Counter',
+    'Templat kondisi',
+    'Baris setup',
+    'Pabrikan',
+];
 
 /**
  * Kotak angka bawaan jenis aset, bergaya sama seperti field kode: selalu mati, tidak
@@ -19,14 +24,22 @@ const BELUM_TERSEDIA = ['Counter', 'Templat kondisi', 'Baris setup', 'Pabrikan']
  * Tidak berhak dan belum tersedia sama-sama tampil sebagai "–". Itu disengaja: layar tidak
  * perlu memberi tahu yang mana yang mana.
  */
-export default function JenisAsetCounters({ detail }: { detail: JenisAsetDetail | null }) {
+export default function JenisAsetCounters({
+    detail,
+}: {
+    detail: JenisAsetDetail | null;
+}) {
     const boxes: { key: string; label: string; count: number | null }[] = [
         {
             key: 'atribut',
             label: 'Tipe atribut',
             count: detail?.atribut_count ?? null,
         },
-        { key: 'model', label: 'Model aset', count: detail?.model_count ?? null },
+        {
+            key: 'model',
+            label: 'Model aset',
+            count: detail?.model_count ?? null,
+        },
         { key: 'aset', label: 'Aset', count: detail?.asset_count ?? null },
         {
             key: 'maintenance',

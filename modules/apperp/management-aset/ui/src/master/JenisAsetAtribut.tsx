@@ -36,8 +36,12 @@ export default function JenisAsetAtribut({
     useEffect(() => {
         let cancelled = false;
         Promise.all([
-            api<{ data: MasterOption[] }>('/tipe-atribut?per_page=100&aktif=true'),
-            api<{ data: Record<string, unknown>[] }>(`/jenis-aset/${jenisAsetId}/atribut`),
+            api<{ data: MasterOption[] }>(
+                '/tipe-atribut?per_page=100&aktif=true',
+            ),
+            api<{ data: Record<string, unknown>[] }>(
+                `/jenis-aset/${jenisAsetId}/atribut`,
+            ),
         ])
             .then(([typeList, assigned]) => {
                 if (cancelled) return;
@@ -51,7 +55,12 @@ export default function JenisAsetAtribut({
             })
             .catch((caught) => {
                 if (!cancelled)
-                    setError(errorMessage(caught, 'Atribut jenis aset belum dapat dimuat.'));
+                    setError(
+                        errorMessage(
+                            caught,
+                            'Atribut jenis aset belum dapat dimuat.',
+                        ),
+                    );
             });
         return () => {
             cancelled = true;
@@ -64,7 +73,8 @@ export default function JenisAsetAtribut({
      * adalah satuannya, dan itulah yang perlu terbaca saat memilih, bukan nomor urutnya.
      */
     const itemOf = (type: MasterOption): TransferListItem => {
-        const satuan = typeof type.satuan === 'string' ? type.satuan.trim() : '';
+        const satuan =
+            typeof type.satuan === 'string' ? type.satuan.trim() : '';
         const labels: Record<string, string> = {
             string: 'Teks',
             decimal: 'Desimal',
@@ -75,17 +85,25 @@ export default function JenisAsetAtribut({
         const dataType = String(type.data_type ?? '');
         const values = Number(type.values_count ?? 0);
         const inputMode =
-            dataType === 'string' ? (values > 0 ? `${values} pilihan` : 'Teks bebas') : '';
+            dataType === 'string'
+                ? values > 0
+                    ? `${values} pilihan`
+                    : 'Teks bebas'
+                : '';
 
         return {
             id: type.id,
             label: type.nama,
             description:
-                [labels[dataType] ?? dataType, satuan, inputMode].filter(Boolean).join(' · ') ||
-                undefined,
+                [labels[dataType] ?? dataType, satuan, inputMode]
+                    .filter(Boolean)
+                    .join(' · ') || undefined,
         };
     };
-    const unknown = (id: string): TransferListItem => ({ id, label: 'Tipe atribut tidak dikenal' });
+    const unknown = (id: string): TransferListItem => ({
+        id,
+        label: 'Tipe atribut tidak dikenal',
+    });
     const itemById = (id: string) => {
         const type = types.find((item) => item.id === id);
         return type ? itemOf(type) : unknown(id);
@@ -94,7 +112,9 @@ export default function JenisAsetAtribut({
     const remaining: TransferListItem[] = types
         .filter((type) => !rows.some((row) => row.tipe_atribut_id === type.id))
         .map(itemOf);
-    const selected: TransferListItem[] = rows.map((row) => itemById(row.tipe_atribut_id));
+    const selected: TransferListItem[] = rows.map((row) =>
+        itemById(row.tipe_atribut_id),
+    );
 
     function applyTransfer(next: { selected: TransferListItem[] }) {
         // Baris yang sudah ada mempertahankan `wajib`-nya; baris baru dari sisi kanan
@@ -131,9 +151,9 @@ export default function JenisAsetAtribut({
 
     return (
         <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-                Aset yang memakai jenis ini akan diminta mengisi atribut yang terpasang di sebelah
-                kanan saat diterima.
+            <p className="text-muted-foreground text-sm">
+                Aset yang memakai jenis ini akan diminta mengisi atribut yang
+                terpasang di sebelah kanan saat diterima.
             </p>
 
             <TransferList
@@ -151,7 +171,10 @@ export default function JenisAsetAtribut({
                 <div className="space-y-2">
                     <p className="text-sm font-medium">Wajib diisi</p>
                     {rows.map((row, index) => (
-                        <Field key={row.tipe_atribut_id} orientation="horizontal">
+                        <Field
+                            key={row.tipe_atribut_id}
+                            orientation="horizontal"
+                        >
                             <Switch
                                 id={`wajib-${row.tipe_atribut_id}`}
                                 disabled={!canEdit}
@@ -159,12 +182,16 @@ export default function JenisAsetAtribut({
                                 onCheckedChange={(checked) =>
                                     setRows((current) =>
                                         current.map((item, i) =>
-                                            i === index ? { ...item, wajib: checked } : item,
+                                            i === index
+                                                ? { ...item, wajib: checked }
+                                                : item,
                                         ),
                                     )
                                 }
                             />
-                            <FieldLabel htmlFor={`wajib-${row.tipe_atribut_id}`}>
+                            <FieldLabel
+                                htmlFor={`wajib-${row.tipe_atribut_id}`}
+                            >
                                 {itemById(row.tipe_atribut_id).label}
                             </FieldLabel>
                         </Field>
@@ -172,11 +199,19 @@ export default function JenisAsetAtribut({
                 </div>
             )}
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {saved && <p className="text-sm text-muted-foreground">Atribut tersimpan.</p>}
+            {error && <p className="text-destructive text-sm">{error}</p>}
+            {saved && (
+                <p className="text-muted-foreground text-sm">
+                    Atribut tersimpan.
+                </p>
+            )}
 
             {canEdit && (
-                <Button type="button" disabled={saving} onClick={() => void save()}>
+                <Button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void save()}
+                >
                     {saving ? 'Menyimpan…' : 'Simpan atribut'}
                 </Button>
             )}

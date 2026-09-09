@@ -28,7 +28,13 @@ export default function WorkOrderPage({
     if (!pertama) return <WorkOrderListPage permissions={permissions} />;
 
     if (pertama === 'baru') {
-        return <WorkOrderDetailPage context={context} permissions={permissions} mode="create" />;
+        return (
+            <WorkOrderDetailPage
+                context={context}
+                permissions={permissions}
+                mode="create"
+            />
+        );
     }
 
     return (

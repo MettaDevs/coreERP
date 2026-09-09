@@ -16,8 +16,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class JenisAsetAtribut extends Model
 {
-    use HasUlids, SoftDeletes;
+    use HasUlids;
     use MilikTenant;
+    use SoftDeletes;
 
     protected $table = 'aset_m_jenis_aset_atribut';
 
@@ -31,11 +32,13 @@ class JenisAsetAtribut extends Model
         ];
     }
 
+    /** @return BelongsTo<JenisAset, $this> */
     public function jenisAset(): BelongsTo
     {
         return $this->belongsTo(JenisAset::class, 'jenis_aset_id');
     }
 
+    /** @return BelongsTo<TipeAtribut, $this> */
     public function tipeAtribut(): BelongsTo
     {
         return $this->belongsTo(TipeAtribut::class, 'tipe_atribut_id');

@@ -59,13 +59,17 @@ export function emptyValue(field: FieldConfig): FieldValue {
 }
 
 /** Nilai field dari sebuah record, dikembalikan dalam bentuk yang dipakai form. */
-export function valueFrom(record: Record<string, unknown> | null, field: FieldConfig): FieldValue {
+export function valueFrom(
+    record: Record<string, unknown> | null,
+    field: FieldConfig,
+): FieldValue {
     if (!record) return emptyValue(field);
     const raw = record[field.name];
     if (field.fromRecord) return field.fromRecord(raw);
     if (raw === null || raw === undefined) return emptyValue(field);
     if (field.type === 'boolean') return Boolean(raw);
-    if (field.type === 'multiselect') return Array.isArray(raw) ? raw.map(String) : [];
+    if (field.type === 'multiselect')
+        return Array.isArray(raw) ? raw.map(String) : [];
 
     return String(raw);
 }
@@ -84,6 +88,9 @@ export function payloadValue(field: FieldConfig, value: FieldValue): unknown {
     return value;
 }
 
-export function isVisible(field: FieldConfig, form: Record<string, unknown>): boolean {
+export function isVisible(
+    field: FieldConfig,
+    form: Record<string, unknown>,
+): boolean {
     return field.visibleWhen ? field.visibleWhen(form) : true;
 }

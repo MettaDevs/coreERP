@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { api, errorMessage } from '../../api';
 type Asset = {
     id: string;
@@ -15,7 +20,9 @@ export default function MonitoringPage() {
     useEffect(() => {
         api<{ data: Asset[] }>('/aset')
             .then((x) => setAssets(x.data))
-            .catch((e) => setError(errorMessage(e, 'Monitoring belum dapat dimuat.')));
+            .catch((e) =>
+                setError(errorMessage(e, 'Monitoring belum dapat dimuat.')),
+            );
     }, []);
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
@@ -23,13 +30,20 @@ export default function MonitoringPage() {
                 <CardTitle>Monitoring aset</CardTitle>
             </CardHeader>
             <CardContent className="px-0">
-                {error && <p className="px-5 py-3 text-sm text-destructive">{error}</p>}
+                {error && (
+                    <p className="text-destructive px-5 py-3 text-sm">
+                        {error}
+                    </p>
+                )}
                 {!assets.length ? (
                     <Empty>
                         <EmptyHeader>
-                            <EmptyTitle>Belum ada aset untuk dipantau</EmptyTitle>
+                            <EmptyTitle>
+                                Belum ada aset untuk dipantau
+                            </EmptyTitle>
                             <EmptyDescription>
-                                Monitoring menampilkan status register aset yang tersedia.
+                                Monitoring menampilkan status register aset yang
+                                tersedia.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
@@ -42,12 +56,13 @@ export default function MonitoringPage() {
                             >
                                 <div>
                                     <p className="font-medium">{asset.kode}</p>
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-muted-foreground text-sm">
                                         Status: {asset.lifecycle_state}
                                     </p>
                                 </div>
                                 <span>
-                                    {asset.currency_code} {asset.acquisition_value}
+                                    {asset.currency_code}{' '}
+                                    {asset.acquisition_value}
                                 </span>
                             </div>
                         ))}

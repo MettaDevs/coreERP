@@ -36,7 +36,10 @@ export default function JenisAsetMaintenanceJobTypes({
             setSelected(result.data.selected.map(itemOf));
         } catch (caught) {
             setError(
-                errorMessage(caught, 'Daftar jenis pekerjaan maintenance belum dapat dimuat.'),
+                errorMessage(
+                    caught,
+                    'Daftar jenis pekerjaan maintenance belum dapat dimuat.',
+                ),
             );
         } finally {
             setLoading(false);
@@ -58,15 +61,24 @@ export default function JenisAsetMaintenanceJobTypes({
             });
             setSaved(true);
         } catch (caught) {
-            setError(errorMessage(caught, 'Relasi maintenance belum dapat disimpan.'));
+            setError(
+                errorMessage(
+                    caught,
+                    'Relasi maintenance belum dapat disimpan.',
+                ),
+            );
         } finally {
             setSaving(false);
         }
     }
 
     if (loading)
-        return <p className="text-sm text-muted-foreground">Memuat jenis pekerjaan maintenance…</p>;
-    if (error) return <p className="text-sm text-destructive">{error}</p>;
+        return (
+            <p className="text-muted-foreground text-sm">
+                Memuat jenis pekerjaan maintenance…
+            </p>
+        );
+    if (error) return <p className="text-destructive text-sm">{error}</p>;
     if (!canEdit && selected.length === 0)
         return (
             <Empty>
@@ -78,7 +90,7 @@ export default function JenisAsetMaintenanceJobTypes({
 
     return (
         <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
                 Pilih jenis pekerjaan yang dapat dipakai oleh jenis aset ini.
             </p>
             <TransferList
@@ -96,12 +108,18 @@ export default function JenisAsetMaintenanceJobTypes({
                 selectedEmptyLabel="Belum ada pekerjaan yang dipilih."
             />
             {canEdit && (
-                <Button type="button" disabled={saving} onClick={() => void save()}>
+                <Button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void save()}
+                >
                     {saving ? 'Menyimpan…' : 'Simpan jenis pekerjaan'}
                 </Button>
             )}
             {saved && (
-                <p className="text-sm text-muted-foreground">Relasi jenis pekerjaan tersimpan.</p>
+                <p className="text-muted-foreground text-sm">
+                    Relasi jenis pekerjaan tersimpan.
+                </p>
             )}
         </div>
     );

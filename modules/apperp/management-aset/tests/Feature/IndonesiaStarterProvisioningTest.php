@@ -151,7 +151,14 @@ class IndonesiaStarterProvisioningTest extends TestCase
 
     public function test_event_untuk_module_lain_dilewati_tanpa_data_separuh(): void
     {
-        $this->pancarkan((string) Str::ulid(), ['human-resources']);
+        // Tenant sungguhan, bukan id acak, dan itu membuat testnya lebih tajam: yang dibuktikan
+        // menjadi "tenant ini tidak disemai **karena app_ids-nya bukan module ini**", bukan
+        // sekadar "tenant yang tidak ada tidak disemai". Sekaligus memastikan tabel module
+        // benar-benar ada, sehingga nol baris berarti tidak ada yang menulis — bukan berarti
+        // tabelnya belum dibuat.
+        $tenant = $this->buatTenantUji();
+
+        $this->pancarkan($tenant, ['human-resources']);
 
         $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
         $this->assertDatabaseCount('aset_m_kelompok_harta_fiskal', 0);

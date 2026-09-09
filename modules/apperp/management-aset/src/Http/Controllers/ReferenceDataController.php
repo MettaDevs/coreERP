@@ -70,7 +70,7 @@ final class ReferenceDataController extends Controller
                 'jurisdiction' => $record->jurisdiction,
                 'label' => $record->label,
                 'regulation_reference' => $record->regulation_reference,
-                'effective_from' => $record->effective_from?->toDateString(),
+                'effective_from' => $record->effective_from->toDateString(),
                 'effective_to' => $record->effective_to?->toDateString(),
                 'useful_life_years' => $record->useful_life_years,
                 'straight_line_rate_percent' => $record->straight_line_rate_percent,
@@ -88,10 +88,9 @@ final class ReferenceDataController extends Controller
         ]);
     }
 
+    /** Tanggal berlaku selalu terisi — kolomnya NOT NULL — jadi label selalu menyebutkannya. */
     private function displayLabel(KelompokHartaFiskal $record): string
     {
-        $effectiveFrom = $record->effective_from?->format('d/m/Y');
-
-        return $effectiveFrom ? $record->label.' — berlaku '.$effectiveFrom : $record->label;
+        return $record->label.' — berlaku '.$record->effective_from->format('d/m/Y');
     }
 }

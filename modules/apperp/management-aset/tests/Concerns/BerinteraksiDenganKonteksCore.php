@@ -8,7 +8,9 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
@@ -328,8 +330,38 @@ trait BerinteraksiDenganKonteksCore
     /**
      * Tenant beserta client pemiliknya, dibuat hanya bila belum ada.
      */
+    /**
+     * Tabel module dibuat oleh test ini sendiri, bukan oleh migration Core.
+     *
+     * Selama module masih terdaftar sedang dipindah, `ModuleServiceProvider` menjalankan
+     * migrationnya bersama migration Core — satu-satunya cara tabelnya ada, karena module yang
+     * sedang dipindah belum boleh dipasang untuk tenant mana pun. Entri itu dibuang pada 9
+     * September 2026, dan bersamanya jalur tersebut.
+     *
+     * Di produksi tabel ini dibuat `ModuleMigrator` saat module dipasang. Test tidak memasang
+     * module, jadi ia menjalankan migrationnya sendiri — pola yang sama dipakai
+     * `TenantScopeBoundaryTest` untuk module contoh.
+     *
+     * Dijalankan sekali per proses, bukan per tenant: tabelnya milik seluruh database dan
+     * dipisahkan `tenant_id`, bukan dibuat per tenant.
+     */
+    private function pastikanTabelModuleAda(): void
+    {
+        if (Schema::hasTable('aset_m_group_aset')) {
+            return;
+        }
+
+        Artisan::call('migrate', [
+            '--path' => dirname(__DIR__, 2).'/database/migrations',
+            '--realpath' => true,
+            '--force' => true,
+        ]);
+    }
+
     private function pastikanTenantAda(string $tenantId): string
     {
+        $this->pastikanTabelModuleAda();
+
         if (DB::table('tenants')->where('id', $tenantId)->exists()) {
             return $tenantId;
         }

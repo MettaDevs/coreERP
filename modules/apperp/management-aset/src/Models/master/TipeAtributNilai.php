@@ -16,8 +16,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class TipeAtributNilai extends Model
 {
-    use HasUlids, SoftDeletes;
+    use HasUlids;
     use MilikTenant;
+    use SoftDeletes;
 
     protected $table = 'aset_m_tipe_atribut_nilai';
 
@@ -28,6 +29,7 @@ class TipeAtributNilai extends Model
         return ['urutan' => 'integer'];
     }
 
+    /** @return BelongsTo<TipeAtribut, $this> */
     public function tipeAtribut(): BelongsTo
     {
         return $this->belongsTo(TipeAtribut::class, 'tipe_atribut_id');

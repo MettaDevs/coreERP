@@ -1,10 +1,28 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@apperp/ui/card';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@apperp/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@apperp/ui/table';
 import { toast } from 'sonner';
 import { api, errorMessage } from '../../api';
 
@@ -35,19 +53,29 @@ const KEPARAHAN: { kode: Aturan['keparahan']; label: string }[] = [
     { kode: 'error', label: 'Error — menahan perpindahan' },
 ];
 
-export default function StatusValidationPage({ permissions }: { permissions: string[] }) {
-    const canUpdate = permissions.includes('management-aset.validasi-status-work-order.update');
+export default function StatusValidationPage({
+    permissions,
+}: {
+    permissions: string[];
+}) {
+    const canUpdate = permissions.includes(
+        'management-aset.validasi-status-work-order.update',
+    );
     const [aturan, setAturan] = useState<Aturan[]>([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
     const load = async () => {
         try {
-            const result = await api<{ data: Aturan[] }>('/validasi-status-work-order');
+            const result = await api<{ data: Aturan[] }>(
+                '/validasi-status-work-order',
+            );
             setAturan(result.data);
             setError('');
         } catch (caught) {
-            setError(errorMessage(caught, 'Aturan validasi belum dapat dimuat.'));
+            setError(
+                errorMessage(caught, 'Aturan validasi belum dapat dimuat.'),
+            );
         }
     };
 
@@ -57,7 +85,9 @@ export default function StatusValidationPage({ permissions }: { permissions: str
 
     const ubah = (id: string, perubahan: Partial<Aturan>) =>
         setAturan((current) =>
-            current.map((baris) => (baris.id === id ? { ...baris, ...perubahan } : baris)),
+            current.map((baris) =>
+                baris.id === id ? { ...baris, ...perubahan } : baris,
+            ),
         );
 
     const simpan = async () => {
@@ -77,7 +107,9 @@ export default function StatusValidationPage({ permissions }: { permissions: str
             await load();
             toast.success('Aturan validasi tersimpan.');
         } catch (caught) {
-            toast.error(errorMessage(caught, 'Aturan validasi belum dapat disimpan.'));
+            toast.error(
+                errorMessage(caught, 'Aturan validasi belum dapat disimpan.'),
+            );
         } finally {
             setSaving(false);
         }
@@ -86,7 +118,10 @@ export default function StatusValidationPage({ permissions }: { permissions: str
     // Dikelompokkan menurut status karena itulah cara aturan dibaca: "apa yang harus
     // terpenuhi sebelum pekerjaan boleh dinyatakan selesai", bukan sebaliknya.
     const perStatus = Object.keys(STATUS)
-        .map((status) => ({ status, baris: aturan.filter((item) => item.status === status) }))
+        .map((status) => ({
+            status,
+            baris: aturan.filter((item) => item.status === status),
+        }))
         .filter((kelompok) => kelompok.baris.length > 0);
 
     return (
@@ -102,18 +137,19 @@ export default function StatusValidationPage({ permissions }: { permissions: str
                 )}
             </CardHeader>
             <CardContent className="space-y-6 px-5 py-4">
-                <p className="text-sm text-muted-foreground">
-                    Aturan melekat pada status tujuan, sehingga pemeriksaan yang sama dapat longgar
-                    saat pekerjaan dijadwalkan dan ketat saat dinyatakan selesai.
+                <p className="text-muted-foreground text-sm">
+                    Aturan melekat pada status tujuan, sehingga pemeriksaan yang
+                    sama dapat longgar saat pekerjaan dijadwalkan dan ketat saat
+                    dinyatakan selesai.
                 </p>
-                {error && <p className="text-sm text-destructive">{error}</p>}
+                {error && <p className="text-destructive text-sm">{error}</p>}
                 {perStatus.length === 0 ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada aturan validasi</EmptyTitle>
                             <EmptyDescription>
-                                Aturan disiapkan saat tenant dikonfigurasi. Hubungi admin bila
-                                daftar ini kosong.
+                                Aturan disiapkan saat tenant dikonfigurasi.
+                                Hubungi admin bila daftar ini kosong.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>
@@ -127,8 +163,12 @@ export default function StatusValidationPage({ permissions }: { permissions: str
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Yang diperiksa</TableHead>
-                                            <TableHead className="w-32">Diperiksa</TableHead>
+                                            <TableHead>
+                                                Yang diperiksa
+                                            </TableHead>
+                                            <TableHead className="w-32">
+                                                Diperiksa
+                                            </TableHead>
                                             <TableHead className="w-72">
                                                 Bila belum terpenuhi
                                             </TableHead>
@@ -138,27 +178,33 @@ export default function StatusValidationPage({ permissions }: { permissions: str
                                         {kelompok.baris.map((baris) => (
                                             <TableRow key={baris.id}>
                                                 <TableCell>
-                                                    {ATURAN[baris.aturan] ?? baris.aturan}
+                                                    {ATURAN[baris.aturan] ??
+                                                        baris.aturan}
                                                 </TableCell>
                                                 <TableCell>
                                                     <Switch
                                                         aria-label={`Periksa ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
                                                         checked={baris.aktif}
                                                         disabled={!canUpdate}
-                                                        onCheckedChange={(checked) =>
-                                                            ubah(baris.id, { aktif: checked })
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            ubah(baris.id, {
+                                                                aktif: checked,
+                                                            })
                                                         }
                                                     />
                                                 </TableCell>
                                                 <TableCell>
                                                     {!baris.aktif ? (
-                                                        <span className="text-sm text-muted-foreground">
+                                                        <span className="text-muted-foreground text-sm">
                                                             Tidak diperiksa
                                                         </span>
                                                     ) : canUpdate ? (
                                                         <Select
                                                             items={KEPARAHAN.map(
-                                                                (item) => item.label,
+                                                                (item) =>
+                                                                    item.label,
                                                             )}
                                                             value={
                                                                 KEPARAHAN.find(
@@ -168,22 +214,35 @@ export default function StatusValidationPage({ permissions }: { permissions: str
                                                                 )?.label ?? null
                                                             }
                                                             ariaLabel={`Keparahan ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
-                                                            onValueChange={(value) => {
-                                                                const dipilih = KEPARAHAN.find(
-                                                                    (item) => item.label === value,
-                                                                );
+                                                            onValueChange={(
+                                                                value,
+                                                            ) => {
+                                                                const dipilih =
+                                                                    KEPARAHAN.find(
+                                                                        (
+                                                                            item,
+                                                                        ) =>
+                                                                            item.label ===
+                                                                            value,
+                                                                    );
                                                                 if (dipilih)
-                                                                    ubah(baris.id, {
-                                                                        keparahan: dipilih.kode,
-                                                                    });
+                                                                    ubah(
+                                                                        baris.id,
+                                                                        {
+                                                                            keparahan:
+                                                                                dipilih.kode,
+                                                                        },
+                                                                    );
                                                             }}
                                                         />
                                                     ) : (
                                                         <span className="text-sm">
                                                             {KEPARAHAN.find(
                                                                 (item) =>
-                                                                    item.kode === baris.keparahan,
-                                                            )?.label ?? baris.keparahan}
+                                                                    item.kode ===
+                                                                    baris.keparahan,
+                                                            )?.label ??
+                                                                baris.keparahan}
                                                         </span>
                                                     )}
                                                 </TableCell>

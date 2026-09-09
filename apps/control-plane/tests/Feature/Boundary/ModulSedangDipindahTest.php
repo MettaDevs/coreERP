@@ -100,7 +100,12 @@ class ModulSedangDipindahTest extends TestCase
         return [
             'prettier' => ['.prettierignore', 'pemeriksaan gaya frontend', ''],
             'typescript' => ['tsconfig.json', 'pemeriksaan tipe frontend', '"exclude"'],
-            'phpstan' => ['phpstan.neon', 'analisa statis PHP', 'excludePaths'],
+            // `phpstan.neon` sengaja tidak di sini sejak 9 September 2026. Pengecualian analisa
+            // tipe PHP punya daftarnya sendiri, `ModulTanpaAnalisaTipe`, dengan tenggat dan
+            // penjaganya sendiri. Alasannya: modul aset lulus kelima penjaga batas sambil masih
+            // menyisakan 405 temuan tipe, jadi kedua pengecualian itu memang berakhir pada waktu
+            // yang berbeda. Menyatukannya berarti kelima penjaga batas ikut mati sampai anotasi
+            // tipenya selesai ditulis.
         ];
     }
 
@@ -214,6 +219,33 @@ class ModulSedangDipindahTest extends TestCase
             'kelas Core di luar kontrak, maupun query builder mentah. Pengecualian yang tidak lagi',
             'mengecualikan apa pun hanya menyisakan lubang yang menunggu dipakai orang berikutnya.',
         ]));
+    }
+
+    /**
+     * Penghalang yang dinyatakan wajib menyebut task yang membuangnya.
+     *
+     * Tanpa syarat ini, `pemblokir` menjadi pintu keluar bebas: satu kalimat apa pun akan membuat
+     * pemeriksaan basi diam selamanya. Menyebut nomor task berarti ada tempat lain yang melacaknya,
+     * dan ada orang yang bisa menanyakannya.
+     */
+    public function test_pemblokir_menyebut_task_yang_membuangnya(): void
+    {
+        foreach (ModulSedangDipindah::bawaan()->semua() as $nama => $entri) {
+            $pemblokir = trim($entri['pemblokir'] ?? '');
+
+            if ($pemblokir === '') {
+                continue;
+            }
+
+            $this->assertMatchesRegularExpression('/\bF\d-\d{2}\b/', $pemblokir, sprintf(
+                'Penghalang entri "%s" tidak menyebut nomor task yang membuangnya. Penghalang tanpa '.
+                'task adalah alasan yang berlaku selamanya, dan pemeriksaan basi berhenti bekerja '.
+                'untuk modul itu tanpa ada yang menyadarinya.',
+                $nama,
+            ));
+        }
+
+        $this->addToAssertionCount(1);
     }
 
     /**
@@ -352,8 +384,17 @@ class ModulSedangDipindahTest extends TestCase
         $folderModul = $pemindai->folderModul();
         $basi = [];
 
-        foreach (array_keys($dipindah->semua()) as $nama) {
+        foreach ($dipindah->semua() as $nama => $entri) {
             if (! isset($folderModul[$nama])) {
+                continue;
+            }
+
+            // Entri yang menyatakan penghalang di luar jangkauan pemindai tidak dihitung basi.
+            // Premis semula — "bersih menurut pemindaian berarti entrinya boleh dibuang" —
+            // terbukti salah, dan yang benar adalah membetulkan premisnya, bukan mematikan
+            // pemeriksaannya: tenggat tetap berlaku, dan `pemblokir` wajib menyebut task yang
+            // membuangnya sehingga ia tidak dapat menjadi alasan yang berlaku selamanya.
+            if (trim($entri['pemblokir'] ?? '') !== '') {
                 continue;
             }
 

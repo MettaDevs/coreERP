@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { applyCoreErpTheme, type CoreErpTheme } from '@apperp/ui/theme';
 import { Card, CardContent } from '@apperp/ui/card';
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '@apperp/ui/empty';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { api, errorMessage, setContextToken } from './api';
 import MasterPage from './master/MasterPage';
-import MasterDetailPage, { DETAIL_LAYOUT_RESOURCES } from './master/detail/MasterDetailPage';
+import MasterDetailPage, {
+    DETAIL_LAYOUT_RESOURCES,
+} from './master/detail/MasterDetailPage';
 import AssetPage from './transactions/inventarisasi-aset/AssetPage';
 import DepreciationPage from './transactions/inventarisasi-aset/DepreciationPage';
 import LifecycleDocumentPage from './transactions/_shared/LifecycleDocumentPage';
@@ -17,7 +24,12 @@ import { config as permintaanPembelianAset } from './transactions/permintaan-pem
 import { config as dekomisioningAset } from './transactions/dekomisioning-aset/config';
 import { config as penjualanAset } from './transactions/penjualan-aset/config';
 import { config as pemusnahanAset } from './transactions/pemusnahan-aset/config';
-import { MASTERS, MasterResource, Permission, permission } from './master/masters';
+import {
+    MASTERS,
+    MasterResource,
+    Permission,
+    permission,
+} from './master/masters';
 import FixedAssetSetupPlaceholderPage from './fixed-assets-setup/FixedAssetSetupPlaceholderPage';
 import { setParentOrigin } from './shell';
 
@@ -69,13 +81,21 @@ export default function App() {
             ),
         [permissions],
     );
-    const active = visible.find((master) => master.resource === hashResource) ?? visible[0];
+    const active =
+        visible.find((master) => master.resource === hashResource) ??
+        visible[0];
 
     useEffect(() => {
-        const parentOrigin = document.referrer ? new URL(document.referrer).origin : '';
+        const parentOrigin = document.referrer
+            ? new URL(document.referrer).origin
+            : '';
         const receiveContext = (event: MessageEvent) => {
-            if (event.source !== window.parent || event.origin !== parentOrigin) return;
-            if (event.data?.type !== 'coreerp.context' || event.data?.appId !== 'management-aset')
+            if (event.source !== window.parent || event.origin !== parentOrigin)
+                return;
+            if (
+                event.data?.type !== 'coreerp.context' ||
+                event.data?.appId !== 'management-aset'
+            )
                 return;
             applyCoreErpTheme(event.data.theme as CoreErpTheme);
             setParentOrigin(event.origin);
@@ -109,7 +129,9 @@ export default function App() {
                 setContextError('');
             })
             .catch((caught) =>
-                setContextError(errorMessage(caught, 'Hak akses belum dapat dibaca.')),
+                setContextError(
+                    errorMessage(caught, 'Hak akses belum dapat dibaca.'),
+                ),
             );
     }, [contextToken]);
 
@@ -119,7 +141,9 @@ export default function App() {
                 <Card>
                     <CardContent>
                         <Empty>
-                            <EmptyDescription>Menyiapkan akses aplikasi…</EmptyDescription>
+                            <EmptyDescription>
+                                Menyiapkan akses aplikasi…
+                            </EmptyDescription>
                         </Empty>
                     </CardContent>
                 </Card>
@@ -134,8 +158,12 @@ export default function App() {
                     <CardContent>
                         <Empty>
                             <EmptyHeader>
-                                <EmptyTitle>Aplikasi belum dapat dibuka</EmptyTitle>
-                                <EmptyDescription>{contextError}</EmptyDescription>
+                                <EmptyTitle>
+                                    Aplikasi belum dapat dibuka
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    {contextError}
+                                </EmptyDescription>
                             </EmptyHeader>
                         </Empty>
                     </CardContent>
@@ -153,18 +181,29 @@ export default function App() {
             <main>
                 <AssetPage
                     context={assetContext}
-                    canUpdate={permissions.includes('management-aset.aset.update')}
+                    canUpdate={permissions.includes(
+                        'management-aset.aset.update',
+                    )}
                 />
             </main>
         );
     }
-    if (hashResource === 'penyusutan' && permissions.includes('management-aset.penyusutan.read'))
+    if (
+        hashResource === 'penyusutan' &&
+        permissions.includes('management-aset.penyusutan.read')
+    )
         return (
             <main>
                 <DepreciationPage
-                    canCreate={permissions.includes('management-aset.penyusutan.create')}
-                    canFinalize={permissions.includes('management-aset.penyusutan.finalize')}
-                    canCorrect={permissions.includes('management-aset.penyusutan.correct')}
+                    canCreate={permissions.includes(
+                        'management-aset.penyusutan.create',
+                    )}
+                    canFinalize={permissions.includes(
+                        'management-aset.penyusutan.finalize',
+                    )}
+                    canCorrect={permissions.includes(
+                        'management-aset.penyusutan.correct',
+                    )}
                 />
             </main>
         );
@@ -179,7 +218,9 @@ export default function App() {
         );
     if (
         hashResource === 'fixed-asset-posting-profiles' &&
-        permissions.includes('management-aset.fixed-asset-posting-profiles.read')
+        permissions.includes(
+            'management-aset.fixed-asset-posting-profiles.read',
+        )
     )
         return (
             <main>
@@ -187,7 +228,10 @@ export default function App() {
             </main>
         );
 
-    if (hashResource === 'mutasi-aset' && permissions.includes('management-aset.mutasi-aset.read'))
+    if (
+        hashResource === 'mutasi-aset' &&
+        permissions.includes('management-aset.mutasi-aset.read')
+    )
         return (
             <main>
                 <MutationPage />
@@ -208,7 +252,10 @@ export default function App() {
     )
         return (
             <main>
-                <PlanningPage context={assetContext} permissions={permissions} />
+                <PlanningPage
+                    context={assetContext}
+                    permissions={permissions}
+                />
             </main>
         );
     if (
@@ -227,7 +274,10 @@ export default function App() {
         permissions.includes('management-aset.pemeliharaan-aset.read')
     )
         return (
-            <main data-layout="full-height" className="h-full min-h-0 overflow-hidden">
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
                 <WorkOrderPage
                     context={assetContext}
                     permissions={permissions}
@@ -236,17 +286,25 @@ export default function App() {
             </main>
         );
     const lifecycle = Object.fromEntries(
-        [permintaanPembelianAset, dekomisioningAset, penjualanAset, pemusnahanAset].map(
-            (config) => [config.resource, config],
-        ),
+        [
+            permintaanPembelianAset,
+            dekomisioningAset,
+            penjualanAset,
+            pemusnahanAset,
+        ].map((config) => [config.resource, config]),
     );
     if (
         lifecycle[hashResource] &&
-        permissions.includes(`management-aset.${hashResource}.read` as Permission)
+        permissions.includes(
+            `management-aset.${hashResource}.read` as Permission,
+        )
     )
         return (
             <main>
-                <LifecycleDocumentPage context={assetContext} config={lifecycle[hashResource]} />
+                <LifecycleDocumentPage
+                    context={assetContext}
+                    config={lifecycle[hashResource]}
+                />
             </main>
         );
 
@@ -257,9 +315,12 @@ export default function App() {
                     <CardContent>
                         <Empty>
                             <EmptyHeader>
-                                <EmptyTitle>Belum ada data yang dapat dibuka</EmptyTitle>
+                                <EmptyTitle>
+                                    Belum ada data yang dapat dibuka
+                                </EmptyTitle>
                                 <EmptyDescription>
-                                    Minta administrator memberi Anda akses master data.
+                                    Minta administrator memberi Anda akses
+                                    master data.
                                 </EmptyDescription>
                             </EmptyHeader>
                         </Empty>
@@ -271,14 +332,24 @@ export default function App() {
 
     // Sementara hanya sebagian master yang memakai tata letak daftar-detail. Saat seluruh
     // master pindah, yang dihapus adalah cabang ini beserta MasterPage.
-    const Page = DETAIL_LAYOUT_RESOURCES.includes(active.resource) ? MasterDetailPage : MasterPage;
+    const Page = DETAIL_LAYOUT_RESOURCES.includes(active.resource)
+        ? MasterDetailPage
+        : MasterPage;
 
     return (
         <main
             data-layout={Page === MasterDetailPage ? 'full-height' : undefined}
-            className={Page === MasterDetailPage ? 'h-full min-h-0 overflow-hidden' : undefined}
+            className={
+                Page === MasterDetailPage
+                    ? 'h-full min-h-0 overflow-hidden'
+                    : undefined
+            }
         >
-            <Page key={active.resource} config={active} permissions={permissions} />
+            <Page
+                key={active.resource}
+                config={active}
+                permissions={permissions}
+            />
         </main>
     );
 }

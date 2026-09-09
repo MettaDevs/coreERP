@@ -10,7 +10,13 @@ import {
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@apperp/ui/sheet';
+import {
+    Sheet,
+    SheetContent,
+    SheetFooter,
+    SheetHeader,
+    SheetTitle,
+} from '@apperp/ui/sheet';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../api';
@@ -60,13 +66,21 @@ export default function MasterForm({
     }));
     const [parentIds, setParentIds] = useState<Record<string, string>>(() =>
         Object.fromEntries(
-            parents.map((parent) => [parent.field, value ? parentIdOf(value, parent) : '']),
+            parents.map((parent) => [
+                parent.field,
+                value ? parentIdOf(value, parent) : '',
+            ]),
         ),
     );
-    const extraFields = useMemo(() => config.extraFields ?? [], [config.extraFields]);
+    const extraFields = useMemo(
+        () => config.extraFields ?? [],
+        [config.extraFields],
+    );
     const isAssetLocation = config.resource === 'lokasi-aset';
     const [extra, setExtra] = useState<Record<string, FieldValue>>(() =>
-        Object.fromEntries(extraFields.map((field) => [field.name, valueFrom(value, field)])),
+        Object.fromEntries(
+            extraFields.map((field) => [field.name, valueFrom(value, field)]),
+        ),
     );
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
@@ -106,7 +120,9 @@ export default function MasterForm({
                 `/${config.resource}${value ? `/${value.id}` : ''}`,
                 {
                     method: value ? 'PATCH' : 'POST',
-                    headers: value ? undefined : { 'Idempotency-Key': creationKey.current },
+                    headers: value
+                        ? undefined
+                        : { 'Idempotency-Key': creationKey.current },
                     body: JSON.stringify({
                         nama: form.nama,
                         keterangan: form.keterangan,
@@ -140,7 +156,9 @@ export default function MasterForm({
 
     function parentField(parent: MasterParentConfig) {
         const options = optionsOf[parent.field] ?? [];
-        const selected = options.find((option) => option.id === parentIds[parent.field]);
+        const selected = options.find(
+            (option) => option.id === parentIds[parent.field],
+        );
         const loadError = parentOptionsError[parent.field] ?? '';
 
         return (
@@ -159,7 +177,9 @@ export default function MasterForm({
                         setParentIds({
                             ...parentIds,
                             [parent.field]:
-                                options.find((option) => optionLabel(option) === item)?.id ?? '',
+                                options.find(
+                                    (option) => optionLabel(option) === item,
+                                )?.id ?? '',
                         })
                     }
                 />
@@ -180,14 +200,20 @@ export default function MasterForm({
                         {value ? 'Ubah' : 'Tambah'} {config.singular}
                     </SheetTitle>
                 </SheetHeader>
-                <form className="flex min-h-0 flex-1 flex-col" onSubmit={submit}>
+                <form
+                    className="flex min-h-0 flex-1 flex-col"
+                    onSubmit={submit}
+                >
                     <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                         <FieldGroup>
                             <Field data-disabled="true">
                                 <Input
                                     id="code"
                                     label={config.kodeLabel}
-                                    value={value?.kode ?? 'Dibuat otomatis saat disimpan'}
+                                    value={
+                                        value?.kode ??
+                                        'Dibuat otomatis saat disimpan'
+                                    }
                                     disabled
                                 />
                             </Field>
@@ -200,7 +226,10 @@ export default function MasterForm({
                                     maxLength={150}
                                     value={form.nama}
                                     onChange={(event) =>
-                                        setForm({ ...form, nama: event.target.value })
+                                        setForm({
+                                            ...form,
+                                            nama: event.target.value,
+                                        })
                                     }
                                 />
                             </Field>
@@ -210,36 +239,49 @@ export default function MasterForm({
                                 <Field>
                                     <FieldTitle>Dimensi keuangan</FieldTitle>
                                     <div
-                                        className="rounded-md border border-dashed bg-muted/40 px-3 py-2"
+                                        className="bg-muted/40 rounded-md border border-dashed px-3 py-2"
                                         role="status"
                                     >
-                                        <p className="text-sm font-medium">Belum tersedia</p>
+                                        <p className="text-sm font-medium">
+                                            Belum tersedia
+                                        </p>
                                     </div>
                                     <FieldDescription>
-                                        Pengaturan ini menunggu Finance. Lokasi fisik tetap dapat
-                                        disimpan tanpa pengaturan ini.
+                                        Pengaturan ini menunggu Finance. Lokasi
+                                        fisik tetap dapat disimpan tanpa
+                                        pengaturan ini.
                                     </FieldDescription>
                                 </Field>
                             )}
                             {extraFields
                                 .filter((field) => isVisible(field, extra))
                                 .map((field) =>
-                                    value?.data_type_locked && field.name === 'data_type' ? (
-                                        <Field key={field.name} data-disabled="true">
+                                    value?.data_type_locked &&
+                                    field.name === 'data_type' ? (
+                                        <Field
+                                            key={field.name}
+                                            data-disabled="true"
+                                        >
                                             <Input
                                                 label="Tipe data"
                                                 value={
                                                     field.options?.find(
                                                         (option) =>
-                                                            option.value === extra[field.name],
-                                                    )?.label ?? String(extra[field.name] ?? '')
+                                                            option.value ===
+                                                            extra[field.name],
+                                                    )?.label ??
+                                                    String(
+                                                        extra[field.name] ?? '',
+                                                    )
                                                 }
                                                 disabled
                                             />
                                             <FieldDescription>
-                                                Tipe data terkunci karena atribut ini sudah pernah
-                                                diisi pada aset. Buat tipe atribut baru bila bentuk
-                                                datanya berbeda.
+                                                Tipe data terkunci karena
+                                                atribut ini sudah pernah diisi
+                                                pada aset. Buat tipe atribut
+                                                baru bila bentuk datanya
+                                                berbeda.
                                             </FieldDescription>
                                         </Field>
                                     ) : (
@@ -258,14 +300,19 @@ export default function MasterForm({
                                     ),
                                 )}
                             <Field>
-                                <FieldLabel htmlFor="description">Keterangan</FieldLabel>
+                                <FieldLabel htmlFor="description">
+                                    Keterangan
+                                </FieldLabel>
                                 <Textarea
                                     id="description"
                                     rows={4}
                                     maxLength={2000}
                                     value={form.keterangan}
                                     onChange={(event) =>
-                                        setForm({ ...form, keterangan: event.target.value })
+                                        setForm({
+                                            ...form,
+                                            keterangan: event.target.value,
+                                        })
                                     }
                                 />
                             </Field>
@@ -286,10 +333,16 @@ export default function MasterForm({
                     </div>
                     {extraSection}
                     <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                        <Button variant="outline" type="button" onClick={onClose}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={onClose}
+                        >
                             Batal
                         </Button>
-                        <Button disabled={saving}>{saving ? 'Menyimpan…' : 'Simpan'}</Button>
+                        <Button disabled={saving}>
+                            {saving ? 'Menyimpan…' : 'Simpan'}
+                        </Button>
                     </SheetFooter>
                 </form>
             </SheetContent>

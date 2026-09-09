@@ -3,7 +3,14 @@ import { Button } from '@apperp/ui/button';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@apperp/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@apperp/ui/table';
 import { api, errorMessage } from '../../api';
 
 type Value = {
@@ -25,10 +32,14 @@ export default function MaintenanceChecklistVariableValues({
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
     useEffect(() => {
-        api<{ data: Value[] }>(`/maintenance-checklist-variables/${variableId}/values`)
+        api<{ data: Value[] }>(
+            `/maintenance-checklist-variables/${variableId}/values`,
+        )
             .then((result) => setValues(result.data))
             .catch((caught) =>
-                setError(errorMessage(caught, 'Nilai checklist belum dapat dimuat.')),
+                setError(
+                    errorMessage(caught, 'Nilai checklist belum dapat dimuat.'),
+                ),
             );
     }, [variableId]);
     function update(index: number, changes: Partial<Value>) {
@@ -49,12 +60,15 @@ export default function MaintenanceChecklistVariableValues({
             });
             setSaved(true);
         } catch (caught) {
-            setError(errorMessage(caught, 'Nilai checklist belum dapat disimpan.'));
+            setError(
+                errorMessage(caught, 'Nilai checklist belum dapat disimpan.'),
+            );
         } finally {
             setSaving(false);
         }
     }
-    if (error && values.length === 0) return <p className="text-sm text-destructive">{error}</p>;
+    if (error && values.length === 0)
+        return <p className="text-destructive text-sm">{error}</p>;
     const labelHasil = (result: Value['result_code']): string =>
         ({ pass: 'Lulus', fail: 'Gagal', none: 'Tidak dinilai' })[result];
     const kodeHasil = (label: string | null): Value['result_code'] =>
@@ -81,7 +95,11 @@ export default function MaintenanceChecklistVariableValues({
                         >
                             Tambah
                         </Button>
-                        <Button type="button" disabled={saving} onClick={() => void save()}>
+                        <Button
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void save()}
+                        >
                             {saving ? 'Menyimpan…' : 'Simpan'}
                         </Button>
                     </div>
@@ -89,7 +107,9 @@ export default function MaintenanceChecklistVariableValues({
             </div>
             {values.length === 0 ? (
                 <Empty>
-                    <EmptyDescription>Belum ada pilihan nilai checklist.</EmptyDescription>
+                    <EmptyDescription>
+                        Belum ada pilihan nilai checklist.
+                    </EmptyDescription>
                 </Empty>
             ) : (
                 <div className="overflow-x-auto rounded-md border">
@@ -103,7 +123,12 @@ export default function MaintenanceChecklistVariableValues({
                         </TableHeader>
                         <TableBody>
                             {values.map((item, index) => (
-                                <TableRow key={item.id ?? `${item.line_number}-${index}`}>
+                                <TableRow
+                                    key={
+                                        item.id ??
+                                        `${item.line_number}-${index}`
+                                    }
+                                >
                                     <TableCell>
                                         {canEdit ? (
                                             <Input
@@ -113,7 +138,9 @@ export default function MaintenanceChecklistVariableValues({
                                                 value={item.line_number}
                                                 onChange={(event) =>
                                                     update(index, {
-                                                        line_number: Number(event.target.value),
+                                                        line_number: Number(
+                                                            event.target.value,
+                                                        ),
                                                     })
                                                 }
                                             />
@@ -127,7 +154,10 @@ export default function MaintenanceChecklistVariableValues({
                                                 aria-label={`Nilai baris ${index + 1}`}
                                                 value={item.value}
                                                 onChange={(event) =>
-                                                    update(index, { value: event.target.value })
+                                                    update(index, {
+                                                        value: event.target
+                                                            .value,
+                                                    })
                                                 }
                                             />
                                         ) : (
@@ -137,11 +167,20 @@ export default function MaintenanceChecklistVariableValues({
                                     <TableCell>
                                         {canEdit ? (
                                             <Select
-                                                items={['Lulus', 'Gagal', 'Tidak dinilai']}
-                                                value={labelHasil(item.result_code)}
+                                                items={[
+                                                    'Lulus',
+                                                    'Gagal',
+                                                    'Tidak dinilai',
+                                                ]}
+                                                value={labelHasil(
+                                                    item.result_code,
+                                                )}
                                                 ariaLabel={`Hasil baris ${index + 1}`}
                                                 onValueChange={(value) =>
-                                                    update(index, { result_code: kodeHasil(value) })
+                                                    update(index, {
+                                                        result_code:
+                                                            kodeHasil(value),
+                                                    })
                                                 }
                                             />
                                         ) : (
@@ -154,8 +193,12 @@ export default function MaintenanceChecklistVariableValues({
                     </Table>
                 </div>
             )}
-            {saved && <p className="text-sm text-muted-foreground">Nilai checklist tersimpan.</p>}
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {saved && (
+                <p className="text-muted-foreground text-sm">
+                    Nilai checklist tersimpan.
+                </p>
+            )}
+            {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
     );
 }

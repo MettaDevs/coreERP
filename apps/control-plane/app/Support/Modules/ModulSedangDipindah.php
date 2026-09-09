@@ -64,7 +64,17 @@ final class ModulSedangDipindah
      * Angka pada `alasan` bukan perkiraan. Semuanya diukur pada repo aset apa adanya sebelum
      * pemindahan, dan dicatat di `docs/todo/satu-runtime/01-prd.md` bagian F3-00.
      *
-     * @var array<string, array{alasan: string, tenggat: string}>
+     * **`pemblokir` opsional, dan sebaiknya tetap kosong.** Ia diisi hanya ketika modulnya sudah
+     * bersih menurut pemindaian berkas tetapi entrinya masih belum boleh dibuang karena sesuatu
+     * yang tidak dapat dilihat pemindai mana pun. Premis semula — "bersih berarti entrinya basi" —
+     * terbukti salah pada 9 September 2026: modul aset lulus seluruh pemindaian, tetapi membuang
+     * entrinya membuatnya **dilayani**, dan itu menjatuhkan 84 test Core yang fixture katalognya
+     * belum menggambarkannya sebagai app yang dapat dipasang.
+     *
+     * Isinya wajib menyebut nomor task yang membuangnya, supaya ia tidak bisa menjadi alasan yang
+     * berlaku selamanya. Tenggat tetap berlaku penuh.
+     *
+     * @var array<string, array{alasan: string, tenggat: string, pemblokir?: string}>
      */
     private const DAFTAR = [
         'management-aset' => [
@@ -73,11 +83,15 @@ final class ModulSedangDipindah
                 .'dan app.yaml yang tidak menyatakan table_prefix — ketiga penjaga merah sekaligus. '
                 .'Dibereskan bertahap pada F3-02 sampai F3-05, dan entri ini dibuang setelahnya.',
             'tenggat' => '2026-12-31',
+            'pemblokir' => 'Ketiga penjaga sudah hijau sejak 9 September 2026, tetapi membuang entri ini '
+                .'membuat modul dilayani: RegisterBusiness memasangnya pada setiap pendaftaran usaha, '
+                .'penyemaian data awalnya menerbitkan nomor sungguhan, dan fixture katalog test Core belum '
+                .'membawa 29 referensi nomornya. Dicoba dan menjatuhkan 84 test Core. Dibuang pada F3-30.',
         ],
     ];
 
     /**
-     * @param  array<string, array{alasan: string, tenggat: string}>  $daftar
+     * @param  array<string, array{alasan: string, tenggat: string, pemblokir?: string}>  $daftar
      */
     private function __construct(private readonly array $daftar) {}
 
@@ -96,7 +110,7 @@ final class ModulSedangDipindah
      * melonggarkan untuk modul lain" adalah menambah modul sungguhan ke daftar sungguhan,
      * dan itu berarti test-nya ikut berubah setiap kali daftarnya berubah.
      *
-     * @param  array<string, array{alasan: string, tenggat: string}>  $daftar
+     * @param  array<string, array{alasan: string, tenggat: string, pemblokir?: string}>  $daftar
      */
     public static function buatan(array $daftar): self
     {
@@ -112,7 +126,7 @@ final class ModulSedangDipindah
     }
 
     /**
-     * @return array<string, array{alasan: string, tenggat: string}>
+     * @return array<string, array{alasan: string, tenggat: string, pemblokir?: string}>
      */
     public function semua(): array
     {

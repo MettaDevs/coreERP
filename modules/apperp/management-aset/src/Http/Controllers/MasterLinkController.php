@@ -36,7 +36,12 @@ abstract class MasterLinkController extends Controller
     /** Kolom foreign key ke pemilik pada tabel penghubung. */
     abstract protected function ownerColumn(): string;
 
-    /** @return class-string<Model> */
+    /**
+     * Model baris penghubung. Ia wajib mengenal soft delete, sebab penggantian himpunan
+     * di bawah menghidupkan kembali baris yang baru saja diarsipkan.
+     *
+     * @return class-string<Model>
+     */
     abstract protected function model(): string;
 
     /**
@@ -54,7 +59,11 @@ abstract class MasterLinkController extends Controller
      */
     abstract protected function rowPayload(array $row): array;
 
-    /** Kolom yang disajikan pada respons. @return list<string> */
+    /**
+     * Kolom yang disajikan pada respons.
+     *
+     * @return list<string>
+     */
     abstract protected function columns(): array;
 
     /**
@@ -145,12 +154,15 @@ abstract class MasterLinkController extends Controller
     {
         $model = $this->model();
 
-        return $model::query()
+        // `array_values()` tidak mengubah isi maupun urutannya: kunci hasil `get()` memang
+        // sudah 0..n. Ia yang membuat bentuk list itu terbaca, dan bentuk list yang menjaga
+        // respons tetap terbit sebagai array JSON, bukan object.
+        return array_values($model::query()
             ->where($this->ownerColumn(), $ownerId)
             ->orderBy('id')
             ->get($this->columns())
             ->map(fn (Model $row): array => $row->only($this->columns()))
-            ->all();
+            ->all());
     }
 
     private function findOwner(string $ownerId): void

@@ -281,7 +281,11 @@ abstract class MasterDataController extends Controller
         return ($lock ? $query->lockForUpdate() : $query)->findOrFail($id);
     }
 
-    /** Master yang menunjuk dirinya sendiri (contohnya lokasi) tidak boleh membentuk siklus. */
+    /**
+     * Master yang menunjuk dirinya sendiri (contohnya lokasi) tidak boleh membentuk siklus.
+     *
+     * @param  array<string, mixed>  $data
+     */
     private function rejectParentCycle(MasterData $record, array $data): void
     {
         foreach ($this->parentMasters() as $parent) {
@@ -470,7 +474,7 @@ abstract class MasterDataController extends Controller
      * group aset dan profil penyusutan, supaya subclass tidak perlu menimpa
      * writeRules() secara penuh dan kehilangan aturan induk.
      *
-     * @return array<string, array<int, mixed>>
+     * @return array<string, list<mixed>>
      */
     protected function extraRules(string $tenantId, bool $creating): array
     {
@@ -507,7 +511,12 @@ abstract class MasterDataController extends Controller
         return [];
     }
 
-    /** Memperkaya query master tanpa menambah query per baris. */
+    /**
+     * Memperkaya query master tanpa menambah query per baris.
+     *
+     * @param  Builder<MasterData>  $query
+     * @return Builder<MasterData>
+     */
     protected function prepareQuery(Builder $query, ?Request $request = null): Builder
     {
         return $query;
