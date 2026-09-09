@@ -13,10 +13,10 @@ class AppContentPathTest extends TestCase
         // Inti dari perubahan ini: placement adalah unit silo/pool, jadi shard
         // pooled kedua dan silo milik satu tenant harus dapat path berbeda
         // walaupun app-nya sama release-nya sama.
-        $pooled = AppContentPath::for('management-aset', 'pooled-primary');
-        $isolated = AppContentPath::for('management-aset', 'isolated-01jq8w2m4k');
+        $pooled = AppContentPath::for('app-uji', 'pooled-primary');
+        $isolated = AppContentPath::for('app-uji', 'isolated-01jq8w2m4k');
 
-        $this->assertSame('/apps-content/pooled-primary/management-aset/', $pooled);
+        $this->assertSame('/apps-content/pooled-primary/app-uji/', $pooled);
         $this->assertNotSame($pooled, $isolated);
     }
 

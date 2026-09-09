@@ -15,12 +15,37 @@ abstract class TestCase extends BaseTestCase
         // Dynamics 365 yang berbeda — entry point, permission, privilege, duty —
         // supaya test membuktikan rantai yang sebenarnya, bukan satu lapis
         // bersalin tiga. Katalog produksi datang dari manifest app, bukan config.
+        //
+        // **Kenapa idnya `app-uji` dan bukan nama produk.** Sampai 9 September 2026
+        // fixture ini memakai id `management-aset`, dan itu berhenti benar pada hari
+        // module aset selesai dipindah. Sejak saat itu id yang sama menunjuk dua hal:
+        // katalog kecil buatan tangan di sini, dan manifest module yang sungguhan di
+        // `modules/apperp/management-aset/app.yaml` dengan 65 entry point, 122
+        // permission, dan 29 referensi nomor. Pendaftaran usaha memasang apa pun yang
+        // ada sebagai folder module, jadi setiap test yang mendaftarkan usaha mulai
+        // memasang module sungguhan di atas katalog palsu — 84 test gagal dengan
+        // "Sequence aktif tidak ditemukan", dan tidak satu pun pesannya menyebut
+        // katalog.
+        //
+        // Id yang tidak akan pernah menjadi module memulihkan pembagiannya: yang di
+        // sini bahan uji rantai izin, yang di manifest katalog produk. Test yang
+        // memang menguji module aset mendaftarkan manifestnya lewat
+        // `app:register-manifest`, jalur yang sama dengan yang dijalankan admin
+        // on-prem.
+        //
+        // Fixture ini juga menyimpan satu sifat yang tidak dimiliki manifest
+        // sungguhan: sebuah entry point yang tidak masuk privilege maupun duty mana
+        // pun. Owner menerima seluruh duty app yang di-entitle, jadi permission yang
+        // sudah terpakai di rantai katalog tidak dapat membuktikan apa pun tentang
+        // rantai custom yang disusun admin tenant. Pada manifest aset setiap
+        // permission ada di sebuah privilege dan setiap privilege ada di sebuah duty,
+        // sehingga sifat itu memang tidak bisa diambil dari sana.
         config()->set('coreerp.app_catalog', [[
-            'id' => 'management-aset',
-            'name' => 'Management Aset',
+            'id' => 'app-uji',
+            'name' => 'App Uji',
             'version' => '0.1.0',
             'status' => 'available',
-            'database' => 'app_erp_management_aset',
+            'database' => 'app_uji',
             'has_ui' => true,
             'navigation' => [
                 'rail' => [
@@ -28,81 +53,81 @@ abstract class TestCase extends BaseTestCase
                 ],
                 'sidebar' => [
                     'master' => [
-                        ['id' => 'entitas-aset', 'label' => 'Entitas aset', 'permission' => 'management-aset.entitas-aset.read'],
-                        ['id' => 'group-aset', 'label' => 'Group aset', 'permission' => 'management-aset.group-aset.read'],
+                        ['id' => 'entitas', 'label' => 'Entitas aset', 'permission' => 'app-uji.entitas.read'],
+                        ['id' => 'group', 'label' => 'Group aset', 'permission' => 'app-uji.group.read'],
                     ],
                 ],
             ],
-            'contract_url' => 'https://contracts.example.test/management-aset/openapi.yaml',
+            'contract_url' => 'https://contracts.example.test/app-uji/openapi.yaml',
             'description' => 'Test catalog app.',
             'entry_points' => [
-                ['code' => 'management-aset.entitas-aset.form', 'name' => 'Layar entitas aset', 'type' => 'form'],
-                ['code' => 'management-aset.entitas-aset.api', 'name' => 'API entitas aset', 'type' => 'api'],
-                ['code' => 'management-aset.group-aset.form', 'name' => 'Layar group aset', 'type' => 'form'],
-                ['code' => 'management-aset.group-aset.api', 'name' => 'API group aset', 'type' => 'api'],
+                ['code' => 'app-uji.entitas.form', 'name' => 'Layar entitas aset', 'type' => 'form'],
+                ['code' => 'app-uji.entitas.api', 'name' => 'API entitas aset', 'type' => 'api'],
+                ['code' => 'app-uji.group.form', 'name' => 'Layar group aset', 'type' => 'form'],
+                ['code' => 'app-uji.group.api', 'name' => 'API group aset', 'type' => 'api'],
                 // Sengaja tidak masuk privilege maupun duty mana pun. Owner menerima
                 // seluruh duty app yang di-entitle, jadi permission yang sudah terpakai
                 // di rantai katalog tidak dapat membuktikan apa pun tentang rantai
                 // custom yang disusun admin tenant. Yang ini hanya bisa diperoleh lewat
                 // privilege dan duty buatan sendiri.
-                ['code' => 'management-aset.perencanaan-aset.form', 'name' => 'Layar perencanaan aset', 'type' => 'form'],
+                ['code' => 'app-uji.perencanaan.form', 'name' => 'Layar perencanaan aset', 'type' => 'form'],
             ],
             'permissions' => [
-                ['code' => 'management-aset.entitas-aset.read', 'name' => 'Lihat entitas aset', 'entry_point' => 'management-aset.entitas-aset.form', 'access' => 'read'],
-                ['code' => 'management-aset.entitas-aset.create', 'name' => 'Tambah entitas aset', 'entry_point' => 'management-aset.entitas-aset.api', 'access' => 'create'],
-                ['code' => 'management-aset.entitas-aset.update', 'name' => 'Ubah entitas aset', 'entry_point' => 'management-aset.entitas-aset.api', 'access' => 'update'],
-                ['code' => 'management-aset.entitas-aset.archive', 'name' => 'Arsipkan entitas aset', 'entry_point' => 'management-aset.entitas-aset.api', 'access' => 'delete'],
-                ['code' => 'management-aset.group-aset.read', 'name' => 'Lihat group aset', 'entry_point' => 'management-aset.group-aset.form', 'access' => 'read'],
-                ['code' => 'management-aset.perencanaan-aset.read', 'name' => 'Lihat perencanaan aset', 'entry_point' => 'management-aset.perencanaan-aset.form', 'access' => 'read'],
-                ['code' => 'management-aset.group-aset.create', 'name' => 'Tambah group aset', 'entry_point' => 'management-aset.group-aset.api', 'access' => 'create'],
-                ['code' => 'management-aset.group-aset.update', 'name' => 'Ubah group aset', 'entry_point' => 'management-aset.group-aset.api', 'access' => 'update'],
-                ['code' => 'management-aset.group-aset.archive', 'name' => 'Arsipkan group aset', 'entry_point' => 'management-aset.group-aset.api', 'access' => 'delete'],
+                ['code' => 'app-uji.entitas.read', 'name' => 'Lihat entitas aset', 'entry_point' => 'app-uji.entitas.form', 'access' => 'read'],
+                ['code' => 'app-uji.entitas.create', 'name' => 'Tambah entitas aset', 'entry_point' => 'app-uji.entitas.api', 'access' => 'create'],
+                ['code' => 'app-uji.entitas.update', 'name' => 'Ubah entitas aset', 'entry_point' => 'app-uji.entitas.api', 'access' => 'update'],
+                ['code' => 'app-uji.entitas.archive', 'name' => 'Arsipkan entitas aset', 'entry_point' => 'app-uji.entitas.api', 'access' => 'delete'],
+                ['code' => 'app-uji.group.read', 'name' => 'Lihat group aset', 'entry_point' => 'app-uji.group.form', 'access' => 'read'],
+                ['code' => 'app-uji.perencanaan.read', 'name' => 'Lihat perencanaan aset', 'entry_point' => 'app-uji.perencanaan.form', 'access' => 'read'],
+                ['code' => 'app-uji.group.create', 'name' => 'Tambah group aset', 'entry_point' => 'app-uji.group.api', 'access' => 'create'],
+                ['code' => 'app-uji.group.update', 'name' => 'Ubah group aset', 'entry_point' => 'app-uji.group.api', 'access' => 'update'],
+                ['code' => 'app-uji.group.archive', 'name' => 'Arsipkan group aset', 'entry_point' => 'app-uji.group.api', 'access' => 'delete'],
             ],
             'privileges' => [
                 [
-                    'code' => 'management-aset.entitas-aset.maintain',
+                    'code' => 'app-uji.entitas.maintain',
                     'name' => 'Pelihara entitas aset',
                     'permissions' => [
-                        'management-aset.entitas-aset.read',
-                        'management-aset.entitas-aset.create',
-                        'management-aset.entitas-aset.update',
+                        'app-uji.entitas.read',
+                        'app-uji.entitas.create',
+                        'app-uji.entitas.update',
                     ],
                 ],
                 [
-                    'code' => 'management-aset.entitas-aset.retire',
+                    'code' => 'app-uji.entitas.retire',
                     'name' => 'Arsipkan entitas aset',
-                    'permissions' => ['management-aset.entitas-aset.archive'],
+                    'permissions' => ['app-uji.entitas.archive'],
                 ],
                 [
-                    'code' => 'management-aset.group-aset.maintain',
+                    'code' => 'app-uji.group.maintain',
                     'name' => 'Pelihara group aset',
                     'permissions' => [
-                        'management-aset.group-aset.read',
-                        'management-aset.group-aset.create',
-                        'management-aset.group-aset.update',
+                        'app-uji.group.read',
+                        'app-uji.group.create',
+                        'app-uji.group.update',
                     ],
                 ],
                 [
-                    'code' => 'management-aset.group-aset.retire',
+                    'code' => 'app-uji.group.retire',
                     'name' => 'Arsipkan group aset',
-                    'permissions' => ['management-aset.group-aset.archive'],
+                    'permissions' => ['app-uji.group.archive'],
                 ],
             ],
             'duties' => [
                 [
-                    'code' => 'management-aset.entitas-aset.manage',
+                    'code' => 'app-uji.entitas.manage',
                     'name' => 'Kelola entitas aset',
                     'privileges' => [
-                        'management-aset.entitas-aset.maintain',
-                        'management-aset.entitas-aset.retire',
+                        'app-uji.entitas.maintain',
+                        'app-uji.entitas.retire',
                     ],
                 ],
                 [
-                    'code' => 'management-aset.group-aset.manage',
+                    'code' => 'app-uji.group.manage',
                     'name' => 'Kelola group aset',
                     'privileges' => [
-                        'management-aset.group-aset.maintain',
-                        'management-aset.group-aset.retire',
+                        'app-uji.group.maintain',
+                        'app-uji.group.retire',
                     ],
                 ],
             ],

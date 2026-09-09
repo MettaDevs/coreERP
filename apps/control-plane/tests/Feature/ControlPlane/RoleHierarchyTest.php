@@ -27,9 +27,9 @@ class RoleHierarchyTest extends TestCase
 
     private User $subject;
 
-    private const ENTITAS = 'management-aset.entitas-aset.manage';
+    private const ENTITAS = 'app-uji.entitas.manage';
 
-    private const GROUP = 'management-aset.group-aset.manage';
+    private const GROUP = 'app-uji.group.manage';
 
     protected function setUp(): void
     {
@@ -38,7 +38,7 @@ class RoleHierarchyTest extends TestCase
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner',
             'business_name' => 'PT Metta',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);
@@ -77,7 +77,7 @@ class RoleHierarchyTest extends TestCase
     private function effectivePermissions(): array
     {
         return app(LaunchableAppCatalog::class)
-            ->permissionsFor($this->subject->activeMembership()->refresh(), 'management-aset');
+            ->permissionsFor($this->subject->activeMembership()->refresh(), 'app-uji');
     }
 
     public function test_parent_role_inherits_the_duties_of_its_children(): void
@@ -89,8 +89,8 @@ class RoleHierarchyTest extends TestCase
         $permissions = $this->effectivePermissions();
 
         // Hak sendiri tetap ada, hak turunan ikut berlaku.
-        $this->assertContains('management-aset.entitas-aset.read', $permissions);
-        $this->assertContains('management-aset.group-aset.archive', $permissions);
+        $this->assertContains('app-uji.entitas.read', $permissions);
+        $this->assertContains('app-uji.group.archive', $permissions);
         $this->assertCount(8, $permissions);
     }
 
@@ -102,8 +102,8 @@ class RoleHierarchyTest extends TestCase
         $this->assignToOwner($child);
         $permissions = $this->effectivePermissions();
 
-        $this->assertContains('management-aset.group-aset.read', $permissions);
-        $this->assertNotContains('management-aset.entitas-aset.read', $permissions);
+        $this->assertContains('app-uji.group.read', $permissions);
+        $this->assertNotContains('app-uji.entitas.read', $permissions);
     }
 
     public function test_app_navigation_only_contains_permitted_entries(): void
@@ -113,11 +113,11 @@ class RoleHierarchyTest extends TestCase
 
         $navigation = app(LaunchableAppCatalog::class)->navigationFor(
             $this->subject->activeMembership()->refresh(),
-            CoreApp::query()->findOrFail('management-aset'),
+            CoreApp::query()->findOrFail('app-uji'),
         );
 
         $this->assertSame('Master data', $navigation[0]['label']);
-        $this->assertSame(['group-aset'], array_column($navigation[0]['items'], 'id'));
+        $this->assertSame(['group'], array_column($navigation[0]['items'], 'id'));
     }
 
     public function test_inheritance_reaches_grandchildren_and_survives_a_diamond(): void
@@ -130,7 +130,7 @@ class RoleHierarchyTest extends TestCase
         $this->assignToOwner($top);
         $permissions = $this->effectivePermissions();
 
-        $this->assertContains('management-aset.group-aset.update', $permissions);
+        $this->assertContains('app-uji.group.update', $permissions);
         // Dua jalur menuju satu cucu tidak boleh menggandakan hasil.
         $this->assertSame(array_values(array_unique($permissions)), $permissions);
     }
@@ -146,8 +146,8 @@ class RoleHierarchyTest extends TestCase
         $this->assignToOwner($parent);
         $permissions = $this->effectivePermissions();
 
-        $this->assertContains('management-aset.entitas-aset.read', $permissions);
-        $this->assertNotContains('management-aset.group-aset.read', $permissions);
+        $this->assertContains('app-uji.entitas.read', $permissions);
+        $this->assertNotContains('app-uji.group.read', $permissions);
     }
 
     public function test_a_cycle_is_rejected(): void
@@ -183,7 +183,7 @@ class RoleHierarchyTest extends TestCase
         $otherOwner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner Lain',
             'business_name' => 'PT Lain',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'owner@lain.test',
             'password' => 'password',
         ]);
@@ -215,8 +215,8 @@ class RoleHierarchyTest extends TestCase
         $catalog = app(LaunchableAppCatalog::class);
         $token = app(AppContextToken::class)->issue(
             $membership,
-            'management-aset',
-            $catalog->permissionsFor($membership, 'management-aset'),
+            'app-uji',
+            $catalog->permissionsFor($membership, 'app-uji'),
             null,
             null,
         );
@@ -225,8 +225,8 @@ class RoleHierarchyTest extends TestCase
         // dalamnya, karena app tidak mengetahui hierarchy role sama sekali.
         $payload = json_decode(base64_decode(strtr(explode('.', $token)[1], '-_', '+/')), true);
 
-        $this->assertContains('management-aset.group-aset.archive', $payload['permissions']);
-        $this->assertContains('management-aset.entitas-aset.read', $payload['permissions']);
+        $this->assertContains('app-uji.group.archive', $payload['permissions']);
+        $this->assertContains('app-uji.entitas.read', $payload['permissions']);
     }
 
     public function test_clearing_children_removes_the_inherited_access(): void
@@ -234,7 +234,7 @@ class RoleHierarchyTest extends TestCase
         $child = $this->createRole('Pengelola group aset', [self::GROUP]);
         $parent = $this->createRole('Manajer aset', [self::ENTITAS], [$child->id]);
         $this->assignToOwner($parent);
-        $this->assertContains('management-aset.group-aset.read', $this->effectivePermissions());
+        $this->assertContains('app-uji.group.read', $this->effectivePermissions());
 
         $this->actingAs($this->owner)->putJson("/api/v1/roles/{$parent->id}", [
             'name' => 'Manajer aset',
@@ -243,6 +243,6 @@ class RoleHierarchyTest extends TestCase
         ])->assertOk();
 
         $this->assertSame(0, DB::table('security_role_children')->where('parent_role_id', $parent->id)->count());
-        $this->assertNotContains('management-aset.group-aset.read', $this->effectivePermissions());
+        $this->assertNotContains('app-uji.group.read', $this->effectivePermissions());
     }
 }

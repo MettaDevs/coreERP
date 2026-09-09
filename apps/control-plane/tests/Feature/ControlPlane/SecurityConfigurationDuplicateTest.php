@@ -26,7 +26,7 @@ class SecurityConfigurationDuplicateTest extends TestCase
         $this->seed(AppCatalogSeeder::class);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner', 'business_name' => 'Tenant duplikat',
-            'app_ids' => ['management-aset'], 'email' => 'owner@duplicate.test', 'password' => 'password',
+            'app_ids' => ['app-uji'], 'email' => 'owner@duplicate.test', 'password' => 'password',
         ]);
     }
 
@@ -37,7 +37,7 @@ class SecurityConfigurationDuplicateTest extends TestCase
     public function test_a_tenant_narrows_an_app_privilege_to_read_only_through_a_duplicate(): void
     {
         $this->actingAs($this->owner)
-            ->post('/settings/security-configuration/privileges/management-aset.entitas-aset.maintain/duplicate')
+            ->post('/settings/security-configuration/privileges/app-uji.entitas.maintain/duplicate')
             ->assertRedirect()
             ->assertSessionHasNoErrors();
 
@@ -45,21 +45,21 @@ class SecurityConfigurationDuplicateTest extends TestCase
         $this->assertSame('draft', $copy->status);
         $this->assertSame($this->owner->activeMembership()->tenant_id, $copy->tenant_id);
         $this->assertEqualsCanonicalizing([
-            'management-aset.entitas-aset.read',
-            'management-aset.entitas-aset.create',
-            'management-aset.entitas-aset.update',
+            'app-uji.entitas.read',
+            'app-uji.entitas.create',
+            'app-uji.entitas.update',
         ], $copy->permissions->pluck('code')->all());
 
         // Bawaan aplikasi tidak boleh ikut berubah.
         $this->assertSame(3, SecurityPrivilege::query()
-            ->whereKey('management-aset.entitas-aset.maintain')->sole()->permissions()->count());
+            ->whereKey('app-uji.entitas.maintain')->sole()->permissions()->count());
 
         $this->actingAs($this->owner)->put("/settings/security-configuration/privileges/{$copy->code}", [
             'name' => 'Lihat entitas aset saja',
-            'permission_codes' => ['management-aset.entitas-aset.read'],
+            'permission_codes' => ['app-uji.entitas.read'],
         ])->assertRedirect()->assertSessionHasNoErrors();
 
-        $this->assertSame(['management-aset.entitas-aset.read'], $copy->refresh()->permissions->pluck('code')->all());
+        $this->assertSame(['app-uji.entitas.read'], $copy->refresh()->permissions->pluck('code')->all());
 
         $this->actingAs($this->owner)
             ->post("/settings/security-configuration/privileges/{$copy->code}/publish")
@@ -90,31 +90,31 @@ class SecurityConfigurationDuplicateTest extends TestCase
         ]);
 
         $effective = app(LaunchableAppCatalog::class)
-            ->permissionsFor($this->owner->activeMembership()->refresh(), 'management-aset');
+            ->permissionsFor($this->owner->activeMembership()->refresh(), 'app-uji');
 
-        $this->assertContains('management-aset.entitas-aset.read', $effective);
-        $this->assertNotContains('management-aset.entitas-aset.create', $effective);
-        $this->assertNotContains('management-aset.entitas-aset.update', $effective);
+        $this->assertContains('app-uji.entitas.read', $effective);
+        $this->assertNotContains('app-uji.entitas.create', $effective);
+        $this->assertNotContains('app-uji.entitas.update', $effective);
     }
 
     public function test_duplicating_a_duty_copies_its_privileges_as_a_tenant_draft(): void
     {
         $this->actingAs($this->owner)
-            ->post('/settings/security-configuration/duties/management-aset.entitas-aset.manage/duplicate')
+            ->post('/settings/security-configuration/duties/app-uji.entitas.manage/duplicate')
             ->assertRedirect()->assertSessionHasNoErrors();
 
         $copy = SecurityDuty::query()->where('source', 'custom')->sole();
         $this->assertSame('draft', $copy->status);
         $this->assertEqualsCanonicalizing([
-            'management-aset.entitas-aset.maintain',
-            'management-aset.entitas-aset.retire',
+            'app-uji.entitas.maintain',
+            'app-uji.entitas.retire',
         ], $copy->privileges->pluck('code')->all());
     }
 
     public function test_a_draft_can_be_discarded_but_a_published_object_cannot(): void
     {
         $this->actingAs($this->owner)
-            ->post('/settings/security-configuration/privileges/management-aset.entitas-aset.maintain/duplicate')
+            ->post('/settings/security-configuration/privileges/app-uji.entitas.maintain/duplicate')
             ->assertRedirect()->assertSessionHasNoErrors();
 
         $copy = SecurityPrivilege::query()->where('source', 'custom')->sole();
@@ -125,9 +125,9 @@ class SecurityConfigurationDuplicateTest extends TestCase
 
         // Bawaan aplikasi bukan milik tenant, jadi tidak dapat dihapus sama sekali.
         $this->actingAs($this->owner)
-            ->delete('/settings/security-configuration/privileges/management-aset.entitas-aset.maintain')
+            ->delete('/settings/security-configuration/privileges/app-uji.entitas.maintain')
             ->assertNotFound();
-        $this->assertNotNull(SecurityPrivilege::query()->find('management-aset.entitas-aset.maintain'));
+        $this->assertNotNull(SecurityPrivilege::query()->find('app-uji.entitas.maintain'));
     }
 
     public function test_the_read_only_role_seeder_grants_read_and_nothing_else(): void
@@ -148,12 +148,12 @@ class SecurityConfigurationDuplicateTest extends TestCase
         ]);
 
         $effective = app(LaunchableAppCatalog::class)
-            ->permissionsFor($membership->refresh(), 'management-aset');
+            ->permissionsFor($membership->refresh(), 'app-uji');
 
         $this->assertEqualsCanonicalizing([
-            'management-aset.entitas-aset.read',
-            'management-aset.group-aset.read',
-            'management-aset.perencanaan-aset.read',
+            'app-uji.entitas.read',
+            'app-uji.group.read',
+            'app-uji.perencanaan.read',
         ], $effective);
     }
 
