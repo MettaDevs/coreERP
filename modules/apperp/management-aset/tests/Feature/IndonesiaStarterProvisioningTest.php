@@ -2,8 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
-use App\Support\Modules\Contracts\TenantDisiapkan;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
+use App\Support\Modules\Contracts\TenantDisiapkan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
