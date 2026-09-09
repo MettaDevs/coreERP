@@ -21,7 +21,7 @@ class DataPolicyAccessResolverTest extends TestCase
         $user = app(RegisterBusiness::class)->handle([
             'name' => 'Pemilik uji',
             'business_name' => 'Bisnis uji',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'pemilik@example.test',
             'password' => 'password',
         ]);
@@ -32,39 +32,39 @@ class DataPolicyAccessResolverTest extends TestCase
         $secondUnitId = $this->organization($membership->tenant_id, 'Sales Negarow', 'operating_unit');
 
         DB::table('app_data_policies')->insert([
-            'code' => 'management-aset.asset-responsibility',
-            'app_id' => 'management-aset',
+            'code' => 'app-uji.tanggung-jawab',
+            'app_id' => 'app-uji',
             'name' => 'Akses aset menurut unit penanggung jawab',
-            'protected_permissions' => json_encode(['management-aset.aset.read'], JSON_THROW_ON_ERROR),
+            'protected_permissions' => json_encode(['app-uji.entitas.read'], JSON_THROW_ON_ERROR),
             'requires_legal_entity' => true,
             'requires_operating_unit' => true,
             'allows_descendants' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
         DB::table('app_data_policies')->insert([
-            'code' => 'management-aset.asset-audit',
-            'app_id' => 'management-aset',
+            'code' => 'app-uji.audit',
+            'app_id' => 'app-uji',
             'name' => 'Akses audit aset',
-            'protected_permissions' => json_encode(['management-aset.aset.read'], JSON_THROW_ON_ERROR),
+            'protected_permissions' => json_encode(['app-uji.entitas.read'], JSON_THROW_ON_ERROR),
             'requires_legal_entity' => true,
             'requires_operating_unit' => true,
             'allows_descendants' => false,
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $this->scope($membership->tenant_id, $assignment, 'management-aset.asset-responsibility', $legalEntityId, $firstUnitId);
-        $this->scope($membership->tenant_id, $assignment, 'management-aset.asset-responsibility', $legalEntityId, $secondUnitId);
-        $this->scope($membership->tenant_id, $assignment, 'management-aset.asset-audit', $legalEntityId, $firstUnitId);
+        $this->scope($membership->tenant_id, $assignment, 'app-uji.tanggung-jawab', $legalEntityId, $firstUnitId);
+        $this->scope($membership->tenant_id, $assignment, 'app-uji.tanggung-jawab', $legalEntityId, $secondUnitId);
+        $this->scope($membership->tenant_id, $assignment, 'app-uji.audit', $legalEntityId, $firstUnitId);
 
         $policies = app(DataPolicyAccessResolver::class)->resolve($membership);
 
         $this->assertSame([
             ['legal_entity_id' => $legalEntityId, 'operating_unit_ids' => [$firstUnitId]],
             ['legal_entity_id' => $legalEntityId, 'operating_unit_ids' => [$secondUnitId]],
-        ], $policies['management-aset.asset-responsibility']['scope_grants']);
+        ], $policies['app-uji.tanggung-jawab']['scope_grants']);
         $this->assertSame([
             ['legal_entity_id' => $legalEntityId, 'operating_unit_ids' => [$firstUnitId]],
-        ], $policies['management-aset.asset-audit']['scope_grants']);
+        ], $policies['app-uji.audit']['scope_grants']);
     }
 
     private function organization(string $tenantId, string $name, string $classification): string

@@ -16,6 +16,7 @@ use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Services\PersetujuanAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
+use stdClass;
 
 class DokumenSiklusAsetController extends Controller
 {
@@ -117,7 +118,11 @@ class DokumenSiklusAsetController extends Controller
         return response()->json(['data' => $this->dokumen((string) $record['id'])], 201);
     }
 
-    /** Dokumen apa adanya dari database, supaya jawaban memuat kolom hasil pengajuan. */
+    /**
+     * Dokumen apa adanya dari database, supaya jawaban memuat kolom hasil pengajuan.
+     *
+     * @return array<string, mixed>
+     */
     private function dokumen(string $id): array
     {
         return (array) DokumenSiklusAset::query()->where('id', $id)->toBase()->first();
@@ -144,7 +149,11 @@ class DokumenSiklusAsetController extends Controller
             ->update(['status' => 'closed', 'closed_on' => $tanggal, 'updated_at' => now()]);
     }
 
-    private function submitWorkflow(object $record, string $tenant, string $legalEntityId, string $key, PersetujuanAset $workflow): void
+    /**
+     * `$record` adalah baris mentah hasil `toBase()` — sebuah `stdClass`, bukan model —
+     * baik yang baru dirakit di sini maupun yang dibaca ulang saat replay idempoten.
+     */
+    private function submitWorkflow(stdClass $record, string $tenant, string $legalEntityId, string $key, PersetujuanAset $workflow): void
     {
         try {
             $workflowId = $workflow->ajukanDekomisioning($tenant, $legalEntityId, $key, (string) $record->id, (string) $record->asset_id);

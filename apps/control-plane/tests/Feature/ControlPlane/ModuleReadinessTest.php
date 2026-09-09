@@ -40,23 +40,23 @@ class ModuleReadinessTest extends TestCase
 
     public function test_module_terpasang_membuat_produk_dapat_diluncurkan_tanpa_penempatan_container(): void
     {
-        $membership = $this->tenantDenganHak('management-aset');
+        $membership = $this->tenantDenganHak('app-uji');
 
         $this->assertSame([], $this->app->make(LaunchableAppCatalog::class)->for($membership));
 
-        $this->pasangSebagaiModule($membership->tenant_id, 'management-aset');
+        $this->pasangSebagaiModule($membership->tenant_id, 'app-uji');
 
         $produk = $this->app->make(LaunchableAppCatalog::class)->for($membership);
 
         $this->assertCount(1, $produk);
-        $this->assertSame('management-aset', $produk[0]['id']);
+        $this->assertSame('app-uji', $produk[0]['id']);
         $this->assertSame(0, DB::table('app_placements')->count(), 'Tidak boleh ada satu pun baris penempatan container.');
     }
 
     public function test_module_yang_dinonaktifkan_tidak_lagi_dapat_diluncurkan(): void
     {
-        $membership = $this->tenantDenganHak('management-aset');
-        $this->pasangSebagaiModule($membership->tenant_id, 'management-aset');
+        $membership = $this->tenantDenganHak('app-uji');
+        $this->pasangSebagaiModule($membership->tenant_id, 'app-uji');
 
         DB::table('core_module_installations')
             ->where('tenant_id', $membership->tenant_id)
@@ -67,7 +67,7 @@ class ModuleReadinessTest extends TestCase
 
     public function test_module_terpasang_tanpa_hak_akses_tidak_muncul(): void
     {
-        $membership = $this->tenantDenganHak('management-aset');
+        $membership = $this->tenantDenganHak('app-uji');
 
         // Hak aksesnya dicabut, pemasangannya tidak. Ini keadaan yang sengaja diuji:
         // pemasangan menjawab "module ini ada untuk tenant ini", bukan "orang ini boleh
@@ -75,7 +75,7 @@ class ModuleReadinessTest extends TestCase
         // sudah dilarang pada empat kebenaran lifecycle.
         DB::table('role_assignments')->where('membership_id', $membership->id)->delete();
 
-        $this->pasangSebagaiModule($membership->tenant_id, 'management-aset');
+        $this->pasangSebagaiModule($membership->tenant_id, 'app-uji');
 
         $this->assertSame(
             [],
@@ -86,22 +86,22 @@ class ModuleReadinessTest extends TestCase
 
     public function test_module_milik_tenant_lain_tidak_muncul(): void
     {
-        $membership = $this->tenantDenganHak('management-aset');
-        $this->pasangSebagaiModule((string) Str::ulid(), 'management-aset');
+        $membership = $this->tenantDenganHak('app-uji');
+        $this->pasangSebagaiModule((string) Str::ulid(), 'app-uji');
 
         $this->assertSame([], $this->app->make(LaunchableAppCatalog::class)->for($membership));
     }
 
     public function test_penentu_menyebut_module_mana_yang_dilayani_runtime_core(): void
     {
-        $membership = $this->tenantDenganHak('management-aset');
+        $membership = $this->tenantDenganHak('app-uji');
         $katalog = $this->app->make(LaunchableAppCatalog::class);
 
-        $this->assertFalse($katalog->berjalanSebagaiModul($membership, 'management-aset'));
+        $this->assertFalse($katalog->berjalanSebagaiModul($membership, 'app-uji'));
 
-        $this->pasangSebagaiModule($membership->tenant_id, 'management-aset');
+        $this->pasangSebagaiModule($membership->tenant_id, 'app-uji');
 
-        $this->assertTrue($katalog->berjalanSebagaiModul($membership, 'management-aset'));
+        $this->assertTrue($katalog->berjalanSebagaiModul($membership, 'app-uji'));
     }
 
     private function pasangSebagaiModule(string $tenantId, string $moduleId): void

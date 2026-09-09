@@ -6,7 +6,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class AssetPlanningTest extends TestCase
@@ -87,14 +89,15 @@ class AssetPlanningTest extends TestCase
         $this->assertSoftDeleted('aset_tr_perencanaan_aset', ['id' => $plan['id']]);
     }
 
-    private function create(string $jenis)
+    /** @return TestResponse<Response> */
+    private function create(string $jenis): TestResponse
     {
         return $this->headers(['management-aset.perencanaan-aset.create'])
             ->withHeader('Idempotency-Key', 'plan-'.Str::ulid())
             ->postJson('/api/modules/management-aset/v1/perencanaan-aset', $this->payload($jenis));
     }
 
-    /** @return array<string, string> */
+    /** @param  list<string>  $permissions */
     private function headers(array $permissions): static
     {
         return $this->sebagaiPengguna($this->tenantId, $permissions);

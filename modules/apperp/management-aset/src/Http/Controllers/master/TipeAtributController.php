@@ -15,6 +15,9 @@ use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use RuntimeException;
 
+/**
+ * @extends MasterDataController<TipeAtribut>
+ */
 class TipeAtributController extends MasterDataController
 {
     /**

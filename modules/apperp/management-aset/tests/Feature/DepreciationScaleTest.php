@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use PHPUnit\Framework\Attributes\Group;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
@@ -259,6 +260,7 @@ class DepreciationScaleTest extends TestCase
         return (string) DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
     }
 
+    /** @return TestResponse<Response> */
     private function propose(string $tenant, string $book, int $monthOffset, ?float $consumption = null): TestResponse
     {
         $start = Carbon::parse('2026-07-01')->addMonthsNoOverflow($monthOffset - 1);
@@ -272,6 +274,7 @@ class DepreciationScaleTest extends TestCase
             ], fn ($value) => $value !== null));
     }
 
+    /** @param TestResponse<Response> $proposal */
     private function finalizeAmount(string $tenant, TestResponse $proposal): float
     {
         $proposal->assertSuccessful();

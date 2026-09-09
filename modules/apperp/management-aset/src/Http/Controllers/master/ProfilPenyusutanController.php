@@ -15,6 +15,8 @@ use Modules\Apperp\ManagementAset\Support\MasterChild;
  * Profil penyusutan adalah master seperti master lainnya: kode dari Number Sequence,
  * idempotency, arsip soft delete. Sebelumnya seluruh perilaku itu ditulis ulang dengan
  * tangan di luar MasterDataController dan hanya mendukung GET serta POST.
+ *
+ * @extends MasterDataController<ProfilPenyusutan>
  */
 class ProfilPenyusutanController extends MasterDataController
 {

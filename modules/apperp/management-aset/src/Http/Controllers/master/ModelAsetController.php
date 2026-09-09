@@ -16,6 +16,8 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
  * Katalog model barang per pabrikan. Master pertama dengan dua induk yang saling
  * lepas: pabrikan wajib, jenis opsional, dan tidak ada penyaringan bertingkat di
  * antara keduanya.
+ *
+ * @extends MasterDataController<ModelAset>
  */
 class ModelAsetController extends MasterDataController
 {

@@ -12,6 +12,9 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
 
+/**
+ * @extends MasterDataController<MaintenanceJobTypeDefault>
+ */
 class MaintenanceJobTypeDefaultController extends MasterDataController
 {
     protected function resource(): string

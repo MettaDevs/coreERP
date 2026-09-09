@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterLinkController;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
@@ -10,6 +11,8 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetAttrib
 
 /**
  * Pilihan nilai untuk atribut bertipe daftar tetap, disunting di dalam form atributnya.
+ *
+ * @extends MasterLinkController<TipeAtributNilai>
  */
 class TipeAtributNilaiController extends MasterLinkController
 {
@@ -28,9 +31,9 @@ class TipeAtributNilaiController extends MasterLinkController
         return 'tipe_atribut_id';
     }
 
-    protected function model(): string
+    protected function query(bool $termasukArsip = false): Builder
     {
-        return TipeAtributNilai::class;
+        return $termasukArsip ? TipeAtributNilai::withTrashed() : TipeAtributNilai::query();
     }
 
     protected function rowRules(string $tenantId): array

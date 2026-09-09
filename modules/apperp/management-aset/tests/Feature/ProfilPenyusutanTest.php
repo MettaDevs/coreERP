@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class ProfilPenyusutanTest extends TestCase
@@ -134,7 +135,10 @@ class ProfilPenyusutanTest extends TestCase
         $this->assertSame(1, $this->jumlahNomorTerbit(), 'Jumlah nomor yang benar-benar diterbitkan Core tidak sesuai.');
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function create(array $payload, ?string $key = null): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissions())
@@ -142,7 +146,10 @@ class ProfilPenyusutanTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/profil-penyusutan', $payload);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function request(string $method, string $uri, array $payload = []): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissions())

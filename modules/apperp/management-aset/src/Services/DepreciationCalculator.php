@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Services;
 
 use Illuminate\Support\Carbon;
+use stdClass;
 
 /**
  * Perhitungan penyusutan satu periode untuk satu buku aset.
@@ -42,10 +43,14 @@ final class DepreciationCalculator
     /**
      * Nilai penyusutan satu periode.
      *
-     * @param  object  $book  Baris buku aset beserta atribut profil yang sudah di-join.
+     * Barisnya `stdClass`, bukan model: pemanggilnya membaca lewat `toBase()` supaya kolom
+     * uang tetap apa adanya. Nilainya karena itu tidak bertipe — kolom `decimal` dipulangkan
+     * driver sebagai string — dan setiap pembacaan di bawah tetap dilewatkan `(float)`.
+     *
+     * @param  stdClass  $book  Baris buku aset beserta atribut profil yang sudah di-join.
      * @param  int  $elapsedPeriods  Jumlah periode yang sudah disusutkan sebelumnya.
      */
-    public function amount(object $book, int $elapsedPeriods, ?float $consumption = null): float
+    public function amount(stdClass $book, int $elapsedPeriods, ?float $consumption = null): float
     {
         $residual = (float) ($book->residual_value ?? 0);
         $acquisition = (float) $book->acquisition_value;
@@ -98,7 +103,7 @@ final class DepreciationCalculator
      * menurun menghasilkan angka lebih kecil daripada garis lurus sisa umur, penyusutan
      * berpindah ke yang alternatif agar aset tetap habis pada akhir masa manfaat.
      */
-    public function shouldSwitch(object $book, int $elapsedPeriods): bool
+    public function shouldSwitch(stdClass $book, int $elapsedPeriods): bool
     {
         if (($book->method ?? null) !== 'reducing_balance' || empty($book->alternative_profile_id)) {
             return false;

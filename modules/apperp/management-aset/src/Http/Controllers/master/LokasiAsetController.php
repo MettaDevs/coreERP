@@ -8,6 +8,9 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
 
+/**
+ * @extends MasterDataController<LokasiAset>
+ */
 class LokasiAsetController extends MasterDataController
 {
     protected function resource(): string

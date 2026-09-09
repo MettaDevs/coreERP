@@ -183,7 +183,7 @@ final class WorkOrderDocument implements ReportDefinition
         return new ReportData(
             fields: $fields,
             tables: [
-                'baris' => $lines->map(fn (object $line): array => [
+                'baris' => array_values($lines->map(fn (object $line): array => [
                     'nomor' => (int) $line->line_number,
                     'asset_kode' => $line->asset_kode,
                     'asset_nama' => $line->asset_nama,
@@ -200,8 +200,8 @@ final class WorkOrderDocument implements ReportDefinition
                     'sebab_kerusakan' => $line->sebab_nama,
                     'tindakan_perbaikan' => $line->tindakan_nama,
                     'catatan' => $line->catatan,
-                ])->all(),
-                'checklist' => $checklist->map(fn (object $item): array => [
+                ])->all()),
+                'checklist' => array_values($checklist->map(fn (object $item): array => [
                     'baris' => (int) $item->job_line_number,
                     'nomor' => rtrim(rtrim((string) $item->line_number, '0'), '.'),
                     'nama' => $item->nama,
@@ -212,7 +212,7 @@ final class WorkOrderDocument implements ReportDefinition
                     'nilai' => $item->nilai,
                     'tidak_berlaku' => $item->tidak_berlaku ? 'Ya' : '',
                     'catatan' => $item->catatan_teknisi,
-                ])->all(),
+                ])->all()),
             ],
             fileName: $wo->kode,
         );
@@ -246,7 +246,17 @@ final class WorkOrderDocument implements ReportDefinition
 
     private function dateTime(?string $value): ?string
     {
-        return $value === null ? null : date('d/m/Y H:i', strtotime($value));
+        if ($value === null) {
+            return null;
+        }
+
+        // `strtotime()` memulangkan `false` untuk teks yang bukan tanggal. Nilai itu
+        // diperlakukan sebagai 0, persis seperti sebelumnya ketika PHP sendiri yang
+        // mengubah `false` menjadi 0 di dalam `date()`. Memulangkan `null` memang lebih
+        // benar, tetapi itu perubahan perilaku dan bukan bagian dari perbaikan tipe ini.
+        $stempel = strtotime($value);
+
+        return date('d/m/Y H:i', $stempel === false ? 0 : $stempel);
     }
 
     private function hours(string|int|float|null $value): ?float

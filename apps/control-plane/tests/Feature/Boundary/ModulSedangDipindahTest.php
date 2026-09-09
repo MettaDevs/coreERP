@@ -6,6 +6,7 @@ namespace Tests\Feature\Boundary;
 
 use App\Support\Modules\ModulSedangDipindah;
 use DateTimeImmutable;
+use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
@@ -231,21 +232,85 @@ class ModulSedangDipindahTest extends TestCase
     public function test_pemblokir_menyebut_task_yang_membuangnya(): void
     {
         foreach (ModulSedangDipindah::bawaan()->semua() as $nama => $entri) {
-            $pemblokir = trim($entri['pemblokir'] ?? '');
-
-            if ($pemblokir === '') {
-                continue;
-            }
-
-            $this->assertMatchesRegularExpression('/\bF\d-\d{2}\b/', $pemblokir, sprintf(
-                'Penghalang entri "%s" tidak menyebut nomor task yang membuangnya. Penghalang tanpa '.
-                'task adalah alasan yang berlaku selamanya, dan pemeriksaan basi berhenti bekerja '.
-                'untuk modul itu tanpa ada yang menyadarinya.',
-                $nama,
-            ));
+            $this->assertPemblokirMenyebutTask($nama, $entri['pemblokir'] ?? '');
         }
 
         $this->addToAssertionCount(1);
+    }
+
+    /**
+     * Syarat di atas dibuktikan bisa merah, karena daftar sungguhannya sedang kosong.
+     *
+     * Sejak modul aset keluar pada F3-30 tidak ada satu pun entri yang dapat diperiksa test di
+     * atas, dan penjaga tanpa subjek adalah penjaga yang hijau tanpa menguji apa pun. Yang
+     * dijaga di sini bukan daftarnya melainkan aturannya, pada entri buatan — sama seperti cara
+     * test lain di berkas ini membuktikan penandaan dan pemeriksaan basi.
+     */
+    public function test_pemblokir_tanpa_nomor_task_ditolak(): void
+    {
+        $this->assertPemblokirMenyebutTask('modul-uji', 'Dibuang pada F9-99.');
+
+        try {
+            $this->assertPemblokirMenyebutTask('modul-uji', 'Nanti kalau sempat.');
+        } catch (AssertionFailedError $gagal) {
+            $this->assertStringContainsString('tidak menyebut nomor task', $gagal->getMessage());
+
+            return;
+        }
+
+        $this->fail('Penghalang tanpa nomor task seharusnya ditolak, tetapi pemeriksaannya diam.');
+    }
+
+    /**
+     * Penghalang yang dinyatakan membuat entri tidak dihitung basi, dan itu pun dibuktikan.
+     *
+     * Premis semula pemeriksaan basi — "bersih menurut pemindaian berarti entrinya boleh dibuang"
+     * — terbukti salah, dan `pemblokir` yang membetulkannya. Tanpa test ini, jalur itu tidak
+     * pernah dijalani siapa pun selama daftar sungguhannya kosong.
+     */
+    public function test_entri_dengan_pemblokir_tidak_dihitung_basi(): void
+    {
+        $akar = $this->akarSementaraBaru();
+        $bersih = 'pindah-bersih-'.bin2hex(random_bytes(4));
+
+        $this->buatModulPalsu($akar, $bersih, melanggar: false);
+
+        $pemindai = new PemindaiModul($akar.'/modules');
+
+        $this->assertSame(
+            [$bersih],
+            $this->entriBasi($pemindai, $this->daftarBerisi($bersih)),
+            'Tanpa penghalang, modul yang sudah bersih harus dilaporkan basi; kalau tidak, pemeriksaan di bawah tidak membuktikan apa pun.',
+        );
+
+        $denganPemblokir = ModulSedangDipindah::buatan([
+            $bersih => [
+                'alasan' => 'Modul palsu milik test ini.',
+                'tenggat' => '2999-12-31',
+                'pemblokir' => 'Ada penghalang di luar jangkauan pemindai. Dibuang pada F9-99.',
+            ],
+        ]);
+
+        $this->assertSame([], $this->entriBasi($pemindai, $denganPemblokir));
+    }
+
+    /**
+     * Bentuk bersama ketiga test di atas, supaya aturannya hanya ditulis sekali.
+     */
+    private function assertPemblokirMenyebutTask(string $nama, string $pemblokir): void
+    {
+        $pemblokir = trim($pemblokir);
+
+        if ($pemblokir === '') {
+            return;
+        }
+
+        $this->assertMatchesRegularExpression('/\bF\d-\d{2}\b/', $pemblokir, sprintf(
+            'Penghalang entri "%s" tidak menyebut nomor task yang membuangnya. Penghalang tanpa '.
+            'task adalah alasan yang berlaku selamanya, dan pemeriksaan basi berhenti bekerja '.
+            'untuk modul itu tanpa ada yang menyadarinya.',
+            $nama,
+        ));
     }
 
     /**

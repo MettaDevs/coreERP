@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class AssetLocationTest extends TestCase
@@ -163,7 +164,10 @@ class AssetLocationTest extends TestCase
         ]);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function create(string $resource, array $payload): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
@@ -171,7 +175,10 @@ class AssetLocationTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function request(string $resource, string $method, string $uri, array $payload = []): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))

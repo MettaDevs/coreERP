@@ -7,13 +7,34 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * Header rencana pengadaan aset satu tahun anggaran.
  *
  * `version` adalah penghitung kunci optimistik yang dinaikkan setiap penyuntingan, bukan
  * nomor revisi dokumen yang dilihat pengguna. `total_estimated_value` adalah jumlah baris
- * yang dihitung ulang saat detail berubah, bukan angka yang diketik.
+ * yang dihitung ulang saat detail berubah, bukan angka yang diketik; ia di-cast `decimal:2`,
+ * jadi Eloquent memulangkannya sebagai string, bukan float.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $creation_key
+ * @property string $kode
+ * @property string $legal_entity_id
+ * @property string $planning_org_unit_id
+ * @property Carbon $planned_on
+ * @property int $planning_year
+ * @property string $planning_type
+ * @property ?string $funding_source
+ * @property ?string $responsible_user_id
+ * @property string $total_estimated_value
+ * @property string $status
+ * @property ?string $description
+ * @property int $version
+ * @property ?Carbon $deleted_at
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  */
 class PerencanaanAset extends Model
 {
@@ -28,6 +49,7 @@ class PerencanaanAset extends Model
         'total_estimated_value', 'status', 'description', 'version',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -38,6 +60,7 @@ class PerencanaanAset extends Model
         ];
     }
 
+    /** @return HasMany<PerencanaanAsetDetail, $this> */
     public function details(): HasMany
     {
         return $this->hasMany(PerencanaanAsetDetail::class, 'planning_id');

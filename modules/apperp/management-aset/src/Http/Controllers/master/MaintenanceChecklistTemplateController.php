@@ -8,6 +8,9 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
+/**
+ * @extends MasterDataController<MaintenanceChecklistTemplate>
+ */
 class MaintenanceChecklistTemplateController extends MasterDataController
 {
     protected function resource(): string

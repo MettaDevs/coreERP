@@ -34,12 +34,12 @@ class WorkflowConfigurationTest extends TestCase
         $this->seed(AppCatalogSeeder::class);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner', 'business_name' => 'Tenant test',
-            'app_ids' => ['management-aset'], 'email' => 'owner@workflow.test', 'password' => 'password',
+            'app_ids' => ['app-uji'], 'email' => 'owner@workflow.test', 'password' => 'password',
         ]);
         $this->workflowTypeId = (string) Str::ulid();
         DB::table('workflow_types')->insert([
-            'id' => $this->workflowTypeId, 'app_id' => 'management-aset',
-            'code' => 'management-aset.pemusnahan-aset-verification',
+            'id' => $this->workflowTypeId, 'app_id' => 'app-uji',
+            'code' => 'app-uji.verifikasi-pemusnahan',
             'name' => 'Verifikasi usulan pemusnahan aset',
             'decision_context_schema' => json_encode(['required' => ['document_id', 'asset_id']], JSON_THROW_ON_ERROR),
             'created_at' => now(), 'updated_at' => now(),

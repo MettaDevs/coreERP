@@ -23,10 +23,10 @@ class WorkspaceContextTest extends TestCase
     {
         $this->seed(AppCatalogSeeder::class);
         DB::table('app_data_policies')->insert([
-            'code' => 'management-aset.asset-responsibility',
-            'app_id' => 'management-aset',
+            'code' => 'app-uji.tanggung-jawab',
+            'app_id' => 'app-uji',
             'name' => 'Akses aset menurut unit penanggung jawab',
-            'protected_permissions' => json_encode(['management-aset.entitas-aset.read'], JSON_THROW_ON_ERROR),
+            'protected_permissions' => json_encode(['app-uji.entitas.read'], JSON_THROW_ON_ERROR),
             'requires_legal_entity' => true,
             'requires_operating_unit' => true,
             'allows_descendants' => true,
@@ -45,7 +45,7 @@ class WorkspaceContextTest extends TestCase
         ]);
         $assignment->dataPolicyScopes()->create([
             'tenant_id' => $membership->tenant_id,
-            'policy_code' => 'management-aset.asset-responsibility',
+            'policy_code' => 'app-uji.tanggung-jawab',
             'include_descendants' => false,
             'valid_from' => now(),
         ]);

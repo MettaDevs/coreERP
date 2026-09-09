@@ -29,7 +29,7 @@ class OrganizationAddressBookTest extends TestCase
         $this->seed(AppCatalogSeeder::class);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner', 'business_name' => 'Tenant alamat',
-            'app_ids' => ['management-aset'], 'email' => 'owner@alamat.test', 'password' => 'password',
+            'app_ids' => ['app-uji'], 'email' => 'owner@alamat.test', 'password' => 'password',
         ]);
         $this->membership = $this->owner->activeMembership();
     }
@@ -137,7 +137,7 @@ class OrganizationAddressBookTest extends TestCase
 
         $outsider = app(RegisterBusiness::class)->handle([
             'name' => 'Lain', 'business_name' => 'Tenant lain',
-            'app_ids' => ['management-aset'], 'email' => 'owner@lain.test', 'password' => 'password',
+            'app_ids' => ['app-uji'], 'email' => 'owner@lain.test', 'password' => 'password',
         ]);
         $this->actingAs($outsider)->getJson("/api/v1/organizations/{$organization}/locations")->assertNotFound();
         $this->actingAs($outsider)->postJson("/api/v1/organizations/{$organization}/contacts", ['type' => 'phone', 'value' => '1'])->assertNotFound();

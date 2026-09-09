@@ -12,6 +12,11 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * Ia dipisahkan dari tindakan perbaikan supaya pertanyaan "kenapa rusak" dan "diapakan"
  * dapat dijawab terpisah. Satu daftar gabungan tidak dapat dipecah lagi setelah datanya
  * terkumpul.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan pada
+ * `MasterData`.
+ *
+ * @property bool $minta_keterangan
  */
 class SebabKerusakan extends MasterData
 {

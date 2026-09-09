@@ -28,6 +28,7 @@ use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AssetAttributeValidator;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
+use stdClass;
 
 class AssetController extends Controller
 {
@@ -445,7 +446,7 @@ class AssetController extends Controller
      */
     private function attributesOf(string $assetId): array
     {
-        return AssetAttribute::query()
+        $baris = AssetAttribute::query()
             ->join('aset_m_tipe_atribut as tipe', function ($join): void {
                 $join->on('tipe.id', '=', 'aset_tr_aset_atribut.tipe_atribut_id')->on('tipe.tenant_id', '=', 'aset_tr_aset_atribut.tenant_id');
             })
@@ -470,6 +471,10 @@ class AssetController extends Controller
                 },
             ])
             ->all();
+
+        // `array_values` bukan hiasan: kuncinya harus berurut supaya jawaban JSON tetap
+        // sebuah array, bukan objek berkunci angka.
+        return array_values($baris);
     }
 
     /**
@@ -704,7 +709,7 @@ class AssetController extends Controller
         ?string $conventionOverride,
         bool $checkEffectiveDate,
         ?string $effectiveOn = null,
-    ): object {
+    ): stdClass {
         if (! $profileId) {
             throw ValidationException::withMessages([
                 'group_aset_id' => 'Buku penyusutan belum memiliki profil utama yang efektif. Pilih profil pada matriks group x book atau pada Buku penyusutan.',
@@ -795,8 +800,10 @@ class AssetController extends Controller
      * Group ditunjuk langsung oleh aset, jadi default penyusutan dibaca dengan satu
      * lookup. Sebelumnya nilai ini diraih dengan menyusuri jenis -> kategori -> group,
      * yang membuat rantai klasifikasi wajib ada semata-mata sebagai jalur lookup.
+     *
+     * Hasilnya baris mentah `toBase()` — sebuah `stdClass`, bukan model.
      */
-    private function groupDefaults(string $groupAsetId): ?object
+    private function groupDefaults(string $groupAsetId): ?stdClass
     {
         return GroupAset::withTrashed()
             ->where('id', $groupAsetId)

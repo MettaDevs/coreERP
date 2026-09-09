@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class MasterDataAsetTest extends TestCase
@@ -643,7 +644,10 @@ class MasterDataAsetTest extends TestCase
         return $id;
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function createRecord(string $resource, array $payload, ?string $tenantId = null): TestResponse
     {
         return $this->sebagaiPengguna($tenantId ?? $this->tenantId, $this->permissionsFor($resource))
@@ -651,7 +655,10 @@ class MasterDataAsetTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function postWithKey(string $resource, array $payload, string $key): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
@@ -659,7 +666,10 @@ class MasterDataAsetTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function request(string $resource, string $method, string $uri, array $payload = []): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))

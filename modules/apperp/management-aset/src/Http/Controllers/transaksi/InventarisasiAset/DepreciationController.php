@@ -15,6 +15,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Depreciatio
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
+use stdClass;
 
 class DepreciationController extends Controller
 {
@@ -69,7 +70,7 @@ class DepreciationController extends Controller
             DB::raw('coalesce(aset_tr_buku_aset.useful_life_periods, profile.useful_life_periods) as useful_life_periods'),
             'asset.legal_entity_id', 'asset.responsible_org_unit_id',
         )->toBase()->first();
-        abort_unless($book, 404);
+        abort_unless($book !== null, 404);
         abort_if(! ($book->depreciate ?? true), 422, 'Buku aset ini ditandai tidak disusutkan.');
         // Buku yang sudah ditutup mengikuti aset yang sudah dijual atau dimusnahkan.
         abort_unless(($book->status ?? 'active') === 'active', 422, 'Buku aset ini sudah ditutup karena asetnya sudah dilepas.');
@@ -209,7 +210,7 @@ class DepreciationController extends Controller
     }
 
     /** @param array<string, mixed> $data */
-    private function bulkSkipReason(object $book, array $data): ?string
+    private function bulkSkipReason(stdClass $book, array $data): ?string
     {
         if ($book->depreciation_start_on !== null && $data['period_ends_on'] < $book->depreciation_start_on) {
             return 'belum_mulai_menyusut';
@@ -226,7 +227,7 @@ class DepreciationController extends Controller
      * lurus sisa umur. Dipakai proposal tunggal maupun massal agar keduanya tidak
      * menyimpang satu sama lain.
      */
-    private function applyAlternativeProfile(object $book, DepreciationCalculator $calculator, int $elapsedPeriods): void
+    private function applyAlternativeProfile(stdClass $book, DepreciationCalculator $calculator, int $elapsedPeriods): void
     {
         if (! $calculator->shouldSwitch($book, $elapsedPeriods)) {
             return;
@@ -255,7 +256,7 @@ class DepreciationController extends Controller
             $query = DepreciationPeriod::query()->where('id', $id);
             $scope->query($query, $request, 'legal_entity_id', 'usage_org_unit_id');
             $period = $query->lockForUpdate()->toBase()->first();
-            abort_unless($period, 404);
+            abort_unless($period !== null, 404);
             if ($period->status === 'final') {
                 // Retry finalisasi harus aman: transaksi dan export yang sudah ada
                 // dikembalikan tanpa menambah saldo atau membuat export kedua.
@@ -278,7 +279,19 @@ class DepreciationController extends Controller
                     'aset_tr_buku_aset.*', 'asset.kode as asset_code', 'asset.currency_code',
                     'buku.export_to_backoffice',
                 )->toBase()->first();
-            AssetBook::query()->where('id', $book->id)->update(['accumulated_depreciation' => DB::raw('round(accumulated_depreciation + '.(float) $period->amount.', 2)'), 'net_book_value' => DB::raw('round(net_book_value - '.(float) $period->amount.', 2)'), 'updated_at' => now()]);
+            // Penambahan dikerjakan database, bukan PHP, dan itu menahan kehilangan pembaruan:
+            // pada `finalize()` yang terkunci hanya periodenya, sehingga dua periode milik satu
+            // buku boleh difinalkan bersamaan. `incrementEach()` menyusun ekspresi `kolom + n`
+            // yang sama seperti sebelumnya, menolak nilai yang bukan angka, dan ikut mengisi
+            // `updated_at`.
+            //
+            // Pembulatan `round(..., 2)` yang dulu ditulis di sini dibuang karena ia tidak
+            // pernah mengubah apa pun: kedua kolom `decimal(18,2)`, dan PostgreSQL membulatkan
+            // ke skala kolom saat nilainya disimpan.
+            AssetBook::query()->where('id', $book->id)->incrementEach([
+                'accumulated_depreciation' => (float) $period->amount,
+                'net_book_value' => -(float) $period->amount,
+            ]);
             $payload = ['contract_version' => 1, 'tenant_id' => $tenant, 'legal_entity_id' => $period->legal_entity_id, 'asset_book_id' => $book->id, 'asset_code' => $book->asset_code, 'usage_org_unit_id' => $period->usage_org_unit_id, 'period_starts_on' => $period->period_starts_on, 'period_ends_on' => $period->period_ends_on, 'amount' => $period->amount, 'currency_code' => $book->currency_code, 'acquisition_value' => $book->acquisition_value, 'accumulated_depreciation' => round((float) $book->accumulated_depreciation + (float) $period->amount, 2), 'net_book_value' => round((float) $book->net_book_value - (float) $period->amount, 2), 'status' => 'final'];
             // Buku pajak lazimnya tidak diekspor, supaya backoffice tidak menjurnal dua
             // kali untuk aset yang sama. Periodenya tetap final dan tercatat.
@@ -305,16 +318,19 @@ class DepreciationController extends Controller
             $query = DepreciationPeriod::query()->where('id', $id);
             $scope->query($query, $request, 'legal_entity_id', 'usage_org_unit_id');
             $original = $query->lockForUpdate()->toBase()->first();
-            abort_unless($original, 404);
+            abort_unless($original !== null, 404);
             abort_unless($original->status === 'final', 409, 'Hanya periode final yang dapat dibalik.');
             abort_if(DepreciationPeriod::query()->where('reverses_period_id', $original->id)->exists(), 409, 'Periode penyusutan ini sudah dibalik.');
             $book = AssetBook::query()->join('aset_tr_penerimaan_aset as asset', function ($join): void {
                 $join->on('asset.id', '=', 'aset_tr_buku_aset.asset_id')->on('asset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
             })->where('aset_tr_buku_aset.id', $original->asset_book_id)->select('aset_tr_buku_aset.*', 'asset.kode as asset_code', 'asset.currency_code')->lockForUpdate()->toBase()->first();
-            abort_unless($book, 404);
+            abort_unless($book !== null, 404);
             $period = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'asset_book_id' => $book->id, 'legal_entity_id' => $original->legal_entity_id, 'usage_org_unit_id' => $original->usage_org_unit_id, 'period_starts_on' => $original->period_starts_on, 'period_ends_on' => $original->period_ends_on, 'amount' => -(float) $original->amount, 'status' => 'final', 'reverses_period_id' => $original->id, 'created_at' => now(), 'updated_at' => now()];
             (new DepreciationPeriod)->forceFill($period)->save();
-            AssetBook::query()->where('id', $book->id)->update(['accumulated_depreciation' => DB::raw('round(accumulated_depreciation - '.(float) $original->amount.', 2)'), 'net_book_value' => DB::raw('round(net_book_value + '.(float) $original->amount.', 2)'), 'updated_at' => now()]);
+            AssetBook::query()->where('id', $book->id)->incrementEach([
+                'accumulated_depreciation' => -(float) $original->amount,
+                'net_book_value' => (float) $original->amount,
+            ]);
             $payload = ['contract_version' => 1, 'tenant_id' => $tenant, 'legal_entity_id' => $original->legal_entity_id, 'asset_book_id' => $book->id, 'asset_code' => $book->asset_code, 'usage_org_unit_id' => $original->usage_org_unit_id, 'period_starts_on' => $original->period_starts_on, 'period_ends_on' => $original->period_ends_on, 'amount' => -(float) $original->amount, 'currency_code' => $book->currency_code, 'status' => 'reversal', 'reverses_period_id' => $original->id, 'reason' => $data['reason']];
             $export = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'posting_id' => 'DPR-'.Str::ulid(), 'depreciation_period_id' => $period['id'], 'payload' => json_encode($payload, JSON_THROW_ON_ERROR), 'finalized_at' => now(), 'created_at' => now(), 'updated_at' => now()];
             $this->saveExport($export, $payload);

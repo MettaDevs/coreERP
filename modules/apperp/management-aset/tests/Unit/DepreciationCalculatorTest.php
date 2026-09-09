@@ -16,7 +16,7 @@ class DepreciationCalculatorTest extends TestCase
     }
 
     /** @param array<string, mixed> $overrides */
-    private function book(array $overrides = []): object
+    private function book(array $overrides = []): \stdClass
     {
         return (object) [
             'method' => 'straight_line',

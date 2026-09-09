@@ -2,11 +2,9 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\Modules\ModuleRegistry;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
@@ -68,9 +66,6 @@ class ReportingTest extends TestCase
 
     private string $kodeWorkOrder;
 
-    /** Akar module sementara tempat manifest aset disalin untuk didaftarkan. */
-    private string $akarModulSementara;
-
     /**
      * Alamat di luar layanan render yang sempat dihubungi selama sebuah test.
      *
@@ -92,7 +87,6 @@ class ReportingTest extends TestCase
             'coreerp.app_context_signing_key' => str_repeat('k', 40),
         ]);
         Storage::fake('reporting-test');
-        $this->akarModulSementara = sys_get_temp_dir().'/coreerp-laporan-manifest-'.bin2hex(random_bytes(6));
 
         $this->seed(NumberSequenceProfileSeeder::class);
         $this->daftarkanKatalogDariManifest();
@@ -102,7 +96,6 @@ class ReportingTest extends TestCase
         ]);
         $this->membership = $this->owner->activeMembership();
         $this->bootstrapRuntime();
-        $this->siapkanNomorDokumenModule();
 
         $this->legalEntityId = $this->buatLegalEntity('CV Surya Jaya');
         // Unit penanggung jawab cukup sebuah id: pemilik memegang kebijakan data tanpa batas
@@ -114,13 +107,6 @@ class ReportingTest extends TestCase
         $this->buatWorkOrder();
 
         $this->fakeHanyaLayananRender();
-    }
-
-    protected function tearDown(): void
-    {
-        $this->hapusFolder($this->akarModulSementara);
-
-        parent::tearDown();
     }
 
     public function test_katalog_menyebut_laporan_manifest_beserta_hak_menjalankannya(): void
@@ -405,41 +391,14 @@ class ReportingTest extends TestCase
      * dari manifest. Selama keduanya ditulis di dua tempat, keduanya akan menyimpang, dan
      * penyimpangannya baru terlihat sebagai ekspor gagal di tangan pengguna.
      *
-     * Manifestnya disalin ke folder bernama lain karena nama folder `management-aset` masih
-     * ada di `ModulSedangDipindah`, dan module yang ditandai memang sengaja tidak didaftarkan
-     * ke katalog. Isi manifestnya dipakai apa adanya; yang berbeda hanya nama foldernya.
+     * Sampai 9 September 2026 manifestnya harus disalin lebih dulu ke folder bernama lain,
+     * karena `management-aset` masih terdaftar di `ModulSedangDipindah` dan module yang
+     * ditandai memang sengaja tidak didaftarkan ke katalog. Salinan itu dibuang pada F3-30:
+     * modulnya kini dilayani, jadi registry yang sungguhan sudah memulangkannya.
      */
     private function daftarkanKatalogDariManifest(): void
     {
-        $tujuan = $this->akarModulSementara.'/apperp/aset';
-        File::ensureDirectoryExists($tujuan);
-        File::copy($this->berkasManifest(), $tujuan.'/app.yaml');
-
-        $registryAsli = $this->app->make(ModuleRegistry::class);
-        $this->app->instance(ModuleRegistry::class, new ModuleRegistry($this->akarModulSementara));
-
-        try {
-            $this->artisan('app:register-manifest', ['module' => 'management-aset'])->assertSuccessful();
-        } finally {
-            // Registry sungguhan dikembalikan sebelum apa pun berjalan: yang memuat rute,
-            // model, dan penyedia laporan module adalah folder module yang sebenarnya, bukan
-            // salinan manifest tanpa kode ini.
-            $this->app->instance(ModuleRegistry::class, $registryAsli);
-        }
-    }
-
-    /**
-     * Urutan nomor dokumen module untuk tenant test.
-     *
-     * Biasanya ini dikerjakan `InstallModule` saat module dipasang untuk tenant. Module aset
-     * belum melewati jalur itu — `ModuleRegistry::cari()` melewatkan module yang masih ada di
-     * daftar pemindahan, sehingga `RegisterBusiness` tidak memasangnya sebagai module. Yang
-     * dipanggil di sini adalah action yang sama persis, dengan referensi nomor yang sama yang
-     * baru didaftarkan dari manifest; tidak ada satu pun baris urutan yang ditulis tangan.
-     */
-    private function siapkanNomorDokumenModule(): void
-    {
-        app(EnsureNumberSequenceDrafts::class)->forTenantAndApp((string) $this->membership->tenant_id, 'management-aset');
+        $this->artisan('app:register-manifest', ['module' => 'management-aset'])->assertSuccessful();
     }
 
     private function bootstrapRuntime(): void
@@ -709,12 +668,5 @@ class ReportingTest extends TestCase
         $zip->close();
 
         return $xml;
-    }
-
-    private function hapusFolder(string $folder): void
-    {
-        if (is_dir($folder)) {
-            File::deleteDirectory($folder);
-        }
     }
 }

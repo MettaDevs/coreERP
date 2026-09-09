@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,11 @@ use Illuminate\Support\Facades\DB;
  * Karena itu permintaan yang sama dapat diulang tanpa efek tambahan, sehingga tidak
  * memerlukan idempotency key per baris. Hak akses memakai permission pemiliknya,
  * sebab baris ini memang bagian dari pengelolaan pemilik.
+ *
+ * `TModel` adalah model baris penghubung milik satu controller turunan; anak
+ * menyebutkannya lewat `@extends MasterLinkController<GroupBukuPenyusutan>`.
+ *
+ * @template TModel of Model
  */
 abstract class MasterLinkController extends Controller
 {
@@ -37,12 +43,20 @@ abstract class MasterLinkController extends Controller
     abstract protected function ownerColumn(): string;
 
     /**
-     * Model baris penghubung. Ia wajib mengenal soft delete, sebab penggantian himpunan
-     * di bawah menghidupkan kembali baris yang baru saja diarsipkan.
+     * Query baris penghubung; `$termasukArsip` membuka baris yang sudah diarsipkan.
      *
-     * @return class-string<Model>
+     * Model baris penghubung **wajib** memakai soft delete, sebab penggantian himpunan di
+     * `replace()` menghidupkan kembali baris yang identitasnya sama alih-alih menyisipkan
+     * yang kedua di bawah unique index yang sama.
+     *
+     * Syarat itu ditegakkan di sini, bukan sekadar ditulis: satu-satunya cara anak
+     * memenuhi kontrak ini adalah menyebut `withTrashed()` pada model konkretnya, dan
+     * `withTrashed()` hanya ada pada model yang memakai soft delete. Model yang melepas
+     * `SoftDeletes` membuat analisa tipe gagal di controller-nya sendiri.
+     *
+     * @return Builder<TModel>
      */
-    abstract protected function model(): string;
+    abstract protected function query(bool $termasukArsip = false): Builder;
 
     /**
      * Aturan validasi tiap baris, tanpa kolom pemilik.
@@ -94,8 +108,7 @@ abstract class MasterLinkController extends Controller
             $rules['rows.*.'.$column] = $rule;
         }
         $data = $request->validate($rules);
-        $model = $this->model();
-        DB::transaction(function () use ($model, $tenantId, $ownerId, $data): void {
+        DB::transaction(function () use ($tenantId, $ownerId, $data): void {
             // Mengunci baris pemilik lebih dahulu supaya dua penyuntingan bersamaan pada
             // pemilik yang sama berjalan berurutan.
             //
@@ -112,25 +125,29 @@ abstract class MasterLinkController extends Controller
 
             // Baris yang hilang dari kiriman diarsipkan, bukan dihapus fisik, supaya
             // buku aset yang sudah terlanjur menyalin aturannya tetap dapat ditelusuri.
-            $model::query()->where($this->ownerColumn(), $ownerId)->delete();
+            $this->query()->where($this->ownerColumn(), $ownerId)->delete();
 
             foreach ($data['rows'] as $row) {
                 $payload = $this->rowPayload($row);
-                // `withTrashed()`: baris yang identitasnya sama boleh saja baru diarsipkan
-                // beberapa baris di atas, atau pada penyimpanan sebelumnya. Ia dihidupkan
-                // kembali, bukan disisipkan kedua kalinya di bawah unique index yang sama.
-                $existing = $model::query()->withTrashed()
+                // Baris terarsip ikut dicari: baris yang identitasnya sama boleh saja baru
+                // diarsipkan beberapa baris di atas, atau pada penyimpanan sebelumnya. Ia
+                // dihidupkan kembali, bukan disisipkan kedua kalinya di bawah unique index
+                // yang sama.
+                $existing = $this->query(termasukArsip: true)
                     ->where($this->ownerColumn(), $ownerId)
                     ->where($this->identity($row))
                     ->first();
                 if ($existing) {
                     $existing->fill($payload);
-                    $existing->deleted_at = null;
+                    // Jalur yang sama dengan `$existing->deleted_at = null`, hanya disebut
+                    // langsung: kolom arsip berada di luar `$fillable`, jadi `fill()` di atas
+                    // tidak menyentuhnya, dan ia bukan kolom yang dikenal `Model`.
+                    $existing->setAttribute('deleted_at', null);
                     $existing->save();
 
                     continue;
                 }
-                $model::query()->create([
+                $this->query()->create([
                     $this->ownerColumn() => $ownerId,
                     ...$this->identity($row),
                     ...$payload,
@@ -152,12 +169,10 @@ abstract class MasterLinkController extends Controller
     /** @return list<array<string, mixed>> */
     private function rows(string $ownerId): array
     {
-        $model = $this->model();
-
         // `array_values()` tidak mengubah isi maupun urutannya: kunci hasil `get()` memang
         // sudah 0..n. Ia yang membuat bentuk list itu terbaca, dan bentuk list yang menjaga
         // respons tetap terbit sebagai array JSON, bukan object.
-        return array_values($model::query()
+        return array_values($this->query()
             ->where($this->ownerColumn(), $ownerId)
             ->orderBy('id')
             ->get($this->columns())

@@ -47,9 +47,12 @@ class PenerbitNomorAset
             throw $this->gagal('number_sequence_failed', $kegagalan->getMessage(), $reference, $tenantId, $kegagalan);
         }
 
-        $nomor = $hasil['number'] ?? null;
+        // Kontrak `PenerbitNomor` sudah menjamin kunci `number` ada dan berupa string, jadi
+        // yang tersisa untuk diperiksa hanyalah nomor kosong — satu-satunya bentuk jawaban
+        // tidak valid yang masih mungkin lolos dari penerbit.
+        $nomor = $hasil['number'];
 
-        if (! is_string($nomor) || $nomor === '') {
+        if ($nomor === '') {
             throw $this->gagal('number_sequence_invalid_response', 'Layanan nomor mengembalikan data yang tidak valid.', $reference, $tenantId);
         }
 

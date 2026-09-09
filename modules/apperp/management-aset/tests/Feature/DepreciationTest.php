@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -79,6 +80,7 @@ class DepreciationTest extends TestCase
         $this->postJson('/api/modules/management-aset/v1/penyusutan/proposal', ['asset_book_id' => $book, 'period_starts_on' => '2026-09-01', 'period_ends_on' => '2026-09-30'])->assertStatus(422);
     }
 
+    /** @return array{string, string} */
     private function book(): array
     {
         $now = now();
@@ -99,7 +101,7 @@ class DepreciationTest extends TestCase
      *
      * @return array{group_aset_id: string, jenis_aset_id: string}
      */
-    private function classification($now): array
+    private function classification(CarbonImmutable $now): array
     {
         $group = (string) Str::ulid();
         $type = (string) Str::ulid();

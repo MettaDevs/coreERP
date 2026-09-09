@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
@@ -77,7 +78,13 @@ class AssetLifecycleTest extends TestCase
         // Nilai disimpan di kolom bertipe, tetapi disajikan kembali sebagai satu kunci
         // `nilai` sehingga klien tidak perlu tahu kolom mana yang terpakai. Dicari
         // berdasarkan id, bukan posisi: penyajiannya terurut menurut nama atribut.
-        $byId = collect($detail->json('data.atribut'))->keyBy('tipe_atribut_id');
+        $atribut = $detail->json('data.atribut');
+
+        if (! is_array($atribut)) {
+            $this->fail('Detail aset tidak memuat daftar atribut.');
+        }
+
+        $byId = collect($atribut)->keyBy('tipe_atribut_id');
         $this->assertSame(75.5, $byId[$daya]['nilai']);
         $this->assertSame('kVA', $byId[$daya]['satuan']);
         $this->assertTrue($byId[$garansi]['nilai']);
@@ -345,7 +352,10 @@ class AssetLifecycleTest extends TestCase
         return (string) $this->receiveResponse($overrides)->assertCreated()->json('data.id');
     }
 
-    /** @param array<string, mixed> $overrides */
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return TestResponse<Response>
+     */
     private function receiveResponse(array $overrides = []): TestResponse
     {
         // Master disiapkan lebih dahulu: `master()` memasang header permission miliknya
@@ -393,19 +403,24 @@ class AssetLifecycleTest extends TestCase
         return $id;
     }
 
+    /** @return TestResponse<Response> */
     private function show(string $assetId): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'])
             ->getJson('/api/modules/management-aset/v1/aset/'.$assetId);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function correct(string $assetId, array $payload): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.update'])
             ->patchJson('/api/modules/management-aset/v1/aset/'.$assetId, $payload);
     }
 
+    /** @return TestResponse<Response> */
     private function propose(string $bookId, string $start, string $end): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
@@ -420,6 +435,7 @@ class AssetLifecycleTest extends TestCase
         DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->update(['lifecycle_state' => 'decommissioned']);
     }
 
+    /** @return TestResponse<Response> */
     private function document(string $type, string $assetId, string $tanggal): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$type.'.create'])
@@ -445,7 +461,10 @@ class AssetLifecycleTest extends TestCase
             ->assertCreated()->json('data.id');
     }
 
-    /** @param list<array<string, mixed>> $rows */
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return TestResponse<Response>
+     */
     private function attach(string $jenisId, array $rows): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'))

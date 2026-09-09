@@ -28,7 +28,7 @@ class InvitationAccessTest extends TestCase
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner',
             'business_name' => 'PT Metta',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);
@@ -37,9 +37,9 @@ class InvitationAccessTest extends TestCase
     public function test_invitation_code_can_be_reused_and_assigns_role_and_policy_scope(): void
     {
         $role = $this->createRole('Finance and Asset Controller', [
-            'management-aset.entitas-aset.manage',
+            'app-uji.entitas.manage',
         ]);
-        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
 
         $response = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
             'system_role' => 'admin',
@@ -85,8 +85,8 @@ class InvitationAccessTest extends TestCase
 
     public function test_expired_and_revoked_codes_are_rejected(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
-        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
+        $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
         foreach (['expired', 'revoked'] as $state) {
             $response = $this->actingAs($this->owner)->postJson('/api/v1/invitation-codes', [
                 'system_role' => 'user',
@@ -117,10 +117,10 @@ class InvitationAccessTest extends TestCase
 
     public function test_invitation_rejects_direct_and_descendant_grants_for_the_same_unit(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
         $policyCode = $this->createPolicy(
-            'management-aset.operating-unit-responsibility',
-            'management-aset.entitas-aset.read',
+            'app-uji.tanggung-jawab-unit',
+            'app-uji.entitas.read',
             requiresOperatingUnit: true,
             allowsDescendants: true,
         );
@@ -161,8 +161,8 @@ class InvitationAccessTest extends TestCase
 
     public function test_role_can_receive_the_entitas_aset_duty(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
-        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
+        $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
 
         $this->assertSame(1, DB::table('security_role_duties')->where('role_id', $role->id)->count());
         $this->assertDatabaseHas('roles', ['id' => $role->id, 'name' => 'Asset administrator']);
@@ -170,8 +170,8 @@ class InvitationAccessTest extends TestCase
 
     public function test_owner_can_assign_a_business_role_to_their_own_membership(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
-        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
+        $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
         $membership = $this->owner->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
@@ -192,8 +192,8 @@ class InvitationAccessTest extends TestCase
 
     public function test_member_cannot_receive_duplicate_tenant_wide_grants_for_one_role(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
-        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
+        $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
         $membership = $this->owner->activeMembership();
 
         $this->actingAs($this->owner)->patchJson("/api/v1/memberships/{$membership->id}", [
@@ -207,10 +207,10 @@ class InvitationAccessTest extends TestCase
 
     public function test_policy_that_requires_an_operating_unit_rejects_a_legal_entity_node(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
         $policyCode = $this->createPolicy(
-            'management-aset.operating-unit-responsibility',
-            'management-aset.entitas-aset.read',
+            'app-uji.tanggung-jawab-unit',
+            'app-uji.entitas.read',
             requiresOperatingUnit: true,
         );
         $legalEntity = $this->createLegalEntity();
@@ -233,9 +233,9 @@ class InvitationAccessTest extends TestCase
 
     public function test_issued_invitation_can_be_edited_without_changing_the_code_or_existing_members(): void
     {
-        $first = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
-        $second = $this->createRole('Asset auditor', ['management-aset.entitas-aset.manage']);
-        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $first = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
+        $second = $this->createRole('Asset auditor', ['app-uji.entitas.manage']);
+        $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
         $scope = [
             'policy_code' => $policyCode,
             'legal_entity_id' => null,
@@ -300,8 +300,8 @@ class InvitationAccessTest extends TestCase
 
     public function test_revoked_invitation_cannot_be_edited(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
-        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
+        $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
         $scope = [
             'policy_code' => $policyCode,
             'legal_entity_id' => null,
@@ -323,8 +323,8 @@ class InvitationAccessTest extends TestCase
 
     public function test_member_without_access_management_cannot_edit_an_invitation(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
-        $policyCode = $this->createPolicy('management-aset.entitas-responsibility', 'management-aset.entitas-aset.read');
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
+        $policyCode = $this->createPolicy('app-uji.tanggung-jawab-entitas', 'app-uji.entitas.read');
         $scope = [
             'policy_code' => $policyCode,
             'legal_entity_id' => null,
@@ -353,10 +353,10 @@ class InvitationAccessTest extends TestCase
 
     public function test_grant_without_dimensions_is_rejected_unless_it_is_declared_unrestricted(): void
     {
-        $role = $this->createRole('Asset administrator', ['management-aset.entitas-aset.manage']);
+        $role = $this->createRole('Asset administrator', ['app-uji.entitas.manage']);
         $policyCode = $this->createPolicy(
-            'management-aset.operating-unit-responsibility',
-            'management-aset.entitas-aset.read',
+            'app-uji.tanggung-jawab-unit',
+            'app-uji.entitas.read',
             requiresOperatingUnit: true,
         );
         $membership = $this->owner->activeMembership();
@@ -448,7 +448,7 @@ class InvitationAccessTest extends TestCase
         bool $allowsDescendants = false,
     ): string {
         DB::table('app_data_policies')->insert([
-            'code' => $code, 'app_id' => 'management-aset', 'name' => 'Policy test',
+            'code' => $code, 'app_id' => 'app-uji', 'name' => 'Policy test',
             'protected_permissions' => json_encode([$permission], JSON_THROW_ON_ERROR),
             'requires_legal_entity' => false, 'requires_operating_unit' => $requiresOperatingUnit,
             'allows_descendants' => $allowsDescendants, 'created_at' => now(), 'updated_at' => now(),

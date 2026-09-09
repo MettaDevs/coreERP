@@ -5,7 +5,36 @@ namespace Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
+/**
+ * Buku penyusutan satu aset: satu baris per pasangan aset dan buku.
+ *
+ * Kolom uangnya di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai string, bukan
+ * float. `closed_on` sengaja tidak ikut `casts()` — ia hanya ditulis lewat query update,
+ * tidak pernah dibaca sebagai properti — sehingga tipenya tetap string apa adanya.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $asset_id
+ * @property ?string $buku_id
+ * @property ?string $depreciation_profile_id
+ * @property ?string $alternative_profile_id
+ * @property string $book_code
+ * @property ?int $useful_life_periods
+ * @property ?string $convention
+ * @property ?Carbon $depreciation_start_on
+ * @property bool $depreciate
+ * @property string $round_off_depreciation
+ * @property string $acquisition_value
+ * @property string $residual_value
+ * @property string $accumulated_depreciation
+ * @property string $net_book_value
+ * @property string $status
+ * @property ?string $closed_on
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ */
 class AssetBook extends Model
 {
     use HasUlids;
@@ -20,6 +49,7 @@ class AssetBook extends Model
         'net_book_value', 'status',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
