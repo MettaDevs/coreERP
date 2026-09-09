@@ -7,6 +7,7 @@ namespace App\Support;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use UnexpectedValueException;
 
 /**
  * Membaca parameter workflow milik sebuah tenant.
@@ -66,10 +67,44 @@ final class ParameterWorkflow
                 continue;
             }
 
-            $tersimpan[(string) $baris->code] = (bool) json_decode((string) $baris->value, true, 512, JSON_THROW_ON_ERROR);
+            $tersimpan[(string) $baris->code] = $this->sesuaiTipe((string) $baris->code, (string) $baris->value);
         }
 
         return $this->ingatan[$tenantId] = $tersimpan + DefinisiParameterWorkflow::bawaan();
+    }
+
+    /**
+     * Nilai tersimpan harus benar-benar bertipe seperti yang dijanjikan registry.
+     *
+     * Tanpa pemeriksaan ini, kalimat "tipenya hidup di registry" cuma komentar. Kolomnya `jsonb`
+     * dan database tidak menolak apa pun: `"mungkin"` masuk dengan senang hati, `json_decode`
+     * memulangkan string, dan `(bool)` mengubahnya menjadi `true`. Sebuah larangan pemisahan
+     * tugas yang menyala karena satu baris rusak — atau mati karena `null` — adalah kegagalan
+     * yang tidak pernah terlihat siapa pun.
+     *
+     * Inilah yang harus dibayar bentuk baris-per-kode: penegakan tipe pindah dari database ke
+     * sini. Menaruhnya di satu tempat yang dilewati setiap pembacaan adalah harga yang wajar;
+     * membiarkannya tidak ditegakkan sama sekali tidak.
+     *
+     * Tipe kembalian `bool` method ini sebenarnya sudah menolaknya sendiri. Yang ditambahkan
+     * pemeriksaan eksplisit ini **pesannya**, bukan penangkapannya: PHP mengatakan "Return value
+     * must be of type bool, string returned" sambil menunjuk sebuah method privat, sedangkan yang
+     * dibutuhkan orang yang membaca log adalah parameter mana yang rusak dan apa yang dijanjikan
+     * registry untuknya.
+     */
+    private function sesuaiTipe(string $kode, string $mentah): bool
+    {
+        $nilai = json_decode($mentah, true, 512, JSON_THROW_ON_ERROR);
+
+        if (! is_bool($nilai)) {
+            throw new UnexpectedValueException(sprintf(
+                'Parameter workflow "%s" dijanjikan boolean oleh registry, tetapi yang tersimpan %s.',
+                $kode,
+                get_debug_type($nilai),
+            ));
+        }
+
+        return $nilai;
     }
 
     /**

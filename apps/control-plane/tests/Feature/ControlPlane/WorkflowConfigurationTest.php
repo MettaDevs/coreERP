@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
+use UnexpectedValueException;
 
 class WorkflowConfigurationTest extends TestCase
 {
@@ -514,6 +515,37 @@ class WorkflowConfigurationTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame(1, DB::table('access_audit_events')->where('action', 'workflow.parameter.updated')->count());
+    }
+
+    /**
+     * Nilai yang tidak sesuai tipe yang dijanjikan registry ditolak keras, bukan dipaksa.
+     *
+     * Ini harga yang dibayar bentuk baris per kode: kolomnya `jsonb`, dan database tidak menolak
+     * apa pun. `"mungkin"` masuk dengan senang hati, lalu `(bool)` mengubahnya menjadi `true` —
+     * sebuah larangan pemisahan tugas yang menyala karena satu baris rusak. Tanpa test ini,
+     * kalimat "tipenya hidup di registry" cuma komentar.
+     *
+     * Barisnya ditulis lewat SQL langsung dengan sengaja: `simpan()` bertipe `bool`, jadi jalur
+     * resmi memang tidak bisa menghasilkan keadaan ini. Yang diuji adalah ketahanan terhadap
+     * baris yang datang dari luar aplikasi — pemulihan cadangan, perbaikan manual, atau versi
+     * lama.
+     */
+    public function test_a_stored_value_that_contradicts_the_registry_type_is_rejected(): void
+    {
+        $tenantId = $this->owner->activeMembership()->tenant_id;
+        DB::table('workflow_parameters')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $tenantId,
+            'code' => DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU,
+            'value' => json_encode('mungkin', JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->expectException(UnexpectedValueException::class);
+        $this->expectExceptionMessage('dijanjikan boolean oleh registry');
+
+        app(ParameterWorkflow::class)->boolean($tenantId, DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU);
     }
 
     private function larangPersetujuanPengaju(string $tenantId): void

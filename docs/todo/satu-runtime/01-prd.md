@@ -3212,6 +3212,16 @@ dibaca orang. Kedua sifat itu dijaga test yang sudah dibuktikan merah:
 Failed asserting that 2 is identical to 1.
 ```
 
+**Harga bentuk baris per kode dibayar di satu tempat: penegakan tipe pindah dari database ke pembaca.**
+Kolomnya `jsonb`, dan database tidak menolak apa pun — `"mungkin"` masuk dengan senang hati. Tanpa
+pemeriksaan saat baca, kalimat "tipenya hidup di registry" cuma komentar. Pembacanya sekarang menolak
+nilai yang tidak sesuai tipe yang dijanjikan.
+
+Satu catatan jujur tentang penjaga itu: tipe kembalian `bool` sudah menolaknya sendiri, jadi yang
+ditambahkan pemeriksaan eksplisitnya adalah **pesannya**, bukan penangkapannya. PHP mengatakan
+"Return value must be of type bool, string returned" sambil menunjuk method privat; yang dibutuhkan
+pembaca log adalah nama parameternya dan apa yang dijanjikan registry untuknya.
+
 **Yang belum dikerjakan.**
 
 - **`Use final approver`.** D365 punya jalan ketiga yang tidak kita punya: alih-alih memblokir, ia
