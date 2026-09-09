@@ -502,6 +502,69 @@ class SusunanManifestModulTest extends TestCase
         return $pelanggaran;
     }
 
+    /**
+     * Module tidak membawa alur CI-nya sendiri.
+     *
+     * GitHub hanya menjalankan alur dari `.github/workflows/` **di akar repo**. Sebuah alur di
+     * dalam `modules/<penerbit>/<module>/.github/workflows/` karena itu tidak pernah berjalan —
+     * ia terlihat seperti pemeriksaan yang menjaga module itu, dan tidak menjaga apa pun.
+     *
+     * Ini peninggalan masa tiap app punya repo sendiri, dan ia ikut mendarat bersama subtree
+     * setiap kali sebuah module dipindah masuk. Modul aset membawanya sampai 10 September 2026,
+     * dan alur itu masih memanggil `app-erp-ci-workflows` — repo pemeriksa bersama yang sudah
+     * digantikan satu alur di akar pada F6-04.
+     *
+     * Yang berbahaya bukan berkasnya, melainkan keyakinan yang ia tumbuhkan: orang yang
+     * melihatnya menyimpulkan module ini punya pemeriksaannya sendiri, lalu berhenti mencari.
+     */
+    public function test_module_tidak_membawa_alur_ci_sendiri(): void
+    {
+        $this->assertSame([], $this->alurSendiri(dirname(__DIR__, 5).'/modules'));
+    }
+
+    public function test_alur_ci_di_dalam_module_membuat_merah(): void
+    {
+        $akar = $this->akarSementaraBaru();
+
+        $this->tulisManifest($akar, 'apperp', 'modul-beralur', [
+            'id: modul-beralur', 'name: Modul Beralur', 'version: 0.1.0',
+            'publisher: apperp', 'kind: business-app', 'table_prefix: alur_',
+            'dependsOn: {}',
+        ]);
+
+        $folder = $akar.'/apperp/modul-beralur/.github/workflows';
+        mkdir($folder, 0o777, true);
+        file_put_contents($folder.'/ci.yml', "name: CI\non: [push]\n");
+
+        $this->assertSame(
+            ['modules/apperp/modul-beralur/.github/workflows/ci.yml'],
+            $this->alurSendiri($akar),
+        );
+    }
+
+    /**
+     * Berkas alur yang tinggal di dalam folder module.
+     *
+     * @return list<string>
+     */
+    private function alurSendiri(string $akar): array
+    {
+        $ditemukan = [];
+
+        foreach (glob($akar.'/*/*/.github/workflows/*') ?: [] as $berkas) {
+            if (! is_file($berkas)) {
+                continue;
+            }
+
+            $jalur = str_replace(chr(92), '/', $berkas);
+            $ditemukan[] = 'modules/'.substr($jalur, strpos($jalur, basename(dirname($berkas, 4)).'/'.basename(dirname($berkas, 3))));
+        }
+
+        sort($ditemukan);
+
+        return $ditemukan;
+    }
+
     private function manifest(string $akar): array
     {
         $hasil = [];

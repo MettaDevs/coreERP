@@ -39,7 +39,7 @@ Yang boleh diubah tenant hanya dua: apakah aturan itu aktif, dan seberapa parah 
 | `peringatan` | Transisi tetap berjalan, tetapi tersimpan pada jejak status |
 | `galat` | Transisi ditolak |
 
-Tabelnya `m_validasi_status_work_order`. Endpointnya `GET`/`PUT /api/v1/validasi-status-work-order` — mengganti seluruh matriks sekaligus, bukan per baris.
+Tabelnya `aset_m_validasi_status_work_order`. Endpointnya `GET`/`PUT /api/v1/validasi-status-work-order` — mengganti seluruh matriks sekaligus, bukan per baris.
 
 Alasan bentuknya begini: daftar aturan adalah bagian dari perilaku aplikasi, jadi ia dirilis bersama kode. Yang boleh berbeda antar tenant hanya seberapa keras aturan itu ditegakkan.
 
@@ -47,12 +47,12 @@ Alasan bentuknya begini: daftar aturan adalah bagian dari perilaku aplikasi, jad
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/master/TipeWorkOrderController.php` | Tipe work order |
-| `api/app/Http/Controllers/master/TingkatLayananController.php` | Tingkat layanan |
-| `api/app/Http/Controllers/master/TradeController.php` | Keahlian |
-| `api/app/Http/Controllers/master/SebabKerusakanController.php`, `TindakanPerbaikanController.php` | Sebab kerusakan dan tindakan perbaikan |
-| `api/app/Http/Controllers/master/ValidasiStatusWorkOrderController.php` | Matriks validasi status |
-| `api/app/Support/WorkOrderValidation.php` | Daftar keparahan yang sah |
+| `src/Http/Controllers/master/TipeWorkOrderController.php` | Tipe work order |
+| `src/Http/Controllers/master/TingkatLayananController.php` | Tingkat layanan |
+| `src/Http/Controllers/master/TradeController.php` | Keahlian |
+| `src/Http/Controllers/master/SebabKerusakanController.php`, `TindakanPerbaikanController.php` | Sebab kerusakan dan tindakan perbaikan |
+| `src/Http/Controllers/master/ValidasiStatusWorkOrderController.php` | Matriks validasi status |
+| `src/Support/WorkOrderValidation.php` | Daftar keparahan yang sah |
 | `database/migrations/2026_08_15_100000_create_work_order_masters.php` | Tabel master di halaman ini |
 
 ## Halaman terkait

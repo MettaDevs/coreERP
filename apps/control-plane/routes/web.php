@@ -38,7 +38,6 @@ use Inertia\Inertia;
 
 Route::inertia('/', 'welcome')->name('home');
 Route::inertia('ui-playground', 'ui-playground')->name('ui-playground');
-Route::inertia('lottie', 'lottie-gallery')->name('lottie-gallery');
 
 Route::middleware(RestrictedDocsAccess::class)->group(function () {
     Route::get('docs', function () {

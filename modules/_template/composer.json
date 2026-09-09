@@ -1,0 +1,23 @@
+{
+    "name": "penerbit-contoh/change-me",
+    "description": "Change Me — module CoreERP.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\PenerbitContoh\\ChangeMe\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\PenerbitContoh\\ChangeMe\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}

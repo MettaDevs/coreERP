@@ -2,7 +2,7 @@
 
 Halaman ini untuk developer. Isinya cara aset dihentikan pemakaiannya dan dilepas.
 
-Ada empat jenis dokumen, semuanya tersimpan di `tr_dokumen_siklus_aset` dan memakai controller yang sama:
+Ada empat jenis dokumen, semuanya tersimpan di `aset_tr_dokumen_siklus_aset` dan memakai controller yang sama:
 
 | Dokumen | Gunanya |
 | --- | --- |
@@ -59,12 +59,12 @@ Jangan menulis kontraknya sebelum perilakunya diputuskan; kontrak yang mendahulu
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/transaksi/DokumenSiklusAset/DokumenSiklusAsetController.php` | Keempat jenis dokumen |
+| `src/Http/Controllers/transaksi/DokumenSiklusAset/DokumenSiklusAsetController.php` | Keempat jenis dokumen |
 | `src/Listeners/TerapkanKeputusanDekomisioning.php` | Penerapan keputusan workflow |
 | `src/Services/PersetujuanAset.php` | Pengajuan ke Core lewat kontrak |
-| `api/app/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — rutenya ada, isinya belum dikerjakan |
+| `src/Http/Controllers/transaksi/PermintaanPengadaanAset/PermintaanPengadaanAsetController.php` | Permintaan pembelian — rutenya ada, isinya belum dikerjakan |
 | `contracts/asyncapi.yaml` | Kontrak event yang diterima |
-| `ui/src/transactions/_shared/LifecycleDocumentPage.tsx` | Layar, satu untuk semua jenis |
+| `ui/transactions/_shared/LifecycleDocumentPage.tsx` | Layar, satu untuk semua jenis |
 
 ## Halaman terkait
 

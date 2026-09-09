@@ -4,12 +4,18 @@ CoreERP adalah monorepo untuk platform ERP modular API-first.
 
 ```text
 apps/          aplikasi platform dan UI host
-modules/       release unit bisnis mandiri
+modules/       module bisnis; berjalan di runtime Core, satu folder per module
+editions/      satu berkas per pelanggan: module apa yang dibeli dan rilis mana yang dipasang
 integrations/  bridge lintas module
 packages/      SDK dan contract lintas aplikasi
 deploy/        manifest deployment dan release tooling
+scripts/       pembangun dan pemeriksa image edisi
 docs/          desain kanonik
 ```
+
+Module bisnis hidup di dalam repo ini dan berjalan di proses Core: ia punya rute, halaman, dan
+migration sendiri, tetapi tidak punya container, database, maupun token layanan sendiri. Bentuk
+foldernya beserta alasannya ada di [`modules/README.md`](modules/README.md).
 
 ## Baru bergabung?
 

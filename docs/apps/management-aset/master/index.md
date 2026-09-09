@@ -2,7 +2,7 @@
 
 Halaman ini untuk developer. Isinya arsitektur dan perilaku yang **dipakai bersama oleh seluruh master data** di modul aset — bukan sekadar penjelasan satu per satu.
 
-Master data adalah daftar pilihan yang dipakai berulang di seluruh alur transaksi: `group-aset`, `jenis-aset`, `kondisi-aset`, `pabrikan-aset`, `model-aset`, `lokasi-aset`, `tipe-lokasi-aset`, `tipe-atribut`, `profil-penyusutan`, `buku-penyusutan`, tipe pekerjaan maintenance, dan master work order. Daftar lengkapnya ada di `api/routes/api.php` pada array `$masters`.
+Master data adalah daftar pilihan yang dipakai berulang di seluruh alur transaksi: `group-aset`, `jenis-aset`, `kondisi-aset`, `pabrikan-aset`, `model-aset`, `lokasi-aset`, `tipe-lokasi-aset`, `tipe-atribut`, `profil-penyusutan`, `buku-penyusutan`, tipe pekerjaan maintenance, dan master work order. Daftar lengkapnya ada di `routes/api.php` pada array `$masters`.
 
 ```mermaid
 graph TD
@@ -163,15 +163,15 @@ Permission berlaku per resource. Memiliki `group-aset.update` tidak memberikan i
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/MasterDataController.php` | Controller dasar seluruh master data |
-| `api/app/Http/Controllers/MasterLinkController.php` | Controller dasar tabel penghubung / matriks |
-| `api/app/Http/Controllers/master/` | Controller spesifik per master |
-| `api/app/Models/master/` | Model Eloquent master |
-| `api/app/Support/MasterParent.php`, `MasterChild.php` | Deklarasi metadata relasi induk-anak |
-| `ui/src/master/MasterPage.tsx`, `MasterForm.tsx` | Layar master standar |
-| `ui/src/master/detail/MasterDetailPage.tsx` | Layar master split-pane dua kolom |
-| `ui/src/master/detail/RecordDetailPane.tsx` | Panel detail kanan ber-accordion |
-| `ui/src/master/DynamicField.tsx` | Renderer kontrol field dinamis |
+| `src/Http/Controllers/MasterDataController.php` | Controller dasar seluruh master data |
+| `src/Http/Controllers/MasterLinkController.php` | Controller dasar tabel penghubung / matriks |
+| `src/Http/Controllers/master/` | Controller spesifik per master |
+| `src/Models/master/` | Model Eloquent master |
+| `src/Support/MasterParent.php`, `MasterChild.php` | Deklarasi metadata relasi induk-anak |
+| `ui/master/MasterPage.tsx`, `MasterForm.tsx` | Layar master standar |
+| `ui/master/detail/MasterDetailPage.tsx` | Layar master split-pane dua kolom |
+| `ui/master/detail/RecordDetailPane.tsx` | Panel detail kanan ber-accordion |
+| `ui/master/DynamicField.tsx` | Renderer kontrol field dinamis |
 
 ---
 

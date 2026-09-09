@@ -2,9 +2,9 @@
 
 Halaman ini untuk developer. Penyiapannya — profil, buku, matriks — ada di [Penyusutan: profil, buku, dan matriks](/apps/management-aset/master/depresiasi/).
 
-Penyusutan dijalankan **per periode, per buku**. Hasilnya baris di `tr_penyusutan_aset` yang mencatat berapa yang disusutkan pada periode itu.
+Penyusutan dijalankan **per periode, per buku**. Hasilnya baris di `aset_tr_penyusutan_aset` yang mencatat berapa yang disusutkan pada periode itu.
 
-Ada satu tabel pendamping, `tr_export_penyusutan`, yang menyimpan hasil finalisasi dalam bentuk siap diserahkan ke pembukuan. App ini tidak memposting ke buku besar — ia menyiapkan datanya dan berhenti di situ, karena akun dan posting milik modul Finance.
+Ada satu tabel pendamping, `aset_tr_export_penyusutan`, yang menyimpan hasil finalisasi dalam bentuk siap diserahkan ke pembukuan. App ini tidak memposting ke buku besar — ia menyiapkan datanya dan berhenti di situ, karena akun dan posting milik modul Finance.
 
 ## Dua langkah, sengaja dipisah
 
@@ -59,10 +59,10 @@ Ini penting: kalender fiskal milik **badan hukum**, bukan unit operasi. Itu seba
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/transaksi/InventarisasiAset/DepreciationController.php` | Proposal, finalisasi, pembalikan |
-| `api/app/Services/DepreciationCalculator.php` | Hitungan per periode |
-| `api/app/Services/FiscalCalendarClient.php` | Tahun buku dari Core |
-| `ui/src/transactions/inventarisasi-aset/DepreciationPage.tsx` | Layar |
+| `src/Http/Controllers/transaksi/InventarisasiAset/DepreciationController.php` | Proposal, finalisasi, pembalikan |
+| `src/Services/DepreciationCalculator.php` | Hitungan per periode |
+| `src/Services/KalenderFiskalAset.php` | Tahun buku dari Core |
+| `ui/transactions/inventarisasi-aset/DepreciationPage.tsx` | Layar |
 | `loadtest/k6/depreciation.js` | Uji beban proposal dan finalisasi |
 
 ## Halaman terkait

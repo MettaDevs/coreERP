@@ -1,5 +1,28 @@
 # API, event, dan integrasi module
 
+## Batas mana yang sedang dilewati
+
+Aturan di halaman ini menjawab pertanyaan "bagaimana melewati batas antar app". Bentuk jawabannya
+bergantung pada batas mana yang dilewati:
+
+| Batas | Bentuk |
+| --- | --- |
+| Module ke Core, di satu runtime | Pemanggilan fungsi lewat antarmuka di `App\Support\Modules\Contracts` |
+| Module ke module, di satu runtime | Event Laravel yang dikirim di dalam proses, dengan nama dan envelope yang sama seperti event terbit |
+| App berkontainer ke Core | REST `internal/v1` dengan token layanan |
+| App berkontainer ke app berkontainer | REST/OpenAPI atau event/AsyncAPI |
+| Sistem eksternal milik tenant | REST/OpenAPI, lihat [integrasi sistem eksternal](12-external-module-integration.md) |
+
+Yang **tidak** berubah karena bentuknya: nama event `module.aggregate.action.vN`, isi envelope, dan
+aturan versinya. Sebuah event yang hari ini dikirim di dalam proses harus tetap bisa diterbitkan ke
+broker tanpa mengubah namanya, dan itulah sebabnya bentuknya tidak boleh disederhanakan hanya
+karena pengirim dan penerimanya kebetulan satu proses.
+
+Satu akibat yang mudah terlewat: **pengiriman di dalam proses mengubah waktunya, bukan hanya
+jalurnya.** Listener berjalan sebelum pemanggilnya selesai, jadi ia ikut ke dalam transaksi yang
+sedang berjalan. Itu keuntungan — dokumen dan akibatnya berpindah status bersama atau tidak sama
+sekali — tetapi ia juga berarti listener yang lambat menahan transaksi.
+
 ## Satu aturan utama per jenis komunikasi
 
 | Kebutuhan | Standar | Contoh |
@@ -62,7 +85,9 @@ Pemeriksa membandingkan rute yang benar-benar terdaftar terhadap kontraknya, dua
 
 Kebalikannya juga berlaku: **kode tidak boleh menerima field yang dilarang kontraknya.** Kalau skema memakai `additionalProperties: false` dan field itu tidak ada di dalamnya, ia tidak akan pernah tiba lewat jalur yang sah. Handler yang tetap memvalidasinya mengiklankan kemampuan yang tidak ada, dan pembaca berikutnya menyimpulkan penerbitnya bisa mengirimkannya. Kalau field itu memang ditunda, yang menunggu adalah kodenya, bukan kontraknya.
 
-Implementasi rujukan: `contracts/check-contract-coverage.py` di Control Plane dan di app Management Aset.
+Implementasi rujukan: `contracts/check-contract-coverage.py` di Control Plane, dijalankan langkah **Check internal API contract coverage** pada `.github/workflows/lint.yml`.
+
+Aturan ini berlaku untuk permukaan yang **melewati batas proses**. Rute module yang hanya dipanggil halamannya sendiri, di dalam repo dan proses yang sama, tidak dikontrakkan sebagai OpenAPI terbit: penyimpangannya terlihat pada test module dan pada halaman yang memanggilnya, dan pemeriksa cakupan yang memaksakan kontrak di situ hanya menambah berkas yang harus dirawat. Yang tetap wajib berkontrak adalah permukaan yang dipanggil dari luar runtime.
 
 ## POS dan Booking tanpa shared database
 

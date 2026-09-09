@@ -1,6 +1,13 @@
 # Number sequences
 
-Number Sequence adalah layanan Control Plane untuk menerbitkan kode bisnis yang dapat dipakai app mana pun. Ia bukan database bersama: app meminta nomor melalui API internal dan tidak pernah membaca tabel sequence Core secara langsung.
+Number Sequence adalah layanan Control Plane untuk menerbitkan kode bisnis yang dapat dipakai app mana pun. Ia bukan tabel bersama: app meminta nomor lewat pintu resmi dan tidak pernah membaca atau menulis tabel sequence Core secara langsung.
+
+Ada dua pintu, dan yang menentukan bukan selera melainkan tempat app itu berjalan:
+
+| Pemanggil | Pintu |
+| --- | --- |
+| Module di runtime Core | Kontrak `App\Support\Modules\Contracts\PenerbitNomor` — pemanggilan fungsi biasa |
+| App berkontainer | API internal `POST /api/internal/v1/number-sequences/...` dengan token layanan |
 
 ## Pemilik kebenaran
 
@@ -9,7 +16,7 @@ Number Sequence adalah layanan Control Plane untuk menerbitkan kode bisnis yang 
 | Reference kode dan scope yang didukung | Manifest app / katalog Core |
 | Format, status, counter, dan audit tenant | Control Plane |
 | Kalender fiskal | Entitas legal (lihat [01a](01a-tenant-and-org-hierarchy.md)) |
-| Transaksi yang memakai nomor | Database app pemanggil |
+| Transaksi yang memakai nomor | App pemanggil |
 
 Reference hanya menjadi konfigurasi `draft` bagi tenant bila app tersebut memiliki entitlement aktif **dan** placement/release-nya `ready`. Katalog atau entitlement saja tidak cukup.
 
@@ -120,9 +127,34 @@ Owner atau admin tenant mengatur tiap reference melalui **Nomor dokumen** (butuh
 
 Manual harus sesuai format dan unik. Manual tidak memajukan counter. Continuous dan manual tidak dapat digabung. Nomor yang melampaui lebar segmennya menghasilkan error, bukan nomor yang melebar diam-diam.
 
+## Penerbitan dari module, di dalam proses
+
+Module memanggil `PenerbitNomor::terbitkan()` atau `cadangkan()`. Antarmukanya menerima **id**,
+bukan objek Core: module yang harus mengambil objek sequence lebih dulu justru melanggar batas yang
+antarmuka itu buat ada.
+
+```php
+use App\Support\Modules\Contracts\PenerbitNomor;
+
+$nomor = $penerbit->terbitkan(
+    ['tenant_id' => $tenantId, 'app_id' => 'management-aset', 'legal_entity_id' => $legalEntityId],
+    'management-aset.dekomisioning-aset',
+    $kunciIdempoten,
+);
+```
+
+Inilah keuntungan yang paling nyata dari satu runtime. Penerbitan berjalan di koneksi yang sama
+dengan dokumen yang sedang disimpan, jadi ia bisa berada **di dalam transaksi dokumen itu**:
+dokumen gagal, nomornya ikut batal, dan tidak ada lompatan nomor yang harus dijelaskan ke pemeriksa.
+
+Akibatnya, [rekonsiliasi](#rekonsiliasi) di bawah — outbox `confirm`/`cancel` dan worker yang
+mengirimnya ulang — tidak berlaku untuk module. Ia lahir dari kenyataan bahwa commit app dan
+confirm ke Core adalah dua transaksi database yang berbeda, dan kenyataan itu hilang begitu
+keduanya satu koneksi.
+
 ## Penerbitan lewat API internal
 
-App memakai credential service miliknya. Provider membuat credential sekali dan token hanya dikembalikan pada respons pembuatan; Core hanya menyimpan hash. Request membawa header `X-CoreERP-App-Id`, `X-CoreERP-Service-Token`, dan `X-CoreERP-Tenant-Id`.
+Bagian ini berlaku untuk app yang berjalan sebagai container sendiri. App memakai credential service miliknya. Provider membuat credential sekali dan token hanya dikembalikan pada respons pembuatan; Core hanya menyimpan hash. Request membawa header `X-CoreERP-App-Id`, `X-CoreERP-Service-Token`, dan `X-CoreERP-Tenant-Id`.
 
 Credential dapat diikat ke satu tenant lewat `app_service_credentials.tenant_id`. Credential bertenant hanya berlaku untuk tenant itu; credential tanpa tenant mempertahankan perilaku lama agar deployment yang sudah jalan tidak putus. **Credential baru sebaiknya selalu bertenant** — tanpa itu, satu token bocor berlaku untuk semua tenant yang memasang app tersebut.
 
@@ -137,7 +169,7 @@ Core tetap memeriksa entitlement dan readiness app untuk tenant tersebut pada se
 
 ## Rekonsiliasi
 
-Core dan app memiliki database terpisah, sehingga commit transaksi app dan confirm ke Core bukan satu transaksi database. Untuk continuous, app wajib menyimpan transaksi bisnis dan outbox `confirm` atau `cancel` dalam satu transaksi database app. Worker app mengirim outbox tersebut ulang sampai Core menjawab; endpoint Core idempotent.
+Bagian ini berlaku untuk app berkontainer. Core dan app semacam itu memiliki database terpisah, sehingga commit transaksi app dan confirm ke Core bukan satu transaksi database. Untuk continuous, app wajib menyimpan transaksi bisnis dan outbox `confirm` atau `cancel` dalam satu transaksi database app. Worker app mengirim outbox tersebut ulang sampai Core menjawab; endpoint Core idempotent.
 
 `php artisan number-sequences:recover` mencari reservation continuous yang melewati masa tunggu lalu mengubahnya menjadi `reconciliation_pending`. Job ini **tidak** mengembalikan nomor ke pool. Reservation `reconciliation_pending` masih boleh dikonfirmasi oleh outbox terlambat, atau dibatalkan bila app membuktikan transaksi tidak pernah tersimpan. Core tidak boleh mendaur ulangnya hanya berdasarkan TTL, karena TTL habis bukan bukti transaksi gagal.
 
@@ -275,11 +307,14 @@ Layanan ini mengasumsikan pemanggilnya bisa salah, termasuk salah yang merusak. 
 ## Aturan implementasi app
 
 1. Nyatakan reference dan allowed scope di manifest app.
-2. Minta nomor hanya melalui API internal; jangan query tabel Core.
+2. Minta nomor hanya lewat pintu resminya — kontrak `PenerbitNomor` untuk module, API internal untuk app berkontainer. Jangan query tabel sequence Core.
 3. Gunakan idempotency key yang **stabil** dari transaksi app. Key yang dibuat ulang tiap percobaan membatalkan seluruh manfaat idempotency dan membakar satu nomor per retry.
-4. Untuk continuous, simpan transaksi bisnis dan catatan outbox confirm/cancel dalam satu transaksi database app; worker mengirimnya sampai sukses.
-5. Jangan menyimpulkan reservation kedaluwarsa berarti transaksi gagal. Hanya cancel bila transaksi memang tidak tersimpan.
-6. Jangan mengaktifkan atau mengubah format dari kode app; itu keputusan owner/admin tenant.
+4. Jangan menyimpulkan reservation kedaluwarsa berarti transaksi gagal. Hanya cancel bila transaksi memang tidak tersimpan.
+5. Jangan mengaktifkan atau mengubah format dari kode app; itu keputusan owner/admin tenant.
+
+Dua aturan tambahan **hanya** untuk app berkontainer:
+
+6. Untuk continuous, simpan transaksi bisnis dan catatan outbox confirm/cancel dalam satu transaksi database app; worker mengirimnya sampai sukses.
 7. Set timeout eksplisit pada HTTP client ke Core.
 
 ## Lihat juga

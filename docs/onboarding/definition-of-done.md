@@ -19,6 +19,9 @@ Kalimat terakhir itu inti seluruh aturan. Kalau kode "sudah dipasang" tidak bisa
 - [ ] Perubahan user yang tidak terkait tidak ikut terbawa
 - [ ] Hanya scope yang berubah yang diverifikasi
 
+Keempat perintah itu dijalankan dari `apps/control-plane` dan **ikut menjangkau `modules/`**.
+Mengubah module tanpa menjalankannya berarti CI yang menemukan masalahnya, bukan kamu.
+
 ### 2. Perubahan UI
 
 Semua di atas, plus:
@@ -39,7 +42,17 @@ Kalau kamu mengubah navigasi atau security di `app.yaml`, tambahan:
 
 ### 3. Module baru
 
-Semua di atas, plus **gate load test**. Module tidak selesai hanya karena feature test lulus.
+Semua di atas, plus **penjaga batas** dan **gate load test**. Module tidak selesai hanya karena feature test lulus.
+
+Penjaga batasnya hidup sebagai test biasa di `apps/control-plane/tests/Feature/Boundary/` dan ikut
+`php artisan test`. Ia memindai seluruh isi `modules/`, jadi module baru langsung masuk cakupannya
+tanpa satu pun berkas yang perlu didaftarkan. Yang ditolaknya: tabel tanpa awalan module, tabel
+milik module lain yang disentuh, model tenant tanpa `MilikTenant`, namespace yang menyeberang,
+kerangka aplikasi Laravel di dalam folder module, rute module tanpa middleware konteks, dan
+manifest yang susunannya tidak sah.
+
+Kalau salah satunya merah, itu bukan test yang perlu dilonggarkan. Ia adalah satu-satunya hal yang
+akan menangkap pelanggaran itu sebelum module dipasang pada tenant sungguhan.
 
 | Dimensi | Minimum |
 | --- | --- |
@@ -61,7 +74,7 @@ Semua di atas, plus **gate load test**. Module tidak selesai hanya karena featur
 
 Diverifikasi lewat **SQL langsung ke database** sesudah run — bukan lewat API. API adalah yang sedang diuji; ia tidak boleh jadi hakim atas dirinya sendiri. Probe lintas tenant dijalankan *selama* beban penuh, bukan sesudahnya.
 
-Detail lengkap termasuk gate latensi: [Load dan concurrency testing](/dev/20-load-and-concurrency-testing). Implementasi rujukan ada di `app-erp-management-aset/loadtest/`.
+Detail lengkap termasuk gate latensi: [Load dan concurrency testing](/dev/20-load-and-concurrency-testing). Implementasi rujukan ada di `modules/apperp/management-aset/loadtest/`.
 
 ## Kalau gate tidak bisa dijalankan
 

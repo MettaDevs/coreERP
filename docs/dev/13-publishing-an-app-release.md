@@ -1,6 +1,16 @@
 # Mendaftarkan app dari repository terpisah
 
-Dokumen ini adalah kontrak kerja antara tim app dan CoreERP. Tujuannya agar satu tim dapat membuat app bisnis pada repository sendiri tanpa menaruh source domain, database, atau UI app di repository CoreERP.
+::: warning Halaman ini menggambarkan bentuk lama
+Module bisnis tidak lagi berasal dari repository terpisah. Manifestnya didaftarkan dari dalam repo
+Core dengan `app:register-manifest <id module>` — bentuk berjalur berkas sudah ditolak — dan
+kodenya ikut image edisi Core, bukan image sendiri. Alurnya ada di
+[jalur membangun modul baru](../apps/membangun-app-baru.md) dan
+[Release dan on-prem](03-release-and-on-prem.md#dua-bentuk-rilis).
+
+Halaman ini tetap berlaku untuk app yang belum dipindah dan masih punya repository sendiri.
+:::
+
+Dokumen ini adalah kontrak kerja antara tim app berkontainer dan CoreERP. Tujuannya agar satu tim dapat membuat app bisnis pada repository sendiri tanpa menaruh source domain, database, atau UI app di repository CoreERP.
 
 ## Batas ownership
 
