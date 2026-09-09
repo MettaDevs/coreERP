@@ -44,7 +44,44 @@ class AppReleaseRegistrationTest extends TestCase
             'app_id' => 'sample-app',
             'version' => '1.0.0',
             'manifest_sha256' => str_repeat('a', 64),
+            'edition_image' => 'registry.example/sample-edition@sha256:'.str_repeat('b', 64),
         ]);
+    }
+
+    /**
+     * Ketiga nama layanan tidak lagi wajib, dan yang tidak disebutkan disimpan sebagai
+     * null. String kosong akan membuat `app:render-proxy-config` dan worker Compose
+     * mengira ada layanan bernama "" yang bisa dihubungi.
+     */
+    public function test_release_tanpa_nama_layanan_diterima_dan_disimpan_sebagai_null(): void
+    {
+        $this->actingAs($this->provider)
+            ->postJson("/api/v1/provider/apps/{$this->catalogApp->id}/releases", $this->payload())
+            ->assertCreated()
+            ->assertJsonPath('data.edition_image', 'registry.example/sample-edition@sha256:'.str_repeat('b', 64));
+
+        $this->assertDatabaseHas('app_releases', [
+            'app_id' => 'sample-app',
+            'api_service' => null,
+            'ui_service' => null,
+            'database_service' => null,
+        ]);
+    }
+
+    /**
+     * Kelonggarannya berhenti pada nama layanan. Sidik jari image edisi tetap wajib:
+     * tanpa satu digest yang tidak bisa berpindah, tidak ada yang bisa dibuktikan tentang
+     * apa yang berjalan di server pelanggan.
+     */
+    public function test_release_ditolak_bila_image_edisinya_bukan_digest(): void
+    {
+        $this->actingAs($this->provider)
+            ->postJson("/api/v1/provider/apps/{$this->catalogApp->id}/releases", [
+                ...$this->payload(),
+                'edition_image' => 'registry.example/sample-edition:latest',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('edition_image');
     }
 
     public function test_release_version_must_match_the_catalogue_until_upgrade_is_supported(): void
@@ -82,14 +119,10 @@ class AppReleaseRegistrationTest extends TestCase
         return [
             'version' => '1.0.0',
             'manifest_sha256' => str_repeat('a', 64),
-            'api_image' => 'registry.example/sample-api@sha256:'.str_repeat('b', 64),
-            'ui_image' => 'registry.example/sample-ui@sha256:'.str_repeat('c', 64),
+            'edition_image' => 'registry.example/sample-edition@sha256:'.str_repeat('b', 64),
             'bundle_path' => 'sample-app/1.0.0',
             'compose_file' => 'compose.yaml',
             'compose_project' => 'sample-app',
-            'api_service' => 'sample-api',
-            'ui_service' => 'sample-ui',
-            'database_service' => 'sample-db',
         ];
     }
 }

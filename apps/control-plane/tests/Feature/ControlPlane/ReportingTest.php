@@ -401,17 +401,19 @@ class ReportingTest extends TestCase
         $this->artisan('app:register-manifest', ['module' => 'management-aset'])->assertSuccessful();
     }
 
+    /**
+     * Perintah ini dipakai sebagai persiapan saja: laporan hanya jalan setelah ada baris
+     * release dan placement yang siap. Bentuk rilisnya sendiri tidak diuji di berkas ini,
+     * jadi yang berubah di sini hanya cara memanggil perintahnya — satu image edisi,
+     * tanpa nama layanan.
+     */
     private function bootstrapRuntime(): void
     {
         $manifest = tempnam(sys_get_temp_dir(), 'coreerp-manifest-');
         File::put($manifest, "id: management-aset\nversion: 0.1.0\n");
         $this->artisan('app:bootstrap-local-runtime', [
             'manifest' => $manifest,
-            '--api-image' => 'local/api@sha256:'.str_repeat('a', 64),
-            '--ui-image' => 'local/ui@sha256:'.str_repeat('b', 64),
-            '--api-service' => 'management-aset-api',
-            '--ui-service' => 'management-aset-ui',
-            '--database-service' => 'management-aset-db',
+            '--edition-image' => 'local/edisi@sha256:'.str_repeat('a', 64),
         ])->assertSuccessful();
     }
 

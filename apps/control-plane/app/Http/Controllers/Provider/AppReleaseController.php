@@ -38,7 +38,7 @@ class AppReleaseController extends Controller
         return response()->json(['data' => $this->present($release)], 201);
     }
 
-    /** @return array{id:string,app_id:string,version:string,status:string,manifest_sha256:string,api_image:string,ui_image:string} */
+    /** @return array{id:string,app_id:string,version:string,status:string,manifest_sha256:string,edition_image:string} */
     private function present(AppRelease $release): array
     {
         return [
@@ -47,8 +47,7 @@ class AppReleaseController extends Controller
             'version' => $release->version,
             'status' => $release->status,
             'manifest_sha256' => $release->manifest_sha256,
-            'api_image' => $release->api_image,
-            'ui_image' => $release->ui_image,
+            'edition_image' => $release->edition_image,
         ];
     }
 }

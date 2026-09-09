@@ -25,13 +25,11 @@ class BootstrapLocalAppRuntimeTest extends TestCase
         $this->assertIsString($manifest);
         File::put($manifest, "id: sample-app\nversion: 1.0.0\n");
 
+        // Tanpa satu pun nama layanan: runtime satu image tidak punya layanan API, UI,
+        // maupun database yang terpisah untuk disebut namanya.
         $this->artisan('app:bootstrap-local-runtime', [
             'manifest' => $manifest,
-            '--api-image' => 'local/sample-api@sha256:'.str_repeat('a', 64),
-            '--ui-image' => 'local/sample-ui@sha256:'.str_repeat('b', 64),
-            '--api-service' => 'sample-api',
-            '--ui-service' => 'sample-ui',
-            '--database-service' => 'sample-db',
+            '--edition-image' => 'local/edisi@sha256:'.str_repeat('a', 64),
         ])->expectsOutputToContain('LOCAL_SERVICE_TOKEN=')
             ->expectsOutputToContain('Runtime lokal sample-app siap pada pooled-primary.')
             // Path konten dilaporkan agar developer tahu di mana app disajikan,
@@ -43,6 +41,10 @@ class BootstrapLocalAppRuntimeTest extends TestCase
             'app_id' => 'sample-app',
             'version' => '1.0.0',
             'status' => 'available',
+            'edition_image' => 'local/edisi@sha256:'.str_repeat('a', 64),
+            'api_service' => null,
+            'ui_service' => null,
+            'database_service' => null,
         ]);
         $this->assertDatabaseHas('app_placements', [
             'app_id' => 'sample-app',
@@ -60,15 +62,25 @@ class BootstrapLocalAppRuntimeTest extends TestCase
 
         $this->artisan('app:bootstrap-local-runtime', [
             'manifest' => $manifest,
-            '--api-image' => 'local/sample-api@sha256:'.str_repeat('a', 64),
-            '--ui-image' => 'local/sample-ui@sha256:'.str_repeat('b', 64),
-            '--api-service' => 'sample-api',
-            '--ui-service' => 'sample-ui',
-            '--database-service' => 'sample-db',
+            '--edition-image' => 'local/edisi@sha256:'.str_repeat('a', 64),
         ])->expectsOutputToContain('LOCAL_SERVICE_TOKEN=')
             ->assertSuccessful();
 
         $this->assertDatabaseCount('app_service_credentials', 1);
+    }
+
+    /**
+     * Kedua kolom image dihapus, bukan sekadar berhenti diisi.
+     *
+     * Selama `ui_image` masih ada, catatan rilis tetap bisa menyimpan sidik jari image UI
+     * yang tidak dibangun siapa pun lagi — dan sidik jari artifact yang tidak ada adalah
+     * cara tercepat membuat orang berikutnya percaya artifact itu masih dibuat.
+     */
+    public function test_catatan_rilis_hanya_menyimpan_satu_kolom_image(): void
+    {
+        $this->assertTrue(Schema::hasColumn('app_releases', 'edition_image'));
+        $this->assertFalse(Schema::hasColumn('app_releases', 'api_image'));
+        $this->assertFalse(Schema::hasColumn('app_releases', 'ui_image'));
     }
 
     public function test_it_no_longer_stores_a_ui_entry_column(): void
