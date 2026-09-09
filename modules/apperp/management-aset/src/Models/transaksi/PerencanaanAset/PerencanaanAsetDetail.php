@@ -6,12 +6,31 @@ use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Baris rencana pengadaan aset.
  *
  * `unit` adalah snapshot kode satuan untuk tampilan, sedangkan `satuan_id` menunjuk satuan
  * milik Core dan boleh kosong pada baris lama yang satuannya masih teks warisan.
+ *
+ * `quantity` dan kedua kolom harga di-cast `decimal:n`, jadi Eloquent memulangkannya sebagai
+ * string, bukan float.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $planning_id
+ * @property int $line_number
+ * @property string $jenis_aset_id
+ * @property ?string $satuan_id
+ * @property string $asset_name
+ * @property string $unit
+ * @property string $quantity
+ * @property string $requested_specification
+ * @property string $estimated_unit_price
+ * @property string $estimated_total_price
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  */
 class PerencanaanAsetDetail extends Model
 {
@@ -26,6 +45,7 @@ class PerencanaanAsetDetail extends Model
         'estimated_unit_price', 'estimated_total_price',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -36,6 +56,7 @@ class PerencanaanAsetDetail extends Model
         ];
     }
 
+    /** @return BelongsTo<PerencanaanAset, $this> */
     public function perencanaan(): BelongsTo
     {
         return $this->belongsTo(PerencanaanAset::class, 'planning_id');

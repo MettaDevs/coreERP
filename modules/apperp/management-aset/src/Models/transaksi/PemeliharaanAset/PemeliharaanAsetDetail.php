@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * Baris pekerjaan work order: satu aset, satu jenis pekerjaan, satu pelaksana.
@@ -17,6 +18,32 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * `asset_location_id` disalin saat baris dibuat, bukan dibaca dari aset, supaya riwayat tetap
  * menunjukkan tempat pekerjaan dikerjakan meski asetnya kemudian dipindahkan.
+ *
+ * `estimasi_jam` dan `aktual_jam` di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai
+ * string, bukan float.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $pemeliharaan_aset_id
+ * @property int $line_number
+ * @property string $asset_id
+ * @property ?string $asset_location_id
+ * @property string $maintenance_job_type_id
+ * @property ?string $variant_id
+ * @property ?string $trade_id
+ * @property ?string $ditugaskan_ke_user_id
+ * @property ?Carbon $dijadwalkan_mulai
+ * @property ?Carbon $dijadwalkan_selesai
+ * @property ?string $estimasi_jam
+ * @property ?string $aktual_jam
+ * @property ?string $hasil
+ * @property ?string $sebab_kerusakan_id
+ * @property ?string $sebab_kerusakan_keterangan
+ * @property ?string $tindakan_perbaikan_id
+ * @property ?string $tindakan_perbaikan_keterangan
+ * @property ?string $catatan
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  */
 class PemeliharaanAsetDetail extends Model
 {
@@ -33,6 +60,7 @@ class PemeliharaanAsetDetail extends Model
         'tindakan_perbaikan_id', 'tindakan_perbaikan_keterangan', 'catatan',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -44,11 +72,13 @@ class PemeliharaanAsetDetail extends Model
         ];
     }
 
+    /** @return BelongsTo<PemeliharaanAset, $this> */
     public function pemeliharaan(): BelongsTo
     {
         return $this->belongsTo(PemeliharaanAset::class, 'pemeliharaan_aset_id');
     }
 
+    /** @return HasMany<PemeliharaanAsetChecklist, $this> */
     public function checklist(): HasMany
     {
         return $this->hasMany(PemeliharaanAsetChecklist::class, 'pemeliharaan_aset_detail_id');

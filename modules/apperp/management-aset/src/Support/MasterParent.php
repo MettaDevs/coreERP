@@ -2,6 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Support;
 
+use Closure;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Str;
 
 /**
@@ -27,10 +30,15 @@ final readonly class MasterParent
     /**
      * Induk yang sudah diarsipkan tetap ditampilkan agar asal data anak tidak hilang.
      *
-     * @return array<string, callable>
+     * Yang dibuang scope soft delete-nya, bukan `withTrashed()` — keduanya persis sama
+     * (`withTrashed()` memang macro yang membuang scope ini), tetapi `withTrashed()` tidak
+     * terdefinisi pada `Relation`, dan menyempitkan parameternya melanggar kontravariansi
+     * `with()`.
+     *
+     * @return array<string, Closure(Relation<*, *, *>): mixed>
      */
     public function eagerLoad(): array
     {
-        return [$this->relation => fn ($query) => $query->withTrashed()];
+        return [$this->relation => fn (Relation $query) => $query->withoutGlobalScope(SoftDeletingScope::class)];
     }
 }

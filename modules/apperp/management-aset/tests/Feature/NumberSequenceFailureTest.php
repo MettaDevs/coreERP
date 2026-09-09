@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
@@ -129,6 +130,7 @@ class NumberSequenceFailureTest extends TestCase
         $this->assertSame(2, DB::table('aset_m_group_aset')->count());
     }
 
+    /** @return TestResponse<Response> */
     private function buatGroup(): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.create'])

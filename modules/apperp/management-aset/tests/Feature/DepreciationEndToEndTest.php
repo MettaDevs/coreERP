@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
@@ -313,6 +314,7 @@ class DepreciationEndToEndTest extends TestCase
         return $amounts;
     }
 
+    /** @return TestResponse<Response> */
     private function propose(string $bookId, int $monthOffset, ?float $consumption = null): TestResponse
     {
         $start = Carbon::parse('2026-07-01')->addMonthsNoOverflow($monthOffset - 1);
@@ -320,6 +322,7 @@ class DepreciationEndToEndTest extends TestCase
         return $this->proposeOn($bookId, $start->toDateString(), $start->copy()->endOfMonth()->toDateString(), $consumption);
     }
 
+    /** @return TestResponse<Response> */
     private function proposeOn(string $bookId, string $start, string $end, ?float $consumption = null): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
@@ -331,6 +334,7 @@ class DepreciationEndToEndTest extends TestCase
             ], fn ($value) => $value !== null));
     }
 
+    /** @param TestResponse<Response> $proposal */
     private function finalizeAmount(TestResponse $proposal): float
     {
         $proposal->assertSuccessful();
@@ -382,7 +386,10 @@ class DepreciationEndToEndTest extends TestCase
         ]);
     }
 
-    /** @param list<array<string, mixed>> $rows */
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return TestResponse<Response>
+     */
     private function matrix(string $groupId, array $rows): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))

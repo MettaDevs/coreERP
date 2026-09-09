@@ -7,6 +7,7 @@ namespace Modules\Apperp\ManagementAset\Models\support;
 use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Event Core yang sudah pernah diproses module ini.
@@ -25,6 +26,13 @@ use Illuminate\Database\Eloquent\Model;
  * Konsekuensinya `tenant_id` ditulis eksplisit pada penyisipan itu: `insertOrIgnore` tidak
  * membuat instance, sehingga pengisian otomatis oleh `MilikTenant` tidak berjalan. Yang
  * dijaga trait ini di sini adalah pembacaannya.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $event_id
+ * @property Carbon $processed_at
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  */
 final class ProcessedCoreEvent extends Model
 {
@@ -35,6 +43,7 @@ final class ProcessedCoreEvent extends Model
 
     protected $fillable = ['tenant_id', 'event_id', 'processed_at'];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return ['processed_at' => 'datetime'];

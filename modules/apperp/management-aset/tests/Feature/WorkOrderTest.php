@@ -6,7 +6,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class WorkOrderTest extends TestCase
@@ -155,25 +157,36 @@ class WorkOrderTest extends TestCase
         $this->assertDatabaseCount('aset_tr_pemeliharaan_aset', 1);
     }
 
-    private function create(array $seed)
+    /**
+     * @param  array<string, string>  $seed
+     * @return TestResponse<Response>
+     */
+    private function create(array $seed): TestResponse
     {
         return $this->submit($this->payload($seed));
     }
 
-    private function submit(array $payload, ?string $key = null)
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
+    private function submit(array $payload, ?string $key = null): TestResponse
     {
         return $this->headers(['management-aset.pemeliharaan-aset.create'])
             ->withHeader('Idempotency-Key', $key ?? 'wo-'.Str::ulid())
             ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset', $payload);
     }
 
-    /** @return array<string, string> */
+    /** @param  list<string>  $permissions */
     private function headers(array $permissions): static
     {
         return $this->sebagaiPengguna($this->tenantId, $permissions);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  array<string, string>  $seed
+     * @return array<string, mixed>
+     */
     private function payload(array $seed): array
     {
         return [

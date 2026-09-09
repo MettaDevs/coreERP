@@ -13,6 +13,13 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * karena "di mana benda ini berada" dan "siapa yang bertanggung jawab" adalah dua
  * pertanyaan berbeda yang berubah karena sebab berbeda. `org_unit_id` adalah
  * jembatan opsional antara keduanya.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan
+ * pada `MasterData`. `org_unit_id` tanpa foreign key: unit organisasi dimiliki Core.
+ *
+ * @property ?string $parent_id
+ * @property ?string $tipe_lokasi_id
+ * @property ?string $org_unit_id
  */
 class LokasiAset extends MasterData
 {
@@ -23,11 +30,13 @@ class LokasiAset extends MasterData
         'parent_id', 'tipe_lokasi_id', 'org_unit_id',
     ];
 
+    /** @return BelongsTo<self, $this> */
     public function parentLocation(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id');
     }
 
+    /** @return BelongsTo<TipeLokasiAset, $this> */
     public function tipeLokasi(): BelongsTo
     {
         return $this->belongsTo(TipeLokasiAset::class, 'tipe_lokasi_id');

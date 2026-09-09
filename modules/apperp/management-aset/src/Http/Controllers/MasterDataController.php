@@ -34,6 +34,14 @@ use RuntimeException;
  * Perilaku bersama seluruh master Management Aset: hak akses per resource, batas
  * tenant, idempotency, kode dari Number Sequence Core, induk rantai klasifikasi,
  * dan arsip yang tidak memutus referensi aktif.
+ *
+ * `TModel` adalah model master yang dipegang satu controller turunan. Tanda tangan PHP
+ * di bawah tetap menyebut `MasterData` — kontravariansi melarang anak menyempitkannya —
+ * sehingga tanpa parameter tipe ini analisa statis membaca setiap `$record` sebagai
+ * kelas induk yang abstrak, lalu menolak kolom yang sebenarnya milik anak. Anak
+ * menyebutkan modelnya lewat `@extends MasterDataController<GroupAset>`.
+ *
+ * @template TModel of MasterData
  */
 abstract class MasterDataController extends Controller
 {
@@ -72,7 +80,7 @@ abstract class MasterDataController extends Controller
     /** Slug resource pada route, kode permission, dan reference nomor. */
     abstract protected function resource(): string;
 
-    /** @return class-string<MasterData> */
+    /** @return class-string<TModel> */
     abstract protected function model(): string;
 
     /**
@@ -242,15 +250,31 @@ abstract class MasterDataController extends Controller
         return response()->json(status: 204);
     }
 
-    /** @return Builder<MasterData> */
-    private function newQuery(): Builder
+    /**
+     * Builder master ini, dengan pilihan ikut memuat baris yang sudah diarsipkan.
+     *
+     * `setModel()` di akhir menyerahkan instance yang sama seperti yang baru dipakai
+     * `newQuery()`, jadi saat berjalan ia tidak mengubah apa pun: model dan nama tabelnya
+     * persis sama. Ia yang mengembalikan tipe anak pada builder ini. Larastan menyimpulkan
+     * tipe `Model::newQuery()` dan `withTrashed()` dari kelas nyata pemanggilnya, dan pada
+     * sebuah parameter tipe ia hanya melihat batas atasnya — `MasterData` — sehingga tanpa
+     * langkah ini seluruh rantai query di bawah kehilangan kolom milik anak.
+     *
+     * @return Builder<TModel>
+     */
+    private function newQuery(bool $termasukArsip = false): Builder
     {
         $model = $this->model();
+        $instance = new $model;
+        $query = $instance->newQuery();
+        if ($termasukArsip) {
+            $query->withTrashed();
+        }
 
-        return $model::query();
+        return $query->setModel($instance);
     }
 
-    /** @return Builder<MasterData> */
+    /** @return Builder<TModel> */
     private function masterQuery(): Builder
     {
         $query = $this->newQuery();
@@ -263,17 +287,18 @@ abstract class MasterDataController extends Controller
 
     /**
      * Unique (tenant_id, creation_key) juga mencakup record yang sudah diarsipkan, jadi
-     * pencarian replay wajib menembus soft delete. Tanpa `withTrashed()`, retry dengan
+     * pencarian replay wajib menembus soft delete. Tanpa baris terarsip, retry dengan
      * kunci milik record yang sudah diarsipkan tidak menemukan apa pun, menerbitkan nomor
      * kedua, lalu menabrak unique index dan berakhir sebagai 500.
      *
-     * @return Builder<MasterData>
+     * @return Builder<TModel>
      */
     private function creationKeyQuery(string $creationKey): Builder
     {
-        return $this->newQuery()->withTrashed()->where('creation_key', $creationKey);
+        return $this->newQuery(termasukArsip: true)->where('creation_key', $creationKey);
     }
 
+    /** @return TModel */
     private function find(Request $request, string $id, bool $lock = false): MasterData
     {
         $query = $this->prepareQuery($this->masterQuery(), $request);
@@ -284,6 +309,7 @@ abstract class MasterDataController extends Controller
     /**
      * Master yang menunjuk dirinya sendiri (contohnya lokasi) tidak boleh membentuk siklus.
      *
+     * @param  TModel  $record
      * @param  array<string, mixed>  $data
      */
     private function rejectParentCycle(MasterData $record, array $data): void
@@ -299,10 +325,10 @@ abstract class MasterDataController extends Controller
             abort_if($parentId === $record->getKey(), 422, 'Data tidak dapat menjadi induk dirinya sendiri.');
             while ($parentId) {
                 abort_if($parentId === $record->getKey(), 422, 'Lokasi induk tidak boleh membentuk siklus.');
-                // `withTrashed()`: induk yang sudah diarsipkan tetap menjadi mata rantai yang
-                // sah. Menghentikan penelusuran di situ berarti siklus yang melewatinya
-                // lolos, dan record itu masih ditunjuk anaknya.
-                $parentId = $this->newQuery()->withTrashed()->whereKey($parentId)->value($parent->column);
+                // Induk yang sudah diarsipkan tetap menjadi mata rantai yang sah.
+                // Menghentikan penelusuran di situ berarti siklus yang melewatinya lolos,
+                // dan record itu masih ditunjuk anaknya.
+                $parentId = $this->newQuery(termasukArsip: true)->whereKey($parentId)->value($parent->column);
             }
         }
     }
@@ -400,7 +426,11 @@ abstract class MasterDataController extends Controller
         return $trimmed === '' ? null : $trimmed;
     }
 
-    /** Yang menahan arsip adalah anak yang belum diarsipkan, terlepas dari penanda `aktif`. */
+    /**
+     * Yang menahan arsip adalah anak yang belum diarsipkan, terlepas dari penanda `aktif`.
+     *
+     * @param  TModel  $record
+     */
     private function unarchivedChild(MasterData $record): ?MasterChild
     {
         foreach ($this->childMasters() as $child) {
@@ -424,6 +454,7 @@ abstract class MasterDataController extends Controller
      * "1000.00" dari database sementara payload membawa float 1000.0, dan perbandingan
      * strict di bawah menganggapnya berbeda.
      *
+     * @param  TModel  $record
      * @param  array<string, mixed>  $payload
      */
     private function replay(MasterData $record, array $payload): JsonResponse
@@ -441,7 +472,10 @@ abstract class MasterDataController extends Controller
         return response()->json(['data' => $this->present($record)], 200, ['Idempotent-Replayed' => 'true']);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  TModel  $record
+     * @return array<string, mixed>
+     */
     private function present(MasterData $record): array
     {
         $data = [
@@ -487,6 +521,7 @@ abstract class MasterDataController extends Controller
      * transaksi atau kombinasi beberapa field.
      *
      * @param  array<string, mixed>  $data
+     * @param  TModel|null  $record
      */
     protected function afterWriteValidation(array $data, string $tenantId, bool $creating, ?MasterData $record = null): void {}
 
@@ -504,6 +539,7 @@ abstract class MasterDataController extends Controller
     /**
      * Kolom tambahan yang disajikan pada respons.
      *
+     * @param  TModel  $record
      * @return array<string, mixed>
      */
     protected function extraPresent(MasterData $record): array
@@ -514,8 +550,8 @@ abstract class MasterDataController extends Controller
     /**
      * Memperkaya query master tanpa menambah query per baris.
      *
-     * @param  Builder<MasterData>  $query
-     * @return Builder<MasterData>
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     protected function prepareQuery(Builder $query, ?Request $request = null): Builder
     {

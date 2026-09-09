@@ -2,7 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,6 +28,7 @@ use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\WorkOrderStatus;
+use stdClass;
 
 /**
  * Work order pemeliharaan aset.
@@ -242,7 +245,7 @@ class PemeliharaanAsetController extends Controller
      * `withTrashed` karena replay idempoten harus tetap menemukan dokumen yang sudah
      * diarsipkan; tanpa itu permintaan ulang mencoba menyisipkan baris kembar.
      */
-    private function replay(string $key): ?object
+    private function replay(string $key): ?stdClass
     {
         return PemeliharaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
     }
@@ -448,8 +451,10 @@ class PemeliharaanAsetController extends Controller
      * Hasilnya sengaja baris mentah, bukan model: jawabannya memuat kolom gabungan dari
      * beberapa tabel yang tidak dimiliki model mana pun. Penyaringan tenant tetap datang
      * dari scope model, yang sudah diterapkan sebelum query diturunkan.
+     *
+     * @param  Builder<PemeliharaanAset>  $query
      */
-    private function withLookups(mixed $query): mixed
+    private function withLookups(Builder $query): QueryBuilder
     {
         return $query
             ->leftJoin('aset_m_tipe_work_order as tipe', function ($join): void {
@@ -474,8 +479,8 @@ class PemeliharaanAsetController extends Controller
             ->toBase();
     }
 
-    /** @return Collection<int, object> */
-    private function jobLines(string $workOrderId): mixed
+    /** @return Collection<int, stdClass> */
+    private function jobLines(string $workOrderId): Collection
     {
         return PemeliharaanAsetDetail::query()
             ->leftJoin('aset_tr_penerimaan_aset as aset', function ($join): void {
@@ -506,7 +511,7 @@ class PemeliharaanAsetController extends Controller
             ]);
     }
 
-    private function workOrder(Request $request, string $id): object
+    private function workOrder(Request $request, string $id): stdClass
     {
         // Setiap kolom di sini disebut lengkap dengan nama tabelnya, dan itu keharusan:
         // `withLookups()` di bawah menyambung dua tabel master yang sama-sama punya kolom

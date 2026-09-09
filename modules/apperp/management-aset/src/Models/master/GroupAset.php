@@ -9,6 +9,20 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * Dynamics 365 F&O. Datar dan berdiri sendiri, tetapi membawa perlakuan akuntansi:
  * referensi kelompok harta fiskal, ambang kapitalisasi, dan lapisan pembukuan yang
  * diizinkan.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan
+ * pada `MasterData`. `capitalization_threshold` di-cast `decimal:2`, jadi Eloquent
+ * memulangkannya sebagai string dan bukan float. `tipe_harta`, `default_book_code`, dan
+ * `default_depreciation_profile_id` adalah kolom lama yang masih ada di tabel; keduanya
+ * yang terakhir mendahului matriks group x buku.
+ *
+ * @property ?string $kelompok_harta_fiskal_id
+ * @property ?string $property_type
+ * @property ?string $asset_location_id
+ * @property ?string $capitalization_threshold
+ * @property ?string $tipe_harta
+ * @property ?string $default_depreciation_profile_id
+ * @property ?string $default_book_code
  */
 class GroupAset extends MasterData
 {

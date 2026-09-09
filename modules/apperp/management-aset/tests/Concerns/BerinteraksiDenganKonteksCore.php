@@ -445,6 +445,10 @@ trait BerinteraksiDenganKonteksCore
         );
     }
 
+    /**
+     * @param  list<string>  $izin
+     * @param  list<array{policy_code:string,legal_entity_id?:?string,organization_id?:?string,include_descendants?:bool}>  $kebijakanData
+     */
     protected function sebagaiPengguna(string $tenantId, array $izin, array $kebijakanData = [], ?string $nama = null): static
     {
         // Test isolasi antar tenant menyusun tenant kedua dengan `Str::ulid()` dan menaruh
@@ -758,12 +762,22 @@ trait BerinteraksiDenganKonteksCore
                 ['from' => 'periksa', 'to' => 'selesai', 'outcome' => 'approve'],
             ];
 
+        // Langkah dan tepi disusun dari kondisi yang sama, jadi setiap kunci yang disebut tepi
+        // pasti sudah punya elemen. Yang dicari di sini tetap dibaca dengan penjagaan: bila
+        // suatu saat kedua daftar itu tidak lagi sejalan, test harus berhenti dengan sebab
+        // yang jelas, bukan memasukkan baris transisi dengan kunci asing yang kosong.
+        $idElemen = static function (string $kunci) use ($elemen): string {
+            return $elemen[$kunci] ?? throw new \RuntimeException(
+                sprintf('Graf workflow uji tidak punya elemen "%s".', $kunci),
+            );
+        };
+
         foreach ($tepiGraf as $tepi) {
             DB::table('workflow_transitions')->insert([
                 'id' => (string) Str::ulid(),
                 'version_id' => $versiId,
-                'from_element_id' => $elemen[$tepi['from']],
-                'to_element_id' => $elemen[$tepi['to']],
+                'from_element_id' => $idElemen($tepi['from']),
+                'to_element_id' => $idElemen($tepi['to']),
                 'outcome' => $tepi['outcome'],
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -774,7 +788,7 @@ trait BerinteraksiDenganKonteksCore
     /**
      * Tugas persetujuan yang sedang menunggu seorang pemeriksa.
      */
-    protected function tugasMenunggu(string $tenantId, string $idKeanggotaanPemeriksa): ?object
+    protected function tugasMenunggu(string $tenantId, string $idKeanggotaanPemeriksa): ?\stdClass
     {
         return DB::table('workflow_work_items')
             ->where('tenant_id', $tenantId)

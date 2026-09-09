@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterLinkController;
@@ -17,6 +19,8 @@ use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
  * masa manfaat dan konvensi apa. Nilainya menjadi default
  * yang disalin ke buku aset saat aset diterima, bukan acuan hidup: mengubah matriks
  * tidak menulis ulang aset yang sudah berjalan.
+ *
+ * @extends MasterLinkController<GroupBukuPenyusutan>
  */
 class GroupBukuPenyusutanController extends MasterLinkController
 {
@@ -35,9 +39,9 @@ class GroupBukuPenyusutanController extends MasterLinkController
         return 'group_aset_id';
     }
 
-    protected function model(): string
+    protected function query(bool $termasukArsip = false): Builder
     {
-        return GroupBukuPenyusutan::class;
+        return $termasukArsip ? GroupBukuPenyusutan::withTrashed() : GroupBukuPenyusutan::query();
     }
 
     protected function rowRules(string $tenantId): array
@@ -86,7 +90,7 @@ class GroupBukuPenyusutanController extends MasterLinkController
             }
             $book = $books->get($row['buku_id'] ?? '');
             foreach (['depreciation_profile_id', 'alternative_profile_id'] as $field) {
-                if (! empty($book?->{$field})) {
+                if (! empty($book->{$field})) {
                     $profileIds[] = $book->{$field};
                 }
             }
@@ -159,8 +163,13 @@ class GroupBukuPenyusutanController extends MasterLinkController
         ];
     }
 
-    /** @param array<string, object> $profiles @param array<string, string> $errors */
-    private function profile($profiles, ?string $id, array &$errors, string $key): ?object
+    /**
+     * Profil yang dipakai satu baris, sekaligus tempat seluruh pemeriksaannya.
+     *
+     * @param  Collection<int|string, ProfilPenyusutan>  $profiles  dikunci id profil
+     * @param  array<string, string>  $errors
+     */
+    private function profile(Collection $profiles, ?string $id, array &$errors, string $key): ?ProfilPenyusutan
     {
         if (! $id) {
             return null;

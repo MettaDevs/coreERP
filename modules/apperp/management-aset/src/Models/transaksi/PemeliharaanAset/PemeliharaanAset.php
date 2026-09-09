@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * Header work order pemeliharaan aset.
@@ -16,6 +17,28 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * Tiga pasang waktu yang tidak boleh saling menggantikan: yang diharapkan pemohon, yang
  * dijadwalkan perencana, dan yang benar-benar terjadi di lapangan.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $creation_key
+ * @property string $kode
+ * @property string $legal_entity_id
+ * @property string $responsible_org_unit_id
+ * @property string $tipe_work_order_id
+ * @property ?string $tingkat_layanan_id
+ * @property ?string $keterangan
+ * @property ?string $penanggung_jawab_user_id
+ * @property ?Carbon $diharapkan_mulai
+ * @property ?Carbon $diharapkan_selesai
+ * @property ?Carbon $dijadwalkan_mulai
+ * @property ?Carbon $dijadwalkan_selesai
+ * @property ?Carbon $aktual_mulai
+ * @property ?Carbon $aktual_selesai
+ * @property string $status
+ * @property int $version
+ * @property ?Carbon $deleted_at
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
  */
 class PemeliharaanAset extends Model
 {
@@ -31,6 +54,7 @@ class PemeliharaanAset extends Model
         'aktual_mulai', 'aktual_selesai', 'status', 'version',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [
@@ -44,11 +68,13 @@ class PemeliharaanAset extends Model
         ];
     }
 
+    /** @return HasMany<PemeliharaanAsetDetail, $this> */
     public function details(): HasMany
     {
         return $this->hasMany(PemeliharaanAsetDetail::class, 'pemeliharaan_aset_id');
     }
 
+    /** @return HasMany<PemeliharaanAsetStatusLog, $this> */
     public function statusLog(): HasMany
     {
         return $this->hasMany(PemeliharaanAsetStatusLog::class, 'pemeliharaan_aset_id');

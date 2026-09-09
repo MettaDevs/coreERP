@@ -7,6 +7,11 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 /**
  * Urgensi penanganan sebuah work order; padanan "Service level" pada modul Asset
  * management Dynamics 365 F&O.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan pada
+ * `MasterData`. `urutan` yang lebih kecil berarti lebih mendesak.
+ *
+ * @property int $urutan
  */
 class TingkatLayanan extends MasterData
 {

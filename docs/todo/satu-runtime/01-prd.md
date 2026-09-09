@@ -4080,6 +4080,94 @@ sekali.
 
 **Bergantung pada.** F3-05, F3-20.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026. **406 temuan di 87 berkas menjadi nol**, tanpa satu pun
+`@phpstan-ignore`, `assert()`, `@var` inline, cast pembungkam, maupun baris baru pada
+`phpstan-baseline.neon` — baseline tidak disentuh sama sekali.
+
+Angka pembukanya 406, bukan 405 seperti yang tertulis di atas. Selisih satu itu muncul karena
+pengukuran pertama memakai keluaran yang **terpotong**: pemformat keluaran repo ini hanya
+menampilkan 30 baris rincian lalu menutup dengan `"truncated": true`, sementara angka `errors`
+di baris yang sama tetap benar. Tanpa `-v`, daftar rinciannya tidak dapat dipakai membagi
+pekerjaan. Itu catatan yang berlaku untuk siapa pun yang mengukur ulang.
+
+**Dikerjakan lima agen paralel dengan kepemilikan berkas yang tegas**, model lebih dulu karena
+sisanya bergantung padanya: model master, model transaksi, service/support/laporan, controller
+master, controller transaksi, lalu test. Urutan itu terbukti benar — 43 temuan di controller
+lenyap tanpa disentuh begitu anotasi modelnya mendarat.
+
+**Empat temuan yang paling menentukan bentuk pekerjaan ini.**
+
+1. **`MasterDataController` menjadi generic.** Sekitar 43 temuan berbunyi `MasterData::$x`
+   dengan tipe **kelas induk abstrak**, bukan anaknya. Kolomnya memang milik anak; menuliskannya
+   pada induk berarti setiap master seolah punya kolom itu. Sebabnya kontravariansi PHP:
+   `extraPresent(MasterData $record)` tidak boleh disempitkan anak. Jalan keluarnya
+   `@template TModel of MasterData` pada induk dan `@extends MasterDataController<GroupAset>`
+   pada 22 anaknya — tanda tangan PHP tidak disentuh.
+
+2. **Larastan menciutkan parameter tipe yang lewat `class-string<T>`.** Dibuktikan dengan
+   `PHPStan\dumpType()`: `$model::query()` dan `(new $model)->newQuery()` sama-sama jatuh ke
+   `Builder<MasterData>`, sedangkan `new $model` benar-benar `TModel`. Satu-satunya jalur yang
+   mempertahankannya `Builder::setModel()`, yang beranotasi `@return static<TModelNew>`.
+
+3. **Syarat soft delete pada model tabel penghubung akhirnya bisa gagal.** Kontrak
+   `MasterLinkController::model(): class-string<Model>` diganti
+   `query(bool $termasukArsip = false): Builder<TModel>`, dan tiap anak menuliskannya pada model
+   konkretnya: `GroupBukuPenyusutan::withTrashed()`. `withTrashed()` hanya ada pada model
+   bersoft-delete, jadi PHPStan benar-benar memeriksanya — dibuktikan dengan menukarnya ke model
+   tanpa `SoftDeletes` dan mendapat `Call to an undefined static method`. Ini yang menutup
+   lubang yang ditinggalkan pembatalan `DataPenghubung`.
+
+4. **Empat temuan terakhir menuntut keputusan, bukan anotasi.**
+   `DB::raw('round(accumulated_depreciation + '.(float) $period->amount.', 2)')` melanggar
+   `literal-string`, dan tidak ada anotasi yang membereskannya: `update()` Laravel tidak dapat
+   mengikat parameter di dalam ekspresi SET. Yang dipakai `incrementEach()` — API Laravel untuk
+   persis keperluan ini. Ia menyusun ekspresi `kolom + n` yang sama, menolak nilai yang bukan
+   angka, dan ikut mengisi `updated_at`. Penambahannya tetap dikerjakan database, dan itu yang
+   penting: pada `finalize()` yang terkunci hanya periodenya, sehingga menghitung di PHP akan
+   kehilangan pembaruan bila dua periode satu buku difinalkan bersamaan.
+
+   `round(..., 2)` yang dulu ditulis di sana dibuang karena ia tidak pernah mengubah apa pun:
+   kedua kolom `decimal(18,2)`, dan PostgreSQL membulatkan ke skala kolom saat menyimpan.
+   Dibuktikan test, bukan diperkirakan: 38 test penyusutan — termasuk ujung ke ujung dan
+   pembalikan periode — hijau dengan 428 asersi.
+
+**Dua bug sungguhan ditemukan analisa tipe, bukan oleh test.**
+
+- `ProvisionIndonesiaStarterData::forTenant()` menyatakan lima kunci lebih sedikit daripada yang
+  benar-benar dipulangkannya, dan penjagaan `template_key` meloloskan konfigurasi yang tidak
+  punya kunci itu sama sekali (`null === null`) lalu membacanya di baris berikutnya.
+- `BuiltinLayout::ref()` menyebut kelas `LayoutRef` tanpa `use`, jadi ia menunjuk kelas yang
+  tidak ada di namespace module; memanggilnya berakhir fatal. Method itu tidak dipanggil dari
+  mana pun, dan kelas aslinya milik Core di luar `Contracts\*`, jadi ia dibuang.
+
+Ditambah tiga docblock yang **salah**, bukan sekadar hilang: dua `@return array<string, string>`
+pada metode yang memulangkan `static`, dan satu docblock yatim di trait test yang menempel ke
+properti di bawahnya sehingga `@param`-nya tidak pernah terbaca PHP maupun PHPStan.
+
+**Dua jebakan alat yang memakan waktu, dan keduanya akan berulang.**
+
+- **Simpanan hasil PHPStan menyembunyikan temuan.** Sebuah berkas dilaporkan dengan temuan yang
+  merujuk keadaan yang sudah tidak ada di disk; begitu simpanannya dibatalkan, temuan yang
+  sebenarnya muncul. Angka nol pada task ini diukur setelah `phpstan clear-result-cache`.
+- **Beberapa proses test pada satu schema PostgreSQL saling menghancurkan.** Lima agen yang
+  menjalankan `RefreshDatabase` bersamaan menghasilkan `deadlock detected`,
+  `relation "tenants" does not exist`, dan duplikat `pg_class` — puluhan kegagalan yang tidak
+  satu pun menyebut kode. Alur CI sudah menyediakan jalan keluarnya (`DB_TEST_SCHEMA`, lihat
+  `.github/workflows/tests.yml`); kerja paralel berikutnya harus memberi tiap agen schema
+  sendiri. Verifikasi test pada task ini dijalankan serial setelah seluruh agen selesai.
+
+**Batas memori dinaikkan lebih dulu**, dari 512M ke 1G pada `composer types:check`. Angka lama
+cukup hanya selama modulnya dikecualikan; begitu 86 berkas tambahan beserta grafik tipe Eloquent
+ikut masuk, analisanya berhenti dengan pesan yang tidak menyebut modul sama sekali.
+
+**`ModulTanpaAnalisaTipe` kini kosong, dan kedua aturannya tetap bisa merah.** Daftar kosong
+membuat pemeriksaan yang membacanya hijau tanpa subjek — keadaan yang berulang kali dilarang
+berkas itu sendiri. Karena itu syarat "alasan menyebut angka terukur" dan "tenggat ditulis
+YYYY-MM-DD" sekarang dibuktikan pada entri buatan, sama seperti cara `tenggatYangLewat()` sudah
+dibuktikan sejak awal.
+
 ### F3-30 — Modul aset keluar dari daftar pemindahan
 
 **Kenapa.** Ini kriteria keluar fase 3 yang sebenarnya. Selama entrinya ada di
@@ -4143,6 +4231,85 @@ sebagai module yang dilayani.
 **Rujukan.** Catatan pelaksanaan F3-05 langkah 3, `App\Support\Modules\ModulSedangDipindah`.
 
 **Bergantung pada.** F3-05, F3-14, F3-20.
+
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Langkah 1 dikerjakan terbalik dari yang tertulis, dan alasannya menentukan.** Rencananya
+fixture katalog test Core mendaftarkan manifest modul apa adanya. Dua hal membuat itu salah
+arah begitu diperiksa terhadap manifest yang sungguhan:
+
+- **Sifat yang dibutuhkan fixture tidak ada di manifest.** Fixture menyimpan satu entry point
+  yang sengaja tidak masuk privilege maupun duty mana pun; tanpa itu, tidak ada cara menguji
+  rantai izin buatan admin tenant, karena owner menerima seluruh duty app yang di-entitle. Pada
+  manifest aset **setiap** permission ada di sebuah privilege dan **setiap** privilege ada di
+  sebuah duty — diperiksa, bukan diperkirakan. Sifat itu memang tidak bisa diambil dari sana.
+- **Ongkosnya jatuh ke seluruh suite.** Mendaftarkan manifest sungguhan pada fixture bersama
+  berarti 65 entry point, 122 permission, 64 privilege, dan 36 duty ditulis ulang di setiap test
+  yang menyentuh katalog, dan setiap pendaftaran usaha ikut memasang modulnya — migration dan
+  penyemaian data awal — pada ratusan test yang tidak ada urusannya dengan aset.
+
+Yang sebenarnya salah bukan isi fixture, melainkan **namanya**. Fixture itu bukan salinan buruk
+dari modul aset; ia bahan uji rantai izin milik Core yang kebetulan meminjam id produk. Selama
+`management-aset` belum dilayani, pinjaman itu tidak berakibat apa-apa. Begitu modulnya
+dilayani, satu id menunjuk dua hal, dan `RegisterBusiness` memilih yang salah.
+
+Perbaikannya karena itu satu baris makna: fixture memakai id `app-uji`, yang tidak akan pernah
+menjadi folder di `modules/`. Setelah itu tidak ada lagi dua sumber kebenaran untuk
+`management-aset` — yang tersisa hanya manifest — dan tidak ada satu pun test Core yang memasang
+modul sungguhan tanpa meminta.
+
+**Yang ikut berubah karena penamaan itu.** 20 berkas test, sekitar 200 sebutan. Dua di antaranya
+tidak boleh ikut diganti dan memang tidak diganti:
+
+- `WorkflowConfigurationTest` baris 285 — nama module pada `coreerp.event_endpoints`. Penjaga di
+  sana membuktikan penerima yang **dimuat runtime ini** tidak dikirimi lewat HTTP; ia hanya
+  berarti bila namanya module yang sungguhan.
+- `NoInternalHttpTest`, `AnggaranQueryPermintaanModuleTest`, `ReportingTest`, dan
+  `RegisterAppManifestModuleTest` seluruhnya memang menguji modul aset.
+
+`TenantRegistrationInstallsModulesTest` menyimpan satu test bernama "app yang belum dipindah
+tetap memakai jalur penempatan container". Perannya tidak lagi bisa dipegang modul aset, dan
+sekarang dipegang `app-uji` — id yang ada di katalog tetapi tidak ada sebagai folder module.
+Itu tepat pertanyaan yang dipakai `RegisterBusiness` untuk memilih jalur.
+
+**Angka yang diukur ulang setelah pengecualiannya dibuang.**
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| Lima penjaga batas memindai modul tanpa pengecualian | 22 test hijau |
+| `npm run types:check` dengan `tsconfig.json` tanpa `exclude` | nol error |
+| `npm run format:check` dengan `.prettierignore` tanpa entri | seluruh berkas sesuai |
+| `php artisan module:list` | `management-aset` tampil sebagai `business-app` |
+| `app:register-manifest --dry-run` | 65 entry point, 122 permission, 64 privilege, 36 duty, 29 referensi nomor |
+
+**`pemblokir` tetap ada, tetapi sekarang diuji pada entri buatan.** Daftarnya kosong, jadi kedua
+pemeriksaan yang membacanya kehilangan subjek dan menjadi hijau tanpa menguji apa pun — persis
+keadaan yang berulang kali dilarang berkas itu sendiri. `ModulSedangDipindahTest` karena itu
+membuktikan keduanya pada daftar buatan: penghalang tanpa nomor task ditolak, dan entri yang
+menyatakan penghalang tidak dihitung basi walau modulnya sudah bersih.
+
+**Akibat lain yang dicari dan ditemukan, tepat satu.** `ModuleRegistryTest` menuliskan daftar
+module yang dilayani secara lengkap — `['contoh-a', 'contoh-b']` — dan daftar itu memang harus
+berubah, karena itulah artinya modul menjadi dilayani. Ditulis lengkap dan bukan "berisi" dengan
+sengaja: daftar yang hanya diperiksa keberadaannya tidak akan pernah menandai module yang
+**hilang** dari runtime. Jumlah baris katalog, `ModuleReadinessTest`, dan test peluncuran produk
+tidak terpengaruh setelah fixture memakai id sendiri.
+
+**Suite penuh: 521 test, 520 lulus, 1 dilewati, nol gagal**, dijalankan serial setelah seluruh
+agen selesai.
+
+**Satu jebakan lingkungan yang akan berulang.** Menjalankan seluruh suite dalam satu proses
+dengan `memory_limit` bawaan CLI 128M berakhir `Fatal error: Premature end of PHP process` pada
+test yang tidak ada hubungannya dengan sebabnya — pesannya menyebut test berikutnya, bukan
+kehabisan memori. CI tidak terkena karena `setup-php` melepas batasnya dan run-nya `--parallel`.
+Secara lokal, jalankan `php -d memory_limit=1G vendor/bin/phpunit`.
+
+**Yang ikut disederhanakan.** `ReportingTest` tidak lagi menyalin manifest ke folder bernama
+lain — akal-akalan yang hanya perlu selama modulnya belum dilayani. Ia juga tidak lagi menyiapkan
+urutan nomor sendiri: pendaftaran usaha memasang modulnya, dan `InstallModule` yang membuatnya,
+lewat jalur yang sama dengan yang dijalankan admin on-prem.
 
 ## 11. Fase 4: UI menjadi satu build
 

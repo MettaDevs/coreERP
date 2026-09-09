@@ -7,12 +7,23 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * Penempelan tipe atribut pada jenis aset; aset mewarisi atribut dari jenisnya.
  *
  * Bukan master penuh: tanpa kode dan tanpa nama. `wajib` di sini berarti aset dari jenis
  * tersebut harus mengisi atribut itu, bukan bahwa penempelannya sendiri wajib ada.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $jenis_aset_id
+ * @property string $tipe_atribut_id
+ * @property bool $wajib
+ * @property int $urutan
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property ?Carbon $deleted_at
  */
 class JenisAsetAtribut extends Model
 {

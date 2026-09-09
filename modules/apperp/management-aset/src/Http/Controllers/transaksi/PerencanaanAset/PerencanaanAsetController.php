@@ -19,6 +19,7 @@ use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
+use stdClass;
 
 /**
  * Rencana pengadaan aset satu tahun anggaran.
@@ -159,7 +160,7 @@ class PerencanaanAsetController extends Controller
      * `withTrashed` karena replay idempoten harus tetap menemukan rencana yang sudah
      * diarsipkan; tanpa itu permintaan ulang mencoba menyisipkan baris kembar.
      */
-    private function replay(string $key): ?object
+    private function replay(string $key): ?stdClass
     {
         return PerencanaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
     }
@@ -189,7 +190,10 @@ class PerencanaanAsetController extends Controller
         return $data;
     }
 
-    /** @param list<array<string, mixed>> $details */
+    /**
+     * @param  list<array<string, mixed>>  $details
+     * @return array<string, array{id: string, code: string, name: string, symbol: ?string, decimal_places: int}>
+     */
     private function validateLookupMasters(string $tenant, array $details, DaftarSatuanAset $units): array
     {
         $ids = array_values(array_unique(array_column($details, 'jenis_aset_id')));
@@ -204,11 +208,12 @@ class PerencanaanAsetController extends Controller
         }
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     private function header(Request $request, array $data, string $key, string $kode, bool $new = true): array
     {
-        $total = collect($data['details'])->sum(fn (array $detail): float => (float) $detail['quantity'] * (float) ($detail['estimated_unit_price'] ?? 0));
-
         return array_filter([
             'id' => $new ? (string) Str::ulid() : null,
             'tenant_id' => $new ? $this->tenant($request) : null,
@@ -217,13 +222,29 @@ class PerencanaanAsetController extends Controller
             'legal_entity_id' => $data['legal_entity_id'], 'planning_org_unit_id' => $data['planning_org_unit_id'],
             'planned_on' => $data['planned_on'], 'planning_year' => $data['planning_year'], 'planning_type' => $data['planning_type'],
             'funding_source' => $data['funding_source'] ?? null, 'responsible_user_id' => (string) $request->attributes->get('coreerp.user_id'),
-            'total_estimated_value' => $total, 'description' => $data['description'] ?? null,
+            'total_estimated_value' => $this->totalEstimasi($data['details']), 'description' => $data['description'] ?? null,
             'status' => $new ? 'draft' : null, 'version' => $new ? 1 : null,
             'created_at' => $new ? now() : null, 'updated_at' => now(),
         ], static fn ($value) => $value !== null);
     }
 
-    /** @param list<array<string, mixed>> $details */
+    /**
+     * Nilai rencana seluruh baris.
+     *
+     * Berdiri sendiri karena `header()` menerima hasil `validate()` yang nilainya tidak
+     * bertipe; barisnya baru dapat dinyatakan bentuknya di sini.
+     *
+     * @param  list<array<string, mixed>>  $details
+     */
+    private function totalEstimasi(array $details): float
+    {
+        return collect($details)->sum(fn (array $detail): float => (float) $detail['quantity'] * (float) ($detail['estimated_unit_price'] ?? 0));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $details
+     * @param  array<string, array{id: string, code: string, name: string, symbol: ?string, decimal_places: int}>  $units
+     */
     private function replaceDetails(string $planId, array $details, array $units): void
     {
         $types = JenisAset::query()->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
@@ -245,7 +266,8 @@ class PerencanaanAsetController extends Controller
         return (string) validator(['key' => $request->header('Idempotency-Key')], ['key' => ['required', 'string', 'max:154', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate()['key'];
     }
 
-    private function plan(Request $request, string $id): object
+    /** Baris mentah hasil `toBase()`: sebuah `stdClass`, bukan model. */
+    private function plan(Request $request, string $id): stdClass
     {
         $query = PerencanaanAset::query()->where('id', $id);
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');

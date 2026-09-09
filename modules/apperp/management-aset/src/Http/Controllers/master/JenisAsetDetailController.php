@@ -11,6 +11,7 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeAssetType;
 use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
+use stdClass;
 
 /**
  * Berapa banyak data yang menggantung pada satu jenis aset, untuk kotak angka pada panel
@@ -82,11 +83,19 @@ class JenisAsetDetailController extends Controller
      * Tabel yang di-`join` berada di luar jangkauan scope tenant, jadi penyaringan tenant
      * dan soft delete pabrikan ditulis di klausa `join` — persis seperti sebelumnya.
      *
+     * `toBase()` melepaskan hasilnya dari model. Tiga kolom di bawah dinamai ulang lewat
+     * alias — `manufacturer`, `model`, `description` — dan tak satu pun dari ketiganya
+     * adalah kolom `aset_m_model_aset`. Dihidrasi sebagai `ModelAset`, baris hasilnya
+     * berpura-pura punya kolom yang tidak ada di tabelnya. `toBase()` tetap menjalankan
+     * global scope lebih dahulu, jadi batas tenant dan soft delete model tidak berubah;
+     * yang berubah hanya bentuk barisnya menjadi `stdClass`, dan bentuk itu tidak keluar
+     * dari metode ini.
+     *
      * @return list<array<string, mixed>>
      */
     private function models(string $tenantId, ?string $jenisAsetId = null): array
     {
-        return ModelAset::query()
+        return array_values(ModelAset::query()
             ->leftJoin('aset_m_pabrikan_aset as pabrikan', function ($join) use ($tenantId): void {
                 $join->on('pabrikan.id', '=', 'aset_m_model_aset.pabrikan_aset_id')
                     ->where('pabrikan.tenant_id', $tenantId)
@@ -99,6 +108,7 @@ class JenisAsetDetailController extends Controller
             )
             ->orderBy('pabrikan.nama')
             ->orderBy('aset_m_model_aset.nama')
+            ->toBase()
             ->get([
                 'aset_m_model_aset.id',
                 'pabrikan.nama as manufacturer',
@@ -106,13 +116,13 @@ class JenisAsetDetailController extends Controller
                 'aset_m_model_aset.model_number',
                 'aset_m_model_aset.keterangan as description',
             ])
-            ->map(static fn (object $model): array => [
+            ->map(static fn (stdClass $model): array => [
                 'id' => (string) $model->id,
                 'manufacturer' => $model->manufacturer,
                 'model' => $model->model,
                 'model_number' => $model->model_number,
                 'description' => $model->description,
             ])
-            ->all();
+            ->all());
     }
 }

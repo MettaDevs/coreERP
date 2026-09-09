@@ -24,6 +24,7 @@ use Modules\Apperp\ManagementAset\Services\MaintenanceChecklistSnapshot;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\WorkOrderStatus;
 use Modules\Apperp\ManagementAset\Support\WorkOrderValidation;
+use stdClass;
 
 /**
  * Pelaksanaan work order: perpindahan status, pengisian checklist, dan daftar pekerjaan
@@ -327,7 +328,7 @@ class PelaksanaanController extends Controller
      *
      * @return list<string> peringatan yang dilewati; kosong bila tidak ada
      */
-    private function pastikanSyaratTerpenuhi(object $workOrder, string $target): array
+    private function pastikanSyaratTerpenuhi(stdClass $workOrder, string $target): array
     {
         $jobs = PemeliharaanAsetDetail::query()
             ->where('pemeliharaan_aset_id', $workOrder->id)->toBase()->get();
@@ -360,7 +361,7 @@ class PelaksanaanController extends Controller
      * pertama membuat pengguna memperbaiki satu hal, mencoba lagi, lalu ditolak lagi karena
      * hal berikutnya; semua kekurangan sebaiknya disebut sekaligus.
      *
-     * @param  Collection<int, object>  $jobs
+     * @param  Collection<int, stdClass>  $jobs
      * @return list<string>
      */
     private function terapkanAturanValidasi(string $target, Collection $jobs): array
@@ -393,7 +394,7 @@ class PelaksanaanController extends Controller
         return $peringatan;
     }
 
-    /** @param Collection<int, object> $jobs */
+    /** @param Collection<int, stdClass> $jobs */
     private function hitungPelanggaran(string $aturan, Collection $jobs): int
     {
         return match ($aturan) {
@@ -434,9 +435,9 @@ class PelaksanaanController extends Controller
 
             $berlaku = $baris->where('tidak_berlaku', false);
             $hasil = match (true) {
-                $berlaku->contains(fn (object $row): bool => $row->result_code === 'fail') => 'gagal',
+                $berlaku->contains(fn (stdClass $row): bool => $row->result_code === 'fail') => 'gagal',
                 $berlaku->isEmpty() => 'tidak_berlaku',
-                $berlaku->contains(fn (object $row): bool => $row->result_code === 'none') => 'tidak_dinilai',
+                $berlaku->contains(fn (stdClass $row): bool => $row->result_code === 'none') => 'tidak_dinilai',
                 default => 'lulus',
             };
             PemeliharaanAsetDetail::query()
@@ -445,7 +446,7 @@ class PelaksanaanController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function capWaktu(object $workOrder, string $target): array
+    private function capWaktu(stdClass $workOrder, string $target): array
     {
         if ($target === WorkOrderStatus::DIKERJAKAN && $workOrder->aktual_mulai === null) {
             return ['aktual_mulai' => now()];
@@ -458,7 +459,7 @@ class PelaksanaanController extends Controller
     }
 
     /** Nilai variabel harus berasal dari pilihannya; pengukuran harus berupa angka. */
-    private function pastikanNilaiSah(object $row, ?string $nilai): void
+    private function pastikanNilaiSah(stdClass $row, ?string $nilai): void
     {
         if ($nilai === null || $nilai === '') {
             return;
@@ -476,7 +477,7 @@ class PelaksanaanController extends Controller
     }
 
     /** Hasil pilihan melekat pada variabel; rentang pengukuran mengevaluasi angka langsung. */
-    private function resultCode(object $row, ?string $nilai): ?string
+    private function resultCode(stdClass $row, ?string $nilai): ?string
     {
         if ($nilai === null || $nilai === '') {
             return null;
@@ -511,7 +512,7 @@ class PelaksanaanController extends Controller
             ->where(['baris.id' => $sumberId, self::TABEL_NILAI.'.value' => $nilai]);
     }
 
-    /** @return Collection<int, object> */
+    /** @return Collection<int, stdClass> */
     private function barisChecklist(string $jobId): Collection
     {
         $rows = PemeliharaanAsetChecklist::query()
@@ -530,14 +531,14 @@ class PelaksanaanController extends Controller
             ->get([self::TABEL_BARIS_TEMPLATE.'.id as source_id', 'nilai.value', 'nilai.result_code'])
             ->groupBy('source_id');
 
-        return $rows->map(function (object $row) use ($variables): object {
+        return $rows->map(function (stdClass $row) use ($variables): stdClass {
             $row->pilihan = $variables->get($row->sumber_id, collect())->values();
 
             return $row;
         });
     }
 
-    private function jobLine(Request $request, string $workOrderId, string $jobId): object
+    private function jobLine(Request $request, string $workOrderId, string $jobId): stdClass
     {
         $this->workOrder($request, $workOrderId);
 
@@ -546,7 +547,7 @@ class PelaksanaanController extends Controller
         ])->toBase()->firstOrFail();
     }
 
-    private function workOrder(Request $request, string $id): object
+    private function workOrder(Request $request, string $id): stdClass
     {
         $query = PemeliharaanAset::query()->where('id', $id);
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'responsible_org_unit_id');
