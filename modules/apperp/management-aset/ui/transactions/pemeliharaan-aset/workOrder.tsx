@@ -1,4 +1,5 @@
 import { Badge } from '@apperp/ui/badge';
+import { router } from '@inertiajs/react';
 
 /**
  * Bentuk data, kosakata status, dan navigasi work order — dipakai bersama oleh daftar
@@ -165,20 +166,18 @@ export const izin = (permissions: string[]) => (action: string) =>
  * Rincian punya alamatnya sendiri, sama seperti di daftar mana pun yang membuka record
  * pada halaman terpisah. Karena itu tombol kembali peramban, muat ulang, dan tautan yang
  * disalin ke rekan kerja semuanya mendarat di work order yang sama, bukan di daftar.
+ *
+ * Alamatnya kini rute shell — `/management-aset/pemeliharaan-aset/<id>/ubah` — bukan lagi
+ * ruas sesudah tanda pagar. Perpindahannya kunjungan Inertia, bukan `window.location`:
+ * yang terakhir memuat ulang seluruh dokumen, dan justru itu yang dibuang fase ini.
  */
 export const RESOURCE = 'pemeliharaan-aset';
-export const bukaDaftar = () => {
-    window.location.hash = `#/${RESOURCE}`;
-};
-export const bukaWorkOrder = (id: string) => {
-    window.location.hash = `#/${RESOURCE}/${id}`;
-};
-export const bukaWorkOrderUbah = (id: string) => {
-    window.location.hash = `#/${RESOURCE}/${id}/ubah`;
-};
-export const bukaWorkOrderBaru = () => {
-    window.location.hash = `#/${RESOURCE}/baru`;
-};
-export const bukaChecklistJob = (workOrderId: string, jobId: string) => {
-    window.location.hash = `#/${RESOURCE}/${workOrderId}/checklist/${jobId}`;
-};
+const alamat = (...ruas: string[]) =>
+    ['/management-aset', RESOURCE, ...ruas].join('/');
+export const bukaDaftar = () => router.visit(alamat());
+export const bukaWorkOrder = (id: string) => router.visit(alamat(id));
+export const bukaWorkOrderUbah = (id: string) =>
+    router.visit(alamat(id, 'ubah'));
+export const bukaWorkOrderBaru = () => router.visit(alamat('baru'));
+export const bukaChecklistJob = (workOrderId: string, jobId: string) =>
+    router.visit(alamat(workOrderId, 'checklist', jobId));

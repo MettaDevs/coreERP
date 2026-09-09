@@ -1,5 +1,3 @@
-let contextToken = '';
-
 export type ApiValidationErrors = Record<string, string[]>;
 
 export class ApiError extends Error {
@@ -31,11 +29,6 @@ function normalizeValidationErrors(value: unknown): ApiValidationErrors {
             },
         ),
     );
-}
-
-/** Token konteks hanya berasal dari Web Shell; UI tidak pernah menyusun tenant sendiri. */
-export function setContextToken(token: string): void {
-    contextToken = token;
 }
 
 /**
@@ -72,22 +65,49 @@ export function newIdempotencyKey(): string {
 }
 
 /**
- * Alamat API selalu dihitung relatif terhadap dokumen, bukan terhadap root origin.
+ * Awalan rute JSON module, mutlak dari akar dokumen.
  *
- * Di dalam Web Shell, UI ini disajikan same-origin di bawah prefix per placement,
- * sehingga `/api/v1` akan menunjuk control plane, bukan API app ini. Reverse proxy
- * meneruskan seluruh isi prefix — termasuk `api/` — ke container app.
+ * Sebelumnya alamat dihitung relatif terhadap `document.baseURI`, karena UI ini disajikan
+ * di dalam iframe di bawah satu awalan penempatan per app dan reverse proxy meneruskan
+ * seluruh isi awalan itu — termasuk `api/` — ke container app. Awalan itu tidak ada lagi:
+ * layar module berjalan di dokumen shell, dan penyedia layanan module mendaftarkan rutenya
+ * apa adanya di bawah alamat ini.
  */
-function apiUrl(path: string): string {
-    return new URL(`api/v1${path}`, document.baseURI).toString();
+const AWALAN_API = '/api/modules/management-aset/v1';
+
+/** Metode yang dilewati pemeriksa CSRF Laravel, jadi tidak perlu membawa tokennya. */
+const METODE_AMAN = ['GET', 'HEAD', 'OPTIONS'];
+
+/**
+ * Token CSRF, dibaca dari cookie `XSRF-TOKEN` yang dipasang Laravel.
+ *
+ * Isi cookie ditulis peramban dalam bentuk ter-encode, jadi ia harus dikembalikan dengan
+ * `decodeURIComponent` sebelum dikirim. Header yang dibaca `PreventRequestForgery` untuk
+ * nilai ini adalah `X-XSRF-TOKEN`: ia mendekripsi sendiri isinya, karena cookie itu
+ * terenkripsi seperti cookie lain. `X-CSRF-TOKEN` bukan padanannya — header itu menunggu
+ * token sesi mentah, yang tidak pernah sampai ke sisi peramban.
+ */
+function tokenCsrf(): string {
+    const awalan = 'XSRF-TOKEN=';
+    const cookie = document.cookie
+        .split('; ')
+        .find((bagian) => bagian.startsWith(awalan));
+
+    return cookie ? decodeURIComponent(cookie.slice(awalan.length)) : '';
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-    const response = await fetch(apiUrl(path), {
+    const metode = (init?.method ?? 'GET').toUpperCase();
+    // Permintaan memakai sesi Core, bukan token pembawa: tidak ada lagi header
+    // `Authorization`, dan cookie sesi ikut karena permintaannya same-origin.
+    const response = await fetch(`${AWALAN_API}${path}`, {
         ...init,
+        credentials: 'same-origin',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${contextToken}`,
+            ...(METODE_AMAN.includes(metode)
+                ? {}
+                : { 'X-XSRF-TOKEN': tokenCsrf() }),
             ...init?.headers,
         },
     });
