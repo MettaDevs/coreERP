@@ -83,7 +83,15 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
           tools: composer:v2
-          coverage: xdebug
+          # `none`, bukan `xdebug`. Tidak ada satu pun yang memakai hasil coverage di sini:
+          # tidak ada flag --coverage, tidak ada unggahan laporan, dan phpunit.xml tidak punya
+          # elemen <coverage>. Sementara `coverage: xdebug` menyetel xdebug.mode=coverage, yang
+          # membuat PHP melacak setiap baris yang dieksekusi sepanjang run — pajak yang dibayar
+          # untuk laporan yang tidak pernah dicetak.
+          #
+          # Kalau kelak coverage benar-benar dibutuhkan, pakai `pcov`: ia jauh lebih murah
+          # daripada xdebug untuk coverage baris, dan nyalakan hanya pada job yang memakainya.
+          coverage: none
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -114,8 +122,18 @@ jobs:
       # Koneksi test menunjuk schema tersendiri lewat search_path, dan PostgreSQL tidak
       # membuat schema itu sendiri. Di mesin pengembang langkah ini dilakukan tangan
       # sekali, sesuai catatan pada apps/control-plane/.env.example.
+      #
+      # Langkah ini dipertahankan walau alur di bawah berjalan paralel dan tidak memakainya:
+      # mode serial masih membutuhkannya, dan itulah yang dijalankan siapa pun yang menyetel
+      # ulang alur ini atau menjalankan satu berkas test di mesin sendiri.
       - name: Create Test Schema
         run: PGPASSWORD=$DB_TEST_PASSWORD psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" -c "CREATE SCHEMA IF NOT EXISTS $DB_TEST_SCHEMA;"
 
+      # `--parallel`, bukan serial. Terukur di mesin pengembang pada keadaan yang sama:
+      # 9 menit 3 detik menjadi 1 menit 27 detik untuk 499 test yang sama — tidak satu pun
+      # dilewatkan. Yang dipotong waktu tunggu, bukan cakupannya.
+      #
+      # Tiap pekerja mendapat databasenya sendiri, dan di sana database itulah batas
+      # isolasinya — schema `coreerp_test` tidak dipakai; lihat config/database.php.
       - name: Tests
-        run: php artisan test
+        run: php artisan test --parallel

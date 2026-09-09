@@ -30,6 +30,28 @@ return [
     |
     */
 
+    /*
+     * Mode paralel mengisolasi lewat database, mode serial lewat schema.
+     *
+     * Suite ini berbagi satu database dengan data pengembangan, jadi ia memakai schema
+     * tersendiri (`coreerp_test`, bersama `coreerp_load` dan `coreerp_ou`). `--parallel`
+     * bekerja dengan cara yang berbeda: Laravel membuat satu database per proses pekerja, dan
+     * database baru hanya punya `public`. Kedua model itu bertabrakan — migration pertama di
+     * mode paralel gagal dengan "no schema has been selected to create in", pesan yang tidak
+     * menyebut schema maupun paralelisme.
+     *
+     * Yang benar bukan memaksa salah satunya, melainkan mengakui bahwa di mode paralel
+     * **database milik pekerja itu sendiri sudah menjadi batasnya** — schema terpisah menjadi
+     * mubazir di sana. Jadi schema-nya `public` saat paralel, dan tetap `coreerp_test` saat
+     * serial, tempat pemisahan itu memang masih dibutuhkan.
+     *
+     * Koneksi sekunder harus ikut berpindah. Laravel hanya menulis ulang nama database untuk
+     * koneksi bawaan; `pgsql_test_secondary` akan tetap menunjuk database bersama, dan dua test
+     * konkurensi yang memakainya akan menulis ke sana — bukan gagal, melainkan mengotori
+     * database pengembangan tanpa ada yang melihat. `TEST_TOKEN` adalah nomor pekerja yang
+     * disetel Laravel, dan nama database yang dibentuknya sama dengan yang dipakai Laravel
+     * sendiri.
+     */
     'connections' => [
 
         'sqlite' => [
@@ -116,7 +138,7 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('DB_TEST_SCHEMA', 'coreerp_test'),
+            'search_path' => env('LARAVEL_PARALLEL_TESTING') ? 'public' : env('DB_TEST_SCHEMA', 'coreerp_test'),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
@@ -124,13 +146,15 @@ return [
             'driver' => 'pgsql',
             'host' => env('DB_TEST_HOST', env('DB_HOST', '127.0.0.1')),
             'port' => env('DB_TEST_PORT', env('DB_PORT', '5432')),
-            'database' => env('DB_TEST_DATABASE', env('DB_DATABASE', 'core_erp')),
+            'database' => env('LARAVEL_PARALLEL_TESTING')
+                ? env('DB_TEST_DATABASE', env('DB_DATABASE', 'core_erp')).'_test_'.env('TEST_TOKEN')
+                : env('DB_TEST_DATABASE', env('DB_DATABASE', 'core_erp')),
             'username' => env('DB_TEST_USERNAME', env('DB_USERNAME', 'root')),
             'password' => env('DB_TEST_PASSWORD', env('DB_PASSWORD', '')),
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('DB_TEST_SCHEMA', 'coreerp_test'),
+            'search_path' => env('LARAVEL_PARALLEL_TESTING') ? 'public' : env('DB_TEST_SCHEMA', 'coreerp_test'),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 
