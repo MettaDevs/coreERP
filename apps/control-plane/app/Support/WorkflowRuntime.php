@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\TenantMembership;
+use App\Support\Modules\Contracts\KeputusanWorkflowDiambil;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -226,14 +227,34 @@ class WorkflowRuntime
             ->join('workflow_configurations as configurations', 'configurations.id', '=', 'versions.configuration_id')
             ->where('versions.id', $instance->configuration_version_id)
             ->value('configurations.legal_entity_id');
+        // Satu isi, dua jalur. Amplop HTTP dan event in-process membawa `data` yang sama
+        // persis karena keduanya dibangun dari variabel ini; menyusunnya dua kali adalah cara
+        // paling pasti membuat penerima di dalam proses dan penerima di luar proses melihat
+        // dua kenyataan yang berbeda.
+        $isi = [
+            'workflow_instance_id' => $instance->id,
+            'workflow_type' => $workflowType?->code,
+            'decision' => $status,
+            'source_document_type' => $instance->source_document_type,
+            'source_document_id' => $instance->source_document_id,
+            'decision_context' => json_decode($instance->decision_context, true, 512, JSON_THROW_ON_ERROR),
+        ];
+        $idEvent = (string) Str::ulid();
+        $idKorelasi = (string) ($instance->correlation_id ?? $instance->id);
         DB::table('outbox_events')->insert([
-            'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'type' => 'core.workflow.decision.v2',
-            'correlation_id' => $instance->correlation_id ?? $instance->id,
+            'id' => $idEvent, 'tenant_id' => $tenantId, 'type' => 'core.workflow.decision.v2',
+            'correlation_id' => $idKorelasi,
             'legal_entity_id' => $legalEntityId,
-            'payload' => json_encode(['workflow_instance_id' => $instance->id, 'workflow_type' => $workflowType?->code, 'decision' => $status, 'source_document_type' => $instance->source_document_type, 'source_document_id' => $instance->source_document_id, 'decision_context' => json_decode($instance->decision_context, true, 512, JSON_THROW_ON_ERROR)], JSON_THROW_ON_ERROR),
+            'payload' => json_encode($isi, JSON_THROW_ON_ERROR),
             'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         $this->history($tenantId, $instance->id, 'decision_event_emitted', ['status' => $status], $actorMembershipId);
+
+        // Dipancarkan **di dalam** transaksi keputusan, dan itu disengaja: listener module
+        // memperbarui dokumennya pada transaksi yang sama, sehingga instance yang `approved`
+        // tidak pernah berpasangan dengan dokumen yang masih `submitted`. Konsekuensinya
+        // seimbang dan diterima: listener yang melempar membatalkan keputusannya juga.
+        event(new KeputusanWorkflowDiambil($idEvent, $tenantId, $idKorelasi, $legalEntityId === null ? null : (string) $legalEntityId, $isi));
     }
 
     /** @return Collection<int, string> */

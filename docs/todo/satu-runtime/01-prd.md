@@ -2945,6 +2945,131 @@ dua tanda tangan HMAC, satu tabel dedup.
 **Selesai bila.** `AssetLifecycleTest` lulus, dan satu dokumen dekomisioning bisa diajukan lalu disetujui
 tanpa satu pun permintaan HTTP.
 
+#### Catatan pelaksanaan
+
+Selesai pada 9 September 2026.
+
+**Jalur yang dipindahkan ternyata tidak pernah bisa berhasil, dan sudah begitu sejak hari ia ditulis.**
+Dua cacat, keduanya mematikan, keduanya di jalur yang sama:
+
+1. `InternalWorkflowInstanceController` mewajibkan `initiator_membership_id`. `WorkflowClient` tidak
+   pernah mengirimnya — tidak ada satu pun pemanggil di seluruh repo yang mengirimnya. Setiap pengajuan
+   dijawab 422, ditangkap sebagai `RuntimeException`, lalu diubah menjadi **503 "Permintaan persetujuan
+   belum dapat dikirim"**: kalimat yang menyalahkan jaringan untuk kesalahan yang seluruhnya ada di badan
+   permintaan.
+2. Pencarian versi workflow memakai `select *` pada join `workflow_configuration_versions` dengan
+   `workflow_configurations`. Kedua tabel punya kolom `id`, dan yang belakangan menimpa yang duluan —
+   sehingga `$version->id` adalah id **konfigurasi**. Instance dibuat menunjuk id yang tidak ada di tabel
+   versi, dan PostgreSQL menolaknya sebagai pelanggaran kunci asing.
+
+Kalau cacat pertama diperbaiki sendirian, yang muncul cacat kedua. Keduanya baru terlihat pada task ini,
+ketika jalurnya dijalankan sungguhan untuk pertama kalinya.
+
+**Kenapa tidak ada yang tahu:** satu-satunya test yang menyentuh jalur ini memalsukan Core dengan
+`Http::fake`. Jawaban palsu tidak memvalidasi apa pun, jadi permintaan yang salah bentuk terlihat persis
+seperti yang benar. Ini bukan kelemahan `Http::fake` melainkan sifatnya, dan pelajarannya sudah muncul dua
+kali sebelum ini: **batas yang dipalsukan tidak menguji sisi seberangnya.** Cacat kedua bahkan tidak akan
+tertangkap kontrak OpenAPI mana pun — ia SQL, bukan bentuk permintaan.
+
+**Kontraknya, lagi-lagi, dibangun dari sisi penyedia.** `MesinWorkflow` versi F2-06 hanya memindahkan
+pencarian tipe dan versi, karena itu yang terlihat dari sisi mesin. Membaca endpoint yang digantikannya
+memperlihatkan empat pemeriksaan lain yang selama ini menjaga pemanggilnya, tidak satu pun berada di
+mesin: keanggotaan pengaju, kewajiban entitas legal, field wajib pada `decision_context`, dan pemutaran
+ulang kunci idempoten. Tanpa keempatnya, modul yang berpindah dari HTTP ke kontrak justru **kehilangan**
+penjaga yang sudah dimilikinya.
+
+Yang hilang paling mahal: tanpa pengaju yang tercatat, penjaga "pengaju tidak dapat menyetujui dokumennya
+sendiri" di dalam mesin berhenti berlaku — tanpa kesalahan, tanpa catatan, hanya sebuah persetujuan yang
+seharusnya ditolak.
+
+**Pengaju dan korelasi dijadikan parameter wajib, bukan kunci di dalam array.** Sebagai kunci opsional,
+yang lupa mengisinya tidak pernah diberi tahu; sebagai parameter, yang lupa tidak bisa memanggil sama
+sekali. Pengaju disebut dengan **id pengguna**, bukan id keanggotaan: keanggotaan tenant milik Core, dan
+modul tidak punya cara mendapatkan idnya tanpa menyentuh tabel Core.
+
+**Event masuk tinggal di `Contracts`, bukan di `App\Events`.** Penjaga batas hanya mengizinkan modul
+menyebut `App\Support\Modules\Contracts`, dan aturan itu ternyata mengarahkan ke tempat yang memang
+benar: event yang didengarkan modul adalah bagian dari permukaan yang dijanjikan Core, sama seperti
+antarmuka di sebelahnya. Menaruhnya di tempat lain berarti menjanjikan sesuatu yang tidak pernah diakui
+sebagai janji.
+
+**Listener berjalan di dalam transaksi keputusan.** Instance yang `approved` tidak pernah berpasangan
+dengan dokumen yang masih `submitted`. Imbalannya seimbang dan diterima: listener yang melempar
+membatalkan keputusannya juga. Isi amplopnya disusun **sekali** lalu dipakai untuk baris outbox dan event
+sekaligus; menyusunnya dua kali adalah cara paling pasti membuat penerima di dalam dan di luar proses
+melihat dua kenyataan berbeda.
+
+**Pengiriman yang menjadi seketika memunculkan urutan yang dulu tidak mungkin.** Alur persetujuan yang
+grafnya tidak punya langkah persetujuan — sebuah kondisi yang langsung menuju Selesai, misalnya — sudah
+berstatus `approved` **pada saat pengajuan**. Keputusannya karena itu sampai ke listener sebelum pemanggil
+sempat menuliskan id instance ke dokumennya, dan listener yang menuntut id itu sudah tercatat akan
+melewatkannya: dokumen menggantung pada `submitted` selamanya sementara instancenya `approved`.
+
+Selama pengiriman berjalan lewat perintah terjadwal, urutan ini tidak pernah muncul — keputusan baru
+dikirim berjam-jam kemudian, saat idnya sudah tersimpan. Ia hanya terlihat setelah pengirimannya menjadi
+seketika. **Ini bentuk umum dari seluruh fase 3:** yang berubah bukan cuma jalurnya, melainkan waktunya,
+dan urutan yang dulu mustahil menjadi urutan yang biasa.
+
+Listener sekarang menerima dokumen yang id instancenya belum tercatat, dan sebuah test dengan graf tanpa
+langkah persetujuan yang menjaganya:
+
+```
+Failed asserting that two strings are identical.
+--- Expected
++++ Actual
+-'approved'
++'submitted'
+```
+
+**Nomor, dokumen, dan pengajuan menjadi satu transaksi.** F3-06 sudah melakukannya untuk master data;
+controller dokumen siklus aset tertinggal, dan ia justru yang punya dua keadaan setengah jadi: nomor yang
+terbit untuk dokumen yang tidak jadi ada, dan dokumen dekomisioning yang menunggu persetujuan yang tidak
+pernah diajukan. Jawaban kegagalannya ikut berubah dari 503 menjadi 422, alasan yang sama seperti F3-06.
+
+**`PublishWorkflowEvents` berhenti mengirim ke penerima di dalam proses**, ditandai kunci `module` pada
+setelan endpoint — bukan tebakan atas bentuk URL-nya. Barisnya tetap ditandai terkirim: baris yang tidak
+pernah ditandai akan diambil ulang setiap kali perintah berjalan, selamanya, dan antrean yang tidak pernah
+menyusut menyembunyikan baris yang benar-benar gagal terkirim.
+
+**Ketiga penjaga baru dibuktikan bisa merah:**
+
+```
+Failed asserting that a row in the table [aset_tr_dokumen_siklus_aset] matches the attributes
+{"id": "...", "status": "approved"}. Found similar results: [{"id": "...", "status": "submitted"}]
+```
+— dengan `Event::listen` dimatikan.
+
+```
+Dokumen tersimpan padahal pengajuannya gagal.
+Failed asserting that 1 is identical to 0.
+```
+— dengan pengajuan dikeluarkan dari transaksi.
+
+```
+Requests were recorded.
+Failed asserting that an array is empty.
+```
+— dengan penyaringan endpoint di dalam proses dilepas.
+
+**Test lamanya diganti, bukan diperbaiki.** `test_approved_decommissioning_event_stops_asset_use_once`
+memalsukan Core dua kali: id instance karangan untuk pengajuan, lalu amplop keputusan yang disusun test
+itu sendiri dan dikirim ke rute panggilan balik modul. Yang dibuktikannya cuma satu — modul bisa membaca
+amplop yang ditulisnya sendiri. Penggantinya menempuh jalur sungguhan: alur persetujuan terbit untuk
+entitas legalnya, pengaju membuat dokumen, Core membuat tugas, pemeriksa menyetujui lewat layar Core, dan
+keputusan itu sampai ke dokumen modul. `Http::preventStrayRequests()` yang membuat kalimat "tanpa satu pun
+permintaan HTTP" bisa gagal.
+
+**Yang sengaja ditinggalkan.**
+
+- `InternalWorkflowInstanceController` masih menyalin logika yang sama untuk app di luar proses. Cacat
+  `select *` di sana ikut diperbaiki karena membiarkan cacat yang sudah terbukti adalah pilihan yang
+  lebih buruk, tetapi penyatuan kedua salinannya tetap milik **F3-20**.
+- Setelan `COREERP_EVENT_ENDPOINTS` di repo `erp-dev` belum menyebut kunci `module`. Sampai ia disebut,
+  keputusan tetap dikirim dua kali; dedup modul menyerapnya, jadi ini pemborosan, bukan kesalahan.
+  Masuk **F6-02**.
+- Enam berkas test modul lain masih membawa `Http::fake` yang tidak dipakai siapa pun sejak F3-06 sampai
+  F3-08. Ia menyesatkan, bukan berbahaya; dibersihkan bersama **F3-19**.
+
 **Rujukan.** [visual workflow engine](../../dev/21-visual-workflow-engine.md).
 
 **Bergantung pada.** F2-06, F3-05.

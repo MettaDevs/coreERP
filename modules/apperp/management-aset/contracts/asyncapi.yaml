@@ -48,23 +48,20 @@ channels:
                   items: { type: string }
   core.workflow.decision.v2:
     address: core.workflow.decision.v2
-    description: Keputusan workflow dekomisioning aset yang diputuskan Core.
+    description: |
+      Keputusan workflow dekomisioning aset yang diputuskan Core.
+
+      Sejak F3-09 module ini menerimanya **di dalam proses**, sebagai event Laravel
+      `KeputusanWorkflowDiambil` yang didengarkan `TerapkanKeputusanDekomisioning`.
+      Tidak ada lagi permintaan HTTP, tidak ada tanda tangan HMAC, dan tidak ada
+      endpoint penerima.
+
+      Bentuk `data` di bawah tetap dikontrakkan karena ia tetap satu isi untuk dua
+      jalur: amplop yang sama masih ditulis ke outbox Core untuk penerima yang berada
+      di luar proses. Nasib akhir berkas kontrak milik module diputuskan pada F3-23.
     messages:
       workflowDecision:
         contentType: application/json
-        headers:
-          type: object
-          required: [X-CoreERP-Event-Timestamp, X-CoreERP-Event-Signature]
-          properties:
-            X-CoreERP-Event-Timestamp:
-              type: string
-              description: Unix timestamp saat Core mengirim request.
-            X-CoreERP-Event-Signature:
-              type: string
-              description: |
-                `hash_hmac('sha256', "<timestamp>.<raw body>", COREERP_APP_CONTEXT_SIGNING_KEY)`.
-                Diverifikasi `VerifyCoreErpEvent` sebelum body dibaca; gagal verifikasi
-                menghasilkan 401.
         payload:
           type: object
           required: [id, type, occurred_at, tenant_id, correlation_id, data]

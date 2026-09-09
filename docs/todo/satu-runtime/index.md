@@ -30,7 +30,7 @@ berbahaya daripada yang tidak ada.
 
 | Task | Siapa | Cabang | Catatan |
 | --- | --- | --- | --- |
-| F3-26 konteks dihitung sekali | induk | `perf/konteks-permintaan-dihitung-sekali` | menunggu #73 digabungkan |
+| F3-09 workflow lewat kontrak Core | induk | `feat/f3-09-workflow-kontrak-dan-event` | menunggu CI |
 
 Kosongkan barisnya setelah pull request-nya digabungkan.
 
@@ -41,7 +41,7 @@ Kosongkan barisnya setelah pull request-nya digabungkan.
 | 0 — prasyarat: CI hijau, aturan kerja, penghapusan lunak | F0-01 sampai F0-07 | F0-01 sampai F0-04 selesai; F0-05 ditutup tanpa dikerjakan; F0-06 menunggu F3-01 |
 | 1 — penjaga batas dan kerangka modul | F1-01 sampai F1-08 | selesai |
 | 2 — Core menjadi tuan rumah modul | F2-01 sampai F2-12 | selesai |
-| 3 — Management Aset pindah | F3-01 sampai F3-26 | F3-00 sampai F3-05a, F3-10, F3-13, F3-15, F3-22, F3-25, F3-26 selesai; sisa F3-05 langkah 3, F3-06 sampai F3-09, F3-11, F3-12, F3-14, F3-16 sampai F3-24 |
+| 3 — Management Aset pindah | F3-01 sampai F3-27 | F3-00 sampai F3-05a, F3-06 sampai F3-10, F3-13, F3-15, F3-16, F3-22, F3-25 sampai F3-27 selesai; sisa F3-05 langkah 3, F3-11, F3-12, F3-14, F3-17 sampai F3-24 |
 | 4 — UI menjadi satu build | F4-01 sampai F4-10 | belum |
 | 5 — edisi dan bundle on-prem | F5-01 sampai F5-06 | belum |
 | 6 — dev stack dan CI | F6-01 sampai F6-05 | belum |

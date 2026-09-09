@@ -60,20 +60,22 @@ trait BerinteraksiDenganKonteksCore
 
     private const ENTRY_POINT_UJI = 'management-aset.uji';
 
+    private const TIPE_WORKFLOW_DEKOMISIONING = 'management-aset.dekomisioning-aset-verification';
+
     private const KEBIJAKAN_TANGGUNG_JAWAB = 'management-aset.asset-responsibility';
 
     /**
      * Tenant untuk test ini.
      */
     /**
-     * Setelan klien HTTP ke Core yang masih dipakai module.
+     * Setelan klien HTTP ke Core yang masih tersisa.
      *
-     * Module ini belum sepenuhnya berhenti memanggil Core lewat HTTP — penerbitan nomor,
-     * kalender fiskal, satuan, dan workflow baru diganti kontrak pada F3-06 sampai F3-09.
-     * Sampai saat itu setelan ini tetap diperlukan, dan test tetap memalsukan jawabannya.
+     * Yang masih membacanya tinggal satu: verifikasi tanda tangan pada panggilan balik
+     * penyediaan data awal tenant, yang menjadi event pada F3-11. Penerbitan nomor, kalender
+     * fiskal, satuan, dan workflow sudah lewat kontrak sejak F3-06 sampai F3-09, dan tidak
+     * satu pun dari keempatnya lagi peduli pada setelan ini.
      *
-     * Dipanggil dari `buatTenantUji()` supaya tidak ada test yang lupa memanggilnya lalu
-     * gagal dengan 503 yang tidak menjelaskan sebabnya.
+     * Sisanya dibuang pada F3-19, bersama seluruh konfigurasi klien HTTP module.
      */
     protected function konfigurasiKlienCore(): void
     {
@@ -622,5 +624,147 @@ trait BerinteraksiDenganKonteksCore
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    /**
+     * Id keanggotaan tenant milik seorang pengguna bernama.
+     *
+     * Dipakai penyusun workflow: penerima tugas persetujuan ditunjuk dengan id keanggotaan,
+     * bukan id pengguna. Module sendiri tidak pernah membaca tabel ini — yang membacanya Core,
+     * dan test ini menyusun keadaan Core, bukan keadaan module.
+     */
+    protected function idKeanggotaan(string $nama, string $tenantId): string
+    {
+        $id = DB::table('tenant_memberships')
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $this->idPengguna($nama))
+            ->value('id');
+
+        return is_string($id) ? $id : throw new \RuntimeException(
+            sprintf('Pengguna "%s" belum menjadi anggota tenant %s.', $nama, $tenantId),
+        );
+    }
+
+    /**
+     * Alur persetujuan dekomisioning yang benar-benar terbit untuk sebuah entitas legal.
+     *
+     * Selama pengajuan berjalan lewat HTTP, test cukup memalsukan jawabannya: `Http::fake`
+     * memulangkan sebuah id instance dan tidak ada satu pun konfigurasi yang perlu ada. Lewat
+     * kontrak Core, instance-nya dibuat **sungguhan**, dan itu menuntut tipe workflow, sebuah
+     * konfigurasi yang menyala, dan satu versi terbit dengan langkah persetujuan di dalamnya.
+     *
+     * Grafnya paling sederhana yang masih berarti: Mulai → Persetujuan → Selesai, satu penerima
+     * tugas. Yang diuji module bukan kerumitan grafnya — itu urusan test Core — melainkan bahwa
+     * keputusan pada graf mana pun sampai ke dokumennya.
+     */
+    protected function siapkanWorkflowDekomisioning(string $tenantId, string $legalEntityId, ?string $idKeanggotaanPemeriksa): void
+    {
+        $this->pastikanKatalogModule();
+
+        $tipeId = DB::table('workflow_types')->where('code', self::TIPE_WORKFLOW_DEKOMISIONING)->value('id');
+
+        if (! is_string($tipeId)) {
+            $tipeId = (string) Str::ulid();
+            DB::table('workflow_types')->insert([
+                'id' => $tipeId,
+                'app_id' => 'management-aset',
+                'scope' => 'legal_entity',
+                'code' => self::TIPE_WORKFLOW_DEKOMISIONING,
+                'name' => 'Verifikasi usulan dekomisioning aset',
+                // Sama dengan yang dinyatakan `app.yaml` module. Field yang diwajibkan di sini
+                // diperiksa Core sebelum instance dibuat, jadi menuliskannya berbeda akan
+                // membuat test lulus atas skema yang tidak pernah dipasang di produksi.
+                'decision_context_schema' => json_encode(['required' => ['document_id', 'asset_id']], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $konfigurasiId = (string) Str::ulid();
+        DB::table('workflow_configurations')->insert([
+            'id' => $konfigurasiId,
+            'tenant_id' => $tenantId,
+            'legal_entity_id' => $legalEntityId,
+            'workflow_type_id' => $tipeId,
+            'name' => 'Persetujuan dekomisioning '.Str::random(6),
+            'enabled' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $versiId = (string) Str::ulid();
+        DB::table('workflow_configuration_versions')->insert([
+            'id' => $versiId,
+            'configuration_id' => $konfigurasiId,
+            'version' => 1,
+            'status' => 'published',
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Pemeriksa yang tidak disebut berarti graf tanpa langkah persetujuan: Mulai → Selesai.
+        // Bentuk ini sah dan bisa diterbitkan admin — sebuah kondisi yang langsung menuju
+        // Selesai menghasilkan graf yang sama — dan instancenya sudah `approved` pada saat
+        // pengajuan, bukan berhari-hari kemudian.
+        $langkah = $idKeanggotaanPemeriksa === null
+            ? [
+                ['key' => 'mulai', 'kind' => 'start', 'label' => 'Mulai', 'configuration' => []],
+                ['key' => 'selesai', 'kind' => 'end', 'label' => 'Selesai', 'configuration' => []],
+            ]
+            : [
+                ['key' => 'mulai', 'kind' => 'start', 'label' => 'Mulai', 'configuration' => []],
+                ['key' => 'periksa', 'kind' => 'approval', 'label' => 'Pemeriksaan aset', 'configuration' => [
+                    'assignee' => ['type' => 'member', 'id' => $idKeanggotaanPemeriksa],
+                ]],
+                ['key' => 'selesai', 'kind' => 'end', 'label' => 'Selesai', 'configuration' => []],
+            ];
+
+        $elemen = [];
+
+        foreach ($langkah as $baris) {
+            $elemen[$baris['key']] = (string) Str::ulid();
+            DB::table('workflow_elements')->insert([
+                'id' => $elemen[$baris['key']],
+                'version_id' => $versiId,
+                'key' => $baris['key'],
+                'kind' => $baris['kind'],
+                'label' => $baris['label'],
+                'configuration' => json_encode($baris['configuration'], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $tepiGraf = $idKeanggotaanPemeriksa === null
+            ? [['from' => 'mulai', 'to' => 'selesai', 'outcome' => null]]
+            : [
+                ['from' => 'mulai', 'to' => 'periksa', 'outcome' => null],
+                ['from' => 'periksa', 'to' => 'selesai', 'outcome' => 'approve'],
+            ];
+
+        foreach ($tepiGraf as $tepi) {
+            DB::table('workflow_transitions')->insert([
+                'id' => (string) Str::ulid(),
+                'version_id' => $versiId,
+                'from_element_id' => $elemen[$tepi['from']],
+                'to_element_id' => $elemen[$tepi['to']],
+                'outcome' => $tepi['outcome'],
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /**
+     * Tugas persetujuan yang sedang menunggu seorang pemeriksa.
+     */
+    protected function tugasMenunggu(string $tenantId, string $idKeanggotaanPemeriksa): ?object
+    {
+        return DB::table('workflow_work_items')
+            ->where('tenant_id', $tenantId)
+            ->where('assigned_membership_id', $idKeanggotaanPemeriksa)
+            ->where('status', 'pending')
+            ->first();
     }
 }
