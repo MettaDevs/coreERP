@@ -5,7 +5,7 @@ import type { ComponentType } from 'react';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
-import halamanModule from '@/pages/modules/host';
+import halamanModule from '@/lib/halaman-module';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 

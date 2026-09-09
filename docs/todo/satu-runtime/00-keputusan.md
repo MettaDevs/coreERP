@@ -104,6 +104,32 @@ Rumusnya ditulis supaya bisa dicek. Angka absolut di production lebih besar (PHP
 
 Rincian dan rumus tiap baris ada di tabel-tabel berikut.
 
+### Bundel JavaScript sesudah UI menyatu
+
+Diukur 9 September 2026 pada F4-10, bukan diperkirakan. Cara mengukurnya sederhana dan bisa
+diulang siapa pun: bangun bundel dengan halaman module ikut, bangun sekali lagi tanpa halaman
+module, lalu selisihkan seluruh isi `public/build/assets`.
+
+| | Bytes | Aset |
+| --- | --- | --- |
+| Shell tanpa halaman module | 3.256.361 | 188 |
+| Shell dengan halaman module | 3.451.081 | 191 |
+| **Yang ditambahkan modul aset** | **194.720** | 3 |
+
+Sebagai aplikasi Vite tersendiri, modul yang sama mengirim **702 KB** — angka yang dicatat pada
+[PRD](01-prd.md) sebelum pemindahan. Layarnya sama persis; yang hilang adalah salinan kedua
+React, `@apperp/ui`, dan pustaka bersama lainnya yang dulu ikut turun di dalam iframe.
+
+Halaman module dipecah per entri menu, jadi tenant yang membuka satu layar tidak mengunduh
+kode 32 layar lainnya: potongan terbesar `MasterDetailPage` 53,5 kB dan `WorkOrderPage` 34,8 kB,
+sedangkan halaman induknya sendiri hanya 9,1 kB.
+
+**React termuat sekali, dan itu dijaga alat, bukan ingatan.** `npm run bundle:check` membaca
+hasil build dan menolak lebih dari satu potongan yang membawa implementasi React. Ia dibuktikan
+bisa merah dengan menaruh satu potongan palsu berisi penanda React di folder aset; pemeriksanya
+melaporkan dua salinan dan gagal. Ia juga gagal bila penandanya tidak ditemukan sama sekali —
+pemeriksa yang tidak menemukan apa pun tidak boleh dianggap hijau.
+
 ### Satu server client on-prem, lima modul
 
 | | Desain saat ini | Satu runtime |
