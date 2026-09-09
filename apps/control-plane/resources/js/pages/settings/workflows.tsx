@@ -10,12 +10,14 @@ import {
 import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
+import { Switch } from '@apperp/ui/switch';
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
     Check,
     GitBranch,
     Plus,
     Power,
+    ShieldCheck,
     Workflow as WorkflowIcon,
 } from 'lucide-react';
 import Heading from '@/components/heading';
@@ -38,8 +40,18 @@ type Workflow = {
     scope: 'tenant' | 'legal_entity';
     legal_entity_id: string | null;
 };
+// Bentuknya sengaja tidak menyebut satu pun nama parameter. Daftarnya datang dari registry
+// di sisi Core, jadi parameter baru muncul di layar tanpa menyentuh berkas ini.
+type WorkflowParameter = {
+    code: string;
+    tipe: 'boolean';
+    label: string;
+    penjelasan: string;
+    value: boolean;
+};
 type Props = {
     canManage: boolean;
+    parameters: WorkflowParameter[];
     workflowTypes: WorkflowType[];
     legalEntities: LegalEntity[];
     workflows: Workflow[];
@@ -47,6 +59,7 @@ type Props = {
 
 export default function Workflows({
     canManage,
+    parameters,
     workflowTypes,
     legalEntities,
     workflows,
@@ -57,6 +70,10 @@ export default function Workflows({
         legal_entity_id: '',
     });
     const toggleForm = useForm({});
+    const parameterForm = useForm<{ code: string; value: boolean }>({
+        code: '',
+        value: false,
+    });
 
     const selectedType = workflowTypes.find(
         (type) => type.id === createForm.data.workflow_type_id,
@@ -225,6 +242,63 @@ export default function Workflows({
                         )}
                     </CardContent>
                 </Card>
+
+                {parameters.length > 0 && (
+                    <Card className="overflow-hidden shadow-xs">
+                        <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                    <ShieldCheck className="size-5" />
+                                </div>
+                                <div className="flex flex-row items-center gap-3">
+                                    <CardTitle className="text-base font-bold text-foreground">
+                                        Parameter Workflow
+                                    </CardTitle>
+                                    <CardDescription className="mt-0.5 text-xs text-muted-foreground">
+                                        Berlaku untuk seluruh workflow milik
+                                        tenant ini.
+                                    </CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-6 p-6">
+                            {parameters.map((parameter) => (
+                                <div
+                                    key={parameter.code}
+                                    className="flex items-start justify-between gap-6"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-foreground">
+                                            {parameter.label}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {parameter.penjelasan}
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={parameter.value}
+                                        disabled={
+                                            !canManage ||
+                                            parameterForm.processing
+                                        }
+                                        onCheckedChange={(checked) => {
+                                            // `transform` memulangkan void di versi ini, jadi
+                                            // pengirimannya berdiri sendiri, bukan dirantai.
+                                            parameterForm.transform(() => ({
+                                                code: parameter.code,
+                                                value: checked,
+                                            }));
+                                            parameterForm.post(
+                                                '/settings/workflows/parameters',
+                                                { preserveScroll: true },
+                                            );
+                                        }}
+                                    />
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Card Daftar Workflow (Desain Modern yang Disukai) */}
                 <Card className="overflow-hidden shadow-xs">

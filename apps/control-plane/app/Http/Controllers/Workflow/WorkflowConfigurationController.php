@@ -5,19 +5,22 @@ namespace App\Http\Controllers\Workflow;
 use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\TenantMembership;
+use App\Support\DefinisiParameterWorkflow;
+use App\Support\ParameterWorkflow;
 use App\Support\WorkflowGraph;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class WorkflowConfigurationController extends Controller
 {
-    public function index(Request $request): JsonResponse|Response
+    public function index(Request $request, ParameterWorkflow $parameter): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
         abort_unless($membership->canManageAccess(), 403);
@@ -49,12 +52,68 @@ class WorkflowConfigurationController extends Controller
 
         $payload = [
             'canManage' => true,
+            // Disusun dari registry, bukan ditulis satu per satu. Layarnya merender dirinya
+            // dari daftar ini, jadi parameter baru muncul di layar tanpa menyentuh berkas
+            // controller maupun berkas halamannya.
+            'parameters' => $this->parameterUntukLayar((string) $membership->tenant_id, $parameter),
             'workflowTypes' => $types,
             'legalEntities' => Organization::query()->where('tenant_id', $membership->tenant_id)->where('classification', 'legal_entity')->orderBy('name')->get(['id', 'name']),
             'workflows' => $workflows,
         ];
 
         return $request->is('api/*') ? response()->json(['data' => $payload]) : Inertia::render('settings/workflows', $payload);
+    }
+
+    /**
+     * Mengubah parameter workflow milik tenant.
+     *
+     * Baru satu parameter: boleh atau tidak pengaju menyetujui dokumennya sendiri. Sebelumnya
+     * itu aturan mati di dalam mesin, dan aturan mati adalah jalan buntu untuk organisasi yang
+     * penggunanya rangkap jabatan — mesin ini belum punya delegasi, jadi tugas yang jatuh ke
+     * pengajunya sendiri tidak bisa diselesaikan siapa pun.
+     *
+     * Barisnya dibuat saat pertama kali diubah, bukan saat tenant dibuat. Tenant tanpa baris
+     * menjawab bawaan, dan bawaannya sama dengan D365: pengaju boleh menyetujui.
+     */
+    public function updateParameters(Request $request, ParameterWorkflow $parameter): RedirectResponse
+    {
+        $membership = $this->currentMembership($request);
+        abort_unless($membership->canManageAccess(), 403);
+
+        // Kodenya divalidasi terhadap registry, bukan terhadap daftar yang ditulis ulang di
+        // sini. Daftar kedua akan menyimpang pada hari seseorang menambah parameter, dan yang
+        // menyimpang menolak parameter yang sah dengan pesan yang tidak menyebut sebabnya.
+        $data = $request->validate([
+            'code' => ['required', 'string', Rule::in(array_keys(DefinisiParameterWorkflow::DAFTAR))],
+            'value' => ['required', 'boolean'],
+        ]);
+
+        $parameter->simpan((string) $membership->tenant_id, $data['code'], (bool) $data['value'], (string) $membership->id);
+
+        return back()->with('status', 'Parameter workflow diperbarui.');
+    }
+
+    /**
+     * Definisi parameter beserta nilai yang berlaku untuk tenant ini.
+     *
+     * @return list<array{code: string, tipe: string, label: string, penjelasan: string, value: bool}>
+     */
+    private function parameterUntukLayar(string $tenantId, ParameterWorkflow $parameter): array
+    {
+        $nilai = $parameter->semua($tenantId);
+        $daftar = [];
+
+        foreach (DefinisiParameterWorkflow::DAFTAR as $kode => $definisi) {
+            $daftar[] = [
+                'code' => $kode,
+                'tipe' => $definisi['tipe'],
+                'label' => $definisi['label'],
+                'penjelasan' => $definisi['penjelasan'],
+                'value' => $nilai[$kode],
+            ];
+        }
+
+        return $daftar;
     }
 
     public function edit(Request $request, string $workflow): JsonResponse|Response

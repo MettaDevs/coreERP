@@ -7,6 +7,8 @@ use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\TenantMembership;
 use App\Models\User;
+use App\Support\DefinisiParameterWorkflow;
+use App\Support\ParameterWorkflow;
 use App\Support\WorkflowRuntime;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,6 +16,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class WorkflowConfigurationTest extends TestCase
@@ -315,5 +318,256 @@ class WorkflowConfigurationTest extends TestCase
 
         Http::assertSent(fn ($request): bool => $request->url() === 'https://hr.test/events');
         $this->assertNotNull(DB::table('outbox_events')->where('id', $eventId)->value('published_at'));
+    }
+
+    /**
+     * Bawaannya: pengaju **boleh** menyetujui dokumennya sendiri.
+     *
+     * Ini kebalikan dari perilaku sebelumnya, dan pembalikannya keputusan pemilik produk:
+     * bentuk dan bawaannya mengikuti Dynamics 365 Finance & Operations, tempat
+     * `Disallow approval by submitter` adalah parameter yang bawaannya mati.
+     *
+     * Alasannya bukan sekadar meniru. Mesin ini belum punya delegasi, eskalasi, maupun
+     * penugasan ulang oleh admin. Larangan yang tidak bisa dimatikan berarti sebuah tugas yang
+     * jatuh ke pengajunya sendiri tidak akan pernah bisa diselesaikan siapa pun — bukan kontrol
+     * yang ketat, melainkan jalan buntu. Rangkap jabatan adalah keadaan biasa pada organisasi
+     * kecil, bukan pengecualian.
+     */
+    public function test_submitter_can_approve_by_default(): void
+    {
+        $membership = $this->owner->activeMembership();
+        $item = $this->workItemForOwnSubmission($membership);
+
+        app(WorkflowRuntime::class)->decide($membership, $item->id, 'approve', 'Saya sendiri yang mengajukan.');
+
+        $this->assertDatabaseHas('workflow_instances', ['id' => $item->instance_id, 'status' => 'approved']);
+    }
+
+    /**
+     * Persetujuan oleh pengajunya sendiri selalu tercatat, dilarang atau tidak.
+     *
+     * Yang membuat "boleh" bisa dipertanggungjawabkan bukan izinnya melainkan jejaknya: seorang
+     * pemeriksa harus bisa menemukan dokumen mana saja yang disetujui pengajunya sendiri tanpa
+     * membandingkan dua tabel.
+     */
+    public function test_history_marks_an_approval_made_by_the_submitter(): void
+    {
+        $membership = $this->owner->activeMembership();
+        $item = $this->workItemForOwnSubmission($membership);
+
+        app(WorkflowRuntime::class)->decide($membership, $item->id, 'approve', null);
+
+        $rincian = DB::table('workflow_history')->where('instance_id', $item->instance_id)
+            ->where('event_type', 'approved')->value('details');
+
+        $this->assertTrue(json_decode((string) $rincian, true, 512, JSON_THROW_ON_ERROR)['oleh_pengaju'] ?? false);
+    }
+
+    /**
+     * Tenant yang menyalakan larangannya: pengaju tidak pernah masuk daftar penerima tugas.
+     *
+     * Disaring pada **penugasan**, bukan pada keputusan. Kalau penyaringannya baru terjadi saat
+     * keputusan, tugasnya tetap terbentuk lalu tidak bisa diklik siapa pun — dan mesin ini tidak
+     * punya cara memindahkannya. Karena penerimanya di sini tinggal pengaju itu sendiri, yang
+     * benar adalah menolak dokumennya sekarang, dengan alasan yang menyebut sebabnya.
+     */
+    public function test_tenant_can_forbid_approval_by_the_submitter(): void
+    {
+        $membership = $this->owner->activeMembership();
+        $this->larangPersetujuanPengaju($membership->tenant_id);
+
+        $instance = $this->submitOwnDocument($membership);
+
+        $this->assertSame('rejected', $instance->status);
+        $this->assertDatabaseCount('workflow_work_items', 0);
+        $alasan = DB::table('workflow_history')->where('instance_id', $instance->id)
+            ->where('event_type', 'decision_rejected')->value('details');
+        $this->assertStringContainsString('pengajunya sendiri', (string) $alasan);
+    }
+
+    /**
+     * Larangannya menyaring pengaju, bukan membatalkan langkahnya.
+     *
+     * Penerima kedua tetap mendapat tugasnya. Tanpa test ini, sebuah penyaringan yang terlalu
+     * lebar — membuang seluruh daftar, bukan satu orang — akan lulus pada test di atas.
+     */
+    public function test_forbidding_the_submitter_still_assigns_the_other_approver(): void
+    {
+        $membership = $this->owner->activeMembership();
+        $this->larangPersetujuanPengaju($membership->tenant_id);
+        $lain = TenantMembership::create([
+            'tenant_id' => $membership->tenant_id,
+            'user_id' => User::factory()->create(['name' => 'Pemeriksa lain', 'email' => 'lain@workflow.test'])->id,
+            'system_role' => 'member', 'status' => 'active',
+        ]);
+
+        $instance = $this->submitOwnDocument($membership, [$membership->id, $lain->id]);
+
+        $this->assertSame('pending', $instance->status);
+        $items = DB::table('workflow_work_items')->where('instance_id', $instance->id)->get();
+        $this->assertCount(1, $items);
+        $this->assertSame($lain->id, $items[0]->assigned_membership_id);
+    }
+
+    /**
+     * Admin tenant menyalakan dan mematikan parameternya lewat layar Core.
+     */
+    public function test_admin_can_switch_the_parameter(): void
+    {
+        $tenantId = $this->owner->activeMembership()->tenant_id;
+
+        $kode = DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU;
+
+        $this->actingAs($this->owner)
+            ->post('/settings/workflows/parameters', ['code' => $kode, 'value' => true])
+            ->assertRedirect();
+        $this->assertDatabaseHas('workflow_parameters', [
+            'tenant_id' => $tenantId, 'code' => $kode, 'value' => 'true',
+        ]);
+
+        $this->actingAs($this->owner)
+            ->post('/settings/workflows/parameters', ['code' => $kode, 'value' => false])
+            ->assertRedirect();
+        $this->assertDatabaseHas('workflow_parameters', [
+            'tenant_id' => $tenantId, 'code' => $kode, 'value' => 'false',
+        ]);
+
+        // Satu baris per tenant per kode; menyalakan lalu mematikan tidak menumpuk baris kedua.
+        $this->assertDatabaseCount('workflow_parameters', 1);
+    }
+
+    /**
+     * Kode parameter yang tidak terdaftar ditolak, bukan disimpan diam-diam.
+     *
+     * Tanpa penjaga ini, sebuah kode yang salah ketik akan mendarat sebagai baris yang tidak
+     * pernah dibaca siapa pun: adminnya melihat sakelar yang berpindah, sementara mesinnya tetap
+     * memakai bawaan. Kegagalan yang paling mahal adalah yang terlihat berhasil.
+     */
+    public function test_unknown_parameter_code_is_rejected(): void
+    {
+        $this->actingAs($this->owner)
+            ->postJson('/settings/workflows/parameters', ['code' => 'tidak-pernah-ada', 'value' => true])
+            ->assertStatus(422);
+
+        $this->assertDatabaseCount('workflow_parameters', 0);
+    }
+
+    /**
+     * Layar settings menyajikan parameter beserta definisinya, bukan sekadar nilainya.
+     *
+     * Inilah yang membuat halaman workflow tidak perlu mengenal satu pun nama parameter: ia
+     * merender apa yang dikirim registry. Test ini yang menahan bentuk itu — begitu payloadnya
+     * kembali menjadi peta nama-ke-nilai, halamannya harus menuliskan setiap parameter dengan
+     * tangan lagi.
+     */
+    public function test_settings_screen_is_rendered_from_the_parameter_registry(): void
+    {
+        $parameter = [];
+        $this->actingAs($this->owner)->get('/settings/workflows')->assertOk()
+            ->assertInertia(function (Assert $page) use (&$parameter): void {
+                $parameter = $page->toArray()['props']['parameters'];
+            });
+
+        $baris = collect($parameter)->firstWhere('code', DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU);
+
+        $this->assertNotNull($baris, 'Parameter yang terdaftar tidak muncul pada payload layar.');
+        $this->assertSame('boolean', $baris['tipe']);
+        $this->assertFalse($baris['value'], 'Bawaannya harus mati, sama seperti D365.');
+        $this->assertNotSame('', $baris['label']);
+        $this->assertNotSame('', $baris['penjelasan']);
+    }
+
+    /**
+     * Mengubah parameter meninggalkan jejak: siapa, kode apa, dari nilai apa ke apa.
+     *
+     * Ini yang membuat "pengaju boleh menyetujui" bisa dipertanggungjawabkan. Tanpa jejak
+     * perubahannya, seorang pemeriksa yang menemukan dokumen disetujui pengajunya sendiri tidak
+     * punya cara mengetahui apakah larangannya memang mati saat itu, atau baru dimatikan
+     * sesudahnya — dan sebuah kontrol kepatuhan yang sakelarnya tidak diaudit meniadakan dirinya
+     * sendiri.
+     */
+    public function test_changing_a_parameter_leaves_an_audit_trail(): void
+    {
+        $membership = $this->owner->activeMembership();
+        $kode = DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU;
+
+        $this->actingAs($this->owner)
+            ->post('/settings/workflows/parameters', ['code' => $kode, 'value' => true])
+            ->assertRedirect();
+
+        $baris = DB::table('access_audit_events')
+            ->where('tenant_id', $membership->tenant_id)
+            ->where('action', 'workflow.parameter.updated')
+            ->first();
+
+        $this->assertNotNull($baris, 'Perubahan parameter tidak meninggalkan jejak audit.');
+        $isi = json_decode((string) $baris->payload, true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame($membership->id, $isi['actor_membership_id']);
+        $this->assertSame($kode, $isi['code']);
+        $this->assertFalse($isi['from']);
+        $this->assertTrue($isi['to']);
+
+        // Menekan sakelar ke posisi yang sudah ditempatinya bukan peristiwa; jejak yang penuh
+        // baris tanpa peristiwa adalah jejak yang berhenti dibaca orang.
+        $this->actingAs($this->owner)
+            ->post('/settings/workflows/parameters', ['code' => $kode, 'value' => true])
+            ->assertRedirect();
+
+        $this->assertSame(1, DB::table('access_audit_events')->where('action', 'workflow.parameter.updated')->count());
+    }
+
+    private function larangPersetujuanPengaju(string $tenantId): void
+    {
+        app(ParameterWorkflow::class)->simpan(
+            $tenantId,
+            DefinisiParameterWorkflow::LARANG_PERSETUJUAN_PENGAJU,
+            true,
+            (string) $this->owner->activeMembership()->id,
+        );
+    }
+
+    /**
+     * Satu dokumen yang diajukan sendiri oleh `$membership`, dengan langkah persetujuan yang
+     * ditujukan ke daftar keanggotaan yang disebut (bawaannya: pengaju itu sendiri).
+     *
+     * @param  list<string>|null  $penerima
+     */
+    private function submitOwnDocument(TenantMembership $membership, ?array $penerima = null): object
+    {
+        $workflow = $this->createWorkflow();
+        $this->putJson("/settings/workflows/{$workflow->id}/graph", ['nodes' => [
+            ['id' => 'start', 'type' => 'start', 'data' => ['label' => 'Mulai', 'config' => []], 'position' => ['x' => 0, 'y' => 0]],
+            ['id' => 'periksa', 'type' => 'approval', 'data' => ['label' => 'Pemeriksaan', 'config' => [
+                'assignees' => array_map(
+                    static fn (string $id): array => ['type' => 'member', 'id' => $id],
+                    $penerima ?? [$membership->id],
+                ),
+                'completion_policy' => 'single',
+            ]], 'position' => ['x' => 200, 'y' => 0]],
+            ['id' => 'end', 'type' => 'end', 'data' => ['label' => 'Selesai', 'config' => []], 'position' => ['x' => 400, 'y' => 0]],
+        ], 'edges' => [
+            ['source' => 'start', 'target' => 'periksa'],
+            ['source' => 'periksa', 'target' => 'end', 'outcome' => 'approve'],
+        ]])->assertRedirect();
+        $this->actingAs($this->owner)->post("/settings/workflows/{$workflow->id}/publish")->assertRedirect();
+
+        $version = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->where('status', 'published')->first();
+        $type = DB::table('workflow_types')->where('id', $this->workflowTypeId)->first();
+
+        return app(WorkflowRuntime::class)->submit($membership->tenant_id, $type, $version, 'pengaju:'.Str::random(8), [
+            'initiator_membership_id' => $membership->id,
+            'source_document_type' => 'pemusnahan-aset', 'source_document_id' => (string) Str::ulid(),
+            'decision_context' => ['document_id' => (string) Str::ulid(), 'asset_id' => (string) Str::ulid()],
+        ]);
+    }
+
+    private function workItemForOwnSubmission(TenantMembership $membership): object
+    {
+        $instance = $this->submitOwnDocument($membership);
+        $item = DB::table('workflow_work_items')->where('instance_id', $instance->id)->first();
+
+        $this->assertNotNull($item, 'Tugas persetujuan tidak terbentuk untuk pengajunya sendiri.');
+
+        return $item;
     }
 }

@@ -168,6 +168,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
+    // Didaftarkan sebelum rute ber-parameter supaya "parameters" tidak pernah terbaca sebagai id workflow.
+    Route::post('settings/workflows/parameters', [WorkflowConfigurationController::class, 'updateParameters'])->name('workflows.parameters.update');
     Route::get('settings/workflows/{workflow}/edit', [WorkflowConfigurationController::class, 'edit'])->name('workflows.edit');
     Route::get('settings/workflows/{workflow}/graph', [WorkflowConfigurationController::class, 'graph'])->name('workflows.graph');
     Route::post('settings/workflows/{workflow}/draft', [WorkflowConfigurationController::class, 'createDraft'])->name('workflows.draft');

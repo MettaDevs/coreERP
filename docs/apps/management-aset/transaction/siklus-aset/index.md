@@ -34,7 +34,7 @@ Yang perlu dipahami saat menulis kode di sini:
 
 - App **tidak tahu dan tidak boleh tahu** siapa approver-nya. Itu urusan Core.
 - Keputusan bisa datang **berhari-hari kemudian**. Karena itu id korelasi disimpan pada dokumen sejak awal — membacanya dari permintaan yang sedang berjalan tidak mungkin, karena permintaan itu sudah lama selesai.
-- Pengaju **tidak bisa menyetujui dokumennya sendiri**. Yang menegakkannya Core, dan itu berlaku karena pengajunya benar-benar dicatat saat pengajuan.
+- Boleh atau tidak **pengaju menyetujui dokumennya sendiri** ditentukan parameter workflow milik tenant, bukan aturan mati di dalam mesin. Bawaannya boleh, sama seperti Dynamics 365; admin menyalakan larangannya di `Settings > Workflow`. Ketika menyala, pengaju dikeluarkan dari daftar penerima tugas — jadi dokumen yang penerimanya tinggal dia sendiri ditolak beserta alasannya, bukan menggantung.
 - Keputusan yang sama tidak diterapkan dua kali: `aset_processed_core_events` menyimpan id event yang sudah diproses.
 
 Setelah `approved` diterima, aset menjadi `decommissioned`.
