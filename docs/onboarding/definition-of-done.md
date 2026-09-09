@@ -33,7 +33,7 @@ Build lokal lulus **bukan** bukti perubahan UI sudah tayang. Jangan melaporkan s
 
 Kalau kamu mengubah navigasi atau security di `app.yaml`, tambahan:
 
-- [ ] `app:register-manifest /workspace/app.yaml` dijalankan lewat container `core-app`
+- [ ] `app:register-manifest <id module>` dijalankan lewat container `core-app`
 - [ ] Kolom `apps.navigation` di database runtime diverifikasi
 - [ ] Shell Core di-reload
 

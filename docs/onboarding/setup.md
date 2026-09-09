@@ -99,7 +99,7 @@ Sambungkan pgAdmin ke `localhost` pada port di tabel atas, **bukan** ke PostgreS
 
 **UI tidak berubah walaupun build lulus.** `npm run build` saja tidak cukup. Container runtime harus dibuat ulang lewat `.\start.ps1 -Build`, lalu layarnya dibuka untuk memastikan artifact baru benar-benar tampil. Type-check lulus bukan bukti perubahan UI sudah tayang.
 
-**Menu lama masih muncul setelah mengubah `app.yaml`.** Rebuild UI tidak mendaftarkan ulang manifest. Jalankan `app:register-manifest /workspace/app.yaml` lewat container `core-app`, verifikasi kolom `apps.navigation` di database runtime, lalu reload shell Core.
+**Menu lama masih muncul setelah mengubah `app.yaml`.** Rebuild UI tidak mendaftarkan ulang manifest. Jalankan `app:register-manifest <id module>` lewat container `core-app`, verifikasi kolom `apps.navigation` di database runtime, lalu reload shell Core.
 
 **Menghapus duty yang sedang dipakai role.** Buat migration kecil untuk melepas relasi role-duty dulu, baru daftarkan ulang manifest.
 

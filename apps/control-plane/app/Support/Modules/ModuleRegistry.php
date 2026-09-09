@@ -115,14 +115,42 @@ final class ModuleRegistry
      */
     private function dependency(array $isi): array
     {
-        $daftar = $isi['depends_on'] ?? [];
+        // Kuncinya `dependsOn`, bukan `depends_on`, dan itu koreksi terhadap keadaan sebelumnya.
+        //
+        // Manifest app yang belum dipindah — dan validasi payload provider di
+        // `AppCatalogRequest` — memakai `dependsOn` berisi **peta** id ke rentang versi:
+        //
+        //     dependsOn:
+        //       business-partner: ^0.1
+        //
+        // Registry ini dulu membaca `depends_on` dan mengambil **nilai**-nya. Ketiga module di
+        // repo kebetulan menulis `depends_on: []`, dan daftar kosong tidak dapat dibedakan dari
+        // peta kosong — jadi tidak ada yang gagal, dan tidak ada yang menyadarinya. Begitu
+        // sebuah module benar-benar menyatakan dependency, katalog akan mencatatnya sementara
+        // runtime membaca kosong: `InstallModule` berhenti menuntut prasyaratnya, dan
+        // `EditionResolver` berhenti menariknya ke dalam image edisi. Pelanggan menerima image
+        // yang kekurangan module yang dibutuhkan module lain, tanpa satu pun kesalahan.
+        $daftar = $isi['dependsOn'] ?? [];
 
-        if (! is_array($daftar)) {
+        // `??` di atas sudah menyingkirkan null, jadi yang tersisa diperiksa hanya kosongnya.
+        if ($daftar === []) {
             return [];
         }
 
+        // Bentuk yang salah dilempar, bukan dianggap kosong. Manifest yang dependency-nya tidak
+        // terbaca adalah manifest yang prasyaratnya tidak dijaga siapa pun, dan itu lebih buruk
+        // daripada module yang menolak dimuat.
+        if (! is_array($daftar) || array_is_list($daftar)) {
+            throw new \RuntimeException(sprintf(
+                'Manifest module menulis `dependsOn` sebagai daftar; yang benar peta id module ke rentang versi, '.
+                'misalnya `dependsOn:%s  business-partner: ^0.1`. Bentuk daftar terbaca kosong dan membuat '.
+                'prasyaratnya tidak dijaga siapa pun.',
+                PHP_EOL,
+            ));
+        }
+
         return array_values(array_filter(
-            array_map(static fn ($nilai): string => is_string($nilai) ? $nilai : '', $daftar),
+            array_map(static fn ($kunci): string => is_string($kunci) ? $kunci : '', array_keys($daftar)),
             static fn (string $nilai): bool => $nilai !== '',
         ));
     }

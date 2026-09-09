@@ -70,7 +70,7 @@ app terakhir pindah, aturan ini dipindahkan menjadi desain kanonik di `docs/dev`
 
 ## App manifest runtime verification
 
-- Setelah mengubah navigasi atau security di `app.yaml`, rebuild UI saja tidak cukup. Jalankan `app:register-manifest /workspace/app.yaml` melalui container `core-app` di `D:\Kerja\erp-dev`, lalu verifikasi kolom `apps.navigation` pada database runtime dan reload shell Core.
+- Setelah mengubah navigasi atau security di `app.yaml`, rebuild UI saja tidak cukup. Jalankan `app:register-manifest <id module>` melalui container `core-app` di `D:\Kerja\erp-dev`, lalu verifikasi kolom `apps.navigation` pada database runtime dan reload shell Core.
 - Saat menghapus duty yang sudah dipakai role, buat migration kecil untuk melepas relasi role-duty terlebih dahulu; baru daftarkan ulang manifest. Ini mencegah menu lama tetap tampil dari katalog Core.
 
 ## graphify

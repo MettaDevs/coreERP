@@ -5208,6 +5208,29 @@ Dockerfile. Modul di dalam repo tidak punya keduanya, jadi tidak akan pernah dit
 
 **Bergantung pada.** F3-20.
 
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026, dan dibuktikan dengan menjalankan stack-nya.
+
+Penemuan memindai `<COREERP_SOURCE_PATH>/modules/<penerbit>/<module>/app.yaml` — pola yang sama
+persis dengan `ModuleRegistry` di runtime. Syarat `api/Dockerfile`, `ui/Dockerfile`, dan
+`ui/package.json` dibuang; module tidak punya ketiganya dan tidak akan pernah ditemukan
+selama syarat itu ada. Pilihan memakai id manifest saja, dan pencocokan nama folder dibuang.
+
+**Module ber-`kind: internal-fixture` tidak dapat dipilih.** `RegisterAppManifestCommand` sudah
+menyaringnya sendiri, jadi memilihnya hanya memindahkan penolakan Core ke tengah run — sesudah
+migration dan seed berjalan. Menyebutnya sekarang menghasilkan pesan yang menyebut sebabnya,
+bukan "tidak ditemukan". Keduanya tetap berfungsi sebagai bahan uji penjaga batas, karena
+penyedia layanan module dimuat runtime tanpa memandang pilihan di skrip ini.
+
+**Satu kerusakan lama ikut terbawa perbaikannya.** Bentuk lama memanggil `app:register-manifest`
+dengan jalur berkas, yang ditolak Core sejak F3-30. Sekarang `app:register-manifest <id>` dan
+`module:migrate <id>`.
+
+**Yang dibuktikan**: `start.ps1 -Build` menyalakan stack dan menjalankan 43 migration module;
+`start.ps1 -Apps management-aset` memilih satu module lewat id manifest; jalan kedua melaporkan
+"Module sudah mutakhir; tidak ada migration yang dijalankan" — aman dijalankan dua kali.
+
 ### F6-02 — Satu compose
 
 **Kenapa.** Berkas compose yang dihasilkan berisi tiga layanan dan satu volume per app. Semuanya hilang.
@@ -5228,6 +5251,27 @@ Dockerfile. Modul di dalam repo tidak punya keduanya, jadi tidak akan pernah dit
 
 **Bergantung pada.** F6-01.
 
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026.
+
+`compose.apps.yaml` dihapus beserta penulisnya, templat layanan database/API/UI per app,
+pengalokasian tiga porta per app, dan pengurusan rahasia per app (`APP_<SLUG>_KEY`,
+`_DB_PASSWORD`, `_SERVICE_TOKEN`). Ikut hilang: pemanggilan `app:bootstrap-local-runtime`
+beserta pembacaan digest image dan penukaran token, penantian HTTP ke porta app dan ke jalur
+konten per penempatan, dan `--force-recreate core-app` yang dulu dipakai merender ulang
+konfigurasi proxy.
+
+`start.ps1` **788 → 391 baris**.
+
+**Yang dibuktikan**: `docker compose ps` memulangkan tepat **enam layanan** — `core-app`,
+`core-db`, `core-renderer`, `core-scheduler`, `core-worker`, `docs` — seluruhnya `running`,
+dengan `http://localhost:8000/up` dan `http://localhost:18090/` menjawab 200.
+
+`COREERP_EVENT_ENDPOINTS` **dipertahankan** sebagai `"[]"`, bukan dibuang: `config/coreerp.php`
+masih membacanya dan `PublishWorkflowEvents` masih memakainya untuk penerima di luar proses.
+Yang dibuang hanya pengisiannya dari kontrak AsyncAPI tiap app.
+
 ### F6-03 — Buang penyebaran paket antarmuka
 
 **Kenapa.** Fungsi penerbit paket dan penyelaras berkas kunci ada hanya untuk menyalin berkas `.tgz` ke
@@ -5246,6 +5290,28 @@ banyak repo.
 **Rujukan.** Bagian 5.5 dokumen ini.
 
 **Bergantung pada.** F4-02, F6-02.
+
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026 untuk bagian yang ada di repo ini.
+
+`Sync-UiSdkLockfile` dan `Publish-UiSdk` dibuang beserta pemanggilannya. Pencarian `tgz`,
+`apperp-ui`, dan nama kedua fungsi itu pada `start.ps1` dan `compose.yaml` memulangkan nol.
+
+**Satu temuan yang membuat pembuangannya bukan sekadar merapikan.** `packages/ui` sekarang
+workspace npm di dalam repo CoreERP, dan npm memasangnya sebagai tautan simbolik di
+`node_modules/@apperp/ui`. `Sync-UiSdkLockfile` yang dijalankan atas `apps/control-plane` justru
+akan **menghapus tautan itu** — fungsi yang dulu menyelaraskan berkas kunci kini merusak
+pemasangan workspace.
+
+**Langkah 2 tidak dikerjakan: repo `app-erp-template` di luar jangkauan sesi ini.** Yang masih
+tersisa di sana, dan perlu dibuang pada pull request di repo itu:
+`ui/vendor/apperp-ui.tgz` (101.005 byte) dan baris `"@apperp/ui": "file:vendor/apperp-ui.tgz"`
+pada `ui/package.json`. F7-08 mengganti repo template dengan cetakan modul; kalau task itu
+dikerjakan lebih dulu, langkah ini gugur bersamanya.
+
+**Perubahan `erp-dev` sengaja dibiarkan belum di-commit**, atas permintaan pemilik. Repo itu
+terpisah (`MettaDevs/erp-docker-start-dev`), dan pull request-nya keputusan pemilik.
 
 ### F6-04 — Satu alur CI
 

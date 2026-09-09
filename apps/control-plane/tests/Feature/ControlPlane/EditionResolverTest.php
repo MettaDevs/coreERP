@@ -224,8 +224,13 @@ class EditionResolverTest extends TestCase
 
             $depends = $entri['depends_on'] ?? [];
             $baris[] = $depends === []
-                ? 'depends_on: []'
-                : "depends_on:\n".implode("\n", array_map(static fn (string $d): string => '  - '.$d, $depends));
+                // Bentuknya peta id ke rentang versi, sama dengan manifest sungguhan dan sama
+                // dengan yang dibaca katalog provider. Rentangnya sendiri tidak dipakai
+                // penghitung edisi — yang dibacanya kuncinya — tetapi menuliskannya sebagai
+                // daftar membuat manifest buatan ini berbeda bentuk dari yang sungguhan, dan
+                // sejak itu test berhenti menguji yang nyata.
+                ? 'dependsOn: {}'
+                : "dependsOn:\n".implode("\n", array_map(static fn (string $d): string => '  '.$d.': ^0.1', $depends));
 
             file_put_contents($folder.'/app.yaml', implode("\n", $baris)."\n");
         }

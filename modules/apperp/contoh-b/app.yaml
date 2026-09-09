@@ -11,7 +11,9 @@ kind: internal-fixture
 
 requires:
   core: ^0.1
-depends_on: []
+# Peta id module ke rentang versi, bukan daftar. Bentuknya sama dengan yang dibaca
+# katalog provider; dua bentuk untuk satu jawaban pasti menyimpang.
+dependsOn: {}
 
 # Awalan tabel dipilih sekali dan tidak berubah. Lihat tabel pemetaan di modules/README.md.
 table_prefix: contoh_b_

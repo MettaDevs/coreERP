@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
+use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\ModulSedangDipindah;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
@@ -405,6 +406,102 @@ class SusunanManifestModulTest extends TestCase
      *
      * @return array<string, array<mixed>>
      */
+    /**
+     * Dependency ditulis dengan satu kunci dan satu bentuk: `dependsOn`, peta id ke rentang versi.
+     *
+     * Dua bentuk untuk satu jawaban pasti menyimpang, dan penyimpangan yang ini tidak berbunyi.
+     * Sampai 10 September 2026 ketiga manifest di repo menulis `depends_on: []` sementara
+     * `ModuleRegistry` mengambil **nilai**-nya dan katalog provider membaca `dependsOn` berisi
+     * **peta**. Daftar kosong tidak dapat dibedakan dari peta kosong, jadi tidak ada yang gagal.
+     * Begitu sebuah module benar-benar menyatakan dependency, katalog mencatatnya sementara
+     * runtime membaca kosong: `InstallModule` berhenti menuntut prasyaratnya, dan
+     * `EditionResolver` berhenti menariknya ke dalam image edisi. Pelanggan menerima image yang
+     * kekurangan module yang dibutuhkan module lain, tanpa satu pun kesalahan.
+     */
+    public function test_dependency_memakai_satu_kunci_dan_satu_bentuk(): void
+    {
+        $this->assertSame([], $this->pelanggaranDependency(dirname(__DIR__, 5).'/modules'));
+    }
+
+    public function test_dependency_berbentuk_daftar_atau_berkunci_lama_membuat_merah(): void
+    {
+        $akar = $this->akarSementaraBaru();
+
+        $this->tulisManifest($akar, 'apperp', 'modul-kunci-lama', [
+            'id: modul-kunci-lama', 'name: Modul Kunci Lama', 'version: 0.1.0',
+            'publisher: apperp', 'kind: business-app', 'table_prefix: lama_',
+            'depends_on: []',
+        ]);
+        $this->tulisManifest($akar, 'apperp', 'modul-bentuk-daftar', [
+            'id: modul-bentuk-daftar', 'name: Modul Bentuk Daftar', 'version: 0.1.0',
+            'publisher: apperp', 'kind: business-app', 'table_prefix: daftar_',
+            'dependsOn:', '  - modul-kunci-lama',
+        ]);
+
+        $pelanggaran = $this->pelanggaranDependency($akar);
+        sort($pelanggaran);
+
+        $this->assertSame([
+            'modules/apperp/modul-bentuk-daftar/app.yaml menulis "dependsOn" sebagai daftar; yang benar peta id module ke rentang versi.',
+            'modules/apperp/modul-kunci-lama/app.yaml memakai kunci "depends_on"; yang dibaca katalog dan runtime adalah "dependsOn".',
+        ], $pelanggaran);
+    }
+
+    /**
+     * Manifest yang dependency-nya salah bentuk ditolak runtime, bukan dianggap kosong.
+     *
+     * Penjaga di atas menahannya pada pull request. Ini menahannya pada saat pemuatan, untuk
+     * manifest yang datang dari tempat lain — bundle edisi, atau module yang disalin tangan ke
+     * server pelanggan.
+     */
+    public function test_registry_menolak_dependency_berbentuk_daftar(): void
+    {
+        $akar = $this->akarSementaraBaru();
+
+        $this->tulisManifest($akar, 'apperp', 'modul-bentuk-daftar', [
+            'id: modul-bentuk-daftar', 'name: Modul Bentuk Daftar', 'version: 0.1.0',
+            'publisher: apperp', 'kind: business-app', 'table_prefix: daftar_',
+            'dependsOn:', '  - modul-lain',
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('sebagai daftar');
+
+        (new ModuleRegistry($akar))->semuaTermasukYangSedangDipindah();
+    }
+
+    /**
+     * Kunci dan bentuk dependency tiap manifest.
+     *
+     * @return list<string>
+     */
+    private function pelanggaranDependency(string $akar): array
+    {
+        $pelanggaran = [];
+
+        foreach ($this->manifest($akar) as $jalur => $isi) {
+            $relatif = 'modules/'.$jalur.'/app.yaml';
+
+            if (array_key_exists('depends_on', $isi)) {
+                $pelanggaran[] = sprintf(
+                    '%s memakai kunci "depends_on"; yang dibaca katalog dan runtime adalah "dependsOn".',
+                    $relatif,
+                );
+            }
+
+            $depends = $isi['dependsOn'] ?? null;
+
+            if (is_array($depends) && $depends !== [] && array_is_list($depends)) {
+                $pelanggaran[] = sprintf(
+                    '%s menulis "dependsOn" sebagai daftar; yang benar peta id module ke rentang versi.',
+                    $relatif,
+                );
+            }
+        }
+
+        return $pelanggaran;
+    }
+
     private function manifest(string $akar): array
     {
         $hasil = [];
