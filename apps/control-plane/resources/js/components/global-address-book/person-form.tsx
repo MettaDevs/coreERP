@@ -35,10 +35,10 @@ export function PersonForm({
         <Card className="overflow-hidden border border-border shadow-xs">
             {/* FASTTAB HEADER UTAMA (1 BUKA-TUTUP UNTUK SELURUH FORM GENERAL) */}
             <CardHeader
-                className="flex flex-row items-center justify-between border-b px-5 py-3.5 cursor-pointer select-none hover:bg-muted/30 transition-colors"
+                className="flex cursor-pointer flex-row items-center justify-between border-b px-5 py-3.5 transition-colors select-none hover:bg-muted/30"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
-                <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     <UserCheck className="h-4 w-4 text-primary" />
                     General
                 </CardTitle>
@@ -61,7 +61,7 @@ export function PersonForm({
             </CardHeader>
 
             {isExpanded && (
-                <div className="p-6 space-y-6">
+                <div className="space-y-6 p-6">
                     {/* 1. IDENTIFIKASI UTAMA */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Input
@@ -83,7 +83,9 @@ export function PersonForm({
                             label="Gelar Depan"
                             items={[]}
                             value={data.personal_title ?? null}
-                            onValueChange={(val) => onChange('personal_title', val)}
+                            onValueChange={(val) =>
+                                onChange('personal_title', val)
+                            }
                             placeholder="Pilih gelar depan"
                         />
 
@@ -92,7 +94,9 @@ export function PersonForm({
                             label="Nama Depan"
                             required
                             value={data.first_name || ''}
-                            onChange={(e) => onChange('first_name', e.target.value)}
+                            onChange={(e) =>
+                                onChange('first_name', e.target.value)
+                            }
                             placeholder="Nama depan"
                             aria-invalid={!!errors?.first_name}
                         />
@@ -101,7 +105,9 @@ export function PersonForm({
                             id="middle_name"
                             label="Nama Tengah"
                             value={data.middle_name || ''}
-                            onChange={(e) => onChange('middle_name', e.target.value)}
+                            onChange={(e) =>
+                                onChange('middle_name', e.target.value)
+                            }
                             placeholder="Nama tengah (opsional)"
                         />
 
@@ -110,7 +116,9 @@ export function PersonForm({
                             label="Nama Belakang"
                             required
                             value={data.last_name || ''}
-                            onChange={(e) => onChange('last_name', e.target.value)}
+                            onChange={(e) =>
+                                onChange('last_name', e.target.value)
+                            }
                             placeholder="Nama belakang"
                             aria-invalid={!!errors?.last_name}
                         />
@@ -119,7 +127,9 @@ export function PersonForm({
                             id="known_as"
                             label="Nama Panggilan"
                             value={data.known_as || ''}
-                            onChange={(e) => onChange('known_as', e.target.value)}
+                            onChange={(e) =>
+                                onChange('known_as', e.target.value)
+                            }
                             placeholder="Nama panggilan"
                         />
 
@@ -127,7 +137,9 @@ export function PersonForm({
                             id="initials"
                             label="Inisial"
                             value={data.initials || ''}
-                            onChange={(e) => onChange('initials', e.target.value)}
+                            onChange={(e) =>
+                                onChange('initials', e.target.value)
+                            }
                             placeholder="Inisial"
                         />
 
@@ -135,7 +147,9 @@ export function PersonForm({
                             id="search_name"
                             label="Nama Pencarian"
                             value={data.search_name || ''}
-                            onChange={(e) => onChange('search_name', e.target.value)}
+                            onChange={(e) =>
+                                onChange('search_name', e.target.value)
+                            }
                             placeholder="Nama pencarian"
                         />
 
@@ -143,7 +157,9 @@ export function PersonForm({
                             id="last_name_prefix"
                             label="Awalan Nama Belakang"
                             value={data.last_name_prefix || ''}
-                            onChange={(e) => onChange('last_name_prefix', e.target.value)}
+                            onChange={(e) =>
+                                onChange('last_name_prefix', e.target.value)
+                            }
                             placeholder="Awalan nama belakang"
                         />
 
@@ -151,7 +167,9 @@ export function PersonForm({
                             label="Gelar Belakang / Akhiran Nama"
                             items={[]}
                             value={data.personal_suffix ?? null}
-                            onValueChange={(val) => onChange('personal_suffix', val)}
+                            onValueChange={(val) =>
+                                onChange('personal_suffix', val)
+                            }
                             placeholder="Pilih gelar belakang"
                         />
 
@@ -183,7 +201,9 @@ export function PersonForm({
                                 label="Status Pernikahan"
                                 items={[]}
                                 value={data.marital_status ?? null}
-                                onValueChange={(val) => onChange('marital_status', val)}
+                                onValueChange={(val) =>
+                                    onChange('marital_status', val)
+                                }
                                 placeholder="Pilih status pernikahan"
                             />
 
@@ -192,7 +212,9 @@ export function PersonForm({
                                 label="Tanggal Lahir"
                                 type="date"
                                 value={data.birthday || ''}
-                                onChange={(e) => onChange('birthday', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('birthday', e.target.value)
+                                }
                             />
 
                             <Input
@@ -200,7 +222,9 @@ export function PersonForm({
                                 label="Ulang Tahun Pernikahan"
                                 type="date"
                                 value={data.anniversary || ''}
-                                onChange={(e) => onChange('anniversary', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('anniversary', e.target.value)
+                                }
                             />
 
                             <Input
@@ -209,7 +233,9 @@ export function PersonForm({
                                 type="number"
                                 min={0}
                                 value={data.children || ''}
-                                onChange={(e) => onChange('children', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('children', e.target.value)
+                                }
                                 placeholder="0"
                             />
 
@@ -217,7 +243,9 @@ export function PersonForm({
                                 id="hobbies"
                                 label="Hobi / Minat"
                                 value={data.hobbies || ''}
-                                onChange={(e) => onChange('hobbies', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('hobbies', e.target.value)
+                                }
                                 placeholder="Hobi atau minat"
                             />
 
@@ -225,7 +253,12 @@ export function PersonForm({
                                 id="professional_title"
                                 label="Gelar Profesi"
                                 value={data.professional_title || ''}
-                                onChange={(e) => onChange('professional_title', e.target.value)}
+                                onChange={(e) =>
+                                    onChange(
+                                        'professional_title',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Gelar profesi"
                             />
 
@@ -233,7 +266,12 @@ export function PersonForm({
                                 id="professional_suffix"
                                 label="Sertifikasi / Gelar Tambahan"
                                 value={data.professional_suffix || ''}
-                                onChange={(e) => onChange('professional_suffix', e.target.value)}
+                                onChange={(e) =>
+                                    onChange(
+                                        'professional_suffix',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Sertifikasi / gelar tambahan"
                             />
                         </div>
@@ -250,7 +288,9 @@ export function PersonForm({
                                 label="Buku Alamat"
                                 items={[]}
                                 value={data.address_books ?? null}
-                                onValueChange={(val) => onChange('address_books', val)}
+                                onValueChange={(val) =>
+                                    onChange('address_books', val)
+                                }
                                 placeholder="Pilih buku alamat"
                             />
 
@@ -258,7 +298,9 @@ export function PersonForm({
                                 id="payment_priority"
                                 label="Prioritas Pembayaran"
                                 value={data.payment_priority || ''}
-                                onChange={(e) => onChange('payment_priority', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('payment_priority', e.target.value)
+                                }
                                 placeholder="Prioritas pembayaran"
                             />
 
@@ -266,7 +308,9 @@ export function PersonForm({
                                 id="phonetic_first"
                                 label="Nama Depan Fonetik"
                                 value={data.phonetic_first || ''}
-                                onChange={(e) => onChange('phonetic_first', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('phonetic_first', e.target.value)
+                                }
                                 placeholder="Fonetik nama depan"
                             />
 
@@ -274,7 +318,9 @@ export function PersonForm({
                                 id="phonetic_middle"
                                 label="Nama Tengah Fonetik"
                                 value={data.phonetic_middle || ''}
-                                onChange={(e) => onChange('phonetic_middle', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('phonetic_middle', e.target.value)
+                                }
                                 placeholder="Fonetik nama tengah"
                             />
 
@@ -282,7 +328,9 @@ export function PersonForm({
                                 id="phonetic_last"
                                 label="Nama Belakang Fonetik"
                                 value={data.phonetic_last || ''}
-                                onChange={(e) => onChange('phonetic_last', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('phonetic_last', e.target.value)
+                                }
                                 placeholder="Fonetik nama belakang"
                             />
 
@@ -290,7 +338,9 @@ export function PersonForm({
                                 label="Bahasa"
                                 items={[]}
                                 value={data.language ?? null}
-                                onValueChange={(val) => onChange('language', val)}
+                                onValueChange={(val) =>
+                                    onChange('language', val)
+                                }
                                 placeholder="Pilih bahasa"
                             />
                         </div>
@@ -316,8 +366,3 @@ export function PersonForm({
         </Card>
     );
 }
-
-
-
-
-

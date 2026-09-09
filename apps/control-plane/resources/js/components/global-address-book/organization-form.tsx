@@ -35,10 +35,10 @@ export function OrganizationForm({
         <Card className="overflow-hidden border border-border shadow-xs">
             {/* FASTTAB HEADER UTAMA (1 BUKA-TUTUP UNTUK SELURUH FORM GENERAL) */}
             <CardHeader
-                className="flex flex-row items-center justify-between border-b px-5 py-3.5 cursor-pointer select-none hover:bg-muted/30 transition-colors"
+                className="flex cursor-pointer flex-row items-center justify-between border-b px-5 py-3.5 transition-colors select-none hover:bg-muted/30"
                 onClick={() => setIsExpanded(!isExpanded)}
             >
-                <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     <Building2 className="h-4 w-4 text-primary" />
                     General
                 </CardTitle>
@@ -61,7 +61,7 @@ export function OrganizationForm({
             </CardHeader>
 
             {isExpanded && (
-                <div className="p-6 space-y-6">
+                <div className="space-y-6 p-6">
                     {/* 1. IDENTIFIKASI UTAMA */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <Input
@@ -93,7 +93,9 @@ export function OrganizationForm({
                             id="search_name"
                             label="Nama Pencarian"
                             value={data.search_name || ''}
-                            onChange={(e) => onChange('search_name', e.target.value)}
+                            onChange={(e) =>
+                                onChange('search_name', e.target.value)
+                            }
                             placeholder="Masukkan nama pencarian"
                         />
 
@@ -101,7 +103,9 @@ export function OrganizationForm({
                             id="payment_priority"
                             label="Prioritas Pembayaran"
                             value={data.payment_priority || ''}
-                            onChange={(e) => onChange('payment_priority', e.target.value)}
+                            onChange={(e) =>
+                                onChange('payment_priority', e.target.value)
+                            }
                             placeholder="Masukkan prioritas pembayaran"
                         />
                     </div>
@@ -117,7 +121,12 @@ export function OrganizationForm({
                                 id="organization_number"
                                 label="Nomor Registrasi / NPWP"
                                 value={data.organization_number || ''}
-                                onChange={(e) => onChange('organization_number', e.target.value)}
+                                onChange={(e) =>
+                                    onChange(
+                                        'organization_number',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Masukkan nomor registrasi atau NPWP"
                             />
 
@@ -130,7 +139,9 @@ export function OrganizationForm({
                                 onChange={(e) =>
                                     onChange(
                                         'number_of_employees',
-                                        e.target.value ? parseInt(e.target.value, 10) : 0,
+                                        e.target.value
+                                            ? parseInt(e.target.value, 10)
+                                            : 0,
                                     )
                                 }
                             />
@@ -139,7 +150,9 @@ export function OrganizationForm({
                                 label="Klasifikasi ABC"
                                 items={[]}
                                 value={data.abc_code ?? null}
-                                onValueChange={(val) => onChange('abc_code', val)}
+                                onValueChange={(val) =>
+                                    onChange('abc_code', val)
+                                }
                                 placeholder="Pilih klasifikasi ABC"
                             />
 
@@ -147,7 +160,9 @@ export function OrganizationForm({
                                 id="duns_number"
                                 label="Nomor DUNS"
                                 value={data.duns_number || ''}
-                                onChange={(e) => onChange('duns_number', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('duns_number', e.target.value)
+                                }
                                 placeholder="Masukkan nomor DUNS"
                             />
                         </div>
@@ -164,7 +179,9 @@ export function OrganizationForm({
                                 label="Buku Alamat"
                                 items={[]}
                                 value={data.address_books ?? null}
-                                onValueChange={(val) => onChange('address_books', val)}
+                                onValueChange={(val) =>
+                                    onChange('address_books', val)
+                                }
                                 placeholder="Pilih buku alamat"
                             />
 
@@ -172,7 +189,9 @@ export function OrganizationForm({
                                 id="known_as"
                                 label="Nama Panggilan / Alias"
                                 value={data.known_as || ''}
-                                onChange={(e) => onChange('known_as', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('known_as', e.target.value)
+                                }
                                 placeholder="Masukkan nama panggilan atau alias"
                             />
 
@@ -180,7 +199,9 @@ export function OrganizationForm({
                                 id="phonetic_name"
                                 label="Nama Fonetik"
                                 value={data.phonetic_name || ''}
-                                onChange={(e) => onChange('phonetic_name', e.target.value)}
+                                onChange={(e) =>
+                                    onChange('phonetic_name', e.target.value)
+                                }
                                 placeholder="Masukkan nama fonetik"
                             />
 
@@ -188,7 +209,9 @@ export function OrganizationForm({
                                 label="Bahasa"
                                 items={[]}
                                 value={data.language ?? null}
-                                onValueChange={(val) => onChange('language', val)}
+                                onValueChange={(val) =>
+                                    onChange('language', val)
+                                }
                                 placeholder="Pilih bahasa"
                             />
                         </div>
@@ -214,4 +237,3 @@ export function OrganizationForm({
         </Card>
     );
 }
-

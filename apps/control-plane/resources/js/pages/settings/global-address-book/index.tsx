@@ -26,21 +26,30 @@ interface GlobalAddressBookProps {
     partyTypes?: PartyTypeItem[];
 }
 
-export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps) {
+export default function GlobalAddressBook({
+    partyTypes,
+}: GlobalAddressBookProps) {
     const { url } = usePage();
-    const querySection = new URLSearchParams(url.split('?')[1] || '').get('section') || 'general';
+    const querySection =
+        new URLSearchParams(url.split('?')[1] || '').get('section') ||
+        'general';
     const [partyType, setPartyType] = useState<PartyType>('organization');
 
-    const typeOptions = partyTypes && partyTypes.length > 0
-        ? partyTypes
-            .filter((t) => t.code === 'person' || t.code === 'organization')
-            .map((t) => ({ value: t.code, label: t.name }))
-        : [
-            { value: 'organization', label: 'Organisasi' },
-            { value: 'person', label: 'Perorangan' },
-        ];
+    const typeOptions =
+        partyTypes && partyTypes.length > 0
+            ? partyTypes
+                  .filter(
+                      (t) => t.code === 'person' || t.code === 'organization',
+                  )
+                  .map((t) => ({ value: t.code, label: t.name }))
+            : [
+                  { value: 'organization', label: 'Organisasi' },
+                  { value: 'person', label: 'Perorangan' },
+              ];
 
-    const { data, setData, processing, errors, reset } = useForm<Record<string, any>>({
+    const { data, setData, processing, errors, reset } = useForm<
+        Record<string, any>
+    >({
         party_id: '000004055',
         type: 'organization',
         active: true,
@@ -89,14 +98,23 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
         if (querySection) {
             const targetElement = document.getElementById(querySection);
             if (targetElement) {
-                targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                targetElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                });
             }
         }
     }, [querySection]);
 
     // Scrollspy dengan Intersection Observer API untuk sinkronisasi realtime status aktif ke Sidebar Shell
     useEffect(() => {
-        const sectionIds = ['general', 'addresses', 'relationships', 'contacts', 'roles'];
+        const sectionIds = [
+            'general',
+            'addresses',
+            'relationships',
+            'contacts',
+            'roles',
+        ];
         const elements = sectionIds
             .map((id) => document.getElementById(id))
             .filter((el): el is HTMLElement => el !== null);
@@ -105,10 +123,14 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
 
         const observer = new IntersectionObserver(
             (entries) => {
-                const intersectingEntries = entries.filter((entry) => entry.isIntersecting);
+                const intersectingEntries = entries.filter(
+                    (entry) => entry.isIntersecting,
+                );
                 if (intersectingEntries.length > 0) {
                     intersectingEntries.sort(
-                        (a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top),
+                        (a, b) =>
+                            Math.abs(a.boundingClientRect.top) -
+                            Math.abs(b.boundingClientRect.top),
                     );
                     const activeId = intersectingEntries[0].target.id;
                     window.dispatchEvent(
@@ -134,7 +156,7 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
     }, [partyType]);
 
     const handleFieldChange = (field: string, value: any) => {
-        setData((prev) => ({
+        setData((prev: Record<string, any>) => ({
             ...prev,
             [field]: value,
         }));
@@ -144,7 +166,7 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
         if (!newType) return;
         const selected = newType as PartyType;
         setPartyType(selected);
-        setData((prev) => ({
+        setData((prev: Record<string, any>) => ({
             ...prev,
             type: selected,
             party_id: selected === 'person' ? '000004584' : '000004055',
@@ -159,7 +181,9 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
 
     const currentPartyName =
         partyType === 'person'
-            ? [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(' ') || 'Perorangan Baru'
+            ? [data.first_name, data.middle_name, data.last_name]
+                  .filter(Boolean)
+                  .join(' ') || 'Perorangan Baru'
             : data.name || 'Organisasi Baru';
 
     return (
@@ -176,7 +200,10 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
                             size="sm"
                             onClick={() => {
                                 reset();
-                                setData('party_id', `00000${Math.floor(1000 + Math.random() * 9000)}`);
+                                setData(
+                                    'party_id',
+                                    `00000${Math.floor(1000 + Math.random() * 9000)}`,
+                                );
                             }}
                         >
                             Tambah Pihak
@@ -186,13 +213,15 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
                             action="archive"
                             size="sm"
                             onClick={() => {
-                                alert(`Pihak ${data.party_id} berhasil diarsipkan.`);
+                                alert(
+                                    `Pihak ${data.party_id} berhasil diarsipkan.`,
+                                );
                             }}
                         >
                             Arsipkan
                         </ActionButton>
 
-                        <div className="h-4 w-px bg-border mx-1" />
+                        <div className="mx-1 h-4 w-px bg-border" />
 
                         <Button
                             type="button"
@@ -242,7 +271,9 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
                 <section id="addresses" className="scroll-mt-6">
                     <AddressSection
                         addresses={data.addresses || []}
-                        onChange={(addresses) => handleFieldChange('addresses', addresses)}
+                        onChange={(addresses) =>
+                            handleFieldChange('addresses', addresses)
+                        }
                     />
                 </section>
 
@@ -252,7 +283,9 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
                         relationships={data.relationships || []}
                         currentPartyId={data.party_id}
                         currentPartyName={currentPartyName}
-                        onChange={(relationships) => handleFieldChange('relationships', relationships)}
+                        onChange={(relationships) =>
+                            handleFieldChange('relationships', relationships)
+                        }
                     />
                 </section>
 
@@ -260,7 +293,9 @@ export default function GlobalAddressBook({ partyTypes }: GlobalAddressBookProps
                 <section id="contacts" className="scroll-mt-6">
                     <ContactInformationSection
                         contacts={data.contacts || []}
-                        onChange={(contacts) => handleFieldChange('contacts', contacts)}
+                        onChange={(contacts) =>
+                            handleFieldChange('contacts', contacts)
+                        }
                     />
                 </section>
 

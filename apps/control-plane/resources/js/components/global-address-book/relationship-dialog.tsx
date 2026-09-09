@@ -23,10 +23,22 @@ interface RelationshipDialogProps {
 
 const RELATIONSHIP_PAIRS = [
     { value: 'pic', labelAtoB: 'PIC dari', labelBtoA: 'Memiliki PIC' },
-    { value: 'subsidiary', labelAtoB: 'Anak perusahaan dari', labelBtoA: 'Induk perusahaan dari' },
+    {
+        value: 'subsidiary',
+        labelAtoB: 'Anak perusahaan dari',
+        labelBtoA: 'Induk perusahaan dari',
+    },
     { value: 'branch', labelAtoB: 'Cabang dari', labelBtoA: 'Memiliki cabang' },
-    { value: 'contact', labelAtoB: 'Kontak person dari', labelBtoA: 'Memiliki kontak person' },
-    { value: 'vendor_customer', labelAtoB: 'Pemasok / Vendor dari', labelBtoA: 'Pelanggan / Klien dari' },
+    {
+        value: 'contact',
+        labelAtoB: 'Kontak person dari',
+        labelBtoA: 'Memiliki kontak person',
+    },
+    {
+        value: 'vendor_customer',
+        labelAtoB: 'Pemasok / Vendor dari',
+        labelBtoA: 'Pelanggan / Klien dari',
+    },
 ];
 
 export function RelationshipDialog({
@@ -41,14 +53,14 @@ export function RelationshipDialog({
     const [partyBId, setPartyBId] = useState('');
     const [partyBName, setPartyBName] = useState('');
     const [effectiveDate, setEffectiveDate] = useState(
-        new Date().toISOString().slice(0, 10)
+        new Date().toISOString().slice(0, 10),
     );
     const [expirationDate, setExpirationDate] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const pair = RELATIONSHIP_PAIRS.find((p) => p.value === selectedPair);
-        
+
         const newRel: RelationshipItem = {
             id: `REL-${Date.now().toString().slice(-4)}`,
             party_a_id: currentPartyId,
@@ -71,7 +83,10 @@ export function RelationshipDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent ref={dialogContentRef} className="sm:max-w-lg flex flex-col overflow-hidden p-0">
+            <DialogContent
+                ref={dialogContentRef}
+                className="flex flex-col overflow-hidden p-0 sm:max-w-lg"
+            >
                 <DialogHeader className="border-b px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
@@ -80,14 +95,18 @@ export function RelationshipDialog({
                         <div>
                             <DialogTitle>Tambah Hubungan Relasi</DialogTitle>
                             <DialogDescription>
-                                Daftarkan hubungan timbal balik antara pihak ini dengan pihak lain.
+                                Daftarkan hubungan timbal balik antara pihak ini
+                                dengan pihak lain.
                             </DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-                    <div className="space-y-4 px-6 py-4 overflow-y-auto">
+                <form
+                    onSubmit={handleSubmit}
+                    className="flex flex-1 flex-col overflow-hidden"
+                >
+                    <div className="space-y-4 overflow-y-auto px-6 py-4">
                         <div className="grid grid-cols-2 gap-3">
                             <Input
                                 id="rel_party_a_id"
@@ -139,14 +158,18 @@ export function RelationshipDialog({
                                 type="date"
                                 required
                                 value={effectiveDate}
-                                onChange={(e) => setEffectiveDate(e.target.value)}
+                                onChange={(e) =>
+                                    setEffectiveDate(e.target.value)
+                                }
                             />
                             <Input
                                 id="rel_expiration"
                                 label="Berakhir Pada"
                                 type="date"
                                 value={expirationDate}
-                                onChange={(e) => setExpirationDate(e.target.value)}
+                                onChange={(e) =>
+                                    setExpirationDate(e.target.value)
+                                }
                             />
                         </div>
                     </div>
@@ -159,13 +182,10 @@ export function RelationshipDialog({
                         >
                             Batal
                         </Button>
-                        <Button type="submit">
-                            Simpan Hubungan
-                        </Button>
+                        <Button type="submit">Simpan Hubungan</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
     );
 }
-

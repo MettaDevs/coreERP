@@ -87,7 +87,10 @@ export function AppSidebar() {
 
         window.addEventListener('coreerp:section-change', handleSectionChange);
         return () => {
-            window.removeEventListener('coreerp:section-change', handleSectionChange);
+            window.removeEventListener(
+                'coreerp:section-change',
+                handleSectionChange,
+            );
         };
     }, []);
 
@@ -311,7 +314,10 @@ export function AppSidebar() {
         ) ?? primaryItems[0];
     const isChildActive = (item: NavigationItem) => {
         if (realtimeSection && path === '/settings/global-address-book') {
-            return item.href === `/settings/global-address-book?section=${realtimeSection}`;
+            return (
+                item.href ===
+                `/settings/global-address-book?section=${realtimeSection}`
+            );
         }
 
         return (

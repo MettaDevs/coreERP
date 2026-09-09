@@ -1,11 +1,35 @@
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@apperp/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@apperp/ui/table';
 import { Badge } from '@apperp/ui/badge';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@apperp/ui/empty';
-import { Phone, Mail, Globe, Printer, Linkedin, Twitter, MessageSquare, PhoneCall, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import {
+    Phone,
+    Mail,
+    Globe,
+    Printer,
+    Linkedin,
+    Twitter,
+    MessageSquare,
+    PhoneCall,
+    ChevronUp,
+    ChevronDown,
+} from 'lucide-react';
 import type { ContactItem, ContactType } from '@/types/global-address-book';
 import { ContactDialog } from './contact-dialog';
 
@@ -36,10 +60,15 @@ const TYPE_LABELS: Record<ContactType, string> = {
     twitter: 'Twitter / X',
 };
 
-export function ContactInformationSection({ contacts, onChange }: ContactInformationSectionProps) {
+export function ContactInformationSection({
+    contacts,
+    onChange,
+}: ContactInformationSectionProps) {
     const [isExpanded, setIsExpanded] = useState(true);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+    const [selectedContactId, setSelectedContactId] = useState<string | null>(
+        null,
+    );
 
     const handleRemove = () => {
         if (!selectedContactId) return;
@@ -59,17 +88,17 @@ export function ContactInformationSection({ contacts, onChange }: ContactInforma
         <>
             <Card className="overflow-hidden border border-border shadow-xs">
                 <CardHeader
-                    className="flex flex-row items-center justify-between border-b px-5 py-3.5 cursor-pointer select-none hover:bg-muted/30 transition-colors"
+                    className="flex cursor-pointer flex-row items-center justify-between border-b px-5 py-3.5 transition-colors select-none hover:bg-muted/30"
                     onClick={() => setIsExpanded(!isExpanded)}
                 >
-                    <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold text-foreground">
                         <PhoneCall className="h-4 w-4 text-primary" />
                         Informasi Kontak (Contact Information)
                     </CardTitle>
                     <div className="flex items-center gap-2">
                         {isExpanded && (
                             <div
-                                className="flex flex-wrap items-center gap-2 mr-1"
+                                className="mr-1 flex flex-wrap items-center gap-2"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <ActionButton
@@ -111,79 +140,108 @@ export function ContactInformationSection({ contacts, onChange }: ContactInforma
 
                 {isExpanded && (
                     <CardContent className="pt-4">
-                    {contacts.length === 0 ? (
-                        <Empty className="py-8">
-                            <EmptyMedia variant="icon">
-                                <Phone className="h-6 w-6" />
-                            </EmptyMedia>
-                            <EmptyHeader>
-                                <EmptyTitle>Belum ada informasi kontak</EmptyTitle>
-                                <EmptyDescription>
-                                    Daftarkan nomor telepon, alamat email, atau tautan media sosial untuk pihak ini.
-                                </EmptyDescription>
-                            </EmptyHeader>
-                        </Empty>
-                    ) : (
-                        <div className="overflow-x-auto rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="bg-muted/40">
-                                        <TableHead className="w-12 text-center">#</TableHead>
-                                        <TableHead className="w-36">Tipe</TableHead>
-                                        <TableHead>Nomor / Alamat Kontak</TableHead>
-                                        <TableHead>Keterangan</TableHead>
-                                        <TableHead className="w-24">Ekstensi</TableHead>
-                                        <TableHead className="w-24 text-center">Utama</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {contacts.map((cnt, idx) => {
-                                        const isSelected = selectedContactId === cnt.id;
-                                        const Icon = TYPE_ICONS[cnt.type] || Phone;
+                        {contacts.length === 0 ? (
+                            <Empty className="py-8">
+                                <EmptyMedia variant="icon">
+                                    <Phone className="h-6 w-6" />
+                                </EmptyMedia>
+                                <EmptyHeader>
+                                    <EmptyTitle>
+                                        Belum ada informasi kontak
+                                    </EmptyTitle>
+                                    <EmptyDescription>
+                                        Daftarkan nomor telepon, alamat email,
+                                        atau tautan media sosial untuk pihak
+                                        ini.
+                                    </EmptyDescription>
+                                </EmptyHeader>
+                            </Empty>
+                        ) : (
+                            <div className="overflow-x-auto rounded-md border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/40">
+                                            <TableHead className="w-12 text-center">
+                                                #
+                                            </TableHead>
+                                            <TableHead className="w-36">
+                                                Tipe
+                                            </TableHead>
+                                            <TableHead>
+                                                Nomor / Alamat Kontak
+                                            </TableHead>
+                                            <TableHead>Keterangan</TableHead>
+                                            <TableHead className="w-24">
+                                                Ekstensi
+                                            </TableHead>
+                                            <TableHead className="w-24 text-center">
+                                                Utama
+                                            </TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {contacts.map((cnt, idx) => {
+                                            const isSelected =
+                                                selectedContactId === cnt.id;
+                                            const Icon =
+                                                TYPE_ICONS[cnt.type] || Phone;
 
-                                        return (
-                                            <TableRow
-                                                key={cnt.id || idx}
-                                                className={`cursor-pointer transition-colors ${
-                                                    isSelected ? 'bg-primary/10 font-medium' : 'hover:bg-muted/30'
-                                                }`}
-                                                onClick={() => setSelectedContactId(cnt.id)}
-                                            >
-                                                <TableCell className="text-center font-mono text-xs text-muted-foreground">
-                                                    {idx + 1}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="flex items-center gap-1.5 text-xs">
-                                                        <Icon className="h-3.5 w-3.5 text-primary" />
-                                                        {TYPE_LABELS[cnt.type] || cnt.type}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="font-mono text-sm font-medium">
-                                                    {cnt.value}
-                                                </TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">
-                                                    {cnt.description || '-'}
-                                                </TableCell>
-                                                <TableCell className="font-mono text-xs text-muted-foreground">
-                                                    {cnt.extension || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    {cnt.is_primary ? (
-                                                        <Badge variant="default" className="text-[10px] bg-emerald-600">
-                                                            Utama
-                                                        </Badge>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">-</span>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
+                                            return (
+                                                <TableRow
+                                                    key={cnt.id || idx}
+                                                    className={`cursor-pointer transition-colors ${
+                                                        isSelected
+                                                            ? 'bg-primary/10 font-medium'
+                                                            : 'hover:bg-muted/30'
+                                                    }`}
+                                                    onClick={() =>
+                                                        setSelectedContactId(
+                                                            cnt.id,
+                                                        )
+                                                    }
+                                                >
+                                                    <TableCell className="text-center font-mono text-xs text-muted-foreground">
+                                                        {idx + 1}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="flex items-center gap-1.5 text-xs">
+                                                            <Icon className="h-3.5 w-3.5 text-primary" />
+                                                            {TYPE_LABELS[
+                                                                cnt.type
+                                                            ] || cnt.type}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-sm font-medium">
+                                                        {cnt.value}
+                                                    </TableCell>
+                                                    <TableCell className="text-xs text-muted-foreground">
+                                                        {cnt.description || '-'}
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-xs text-muted-foreground">
+                                                        {cnt.extension || '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {cnt.is_primary ? (
+                                                            <Badge
+                                                                variant="default"
+                                                                className="bg-emerald-600 text-[10px]"
+                                                            >
+                                                                Utama
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                -
+                                                            </span>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
+                    </CardContent>
                 )}
             </Card>
 

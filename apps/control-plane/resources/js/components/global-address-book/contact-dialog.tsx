@@ -20,7 +20,11 @@ interface ContactDialogProps {
     onSave: (contact: ContactItem) => void;
 }
 
-export function ContactDialog({ open, onOpenChange, onSave }: ContactDialogProps) {
+export function ContactDialog({
+    open,
+    onOpenChange,
+    onSave,
+}: ContactDialogProps) {
     const dialogContentRef = useRef<HTMLDivElement>(null);
     const [type, setType] = useState<ContactType>('phone');
     const [value, setValue] = useState('');
@@ -48,7 +52,10 @@ export function ContactDialog({ open, onOpenChange, onSave }: ContactDialogProps
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent ref={dialogContentRef} className="sm:max-w-md flex flex-col overflow-hidden p-0">
+            <DialogContent
+                ref={dialogContentRef}
+                className="flex flex-col overflow-hidden p-0 sm:max-w-md"
+            >
                 <DialogHeader className="border-b px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
@@ -57,19 +64,25 @@ export function ContactDialog({ open, onOpenChange, onSave }: ContactDialogProps
                         <div>
                             <DialogTitle>Tambah Informasi Kontak</DialogTitle>
                             <DialogDescription>
-                                Daftarkan nomor telepon, email, atau saluran komunikasi lainnya.
+                                Daftarkan nomor telepon, email, atau saluran
+                                komunikasi lainnya.
                             </DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-                    <div className="space-y-4 px-6 py-4 overflow-y-auto">
+                <form
+                    onSubmit={handleSubmit}
+                    className="flex flex-1 flex-col overflow-hidden"
+                >
+                    <div className="space-y-4 overflow-y-auto px-6 py-4">
                         <Select
                             label="Tipe Kontak"
                             items={[]}
                             value={type}
-                            onValueChange={(val) => setType((val as ContactType) || '')}
+                            onValueChange={(val) =>
+                                setType((val as ContactType) || '')
+                            }
                             placeholder="Pilih tipe kontak"
                             portalContainer={dialogContentRef}
                         />
@@ -100,10 +113,15 @@ export function ContactDialog({ open, onOpenChange, onSave }: ContactDialogProps
                             />
                         </div>
 
-                        <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                        <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-3">
                             <div>
-                                <p className="text-sm font-medium text-foreground">Kontak Utama (Primary)</p>
-                                <p className="text-xs text-muted-foreground">Jadikan saluran komunikasi ini sebagai kontak utama</p>
+                                <p className="text-sm font-medium text-foreground">
+                                    Kontak Utama (Primary)
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                    Jadikan saluran komunikasi ini sebagai
+                                    kontak utama
+                                </p>
                             </div>
                             <Switch
                                 checked={isPrimary}
@@ -120,13 +138,10 @@ export function ContactDialog({ open, onOpenChange, onSave }: ContactDialogProps
                         >
                             Batal
                         </Button>
-                        <Button type="submit">
-                            Simpan Kontak
-                        </Button>
+                        <Button type="submit">Simpan Kontak</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
     );
 }
-

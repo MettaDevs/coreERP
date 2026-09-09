@@ -36,7 +36,15 @@ export interface RelationshipItem {
     status: 'active' | 'expired' | 'future';
 }
 
-export type ContactType = 'phone' | 'email' | 'whatsapp' | 'url' | 'telex' | 'fax' | 'linkedin' | 'twitter';
+export type ContactType =
+    | 'phone'
+    | 'email'
+    | 'whatsapp'
+    | 'url'
+    | 'telex'
+    | 'fax'
+    | 'linkedin'
+    | 'twitter';
 
 export interface ContactItem {
     id: string;

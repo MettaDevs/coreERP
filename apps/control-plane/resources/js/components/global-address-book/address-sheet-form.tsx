@@ -55,7 +55,8 @@ export function AddressSheetForm({
         if (initialData) {
             setFormData({
                 ...initialData,
-                location_id: initialData.location_id || initialData.id || '000004822',
+                location_id:
+                    initialData.location_id || initialData.id || '000004822',
                 purpose: initialData.purpose || '',
                 country: initialData.country || '',
                 postal_code: initialData.postal_code || '',
@@ -64,7 +65,9 @@ export function AddressSheetForm({
                 state: initialData.state || '',
                 county: initialData.county || '',
                 is_primary_for_country_region:
-                    initialData.is_primary_for_country_region ?? initialData.is_primary ?? false,
+                    initialData.is_primary_for_country_region ??
+                    initialData.is_primary ??
+                    false,
             });
         } else {
             const randomLoc = `00000${Math.floor(4000 + Math.random() * 5000)}`;
@@ -106,7 +109,10 @@ export function AddressSheetForm({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent ref={dialogContentRef} className="sm:max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-0">
+            <DialogContent
+                ref={dialogContentRef}
+                className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-2xl"
+            >
                 {/* 1. HEADER DIALOG STANDAR */}
                 <DialogHeader className="border-b px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -115,17 +121,23 @@ export function AddressSheetForm({
                         </div>
                         <div>
                             <DialogTitle>
-                                {initialData ? 'Ubah Alamat' : 'Tambah Alamat Baru'}
+                                {initialData
+                                    ? 'Ubah Alamat'
+                                    : 'Tambah Alamat Baru'}
                             </DialogTitle>
                             <DialogDescription>
-                                Simpan alamat lengkap dan peruntukan lokasi pihak ini.
+                                Simpan alamat lengkap dan peruntukan lokasi
+                                pihak ini.
                             </DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
                 {/* 2. FORM BODY (SCROLLABLE) */}
-                <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
+                <form
+                    onSubmit={handleSubmit}
+                    className="flex flex-1 flex-col overflow-hidden"
+                >
                     <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             {/* Location ID */}
@@ -142,7 +154,9 @@ export function AddressSheetForm({
                                 label="Peruntukan Alamat"
                                 items={[]}
                                 value={formData.purpose || null}
-                                onValueChange={(val) => handleChange('purpose', val || '')}
+                                onValueChange={(val) =>
+                                    handleChange('purpose', val || '')
+                                }
                                 placeholder="Pilih peruntukan alamat"
                                 portalContainer={dialogContentRef}
                             />
@@ -155,7 +169,12 @@ export function AddressSheetForm({
                                     required
                                     placeholder="Contoh: Kantor Pusat, Pabrik Utama, Gudang Logistik"
                                     value={formData.description}
-                                    onChange={(e) => handleChange('description', e.target.value)}
+                                    onChange={(e) =>
+                                        handleChange(
+                                            'description',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                             </div>
 
@@ -165,7 +184,9 @@ export function AddressSheetForm({
                                 required
                                 items={[]}
                                 value={formData.country || null}
-                                onValueChange={(val) => handleChange('country', val || '')}
+                                onValueChange={(val) =>
+                                    handleChange('country', val || '')
+                                }
                                 placeholder="Pilih negara atau wilayah"
                                 portalContainer={dialogContentRef}
                             />
@@ -176,7 +197,9 @@ export function AddressSheetForm({
                                 label="Kode Pos"
                                 placeholder="Masukkan kode pos"
                                 value={formData.postal_code || ''}
-                                onChange={(e) => handleChange('postal_code', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('postal_code', e.target.value)
+                                }
                             />
 
                             {/* Jalan */}
@@ -191,9 +214,11 @@ export function AddressSheetForm({
                                     id="addr_street"
                                     rows={2}
                                     value={formData.street}
-                                    onChange={(e) => handleChange('street', e.target.value)}
+                                    onChange={(e) =>
+                                        handleChange('street', e.target.value)
+                                    }
                                     placeholder="Nama jalan, nomor gedung, atau patokan lokasi..."
-                                    className="w-full text-sm resize-y"
+                                    className="w-full resize-y text-sm"
                                 />
                             </div>
 
@@ -203,7 +228,12 @@ export function AddressSheetForm({
                                 label="Nomor Bangunan / Jalan"
                                 placeholder="Contoh: No. 42"
                                 value={formData.street_number || ''}
-                                onChange={(e) => handleChange('street_number', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange(
+                                        'street_number',
+                                        e.target.value,
+                                    )
+                                }
                             />
 
                             {/* Gedung / Unit / Lantai */}
@@ -211,9 +241,16 @@ export function AddressSheetForm({
                                 id="addr_building_comp"
                                 label="Gedung / Unit / Lantai"
                                 placeholder="Contoh: Gedung Graha Lt. 5"
-                                value={formData.building_complement || formData.building || ''}
+                                value={
+                                    formData.building_complement ||
+                                    formData.building ||
+                                    ''
+                                }
                                 onChange={(e) => {
-                                    handleChange('building_complement', e.target.value);
+                                    handleChange(
+                                        'building_complement',
+                                        e.target.value,
+                                    );
                                     handleChange('building', e.target.value);
                                 }}
                             />
@@ -224,7 +261,9 @@ export function AddressSheetForm({
                                 label="Kotak Pos (PO Box)"
                                 placeholder="Nomor PO Box (opsional)"
                                 value={formData.post_box || ''}
-                                onChange={(e) => handleChange('post_box', e.target.value)}
+                                onChange={(e) =>
+                                    handleChange('post_box', e.target.value)
+                                }
                             />
 
                             {/* Kota / Kabupaten */}
@@ -232,7 +271,9 @@ export function AddressSheetForm({
                                 label="Kota / Kabupaten"
                                 items={[]}
                                 value={formData.city || null}
-                                onValueChange={(val) => handleChange('city', val || '')}
+                                onValueChange={(val) =>
+                                    handleChange('city', val || '')
+                                }
                                 placeholder="Pilih kota atau kabupaten"
                                 portalContainer={dialogContentRef}
                             />
@@ -242,7 +283,9 @@ export function AddressSheetForm({
                                 label="Kecamatan"
                                 items={[]}
                                 value={formData.district || null}
-                                onValueChange={(val) => handleChange('district', val || '')}
+                                onValueChange={(val) =>
+                                    handleChange('district', val || '')
+                                }
                                 placeholder="Pilih kecamatan"
                                 portalContainer={dialogContentRef}
                             />
@@ -252,7 +295,9 @@ export function AddressSheetForm({
                                 label="Provinsi"
                                 items={[]}
                                 value={formData.state || null}
-                                onValueChange={(val) => handleChange('state', val || '')}
+                                onValueChange={(val) =>
+                                    handleChange('state', val || '')
+                                }
                                 placeholder="Pilih provinsi"
                                 portalContainer={dialogContentRef}
                             />
@@ -262,7 +307,9 @@ export function AddressSheetForm({
                                 label="Wilayah Tambahan"
                                 items={[]}
                                 value={formData.county || null}
-                                onValueChange={(val) => handleChange('county', val || '')}
+                                onValueChange={(val) =>
+                                    handleChange('county', val || '')
+                                }
                                 placeholder="Pilih wilayah tambahan"
                                 portalContainer={dialogContentRef}
                             />
@@ -270,32 +317,51 @@ export function AddressSheetForm({
 
                         {/* STATUS SWITCHES */}
                         <div className="space-y-3 pt-2">
-                            <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                            <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-3">
                                 <div>
-                                    <p className="text-sm font-medium text-foreground">Alamat Utama (Primary)</p>
-                                    <p className="text-xs text-muted-foreground">Jadikan alamat ini sebagai alamat surat-menyurat utama</p>
+                                    <p className="text-sm font-medium text-foreground">
+                                        Alamat Utama (Primary)
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Jadikan alamat ini sebagai alamat
+                                        surat-menyurat utama
+                                    </p>
                                 </div>
                                 <Switch
                                     checked={formData.is_primary}
-                                    onCheckedChange={(checked) => handleChange('is_primary', checked)}
+                                    onCheckedChange={(checked) =>
+                                        handleChange('is_primary', checked)
+                                    }
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                            <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-3">
                                 <div>
-                                    <p className="text-sm font-medium text-foreground">Alamat Pribadi (Private)</p>
-                                    <p className="text-xs text-muted-foreground">Batasi akses hanya untuk pengguna yang memiliki wewenang</p>
+                                    <p className="text-sm font-medium text-foreground">
+                                        Alamat Pribadi (Private)
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Batasi akses hanya untuk pengguna yang
+                                        memiliki wewenang
+                                    </p>
                                 </div>
                                 <Switch
                                     checked={formData.is_private}
-                                    onCheckedChange={(checked) => handleChange('is_private', checked)}
+                                    onCheckedChange={(checked) =>
+                                        handleChange('is_private', checked)
+                                    }
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                            <div className="flex items-center justify-between rounded-lg border bg-muted/20 p-3">
                                 <div>
-                                    <p className="text-sm font-medium text-foreground">Utama untuk Negara/Wilayah</p>
-                                    <p className="text-xs text-muted-foreground">Jadikan alamat default untuk wilayah negara terpilih</p>
+                                    <p className="text-sm font-medium text-foreground">
+                                        Utama untuk Negara/Wilayah
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Jadikan alamat default untuk wilayah
+                                        negara terpilih
+                                    </p>
                                 </div>
                                 <Switch
                                     checked={
@@ -303,7 +369,10 @@ export function AddressSheetForm({
                                         formData.is_primary
                                     }
                                     onCheckedChange={(checked) =>
-                                        handleChange('is_primary_for_country_region', checked)
+                                        handleChange(
+                                            'is_primary_for_country_region',
+                                            checked,
+                                        )
                                     }
                                 />
                             </div>
@@ -319,13 +388,10 @@ export function AddressSheetForm({
                         >
                             Batal
                         </Button>
-                        <Button type="submit">
-                            Simpan Alamat
-                        </Button>
+                        <Button type="submit">Simpan Alamat</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
     );
 }
-
