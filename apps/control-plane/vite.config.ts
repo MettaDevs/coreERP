@@ -3,7 +3,6 @@ import { wayfinder } from '@laravel/vite-plugin-wayfinder';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
-import { bunny } from 'laravel-vite-plugin/fonts';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
@@ -47,11 +46,22 @@ export default defineConfig({
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],
             refresh: true,
-            fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
-                }),
-            ],
+            /*
+             * Tidak ada blok `fonts` di sini, dan itu disengaja.
+             *
+             * Cetakan Laravel memasang `bunny('Instrument Sans')`, yang **mengunduh font dari
+             * fonts.bunny.net setiap kali build berjalan**. Akibatnya build ini gagal ketika
+             * host itu lambat — sudah terjadi di CI dengan `ConnectTimeoutError` pada
+             * fonts.bunny.net:443, dan tidak ada satu pun barisnya yang salah.
+             *
+             * Fontnya sendiri tidak pernah dipakai: tema memakai Poppins dan Geist, keduanya
+             * di-import dari paket `@fontsource` di `packages/ui/src/styles.css` sehingga ikut
+             * terpasang lewat npm dan tidak menyentuh jaringan saat build.
+             *
+             * Kalau kelak ada font baru, ambil paket `@fontsource`-nya. Build yang menghubungi
+             * internet berarti build yang bisa gagal karena server orang lain, dan itu berlaku
+             * juga di server pelanggan yang memasang sendiri.
+             */
         }),
         inertia(),
         react({
