@@ -1,7 +1,7 @@
 // Skrip asap: membuktikan penyiapan tenant, sesi bersama, dan rute module bekerja pada
 // stack gabungan sebelum skenario besar dijalankan. Bukan gate; alat bantu diagnosis.
 import http from 'k6/http';
-import { siapkanTenant, sempitkanTenant, paramsUntuk, bangunJar, urlModule, BASE } from './lib.js';
+import { siapkanTenant, sempitkanTenant, paramsUntuk, bangunJar, urlModule } from './lib.js';
 
 export const options = { scenarios: { asap: { executor: 'per-vu-iterations', vus: 1, iterations: 1 } }, setupTimeout: '10m' };
 
@@ -34,7 +34,9 @@ export default function (data) {
     const group = lapor('group-aset', http.post(ASET('group-aset'), JSON.stringify({ nama: 'Group asap' }), paramsUntuk(a, {}, kunci('group'))));
     const jenis = lapor('jenis-aset', http.post(ASET('jenis-aset'), JSON.stringify({ nama: 'Jenis asap' }), paramsUntuk(a, {}, kunci('jenis'))));
     const pabrikan = lapor('pabrikan-aset', http.post(ASET('pabrikan-aset'), JSON.stringify({ nama: 'Pabrikan asap' }), paramsUntuk(a, {}, kunci('pabrikan'))));
-    const model = lapor(
+    // Nilainya tidak dipakai — yang diuji bahwa pembuatannya berhasil, dan `lapor` yang
+    // mencatatnya. Menyimpannya ke variabel hanya menyisakan nama yang tidak pernah dibaca.
+    lapor(
         'model-aset',
         http.post(ASET('model-aset'), JSON.stringify({ nama: 'Model asap', pabrikan_aset_id: pabrikan.json('data.id'), jenis_aset_id: jenis.json('data.id') }), paramsUntuk(a, {}, kunci('model'))),
     );
@@ -66,6 +68,7 @@ export default function (data) {
             paramsUntuk(a, {}, kunci('aset')),
         ),
     );
+
     if (aset.status === 201) {
         lapor('penempatan aset', http.post(`${ASET('aset')}/${aset.json('data.id')}/penempatan`, JSON.stringify({ effective_on: '2026-01-02', reason: 'asap', usage_org_unit_id: a.orgUnitId }), paramsUntuk(a)));
     }
@@ -89,11 +92,14 @@ export default function (data) {
     );
 
     const jobType = lapor('maintenance-job-types', http.post(ASET('maintenance-job-types'), JSON.stringify({ nama: 'Job asap' }), paramsUntuk(a, {}, kunci('job'))));
+
     if (jobType.status === 201) {
         lapor('kaitan job type x jenis aset', http.put(`${ASET('maintenance-job-types')}/${jobType.json('data.id')}/asset-types`, JSON.stringify({ jenis_aset_ids: [jenis.json('data.id')] }), paramsUntuk(a)));
         lapor('baca kaitan', http.get(`${ASET('maintenance-job-types')}/${jobType.json('data.id')}/asset-types`, paramsUntuk(a)));
     }
+
     const variabel = lapor('maintenance-checklist-variables', http.post(ASET('maintenance-checklist-variables'), JSON.stringify({ nama: 'Variabel asap' }), paramsUntuk(a, {}, kunci('var'))));
+
     if (variabel.status === 201) {
         lapor(
             'nilai variabel',

@@ -21,8 +21,8 @@
 // jadi satu sesi yang dipakai empat instance sekaligus adalah persis keadaan yang gagal bila ada
 // identitas, tenant, atau cache izin yang menempel pada memori satu proses.
 
-import http from 'k6/http';
 import { fail } from 'k6';
+import http from 'k6/http';
 
 export const BASE = __ENV.BASE_URL || 'http://lb';
 export const RUN_ID = __ENV.RUN_ID || 'r0';
@@ -72,6 +72,7 @@ export function paramsUntuk(tenant, extra, headerTambahan) {
 /** Membangun kembali CookieJar sebuah tenant di dalam VU dari cookie hasil setup. */
 export function bangunJar(tenant) {
     const jar = new http.CookieJar();
+
     for (const [nama, nilai] of Object.entries(tenant.cookies)) {
         jar.set(BASE, nama, nilai);
     }
@@ -87,6 +88,7 @@ const jarCache = new Map();
 
 export function tenantVu(daftar, index) {
     const kunci = index % daftar.length;
+
     if (!jarCache.has(kunci)) {
         jarCache.set(kunci, bangunJar(daftar[kunci]));
     }
@@ -179,6 +181,7 @@ export function siapkanTenant(jumlah, appIds, tag = '') {
     const cari = (index, classification) => organisasi[index].find((row) => row.classification === classification);
 
     const perluLegal = indeks.filter((index) => !cari(index, 'legal_entity'));
+
     if (perluLegal.length > 0) {
         const dibuat = batchWajib(
             'legal entity',
@@ -194,6 +197,7 @@ export function siapkanTenant(jumlah, appIds, tag = '') {
     }
 
     const perluUnit = indeks.filter((index) => !cari(index, 'operating_unit'));
+
     if (perluUnit.length > 0) {
         const dibuat = batchWajib(
             'operating unit',
@@ -211,6 +215,7 @@ export function siapkanTenant(jumlah, appIds, tag = '') {
     return indeks.map((index) => {
         const legal = cari(index, 'legal_entity');
         const unit = cari(index, 'operating_unit');
+
         if (!legal || !unit) {
             fail(`setup organisasi tenant ${index} tidak lengkap`);
         }
@@ -231,6 +236,7 @@ const OPERATING_UNIT_TYPE = __ENV.OPERATING_UNIT_TYPE || 'department';
 
 function kumpulkanCookie(jar) {
     const keluar = {};
+
     for (const [nama, nilai] of Object.entries(jar.cookiesForURL(BASE))) {
         keluar[nama] = nilai[0];
     }
@@ -245,16 +251,21 @@ function kumpulkanCookie(jar) {
  */
 export function sempitkanTenant(tenant, dutyCode = DUTY_SEMPIT) {
     const jar = new http.CookieJar();
+
     for (const [nama, nilai] of Object.entries(tenant.cookies)) {
         jar.set(BASE, nama, nilai);
     }
+
     const params = { jar, headers: jsonHeaders(tenant.csrf) };
 
     const daftar = http.get(`${BASE}/api/v1/roles`, params);
+
     if (daftar.status !== 200) {
         fail(`setup role tenant sempit gagal: ${daftar.status} ${String(daftar.body).slice(0, 300)}`);
     }
+
     const owner = (daftar.json('data') || []).find((role) => role.name === 'Owner');
+
     if (!owner) {
         fail('setup tenant sempit: role Owner tidak ditemukan');
     }
@@ -264,6 +275,7 @@ export function sempitkanTenant(tenant, dutyCode = DUTY_SEMPIT) {
         JSON.stringify({ name: 'Owner', duty_codes: [dutyCode] }),
         params,
     );
+
     if (disunting.status !== 200) {
         fail(`setup penyempitan role gagal: ${disunting.status} ${String(disunting.body).slice(0, 300)}`);
     }
