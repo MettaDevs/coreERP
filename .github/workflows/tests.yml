@@ -146,14 +146,19 @@ jobs:
       # Ini **hanya** untuk database yang umurnya sepanjang satu job CI. Menyalakannya di mesin
       # sungguhan berarti kehilangan data pada mati listrik, dan `full_page_writes=off`
       # merusak database pada mati listrik di tengah penulisan halaman.
+      #
+      # Tiap pernyataan memakai `-c` sendiri, bukan satu `-c` berisi empat baris. psql
+      # mengirim isi satu `-c` sebagai **satu blok transaksi**, dan ALTER SYSTEM dilarang
+      # berjalan di dalam transaksi: "ALTER SYSTEM cannot run inside a transaction block".
       - name: Relax Test Database Durability
+        env:
+          PGPASSWORD: ${{ env.DB_TEST_PASSWORD }}
         run: |
-          PGPASSWORD=$DB_TEST_PASSWORD psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" -c "
-            ALTER SYSTEM SET fsync = off;
-            ALTER SYSTEM SET synchronous_commit = off;
-            ALTER SYSTEM SET full_page_writes = off;
-            SELECT pg_reload_conf();
-          "
+          psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" \
+            -c "ALTER SYSTEM SET fsync = off;" \
+            -c "ALTER SYSTEM SET synchronous_commit = off;" \
+            -c "ALTER SYSTEM SET full_page_writes = off;" \
+            -c "SELECT pg_reload_conf();"
 
       # `--parallel`, bukan serial. Terukur di mesin pengembang pada keadaan yang sama:
       # 9 menit 3 detik menjadi 1 menit 27 detik untuk 499 test yang sama — tidak satu pun
