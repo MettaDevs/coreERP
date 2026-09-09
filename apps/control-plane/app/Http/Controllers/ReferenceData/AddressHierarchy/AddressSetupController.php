@@ -38,9 +38,6 @@ final class AddressSetupController extends Controller
     {
         $section = is_string($sec = $request->query('section')) ? $sec : 'countries';
         $country = is_string($c = $request->query('country')) ? $c : '';
-        if ($country === 'ID') {
-            $country = 'IDN';
-        }
         $province = is_string($p = $request->query('province_id')) ? $p : '';
         $regency = is_string($r = $request->query('regency_id')) ? $r : '';
         $district = is_string($d = $request->query('district_id')) ? $d : '';

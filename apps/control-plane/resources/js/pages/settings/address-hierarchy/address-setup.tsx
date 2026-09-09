@@ -1582,7 +1582,7 @@ export default function AddressSetup({
         });
     };
 
-    const isFormDisabled = !selectedId && !isNew;
+    const isFormDisabled = true;
 
     // Update form field
     const updateFormField = (field: string, val: any) => {
@@ -2265,42 +2265,9 @@ export default function AddressSetup({
 
             {/* 2. MAIN CONTENT AREA */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
-                {/* TOOLBAR */}
+                {/* TOOLBAR — Read-only mode: semua aksi CRUD disembunyikan sementara */}
                 <AddressToolbar
                     title={pageHeaderTitle}
-                    newLabel={newButtonLabel}
-                    onNew={handleNew}
-                    onDelete={handleDelete}
-                    onSave={handleSave}
-                    saveLabel={
-                        ['parameters', 'addressFormat'].includes(activeSection)
-                            ? 'Simpan'
-                            : isNew
-                              ? 'Simpan'
-                              : 'Ubah'
-                    }
-                    saveVariant={
-                        ['parameters', 'addressFormat'].includes(activeSection)
-                            ? 'blue'
-                            : 'amber'
-                    }
-                    canSave={
-                        ['parameters', 'addressFormat'].includes(activeSection)
-                            ? Boolean(filterCountry)
-                            : isNew
-                              ? true
-                              : Boolean(selectedId)
-                    }
-                    onExternalCodes={
-                        ['parameters', 'addressFormat'].includes(activeSection)
-                            ? undefined
-                            : openExternalCodesModal
-                    }
-                    onTranslations={
-                        ['parameters', 'addressFormat'].includes(activeSection)
-                            ? undefined
-                            : openTranslationsModal
-                    }
                     onFilterToggle={
                         ['parameters', 'addressFormat'].includes(activeSection)
                             ? undefined
@@ -2309,30 +2276,15 @@ export default function AddressSetup({
                     isFilterActive={isFilterOpen}
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
-                    isNew={isNew}
-                    isSaving={isSaving}
-                    isDeleting={isDeleting}
-                    canDelete={
-                        Boolean(selectedId) &&
-                        !isNew &&
-                        !['parameters', 'addressFormat'].includes(activeSection)
-                    }
-                    canManageRelations={
-                        Boolean(selectedId) &&
-                        !isNew &&
-                        !['parameters', 'addressFormat'].includes(activeSection)
-                    }
-                    showTranslations={
-                        !['parameters', 'addressFormat'].includes(activeSection)
-                    }
-                    showNew={
-                        !['parameters', 'addressFormat'].includes(activeSection)
-                    }
-                    showDelete={
-                        !['parameters', 'addressFormat'].includes(activeSection)
-                    }
-                    showSave={true}
+                    showNew={false}
+                    showSave={false}
+                    showDelete={false}
+                    showTranslations={false}
                     showSearch={false}
+                    canDelete={false}
+                    canManageRelations={false}
+                    isSaving={false}
+                    isDeleting={false}
                 />
 
                 {/* FILTER BAR (Below Toolbar for hierarchy entities) */}
@@ -2715,7 +2667,7 @@ export default function AddressSetup({
                                         checked={Boolean(
                                             paramState.use_province,
                                         )}
-                                        disabled={!filterCountry}
+                                        disabled={true}
                                         onChange={(val) =>
                                             setParamState((prev) => ({
                                                 ...prev,
@@ -2733,7 +2685,7 @@ export default function AddressSetup({
                                         checked={Boolean(
                                             paramState.use_regency,
                                         )}
-                                        disabled={!filterCountry}
+                                        disabled={true}
                                         onChange={(val) =>
                                             setParamState((prev) => ({
                                                 ...prev,
@@ -2751,7 +2703,7 @@ export default function AddressSetup({
                                         checked={Boolean(
                                             paramState.use_district,
                                         )}
-                                        disabled={!filterCountry}
+                                        disabled={true}
                                         onChange={(val) =>
                                             setParamState((prev) => ({
                                                 ...prev,
@@ -2769,7 +2721,7 @@ export default function AddressSetup({
                                         checked={Boolean(
                                             paramState.use_village,
                                         )}
-                                        disabled={!filterCountry}
+                                        disabled={true}
                                         onChange={(val) =>
                                             setParamState((prev) => ({
                                                 ...prev,
@@ -2785,7 +2737,7 @@ export default function AddressSetup({
                                 >
                                     <AddressToggle
                                         checked={Boolean(paramState.use_rt_rw)}
-                                        disabled={!filterCountry}
+                                        disabled={true}
                                         onChange={(val) =>
                                             setParamState((prev) => ({
                                                 ...prev,
@@ -2803,7 +2755,7 @@ export default function AddressSetup({
                                         checked={Boolean(
                                             paramState.use_postal_code,
                                         )}
-                                        disabled={!filterCountry}
+                                        disabled={true}
                                         onChange={(val) =>
                                             setParamState((prev) => ({
                                                 ...prev,
@@ -2821,7 +2773,7 @@ export default function AddressSetup({
                                         checked={Boolean(
                                             paramState.use_building,
                                         )}
-                                        disabled={!filterCountry}
+                                        disabled={true}
                                         onChange={(val) =>
                                             setParamState((prev) => ({
                                                 ...prev,
@@ -2887,7 +2839,7 @@ export default function AddressSetup({
                                 <AddressFieldGroup label="Address Format Template">
                                     <AddressInput
                                         value={paramState.address_format || ''}
-                                        disabled={!filterCountry}
+                                        disabled={true}
                                         onChange={(val) =>
                                             setParamState((prev) => ({
                                                 ...prev,
@@ -2922,7 +2874,7 @@ export default function AddressSetup({
                                             <button
                                                 key={tag}
                                                 type="button"
-                                                disabled={!filterCountry}
+                                                disabled={true}
                                                 onClick={() => {
                                                     setParamState((prev) => ({
                                                         ...prev,
@@ -3382,7 +3334,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
@@ -3577,7 +3529,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Union Territory">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : Boolean(
                                                                       form.union_territory,
@@ -3597,7 +3549,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Default State / Province">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : Boolean(
                                                                       form.default_state,
@@ -3772,7 +3724,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
@@ -3861,7 +3813,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
@@ -3949,7 +3901,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
@@ -4052,7 +4004,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
@@ -4140,7 +4092,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
@@ -4231,7 +4183,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
@@ -4349,7 +4301,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
@@ -4434,7 +4386,7 @@ export default function AddressSetup({
                                                 <AddressFieldGroup label="Active">
                                                     <AddressToggle
                                                         checked={
-                                                            isFormDisabled
+                                                            !selectedId
                                                                 ? false
                                                                 : form.active ===
                                                                       '1' ||
