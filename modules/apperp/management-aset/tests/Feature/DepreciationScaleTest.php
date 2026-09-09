@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -25,7 +26,18 @@ use Tests\TestCase;
  *   1. nilai buku mendarat TEPAT di residu, bukan sekitar residu;
  *   2. nilai buku tidak pernah menembus residu di periode mana pun;
  *   3. jumlah seluruh periode final sama persis dengan akumulasi penyusutan.
+ *
+ * **Ditandai `lambat` dan dikecualikan dari pemeriksaan tiap pull request.** Sapuannya 40
+ * kombinasi yang masing-masing dijalankan sampai akhir masa manfaat — 460 periode, sekitar
+ * 920 permintaan HTTP — dan itu 56 detik, tujuh persen dari seluruh suite dalam satu method.
+ * Dengan dua pekerja di CI, satu pekerja menjalankannya sendirian sementara yang lain sudah
+ * selesai; itulah ekor yang menggantung di akhir tiap run.
+ *
+ * Ia tetap dijalankan penuh pada jadwal mingguan. Yang dijaganya berubah jarang — kalkulator
+ * penyusutan — sedangkan biayanya dibayar pada setiap perubahan apa pun. Ini penjadwalan
+ * ulang, bukan pengurangan cakupan: tidak satu kombinasi pun dibuang.
  */
+#[Group('lambat')]
 class DepreciationScaleTest extends TestCase
 {
     use BerinteraksiDenganKonteksCore, RefreshDatabase;
