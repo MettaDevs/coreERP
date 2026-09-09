@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
-import { MapPin } from 'lucide-react';
+import { Button } from '@apperp/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -8,12 +7,34 @@ import {
     DialogDescription,
     DialogFooter,
 } from '@apperp/ui/dialog';
-import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import { Textarea } from '@apperp/ui/textarea';
 import { Switch } from '@apperp/ui/switch';
+import { Textarea } from '@apperp/ui/textarea';
+import { MapPin } from 'lucide-react';
+import { useState, useRef } from 'react';
 import type { AddressItem } from '@/types/global-address-book';
+
+const DEFAULT_EMPTY_ADDRESS: AddressItem = {
+    id: '',
+    location_id: '000004822',
+    description: '',
+    purpose: '',
+    country: '',
+    postal_code: '',
+    street: '',
+    street_number: '',
+    building_complement: '',
+    building: '',
+    post_box: '',
+    city: '',
+    district: '',
+    state: '',
+    county: '',
+    is_primary: true,
+    is_private: false,
+    is_primary_for_country_region: true,
+};
 
 interface AddressSheetFormProps {
     open: boolean;
@@ -30,28 +51,21 @@ export function AddressSheetForm({
 }: AddressSheetFormProps) {
     const dialogContentRef = useRef<HTMLDivElement>(null);
 
-    const [formData, setFormData] = useState<AddressItem>({
-        id: '',
-        location_id: '000004822',
-        description: '',
-        purpose: '',
-        country: '',
-        postal_code: '',
-        street: '',
-        street_number: '',
-        building_complement: '',
-        building: '',
-        post_box: '',
-        city: '',
-        district: '',
-        state: '',
-        county: '',
-        is_primary: true,
-        is_private: false,
-        is_primary_for_country_region: true,
-    });
+    const [formData, setFormData] = useState<AddressItem>(
+        DEFAULT_EMPTY_ADDRESS,
+    );
 
-    useEffect(() => {
+    const [prevOpenState, setPrevOpenState] = useState<{
+        open: boolean;
+        initialData?: AddressItem | null;
+    }>({ open, initialData });
+
+    if (
+        prevOpenState.open !== open ||
+        prevOpenState.initialData !== initialData
+    ) {
+        setPrevOpenState({ open, initialData });
+
         if (initialData) {
             setFormData({
                 ...initialData,
@@ -70,29 +84,9 @@ export function AddressSheetForm({
                     false,
             });
         } else {
-            const randomLoc = `00000${Math.floor(4000 + Math.random() * 5000)}`;
-            setFormData({
-                id: `ADDR-${Date.now().toString().slice(-4)}`,
-                location_id: randomLoc,
-                description: '',
-                purpose: '',
-                country: '',
-                postal_code: '',
-                street: '',
-                street_number: '',
-                building_complement: '',
-                building: '',
-                post_box: '',
-                city: '',
-                district: '',
-                state: '',
-                county: '',
-                is_primary: true,
-                is_private: false,
-                is_primary_for_country_region: true,
-            });
+            setFormData(DEFAULT_EMPTY_ADDRESS);
         }
-    }, [initialData, open]);
+    }
 
     const handleChange = (field: keyof AddressItem, value: any) => {
         setFormData((prev) => ({
@@ -103,7 +97,14 @@ export function AddressSheetForm({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        const finalData: AddressItem = {
+            ...formData,
+            id: formData.id || `ADDR-${Date.now().toString().slice(-4)}`,
+            location_id:
+                formData.location_id ||
+                `00000${Math.floor(4000 + Math.random() * 5000)}`,
+        };
+        onSave(finalData);
         onOpenChange(false);
     };
 

@@ -1,5 +1,14 @@
-import { useState } from 'react';
+import { ActionButton } from '@apperp/ui/action-button';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import {
     Table,
     TableBody,
@@ -8,16 +17,6 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Badge } from '@apperp/ui/badge';
-import { ActionButton } from '@apperp/ui/action-button';
-import { Button } from '@apperp/ui/button';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyMedia,
-    EmptyTitle,
-} from '@apperp/ui/empty';
 import {
     Phone,
     Mail,
@@ -30,6 +29,7 @@ import {
     ChevronUp,
     ChevronDown,
 } from 'lucide-react';
+import { useState } from 'react';
 import type { ContactItem, ContactType } from '@/types/global-address-book';
 import { ContactDialog } from './contact-dialog';
 
@@ -71,16 +71,21 @@ export function ContactInformationSection({
     );
 
     const handleRemove = () => {
-        if (!selectedContactId) return;
+        if (!selectedContactId) {
+            return;
+        }
+
         onChange(contacts.filter((c) => c.id !== selectedContactId));
         setSelectedContactId(null);
     };
 
     const handleSaveNew = (newContact: ContactItem) => {
         let updated = [...contacts];
+
         if (newContact.is_primary) {
             updated = updated.map((c) => ({ ...c, is_primary: false }));
         }
+
         onChange([...updated, newContact]);
     };
 

@@ -1,5 +1,16 @@
-import { useState } from 'react';
+import { ActionButton } from '@apperp/ui/action-button';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import { Checkbox } from '@apperp/ui/checkbox';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { Select } from '@apperp/ui/select';
 import {
     Table,
     TableBody,
@@ -8,18 +19,6 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Badge } from '@apperp/ui/badge';
-import { Select } from '@apperp/ui/select';
-import { Checkbox } from '@apperp/ui/checkbox';
-import { ActionButton } from '@apperp/ui/action-button';
-import { Button } from '@apperp/ui/button';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyMedia,
-    EmptyTitle,
-} from '@apperp/ui/empty';
 import {
     Users,
     ArrowLeftRight,
@@ -27,6 +26,7 @@ import {
     ChevronUp,
     ChevronDown,
 } from 'lucide-react';
+import { useState } from 'react';
 import type {
     RelationshipItem,
     RelationshipDirection,
@@ -58,14 +58,26 @@ export function RelationshipSection({
     const [filterFuture, setFilterFuture] = useState(true);
 
     const filteredRelationships = relationships.filter((rel) => {
-        if (rel.status === 'expired' && !filterExpired) return false;
-        if (rel.status === 'active' && !filterActive) return false;
-        if (rel.status === 'future' && !filterFuture) return false;
+        if (rel.status === 'expired' && !filterExpired) {
+            return false;
+        }
+
+        if (rel.status === 'active' && !filterActive) {
+            return false;
+        }
+
+        if (rel.status === 'future' && !filterFuture) {
+            return false;
+        }
+
         return true;
     });
 
     const handleRemove = () => {
-        if (!selectedRelId) return;
+        if (!selectedRelId) {
+            return;
+        }
+
         onChange(relationships.filter((r) => r.id !== selectedRelId));
         setSelectedRelId(null);
     };

@@ -1,5 +1,13 @@
-import { useState } from 'react';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import {
     Table,
     TableBody,
@@ -8,16 +16,8 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyMedia,
-    EmptyTitle,
-} from '@apperp/ui/empty';
 import { Briefcase, ChevronUp, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 import type { PartyRoleItem } from '@/types/global-address-book';
 
 interface RolesSectionProps {

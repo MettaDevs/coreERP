@@ -1,6 +1,14 @@
-import { useState } from 'react';
-import { ChevronUp, ChevronDown, MapPin } from 'lucide-react';
+import { ActionButton } from '@apperp/ui/action-button';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import {
     Table,
     TableBody,
@@ -9,16 +17,8 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import { ActionButton } from '@apperp/ui/action-button';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyMedia,
-    EmptyTitle,
-} from '@apperp/ui/empty';
+import { ChevronUp, ChevronDown, MapPin } from 'lucide-react';
+import { useState } from 'react';
 import type { AddressItem } from '@/types/global-address-book';
 import { AddressSheetForm } from './address-sheet-form';
 
@@ -46,13 +46,19 @@ export function AddressSection({ addresses, onChange }: AddressSectionProps) {
     };
 
     const handleOpenEdit = () => {
-        if (!selectedAddress) return;
+        if (!selectedAddress) {
+            return;
+        }
+
         setEditingAddress(selectedAddress);
         setSheetOpen(true);
     };
 
     const handleDelete = () => {
-        if (!selectedAddressId) return;
+        if (!selectedAddressId) {
+            return;
+        }
+
         onChange(addresses.filter((a) => a.id !== selectedAddressId));
         setSelectedAddressId(null);
     };
@@ -62,17 +68,21 @@ export function AddressSection({ addresses, onChange }: AddressSectionProps) {
             let updated = addresses.map((a) =>
                 a.id === savedAddress.id ? savedAddress : a,
             );
+
             if (savedAddress.is_primary) {
                 updated = updated.map((a) =>
                     a.id === savedAddress.id ? a : { ...a, is_primary: false },
                 );
             }
+
             onChange(updated);
         } else {
             let updated = [...addresses];
+
             if (savedAddress.is_primary) {
                 updated = updated.map((a) => ({ ...a, is_primary: false }));
             }
+
             onChange([...updated, savedAddress]);
         }
     };
@@ -185,6 +195,7 @@ export function AddressSection({ addresses, onChange }: AddressSectionProps) {
                                         {addresses.map((addr, idx) => {
                                             const isSelected =
                                                 selectedAddressId === addr.id;
+
                                             return (
                                                 <TableRow
                                                     key={addr.id || idx}

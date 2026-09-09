@@ -1,5 +1,4 @@
-import { useState, useRef } from 'react';
-import { Users2 } from 'lucide-react';
+import { Button } from '@apperp/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -8,9 +7,10 @@ import {
     DialogDescription,
     DialogFooter,
 } from '@apperp/ui/dialog';
-import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
+import { Users2 } from 'lucide-react';
+import { useState, useRef } from 'react';
 import type { RelationshipItem } from '@/types/global-address-book';
 
 interface RelationshipDialogProps {

@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { Button } from '@apperp/ui/button';
 import { ActionButton } from '@apperp/ui/action-button';
+import { Button } from '@apperp/ui/button';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { PersonForm } from '@/components/global-address-book/person-form';
-import { OrganizationForm } from '@/components/global-address-book/organization-form';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
 import { AddressSection } from '@/components/global-address-book/address-section';
-import { RelationshipSection } from '@/components/global-address-book/relationship-section';
 import { ContactInformationSection } from '@/components/global-address-book/contact-information-section';
+import { OrganizationForm } from '@/components/global-address-book/organization-form';
+import { PersonForm } from '@/components/global-address-book/person-form';
+import { RelationshipSection } from '@/components/global-address-book/relationship-section';
 import { RolesSection } from '@/components/global-address-book/roles-section';
 import type {
     PartyType,
@@ -97,6 +97,7 @@ export default function GlobalAddressBook({
     useEffect(() => {
         if (querySection) {
             const targetElement = document.getElementById(querySection);
+
             if (targetElement) {
                 targetElement.scrollIntoView({
                     behavior: 'smooth',
@@ -119,13 +120,16 @@ export default function GlobalAddressBook({
             .map((id) => document.getElementById(id))
             .filter((el): el is HTMLElement => el !== null);
 
-        if (elements.length === 0) return;
+        if (elements.length === 0) {
+            return;
+        }
 
         const observer = new IntersectionObserver(
             (entries) => {
                 const intersectingEntries = entries.filter(
                     (entry) => entry.isIntersecting,
                 );
+
                 if (intersectingEntries.length > 0) {
                     intersectingEntries.sort(
                         (a, b) =>
@@ -163,7 +167,10 @@ export default function GlobalAddressBook({
     };
 
     const handleTypeChange = (newType: string | null) => {
-        if (!newType) return;
+        if (!newType) {
+            return;
+        }
+
         const selected = newType as PartyType;
         setPartyType(selected);
         setData((prev: Record<string, any>) => ({
@@ -175,7 +182,10 @@ export default function GlobalAddressBook({
     };
 
     const handleSubmit = (e?: React.FormEvent) => {
-        if (e) e.preventDefault();
+        if (e) {
+            e.preventDefault();
+        }
+
         alert('Data berhasil disimpan secara lokal.');
     };
 

@@ -1,5 +1,4 @@
-import { useState, useRef } from 'react';
-import { PhoneCall } from 'lucide-react';
+import { Button } from '@apperp/ui/button';
 import {
     Dialog,
     DialogContent,
@@ -8,10 +7,11 @@ import {
     DialogDescription,
     DialogFooter,
 } from '@apperp/ui/dialog';
-import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
+import { PhoneCall } from 'lucide-react';
+import { useState, useRef } from 'react';
 import type { ContactItem, ContactType } from '@/types/global-address-book';
 
 interface ContactDialogProps {

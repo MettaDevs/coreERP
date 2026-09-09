@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { Button } from '@apperp/ui/button';
+import { Card, CardHeader, CardTitle } from '@apperp/ui/card';
+import { Input } from '@apperp/ui/input';
+import { Select } from '@apperp/ui/select';
+import { Textarea } from '@apperp/ui/textarea';
 import {
     UserCheck,
     Info,
@@ -6,11 +10,7 @@ import {
     ChevronUp,
     ChevronDown,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle } from '@apperp/ui/card';
-import { Button } from '@apperp/ui/button';
-import { Input } from '@apperp/ui/input';
-import { Select } from '@apperp/ui/select';
-import { Textarea } from '@apperp/ui/textarea';
+import { useState } from 'react';
 
 interface PersonFormProps {
     data: Record<string, any>;

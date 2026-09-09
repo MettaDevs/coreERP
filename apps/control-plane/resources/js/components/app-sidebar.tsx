@@ -76,16 +76,24 @@ export function AppSidebar() {
     const { url, props } = usePage();
     const path = url.split('?')[0];
     const [realtimeSection, setRealtimeSection] = useState<string | null>(null);
+    const [prevUrl, setPrevUrl] = useState(url);
+
+    if (prevUrl !== url) {
+        setPrevUrl(url);
+        setRealtimeSection(null);
+    }
 
     useEffect(() => {
         const handleSectionChange = (event: Event) => {
             const customEvent = event as CustomEvent<{ section: string }>;
+
             if (customEvent.detail?.section) {
                 setRealtimeSection(customEvent.detail.section);
             }
         };
 
         window.addEventListener('coreerp:section-change', handleSectionChange);
+
         return () => {
             window.removeEventListener(
                 'coreerp:section-change',
@@ -93,10 +101,6 @@ export function AppSidebar() {
             );
         };
     }, []);
-
-    useEffect(() => {
-        setRealtimeSection(null);
-    }, [url]);
 
     const coreItems: PrimaryNavigationItem[] = [
         {
