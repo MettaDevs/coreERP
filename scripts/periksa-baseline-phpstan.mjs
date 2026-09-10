@@ -129,8 +129,9 @@ try {
         'ia tidak dapat menyimpulkan apa pun — dan lulus tanpa membandingkan lebih berbahaya',
         'daripada tidak memeriksa sama sekali.',
         '',
-        'Pada alur CI, pastikan langkah checkout mengambil riwayat yang cukup (`fetch-depth: 0`)',
-        'dan cabang pembandingnya ikut diambil.',
+        'Pada alur CI, langkah checkout harus mengambil riwayat penuh (`fetch-depth: 0`).',
+        'Mengambilnya belakangan lewat `git fetch` tidak bisa: alur ini memakai',
+        '`persist-credentials: false`, jadi tidak ada kredensial yang tertinggal untuk itu.',
     );
 }
 

@@ -42,6 +42,12 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          # Riwayat penuh dibutuhkan satu langkah saja: penjaga baseline analisa tipe
+          # membandingkan berkasnya terhadap cabang basis. Mengambilnya belakangan lewat
+          # `git fetch` tidak mungkin, karena `persist-credentials: false` sengaja tidak
+          # meninggalkan kredensial — dan itu keputusan yang tidak diubah demi kenyamanan
+          # satu langkah.
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -107,10 +113,7 @@ jobs:
       # akan mengunduh seluruh riwayat repo demi satu berkas.
       - name: Periksa baseline analisa tipe tidak bertambah
         working-directory: .
-        run: |
-          basis="${{ github.base_ref || 'main' }}"
-          git fetch --depth=1 origin "$basis"
-          node scripts/periksa-baseline-phpstan.mjs FETCH_HEAD
+        run: node scripts/periksa-baseline-phpstan.mjs "origin/${{ github.base_ref || 'main' }}"
 
       # `.agents/skills` dan `.claude/skills` dibaca alat yang berbeda dan isinya sudah
       # menyimpang diam-diam sekali. Tidak ada test yang gagal karena aturan di satu
