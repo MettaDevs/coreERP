@@ -1,4 +1,3 @@
-import * as React from "react"
 import {
   ArrowDown,
   ArrowRight,
@@ -7,7 +6,11 @@ import {
   Ellipsis,
   Plus,
 } from "lucide-react"
+import * as React from "react"
 
+import { cn } from "../utils"
+import { Button } from "./button"
+import { Checkbox } from "./checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,8 +18,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu"
-import { Button } from "./button"
-import { Checkbox } from "./checkbox"
 import {
   Table,
   TableBody,
@@ -25,7 +26,6 @@ import {
   TableHeader,
   TableRow,
 } from "./table"
-import { cn } from "../utils"
 
 type SortValue = string | number
 type SortDirection = "asc" | "desc"
@@ -137,6 +137,7 @@ function DataTable<T>({
     )
 
     setWidths(measured)
+
     return measured
   }
 
@@ -158,10 +159,15 @@ function DataTable<T>({
   }
 
   const sortedData = React.useMemo(() => {
-    if (!sort) return data
+    if (!sort) {
+return data
+}
 
     const column = columns.find((item) => item.id === sort.columnId)
-    if (!column?.sortValue) return data
+
+    if (!column?.sortValue) {
+return data
+}
 
     return [...data].sort((left, right) => {
       const a = column.sortValue!(left)
@@ -192,12 +198,19 @@ function DataTable<T>({
   const someRowsSelected = data.some((row) => selectedKeys.has(getRowKey(row)))
 
   const toggleAllRows = () => {
-    if (!selection) return
+    if (!selection) {
+return
+}
+
     const next = new Set(selection.selectedKeys)
     data.forEach((row) => {
       const key = getRowKey(row)
-      if (allRowsSelected) next.delete(key)
-      else next.add(key)
+
+      if (allRowsSelected) {
+next.delete(key)
+} else {
+next.add(key)
+}
     })
     selection.onSelectedKeysChange([...next])
   }
@@ -267,8 +280,13 @@ function DataTable<T>({
             onCheckedChange={(checked) => {
               const next = new Set(selection.selectedKeys)
               const key = getRowKey(row)
-              if (checked) next.add(key)
-              else next.delete(key)
+
+              if (checked) {
+next.add(key)
+} else {
+next.delete(key)
+}
+
               selection.onSelectedKeysChange([...next])
             }}
             aria-label={`Pilih ${getRowLabel?.(row) ?? "baris"}`}
@@ -425,7 +443,11 @@ function DataTable<T>({
                       }}
                       onPointerMove={(event) => {
                         const current = resize.current
-                        if (!current || current.columnId !== column.id) return
+
+                        if (!current || current.columnId !== column.id) {
+return
+}
+
                         setResizeGuide(event.clientX - (containerRef.current?.getBoundingClientRect().left ?? 0))
                         resizePair(current, event.clientX - current.startX)
                       }}
@@ -441,8 +463,10 @@ function DataTable<T>({
                         if (
                           event.key !== "ArrowLeft" &&
                           event.key !== "ArrowRight"
-                        )
-                          return
+                        ) {
+return
+}
+
                         event.preventDefault()
                         const measured = measureWidths()
                         resizePair(

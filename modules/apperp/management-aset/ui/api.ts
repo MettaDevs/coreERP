@@ -11,7 +11,9 @@ export class ApiError extends Error {
 }
 
 function normalizeValidationErrors(value: unknown): ApiValidationErrors {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return {};
+    }
 
     return Object.fromEntries(
         Object.entries(value as Record<string, unknown>).flatMap(
@@ -37,6 +39,7 @@ function normalizeValidationErrors(value: unknown): ApiValidationErrors {
  */
 export function newIdempotencyKey(): string {
     const webCrypto = globalThis.crypto;
+
     if (typeof webCrypto?.randomUUID === 'function') {
         try {
             return webCrypto.randomUUID();
@@ -111,6 +114,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
             ...init?.headers,
         },
     });
+
     if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
             message?: unknown;
@@ -130,8 +134,10 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
                 : typeof body?.message === 'string'
                   ? body.message
                   : 'Permintaan belum berhasil.';
+
         throw new ApiError(message, validationErrors);
     }
+
     return response.status === 204 ? (undefined as T) : response.json();
 }
 

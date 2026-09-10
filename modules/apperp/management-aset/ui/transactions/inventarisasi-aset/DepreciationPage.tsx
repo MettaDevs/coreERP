@@ -62,28 +62,56 @@ export default function DepreciationPage({
     const [bulkOpen, setBulkOpen] = useState(false);
     const [bulkResult, setBulkResult] = useState('');
     const [saving, setSaving] = useState(false);
-    const load = async () => {
-        try {
-            const [bookResult, periodResult] = await Promise.all([
-                api<{ data: Book[] }>('/penyusutan/buku'),
-                api<{ data: Period[] }>('/penyusutan'),
-            ]);
-            setBooks(bookResult.data);
-            setPeriods(periodResult.data);
-            setError('');
-        } catch (caught) {
-            setError(
-                errorMessage(caught, 'Data penyusutan belum dapat dimuat.'),
-            );
-        }
-    };
+    // Effect adalah satu-satunya pemilik pengambilan data. Pemuatan ulang setelah
+    // proposal, finalisasi, atau koreksi dinyatakan dengan menaikkan penanda ini.
+    const [versiMuat, setVersiMuat] = useState(0);
+
     useEffect(() => {
-        void load();
-    }, []);
+        let dilepas = false;
+
+        // Pengambilan data lahir di dalam effect: state baru disetel setelah jawaban
+        // server tiba, bukan pada commit render yang sama, dan jawaban yang telat
+        // datang setelah layar ditutup dibuang lewat `dilepas`.
+        const muat = async () => {
+            try {
+                const [bookResult, periodResult] = await Promise.all([
+                    api<{ data: Book[] }>('/penyusutan/buku'),
+                    api<{ data: Period[] }>('/penyusutan'),
+                ]);
+
+                if (dilepas) {
+                    return;
+                }
+
+                setBooks(bookResult.data);
+                setPeriods(periodResult.data);
+                setError('');
+            } catch (caught) {
+                if (dilepas) {
+                    return;
+                }
+
+                setError(
+                    errorMessage(caught, 'Data penyusutan belum dapat dimuat.'),
+                );
+            }
+        };
+
+        void muat();
+
+        return () => {
+            dilepas = true;
+        };
+    }, [versiMuat]);
+    const muatUlang = () => setVersiMuat((versi) => versi + 1);
     const propose = async (form: HTMLFormElement) => {
-        if (!selected) return;
+        if (!selected) {
+            return;
+        }
+
         const data = new FormData(form);
         setSaving(true);
+
         try {
             await api('/penyusutan/proposal', {
                 method: 'POST',
@@ -95,7 +123,7 @@ export default function DepreciationPage({
                 }),
             });
             setSelected(null);
-            await load();
+            muatUlang();
         } catch (caught) {
             setError(
                 errorMessage(caught, 'Proposal penyusutan belum dapat dibuat.'),
@@ -113,6 +141,7 @@ export default function DepreciationPage({
         const data = new FormData(form);
         setSaving(true);
         setBulkResult('');
+
         try {
             const result = await api<{
                 data: { dibuat: number; dilewati: number };
@@ -127,7 +156,7 @@ export default function DepreciationPage({
                 `${result.data.dibuat} proposal dibuat, ${result.data.dilewati} buku dilewati.`,
             );
             setBulkOpen(false);
-            await load();
+            muatUlang();
         } catch (caught) {
             setError(
                 errorMessage(caught, 'Proposal massal belum dapat dijalankan.'),
@@ -141,13 +170,15 @@ export default function DepreciationPage({
             !window.confirm(
                 `Finalisasi penyusutan ${period.asset_code} untuk periode ini? Nilai final tidak dapat diubah.`,
             )
-        )
+        ) {
             return;
+        }
+
         try {
             await api(`/penyusutan/${period.id}/finalisasi`, {
                 method: 'POST',
             });
-            await load();
+            muatUlang();
         } catch (caught) {
             setError(
                 errorMessage(caught, 'Penyusutan belum dapat difinalisasi.'),
@@ -156,17 +187,22 @@ export default function DepreciationPage({
     };
     const reverse = async (period: Period) => {
         const reason = window.prompt('Alasan koreksi penyusutan:');
-        if (!reason) return;
+
+        if (!reason) {
+            return;
+        }
+
         try {
             await api(`/penyusutan/${period.id}/reversal`, {
                 method: 'POST',
                 body: JSON.stringify({ reason }),
             });
-            await load();
+            muatUlang();
         } catch (caught) {
             setError(errorMessage(caught, 'Penyusutan belum dapat dibalik.'));
         }
     };
+
     return (
         <div className="space-y-4">
             <Card className="rounded-none border-x-0 shadow-none">

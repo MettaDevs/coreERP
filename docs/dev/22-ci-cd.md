@@ -76,13 +76,25 @@ hal yang sama.
 tidak boleh ditambahkan. Langkah yang boleh merah tanpa menggagalkan alur tidak menjaga apa pun,
 sementara keberadaannya tetap terbaca seolah ada yang dijaga.
 
-**Lubang yang diketahui: ESLint belum menjangkau `modules/`.** `npm run lint:check` menjalankan
-`eslint .` dari `apps/control-plane`, dan konfigurasi flat ESLint menolak berkas di luar folder
-konfigurasinya. Prettier dan `tsc` sudah mencakup UI module — lewat pola glob di
-`apps/control-plane/package.json` dan `include` di `apps/control-plane/tsconfig.json` — ESLint
-belum. Akibatnya aturan hook React dan urutan impor tidak berlaku sama sekali pada halaman
-module. Menutupnya berarti memindahkan konfigurasi ESLint ke akar repo, yang menyentuh seluruh
-berkas frontend Core sekaligus; sampai itu dikerjakan, lubang ini terbuka.
+**Jangkauan ESLint dijaga, karena ia pernah hilang tanpa berbunyi.** `eslint.config.js` hidup di
+**akar repo**, dan perintah lint menargetkan akar repo. Keduanya bukan selera: ESLint 9 menetapkan
+base path dari letak berkas konfigurasinya, dan sampai 10 September 2026 berkas itu ada di
+`apps/control-plane/` — sehingga `eslint .` memeriksa **nol** berkas di bawah `modules/` dan
+`packages/`, lalu keluar dengan kode 0.
+
+Bukan menolak, bukan memperingatkan; hanya diam. Puluhan berkas UI module karena itu tidak pernah
+diperiksa aturan hook React maupun urutan impor sejak module pertama mendarat, sementara alur ini
+melaporkan linter hijau di setiap pull request. Begitu jangkauannya dibuka, ratusan temuan mekanis
+muncul sekaligus.
+
+Yang menjaganya sekarang `scripts/periksa-jangkauan-eslint.mjs`, dipanggil dari `lint:check`
+sesudah ESLint sendiri: ia menolak bila tidak satu pun berkas yang diperiksa berada di bawah
+`modules/` atau `packages/`. Ia juga menolak bila kedua folder itu kosong — daftar tanpa subjek
+membuat pemeriksanya hijau tanpa membuktikan apa pun.
+
+Pelajarannya lebih umum daripada ESLint, dan ia berlaku untuk setiap pemeriksa yang menyaring
+berkas: **sebuah pemeriksa yang tidak menemukan subjek tidak dapat dibedakan dari pemeriksa yang
+tidak menemukan pelanggaran.** Lihat [standar penjaga dan pengujian](25-standar-penjaga-dan-pengujian.md).
 
 ### Baseline analisa tipe hanya boleh menyusut
 
@@ -99,6 +111,17 @@ baris yang sudah tidak terpakai akan dilaporkan.
 
 Tidak ada mesin yang menahan pertumbuhannya. Pull request yang menambah baris ke berkas itu
 tetap hijau, jadi yang menahannya adalah peninjau yang membaca diff.
+
+Sejak 10 September 2026 aturan itu punya mesin: `scripts/periksa-baseline-phpstan.mjs`, dijalankan
+langkah **Periksa baseline analisa tipe tidak bertambah** pada `lint.yml`.
+
+Yang dibandingkan **per entri**, bukan totalnya. Rancangan pertamanya membandingkan total dan
+terbukti tidak menjaga apa pun: pada cabang yang membuang tujuh belas bungkaman, menambahkan tiga
+bungkaman baru masih terbaca "menyusut" dan lolos. Aturan yang berlaku sekarang lebih sempit dan
+lebih jujur — **tidak boleh ada bungkaman baru**, termasuk menaikkan `count:` pada entri yang sudah
+ada. Membuang entri tetap bebas.
+
+Kedua bentuk kegagalan itu dibuktikan merah sebelum langkahnya dipasang.
 
 ### Dua folder skill wajib identik
 

@@ -1,4 +1,4 @@
-import { FieldConfig, FieldValue } from './fields';
+import type { FieldConfig, FieldValue } from './fields';
 
 export type MasterResource =
     | 'group-aset'

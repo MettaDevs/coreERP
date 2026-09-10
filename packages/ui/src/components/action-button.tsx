@@ -1,8 +1,8 @@
-import * as React from "react"
 import { ArchiveIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import * as React from "react"
 
-import { Button } from "./button"
 import { cn } from "../utils"
+import { Button } from "./button"
 
 /**
  * Tombol untuk aksi record yang berulang di seluruh aplikasi: tambah, ubah, arsipkan,

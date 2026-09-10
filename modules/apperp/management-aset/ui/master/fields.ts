@@ -52,8 +52,13 @@ export type FieldValue = string | number | boolean | string[] | null;
 
 /** Nilai awal satu field saat form dibuka tanpa data. */
 export function emptyValue(field: FieldConfig): FieldValue {
-    if (field.type === 'boolean') return false;
-    if (field.type === 'multiselect') return [];
+    if (field.type === 'boolean') {
+        return false;
+    }
+
+    if (field.type === 'multiselect') {
+        return [];
+    }
 
     return '';
 }
@@ -63,13 +68,27 @@ export function valueFrom(
     record: Record<string, unknown> | null,
     field: FieldConfig,
 ): FieldValue {
-    if (!record) return emptyValue(field);
+    if (!record) {
+        return emptyValue(field);
+    }
+
     const raw = record[field.name];
-    if (field.fromRecord) return field.fromRecord(raw);
-    if (raw === null || raw === undefined) return emptyValue(field);
-    if (field.type === 'boolean') return Boolean(raw);
-    if (field.type === 'multiselect')
+
+    if (field.fromRecord) {
+        return field.fromRecord(raw);
+    }
+
+    if (raw === null || raw === undefined) {
+        return emptyValue(field);
+    }
+
+    if (field.type === 'boolean') {
+        return Boolean(raw);
+    }
+
+    if (field.type === 'multiselect') {
         return Array.isArray(raw) ? raw.map(String) : [];
+    }
 
     return String(raw);
 }
@@ -79,11 +98,25 @@ export function valueFrom(
  * benar-benar menghapus nilainya, bukan menyimpan string kosong.
  */
 export function payloadValue(field: FieldConfig, value: FieldValue): unknown {
-    if (field.toPayload) return field.toPayload(value);
-    if (field.type === 'boolean') return Boolean(value);
-    if (field.type === 'multiselect') return Array.isArray(value) ? value : [];
-    if (value === '' || value === null) return null;
-    if (field.type === 'number') return Number(value);
+    if (field.toPayload) {
+        return field.toPayload(value);
+    }
+
+    if (field.type === 'boolean') {
+        return Boolean(value);
+    }
+
+    if (field.type === 'multiselect') {
+        return Array.isArray(value) ? value : [];
+    }
+
+    if (value === '' || value === null) {
+        return null;
+    }
+
+    if (field.type === 'number') {
+        return Number(value);
+    }
 
     return value;
 }

@@ -131,30 +131,60 @@ Satu repo sengaja **tidak** disentuh: `app-erp-procurement`. Ia belum dipindah; 
 produk pada 10 September 2026 adalah ia datang sebagai module, dan pemindahannya sendiri belum
 dikerjakan. Yang sudah selesai adalah pembuangan jalur container yang disebut bagian 1 di atas.
 
-## 5. Tiga lubang pemeriksaan yang ditemukan saat menulis desain kanonik
+## 5. Lubang pemeriksaan — dua nyata dan sudah ditutup, satu salah lapor
 
-Ketiganya ditemukan dengan memeriksa alur dan setelannya, bukan dengan membaca dokumen, dan tidak
-satu pun sudah ditutup.
+**ESLint tidak menjangkau `modules/` maupun `packages/`.** Dan bentuknya lebih buruk daripada
+"menolak": ia memeriksa **nol** berkas di sana lalu keluar dengan kode 0. ESLint 9 menetapkan base
+path dari letak berkas konfigurasi, dan konfigurasinya ada di `apps/control-plane/`. Puluhan berkas
+UI module karena itu tidak pernah diperiksa aturan hook React maupun urutan impor sejak module
+pertama mendarat, sementara alur CI melaporkan linter hijau di setiap pull request.
 
-**ESLint tidak menjangkau `modules/` sama sekali.** Perintah `npm run lint:check` menjalankan
-`eslint .` dari `apps/control-plane`, dan konfigurasi flat menolak berkas di luar folder
-konfigurasinya. Prettier dan `tsc` sudah mencakup `modules/`; ESLint tidak. Akibat nyatanya: aturan
-hook React dan urutan impor **tidak berlaku** pada halaman modul, dan ada puluhan berkas UI modul di
-pohon ini yang belum pernah diperiksa keduanya.
+Ditutup: konfigurasinya pindah ke akar repo, perintahnya diarahkan ke akar, dan
+`scripts/periksa-jangkauan-eslint.mjs` menolak bila ESLint tidak melihat satu pun berkas di kedua
+folder itu. Begitu jangkauannya dibuka, 608 temuan mekanis muncul sekaligus.
 
-**Tidak ada mesin yang menahan `phpstan-baseline.neon` bertambah.** Aturannya jelas — baseline hanya
-boleh menyusut — tetapi tidak ada test maupun langkah alur yang membandingkan ukurannya. Pull request
-yang menambah baris tetap hijau; yang menegakkannya hanya peninjau.
+**Tidak ada mesin yang menahan `phpstan-baseline.neon` bertambah.** Ditutup oleh
+`scripts/periksa-baseline-phpstan.mjs`, yang membandingkan **per entri**, bukan totalnya.
+Rancangan pertamanya membandingkan total dan terbukti tidak menjaga apa pun: pada cabang yang
+membuang tujuh belas bungkaman, menambahkan tiga bungkaman baru masih terbaca "menyusut" dan lolos.
 
-**Push langsung ke `main` tidak diperiksa apa pun.** Alur linter dan alur test keduanya hanya dipicu
-`pull_request`. Ini bertetangga dengan catatan yang sudah tertulis di
-[CI/CD](../../dev/22-ci-cd.md): perlindungan cabang tidak tersedia pada paket GitHub yang dipakai,
-jadi pemeriksaan apa pun dapat dilewati dengan satu klik gabungkan.
+**"Push langsung ke `main` tidak diperiksa" — ini salah lapor, dan pantas dicatat sebagai
+kesalahan.** Ketiadaan pemicu `push` bukan kelalaian melainkan keputusan sadar, dan alasannya sudah
+tertulis di kepala kedua alur: `pull_request` dijalankan terhadap pohon yang **sudah digabungkan**
+ke basisnya, jadi mengulang alur yang sama setelah merge menguji pohon yang praktis identik dengan
+yang barusan hijau — dan repo ini privat di paket gratis. Komentar itu bahkan sudah menyebut sendiri
+konsekuensi yang dilepasnya.
 
-Satu lagi yang sejenis dan tercatat di halaman desainnya sendiri: larangan mengimpor `@/lib/...` dari
-folder modul **tidak dijaga alat mana pun**, dan build tetap hijau bila dilanggar.
+Pelajarannya: sebuah survei yang membaca setelan tanpa membaca alasan yang tertulis di sebelahnya
+akan melaporkan keputusan sebagai kelalaian.
 
-## 6. Repo penyebaran belum di-commit
+Satu yang sejenis dan masih terbuka: larangan mengimpor `@/lib/...` dari folder module **tidak
+dijaga alat mana pun**, dan build tetap hijau bila dilanggar. Ia tercatat di
+[UI modul di dalam shell](../../dev/27-ui-modul-dalam-shell.md).
+
+## 6. Aksi massal di layar master tidak pernah dapat dijangkau
+
+Ditemukan saat memperbaiki temuan hook React, di luar lint.
+
+Pada `modules/apperp/management-aset/ui/master/MasterPage.tsx`, daftar baris terpilih **tidak pernah
+terisi**: satu-satunya penyetelnya hanya pernah dipanggil dengan daftar kosong, dan tabelnya punya
+prop pemilihan yang tidak pernah diberikan.
+
+Akibatnya bilah aksi massal — yang hanya muncul ketika ada baris terpilih — **tidak pernah muncul**,
+dan sekitar enam puluh baris di belakangnya, lengkap dengan konfirmasi dan pemrosesan berbarengan,
+tidak dapat dijangkau siapa pun. Tidak ada test yang gagal karenanya, karena tidak ada test yang
+pernah menekan tombol yang tidak pernah ada.
+
+Dua jalan, dan keduanya keputusan pemilik produk, bukan pekerjaan yang tinggal dijalankan:
+
+- **Sambungkan** — pemilihan baris diaktifkan, dan aksi massal menjadi fitur yang benar-benar ada.
+  Itu menambah fitur, bukan memperbaiki cacat.
+- **Buang** — enam puluh baris itu dihapus. Itu membuang niat yang mungkin masih dipegang.
+
+Perbaikan lint di berkas itu sudah dikerjakan dengan menurunkan daftar terpilih dari daftar baris,
+jadi kodenya sudah benar begitu pemilihan disambungkan.
+
+## 7. Repo penyebaran belum di-commit
 
 `app-erp-deployment` sudah diperbaiki agar memakai satu image edisi — satu berkas compose, satu
 database, satu repo sumber — dan dibuktikan jalan. Perubahannya sengaja **dibiarkan belum di-commit**
@@ -163,7 +193,7 @@ atas permintaan pemilik repo.
 Selama belum di-commit, siapa pun yang memasang on-prem dengan mengikuti repo itu apa adanya masih
 akan mencoba menarik image per app yang tidak dibangun lagi.
 
-## 7. Kontrak OpenAPI internal tidak diregenerasi siapa pun
+## 8. Kontrak OpenAPI internal tidak diregenerasi siapa pun
 
 `apps/control-plane/contracts/openapi.json` adalah salinan yang dibuat sekali dan tidak ada langkah
 CI yang meregenerasinya maupun memeriksa apakah ia masih cocok dengan rute yang benar-benar ada.

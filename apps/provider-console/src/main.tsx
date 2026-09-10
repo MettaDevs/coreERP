@@ -21,6 +21,7 @@ function ProviderConsole() {
 
         try {
             const response = await fetch('/api/v1/provider/apps', { credentials: 'include' });
+
             if (!response.ok) {
                 throw new Error(response.status === 403 ? 'Anda tidak punya akses untuk melihat katalog aplikasi.' : 'Katalog aplikasi belum bisa dimuat.');
             }

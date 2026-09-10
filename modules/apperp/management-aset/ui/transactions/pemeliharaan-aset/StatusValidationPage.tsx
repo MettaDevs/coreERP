@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@apperp/ui/button';
 import {
     Card,
@@ -23,7 +24,6 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { toast } from 'sonner';
 import { api, errorMessage } from '../../api';
 
 type Aturan = {
@@ -65,23 +65,46 @@ export default function StatusValidationPage({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    const load = async () => {
-        try {
-            const result = await api<{ data: Aturan[] }>(
-                '/validasi-status-work-order',
-            );
-            setAturan(result.data);
-            setError('');
-        } catch (caught) {
-            setError(
-                errorMessage(caught, 'Aturan validasi belum dapat dimuat.'),
-            );
-        }
-    };
+    // Effect adalah satu-satunya pemilik pengambilan data. Pemuatan ulang setelah
+    // simpan dinyatakan dengan menaikkan penanda ini, bukan dengan memanggil ulang
+    // fungsi pemuat dari luar.
+    const [versiMuat, setVersiMuat] = useState(0);
 
     useEffect(() => {
-        void load();
-    }, []);
+        let dilepas = false;
+
+        // Pengambilan data lahir di dalam effect: state baru disetel setelah jawaban
+        // server tiba, bukan pada commit render yang sama, dan jawaban yang telat
+        // datang setelah layar ditutup dibuang lewat `dilepas`.
+        const muat = async () => {
+            try {
+                const result = await api<{ data: Aturan[] }>(
+                    '/validasi-status-work-order',
+                );
+
+                if (dilepas) {
+                    return;
+                }
+
+                setAturan(result.data);
+                setError('');
+            } catch (caught) {
+                if (dilepas) {
+                    return;
+                }
+
+                setError(
+                    errorMessage(caught, 'Aturan validasi belum dapat dimuat.'),
+                );
+            }
+        };
+
+        void muat();
+
+        return () => {
+            dilepas = true;
+        };
+    }, [versiMuat]);
 
     const ubah = (id: string, perubahan: Partial<Aturan>) =>
         setAturan((current) =>
@@ -92,6 +115,7 @@ export default function StatusValidationPage({
 
     const simpan = async () => {
         setSaving(true);
+
         try {
             await api('/validasi-status-work-order', {
                 method: 'PUT',
@@ -104,7 +128,7 @@ export default function StatusValidationPage({
                     })),
                 }),
             });
-            await load();
+            setVersiMuat((versi) => versi + 1);
             toast.success('Aturan validasi tersimpan.');
         } catch (caught) {
             toast.error(
@@ -225,7 +249,8 @@ export default function StatusValidationPage({
                                                                             item.label ===
                                                                             value,
                                                                     );
-                                                                if (dipilih)
+
+                                                                if (dipilih) {
                                                                     ubah(
                                                                         baris.id,
                                                                         {
@@ -233,6 +258,7 @@ export default function StatusValidationPage({
                                                                                 dipilih.kode,
                                                                         },
                                                                     );
+                                                                }
                                                             }}
                                                         />
                                                     ) : (

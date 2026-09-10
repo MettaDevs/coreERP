@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import {
@@ -9,9 +9,13 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { TransferList, type TransferListItem } from '@apperp/ui/transfer-list';
+import { TransferList } from '@apperp/ui/transfer-list';
+import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../../api';
-import { JenisAsetDetail, JenisAsetModelSummary } from './jenisAsetDetail';
+import type { JenisAsetDetail, JenisAsetModelSummary } from './jenisAsetDetail';
+
+type Asal = { remaining: TransferListItem[]; selected: TransferListItem[] };
+type Kerja = Asal & { asal: Asal; saved: boolean; saveError: string };
 
 function itemOf(model: JenisAsetModelSummary): TransferListItem {
     return {
@@ -37,23 +41,41 @@ export default function JenisAsetModels({
     error: string;
     canEdit: boolean;
 }) {
-    const [remaining, setRemaining] = useState<TransferListItem[]>([]);
-    const [selected, setSelected] = useState<TransferListItem[]>([]);
     const [saving, setSaving] = useState(false);
-    const [saved, setSaved] = useState(false);
-    const [saveError, setSaveError] = useState('');
 
-    useEffect(() => {
-        setRemaining((detail?.available_models ?? []).map(itemOf));
-        setSelected((detail?.models ?? []).map(itemOf));
-        setSaved(false);
-        setSaveError('');
-    }, [detail]);
+    /**
+     * Isi transfer list adalah salinan kerja: mula-mula persis seperti yang datang dari
+     * server, lalu berubah mengikuti pilihan pengguna.
+     *
+     * Salinan itu dicatat bersama `asal` yang melahirkannya, dan yang dipakai saat render
+     * hanyalah salinan yang asalnya masih sama dengan detail terbaru. Detail baru dari
+     * server dengan sendirinya membatalkan salinan lama beserta penanda tersimpan dan
+     * pesan kesalahannya — tanpa effect yang menyalin ulang props ke dalam state.
+     */
+    const asal = useMemo(
+        () => ({
+            remaining: (detail?.available_models ?? []).map(itemOf),
+            selected: (detail?.models ?? []).map(itemOf),
+        }),
+        [detail],
+    );
+    const [kerja, setKerja] = useState<Kerja | null>(null);
+    const aktif: Kerja =
+        kerja?.asal === asal
+            ? kerja
+            : {
+                  asal,
+                  remaining: asal.remaining,
+                  selected: asal.selected,
+                  saved: false,
+                  saveError: '',
+              };
+    const { remaining, selected, saved, saveError } = aktif;
 
     async function save() {
         setSaving(true);
-        setSaved(false);
-        setSaveError('');
+        setKerja({ ...aktif, saved: false, saveError: '' });
+
         try {
             await api(`/jenis-aset/${jenisAsetId}/models`, {
                 method: 'PUT',
@@ -61,26 +83,35 @@ export default function JenisAsetModels({
                     model_ids: selected.map((item) => item.id),
                 }),
             });
-            setSaved(true);
+            setKerja((current) => current && { ...current, saved: true });
         } catch (caught) {
-            setSaveError(
-                errorMessage(
-                    caught,
-                    'Pabrikan dan model belum dapat disimpan.',
-                ),
+            setKerja(
+                (current) =>
+                    current && {
+                        ...current,
+                        saveError: errorMessage(
+                            caught,
+                            'Pabrikan dan model belum dapat disimpan.',
+                        ),
+                    },
             );
         } finally {
             setSaving(false);
         }
     }
 
-    if (loading)
+    if (loading) {
         return (
             <p className="text-muted-foreground text-sm">
                 Memuat daftar pabrikan dan model...
             </p>
         );
-    if (error) return <p className="text-destructive text-sm">{error}</p>;
+    }
+
+    if (error) {
+        return <p className="text-destructive text-sm">{error}</p>;
+    }
+
     if (!detail || detail.models === null || detail.available_models === null) {
         return (
             <Empty>
@@ -101,11 +132,14 @@ export default function JenisAsetModels({
                 <TransferList
                     remaining={remaining}
                     selected={selected}
-                    onChange={(next) => {
-                        setRemaining(next.remaining);
-                        setSelected(next.selected);
-                        setSaved(false);
-                    }}
+                    onChange={(next) =>
+                        setKerja({
+                            ...aktif,
+                            remaining: next.remaining,
+                            selected: next.selected,
+                            saved: false,
+                        })
+                    }
                     remainingTitle="Model tersedia"
                     selectedTitle="Model terpasang"
                     disabled={saving}

@@ -1,6 +1,6 @@
-import * as React from "react"
 import { XIcon } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
+import * as React from "react"
 
 import { cn } from "../utils"
 import { Button } from "./button"
@@ -56,13 +56,11 @@ function subscribe(listener: () => void) {
 }
 
 function useStackPosition() {
-  const id = React.useRef<symbol | null>(null)
-
-  if (id.current === null) {
-    id.current = Symbol("dialog")
-  }
-
-  const self = id.current
+  // Identitas dialog ini lahir sekali lewat penginisialisasi `useState`, bukan lewat ref
+  // yang diisi malas. Nilai yang ikut menentukan hasil render harus boleh dibaca saat
+  // render, dan `current` sebuah ref tidak boleh — membacanya di sana membuat React tidak
+  // dapat menjamin komponen ini ikut diperbarui saat nilainya berubah.
+  const [self] = React.useState(() => Symbol("dialog"))
   // Snapshot berupa posisi dialog ini sendiri, bukan nomor versi tumpukan.
   // Dengan nomor versi, setiap buka/tutup dialog mana pun akan merender ulang
   // seluruh dialog yang sedang terpasang — kerja React itu jatuh tepat pada

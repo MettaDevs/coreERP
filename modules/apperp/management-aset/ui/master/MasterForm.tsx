@@ -1,4 +1,5 @@
-import { FormEvent, ReactNode, useMemo, useRef, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Field,
@@ -21,15 +22,15 @@ import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../api';
 import DynamicField from './DynamicField';
-import { FieldValue, isVisible, payloadValue, valueFrom } from './fields';
-import {
+import type { FieldValue } from './fields';
+import { isVisible, payloadValue, valueFrom } from './fields';
+import type {
     MasterConfig,
     MasterParentConfig,
     MasterRecord,
     ParentSummary,
-    parentIdOf,
-    parentSummaryOf,
 } from './masters';
+import { parentIdOf, parentSummaryOf } from './masters';
 
 type FormValue = { nama: string; keterangan: string; aktif: boolean };
 
@@ -93,6 +94,7 @@ export default function MasterForm({
      */
     const optionsOf = useMemo(() => {
         const resolved: Record<string, ParentSummary[]> = {};
+
         for (const parent of parents) {
             const available = parentOptions[parent.field] ?? [];
             const current = value ? parentSummaryOf(value, parent) : null;
@@ -101,6 +103,7 @@ export default function MasterForm({
                     ? available
                     : [current, ...available];
         }
+
         return resolved;
     }, [parents, parentOptions, value]);
 
@@ -109,12 +112,16 @@ export default function MasterForm({
         const missing = parents.find(
             (parent) => parent.required !== false && !parentIds[parent.field],
         );
+
         if (missing) {
             setError(`Pilih ${missing.label.toLowerCase()} terlebih dahulu.`);
+
             return;
         }
+
         setSaving(true);
         setError('');
+
         try {
             const saved = await api<{ data: MasterRecord }>(
                 `/${config.resource}${value ? `/${value.id}` : ''}`,

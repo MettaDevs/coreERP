@@ -66,18 +66,24 @@ const newLine = (line_number: number): Line => ({
 type LineErrors = Record<number, Record<string, string>>;
 
 function lineErrorsFrom(caught: unknown): LineErrors {
-    if (!(caught instanceof ApiError)) return {};
+    if (!(caught instanceof ApiError)) {
+        return {};
+    }
 
     return Object.entries(caught.validationErrors).reduce<LineErrors>(
         (result, [key, messages]) => {
             const match = /^lines\.(\d+)\.([^.]+)$/.exec(key);
-            if (!match) return result;
+
+            if (!match) {
+                return result;
+            }
 
             const index = Number(match[1]);
             result[index] = {
                 ...result[index],
                 [match[2]]: messages[0] ?? 'Periksa nilai ini.',
             };
+
             return result;
         },
         {},
@@ -85,9 +91,15 @@ function lineErrorsFrom(caught: unknown): LineErrors {
 }
 
 function validationSummary(caught: unknown): string {
-    if (!(caught instanceof ApiError)) return '';
+    if (!(caught instanceof ApiError)) {
+        return '';
+    }
+
     const first = Object.entries(caught.validationErrors)[0];
-    if (!first) return '';
+
+    if (!first) {
+        return '';
+    }
 
     const match = /^lines\.(\d+)\.([^.]+)$/.exec(first[0]);
     const fieldLabels: Record<string, string> = {
@@ -97,7 +109,10 @@ function validationSummary(caught: unknown): string {
         variable_id: 'Variabel checklist',
         nested_template_id: 'Template checklist',
     };
-    if (!match) return first[1][0] ?? '';
+
+    if (!match) {
+        return first[1][0] ?? '';
+    }
 
     return `Baris ${Number(match[1]) + 1}, ${fieldLabels[match[2]] ?? match[2]}: ${first[1][0] ?? 'Periksa nilai ini.'}`;
 }
@@ -159,12 +174,21 @@ export default function MaintenanceChecklistTemplateLines({
         setError('');
         setLineErrors((current) => {
             const row = current[index];
-            if (!row) return current;
+
+            if (!row) {
+                return current;
+            }
+
             const remaining = { ...row };
             Object.keys(changes).forEach((field) => delete remaining[field]);
             const next = { ...current };
-            if (Object.keys(remaining).length === 0) delete next[index];
-            else next[index] = remaining;
+
+            if (Object.keys(remaining).length === 0) {
+                delete next[index];
+            } else {
+                next[index] = remaining;
+            }
+
             return next;
         });
         setLines((current) =>
@@ -208,6 +232,7 @@ export default function MaintenanceChecklistTemplateLines({
         setSaving(true);
         setError('');
         setLineErrors({});
+
         try {
             const result = await api<{ data: Line[] }>(
                 `/maintenance-checklist-templates/${templateId}/lines`,
@@ -221,10 +246,12 @@ export default function MaintenanceChecklistTemplateLines({
             const firstErrorIndex = Object.keys(nextErrors)
                 .map(Number)
                 .sort((a, b) => a - b)[0];
+
             if (firstErrorIndex !== undefined) {
                 setCheckedIndexes([firstErrorIndex]);
                 setSelectedIndex(firstErrorIndex);
             }
+
             setError(
                 validationSummary(caught) ||
                     (firstErrorIndex !== undefined
@@ -250,6 +277,7 @@ export default function MaintenanceChecklistTemplateLines({
                       ? (next.at(-1) ?? null)
                       : active,
             );
+
             return next;
         });
     }
@@ -262,8 +290,10 @@ export default function MaintenanceChecklistTemplateLines({
         setCheckedIndexes([index]);
         setSelectedIndex(index);
     }
-    if (error && lines.length === 0)
+
+    if (error && lines.length === 0) {
         return <p className="text-destructive text-sm">{error}</p>;
+    }
 
     const allChecked =
         lines.length > 0 && checkedIndexes.length === lines.length;
@@ -362,6 +392,7 @@ export default function MaintenanceChecklistTemplateLines({
                                 const referenceError =
                                     rowError.variable_id ??
                                     rowError.nested_template_id;
+
                                 return (
                                     <TableRow
                                         key={
@@ -383,8 +414,10 @@ export default function MaintenanceChecklistTemplateLines({
                                             if (
                                                 event.target !==
                                                 event.currentTarget
-                                            )
+                                            ) {
                                                 return;
+                                            }
+
                                             if (
                                                 event.key === 'Enter' ||
                                                 event.key === ' '
@@ -439,11 +472,12 @@ export default function MaintenanceChecklistTemplateLines({
                                                     value={typeLabel(item.type)}
                                                     ariaLabel={`Jenis baris ${index + 1}`}
                                                     onValueChange={(value) => {
-                                                        if (value)
+                                                        if (value) {
                                                             changeType(
                                                                 index,
                                                                 typeCode(value),
                                                             );
+                                                        }
                                                     }}
                                                 />
                                             ) : (
@@ -571,6 +605,7 @@ function LineDetails({
                 {pick(items, id)?.nama ?? 'Belum dipilih'}
             </p>
         );
+
     return (
         <section className="space-y-4 rounded-md border p-4">
             <h4 className="font-semibold">Rincian baris</h4>
@@ -686,13 +721,16 @@ function DetailSwitch({
     onChange: (changes: Partial<Line>) => void;
 }) {
     const id = `line-wajib-${line.id ?? 'baru'}`;
-    if (!canEdit)
+
+    if (!canEdit) {
         return (
             <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Wajib diisi</span>
                 <span className="text-sm">{line.wajib ? 'Ya' : 'Tidak'}</span>
             </div>
         );
+    }
+
     return (
         <Field orientation="horizontal">
             <Switch
