@@ -78,13 +78,89 @@ Alasannya bukan kerapian. Begitu stack mati, tidak ada lagi yang bisa membuktika
 berikutnya benar-benar berjalan, dan kegagalan menumpuk sampai tidak ketahuan mana yang menyebabkan
 mana.
 
-## Muat-ulang-panas belum terbukti di Windows
+## Muat-ulang-panas: bekerja, dan empat hal yang harus benar sekaligus
 
-`-HotReload` memasang `apps/control-plane` dan `modules` dari host ke dalam container, termasuk
-`vendor`. Di dalam `vendor` itu tiap module terpasang sebagai tautan simbolik ke `modules`, dan di
-Windows tautan semacam itu adalah reparse point; apakah Docker menerjemahkannya dengan benar
-**belum pernah diuji**. Bila mode itu bermasalah, jalankan stack tanpa muat-ulang-panas — isinya
-sama, hanya perubahan frontend baru tampil setelah build.
+Diuji pada 10 September 2026 sampai perubahan benar-benar tampil di layar tanpa muat ulang. Angka
+di bawah diukur, bukan diperkirakan.
+
+| Yang diukur | Hasil |
+| --- | --- |
+| Jeda dari berkas disimpan sampai peramban meminta modul barunya | 0,01 detik |
+| Mengambil modul JS yang berubah | 0,15 detik |
+| Membangun ulang `app.css` | 0,54 detik |
+| Halaman dimuat ulang | tidak |
+
+Sebelum keempat perbaikan di bawah, angka yang sama adalah **99–102 detik** untuk `app.css` — dan
+karena Vite menahan seluruh isi satu paket pembaruan sampai bagian terlambatnya selesai, perubahan
+JS yang sudah siap dalam 0,5 detik ikut tertahan selama itu.
+
+Itu bentuk kegagalan yang paling menyesatkan yang ditemui sepanjang pengerjaan ini: **muat-ulang-panas
+tidak pernah rusak, ia kelaparan.** Pembaruan tetap terkirim dan tetap diterapkan, hanya jauh setelah
+siapa pun berhenti menunggu. Yang terlihat pengembang: menyimpan berkas, layar diam, lalu ia menekan
+muat ulang — dan muat ulang terasa cepat justru karena antrean tadi sudah menghangatkan cache-nya.
+
+### 1. Server pengembangan dijalankan di host, bukan di dalam container
+
+Ini yang paling berpengaruh, dan satu-satunya yang tidak dapat diperbaiki lewat setelan.
+
+Tailwind membaca ulang seluruh berkas sumbernya setiap kali satu baris berubah. Menembus bind mount
+dari drive Windows ke container, satu berkas berharga puluhan milidetik; dibaca langsung oleh
+Windows, ia kembali ke ukuran normal. Selisihnya terukur **99 detik lawan 5,5 detik** pada
+konfigurasi yang persis sama.
+
+Jalankan `npx vite --host 127.0.0.1 --port 5173` dari `apps/control-plane` di Windows, dan biarkan
+sisa stack tetap di container. PHP, database, worker, penjadwal, dan perender tidak membaca ratusan
+berkas per perubahan, jadi keduanya tidak terganggu bind mount.
+
+### 2. Yang dipantau pengawas berkas dibatasi
+
+`server.watch.ignored` pada `vite.config.ts` membuang `vendor/`, `storage/`, `bootstrap/cache/`, dan
+`public/build/`. Daftar abaian bawaan Vite tidak memuat `vendor/`, padahal di bawah folder app ada
+belasan ribu berkas dan sebagian besar miliknya.
+
+Ketika pengawas terpaksa memoll — dan di dalam container ia terpaksa, karena inotify tidak merambat
+lewat bind mount — memoll belasan ribu berkas tiap seratus milidetik membanjiri threadpool libuv yang
+hanya berisi empat utas. Terukur: proses Vite yang benar-benar menganggur membakar **252% CPU**;
+sesudah dibatasi, **6,8%**.
+
+### 3. Yang dipindai Tailwind dipersempit
+
+`app.css` memakai `source(none)` dan menyebut sumbernya satu per satu, alih-alih membiarkan Tailwind
+memindai otomatis dari akar repositori. Sumber paket antarmuka juga ditunjuk ke `src`, bukan ke
+`dist` — kelasnya sama, berkasnya seperempatnya.
+
+Pembangunan `app.css` turun dari 5,5 detik menjadi **0,365 detik**, dan keluarannya justru lebih
+tepat: satu kelas yang hilang, `lowercase`, ternyata tidak pernah dipakai satu komponen pun. Ia lahir
+karena pemindaian otomatis membaca kata "lowercase" di dalam berkas PHP aturan validasi.
+
+Kalau kelak sebuah kelas hilang dari tampilan, itu tandanya ada sumber baru yang belum disebut di
+`app.css` — bukan tanda bahwa `source(none)` keliru.
+
+### 4. Mesin SSR plugin Inertia dimatikan
+
+Repo ini tidak punya berkas entri SSR. Ketika tidak ada, plugin menuruni daftar kandidatnya dan
+berhenti di `resources/js/app.tsx` — entri **klien** — lalu memuatnya di lingkungan SSR saat server
+menyala. Ia tersangkut, dan gagal setelah menunggu satu menit penuh:
+
+```
+Failed to warm up Inertia SSR module graph: transport invoke timed out after 60000ms
+```
+
+Selama menit itu server pengembangan berhenti menjawab, dan gejalanya menyamar sebagai hal lain
+sama sekali: aset gagal dimuat, halaman kosong, pembaruan tidak sampai — berubah-ubah tergantung
+kapan sebuah permintaan kebetulan jatuh. `inertia({ ssr: false })` mematikannya; waktu nyala Vite
+turun dari puluhan detik menjadi 1,4 detik.
+
+### Kalau mengukurnya sendiri, jangan memakai `?t=` buatan
+
+Setiap permintaan `app.css?t=<angka>` yang dibuat tangan **menambah satu modul permanen** ke graf
+Vite, dan sejak itu setiap paket pembaruan ikut menyeret semuanya. Pengukuran yang dilakukan begitu
+akan melaporkan angka yang memburuk pada tiap percobaan berikutnya — bukan karena sistemnya
+melambat, melainkan karena alat ukurnya menumpuk beban.
+
+Cara yang tidak mencemari: baca `?t=` yang **dipasang Vite sendiri** pada modul yang diperbarui — ia
+sama dengan waktu ubah berkasnya — lalu bandingkan dengan `performance.getEntriesByType('resource')`
+di peramban.
 
 ## Module ditemukan dengan memindai repo
 
