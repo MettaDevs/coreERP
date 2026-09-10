@@ -5889,11 +5889,14 @@ assertion test membuat test itu berhenti menjaga apa pun.
 
 ### F7-10 — Setelan dan rute di-cache saat penyebaran
 
-**Kenapa.** Diukur pada F7-03: **tidak ada satu pun langkah penyebaran yang memanggil
-`config:cache` maupun `route:cache`** — tidak `Dockerfile`, tidak `docker/entrypoint.sh`, tidak
-skrip repo penyebaran. Setiap permintaan karena itu membayar bootstrap penuh: membaca dan
-menggabungkan seluruh berkas `config/`, lalu mendaftarkan ulang seluruh rute. Pada gate latensi,
-angka yang tercatat — lulus sampai 12 permintaan bersamaan, gagal di 16 — diukur dalam keadaan itu.
+**Kenapa.** Diukur pada F7-03, dan keadaan ini **sudah diperbaiki task ini** — paragraf di bawah
+menggambarkan keadaan sebelumnya, bukan keadaan sekarang.
+
+Saat itu **tidak ada satu pun langkah penyebaran yang memanggil `config:cache` maupun
+`route:cache`** — tidak `Dockerfile`, tidak `docker/entrypoint.sh`, tidak skrip repo penyebaran.
+Setiap permintaan karena itu membayar bootstrap penuh: membaca dan menggabungkan seluruh berkas
+`config/`, lalu mendaftarkan ulang seluruh rute. Angka gate latensi yang tercatat pada F7-03 —
+lulus sampai 12 permintaan bersamaan, gagal di 16 — diukur dalam keadaan itu.
 
 **Dan kalau langkah itu ditambahkan hari ini, ia gagal.** `config:cache` berhenti dengan
 `Call to undefined method Dedoc\Scramble\Support\Generator\SecurityScheme\ApiKeySecurityScheme::__set_state()`:
@@ -5924,6 +5927,143 @@ cache dibangun saat penyebaran, dan angka latensi barunya tercatat di sebelah an
 **Rujukan.** Catatan pelaksanaan F7-03.
 
 **Bergantung pada.** F7-03.
+
+#### Catatan pelaksanaan
+
+Keempat langkah selesai pada 10 September 2026. Jawaban langkah 4 tidak seperti yang diharapkan,
+dan ditulis apa adanya di bawah: cache menghemat ongkos bootstrap, tetapi **tidak menggeser gate
+latensi**.
+
+**Sebabnya satu baris setelan.** `config/scramble.php` menyimpan objek `SecurityScheme` hidup pada
+`security_strategy`, dan setelan yang di-cache ditulis Laravel dengan `var_export` — yang hanya
+dapat menuliskan ulang objek bila kelasnya punya `__set_state()`. Skemanya kini disusun di dalam
+kelasnya sendiri, `App\Support\Docs\KeamananSesiCore`, dan berkas setelan hanya memuat nama kelas
+itu: sebuah string.
+
+Satu akibat sampingan yang justru perbaikan: nama cookie dibaca dari `config('session.cookie')` di
+dalam konstruktor, bukan saat berkas setelan dimuat. Dulu nilai itu ikut terbekukan ke dalam
+setelan yang di-cache.
+
+**Dokumen API tidak kehilangan apa pun, dan itu diperiksa, bukan diasumsikan.** Dengan setelan
+ter-cache, `scramble:export` memulangkan `securitySchemes.sessionCookie` identik sampai ke
+deskripsinya, dan `security` global tetap `[{"sessionCookie": []}]`.
+
+Dua hal lain yang ikut terbukti: `route:cache` memulangkan **383 rute, sama dengan tanpa cache**,
+jadi tidak ada rute yang hilang diam-diam — termasuk rute closure `docs`. Dan dokumen yang
+dihasilkan ternyata **superset** dari `contracts/openapi.json` yang ter-commit: seluruh path lama
+ada, ditambah banyak yang baru. Snapshot itu sudah basi sejak lama dan tidak ada satu pun langkah
+CI yang meregenerasi atau memeriksanya — bukan akibat task ini, dan tidak disegarkan di sini.
+
+**Cache dibangun di entrypoint, bukan di Dockerfile, dan bedanya menentukan.** `config:cache`
+membekukan nilai env ke dalam berkas hasilnya, sedangkan satu image edisi dipakai banyak deployment
+dengan env yang berbeda — membangunnya saat build berarti mengirim setelan milik mesin pembangun ke
+server pelanggan. Ketiga peran membangunnya, karena web, scheduler, dan worker membayar bootstrap
+yang sama. Ia gagal dengan peringatan, bukan berhenti: tanpa cache aplikasi tetap benar, hanya
+lebih lambat, dan container yang menolak naik karena cache-nya gagal menukar kelambatan dengan mati.
+
+Dibuktikan di dalam container, bukan di host: ketiga peran mencatat `Configuration cached
+successfully` dan `Routes cached successfully` dengan **nol peringatan**, `bootstrap/cache/` memuat
+`config.php` 123 KB dan `routes-v7.php` 543 KB, `php artisan about` melaporkan keduanya CACHED, dan
+`/up` serta dokumentasi menjawab 200.
+
+#### Langkah 4: yang terukur, dan yang tidak
+
+**Yang terukur — biaya bootstrap pada `/up`**, endpoint tanpa autentikasi dan tanpa database, jadi
+yang tersisa persis bagian yang disentuh cache ini. Empat putaran bergantian, 200 permintaan tiap
+putaran, dari dalam jaringan container, mesin dan basis data yang sama:
+
+| Putaran | Cache nyala (min / p50) | Cache mati (min / p50) |
+| --- | --- | --- |
+| 1 | 17,5 / 21,2 ms | 20,9 / 24,8 ms |
+| 2 | 17,9 / 23,6 ms | 22,8 / 29,2 ms |
+| 3 | 19,5 / 27,1 ms | 24,2 / 31,5 ms |
+| 4 | 20,4 / 27,5 ms | 23,0 / 34,9 ms |
+
+Cache menang pada keempat putaran: **3–5 ms pada min, 4–7 ms pada p50.** Nyata, dan kecil — sejalan
+dengan temuan F7-03 bahwa bottleneck-nya CPU PHP di dalam badan permintaan, bukan I/O setelan.
+Bentuk bergantian dipakai dengan sengaja supaya pergeseran mesin tercabut dari hasilnya.
+
+Diulang pada **concurrency 16**, 25 detik per putaran, urutan arm tetap dibalik tiap putaran:
+
+| Putaran | Arm pertama | Cache nyala (min / p50 / rps) | Cache mati (min / p50 / rps) |
+| ---: | --- | ---: | ---: |
+| 1 | nyala | 43,3 / 90,2 / 159 | 48,9 / 93,1 / 160 |
+| 2 | mati | 43,1 / 93,9 / 157 | 50,6 / 94,7 / 156 |
+| 3 | nyala | 44,1 / 90,4 / 161 | 59,1 / 112,8 / 130 |
+| 4 | mati | 48,2 / 89,0 / 167 | 51,3 / 108,2 / 139 |
+
+Cache menang **8 dari 8 putaran** pada min dan pada p50: **8 ms pada min, 11 ms pada p50** saat
+dibebani, dengan throughput rata-rata ~10% lebih tinggi (161 vs 146 rps).
+
+**Dan penghematan itu hilang begitu ada database di jalurnya.** Pada 1 VU skenario terautentikasi,
+read p50 **61,8 ms dengan cache dan 61,8 ms tanpa cache**; ulangan arm tanpa cache malah 51,8 ms.
+Satu permintaan baca menghabiskan ~60 ms, sebagian besar di database, dan 4 ms tidak terlihat di
+atas sebaran arm itu sendiri yang ~10 ms.
+
+#### Langkah 4: ambang concurrency, diukur pada kedua keadaan
+
+Gate dijalankan dengan cara dan ambang yang sama persis dengan F7-03 (`PROFILE=latency`,
+`TENANTS=32`, `DURATION=60s`, `FIXTURE=g1`), **15 run**, tiap tingkat pada cache nyala *dan* cache
+mati, bergantian, pada mesin dan basis data yang sama. Angka di bawah adalah read p95; ambangnya
+< 200 ms. Tabel penuh beserta p99 dan angka tulis ada di `apps/control-plane/loadtest/README.md`.
+
+| Concurrency | F7-03, tanpa cache | F7-10, cache nyala | F7-10, cache mati |
+| ---: | ---: | ---: | ---: |
+| 1 | 55 ms | 89 ms | 92 ms / 69 ms |
+| 8 | 131 ms | 272 ms / 195 ms | 190 ms / 203 ms |
+| 12 | 196 ms (lulus) | 506 ms / 242 ms | 319 ms / 308 ms |
+| 16 | 253 ms (gagal) | 306 ms | 400 ms |
+| 32 | 462 ms | 521 ms | 610 ms |
+
+Seluruh 15 run nol pelanggaran kebenaran, nol 5xx aplikasi, nol timeout klien.
+
+**Concurrency tertinggi yang lulus hari ini: 8, dan itu berlaku untuk kedua keadaan.** Pada 12 tidak
+ada satu pun run yang lulus, dengan maupun tanpa cache. Turunnya ambang dari 12 ke 8 karena itu
+bukan akibat cache: ia terjadi sama besar pada arm yang cache-nya mati.
+
+**Di tingkat gate, derau mengalahkan selisihnya.** Pada 8 VU kedua arm mengangkangi ambang 200 ms —
+cache nyala 272 lalu 195 ms, cache mati 190 lalu 203 ms — jadi lulus atau gagal di tingkat itu
+ditentukan run mana yang dilihat, bukan oleh cache. Sebaran di dalam satu arm mencapai **2,1 kali
+lipat** (cache nyala pada 12 VU: 506 lalu 242 ms). Arah selisih antar-arm pun berbalik-balik: cache
+lebih lambat pada 8 dan 12, lebih cepat pada 16 dan 32.
+
+**Kondisi pengukurannya, dan kenapa angka absolutnya tidak sebanding dengan F7-03.** Host sama
+(Windows 11, 12 vCPU / 16 GB, Docker Desktop WSL2 dengan 7,61 GB), keadaannya tidak: RAM host yang
+masih bebas **0,58 GB dari 15,71 GB**, beban CPU dasar dari aplikasi lain **~51%** (VS Code ×3,
+Discord, Chrome, Docker Desktop). Stack `erp-dev` ikut menyala tetapi **idle** — enam container,
+~0,2% CPU, ~210 MB — jadi ia bukan sebabnya. Dua sebab yang cukup menjelaskan seluruh selisihnya,
+dan keduanya bukan cache:
+
+1. **Mesinnya sendiri 33% lebih lambat.** Perintah yang sama persis dengan F7-03, satu VU, cache
+   mati — arm yang keadaannya *identik* dengan F7-03 — memulangkan read p50/p95 **61,8 / 92,4 ms**
+   hari ini terhadap **46,5 / 55,1 ms** pada F7-03.
+2. **Skenarionya menumbuhkan datanya sendiri.** Tiap run menulis master baru, jadi run berikutnya
+   melist dan menghitung tabel yang lebih besar. Sepanjang sesi ini basis data naik dari 169 MB ke
+   **203 MB**, `number_sequence_issues` dari 64.299 ke **81.023**, dan `aset_m_group_aset` dari
+   2.770 ke **5.529** baris — dua kali lipat sepanjang sesi ini. PostgreSQL saat dibebani kini membakar
+   **77–150% CPU** di mana F7-03 mencatat 11–65%. Run latensi F7-03 juga mendahului `gate-sat-3`,
+   jadi ia bekerja pada dataset yang lebih kecil lagi.
+
+**Jadi angka gate F7-03 — lulus sampai 12 permintaan bersamaan, gagal di 16 — sengaja dibiarkan apa
+adanya dan tidak diganti.** Nilai sapuan hari ini ada pada perbandingan antar-arm di dalamnya, bukan
+pada angka absolutnya; ambang yang layak dijadikan janji SLO masih harus diukur pada deployment yang
+representatif, di mesin yang tenang dan basis data uji beban yang baru dibangun.
+
+**Kesimpulan langkah 4.** Kedua cache tetap benar untuk dipasang: ia menghapus pekerjaan yang memang
+sia-sia, dan penghematannya terukur pada jalur yang hanya berisi bootstrap. Tetapi ia **tidak
+menggeser gate latensi**, dan tidak ada dasar untuk menjanjikan concurrency yang lebih tinggi
+karenanya. Itu memperkuat temuan F7-03, bukan membatalkannya: yang jenuh lebih dulu adalah CPU PHP
+di dalam badan permintaan, bukan I/O setelan.
+
+**Yang ditinggalkan.** Tiga tempat masih menggambarkan keadaan sebelum F7-10 dan berada di luar
+jatah pengukuran ini, jadi tidak disentuh: blok komentar `x-api` pada
+`apps/control-plane/loadtest/docker-compose.yml` yang menyatakan `config:cache` dan `route:cache`
+gagal sehingga keempat instance membayar bootstrap penuh; blockquote pada bagian "Bottleneck: CPU
+PHP" di `apps/control-plane/loadtest/README.md` yang menyatakan hal yang sama dalam bentuk sekarang;
+dan kalimat pada **Kenapa** di task ini yang menyebut tidak ada langkah penyebaran yang memanggil
+keduanya. Ketiganya kini salah. Stack uji beban ditinggalkan **menyala** dengan kedua cache
+terpasang; volume `db-data` sudah menanggung pertumbuhan seluruh run di atas, jadi ukur ulang berikutnya
+sebaiknya dimulai dari `docker compose down -v`.
 
 ### F7-09 — Keputusan yang mengeras dipindahkan ke desain kanonik
 
