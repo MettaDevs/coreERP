@@ -6,6 +6,7 @@ use App\Http\Controllers\Access\MembershipController;
 use App\Http\Controllers\Access\RoleController;
 use App\Http\Controllers\Access\SecurityConfigurationController;
 use App\Http\Controllers\AppLaunchManifestController;
+use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;
@@ -161,6 +162,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index');
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
     Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
+    Route::get('settings/working-time-templates', [WorkingTimeTemplateController::class, 'index'])->name('working-time-templates.index');
+    Route::post('settings/working-time-templates', [WorkingTimeTemplateController::class, 'store'])->name('working-time-templates.store');
+    Route::put('settings/working-time-templates/{template}', [WorkingTimeTemplateController::class, 'update'])->name('working-time-templates.update');
+    Route::delete('settings/working-time-templates/{template}', [WorkingTimeTemplateController::class, 'destroy'])->name('working-time-templates.destroy');
+    Route::put('settings/working-time-templates/{template}/lines', [WorkingTimeTemplateController::class, 'updateLines'])->name('working-time-templates.lines.update');
+    Route::post('settings/working-time-templates/{template}/copy', [WorkingTimeTemplateController::class, 'copy'])->name('working-time-templates.copy');
     // Laporan cetak/ekspor untuk semua app; lihat docs/dev/23-document-rendering.md.
     Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index');
     Route::get('reports/exports', [ReportExportController::class, 'page'])->name('report-exports.index');

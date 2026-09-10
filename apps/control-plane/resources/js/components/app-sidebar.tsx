@@ -3,6 +3,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Link, usePage } from '@inertiajs/react';
 import {
     Building2,
+    CalendarDays,
+    Clock,
     Database,
     FileOutput,
     FileText,
@@ -95,6 +97,23 @@ export function AppSidebar() {
         },
         ...(props.auth.membership
             ? [
+                  ...(props.auth.membership &&
+                  ['owner', 'admin'].includes(props.auth.membership.system_role)
+                      ? [
+                            {
+                                label: 'Kalender',
+                                icon: CalendarDays,
+                                href: '/settings/working-time-templates',
+                                children: [
+                                    {
+                                        label: 'Pola jam kerja',
+                                        icon: Clock,
+                                        href: '/settings/working-time-templates',
+                                    },
+                                ],
+                            },
+                        ]
+                      : []),
                   {
                       label: 'Organization',
                       icon: Building2,
