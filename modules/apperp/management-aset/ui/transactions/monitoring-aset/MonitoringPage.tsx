@@ -24,6 +24,7 @@ export default function MonitoringPage() {
                 setError(errorMessage(e, 'Monitoring belum dapat dimuat.')),
             );
     }, []);
+
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
             <CardHeader className="border-b px-5 py-3">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Card,
@@ -51,25 +51,31 @@ export default function LifecycleDocumentPage({
     const [open, setOpen] = useState(false);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
-    const load = () =>
-        api<{ data: Record[] }>('/' + config.resource)
-            .then((result) => setRecords(result.data))
-            .catch((caught) =>
-                setError(errorMessage(caught, 'Data belum dapat dimuat.')),
-            );
+    const load = useCallback(
+        () =>
+            api<{ data: Record[] }>('/' + config.resource)
+                .then((result) => setRecords(result.data))
+                .catch((caught) =>
+                    setError(errorMessage(caught, 'Data belum dapat dimuat.')),
+                ),
+        [config.resource],
+    );
     useEffect(() => {
         void load();
-    }, [config.resource]);
+    }, [load]);
     async function save(form: HTMLFormElement) {
         if (!context.legal_entity_id || !context.org_unit_id) {
             setError(
                 'Pilih entitas legal dan unit kerja aktif di CoreERP sebelum membuat dokumen.',
             );
+
             return;
         }
+
         const values = new FormData(form);
         setSaving(true);
         setError('');
+
         try {
             await api('/' + config.resource, {
                 method: 'POST',
@@ -92,6 +98,7 @@ export default function LifecycleDocumentPage({
             setSaving(false);
         }
     }
+
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
             <CardHeader className="border-b px-5 py-3">

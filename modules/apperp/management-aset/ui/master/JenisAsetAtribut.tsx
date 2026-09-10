@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Field, FieldLabel } from '@apperp/ui/field';
 import { Switch } from '@apperp/ui/switch';
-import { TransferList, type TransferListItem } from '@apperp/ui/transfer-list';
+import { TransferList } from '@apperp/ui/transfer-list';
+import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../api';
-import { MasterOption } from './useMasterOptions';
+import type { MasterOption } from './useMasterOptions';
 
 type Row = { tipe_atribut_id: string; wajib: boolean };
 
@@ -44,7 +45,10 @@ export default function JenisAsetAtribut({
             ),
         ])
             .then(([typeList, assigned]) => {
-                if (cancelled) return;
+                if (cancelled) {
+                    return;
+                }
+
                 setTypes(typeList.data);
                 setRows(
                     assigned.data.map((row) => ({
@@ -54,14 +58,16 @@ export default function JenisAsetAtribut({
                 );
             })
             .catch((caught) => {
-                if (!cancelled)
+                if (!cancelled) {
                     setError(
                         errorMessage(
                             caught,
                             'Atribut jenis aset belum dapat dimuat.',
                         ),
                     );
+                }
             });
+
         return () => {
             cancelled = true;
         };
@@ -106,6 +112,7 @@ export default function JenisAsetAtribut({
     });
     const itemById = (id: string) => {
         const type = types.find((item) => item.id === id);
+
         return type ? itemOf(type) : unknown(id);
     };
 
@@ -134,6 +141,7 @@ export default function JenisAsetAtribut({
         setSaving(true);
         setError('');
         setSaved(false);
+
         try {
             await api(`/jenis-aset/${jenisAsetId}/atribut`, {
                 method: 'PUT',

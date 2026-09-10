@@ -1,9 +1,10 @@
 "use client"
 
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
+import { cva  } from "class-variance-authority"
+import type {VariantProps} from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react"
 import { Slot } from "radix-ui"
+import * as React from "react"
 
 import { useIsMobile } from "../use-mobile"
 import { cn } from "../utils"
@@ -46,6 +47,7 @@ const SidebarContext = React.createContext<SidebarContextProps | null>(null)
 
 function useSidebar() {
   const context = React.useContext(SidebarContext)
+
   if (!context) {
     throw new Error("useSidebar must be used within a SidebarProvider.")
   }
@@ -76,6 +78,7 @@ function SidebarProvider({
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value
+
       if (setOpenProp) {
         setOpenProp(openState)
       } else {
@@ -106,6 +109,7 @@ function SidebarProvider({
     }
 
     window.addEventListener("keydown", handleKeyDown)
+
     return () => window.removeEventListener("keydown", handleKeyDown)
   }, [toggleSidebar])
 
@@ -611,10 +615,24 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
+  // Lebar rangka pemuatan bervariasi antara 50% dan 90% supaya deretannya tidak terlihat
+  // seperti kolom yang rata — tetapi variasinya diturunkan dari `useId()`, bukan dari
+  // `Math.random()` seperti pada kode asal shadcn.
+  //
+  // Alasannya bukan kemurnian sebagai prinsip. `Math.random()` saat render menghasilkan nilai
+  // berbeda di server dan di peramban, dan React membuang seluruh hasil render server ketika
+  // keduanya tidak cocok. Control-plane merender di server, jadi cacat ini nyata di sini
+  // meski komponennya belum dipakai.
+  const id = React.useId()
   const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+    let jumlah = 0
+
+    for (const huruf of id) {
+      jumlah += huruf.charCodeAt(0)
+    }
+
+    return `${(jumlah % 41) + 50}%`
+  }, [id])
 
   return (
     <div

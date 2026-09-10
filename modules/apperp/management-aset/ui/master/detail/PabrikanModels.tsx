@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -12,10 +12,10 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import {
-    DataTable,
-    type DataTableColumn,
-    type DataTableRowAction,
+import { DataTable } from '@apperp/ui/data-table';
+import type {
+    DataTableColumn,
+    DataTableRowAction,
 } from '@apperp/ui/data-table';
 import {
     Empty,
@@ -24,9 +24,9 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { api, errorMessage } from '../../api';
-import { MasterRecord, ParentSummary } from '../masters';
+import type { MasterRecord, ParentSummary } from '../masters';
 import ModelAsetFormSheet from './ModelAsetFormSheet';
-import { PabrikanModelRecord } from './pabrikanAsetDetail';
+import type { PabrikanModelRecord } from './pabrikanAsetDetail';
 
 type ListMeta = { current_page: number; last_page: number; total: number };
 
@@ -56,8 +56,11 @@ export default function PabrikanModels({
         total: 0,
     });
     const [page, setPage] = useState(1);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    // Effect adalah satu-satunya pemilik pengambilan data; pemuatan ulang setelah
+    // simpan atau arsip dinyatakan dengan menaikkan penanda ini.
+    const [versiMuat, setVersiMuat] = useState(0);
+    const muatUlang = () => setVersiMuat((versi) => versi + 1);
     const [editing, setEditing] = useState<
         PabrikanModelRecord | null | undefined
     >(undefined);
@@ -65,44 +68,74 @@ export default function PabrikanModels({
         null,
     );
 
-    const load = useCallback(async () => {
-        if (!canReadModels) return;
-        setLoading(true);
-        setError('');
+    // Isi tabel selalu berpasangan dengan parameter yang menghasilkannya. Selama
+    // pasangan itu belum sama dengan yang sedang diminta, layar masih memuat. Nilai ini
+    // dihitung saat render, jadi pindah halaman langsung menampilkan keadaan memuat
+    // tanpa effect yang perlu menyetel penanda lebih dulu. Nomor halaman sendiri tidak
+    // perlu disetel ulang saat ganti pabrikan: RecordDetailPane memasang `key`, jadi
+    // panel ini dipasang ulang dengan halaman pertama.
+    const kunciMuat = `${manufacturer.id}|${page}|${versiMuat}`;
+    const [kunciTermuat, setKunciTermuat] = useState<string | null>(null);
+    const loading = canReadModels && kunciTermuat !== kunciMuat;
+
+    useEffect(() => {
+        if (!canReadModels) {
+            return;
+        }
+
+        let dilepas = false;
         const params = new URLSearchParams({
             pabrikan_aset_id: manufacturer.id,
             per_page: '20',
             page: String(page),
         });
 
-        try {
-            const result = await api<{
-                data: PabrikanModelRecord[];
-                meta: ListMeta;
-            }>(`/model-aset?${params}`);
-            setItems(result.data);
-            setMeta(result.meta);
-        } catch (caught) {
-            setError(errorMessage(caught, 'Model belum dapat dimuat.'));
-        } finally {
-            setLoading(false);
-        }
-    }, [canReadModels, manufacturer.id, page]);
+        // Pengambilan data lahir di dalam effect: state baru disetel setelah jawaban
+        // server tiba, bukan pada commit render yang sama, dan jawaban yang telat
+        // datang setelah panel dilepas dibuang lewat `dilepas`.
+        const muat = async () => {
+            try {
+                const result = await api<{
+                    data: PabrikanModelRecord[];
+                    meta: ListMeta;
+                }>(`/model-aset?${params}`);
 
-    useEffect(() => {
-        setPage(1);
-    }, [manufacturer.id]);
+                if (dilepas) {
+                    return;
+                }
 
-    useEffect(() => {
-        void load();
-    }, [load]);
+                setItems(result.data);
+                setMeta(result.meta);
+                setError('');
+            } catch (caught) {
+                if (dilepas) {
+                    return;
+                }
+
+                setError(errorMessage(caught, 'Model belum dapat dimuat.'));
+            } finally {
+                if (!dilepas) {
+                    setKunciTermuat(kunciMuat);
+                }
+            }
+        };
+
+        void muat();
+
+        return () => {
+            dilepas = true;
+        };
+    }, [canReadModels, kunciMuat, manufacturer.id, page]);
 
     async function archive() {
-        if (!archiving) return;
+        if (!archiving) {
+            return;
+        }
+
         try {
             await api(`/model-aset/${archiving.id}`, { method: 'DELETE' });
             setArchiving(null);
-            await load();
+            muatUlang();
             onChanged();
         } catch (caught) {
             setError(errorMessage(caught, 'Model belum dapat diarsipkan.'));
@@ -167,14 +200,19 @@ export default function PabrikanModels({
         },
     ];
     const actions: DataTableRowAction[] = [];
-    if (canUpdate) actions.push({ id: 'edit', label: 'Ubah' });
-    if (canArchive)
+
+    if (canUpdate) {
+        actions.push({ id: 'edit', label: 'Ubah' });
+    }
+
+    if (canArchive) {
         actions.push({
             id: 'archive',
             label: 'Arsipkan',
             destructive: true,
             separatorBefore: actions.length > 0,
         });
+    }
 
     return (
         <div className="space-y-3">
@@ -195,19 +233,22 @@ export default function PabrikanModels({
                     </ActionButton>
                 )}
             </div>
-            {error ? (
+            {/* Keadaan memuat diperiksa lebih dulu daripada pesan kesalahan supaya
+                tombol "Coba lagi" langsung terlihat bekerja: pesan lama tidak lagi
+                menutupi permintaan yang sedang berjalan. */}
+            {loading ? (
+                <Empty>
+                    <EmptyDescription>Memuat model…</EmptyDescription>
+                </Empty>
+            ) : error ? (
                 <Empty>
                     <EmptyHeader>
                         <EmptyTitle>Model belum dapat ditampilkan</EmptyTitle>
                         <EmptyDescription>{error}</EmptyDescription>
                     </EmptyHeader>
-                    <Button variant="outline" onClick={() => void load()}>
+                    <Button variant="outline" onClick={muatUlang}>
                         Coba lagi
                     </Button>
-                </Empty>
-            ) : loading ? (
-                <Empty>
-                    <EmptyDescription>Memuat model…</EmptyDescription>
                 </Empty>
             ) : items.length === 0 ? (
                 <Empty>
@@ -226,8 +267,13 @@ export default function PabrikanModels({
                     getRowLabel={(item) => item.nama}
                     actions={actions}
                     onRowAction={(action, item) => {
-                        if (action === 'edit') setEditing(item);
-                        if (action === 'archive') setArchiving(item);
+                        if (action === 'edit') {
+                            setEditing(item);
+                        }
+
+                        if (action === 'archive') {
+                            setArchiving(item);
+                        }
                     }}
                 />
             )}
@@ -262,9 +308,9 @@ export default function PabrikanModels({
                     value={editing}
                     canReadJenis={canReadJenis}
                     onClose={() => setEditing(undefined)}
-                    onSaved={async () => {
+                    onSaved={() => {
                         setEditing(undefined);
-                        await load();
+                        muatUlang();
                         onChanged();
                     }}
                 />

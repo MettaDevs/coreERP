@@ -1,10 +1,12 @@
+import { FileOutput } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
-import {
-    DataTable,
-    type DataTableColumn,
-    type DataTableRowAction,
+import { DataTable } from '@apperp/ui/data-table';
+import type {
+    DataTableColumn,
+    DataTableRowAction,
 } from '@apperp/ui/data-table';
 import {
     Empty,
@@ -15,14 +17,12 @@ import {
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
-import { FileOutput } from 'lucide-react';
-import { toast } from 'sonner';
 import { api, errorMessage } from '../../api';
 import { requestPrint } from '../../print';
+import type { WorkOrder } from './workOrder';
 import {
     STATUS,
     StatusBadge,
-    WorkOrder,
     bukaChecklistJob,
     bukaWorkOrder,
     bukaWorkOrderBaru,
@@ -58,7 +58,10 @@ export default function WorkOrderListPage({
     }, []);
 
     useEffect(() => {
-        if (!hanyaPekerjaanSaya) return;
+        if (!hanyaPekerjaanSaya) {
+            return;
+        }
+
         api<{ data: Record<string, unknown>[] }>('/pemeliharaan-aset/saya')
             .then((result) => setPekerjaanSaya(result.data))
             .catch((caught) =>
@@ -155,7 +158,10 @@ export default function WorkOrderListPage({
     const workOrderActions: DataTableRowAction[] = [
         { id: 'detail', label: 'Buka rincian' },
     ];
-    if (can('update')) workOrderActions.push({ id: 'edit', label: 'Ubah' });
+
+    if (can('update')) {
+        workOrderActions.push({ id: 'edit', label: 'Ubah' });
+    }
 
     const pekerjaanSayaColumns: DataTableColumn<Record<string, unknown>>[] = [
         {
@@ -276,21 +282,25 @@ export default function WorkOrderListPage({
                                 { id: 'checklist', label: 'Isi checklist' },
                             ]}
                             onRowClick={(job) => {
-                                if (can('read'))
+                                if (can('read')) {
                                     bukaWorkOrder(
                                         String(job.pemeliharaan_aset_id),
                                     );
+                                }
                             }}
                             onRowAction={(action, job) => {
-                                if (action === 'detail' && can('read'))
+                                if (action === 'detail' && can('read')) {
                                     bukaWorkOrder(
                                         String(job.pemeliharaan_aset_id),
                                     );
-                                if (action === 'checklist')
+                                }
+
+                                if (action === 'checklist') {
                                     bukaChecklistJob(
                                         String(job.pemeliharaan_aset_id),
                                         String(job.id),
                                     );
+                                }
                             }}
                         />
                     )
@@ -335,13 +345,18 @@ export default function WorkOrderListPage({
                             getRowLabel={(workOrder) => workOrder.kode}
                             actions={workOrderActions}
                             onRowClick={(workOrder) => {
-                                if (can('read')) bukaWorkOrder(workOrder.id);
+                                if (can('read')) {
+                                    bukaWorkOrder(workOrder.id);
+                                }
                             }}
                             onRowAction={(action, workOrder) => {
-                                if (action === 'detail' && can('read'))
+                                if (action === 'detail' && can('read')) {
                                     bukaWorkOrder(workOrder.id);
-                                if (action === 'edit' && can('update'))
+                                }
+
+                                if (action === 'edit' && can('update')) {
                                     bukaWorkOrderUbah(workOrder.id);
+                                }
                             }}
                             emptyMessage="Tidak ada work order yang cocok dengan pencarian."
                         />

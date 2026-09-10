@@ -10,7 +10,8 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { TransferList, type TransferListItem } from '@apperp/ui/transfer-list';
+import { TransferList } from '@apperp/ui/transfer-list';
+import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 
 type Variant = {
@@ -41,35 +42,65 @@ export default function MaintenanceJobTypeDetails({
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
 
-    async function load() {
-        setError('');
-        try {
-            const [variantResult, assetTypeResult] = await Promise.all([
-                api<{ data: Variant[] }>(
-                    `/maintenance-job-types/${jobTypeId}/variants`,
-                ),
-                api<{ data: { remaining: Choice[]; selected: Choice[] } }>(
-                    `/maintenance-job-types/${jobTypeId}/asset-types`,
-                ),
-            ]);
-            setVariants(variantResult.data);
-            setRemaining(assetTypeResult.data.remaining.map(choiceItem));
-            setSelected(assetTypeResult.data.selected.map(choiceItem));
-        } catch (caught) {
-            setError(
-                errorMessage(caught, 'Rincian maintenance belum dapat dimuat.'),
-            );
-        }
-    }
+    // Effect adalah satu-satunya pemilik pengambilan data; menambah atau mengarsipkan
+    // varian menyatakan pemuatan ulang dengan menaikkan penanda ini.
+    const [versiMuat, setVersiMuat] = useState(0);
+    const muatUlang = () => setVersiMuat((versi) => versi + 1);
 
     useEffect(() => {
-        void load();
-    }, [jobTypeId]);
+        let dilepas = false;
+
+        // Pengambilan data lahir di dalam effect: state baru disetel setelah jawaban
+        // server tiba, bukan pada commit render yang sama, dan jawaban yang telat datang
+        // setelah panel dilepas dibuang lewat `dilepas`.
+        const muat = async () => {
+            try {
+                const [variantResult, assetTypeResult] = await Promise.all([
+                    api<{ data: Variant[] }>(
+                        `/maintenance-job-types/${jobTypeId}/variants`,
+                    ),
+                    api<{ data: { remaining: Choice[]; selected: Choice[] } }>(
+                        `/maintenance-job-types/${jobTypeId}/asset-types`,
+                    ),
+                ]);
+
+                if (dilepas) {
+                    return;
+                }
+
+                setVariants(variantResult.data);
+                setRemaining(assetTypeResult.data.remaining.map(choiceItem));
+                setSelected(assetTypeResult.data.selected.map(choiceItem));
+                setError('');
+            } catch (caught) {
+                if (dilepas) {
+                    return;
+                }
+
+                setError(
+                    errorMessage(
+                        caught,
+                        'Rincian maintenance belum dapat dimuat.',
+                    ),
+                );
+            }
+        };
+
+        void muat();
+
+        return () => {
+            dilepas = true;
+        };
+    }, [jobTypeId, versiMuat]);
 
     async function addVariant() {
-        if (!variantName.trim()) return;
+        if (!variantName.trim()) {
+            return;
+        }
+
         setBusy(true);
         setError('');
+
         try {
             await api('/maintenance-job-type-variants', {
                 method: 'POST',
@@ -80,7 +111,7 @@ export default function MaintenanceJobTypeDetails({
                 }),
             });
             setVariantName('');
-            await load();
+            muatUlang();
         } catch (caught) {
             setError(errorMessage(caught, 'Varian belum dapat ditambahkan.'));
         } finally {
@@ -89,12 +120,15 @@ export default function MaintenanceJobTypeDetails({
     }
 
     async function removeVariant(id: string) {
-        if (!window.confirm('Arsipkan varian ini?')) return;
+        if (!window.confirm('Arsipkan varian ini?')) {
+            return;
+        }
+
         try {
             await api(`/maintenance-job-type-variants/${id}`, {
                 method: 'DELETE',
             });
-            await load();
+            muatUlang();
         } catch (caught) {
             setError(errorMessage(caught, 'Varian belum dapat diarsipkan.'));
         }
@@ -103,6 +137,7 @@ export default function MaintenanceJobTypeDetails({
     async function saveAssetTypes() {
         setBusy(true);
         setError('');
+
         try {
             await api(`/maintenance-job-types/${jobTypeId}/asset-types`, {
                 method: 'PUT',

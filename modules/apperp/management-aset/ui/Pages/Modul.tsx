@@ -1,7 +1,8 @@
 import { Suspense } from 'react';
 import { Card, CardContent } from '@apperp/ui/card';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import App, { type PropsModul } from '../App';
+import App from '../App';
+import type { PropsModul } from '../App';
 import '../styles.css';
 
 /**

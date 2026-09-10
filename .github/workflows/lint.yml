@@ -95,6 +95,23 @@ jobs:
       - name: Run Type Analysis
         run: composer types:check
 
+      # Baseline analisa tipe hanya boleh menyusut. Aturannya sudah lama tertulis; sampai
+      # langkah ini ada, tidak satu pun mesin menegakkannya — pull request yang menambah
+      # bungkaman tetap hijau dan hanya tertangkap kalau peninjau kebetulan membuka berkasnya.
+      #
+      # Dibandingkan per entri, bukan totalnya. Rancangan pertama membandingkan total dan
+      # terbukti tidak menjaga apa pun: pada cabang yang membuang tujuh belas bungkaman,
+      # menambahkan tiga bungkaman baru masih terbaca "menyusut" dan lolos.
+      #
+      # Riwayatnya diambil dangkal untuk basis yang dipakai membandingkan saja; `fetch-depth: 0`
+      # akan mengunduh seluruh riwayat repo demi satu berkas.
+      - name: Periksa baseline analisa tipe tidak bertambah
+        working-directory: .
+        run: |
+          basis="${{ github.base_ref || 'main' }}"
+          git fetch --depth=1 origin "$basis"
+          node scripts/periksa-baseline-phpstan.mjs FETCH_HEAD
+
       # `.agents/skills` dan `.claude/skills` dibaca alat yang berbeda dan isinya sudah
       # menyimpang diam-diam sekali. Tidak ada test yang gagal karena aturan di satu
       # salinan hilang di salinan lain.

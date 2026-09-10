@@ -1,5 +1,5 @@
-import { FieldConfig, FieldValue } from '../fields';
-import { MasterConfig } from '../masters';
+import type { FieldConfig, FieldValue } from '../fields';
+import type { MasterConfig } from '../masters';
 
 /**
  * Satu seksi lipat pada panel detail. Pembagiannya milik tampilan, bukan milik API:
@@ -228,13 +228,19 @@ export function summaryFor(
 
     for (const field of section.fields) {
         const value = values[field.name];
-        if (value === '' || value === null || value === undefined) continue;
+
+        if (value === '' || value === null || value === undefined) {
+            continue;
+        }
 
         if (field.type === 'select') {
             const label = field.options?.find(
                 (option) => option.value === value,
             )?.label;
-            if (label) parts.push(label);
+
+            if (label) {
+                parts.push(label);
+            }
         } else if (
             field.type === 'multiselect' &&
             Array.isArray(value) &&

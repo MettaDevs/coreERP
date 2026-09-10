@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Field,
@@ -19,8 +20,8 @@ import {
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
-import { MasterRecord, ParentSummary } from '../masters';
-import { PabrikanModelRecord } from './pabrikanAsetDetail';
+import type { MasterRecord, ParentSummary } from '../masters';
+import type { PabrikanModelRecord } from './pabrikanAsetDetail';
 
 function optionLabel(option: ParentSummary): string {
     return `${option.kode} — ${option.nama}`;
@@ -43,7 +44,17 @@ export default function ModelAsetFormSheet({
     const [keterangan, setKeterangan] = useState(value?.keterangan ?? '');
     const [aktif, setAktif] = useState(value?.aktif ?? true);
     const [jenisAsetId, setJenisAsetId] = useState(value?.jenis_aset_id ?? '');
-    const [jenisOptions, setJenisOptions] = useState<ParentSummary[]>([]);
+    const [jenisOptionsTermuat, setJenisOptionsTermuat] = useState<
+        ParentSummary[]
+    >([]);
+    // Tanpa akses lihat jenis aset, pilihannya kosong — dihitung saat render, bukan
+    // dikosongkan lewat effect. Isi form sendiri tidak perlu disalin ulang dari props:
+    // pemanggilnya memasang `key` berisi id record, jadi ganti record memasang ulang
+    // sheet ini dan penginisialisasi `useState` di atas yang mengerjakannya.
+    const jenisOptions = useMemo(
+        () => (canReadJenis ? jenisOptionsTermuat : []),
+        [canReadJenis, jenisOptionsTermuat],
+    );
     const [jenisError, setJenisError] = useState('');
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
@@ -51,52 +62,48 @@ export default function ModelAsetFormSheet({
     const creationKey = useRef(newIdempotencyKey());
 
     useEffect(() => {
-        setNama(value?.nama ?? '');
-        setKeterangan(value?.keterangan ?? '');
-        setAktif(value?.aktif ?? true);
-        setJenisAsetId(value?.jenis_aset_id ?? '');
-        setError('');
-        setJenisError('');
-    }, [value?.id]);
-
-    useEffect(() => {
         if (!canReadJenis) {
-            setJenisOptions([]);
             return;
         }
 
         let cancelled = false;
         api<{ data: MasterRecord[] }>('/jenis-aset?per_page=100&aktif=true')
             .then((result) => {
-                if (cancelled) return;
+                if (cancelled) {
+                    return;
+                }
+
                 const options = result.data.map(({ id, kode, nama }) => ({
                     id,
                     kode,
                     nama,
                 }));
+
                 if (
                     value?.jenis_aset &&
                     !options.some((option) => option.id === value.jenis_aset_id)
                 ) {
                     options.unshift(value.jenis_aset);
                 }
-                setJenisOptions(options);
+
+                setJenisOptionsTermuat(options);
                 setJenisError('');
             })
             .catch((caught) => {
-                if (!cancelled)
+                if (!cancelled) {
                     setJenisError(
                         errorMessage(
                             caught,
                             'Pilihan jenis aset belum dapat dimuat.',
                         ),
                     );
+                }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [canReadJenis, value?.id, value?.jenis_aset_id]);
+    }, [canReadJenis, value?.jenis_aset, value?.jenis_aset_id]);
 
     const jenisLabel = useMemo(() => {
         const selected = jenisOptions.find(

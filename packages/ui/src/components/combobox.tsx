@@ -1,6 +1,6 @@
-import * as React from "react"
 import { Combobox as ComboboxPrimitive } from "@base-ui/react"
 import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from "lucide-react"
+import * as React from "react"
 
 import { cn } from "../utils"
 import { Button } from "./button"
@@ -278,11 +278,13 @@ function ComboboxChip({
   )
 }
 
+// `children` sengaja tidak diterima: yang dirender adalah sebuah `input`, dan elemen itu
+// tidak punya isi. Menyingkirkannya lewat tipe membuat pemanggil yang mengirim isi ditolak
+// TypeScript, bukan kehilangan isinya diam-diam.
 function ComboboxChipsInput({
   className,
-  children,
   ...props
-}: ComboboxPrimitive.Input.Props) {
+}: Omit<ComboboxPrimitive.Input.Props, "children">) {
   return (
     <ComboboxPrimitive.Input
       data-slot="combobox-chip-input"

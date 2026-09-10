@@ -1,6 +1,6 @@
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
-import { PabrikanAsetDetail } from './pabrikanAsetDetail';
+import type { PabrikanAsetDetail } from './pabrikanAsetDetail';
 
 export default function PabrikanAsetCounters({
     detail,
@@ -11,14 +11,19 @@ export default function PabrikanAsetCounters({
     loading: boolean;
     error: string;
 }) {
-    if (loading)
+    if (loading) {
         return (
             <p className="text-muted-foreground text-sm">
                 Memuat jumlah model dan aset…
             </p>
         );
-    if (error) return <p className="text-destructive text-sm">{error}</p>;
-    if (!detail)
+    }
+
+    if (error) {
+        return <p className="text-destructive text-sm">{error}</p>;
+    }
+
+    if (!detail) {
         return (
             <Empty>
                 <EmptyDescription>
@@ -26,6 +31,7 @@ export default function PabrikanAsetCounters({
                 </EmptyDescription>
             </Empty>
         );
+    }
 
     return (
         <div className="grid gap-4 pt-1 sm:grid-cols-2">

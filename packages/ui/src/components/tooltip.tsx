@@ -1,5 +1,5 @@
-import * as React from "react"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
+import * as React from "react"
 
 import { cn } from "../utils"
 
@@ -74,6 +74,7 @@ function TooltipTrigger({
       {...props}
       onClick={(event) => {
         onClick?.(event)
+
         if (!event.defaultPrevented) {
           pinContext?.togglePinned()
         }

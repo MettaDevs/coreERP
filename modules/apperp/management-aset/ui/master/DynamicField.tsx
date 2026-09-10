@@ -1,5 +1,5 @@
-import { ReactNode, RefObject } from 'react';
 import { CircleAlert } from 'lucide-react';
+import type { ReactNode, RefObject } from 'react';
 import {
     Field,
     FieldDescription,
@@ -11,7 +11,7 @@ import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../_shared/EditShield';
-import { FieldConfig, FieldValue } from './fields';
+import type { FieldConfig, FieldValue } from './fields';
 import { optionLabel, useMasterOptions } from './useMasterOptions';
 
 /**
@@ -31,7 +31,9 @@ import { optionLabel, useMasterOptions } from './useMasterOptions';
  * tindih dengan area yang dipakai untuk berinteraksi dengan kontrolnya.
  */
 function wrapHint(control: ReactNode, help: string | undefined) {
-    if (!help) return control;
+    if (!help) {
+        return control;
+    }
 
     return (
         <div className="flex items-center gap-1.5">

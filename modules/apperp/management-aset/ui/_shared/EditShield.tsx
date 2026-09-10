@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 /**
  * Perisai mode baca untuk kontrol yang tidak mengenal `readOnly`, yaitu Select dan Switch.
@@ -22,7 +22,9 @@ export default function EditShield({
     onActivate: () => void;
     children: ReactNode;
 }) {
-    if (!active) return <>{children}</>;
+    if (!active) {
+        return <>{children}</>;
+    }
 
     return (
         <div className="relative">

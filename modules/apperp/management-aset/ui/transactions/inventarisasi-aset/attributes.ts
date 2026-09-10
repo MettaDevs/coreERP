@@ -1,4 +1,4 @@
-import { FieldConfig } from '../../master/fields';
+import type { FieldConfig } from '../../master/fields';
 
 /** Bentuk definisi atribut yang dikirim `GET /jenis-aset/{id}/atribut-definisi`. */
 export type AttributeDefinition = {

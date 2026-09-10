@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -12,10 +13,10 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
-import {
-    DataTable,
-    type DataTableColumn,
-    type DataTableRowAction,
+import { DataTable } from '@apperp/ui/data-table';
+import type {
+    DataTableColumn,
+    DataTableRowAction,
 } from '@apperp/ui/data-table';
 import {
     Empty,
@@ -36,14 +37,11 @@ import {
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import DynamicField from '../../master/DynamicField';
-import {
-    FieldConfig,
-    FieldValue,
-    emptyValue,
-    payloadValue,
-} from '../../master/fields';
-import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
-import { AttributeDefinition, toFieldConfig } from './attributes';
+import type { FieldConfig, FieldValue } from '../../master/fields';
+import { emptyValue, payloadValue } from '../../master/fields';
+import { useMasterOptions } from '../../master/useMasterOptions';
+import type { AttributeDefinition } from './attributes';
+import { toFieldConfig } from './attributes';
 
 type Context = {
     legal_entity_id: string | null;
@@ -191,7 +189,11 @@ const textDefaults = (context: Context): Record<string, string> => ({
  */
 function money(value: string, currency: string): string {
     const amount = Number(value);
-    if (!Number.isFinite(amount)) return `${currency} ${value}`;
+
+    if (!Number.isFinite(amount)) {
+        return `${currency} ${value}`;
+    }
+
     const formatted = new Intl.NumberFormat('id-ID', {
         minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
         maximumFractionDigits: 2,
@@ -231,28 +233,74 @@ const CONVENTION_LABEL: Record<string, string> = {
  * mencatat aset tanpa akses melihat konfigurasi group, dan itu tidak boleh membuat
  * bagian ini berteriak tentang sesuatu yang bukan urusannya.
  */
+/**
+ * Sekelompok field penunjuk yang seluruhnya membuka daftar pilihannya di dalam sheet
+ * yang sama.
+ *
+ * Ditulis sebagai komponen, bukan fungsi pembantu, karena ref wadah portal harus
+ * berpindah lewat props JSX: ref tidak boleh dibaca saat render, dan melewatkannya
+ * sebagai argumen fungsi membuatnya tidak dapat dibedakan dari pembacaan.
+ */
+function ReferenceFields({
+    fields,
+    portal,
+    references,
+    onChange,
+}: {
+    fields: FieldConfig[];
+    portal: RefObject<HTMLDivElement | null>;
+    references: Record<string, FieldValue>;
+    onChange: (name: string, next: FieldValue) => void;
+}) {
+    return fields.map((field) => (
+        <DynamicField
+            key={field.name}
+            config={field}
+            value={references[field.name]}
+            onChange={(next) => onChange(field.name, next)}
+            portalContainer={portal}
+        />
+    ));
+}
+
+/** Dipakai bersama saat jenis asetnya belum punya definisi atribut termuat, agar
+ *  identitasnya tetap dan daftar dependensi yang memuatnya tidak ikut berubah. */
+const TANPA_ATRIBUT: AttributeDefinition[] = [];
+
 function useGroupBooks(groupId: string) {
-    const [rows, setRows] = useState<MatrixRow[] | null>(null);
+    // Hasil dicatat bersama group yang melahirkannya, dan yang dikembalikan hanyalah
+    // hasil milik group yang diminta sekarang. Ganti group — atau mengosongkannya —
+    // langsung memberi `null` pada render yang sama, tanpa effect yang perlu
+    // mengosongkannya lebih dulu dan tanpa satu frame pun berisi matriks group lama.
+    const [muatan, setMuatan] = useState<{
+        groupId: string;
+        rows: MatrixRow[] | null;
+    } | null>(null);
 
     useEffect(() => {
         if (!groupId) {
-            setRows(null);
             return;
         }
+
         let cancelled = false;
         api<{ data: MatrixRow[] }>(`/group-aset/${groupId}/buku-penyusutan`)
             .then((result) => {
-                if (!cancelled) setRows(result.data);
+                if (!cancelled) {
+                    setMuatan({ groupId, rows: result.data });
+                }
             })
             .catch(() => {
-                if (!cancelled) setRows(null);
+                if (!cancelled) {
+                    setMuatan({ groupId, rows: null });
+                }
             });
+
         return () => {
             cancelled = true;
         };
     }, [groupId]);
 
-    return rows;
+    return muatan?.groupId === groupId ? muatan.rows : null;
 }
 
 function DepreciationPreview({ groupId }: { groupId: string }) {
@@ -272,6 +320,7 @@ function DepreciationPreview({ groupId }: { groupId: string }) {
             </p>
         );
     }
+
     if (rows === null) {
         return (
             <p className="text-muted-foreground text-sm">
@@ -279,6 +328,7 @@ function DepreciationPreview({ groupId }: { groupId: string }) {
             </p>
         );
     }
+
     if (rows.length === 0) {
         return (
             <p className="text-destructive text-sm">
@@ -362,7 +412,12 @@ export default function AssetPage({
     );
     const [parentAssetId, setParentAssetId] = useState('');
     // Atribut diwarisi dari jenis aset, jadi definisinya dibaca ulang tiap jenis berubah.
-    const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
+    // Definisi yang termuat dicatat bersama jenis aset yang memintanya; selama jenisnya
+    // belum cocok, daftarnya kosong — dihitung saat render, bukan dikosongkan effect.
+    const [attributesMuatan, setAttributesMuatan] = useState<{
+        typeId: string;
+        items: AttributeDefinition[];
+    } | null>(null);
     const [attributeValues, setAttributeValues] = useState<
         Record<string, FieldValue>
     >({});
@@ -370,6 +425,10 @@ export default function AssetPage({
     const editSheetRef = useRef<HTMLDivElement>(null);
     const typeId = String(references.jenis_aset_id ?? '');
     const groupId = String(references.group_aset_id ?? '');
+    const attributes =
+        attributesMuatan?.typeId === typeId
+            ? attributesMuatan.items
+            : TANPA_ATRIBUT;
 
     const { options: groupOptions } = useMasterOptions('group-aset');
     const { options: typeOptions } = useMasterOptions('jenis-aset');
@@ -390,17 +449,19 @@ export default function AssetPage({
 
     useEffect(() => {
         if (!typeId) {
-            setAttributes([]);
-            setAttributeValues({});
             return;
         }
+
         let cancelled = false;
         api<{ data: AttributeDefinition[] }>(
             `/jenis-aset/${typeId}/atribut-definisi`,
         )
             .then((result) => {
-                if (cancelled) return;
-                setAttributes(result.data);
+                if (cancelled) {
+                    return;
+                }
+
+                setAttributesMuatan({ typeId, items: result.data });
                 // Nilai yang sudah ada dipertahankan, bukan ditimpa kosong. Saat mengoreksi
                 // aset, definisinya baru selesai dimuat setelah nilainya dipasang; menimpa
                 // di sini akan menghapus isian yang barusan dibaca dari server.
@@ -415,8 +476,11 @@ export default function AssetPage({
                 );
             })
             .catch(() => {
-                if (!cancelled) setAttributes([]);
+                if (!cancelled) {
+                    setAttributesMuatan({ typeId, items: [] });
+                }
             });
+
         return () => {
             cancelled = true;
         };
@@ -436,7 +500,11 @@ export default function AssetPage({
 
     const visible = useMemo(() => {
         const query = search.trim().toLowerCase();
-        if (!query) return assets;
+
+        if (!query) {
+            return assets;
+        }
+
         return assets.filter(
             (asset) =>
                 asset.kode.toLowerCase().includes(query) ||
@@ -509,9 +577,13 @@ export default function AssetPage({
         }));
 
     async function saveEdit() {
-        if (!editing) return;
+        if (!editing) {
+            return;
+        }
+
         setSaving(true);
         setError('');
+
         try {
             await api(`/aset/${editing.id}`, {
                 method: 'PATCH',
@@ -560,23 +632,31 @@ export default function AssetPage({
             setError(
                 'Pilih entitas legal aktif di CoreERP sebelum menerima aset.',
             );
+
             return;
         }
+
         const missing = REFERENCES.find(
             (field) => field.required && !references[field.name],
         );
+
         if (missing) {
             setError(`Pilih ${missing.label.toLowerCase()} terlebih dahulu.`);
+
             return;
         }
+
         if (!values.nama || !values.acquired_on || !values.acquisition_value) {
             setError(
                 'Nama aset, tanggal perolehan, dan nilai perolehan wajib diisi.',
             );
+
             return;
         }
+
         setSaving(true);
         setError('');
+
         try {
             await api('/aset', {
                 method: 'POST',
@@ -624,21 +704,6 @@ export default function AssetPage({
         }
     }
 
-    const referenceField = (
-        field: FieldConfig,
-        portal: typeof sheetContentRef,
-    ) => (
-        <DynamicField
-            key={field.name}
-            config={field}
-            value={references[field.name]}
-            onChange={(next) =>
-                setReferences((current) => ({ ...current, [field.name]: next }))
-            }
-            portalContainer={portal}
-        />
-    );
-
     const textField = (
         name: string,
         label: string,
@@ -653,6 +718,9 @@ export default function AssetPage({
             />
         </Field>
     );
+
+    const ubahReferensi = (name: string, next: FieldValue) =>
+        setReferences((current) => ({ ...current, [name]: next }));
 
     const attributeFields = (portal: typeof sheetContentRef) =>
         attributes.map((definition) => (
@@ -768,6 +836,7 @@ export default function AssetPage({
                     label: asset.lifecycle_state,
                     variant: 'secondary' as const,
                 };
+
                 return <Badge variant={state.variant}>{state.label}</Badge>;
             },
             width: 140,
@@ -777,7 +846,10 @@ export default function AssetPage({
     const rowActions: DataTableRowAction[] = [
         { id: 'history', label: 'Riwayat' },
     ];
-    if (canUpdate) rowActions.unshift({ id: 'edit', label: 'Ubah' });
+
+    if (canUpdate) {
+        rowActions.unshift({ id: 'edit', label: 'Ubah' });
+    }
 
     const summaryOf = (options: { id: string; nama: string }[], id: unknown) =>
         nameOf(options, id) ?? undefined;
@@ -840,9 +912,13 @@ export default function AssetPage({
                             if (
                                 action === 'edit' &&
                                 asset.lifecycle_state !== 'disposed'
-                            )
+                            ) {
                                 void edit(asset);
-                            if (action === 'history') void showHistory(asset);
+                            }
+
+                            if (action === 'history') {
+                                void showHistory(asset);
+                            }
                         }}
                     />
                 )}
@@ -852,7 +928,10 @@ export default function AssetPage({
                 open={open}
                 onOpenChange={(next) => {
                     setOpen(next);
-                    if (!next) resetForm();
+
+                    if (!next) {
+                        resetForm();
+                    }
                 }}
             >
                 <SheetContent
@@ -886,9 +965,12 @@ export default function AssetPage({
                                         maxLength: 150,
                                         required: true,
                                     })}
-                                    {CLASSIFICATION.map((field) =>
-                                        referenceField(field, sheetContentRef),
-                                    )}
+                                    <ReferenceFields
+                                        fields={CLASSIFICATION}
+                                        portal={sheetContentRef}
+                                        references={references}
+                                        onChange={ubahReferensi}
+                                    />
                                 </div>
                             </CollapsibleSection>
 
@@ -898,9 +980,12 @@ export default function AssetPage({
                                 summary={values.serial_number || undefined}
                             >
                                 <div className="space-y-4">
-                                    {MANUFACTURER.map((field) =>
-                                        referenceField(field, sheetContentRef),
-                                    )}
+                                    <ReferenceFields
+                                        fields={MANUFACTURER}
+                                        portal={sheetContentRef}
+                                        references={references}
+                                        onChange={ubahReferensi}
+                                    />
                                     {textField('serial_number', 'Nomor seri')}
                                     {textField('model_number', 'Nomor model')}
                                 </div>
@@ -999,9 +1084,12 @@ export default function AssetPage({
                                 )}
                             >
                                 <div className="space-y-4">
-                                    {PLACEMENT.map((field) =>
-                                        referenceField(field, sheetContentRef),
-                                    )}
+                                    <ReferenceFields
+                                        fields={PLACEMENT}
+                                        portal={sheetContentRef}
+                                        references={references}
+                                        onChange={ubahReferensi}
+                                    />
                                     {textField(
                                         'receiving_org_unit_id',
                                         'ID unit penerima',
@@ -1110,13 +1198,17 @@ export default function AssetPage({
                                         maxLength: 150,
                                         required: true,
                                     })}
-                                    {EDITABLE.filter((field) =>
-                                        CLASSIFICATION.some(
-                                            (item) => item.name === field.name,
-                                        ),
-                                    ).map((field) =>
-                                        referenceField(field, editSheetRef),
-                                    )}
+                                    <ReferenceFields
+                                        fields={EDITABLE.filter((field) =>
+                                            CLASSIFICATION.some(
+                                                (item) =>
+                                                    item.name === field.name,
+                                            ),
+                                        )}
+                                        portal={editSheetRef}
+                                        references={references}
+                                        onChange={ubahReferensi}
+                                    />
                                 </div>
                             </CollapsibleSection>
 
@@ -1126,13 +1218,17 @@ export default function AssetPage({
                                 summary={values.serial_number || undefined}
                             >
                                 <div className="space-y-4">
-                                    {EDITABLE.filter((field) =>
-                                        MANUFACTURER.some(
-                                            (item) => item.name === field.name,
-                                        ),
-                                    ).map((field) =>
-                                        referenceField(field, editSheetRef),
-                                    )}
+                                    <ReferenceFields
+                                        fields={EDITABLE.filter((field) =>
+                                            MANUFACTURER.some(
+                                                (item) =>
+                                                    item.name === field.name,
+                                            ),
+                                        )}
+                                        portal={editSheetRef}
+                                        references={references}
+                                        onChange={ubahReferensi}
+                                    />
                                     {textField('serial_number', 'Nomor seri')}
                                     {textField('model_number', 'Nomor model')}
                                 </div>
@@ -1228,7 +1324,9 @@ export default function AssetPage({
             <Sheet
                 open={history !== null}
                 onOpenChange={(next) => {
-                    if (!next) setHistory(null);
+                    if (!next) {
+                        setHistory(null);
+                    }
                 }}
             >
                 <SheetContent side="right">
