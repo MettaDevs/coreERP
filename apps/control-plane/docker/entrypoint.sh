@@ -13,7 +13,9 @@ set -e
 # between roles, so anything an earlier root-run process left behind would otherwise block
 # www-data from writing next to it.
 drop_to_www_data() {
-    chown -R www-data:www-data /repo/apps/control-plane/storage/app /repo/apps/control-plane/storage/framework /repo/apps/control-plane/storage/logs 2>/dev/null || true
+    mkdir -p /repo/apps/control-plane/storage/logs /repo/apps/control-plane/storage/framework/views /repo/apps/control-plane/storage/framework/sessions /repo/apps/control-plane/storage/framework/cache 2>/dev/null || true
+    chown -R www-data:www-data /repo/apps/control-plane/storage /repo/apps/control-plane/bootstrap/cache 2>/dev/null || true
+    chmod -R 775 /repo/apps/control-plane/storage /repo/apps/control-plane/bootstrap/cache 2>/dev/null || true
 }
 
 # Setelan dan rute di-cache saat container naik, bukan saat image dibangun.
@@ -41,6 +43,7 @@ bangun_cache
 
 case "${CONTAINER_ROLE:-web}" in
     web)
+        drop_to_www_data
         # Konten UI app disajikan same-origin di /apps-content/<placement>/<app>/, dari registry
         # placement — bukan dari nilai yang ditulis tangan. Config ini statis, jadi placement yang
         # dibuat setelah container hidup baru dilayani setelah restart. Bila registry belum bisa

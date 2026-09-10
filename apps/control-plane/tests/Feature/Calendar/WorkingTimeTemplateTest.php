@@ -69,7 +69,7 @@ class WorkingTimeTemplateTest extends TestCase
         $response->assertOk();
     }
 
-    public function test_initial_templates_are_seeded_with_prod_day_and_empty_std_day(): void
+    public function test_working_time_templates_empty_by_default(): void
     {
         [$user, $tenant, $org] = $this->createTenantUser('admin');
 
@@ -79,34 +79,22 @@ class WorkingTimeTemplateTest extends TestCase
 
         $response->assertOk();
 
-        // Harus ada 3 template bawaan: 24HR-DAY, PROD-DAY, STD-DAY
-        $this->assertDatabaseHas('working_time_templates', [
-            'tenant_id' => $tenant->id,
-            'legal_entity_id' => $org->id,
-            'code' => 'PROD-DAY',
-        ]);
+        $this->assertDatabaseCount('working_time_templates', 0);
+    }
 
-        $this->assertDatabaseHas('working_time_templates', [
-            'tenant_id' => $tenant->id,
-            'legal_entity_id' => $org->id,
-            'code' => 'STD-DAY',
-        ]);
+    public function test_unauthorized_user_cannot_manage_working_time_templates(): void
+    {
+        [$user, $tenant, $org] = $this->createTenantUser('member');
 
-        $stdDay = WorkingTimeTemplate::where('tenant_id', $tenant->id)
-            ->where('code', 'STD-DAY')
-            ->first();
+        $response = $this
+            ->actingAs($user)
+            ->postJson('/settings/working-time-templates', [
+                'code' => 'SHIFT-PAGI',
+                'name' => 'Shift Pagi Khusus',
+                'legal_entity_id' => $org->id,
+            ]);
 
-        $this->assertNotNull($stdDay);
-        // Sesuai arahan atasan: input std-day dikosongkan agar user yang mengisi
-        $this->assertSame(0, $stdDay->lines()->count());
-
-        $prodDay = WorkingTimeTemplate::where('tenant_id', $tenant->id)
-            ->where('code', 'PROD-DAY')
-            ->first();
-
-        $this->assertNotNull($prodDay);
-        // PROD-DAY memiliki jam kerja bawaan
-        $this->assertGreaterThan(0, $prodDay->lines()->count());
+        $response->assertForbidden();
     }
 
     public function test_user_can_create_new_template_with_empty_inputs(): void

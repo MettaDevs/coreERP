@@ -33,10 +33,6 @@ class WorkingTimeTemplateController extends Controller
 
         $selectedLegalEntityId = $workspaceLegalEntity?->id;
 
-        if ($selectedLegalEntityId) {
-            $this->ensureInitialTemplates($membership->tenant_id, $selectedLegalEntityId);
-        }
-
         $templates = $selectedLegalEntityId
             ? WorkingTimeTemplate::query()
                 ->where('tenant_id', $membership->tenant_id)
@@ -84,14 +80,15 @@ class WorkingTimeTemplateController extends Controller
         return Inertia::render('settings/working-time-templates', [
             'templates' => $templates,
             'currentLegalEntity' => $currentLegalEntityData,
-            'canManage' => in_array($membership->system_role, ['owner', 'admin'], true),
+            'canManage' => $request->user()?->can('manage-reference-data') ?? false,
         ]);
     }
 
     public function store(Request $request): RedirectResponse|JsonResponse
     {
+        abort_unless($request->user()?->can('manage-reference-data'), 403);
+
         $membership = $this->currentMembership($request);
-        abort_unless(in_array($membership->system_role, ['owner', 'admin'], true), 403);
 
         $workspaceLegalEntity = app(CurrentWorkspace::class)->legalEntity($request, $membership);
         if (! $workspaceLegalEntity) {
@@ -139,8 +136,9 @@ class WorkingTimeTemplateController extends Controller
 
     public function update(Request $request, WorkingTimeTemplate $template): RedirectResponse|JsonResponse
     {
+        abort_unless($request->user()?->can('manage-reference-data'), 403);
+
         $membership = $this->currentMembership($request);
-        abort_unless(in_array($membership->system_role, ['owner', 'admin'], true), 403);
         abort_unless($template->tenant_id === $membership->tenant_id, 404);
 
         $validated = $request->validate([
@@ -180,8 +178,9 @@ class WorkingTimeTemplateController extends Controller
 
     public function destroy(Request $request, WorkingTimeTemplate $template): RedirectResponse|JsonResponse
     {
+        abort_unless($request->user()?->can('manage-reference-data'), 403);
+
         $membership = $this->currentMembership($request);
-        abort_unless(in_array($membership->system_role, ['owner', 'admin'], true), 403);
         abort_unless($template->tenant_id === $membership->tenant_id, 404);
 
         $template->delete();
@@ -195,8 +194,9 @@ class WorkingTimeTemplateController extends Controller
 
     public function copy(Request $request, WorkingTimeTemplate $template): RedirectResponse|JsonResponse
     {
+        abort_unless($request->user()?->can('manage-reference-data'), 403);
+
         $membership = $this->currentMembership($request);
-        abort_unless(in_array($membership->system_role, ['owner', 'admin'], true), 403);
         abort_unless($template->tenant_id === $membership->tenant_id, 404);
 
         $validated = $request->validate([
@@ -240,8 +240,9 @@ class WorkingTimeTemplateController extends Controller
 
     public function updateLines(Request $request, WorkingTimeTemplate $template): RedirectResponse|JsonResponse
     {
+        abort_unless($request->user()?->can('manage-reference-data'), 403);
+
         $membership = $this->currentMembership($request);
-        abort_unless(in_array($membership->system_role, ['owner', 'admin'], true), 403);
         abort_unless($template->tenant_id === $membership->tenant_id, 404);
 
         $validated = $request->validate([
@@ -266,82 +267,7 @@ class WorkingTimeTemplateController extends Controller
         return back()->with('success', 'Baris jam kerja berhasil disimpan.');
     }
 
-    private function ensureInitialTemplates(string $tenantId, string $legalEntityId): void
-    {
-        $existingCount = WorkingTimeTemplate::query()
-            ->where('tenant_id', $tenantId)
-            ->where('legal_entity_id', $legalEntityId)
-            ->count();
 
-        if ($existingCount > 0) {
-            return;
-        }
-
-        DB::transaction(function () use ($tenantId, $legalEntityId): void {
-            $t24 = WorkingTimeTemplate::create([
-                'tenant_id' => $tenantId,
-                'legal_entity_id' => $legalEntityId,
-                'code' => '24HR-DAY',
-                'name' => '24 Hours Day',
-                'description' => 'Template pola 24 jam sehari.',
-                'is_active' => true,
-            ]);
-
-            for ($d = 0; $d <= 6; $d++) {
-                WorkingTimeLine::create([
-                    'tenant_id' => $tenantId,
-                    'working_time_template_id' => $t24->id,
-                    'day_of_week' => $d,
-                    'from_time' => '00:00',
-                    'to_time' => '24:00',
-                    'efficiency' => 100.0,
-                    'closed_for_pickup' => false,
-                    'hours' => 24.0,
-                ]);
-            }
-
-            $tProd = WorkingTimeTemplate::create([
-                'tenant_id' => $tenantId,
-                'legal_entity_id' => $legalEntityId,
-                'code' => 'PROD-DAY',
-                'name' => 'Production Day',
-                'description' => 'Pola jam kerja standar produksi (Senin - Jumat).',
-                'is_active' => true,
-            ]);
-
-            for ($d = 0; $d <= 4; $d++) {
-                WorkingTimeLine::create([
-                    'tenant_id' => $tenantId,
-                    'working_time_template_id' => $tProd->id,
-                    'day_of_week' => $d,
-                    'from_time' => '08:00',
-                    'to_time' => '12:00',
-                    'efficiency' => 100.0,
-                    'closed_for_pickup' => false,
-                    'hours' => 4.0,
-                ]);
-                WorkingTimeLine::create([
-                    'tenant_id' => $tenantId,
-                    'working_time_template_id' => $tProd->id,
-                    'day_of_week' => $d,
-                    'from_time' => '13:00',
-                    'to_time' => '17:00',
-                    'efficiency' => 100.0,
-                    'closed_for_pickup' => false,
-                    'hours' => 4.0,
-                ]);
-            }
-
-            WorkingTimeTemplate::create([
-                'tenant_id' => $tenantId,
-                'legal_entity_id' => $legalEntityId,
-                'code' => 'STD-DAY',
-                'name' => 'Standard Day',
-                'description' => 'Pola jam kerja standar (kosong).',
-                'is_active' => true,
-            ]);
-        });
-    }
 
     /**
      * @param  array<int, array{day_of_week: int, from_time?: ?string, to_time?: ?string, efficiency?: ?float, property?: ?string, closed_for_pickup?: ?bool, hours?: ?float}>  $lines

@@ -48,6 +48,15 @@ class RegisterAppManifestCommand extends Command
 
     public function handle(ModuleRegistry $registry, RegisterAppCatalog $registrar): int
     {
+        // Bila argumen terlihat seperti path file (mengandung pemisah direktori
+        // atau berakhiran .yaml/.yml), daftar langsung dari file tersebut.
+        // Ini memungkinkan start.ps1 mendaftarkan app external container yang
+        // manifest-nya di-mount ke /workspace/manifests/.
+        $arg = $this->argument('module');
+        if (is_string($arg) && $arg !== '' && $this->tampaknyaPath($arg)) {
+            return $this->daftarkanDariPath($arg, $registrar);
+        }
+
         $module = $this->modulYangDidaftarkan($registry);
 
         if ($module === null) {
@@ -65,6 +74,90 @@ class RegisterAppManifestCommand extends Command
                 return self::FAILURE;
             }
         }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Apakah argumen yang diberikan tampak seperti path file, bukan ID module.
+     */
+    private function tampaknyaPath(string $nilai): bool
+    {
+        return str_contains($nilai, '/') || str_contains($nilai, '\\') || str_ends_with($nilai, '.yaml') || str_ends_with($nilai, '.yml');
+    }
+
+    /**
+     * Daftarkan app external dari path file manifest secara langsung.
+     * Dipakai untuk app container sendiri (app-erp-*) yang manifest-nya
+     * di-mount ke /workspace/manifests/ saat development lokal.
+     */
+    private function daftarkanDariPath(string $path, RegisterAppCatalog $registrar): int
+    {
+        if (! is_file($path)) {
+            $this->components->error("Manifest tidak ditemukan: {$path}");
+
+            return self::FAILURE;
+        }
+
+        try {
+            /** @var mixed $manifest */
+            $manifest = Yaml::parseFile($path);
+        } catch (ParseException $exception) {
+            $this->components->error("Manifest {$path} bukan YAML yang valid: ".$exception->getMessage());
+
+            return self::FAILURE;
+        }
+
+        if (! is_array($manifest)) {
+            $this->components->error("Manifest {$path} harus berupa map di level teratas.");
+
+            return self::FAILURE;
+        }
+
+        if (isset($manifest['ui']['entry'])) {
+            $this->components->error(
+                'Manifest tidak boleh lagi mendeklarasikan `ui.entry`. Path konten UI '
+                .'ditentukan platform dari app dan placement; hapus baris itu dari app.yaml.'
+            );
+
+            return self::FAILURE;
+        }
+
+        $request = $this->requestFor($this->toPayload($manifest));
+        $validator = $this->validatorFor($request);
+
+        if ($validator->fails()) {
+            $this->components->error("Manifest {$path} ditolak validasi katalog:");
+            $this->components->bulletList($validator->errors()->all());
+
+            return self::FAILURE;
+        }
+
+        $this->summarize($request);
+
+        if ($this->option('dry-run')) {
+            $this->components->info('Dry run: tidak ada perubahan yang ditulis.');
+
+            return self::SUCCESS;
+        }
+
+        $app = $registrar->handle(
+            $request->appPayload(),
+            $request->securityPayload(),
+            $request->numberSequenceReferencesPayload(),
+            $request->workflowTypesPayload(),
+            $request->dataPoliciesPayload(),
+            $request->dependenciesPayload(),
+            $request->reportsPayload(),
+        );
+
+        $this->components->info(sprintf(
+            'App "%s" (%s) %s di katalog dengan status %s.',
+            $app->name,
+            $app->id,
+            $app->wasRecentlyCreated ? 'didaftarkan' : 'diperbarui',
+            $app->status,
+        ));
 
         return self::SUCCESS;
     }
