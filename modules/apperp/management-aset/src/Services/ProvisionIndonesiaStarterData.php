@@ -29,6 +29,7 @@ use Modules\Apperp\ManagementAset\Models\master\TipeLokasiAset;
 use Modules\Apperp\ManagementAset\Models\master\TipeWorkOrder;
 use Modules\Apperp\ManagementAset\Models\master\Trade;
 use Modules\Apperp\ManagementAset\Models\master\ValidasiStatusWorkOrder;
+use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Support\WorkOrderValidation;
 
 final class ProvisionIndonesiaStarterData
@@ -39,7 +40,10 @@ final class ProvisionIndonesiaStarterData
      * Menyediakan template starter untuk satu tenant. Semua key berasal dari
      * konfigurasi berversi; data yang sudah ada tidak ditimpa.
      *
-     * @return array{template_key: string, fiscal_classifications: int, profiles: int, books: int, mappings: int, location_types: int, conditions: int, maintenance_job_types: int, maintenance_variants: int, maintenance_variables: int, maintenance_templates: int, maintenance_defaults: int, work_order_validations: int}
+     * Lima kunci setup work order sebelumnya tidak ikut disebut padahal
+     * `seedWorkOrderSetup()` selalu menyertakannya; sekarang bentuknya lengkap.
+     *
+     * @return array{template_key: string, fiscal_classifications: int, profiles: int, books: int, mappings: int, location_types: int, conditions: int, work_order_types: int, service_levels: int, trades: int, fault_causes: int, repair_actions: int, maintenance_job_types: int, maintenance_variants: int, maintenance_variables: int, maintenance_templates: int, maintenance_defaults: int, work_order_validations: int}
      */
     public function forTenant(string $tenantId, ?string $templateKey = null): array
     {
@@ -48,15 +52,18 @@ final class ProvisionIndonesiaStarterData
         }
 
         $template = config('modules.management-aset.indonesia_starter');
-        $selectedTemplateKey = $templateKey ?? (is_array($template) ? ($template['template_key'] ?? null) : null);
-        if (! is_array($template) || $selectedTemplateKey !== ($template['template_key'] ?? null)) {
+        // Kunci template harus benar-benar berupa string. Dulu cukup `null === null`, sehingga
+        // konfigurasi yang kehilangan `template_key` lolos penjagaan ini dan baru terlihat
+        // sebagai kunci array yang tidak ada ketika jawabannya disusun di bawah.
+        $kunciTemplate = is_array($template) ? ($template['template_key'] ?? null) : null;
+        if (! is_array($template) || ! is_string($kunciTemplate) || ($templateKey !== null && $templateKey !== $kunciTemplate)) {
             throw new LogicException('Template starter Indonesia tidak tersedia.');
         }
 
         $classifications = $this->seedClassifications($tenantId, $template['fiscal_classifications']);
-        $profiles = $this->seedProfiles($tenantId, $template, $classifications);
+        $profiles = $this->seedProfiles($tenantId, $template['profiles'], $template['fiscal_classifications'], $classifications);
         $books = $this->seedBooks($tenantId, $template);
-        $mappings = $this->seedDefaultBookMappings($tenantId, $classifications, $profiles, $books);
+        $mappings = $this->seedDefaultBookMappings($tenantId, $classifications, $profiles, $books, $template['profiles']);
         $locationTypes = $this->seedOptionalMasters(
             $tenantId,
             TipeLokasiAset::class,
@@ -76,7 +83,7 @@ final class ProvisionIndonesiaStarterData
         $maintenance = $this->seedMaintenance($tenantId, $template['maintenance'] ?? []);
 
         return [
-            'template_key' => $template['template_key'],
+            'template_key' => $kunciTemplate,
             'fiscal_classifications' => count($classifications),
             'profiles' => count($profiles),
             'books' => count($books),
@@ -88,26 +95,33 @@ final class ProvisionIndonesiaStarterData
         ];
     }
 
-    /** Menambahkan hanya setup maintenance ke tenant yang sudah berjalan. */
+    /**
+     * Menambahkan hanya setup maintenance ke tenant yang sudah berjalan.
+     *
+     * @return array{template_key: string, work_order_types: int, service_levels: int, trades: int, fault_causes: int, repair_actions: int, maintenance_job_types: int, maintenance_variants: int, maintenance_variables: int, maintenance_templates: int, maintenance_defaults: int, work_order_validations: int}
+     */
     public function maintenanceForTenant(string $tenantId, ?string $templateKey = null): array
     {
         if (! Str::isUlid($tenantId)) {
             throw new InvalidArgumentException('Tenant tidak valid.');
         }
         $maintenance = config('modules.management-aset.indonesia_starter.maintenance');
-        $selectedTemplateKey = $templateKey ?? ($maintenance['template_key'] ?? null);
-        if (! is_array($maintenance) || $selectedTemplateKey !== ($maintenance['template_key'] ?? null)) {
+        $kunciTemplate = is_array($maintenance) ? ($maintenance['template_key'] ?? null) : null;
+        if (! is_array($maintenance) || ! is_string($kunciTemplate) || ($templateKey !== null && $templateKey !== $kunciTemplate)) {
             throw new LogicException('Template maintenance Indonesia tidak tersedia.');
         }
 
         return [
-            'template_key' => $maintenance['template_key'],
+            'template_key' => $kunciTemplate,
             ...$this->seedWorkOrderSetup($tenantId, $maintenance),
             ...$this->seedMaintenance($tenantId, $maintenance),
         ];
     }
 
-    /** @param array<string, mixed> $template @return array<string, int> */
+    /**
+     * @param  array<string, mixed>  $template
+     * @return array{work_order_types: int, service_levels: int, trades: int, fault_causes: int, repair_actions: int}
+     */
     private function seedWorkOrderSetup(string $tenantId, array $template): array
     {
         $created = [
@@ -190,7 +204,10 @@ final class ProvisionIndonesiaStarterData
         return $created;
     }
 
-    /** @param array<string, mixed> $template @return array<string, int> */
+    /**
+     * @param  array<string, mixed>  $template
+     * @return array{maintenance_job_types: int, maintenance_variants: int, maintenance_variables: int, maintenance_templates: int, maintenance_defaults: int, work_order_validations: int}
+     */
     private function seedMaintenance(string $tenantId, array $template): array
     {
         $jobTypes = [];
@@ -287,7 +304,7 @@ final class ProvisionIndonesiaStarterData
 
         return [
             'maintenance_job_types' => count($jobTypes),
-            'maintenance_variants' => collect($variants)->map(fn (array $items): int => count($items))->sum(),
+            'maintenance_variants' => array_sum(array_map('count', $variants)),
             'maintenance_variables' => count($variables),
             'maintenance_templates' => count($templates),
             'maintenance_defaults' => $defaults,
@@ -343,7 +360,10 @@ final class ProvisionIndonesiaStarterData
         }
     }
 
-    /** @param list<array<string, mixed>> $items @param array<string, string> $variables */
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @param  array<string, string>  $variables
+     */
     private function ensureChecklistTemplateLines(string $tenantId, string $templateId, array $items, array $variables = []): void
     {
         foreach ($items as $item) {
@@ -364,7 +384,10 @@ final class ProvisionIndonesiaStarterData
         }
     }
 
-    /** @param list<array<string, mixed>> $items @return array<string, string> */
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return array<string, string>
+     */
     private function seedClassifications(string $tenantId, array $items): array
     {
         $ids = [];
@@ -388,12 +411,20 @@ final class ProvisionIndonesiaStarterData
         return $ids;
     }
 
-    /** @param array<string, mixed> $template @param array<string, string> $classifications @return array<string, string> */
-    private function seedProfiles(string $tenantId, array $template, array $classifications): array
+    /**
+     * Daftar profil dan daftar klasifikasi fiskal diterima terpisah, bukan digali lagi dari
+     * `$template`, supaya keduanya sampai ke sini sebagai daftar yang tipenya diketahui.
+     *
+     * @param  list<array<string, mixed>>  $profiles
+     * @param  list<array<string, mixed>>  $fiscalClassifications
+     * @param  array<string, string>  $classifications
+     * @return array<string, string>
+     */
+    private function seedProfiles(string $tenantId, array $profiles, array $fiscalClassifications, array $classifications): array
     {
         $ids = [];
-        foreach ($template['profiles'] as $item) {
-            $classification = collect($template['fiscal_classifications'])
+        foreach ($profiles as $item) {
+            $classification = collect($fiscalClassifications)
                 ->firstWhere('template_key', $item['classification_key']);
             if (! is_array($classification) || ! isset($classifications[$item['classification_key']])) {
                 throw new LogicException('Profil starter merujuk klasifikasi fiskal yang tidak tersedia.');
@@ -432,7 +463,10 @@ final class ProvisionIndonesiaStarterData
         return $ids;
     }
 
-    /** @param array<string, mixed> $template @return array<string, string> */
+    /**
+     * @param  array<string, mixed>  $template
+     * @return array<string, string>
+     */
     private function seedBooks(string $tenantId, array $template): array
     {
         $ids = [];
@@ -474,16 +508,19 @@ final class ProvisionIndonesiaStarterData
      * dapat diganti tenant tanpa menyentuh matriks. Buku fiskal tetap dibuat sebagai
      * master dan menganggur sampai ada baris matriks yang menunjuknya.
      *
-     * @param  array<string, string>  $classifications  @param array<string, string> $profiles @param array<string, string> $books
+     * @param  array<string, string>  $classifications
+     * @param  array<string, string>  $profiles
+     * @param  array<string, string>  $books
+     * @param  list<array<string, mixed>>  $profileTemplates  Daftar profil dari template yang sama, dioper dari pemanggil supaya tidak dibaca ulang dari konfigurasi sebagai nilai tanpa tipe.
      */
-    private function seedDefaultBookMappings(string $tenantId, array $classifications, array $profiles, array $books): int
+    private function seedDefaultBookMappings(string $tenantId, array $classifications, array $profiles, array $books, array $profileTemplates): int
     {
         $defaultBookId = $books['id:pmk72-2023:buku:komersial:v1'] ?? null;
         if (! $defaultBookId) {
             return 0;
         }
 
-        $straightLineProfiles = collect(config('modules.management-aset.indonesia_starter.profiles', []))
+        $straightLineProfiles = collect($profileTemplates)
             ->filter(fn (array $profile): bool => $profile['method'] === 'straight_line')
             ->keyBy('classification_key');
         $created = 0;
@@ -525,7 +562,7 @@ final class ProvisionIndonesiaStarterData
     }
 
     /**
-     * @param  class-string<Model>  $model
+     * @param  class-string<MasterData>  $model
      * @param  list<array<string, mixed>>  $items
      */
     private function seedOptionalMasters(string $tenantId, string $model, string $reference, string $resource, array $items): int
@@ -622,7 +659,11 @@ final class ProvisionIndonesiaStarterData
     }
 
     /**
-     * @param  class-string<Model>  $model
+     * `class-string<MasterData>`, bukan `class-string<Model>`: `withTrashed()` di bawah hanya
+     * ada pada model yang memakai soft delete, dan seluruh master starter mewarisinya dari
+     * `MasterData`. Model tanpa soft delete tidak boleh sampai ke sini.
+     *
+     * @param  class-string<MasterData>  $model
      * @param  array<string, mixed>  $values
      */
     private function ensureNumberedMaster(string $tenantId, string $model, string $reference, string $creationKey, array $values, ?int &$created = null): string

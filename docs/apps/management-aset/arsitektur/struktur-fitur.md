@@ -1,6 +1,6 @@
 # Skill: struktur fitur
 
-Sebelum membuat halaman atau fitur baru, buat folder fiturnya pada API dan UI. Controller dan model khusus fitur tidak boleh diletakkan pada root `Controllers` atau `Models`; page, form, dan komponen khusus fitur tidak boleh diletakkan pada root `ui/src`.
+Sebelum membuat halaman atau fitur baru, buat folder fiturnya pada API dan UI. Controller dan model khusus fitur tidak boleh diletakkan pada root `Controllers` atau `Models`; page, form, dan komponen khusus fitur tidak boleh diletakkan pada root `ui/`.
 
 Pertahankan kode shared tetap kecil. Pindahkan ke shared hanya setelah benar-benar dipakai minimal dua fitur.
 
@@ -10,7 +10,7 @@ Pertanyaan pertama bukan "bagaimana membuat cascade", melainkan **apakah indukny
 
 Sebagian besar tidak. Master klasifikasi aset datar dan saling lepas: `model-aset` punya dua induk (pabrikan dan jenis), tetapi memilih pabrikan tidak menyaring pilihan jenis. Untuk kasus seperti ini render **N dropdown sejajar** — tanpa reset, tanpa urutan, tanpa `key` remount. Menambahkan cascade di sini justru memaksa pengguna mengisi urutan yang tidak ada aturannya, dan itulah bentuk kesalahan yang paling sering terjadi.
 
-`MasterForm` dan `MasterPage` sudah menangani ini lewat `parents: MasterParentConfig[]` di `ui/src/master/masters.ts`; tambahkan induk di konfigurasi, jangan menulis dropdown khusus.
+`MasterForm` dan `MasterPage` sudah menangani ini lewat `parents: MasterParentConfig[]` di `ui/master/masters.ts`; tambahkan induk di konfigurasi, jangan menulis dropdown khusus.
 
 Cascade hanya dipakai ketika pilihan anak **memang** merupakan himpunan bagian dari induknya. Bila demikian:
 

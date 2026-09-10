@@ -2,9 +2,9 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
@@ -57,8 +57,8 @@ class ValidasiStatusWorkOrderController extends Controller
         return $this->index($request);
     }
 
-    /** @return Collection<int, object> */
-    private function aturan(): mixed
+    /** @return Collection<int, ValidasiStatusWorkOrder> */
+    private function aturan(): Collection
     {
         return ValidasiStatusWorkOrder::query()
             ->orderBy('status')->orderBy('aturan')

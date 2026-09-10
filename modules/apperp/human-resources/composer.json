@@ -1,0 +1,23 @@
+{
+    "name": "apperp/human-resources",
+    "description": "Module Human Resources: pekerja, jabatan, posisi, dan penugasan kerja.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Apperp\\HumanResources\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Apperp\\HumanResources\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable"
+}

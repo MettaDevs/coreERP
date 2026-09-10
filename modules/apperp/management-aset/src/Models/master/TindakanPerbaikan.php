@@ -8,6 +8,11 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * Perbaikan yang dikerjakan atas sebuah kerusakan; padanan "Fault remedy" pada modul
  * Asset management Dynamics 365 F&O. Seperti sebab kerusakan, ia dipilih bebas saat
  * pekerjaan ditutup dan tidak diikat ke jenis aset.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan pada
+ * `MasterData`.
+ *
+ * @property bool $minta_keterangan
  */
 class TindakanPerbaikan extends MasterData
 {

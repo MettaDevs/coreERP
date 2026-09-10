@@ -5,7 +5,48 @@ customer bergerak di CoreERP. Tujuannya bukan membuat semua repository berjalan
 bersama, tetapi memberi setiap repository jalur release yang sama tanpa Git
 submodule atau build pada server production.
 
+## Yang benar-benar ada hari ini
+
+> Bagian ini menggambarkan alur yang berjalan di repo ini pada 9 September 2026. Sisa dokumen —
+> mulai dari [Keputusan](#keputusan) ke bawah — menggambarkan **target** Forgejo, Harbor, dan
+> Dokploy beserta dunia polyrepo yang sedang ditinggalkan. Keduanya sengaja dibiarkan
+> berdampingan: yang di bawah masih menjadi arah, yang di sini yang menjaga pull request hari
+> ini. Yang berbahaya bukan rencana yang belum terwujud, melainkan dokumen yang tidak
+> membedakan keduanya.
+
+Empat alur, seluruhnya di GitHub Actions:
+
+| Alur | Kapan | Yang dijaganya |
+| --- | --- | --- |
+| `tests.yml` | tiap pull request, push ke `main`, dan jadwal mingguan | Satu perintah menjalankan test Core **dan** seluruh module — `php artisan test --parallel`, dengan suite `Module` yang menyapu `modules/*/*/tests`. Tidak ada alur kedua untuk module. Ditambah pemeriksa bundel: React hanya boleh termuat sekali. |
+| `lint.yml` | tiap pull request | Gaya PHP (`pint`, termasuk `modules/`), gaya dan tipe frontend, format berkas. |
+| `edition.yml` | tiap pull request dan push ke `main` | Membangun dua image edisi dan membuktikan modul yang tidak dibeli tidak ada di dalamnya, lalu membuat pemeriksanya merah dengan sengaja untuk membuktikan ia masih memeriksa. |
+| `release.yml` | push ke `main` | Membangun image tiap edisi, memeriksanya, lalu mendorongnya ke registry bertanda SHA commit. |
+
+**Penandaan penempatan memakai digest atau SHA, tidak pernah awalan yang bergerak.** Dua server
+pelanggan yang menarik `latest` pada hari berbeda mendapat isi yang berbeda, dan ketika salah
+satunya bermasalah tidak ada cara mengetahui versi mana yang sedang berjalan di sana. Larangan
+itu dijaga satu langkah di dalam `release.yml` yang membaca alur itu sendiri.
+
+**Yang belum ada, dan disebut di sini supaya tidak dikira ada.** Bundle on-prem beserta skrip
+pemasangannya (F5-06) belum dibangun: kriteria selesainya menuntut pemasangan di mesin virtual
+bersih. Registry yang dipakai `release.yml` masih GitHub Container Registry, bukan Harbor.
+Langkah `docker push` sendiri baru berjalan pada penggabungan pertama ke `main` — sampai itu
+terjadi, yang terbukti hanya bagian bangun dan periksanya, yang memang dijalankan tiap pull
+request lewat `edition.yml`.
+
+**Pemeriksa susunan repo app yang lama** (`app-erp-ci-workflows`, action
+`validate-app-repository`) tidak dipanggil satu pun alur di repo ini. Aturannya yang masih
+berlaku — manifest sah, rantai keamanan lengkap, awalan tabel terdaftar — dipasang ulang sebagai
+penjaga batas di `apps/control-plane/tests/Feature/Boundary/`, tempat ia benar-benar dijalankan
+tiap pull request. Syarat lamanya tentang Dockerfile per app, potongan compose, dan skrip
+migrasi per app sudah tidak berlaku sama sekali.
+
 ## Keputusan
+
+> Mulai dari sini sampai akhir halaman, "repository app" berarti repo `app-erp-*` yang masih
+> berjalan sebagai container sendiri. Module di bawah `modules/` tidak punya pipeline sendiri:
+> ia diuji, di-lint, dan diterbitkan bersama Core lewat empat alur di atas.
 
 Target platform adalah **Forgejo LTS + Forgejo Actions runner terpisah + Harbor +
 Dokploy**. Semua komponennya self-hosted. GitHub yang sudah dipakai saat ini boleh
@@ -262,7 +303,9 @@ bukan karena jumlah repository bertambah.
 - CoreERP baru memiliki GitHub workflow untuk lint dan test Control Plane.
 - Repository app yang diaudit belum mempunyai workflow CI.
 - Hanya satu app pilot yang memiliki contract coverage checker berbasis route
-  Laravel; checker ini harus menjadi standar semua repository app.
+  Laravel. Untuk repository app yang tersisa, checker itu tetap standar. Untuk module
+  ia tidak dipasang lagi: permukaan yang dipanggil dari luar runtime sudah bukan HTTP,
+  dan rute yang hanya dipanggil halamannya sendiri dijaga test module.
 - Repository deployment masih mempunyai mode yang clone dan build source pada
   server deployment. Mode itu adalah gap transisi dan tidak boleh menjadi jalur
   Production setelah Harbor tersedia.

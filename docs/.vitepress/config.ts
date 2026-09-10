@@ -88,7 +88,7 @@ export default withMermaid({
           text: 'App',
           items: [
             { text: 'Katalog app', link: '/apps/' },
-            { text: 'Membangun app baru', link: '/apps/membangun-app-baru' },
+            { text: 'Membangun modul baru', link: '/apps/membangun-app-baru' },
           ],
         },
         {
@@ -164,10 +164,10 @@ export default withMermaid({
           ],
         },
         {
-          text: 'Membangun app',
+          text: 'Membangun modul',
           collapsed: false,
           items: [
-            { text: 'Jalur membangun app baru', link: '/apps/membangun-app-baru' },
+            { text: 'Jalur membangun modul baru', link: '/apps/membangun-app-baru' },
             { text: 'Gate penemuan dan keputusan', link: '/dev/18-module-discovery-and-decision-gate' },
             { text: 'Standar module', link: '/dev/02-module-standard' },
             { text: 'Rantai keamanan modul transaksi', link: '/dev/19-transaction-security-chain' },

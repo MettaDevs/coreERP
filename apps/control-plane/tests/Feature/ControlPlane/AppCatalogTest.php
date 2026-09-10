@@ -11,18 +11,18 @@ class AppCatalogTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_exposes_only_the_management_aset_seed_app(): void
+    public function test_it_exposes_only_the_app_uji_seed_app(): void
     {
         $this->seed(AppCatalogSeeder::class);
 
         $this->getJson('/api/v1/control/apps')
             ->assertOk()
-            ->assertJsonPath('data.0.id', 'management-aset')
-            ->assertJsonPath('data.0.database_name', 'app_erp_management_aset')
+            ->assertJsonPath('data.0.id', 'app-uji')
+            ->assertJsonPath('data.0.database_name', 'app_uji')
             ->assertJsonCount(1, 'data');
 
-        $this->assertDatabaseHas('permissions', ['code' => 'management-aset.entitas-aset.read']);
-        $this->assertDatabaseMissing('permissions', ['code' => 'management-aset.asset.read']);
-        $this->assertSame(9, DB::table('permissions')->where('app_id', 'management-aset')->count());
+        $this->assertDatabaseHas('permissions', ['code' => 'app-uji.entitas.read']);
+        $this->assertDatabaseMissing('permissions', ['code' => 'app-uji.tidak-terdaftar.read']);
+        $this->assertSame(9, DB::table('permissions')->where('app_id', 'app-uji')->count());
     }
 }

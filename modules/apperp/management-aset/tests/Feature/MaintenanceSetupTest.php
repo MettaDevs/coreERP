@@ -7,8 +7,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class MaintenanceSetupTest extends TestCase
@@ -155,8 +157,11 @@ class MaintenanceSetupTest extends TestCase
         $this->assertDatabaseCount('aset_m_maintenance_checklist_variable_value', 3);
     }
 
-    /** @param array<string, mixed> $payload */
-    private function postMaster(string $resource, array $payload)
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
+    private function postMaster(string $resource, array $payload): TestResponse
     {
         return $this->withContext(array_merge($this->permissions($resource), $resource === 'jenis-aset' ? [] : []))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::lower(Str::random(12)))
@@ -164,7 +169,7 @@ class MaintenanceSetupTest extends TestCase
     }
 
     /** @param list<string> $permissions */
-    private function withContext(array $permissions)
+    private function withContext(array $permissions): static
     {
         return $this->sebagaiPengguna($this->tenantId, $permissions);
     }

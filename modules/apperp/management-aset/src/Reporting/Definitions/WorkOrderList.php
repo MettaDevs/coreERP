@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetDetail;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
@@ -105,20 +106,14 @@ final class WorkOrderList implements ReportDefinition
             $query->where('aset_tr_pemeliharaan_aset.created_at', '<=', $parameters['sampai'].' 23:59:59');
         }
 
-        // Penyaringan tenant pada ketiga subquery ini datang dari scope model detailnya, bukan
-        // dari `where` yang ditulis tangan seperti sebelumnya.
-        $ringkasan = fn (string $ekspresi) => PemeliharaanAsetDetail::query()
-            ->selectRaw($ekspresi)
-            ->whereColumn('aset_tr_pemeliharaan_aset_details.pemeliharaan_aset_id', 'aset_tr_pemeliharaan_aset.id');
-
         // `toBase()` dipakai supaya barisnya tetap objek biasa, bukan model. Scope tenant sudah
         // disisipkan sebelum ini, jadi yang dilewati hanya penghidupan model — dan itu memang
         // yang diinginkan: dataset laporan membaca nilai apa adanya, sedangkan cast model akan
         // mengubah kolom tanggal menjadi objek yang tidak diterima pemformatnya di bawah.
         $rows = $query
-            ->selectSub($ringkasan('count(*)'), 'jumlah_baris')
-            ->selectSub($ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.estimasi_jam), 0)'), 'estimasi_jam')
-            ->selectSub($ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.aktual_jam), 0)'), 'aktual_jam')
+            ->selectSub($this->ringkasan('count(*)'), 'jumlah_baris')
+            ->selectSub($this->ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.estimasi_jam), 0)'), 'estimasi_jam')
+            ->selectSub($this->ringkasan('coalesce(sum(aset_tr_pemeliharaan_aset_details.aktual_jam), 0)'), 'aktual_jam')
             ->addSelect(['aset_tr_pemeliharaan_aset.*', 'tipe.nama as tipe_nama', 'layanan.nama as layanan_nama'])
             ->orderBy('aset_tr_pemeliharaan_aset.kode')
             ->toBase()
@@ -133,7 +128,7 @@ final class WorkOrderList implements ReportDefinition
                 'dicetak_pada' => now()->format('d/m/Y H:i'),
             ],
             tables: [
-                'baris' => $rows->map(fn (object $wo): array => [
+                'baris' => array_values($rows->map(fn (object $wo): array => [
                     'kode' => $wo->kode,
                     'status' => $wo->status,
                     'tipe_work_order' => $wo->tipe_nama,
@@ -148,14 +143,43 @@ final class WorkOrderList implements ReportDefinition
                     'aktual_mulai' => $this->dateTime($wo->aktual_mulai),
                     'aktual_selesai' => $this->dateTime($wo->aktual_selesai),
                     'dibuat_pada' => $this->dateTime($wo->created_at),
-                ])->all(),
+                ])->all()),
             ],
             fileName: 'daftar-work-order-'.now()->format('Ymd-Hi'),
         );
     }
 
+    /**
+     * Subquery ringkasan baris pekerjaan untuk work order yang sedang dibaca.
+     *
+     * `literal-string`: ekspresinya hanya boleh teks yang tertulis di berkas ini. Ia masuk ke
+     * SQL apa adanya, jadi tipe itulah yang menahan rakitan dari masukan pengguna.
+     *
+     * Penyaringan tenant pada subquery ini datang dari scope model detailnya, bukan dari
+     * `where` yang ditulis tangan seperti sebelumnya.
+     *
+     * @param  literal-string  $ekspresi
+     * @return Builder<PemeliharaanAsetDetail>
+     */
+    private function ringkasan(string $ekspresi): Builder
+    {
+        return PemeliharaanAsetDetail::query()
+            ->selectRaw($ekspresi)
+            ->whereColumn('aset_tr_pemeliharaan_aset_details.pemeliharaan_aset_id', 'aset_tr_pemeliharaan_aset.id');
+    }
+
     private function dateTime(?string $value): ?string
     {
-        return $value === null ? null : date('d/m/Y H:i', strtotime($value));
+        if ($value === null) {
+            return null;
+        }
+
+        // `strtotime()` memulangkan `false` untuk teks yang bukan tanggal. Nilai itu
+        // diperlakukan sebagai 0, persis seperti sebelumnya ketika PHP sendiri yang
+        // mengubah `false` menjadi 0 di dalam `date()`. Memulangkan `null` memang lebih
+        // benar, tetapi itu perubahan perilaku dan bukan bagian dari perbaikan tipe ini.
+        $stempel = strtotime($value);
+
+        return date('d/m/Y H:i', $stempel === false ? 0 : $stempel);
     }
 }

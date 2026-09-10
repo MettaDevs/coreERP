@@ -6,6 +6,9 @@ use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\TipeWorkOrder;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 
+/**
+ * @extends MasterDataController<TipeWorkOrder>
+ */
 class TipeWorkOrderController extends MasterDataController
 {
     /**

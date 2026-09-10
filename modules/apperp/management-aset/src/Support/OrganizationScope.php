@@ -61,20 +61,35 @@ final class OrganizationScope
             return ['all' => false, 'scope_grants' => []];
         }
 
+        $daftarHibah = $scope['scope_grants'] ?? null;
+        $hibah = [];
+        foreach (is_array($daftarHibah) ? $daftarHibah : [] as $grant) {
+            if (! is_array($grant)) {
+                continue;
+            }
+            // Id unit dikumpulkan satu per satu, bukan lewat `array_filter`, supaya tipenya
+            // benar-benar terbaca sebagai daftar string — dan supaya isi yang bukan daftar
+            // sama sekali tidak menjatuhkan permintaan.
+            $unitIds = $grant['operating_unit_ids'] ?? null;
+            $unitTersaring = [];
+            foreach (is_array($unitIds) ? $unitIds : [] as $unitId) {
+                if (is_string($unitId)) {
+                    $unitTersaring[] = $unitId;
+                }
+            }
+            $hibah[] = [
+                'legal_entity_id' => is_string($grant['legal_entity_id'] ?? null) ? $grant['legal_entity_id'] : null,
+                'operating_unit_ids' => $unitTersaring,
+            ];
+        }
+
         return [
             // `?? false`, bukan akses langsung: kebijakan yang tidak diberikan kepada
             // pengguna sama sekali menghasilkan array kosong, dan itu keadaan normal — bukan
             // alasan untuk melempar. Dulu tidak pernah terjadi karena token selalu memuat
             // kunci kebijakannya walau isinya kosong; Core menyusunnya hanya bila ada.
             'all' => ($scope['all'] ?? false) === true,
-            'scope_grants' => collect($scope['scope_grants'] ?? [])
-                ->filter(fn (mixed $grant): bool => is_array($grant))
-                ->map(fn (array $grant): array => [
-                    'legal_entity_id' => is_string($grant['legal_entity_id'] ?? null) ? $grant['legal_entity_id'] : null,
-                    'operating_unit_ids' => array_values(array_filter($grant['operating_unit_ids'] ?? [], 'is_string')),
-                ])
-                ->values()
-                ->all(),
+            'scope_grants' => $hibah,
         ];
     }
 }

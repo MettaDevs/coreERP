@@ -156,7 +156,7 @@ Upgrade bukan efek samping onboarding — ia punya alur sendiri dengan compatibi
 
 1. Fakta lifecycle tidak disimpulkan dari fakta sebelumnya — masing-masing dibaca dari sumbernya.
 2. Efek samping ke dunia luar ditunda sampai transaksi commit.
-3. Core mengatur policy dan koordinasi; Core **tidak** menulis database app.
+3. Core mengatur policy dan koordinasi; Core **tidak** menulis data app. Itu tetap berlaku setelah module pindah ke runtime Core: satu database yang sama bukan izin untuk saling menulis.
 4. Duty dan data policy datang dari manifest app, bukan dari kode Core.
 5. Operasi berisiko (upgrade, ganti profile) menolak jalan diam-diam.
 

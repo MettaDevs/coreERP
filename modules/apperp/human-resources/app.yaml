@@ -1,0 +1,82 @@
+id: human-resources
+name: Human Resources
+description: Kelola pekerja, jabatan, posisi, dan penugasan kerja.
+publisher: apperp
+version: 0.1.0
+kind: business-app
+requires:
+  core: ^0.1
+# Peta id module ke rentang versi, bukan daftar. Bentuknya sama dengan yang dibaca
+# katalog provider; dua bentuk untuk satu jawaban pasti menyimpang.
+dependsOn: {}
+
+# Seluruh tabel module ini berawalan `hr_`, dan sudah begitu sejak migration pertamanya —
+# satu-satunya bagian pemindahan modul aset yang tidak perlu diulang di sini. Awalan inilah
+# yang memisahkan datanya dari data Core dan module lain di dalam satu database yang sama.
+table_prefix: hr_
+api:
+  image: registry.apperp.local/apps/human-resources-api:0.1.0
+  openapi: contracts/openapi.yaml
+ui:
+  image: registry.apperp.local/apps/human-resources-ui:0.1.0
+  navigation:
+    rail:
+      - id: workforce
+        label: Tenaga kerja
+    sidebar:
+      workforce:
+        - { id: workers, label: Pekerja, permission: human-resources.workers.read }
+        - { id: jobs, label: Jabatan, permission: human-resources.jobs.read }
+        - { id: positions, label: Posisi, permission: human-resources.positions.read }
+        - { id: worker-position-assignments, label: Penugasan posisi, permission: human-resources.assignments.read }
+database:
+  logical_name: app_erp_human_resources
+  migrations: database/migrations
+events:
+  asyncapi: contracts/asyncapi.yaml
+security:
+  data_policies:
+    - code: human-resources.workforce-responsibility
+      name: Akses tenaga kerja menurut unit kerja
+      protected_permissions:
+        - human-resources.workers.read
+        - human-resources.workers.create
+        - human-resources.positions.read
+        - human-resources.positions.create
+        - human-resources.assignments.read
+        - human-resources.assignments.create
+      requires_legal_entity: false
+      requires_operating_unit: true
+      allows_descendants: true
+  entry_points:
+    - { code: human-resources.workers.api, name: API pekerja, type: api }
+    - { code: human-resources.jobs.api, name: API jabatan, type: api }
+    - { code: human-resources.positions.api, name: API posisi, type: api }
+    - { code: human-resources.assignments.api, name: API penugasan posisi, type: api }
+  permissions:
+    - { code: human-resources.workers.read, name: Lihat pekerja, entry_point: human-resources.workers.api, access: read }
+    - { code: human-resources.workers.create, name: Tambah pekerja, entry_point: human-resources.workers.api, access: create }
+    - { code: human-resources.jobs.read, name: Lihat jabatan, entry_point: human-resources.jobs.api, access: read }
+    - { code: human-resources.jobs.create, name: Tambah jabatan, entry_point: human-resources.jobs.api, access: create }
+    - { code: human-resources.positions.read, name: Lihat posisi, entry_point: human-resources.positions.api, access: read }
+    - { code: human-resources.positions.create, name: Tambah posisi, entry_point: human-resources.positions.api, access: create }
+    - { code: human-resources.assignments.read, name: Lihat penugasan posisi, entry_point: human-resources.assignments.api, access: read }
+    - { code: human-resources.assignments.create, name: Tambah penugasan posisi, entry_point: human-resources.assignments.api, access: create }
+    - { code: human-resources.core-account-link.invoke, name: Tautkan akun Core, entry_point: human-resources.workers.api, access: invoke }
+  privileges:
+    - { code: human-resources.worker-records, name: Kelola data pekerja, permissions: [human-resources.workers.read, human-resources.workers.create] }
+    - { code: human-resources.job-records, name: Kelola data jabatan, permissions: [human-resources.jobs.read, human-resources.jobs.create] }
+    - { code: human-resources.position-records, name: Kelola data posisi, permissions: [human-resources.positions.read, human-resources.positions.create] }
+    - { code: human-resources.assignment-records, name: Kelola penugasan posisi, permissions: [human-resources.assignments.read, human-resources.assignments.create] }
+    - { code: human-resources.core-account-link-task, name: Tautkan akun Core, permissions: [human-resources.core-account-link.invoke] }
+  duties:
+    - { code: human-resources.workers.manage, name: Kelola pekerja, privileges: [human-resources.worker-records] }
+    - { code: human-resources.jobs.manage, name: Kelola jabatan, privileges: [human-resources.job-records] }
+    - { code: human-resources.positions.manage, name: Kelola posisi, privileges: [human-resources.position-records] }
+    - { code: human-resources.assignments.manage, name: Kelola penugasan posisi, privileges: [human-resources.assignment-records] }
+    - { code: human-resources.core-account-link.manage, name: Kelola tautan akun Core, privileges: [human-resources.core-account-link-task] }
+number_sequences:
+  references:
+    - { code: human-resources.pekerja, name: Nomor pekerja, default_prefix: PEGH, allowed_scopes: [tenant] }
+    - { code: human-resources.jabatan, name: Kode jabatan, default_prefix: JABH, allowed_scopes: [tenant] }
+    - { code: human-resources.posisi, name: Kode posisi, default_prefix: POSH, allowed_scopes: [tenant] }

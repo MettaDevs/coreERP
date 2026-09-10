@@ -10,6 +10,9 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
+/**
+ * @extends MasterDataController<BukuPenyusutan>
+ */
 class BukuPenyusutanController extends MasterDataController
 {
     protected function resource(): string

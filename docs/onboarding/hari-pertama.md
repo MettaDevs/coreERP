@@ -4,7 +4,7 @@ Target hari ini: stack lokal jalan, kamu tahu di mana barang disimpan, dan kamu 
 
 ## Checklist
 
-- [ ] Dapat akses ke lima repository (lihat tabel di bawah)
+- [ ] Dapat akses ke repo `CoreERP` dan repo orkestrasi lokal
 - [ ] Docker Desktop terpasang dan jalan
 - [ ] [Stack lokal jalan](/onboarding/setup), Core terbuka di `http://localhost:8000`
 - [ ] Baca [Glosarium](/onboarding/glosarium) — tenant, organization, legal entity, operating unit
@@ -13,18 +13,16 @@ Target hari ini: stack lokal jalan, kamu tahu di mana barang disimpan, dan kamu 
 
 ## Clone di folder sejajar
 
-Stack lokal mengasumsikan repository berada dalam satu folder induk yang sama:
+Stack lokal mengasumsikan dua repository berada dalam satu folder induk yang sama:
 
 ```text
 D:\Kerja\
-├─ CoreERP\
-├─ app-erp-management-aset\
-├─ app-erp-hr\
-├─ app-erp-template\
-└─ erp-dev\                 # orkestrasi lokal
+├─ CoreERP\                   # Core dan seluruh module di dalamnya
+└─ erp-docker-start-dev\      # orkestrasi lokal
 ```
 
-Kalau strukturnya beda, `start.ps1` tidak akan menemukan app-nya. Ini asumsi yang belum otomatis diperiksa — kalau kamu tergoda menaruhnya di tempat lain, jangan.
+Nama foldernya harus persis, karena `compose.yaml` membangun dari relative path ke `../CoreERP`.
+Ini asumsi yang belum otomatis diperiksa — kalau kamu tergoda menaruhnya di tempat lain, jangan.
 
 ## Apa yang kamu jalankan sebenarnya
 
@@ -32,39 +30,43 @@ Setelah stack naik, ini yang aktif:
 
 | Layanan | Alamat | Isinya |
 | --- | --- | --- |
-| Core app | `http://localhost:8000` | Control plane + web shell. Ini pintu masuk utama. |
+| Core app | `http://localhost:8000` | Control plane, web shell, **dan seluruh module bisnis**. Ini pintu masuk utama. |
 | Dokumentasi | `http://localhost:18090` | Situs ini. Ikut nyala bersama stack. |
-| Core database | `localhost:5543` | `core_erp` |
-| Management Aset — API | `localhost:18091` | App bisnis pertama |
-| Management Aset — UI | `localhost:18092` | Dibuka lewat shell Core, bukan langsung |
-| Management Aset — database | `localhost:5544` | `management_aset` |
-| HR — UI | `localhost:18093` | App bisnis kedua |
+| Core database | `localhost:5543` | `core_erp` — Core dan seluruh module memakai database ini |
 
-Worker dan scheduler Core ikut jalan. Itu penting: job onboarding seperti `DeployAppPlacement` tidak akan selesai kalau worker mati, dan app akan tertahan di status belum siap.
+Worker, scheduler, dan renderer Core ikut jalan. Itu penting: job onboarding tidak akan selesai
+kalau worker mati, dan app akan tertahan di status belum siap.
+
+Module tidak punya port sendiri untuk dibuka. Halamannya dirender shell Core pada jalur
+`/<id module>/<id entri menu>`, dan menunya muncul setelah module itu dipasang untuk tenant yang
+sedang kamu buka.
 
 ## Peta repo CoreERP
 
 ```text
-apps/control-plane/    Laravel. Identity, tenant, entitlement, placement, release registry. Sekaligus shell UI yang memuat app.
+apps/control-plane/    Laravel. Identity, tenant, entitlement, placement, release registry. Sekaligus shell UI yang merender halaman module.
 apps/provider-console/ Konsol vendor.
 packages/ui/           SDK UI bersama (@apperp/ui).
-modules/               Kosong sampai module diimplementasikan di sini.
+modules/               Module bisnis, satu folder per module di bawah <penerbit>/. Baca modules/README.md dulu.
+editions/              Satu berkas per pelanggan: module apa yang dibeli dan rilis mana yang dipasang.
 integrations/          Bridge lintas app.
 deploy/                Manifest deployment dan contoh konfigurasi.
 docs/                  Dokumentasi ini.
 ```
 
 Perintah Composer dan NPM untuk Core dijalankan dari `apps/control-plane`, bukan dari root repo.
+Perintah itu ikut menjangkau `modules/`: `composer lint:check` menjalankan Pint pada keduanya, dan
+`php artisan test` menjalankan suite Core beserta suite `Module` yang menyapu `modules/*/*/tests`.
 
 ## Yang jangan dilakukan minggu ini
 
-**Jangan bikin app baru dulu.** Ada gate keputusan yang harus dilewati, dan proposalnya butuh persetujuan. Lihat [Gate penemuan dan keputusan](/dev/18-module-discovery-and-decision-gate).
+**Jangan bikin modul baru dulu.** Ada gate keputusan yang harus dilewati, dan proposalnya butuh persetujuan. Lihat [Gate penemuan dan keputusan](/dev/18-module-discovery-and-decision-gate).
 
-**Jangan query database app dari Core, atau sebaliknya.** Tidak ada pengecualian. Kalau kamu butuh data dari app lain, jawabannya REST atau event.
+**Jangan menyentuh tabel milik module lain.** Tidak ada pengecualian, walaupun tabelnya ada di database yang sama dan `DB::table()` akan berhasil menjangkaunya. Kalau kamu butuh data dari module lain, jawabannya kontrak atau event — bukan query.
 
 **Jangan hardcode nama.** Nama perusahaan, nama orang, nama modul besar — semuanya konfigurasi di database. Kalau ragu, tanya dulu.
 
-**Jangan percaya `docs/todo/`.** Isinya 227 temuan audit yang menunggu review, bukan pekerjaan yang sudah disetujui. Yang mengikat ada di [Desain kanonik](/dev/).
+**Jangan percaya `docs/todo/`.** Isinya rencana kerja dan temuan audit yang menunggu review, bukan pekerjaan yang sudah disetujui. Yang mengikat ada di [Desain kanonik](/dev/). Cara membaca folder itu dijelaskan di halaman pengantarnya sendiri.
 
 ## Besok
 

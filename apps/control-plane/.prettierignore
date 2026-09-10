@@ -1,8 +1,7 @@
 resources/js/components/ui/*
 resources/views/mail/*
 
-# Module yang sedang dipindah masuk dan belum dibentuk ulang. Gayanya milik repo asalnya,
-# dan memformat ulang di sini akan menenggelamkan riwayat blame-nya tanpa memperbaiki apa pun.
-# Daftar ini dijaga tetap sama dengan ModulSedangDipindah oleh ModulSedangDipindahTest:
-# entri yang tertinggal setelah modulnya selesai dipindah membuat alur merah.
-../../modules/apperp/management-aset/**
+# Module yang sedang dipindah masuk dan belum dibentuk ulang ditulis di sini, satu baris per
+# module. Daftar ini dijaga tetap sama dengan ModulSedangDipindah oleh ModulSedangDipindahTest:
+# entri yang tertinggal setelah modulnya selesai dipindah membuat alur merah. Kosong sejak
+# modul aset selesai dipindah pada 9 September 2026.

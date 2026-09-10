@@ -67,7 +67,7 @@ class TenantRegistrationInstallsModulesTest extends TestCase
 
     public function test_app_yang_belum_dipindah_tetap_memakai_jalur_penempatan_container(): void
     {
-        $this->daftarkan(['management-aset']);
+        $this->daftarkan(['app-uji']);
 
         Queue::assertPushed(DeployAppPlacement::class);
         $this->assertSame(
@@ -79,7 +79,7 @@ class TenantRegistrationInstallsModulesTest extends TestCase
 
     public function test_mendaftar_dengan_module_dan_app_lama_sekaligus_memakai_kedua_jalur(): void
     {
-        $this->daftarkan(['contoh-a', 'management-aset']);
+        $this->daftarkan(['contoh-a', 'app-uji']);
 
         $tenantId = (string) Tenant::query()->value('id');
 
@@ -90,7 +90,7 @@ class TenantRegistrationInstallsModulesTest extends TestCase
         ]);
         $this->assertDatabaseMissing('core_module_installations', [
             'tenant_id' => $tenantId,
-            'module_id' => 'management-aset',
+            'module_id' => 'app-uji',
         ]);
     }
 
@@ -111,7 +111,7 @@ class TenantRegistrationInstallsModulesTest extends TestCase
                     // `database_name` sengaja tidak diisi. Module memakai database Core,
                     // jadi ia tidak punya nama database untuk disebutkan, dan sejak F2-12
                     // katalog tidak lagi menuntutnya. App container yang sudah ada di
-                    // katalog (mis. management-aset dari AppCatalogSeeder) tidak tersentuh
+                    // katalog (mis. app-uji dari AppCatalogSeeder) tidak tersentuh
                     // di sini, sehingga nama databasenya tetap seperti yang dideklarasikan.
                     'created_at' => now(),
                     'updated_at' => now(),

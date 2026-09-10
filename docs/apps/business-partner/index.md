@@ -11,9 +11,15 @@ Business Partner adalah fondasi untuk identitas pihak bisnis yang dipakai lebih 
 | Versi | `0.1.0` — release pengembangan |
 | Kind | `business-app` |
 | Butuh Core | `^0.1` |
-| Repository | `app-erp-business-partner` |
-| Database | `app_erp_business_partner` |
+| Bentuk | Belum diputuskan — app ini belum dibangun |
+| Database | `app_erp_business_partner` bila ia dibangun sebagai app berkontainer |
 | Dependency app | Tidak ada |
+
+::: tip Halaman ini menggambarkan rencana
+Business Partner belum ada, baik sebagai module maupun sebagai app berkontainer. Bentuk penempatannya
+diputuskan saat ia dibangun, dan bentuk yang berlaku untuk pekerjaan baru adalah module di dalam repo
+Core. Batas domain di bawah tetap berlaku apa pun bentuknya.
+:::
 
 ## Batas domain
 
@@ -21,7 +27,7 @@ Business Partner adalah fondasi untuk identitas pihak bisnis yang dipakai lebih 
 
 Business Partner akan memiliki identitas party serta data bersama yang benar-benar disetujui sebagai data party. Procurement akan memiliki fakta proses pengadaan, seperti prakualifikasi pemasok, penawaran, dan keputusan pengadaan, setelah scope-nya disetujui. Accounts Payable akan memiliki utang, invoice, dan pembayaran. Konsekuensi keuangan atau hukum tidak dipindahkan ke Business Partner hanya karena memakai party yang sama.
 
-Setiap app tetap memiliki database sendiri. Tidak ada app yang boleh membaca database Business Partner secara langsung. Saat resource party dan contract-nya sudah diterbitkan, app pemakai mengambil atau mengubah data lewat REST/OpenAPI atau menerima fakta lewat event/AsyncAPI.
+Setiap app tetap memiliki datanya sendiri, dan tidak ada app yang boleh membaca data Business Partner secara langsung. Saat resource party dan contract-nya sudah diterbitkan, app pemakai mengambil atau mengubah data lewat pintu resminya: kontrak PHP bila keduanya berjalan di satu runtime, REST/OpenAPI atau event/AsyncAPI bila tidak.
 
 ## Status fondasi saat ini
 

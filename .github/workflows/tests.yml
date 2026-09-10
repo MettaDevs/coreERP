@@ -149,6 +149,13 @@ jobs:
       - name: Build Assets
         run: npm run build
 
+      # React hanya boleh termuat sekali. Kegagalannya tidak berbunyi — build tetap hijau,
+      # halaman tetap tampil, lalu hook melempar "Invalid hook call" pada komponen yang
+      # kebetulan melintasi batas salinan. Selama UI module berada di dalam iframe, dua
+      # salinan memang selalu ada; sejak fase 4 tidak boleh lagi, dan ini yang menagihnya.
+      - name: Periksa Bundel
+        run: npm run bundle:check
+
       # Koneksi test menunjuk schema tersendiri lewat search_path, dan PostgreSQL tidak
       # membuat schema itu sendiri. Di mesin pengembang langkah ini dilakukan tangan
       # sekali, sesuai catatan pada apps/control-plane/.env.example.

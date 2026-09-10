@@ -6,7 +6,42 @@ use App\Support\Modules\Contracts\MilikTenant;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
+/**
+ * Aset tercatat: satu baris per aset, termasuk komponen yang menjadi anak aset lain.
+ *
+ * `acquisition_value` di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai string,
+ * bukan float. Kolom tanggal di-cast `date` dan menjadi `Carbon`.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $creation_key
+ * @property string $kode
+ * @property string $nama
+ * @property string $legal_entity_id
+ * @property ?string $responsible_org_unit_id
+ * @property string $group_aset_id
+ * @property ?string $kelompok_harta_fiskal_id
+ * @property string $jenis_aset_id
+ * @property ?string $kondisi_aset_id
+ * @property ?string $pabrikan_aset_id
+ * @property ?string $model_aset_id
+ * @property ?string $parent_asset_id
+ * @property ?string $asset_location_id
+ * @property ?string $financial_dimension_org_unit_id
+ * @property ?string $serial_number
+ * @property ?string $model_number
+ * @property Carbon $acquired_on
+ * @property ?Carbon $placed_in_service_on
+ * @property string $acquisition_value
+ * @property string $currency_code
+ * @property string $lifecycle_state
+ * @property ?string $keterangan
+ * @property ?Carbon $deleted_at
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ */
 class Asset extends Model
 {
     use HasUlids, SoftDeletes;
@@ -22,6 +57,7 @@ class Asset extends Model
         'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan',
     ];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return [

@@ -14,14 +14,14 @@ Susunannya empat tabel:
 
 | Tabel | Isi |
 | --- | --- |
-| `m_tipe_atribut` | Daftar hal yang bisa dicatat. Punya tipe data dan satuan |
-| `m_tipe_atribut_nilai` | Pilihan nilai, kalau tipenya berupa daftar pilihan |
-| `m_jenis_aset_atribut` | Atribut mana berlaku untuk jenis mana, dan mana yang wajib |
-| `tr_aset_atribut` | Nilai sebenarnya, milik satu aset |
+| `aset_m_tipe_atribut` | Daftar hal yang bisa dicatat. Punya tipe data dan satuan |
+| `aset_m_tipe_atribut_nilai` | Pilihan nilai, kalau tipenya berupa daftar pilihan |
+| `aset_m_jenis_aset_atribut` | Atribut mana berlaku untuk jenis mana, dan mana yang wajib |
+| `aset_tr_aset_atribut` | Nilai sebenarnya, milik satu aset |
 
 ### Nilai disimpan menurut tipenya
 
-`tr_aset_atribut` punya kolom terpisah: `nilai_text`, `nilai_number`, `nilai_boolean`, `nilai_date`, dan `tipe_atribut_nilai_id` untuk pilihan.
+`aset_tr_aset_atribut` punya kolom terpisah: `nilai_text`, `nilai_number`, `nilai_boolean`, `nilai_date`, dan `tipe_atribut_nilai_id` untuk pilihan.
 
 Bukan satu kolom teks untuk semua. Alasannya sederhana: angka harus bisa dibandingkan sebagai angka dan tanggal harus bisa diurutkan sebagai tanggal. Menyimpan `"12"` dan `"9"` sebagai teks membuat `"12" < "9"` bernilai benar, dan laporan jadi salah tanpa ada yang error.
 
@@ -61,14 +61,14 @@ Endpoint itu butuh **dua** permission sekaligus: `jenis-aset.update` karena yang
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/master/JenisAsetController.php` | Master jenis aset |
-| `api/app/Http/Controllers/master/JenisAsetModelController.php` | Kaitan jenis ke model |
-| `api/app/Http/Controllers/master/JenisAsetDetailController.php` | Angka pada panel detail |
-| `api/app/Http/Controllers/master/JenisAsetAtributController.php`, `JenisAsetAtributDefinisiController.php` | Nilai dan definisi atribut |
-| `api/app/Http/Controllers/master/TipeAtributController.php`, `TipeAtributNilaiController.php` | Master tipe atribut dan pilihan nilainya |
-| `api/app/Support/AssetAttributeValidator.php` | Validasi nilai atribut |
+| `src/Http/Controllers/master/JenisAsetController.php` | Master jenis aset |
+| `src/Http/Controllers/master/JenisAsetModelController.php` | Kaitan jenis ke model |
+| `src/Http/Controllers/master/JenisAsetDetailController.php` | Angka pada panel detail |
+| `src/Http/Controllers/master/JenisAsetAtributController.php`, `JenisAsetAtributDefinisiController.php` | Nilai dan definisi atribut |
+| `src/Http/Controllers/master/TipeAtributController.php`, `TipeAtributNilaiController.php` | Master tipe atribut dan pilihan nilainya |
+| `src/Support/AssetAttributeValidator.php` | Validasi nilai atribut |
 | `database/migrations/2026_08_07_130000_create_asset_attribute_tables.php` | Empat tabel atribut |
-| `ui/src/master/DynamicField.tsx` | Field yang dibentuk dari definisi atribut |
+| `ui/master/DynamicField.tsx` | Field yang dibentuk dari definisi atribut |
 
 ## Halaman terkait
 

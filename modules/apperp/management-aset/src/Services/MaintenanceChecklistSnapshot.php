@@ -43,7 +43,7 @@ final class MaintenanceChecklistSnapshot
             ->where('pemeliharaan_aset_detail_id', $jobId)
             ->delete();
 
-        foreach (array_values($lines) as $index => $line) {
+        foreach ($lines as $index => $line) {
             PemeliharaanAsetChecklist::create([
                 'pemeliharaan_aset_detail_id' => $jobId,
                 'line_number' => $index + 1,

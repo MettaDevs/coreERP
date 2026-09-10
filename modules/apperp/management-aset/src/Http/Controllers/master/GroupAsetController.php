@@ -8,6 +8,9 @@ use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
+/**
+ * @extends MasterDataController<GroupAset>
+ */
 class GroupAsetController extends MasterDataController
 {
     protected function resource(): string

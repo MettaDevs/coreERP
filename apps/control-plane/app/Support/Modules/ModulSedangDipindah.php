@@ -69,7 +69,8 @@ final class ModulSedangDipindah
      * yang tidak dapat dilihat pemindai mana pun. Premis semula — "bersih berarti entrinya basi" —
      * terbukti salah pada 9 September 2026: modul aset lulus seluruh pemindaian, tetapi membuang
      * entrinya membuatnya **dilayani**, dan itu menjatuhkan 84 test Core yang fixture katalognya
-     * belum menggambarkannya sebagai app yang dapat dipasang.
+     * belum menggambarkannya sebagai app yang dapat dipasang. Sebabnya dibereskan F3-30 —
+     * fixture itu berhenti memakai id modul sungguhan — dan entrinya dibuang bersamanya.
      *
      * Isinya wajib menyebut nomor task yang membuangnya, supaya ia tidak bisa menjadi alasan yang
      * berlaku selamanya. Tenggat tetap berlaku penuh.
@@ -77,17 +78,10 @@ final class ModulSedangDipindah
      * @var array<string, array{alasan: string, tenggat: string, pemblokir?: string}>
      */
     private const DAFTAR = [
-        'management-aset' => [
-            'alasan' => 'Ditarik masuk apa adanya pada F3-01 supaya riwayat 35 commit-nya ikut pindah. '
-                .'Saat diukur, isinya 131 berkas PHP ber-namespace App\\, 200 pemanggilan DB::table(, '
-                .'dan app.yaml yang tidak menyatakan table_prefix — ketiga penjaga merah sekaligus. '
-                .'Dibereskan bertahap pada F3-02 sampai F3-05, dan entri ini dibuang setelahnya.',
-            'tenggat' => '2026-12-31',
-            'pemblokir' => 'Ketiga penjaga sudah hijau sejak 9 September 2026, tetapi membuang entri ini '
-                .'membuat modul dilayani: RegisterBusiness memasangnya pada setiap pendaftaran usaha, '
-                .'penyemaian data awalnya menerbitkan nomor sungguhan, dan fixture katalog test Core belum '
-                .'membawa 29 referensi nomornya. Dicoba dan menjatuhkan 84 test Core. Dibuang pada F3-30.',
-        ],
+        // Kosong lagi sejak 10 September 2026. Dua module sudah melewati daftar ini — aset pada
+        // F3-30, human-resources pada F7-01 — dan yang kedua tinggal di sini kurang dari satu hari.
+        // Itu ukuran yang paling berguna dari daftar ini: bukan berapa lama ia kosong, melainkan
+        // berapa lama sebuah entri bertahan.
     ];
 
     /**

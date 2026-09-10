@@ -14,13 +14,32 @@ use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
  *
  * Definisi atribut dibuat tenant saat berjalan, jadi aturannya tidak dapat dituliskan
  * sebagai rule statis di controller; ia harus dibaca dari database tiap kali.
+ *
+ * Kolom yang datang dari database ditulis `mixed` dengan sengaja. Ia dibaca lewat
+ * `getAttributes()`, yaitu nilai mentah apa adanya dari driver — `decimal` dapat berupa
+ * string maupun float tergantung driver — sehingga menuliskannya `string` atau `float`
+ * akan menjadi anotasi yang meyakinkan sekaligus keliru. Dua kunci yang dilekatkan di
+ * sini, `wajib` dan `nilai_pilihan`, tipenya diketahui dan karena itu dituliskan.
+ *
+ * @phpstan-type DefinisiAtribut array{
+ *     tipe_atribut_id: mixed,
+ *     kode: mixed,
+ *     nama: mixed,
+ *     data_type: mixed,
+ *     satuan: mixed,
+ *     min_value: mixed,
+ *     max_value: mixed,
+ *     wajib: bool,
+ *     urutan: mixed,
+ *     nilai_pilihan: list<array{id: string, nilai: string}>,
+ * }
  */
 final class AssetAttributeValidator
 {
     /**
      * Definisi atribut satu jenis aset, terurut sesuai tampilan.
      *
-     * @return list<array<string, mixed>>
+     * @return list<DefinisiAtribut>
      */
     public function definitions(string $tenantId, string $jenisAsetId): array
     {
@@ -41,13 +60,27 @@ final class AssetAttributeValidator
                 'tipe.min_value', 'tipe.max_value', 'aset_m_jenis_aset_atribut.wajib', 'aset_m_jenis_aset_atribut.urutan',
             ]);
 
-        $choices = $this->choices($rows->pluck('tipe_atribut_id')->all());
+        $choices = $this->choices(array_values($rows->map(fn (JenisAsetAtribut $row): string => $row->tipe_atribut_id)->all()));
 
-        return $rows->map(fn (JenisAsetAtribut $row): array => [
-            ...$row->getAttributes(),
-            'wajib' => (bool) $row->wajib,
-            'nilai_pilihan' => $choices[$row->tipe_atribut_id] ?? [],
-        ])->all();
+        // Kunci disebut satu per satu, bukan disebar dari `getAttributes()`, supaya bentuk
+        // yang dijanjikan docblock benar-benar terbukti. Urutannya sama dengan urutan kolom
+        // pada `get()` di atas, jadi bentuk jawaban endpoint definisi atribut tidak berubah.
+        return array_values($rows->map(function (JenisAsetAtribut $row) use ($choices): array {
+            $atribut = $row->getAttributes();
+
+            return [
+                'tipe_atribut_id' => $atribut['tipe_atribut_id'],
+                'kode' => $atribut['kode'],
+                'nama' => $atribut['nama'],
+                'data_type' => $atribut['data_type'],
+                'satuan' => $atribut['satuan'],
+                'min_value' => $atribut['min_value'],
+                'max_value' => $atribut['max_value'],
+                'wajib' => $row->wajib,
+                'urutan' => $atribut['urutan'],
+                'nilai_pilihan' => $choices[$row->tipe_atribut_id] ?? [],
+            ];
+        })->all());
     }
 
     /**
@@ -123,7 +156,7 @@ final class AssetAttributeValidator
     }
 
     /**
-     * @param  array<string, mixed>  $definition
+     * @param  DefinisiAtribut  $definition
      * @param  array<string, list<string>>  $errors
      * @return array<string, mixed>|null
      */

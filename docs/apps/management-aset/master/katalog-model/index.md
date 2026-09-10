@@ -41,10 +41,10 @@ Diperiksa saat aset dibuat maupun dikoreksi, di `AssetController::assertModelCom
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/master/PabrikanAsetController.php` | Master pabrikan |
-| `api/app/Http/Controllers/master/ModelAsetController.php` | Master model |
-| `api/app/Http/Controllers/master/JenisAsetModelController.php` | Kaitan jenis ke model |
-| `api/app/Http/Controllers/master/PabrikanAsetDetailController.php` | Angka pada panel detail |
+| `src/Http/Controllers/master/PabrikanAsetController.php` | Master pabrikan |
+| `src/Http/Controllers/master/ModelAsetController.php` | Master model |
+| `src/Http/Controllers/master/JenisAsetModelController.php` | Kaitan jenis ke model |
+| `src/Http/Controllers/master/PabrikanAsetDetailController.php` | Angka pada panel detail |
 | `AssetController::assertModelCombination()` | Aturan kombinasi |
 
 ## Halaman terkait

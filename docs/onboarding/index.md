@@ -4,21 +4,32 @@ Halaman ini untuk orang yang baru masuk tim. Tujuannya satu: dalam beberapa hari
 
 ## Yang perlu kamu tahu duluan
 
-CoreERP **bukan** satu aplikasi Laravel besar. Ia platform yang terdiri dari beberapa repository yang berdiri sendiri:
+CoreERP adalah platform, dan modul bisnisnya hidup di dalam repo yang sama:
 
 | Repository | Isinya |
 | --- | --- |
-| `CoreERP` | Control plane, web shell, provider console, SDK UI. Repo ini juga rumah dokumentasi platform. |
-| `app-erp-management-aset` | App bisnis pertama. API, UI, database, migration, contract, container sendiri. |
-| `app-erp-hr` | App bisnis kedua. |
-| `app-erp-template` | Titik mulai untuk app baru. |
-| `erp-dev` | Orkestrasi Docker untuk menjalankan semuanya di laptop. Bukan repo domain. |
+| `CoreERP` | Control plane, web shell, provider console, SDK UI, **dan seluruh module bisnis** di bawah `modules/<penerbit>/<module>/`. Repo ini juga rumah dokumentasi platform. |
+| Orkestrasi lokal | Docker Compose untuk menjalankan semuanya di laptop. Bukan repo domain. |
+| `app-erp-*` | App yang belum dipindah ke runtime Core dan masih punya container serta database sendiri. |
 
-Konsekuensinya ada dua, dan keduanya sering bikin kaget orang baru:
+Daftar module yang sudah ada bisa dibaca dari `modules/` di repo ini, atau dari
+`php artisan module:list` pada runtime yang sedang jalan. Jangan menghafal daftarnya dari halaman
+mana pun — ia bertambah.
 
-**Satu app tidak boleh membaca database app lain.** Tidak ada `join` lintas app. Integrasi memakai REST/OpenAPI atau event/AsyncAPI. Ini bukan preferensi gaya — ini yang membuat app bisa dirilis, di-upgrade, dan di-uninstall sendiri-sendiri.
+Konsekuensinya ada tiga, dan ketiganya sering bikin kaget orang baru:
 
-**Dokumen di [`/dev/`](/dev/) mengikat semua repo.** Kalau kamu bekerja di `app-erp-hr`, aturan di sana tetap berlaku untukmu.
+**Satu module tidak boleh menyentuh data module lain.** Tidak ada `join` ke tabel milik module
+sebelah. Module berbagi satu database tenant, dan yang memisahkannya adalah awalan nama tabel
+beserta penjaga batas yang menolak pelanggarnya di pull request. Batas yang dijaga pemeriksaan
+tetap batas.
+
+**Dua bentuk hidup berdampingan.** Module berjalan di runtime Core; app `app-erp-*` yang belum
+pindah masih berjalan sebagai container dengan database dan token layanan sendiri. Aturannya
+berbeda, dan menilai yang satu dengan aturan yang lain adalah kesalahan yang paling mudah terjadi.
+Tabel perbandingannya ada di [Grand design](/dev/01-grand-design#dua-bentuk-yang-hidup-berdampingan).
+
+**Dokumen di [`/dev/`](/dev/) mengikat semuanya.** Ia berlaku untuk module di dalam repo ini
+maupun app yang masih berupa container.
 
 ## Jalur baca
 
@@ -34,7 +45,7 @@ Urutannya:
 
 </div>
 
-Kalau kamu ditugaskan ke app tertentu, buka juga hub teknisnya: [Management Aset](/apps/management-aset/) atau [Human Resources](/apps/human-resources/). Kalau kamu akan membangun app baru, mulai dari [Membangun app baru](/apps/membangun-app-baru) — bukan dari `git clone` template.
+Kalau kamu ditugaskan ke app tertentu, buka juga hub teknisnya: [Management Aset](/apps/management-aset/) atau [Human Resources](/apps/human-resources/). Kalau kamu akan membangun modul baru, mulai dari [Membangun modul baru](/apps/membangun-app-baru) — bukan dari menyalin folder modul yang sudah jadi.
 
 ## Tiga hal yang paling sering disalahpahami
 

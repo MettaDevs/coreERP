@@ -215,13 +215,34 @@ class DeployAppPlacement implements ShouldBeUnique, ShouldQueueAfterCommit
             throw new RuntimeException('Release root has not been configured.');
         }
 
+        // Ketiga nama layanan menjadi opsional pada F5-05, karena rilis edisi satu image tidak
+        // punya layanan per app. Jalur ini justru jalur container, dan di sini ketiganya wajib:
+        // tanpa penjagaan ini `docker compose pull` disusun dengan nama kosong dan gagal jauh
+        // dari sebabnya — sebagai perintah Compose yang aneh, bukan sebagai rilis yang kurang
+        // lengkap. Jalur ini seluruhnya dibuang pada fase 7 bersama app berkontainer terakhir.
+        $layanan = [
+            'api_service' => $release->api_service,
+            'ui_service' => $release->ui_service,
+            'db_service' => $release->database_service,
+        ];
+
+        foreach ($layanan as $kunci => $nama) {
+            if (! is_string($nama) || trim($nama) === '') {
+                throw new RuntimeException(sprintf(
+                    'Release %s versi %s tidak menyebut %s, sedangkan app ini ditempatkan sebagai container. '.
+                    'Nama layanan hanya boleh kosong untuk app yang berjalan sebagai module di dalam runtime Core.',
+                    $app->id,
+                    $app->version,
+                    $kunci,
+                ));
+            }
+        }
+
         return [
             'deploy_path' => $releaseRoot.DIRECTORY_SEPARATOR.$release->bundle_path,
             'compose_file' => $release->compose_file,
             'project' => $release->compose_project,
-            'api_service' => $release->api_service,
-            'ui_service' => $release->ui_service,
-            'db_service' => $release->database_service,
+            ...$layanan,
         ];
     }
 

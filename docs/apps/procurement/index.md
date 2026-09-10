@@ -11,9 +11,17 @@ Procurement akan memiliki proses pengadaan. Satu record Procurement nantinya mew
 | Versi | `0.1.0` — release pengembangan |
 | Kind | `business-app` |
 | Butuh Core | `^0.1` |
+| Bentuk | App berkontainer — belum dipindah ke runtime Core |
 | Repository | `app-erp-procurement` |
 | Database | `app_erp_procurement` |
 | Dependency app | `business-partner: ^0.1` |
+
+::: warning App terakhir yang masih berkontainer
+Modul bisnis lain sudah pindah ke runtime Core dan memakai database tenant yang sama. Procurement
+belum, jadi jalur lama — container sendiri, database sendiri, token layanan, proxy konten, dan token
+konteks — masih hidup untuknya. Aturan yang berlaku untuk app itu ada di
+[Standar module](/dev/02-module-standard#bentuk-lama-app-dengan-repository-dan-container-sendiri).
+:::
 
 ## Batas domain
 
@@ -81,5 +89,5 @@ Business Partner akan memberi data party bersama setelah resource dan contract-n
 
 - [Business Partner](/apps/business-partner/) — pemilik data pihak bisnis bersama
 - [Katalog app](/apps/) — pola satu app satu repository dan batas ownership
-- [Membangun app baru](/apps/membangun-app-baru) — gate sebelum resource atau proses baru dibuat
+- [Membangun modul baru](/apps/membangun-app-baru) — gate sebelum resource atau proses baru dibuat
 - [Standar module](/dev/02-module-standard) — contract dan batas lintas app

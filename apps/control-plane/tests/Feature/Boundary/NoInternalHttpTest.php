@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\Modules\ModulSedangDipindah;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -38,25 +37,26 @@ class NoInternalHttpTest extends TestCase
     /**
      * Tidak satu pun module memanggil Core lewat HTTP.
      *
-     * **Module yang sedang dipindah tidak dikecualikan, dan itu keputusan yang disengaja.**
-     * Ketiga penjaga pembaca berkas yang sudah ada mengecualikan `management-aset` lewat
-     * `ModulSedangDipindah`, karena keadaan yang mereka larang — namespace `App\`, query
-     * builder mentah, awalan tabel yang belum dinyatakan — memang ikut mendarat bersama subtree
-     * pada F3-01 dan tidak mungkin dibereskan pada pull request yang sama.
+     * **Penjaga ini tidak pernah mengecualikan siapa pun, dan itu keputusan yang disengaja.**
+     * Sampai 9 September 2026 empat penjaga pembaca berkas lain mengecualikan modul yang sedang
+     * dipindah lewat `ModulSedangDipindah`, karena keadaan yang mereka larang — namespace
+     * `App\`, query builder mentah, awalan tabel yang belum dinyatakan — memang ikut mendarat
+     * bersama subtree-nya dan tidak mungkin dibereskan pada pull request yang sama.
      *
      * Penjaga ini berbeda jenisnya. Ia bukan pagar yang menunggu module menyusul; ia adalah
-     * **kriteria selesai fase yang sedang memindahkan module itu**. Mengecualikan
-     * `management-aset` berarti penjaga ini hijau justru pada satu-satunya module yang ia
-     * dimaksudkan untuk menilai — hijau tanpa pernah bisa merah, yang tidak menjaga apa pun.
+     * **kriteria selesai fase yang memindahkan module itu**. Mengecualikan modulnya berarti
+     * penjaga ini hijau justru pada satu-satunya module yang ia dimaksudkan untuk menilai —
+     * hijau tanpa pernah bisa merah, yang tidak menjaga apa pun.
      *
-     * Dan pengecualiannya tidak diperlukan: dipindai apa adanya hari ini, module aset bersih.
-     * Itu diukur, bukan diperkirakan.
+     * Daftar pemindahan sendiri kosong sejak modul aset selesai pada F3-30, jadi sekarang
+     * kelima penjaga memindai seluruh modul tanpa kecuali. Perbedaan di atas tetap ditulis
+     * karena ia berlaku lagi pada modul berikutnya yang mendarat.
      *
      * Konsekuensinya juga disengaja: seandainya sebuah module lain mendarat besok dengan klien
      * HTTP-nya masih utuh, penjaga ini merah sejak hari pertama dan pemindahannya tidak bisa
-     * digabung sebelum jalurnya diganti. Itu urutan yang benar untuk fase ini — jalur HTTP
-     * adalah hal yang paling mahal ditinggalkan setengah jadi, karena ia tetap bekerja di
-     * lingkungan pengembangan dan baru gagal saat Core dan module tidak lagi saling melihat.
+     * digabung sebelum jalurnya diganti. Itu urutan yang benar — jalur HTTP adalah hal yang
+     * paling mahal ditinggalkan setengah jadi, karena ia tetap bekerja di lingkungan
+     * pengembangan dan baru gagal saat Core dan module tidak lagi saling melihat.
      */
     public function test_tidak_ada_module_yang_memanggil_core_lewat_http(): void
     {
@@ -209,42 +209,6 @@ class NoInternalHttpTest extends TestCase
 
         $this->assertStringContainsString('Http::fake', $isi, 'Contoh nyata komentar yang menyebut Http:: sudah hilang dari berkas ini, jadi test ini tidak lagi menguji keadaan yang sungguhan ada.');
         $this->assertSame([], PemindaiModul::lompatanHttpYangDipakai($isi), 'Berkas ini hanya menyebut Http:: di dalam komentar, jadi ia tidak boleh dihitung melompat.');
-    }
-
-    /**
-     * Daftar module yang sedang dipindah tetap dibaca, supaya keputusan di atas tercatat.
-     *
-     * Tanpa test ini, "penjaga lompatan HTTP sengaja tidak mengecualikan siapa pun" hanya
-     * kalimat pada docblock. Di sini ia menjadi ukuran: module yang dikecualikan penjaga lain
-     * memang ikut dipindai penjaga ini, dan hasilnya ikut dihitung.
-     */
-    public function test_module_yang_sedang_dipindah_ikut_dipindai(): void
-    {
-        $pemindai = PemindaiModul::padaRepo();
-        $dipindah = ModulSedangDipindah::bawaan();
-        $folderModul = $pemindai->folderModul();
-
-        $ikutDipindai = [];
-
-        foreach ($folderModul as $nama => $folder) {
-            if (! $dipindah->menandai($nama)) {
-                continue;
-            }
-
-            $ikutDipindai[] = $nama;
-
-            $this->assertSame([], $pemindai->pelanggaranLompatanHttp($folder), sprintf(
-                'Module "%s" masih melompat ke Core lewat HTTP. Ia dikecualikan tiga penjaga lain, tetapi '.
-                'bukan penjaga ini: jalur HTTP adalah hal yang sedang dipindahkan fase ini, jadi '.
-                'mengecualikannya berarti tidak memeriksa apa pun.',
-                $nama,
-            ));
-        }
-
-        $this->assertNotSame([], $ikutDipindai, implode("\n", [
-            'Sudah tidak ada module yang terdaftar sedang dipindah, jadi test ini tidak lagi mengukur apa pun.',
-            'Buang test ini bersama entri terakhir ModulSedangDipindah — bukan biarkan ia hijau tanpa subjek.',
-        ]));
     }
 
     /**

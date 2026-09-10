@@ -1,16 +1,26 @@
 # Kondisi repository sekarang dan target pemisahan app
 
-## Baseline yang benar-benar ada saat ini
+::: danger Arah halaman ini sudah dibalik
+Halaman ini ditulis ketika target platform adalah **satu repository per app bisnis**. Target itu
+sudah dibalik: module bisnis kini hidup di dalam repo CoreERP pada `modules/<penerbit>/<module>/`
+dan berjalan di runtime Core. Alasan dan bukti pembalikannya ada di
+[keputusan satu runtime](../todo/satu-runtime/00-keputusan.md).
 
-Repository saat ini adalah monorepo transisi. Laravel 13 React starter berada di `apps/control-plane`; ia belum menjadi app platform yang terpisah secara fisik dari app bisnis.
+Isinya tidak dibuang karena app yang belum dipindah masih menjalankan bentuk yang digambarkan di
+sini, dan aturan ownership serta batas release di bawah tetap berlaku untuknya. Yang salah adalah
+membacanya sebagai arah untuk pekerjaan baru.
+:::
 
-| Lokasi sekarang | Keadaan saat ini | Arah target |
-| --- | --- | --- |
-| `apps/control-plane/` | Laravel 13, Inertia, Fortify; organization, access, entitlement, placement, dan worker sudah ada. | Tetap di repository CoreERP ini sebagai Control Plane. Ia tidak memiliki domain bisnis app. |
-| `apps/provider-console/` | Belum dipisahkan sebagai aplikasi mandiri. | Dibuat di repository CoreERP ini; hanya memakai Control Plane API untuk operasi provider. |
-| Web Shell | Tidak punya folder sendiri. Launcher dan halaman tuan rumah app hidup di UI Control Plane (`resources/js/components/product-launcher.tsx`, `resources/js/pages/apps/host.tsx`). | Dipisahkan sebagai aplikasi mandiri di repository CoreERP ini bila surface lintas app sudah cukup banyak untuk membenarkannya. |
-| App bisnis | Tidak lagi disimpan di repository CoreERP. | Management Aset berjalan dari repository `app-erp-management-aset`; app berikutnya dibuat sebagai repository `app-erp-<app-key>` sendiri. |
-| `packages/` | Belum merupakan package registry berversi. | Tidak dipisahkan dulu. Package hanya dipublish bila dipakai minimal dua repository. |
+## Keadaan sekarang
+
+| Lokasi | Keadaan |
+| --- | --- |
+| `apps/control-plane/` | Laravel, Inertia, Fortify; organization, access, entitlement, placement, worker, dan **runtime yang menjalankan seluruh module** ada di sini. Ia tidak memiliki domain bisnis sendiri. |
+| `apps/provider-console/` | Ada di repository ini; hanya memakai Control Plane API untuk operasi provider. |
+| Web Shell | Tidak punya folder sendiri. Launcher dan halaman tuan rumah hidup di UI Control Plane (`resources/js/components/product-launcher.tsx`, `resources/js/lib/halaman-module.tsx`, `resources/js/pages/apps/host.tsx`). |
+| `modules/` | Module bisnis, satu folder per module. Berjalan di runtime Core, memakai database tenant yang sama, dipisahkan awalan tabel. |
+| App bisnis yang belum dipindah | Masih berjalan dari repository `app-erp-*` sendiri dengan container dan database sendiri. |
+| `packages/` | Belum merupakan package registry berversi. Package hanya dipublish bila dipakai minimal dua repository. |
 
 Control Plane sekarang memiliki organization directory (`organizations`, `legal_entities`, `operating_units`), purpose-scoped versioned hierarchy, membership, entitlement, tenant deployment binding, placement registry, installation-attempt history, queued placement worker, role → duty → privilege → permission, organization-scoped assignment, invitation, dan provider access. Launcher memisahkan hak produk dari produk yang benar-benar siap dibuka. Workforce/position, automatic dan temporary assignment, SoD, audit access, dan integrasi deployment production masih menjadi fase berikutnya.
 
@@ -19,22 +29,23 @@ Control Plane sekarang memiliki organization directory (`organizations`, `legal_
 ```text
 CoreERP/                            # repository platform yang sekarang ini
 ├── apps/
-│   ├── control-plane/              # tenant, identity, entitlement, placement, installer
+│   ├── control-plane/              # tenant, identity, entitlement, placement, installer, runtime module
 │   ├── provider-console/           # operasi provider, memakai Control Plane API
-│   └── web-shell/                  # host UI tenant dan launcher app (belum ada, lihat tabel di atas)
+│   └── web-shell/                  # host UI tenant dan launcher (belum ada, lihat tabel di atas)
+├── modules/<penerbit>/<module>/    # module bisnis, berjalan di runtime Core
+├── editions/                       # satu berkas per pelanggan
 ├── deploy/                         # deployment platform
 └── README.md
 
-app-erp-<app-key>/                  # satu repository untuk satu app bisnis
+app-erp-<app-key>/                  # app yang belum dipindah; bentuk lama
 ├── api/ ui/ database/ contracts/ deploy/
 ├── app.yaml
 └── README.md
-
-app-erp-<bridge-key>/               # repository bridge bila use case nyata muncul
-└── api/ database/ contracts/ deploy/ app.yaml
 ```
 
-API dan UI sebuah app tetap satu repository. Pemisahan repository dilakukan antar-app, bukan antara frontend dan backend. Addon app mengikuti bentuk repository yang sama. Tidak ada Git submodule dan tidak ada shared database.
+Untuk app yang masih berupa repository sendiri, API dan UI tetap satu repository: pemisahan
+dilakukan antar-app, bukan antara frontend dan backend. Tidak ada Git submodule dan tidak ada shared
+database.
 
 ## Urutan implementasi
 
@@ -70,7 +81,8 @@ Control Plane mengoordinasi katalog, entitlement, placement, dan status runtime.
 
 ## Lihat juga
 
-- [Standar module](02-module-standard.md) — isi wajib satu repository app
-- [Release dan on-prem](03-release-and-on-prem.md) — apa yang dirilis dari repository terpisah
-- [Development stack lokal](11-local-docker-development.md) — menjalankan repository terpisah sebagai satu stack
+- [Standar module](02-module-standard.md) — isi wajib satu module, dan isi wajib satu repository app
+- [Release dan on-prem](03-release-and-on-prem.md) — image edisi untuk module, bundle untuk app berkontainer
+- [Development stack lokal](11-local-docker-development.md) — bentuk stack yang benar-benar dijalankan hari ini
 - [Menerbitkan release app](13-publishing-an-app-release.md) — CI per repository app
+- [Keputusan satu runtime](../todo/satu-runtime/00-keputusan.md) — kenapa arah halaman ini dibalik

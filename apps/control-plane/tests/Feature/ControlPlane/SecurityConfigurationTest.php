@@ -24,7 +24,7 @@ class SecurityConfigurationTest extends TestCase
         $this->seed(AppCatalogSeeder::class);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner', 'business_name' => 'Tenant test',
-            'app_ids' => ['management-aset'], 'email' => 'owner@security.test', 'password' => 'password',
+            'app_ids' => ['app-uji'], 'email' => 'owner@security.test', 'password' => 'password',
         ]);
     }
 
@@ -32,7 +32,7 @@ class SecurityConfigurationTest extends TestCase
     {
         $this->actingAs($this->owner)->post('/settings/security-configuration/privileges', [
             'name' => 'Lihat perencanaan',
-            'permission_codes' => ['management-aset.perencanaan-aset.read'],
+            'permission_codes' => ['app-uji.perencanaan.read'],
         ])->assertRedirect();
         $privilege = SecurityPrivilege::query()->where('source', 'custom')->firstOrFail();
         $this->assertSame('draft', $privilege->status);
@@ -60,7 +60,7 @@ class SecurityConfigurationTest extends TestCase
             'role_id' => $roleId,
             'source' => 'manual', 'status' => 'active', 'valid_from' => now(),
         ]);
-        $this->assertContains('management-aset.perencanaan-aset.read', app(LaunchableAppCatalog::class)
-            ->permissionsFor($this->owner->activeMembership()->refresh(), 'management-aset'));
+        $this->assertContains('app-uji.perencanaan.read', app(LaunchableAppCatalog::class)
+            ->permissionsFor($this->owner->activeMembership()->refresh(), 'app-uji'));
     }
 }

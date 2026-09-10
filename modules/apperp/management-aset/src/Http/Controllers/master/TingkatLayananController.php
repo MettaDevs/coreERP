@@ -8,6 +8,9 @@ use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\TingkatLayanan;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 
+/**
+ * @extends MasterDataController<TingkatLayanan>
+ */
 class TingkatLayananController extends MasterDataController
 {
     protected function resource(): string

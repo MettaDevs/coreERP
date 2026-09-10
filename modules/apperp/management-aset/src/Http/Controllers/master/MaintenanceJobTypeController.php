@@ -8,6 +8,9 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobType;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
+/**
+ * @extends MasterDataController<MaintenanceJobType>
+ */
 class MaintenanceJobTypeController extends MasterDataController
 {
     protected function resource(): string

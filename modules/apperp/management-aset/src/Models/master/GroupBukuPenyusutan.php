@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * Matriks group aset x buku penyusutan; padanan "Fixed asset group/book" di Dynamics 365 F&O.
@@ -15,7 +16,22 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * apa. Bukan master penuh: tanpa kode dan tanpa nama.
  *
  * `round_off_depreciation` null berarti memakai nilai dari buku, sedangkan nol berarti
- * pembulatan sengaja dimatikan untuk kombinasi group dan buku ini.
+ * pembulatan sengaja dimatikan untuk kombinasi group dan buku ini. Ia di-cast `decimal:2`,
+ * jadi Eloquent memulangkannya sebagai string dan bukan float.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $group_aset_id
+ * @property string $buku_id
+ * @property ?string $depreciation_profile_id
+ * @property ?string $alternative_profile_id
+ * @property ?int $useful_life_periods
+ * @property ?string $convention
+ * @property bool $depreciate
+ * @property ?string $round_off_depreciation
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property ?Carbon $deleted_at
  */
 class GroupBukuPenyusutan extends Model
 {

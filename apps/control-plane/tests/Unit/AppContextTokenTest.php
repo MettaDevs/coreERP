@@ -21,8 +21,8 @@ class AppContextTokenTest extends TestCase
 
         $token = app(AppContextToken::class)->issue(
             $membership,
-            'management-aset',
-            ['management-aset.entitas-aset.read'],
+            'app-uji',
+            ['app-uji.entitas.read'],
             null,
             null,
         );
@@ -36,9 +36,9 @@ class AppContextTokenTest extends TestCase
         $claims = json_decode(base64_decode(strtr($payload, '-_', '+/'), true), true, flags: JSON_THROW_ON_ERROR);
 
         $this->assertSame($expected, $signature);
-        $this->assertSame('management-aset', $claims['aud']);
+        $this->assertSame('app-uji', $claims['aud']);
         $this->assertSame($membership->tenant_id, $claims['tenant_id']);
-        $this->assertSame(['management-aset.entitas-aset.read'], $claims['permissions']);
+        $this->assertSame(['app-uji.entitas.read'], $claims['permissions']);
         $this->assertGreaterThan(time(), $claims['exp']);
     }
 }

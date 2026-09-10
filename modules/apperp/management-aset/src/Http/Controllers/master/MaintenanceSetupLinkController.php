@@ -198,12 +198,15 @@ final class MaintenanceSetupLinkController extends Controller
         return $this->templateLines($request, $templateId);
     }
 
-    /** @param list<array<string, mixed>> $lines @return array<string, string> */
+    /**
+     * @param  list<array<string, mixed>>  $lines
+     * @return array<string, string>
+     */
     private function measurementUnitCodes(string $tenant, array $lines): array
     {
-        $ids = collect($lines)
+        $ids = array_values(collect($lines)
             ->filter(fn (array $line): bool => ($line['type'] ?? null) === 'measurement' && ! empty($line['unit_id']))
-            ->pluck('unit_id')->map(fn ($id): string => (string) $id)->unique()->values()->all();
+            ->pluck('unit_id')->map(fn ($id): string => (string) $id)->unique()->values()->all());
         if ($ids === []) {
             return [];
         }
@@ -230,6 +233,7 @@ final class MaintenanceSetupLinkController extends Controller
         return $row->getAttributes();
     }
 
+    /** @return array<string, mixed> */
     private function assetTypeTransfer(string $id, string $column): array
     {
         $selectedIds = MaintenanceJobTypeAssetType::query()->where($column, $id)
@@ -244,6 +248,7 @@ final class MaintenanceSetupLinkController extends Controller
         ]];
     }
 
+    /** @param  list<string>  $jenisAsetIds */
     private function replaceAssetTypeLink(string $jobTypeId, array $jenisAsetIds): void
     {
         DB::transaction(function () use ($jobTypeId, $jenisAsetIds): void {
@@ -258,6 +263,7 @@ final class MaintenanceSetupLinkController extends Controller
         });
     }
 
+    /** @return array<string, list<mixed>> */
     private function assetTypeIdsRules(string $tenant): array
     {
         return [
@@ -266,6 +272,7 @@ final class MaintenanceSetupLinkController extends Controller
         ];
     }
 
+    /** @return array<string, list<mixed>> */
     private function jobTypeIdsRules(string $tenant): array
     {
         return [
@@ -304,6 +311,9 @@ final class MaintenanceSetupLinkController extends Controller
      *
      * Urutan `id` yang tetap mencegah dua transaksi mengambil kunci yang sama dalam
      * urutan berlawanan dan saling menunggu selamanya.
+     *
+     * @param  array<int, mixed>  $jobTypeIds  id dari kiriman maupun dari `pluck()`, jadi
+     *                                         bentuknya baru dipastikan di dalam
      */
     private function lockJobTypes(array $jobTypeIds): void
     {

@@ -5,6 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Catatan rilis satu app: satu image edisi, bukan lagi sepasang image API dan UI.
+ *
+ * `api_service`, `ui_service`, dan `database_service` boleh kosong. Ketiganya hanya berarti
+ * untuk app yang masih berjalan sebagai container sendiri; edisi satu image tidak punya
+ * layanan terpisah untuk disebut namanya.
+ */
 class AppRelease extends Model
 {
     protected $table = 'app_releases';
@@ -18,8 +25,7 @@ class AppRelease extends Model
         'app_id',
         'version',
         'manifest_sha256',
-        'api_image',
-        'ui_image',
+        'edition_image',
         'bundle_path',
         'compose_file',
         'compose_project',

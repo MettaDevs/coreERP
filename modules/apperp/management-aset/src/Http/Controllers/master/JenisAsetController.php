@@ -15,6 +15,8 @@ use Modules\Apperp\ManagementAset\Support\MasterChild;
  * menghitungnya, dan berarti pemegang izin baca jenis aset ikut mengetahui isi resource
  * lain yang belum tentu boleh ia lihat. Keduanya ditangani
  * {@see JenisAsetDetailController}, yang hanya dipanggil untuk satu record terbuka.
+ *
+ * @extends MasterDataController<JenisAset>
  */
 class JenisAsetController extends MasterDataController
 {

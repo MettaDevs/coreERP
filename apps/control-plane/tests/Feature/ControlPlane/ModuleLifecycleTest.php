@@ -195,9 +195,15 @@ class ModuleLifecycleTest extends TestCase
     /**
      * Menyatakan bahwa satu module bergantung pada module lain.
      *
-     * Manifestnya disalin ke folder sementara dengan `depends_on` ditambahkan, lalu registry
+     * Manifestnya disalin ke folder sementara dengan `dependsOn` ditambahkan, lalu registry
      * diarahkan ke sana. Berkas manifest di repo tidak disentuh, dan kelas registry tidak
      * perlu dilonggarkan demi test.
+     *
+     * Bentuknya peta id ke rentang versi, sama dengan manifest sungguhan. Sampai 10 September
+     * 2026 test ini menulis `depends_on` berisi daftar — kunci dan bentuk yang tidak pernah
+     * dibaca katalog — dan begitu registry dibetulkan, kedua test yang memakainya berhenti
+     * melihat dependency sama sekali. Keduanya merah, dan itu yang menunjukkan keduanya memang
+     * menguji penegakan dependency, bukan kebetulan hijau.
      */
     private function jadikanBergantung(string $moduleId, string $bergantungPada): void
     {
@@ -216,8 +222,8 @@ class ModuleLifecycleTest extends TestCase
 
             if (str_contains($isi, 'id: '.$moduleId.'
 ')) {
-                $isi = str_replace('depends_on: []', 'depends_on:
-  - '.$bergantungPada, $isi);
+                $isi = str_replace('dependsOn: {}', 'dependsOn:
+  '.$bergantungPada.': ^0.1', $isi);
             }
 
             file_put_contents($tujuan.'/app.yaml', $isi);

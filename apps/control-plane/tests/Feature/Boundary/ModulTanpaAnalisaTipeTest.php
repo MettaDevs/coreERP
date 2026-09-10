@@ -6,6 +6,8 @@ namespace Tests\Feature\Boundary;
 
 use App\Support\Modules\ModulTanpaAnalisaTipe;
 use DateTimeImmutable;
+use PHPUnit\Framework\AssertionFailedError;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -96,24 +98,79 @@ class ModulTanpaAnalisaTipeTest extends TestCase
     public function test_tiap_entri_menyebut_alasan_terukur_dan_tenggat(): void
     {
         foreach (ModulTanpaAnalisaTipe::bawaan()->semua() as $nama => $entri) {
-            $this->assertNotSame('', trim($entri['alasan']), sprintf(
-                'Entri "%s" tidak menyebut alasan. Pengecualian tanpa alasan tidak bisa ditinjau, hanya bisa diwarisi.',
-                $nama,
-            ));
-
-            $this->assertMatchesRegularExpression('/\d/', $entri['alasan'], sprintf(
-                'Alasan entri "%s" tidak menyebut satu pun angka. Sebut jumlah temuan dan kapan diukur, '.
-                'supaya orang berikutnya dapat memeriksa apakah keadaannya masih sama.',
-                $nama,
-            ));
-
-            $this->assertMatchesRegularExpression(
-                '/^\d{4}-\d{2}-\d{2}$/',
-                $entri['tenggat'],
-                sprintf('Tenggat entri "%s" harus ditulis sebagai YYYY-MM-DD.', $nama),
-            );
+            $this->assertEntriDapatDitinjau($nama, $entri);
         }
 
         $this->addToAssertionCount(1);
+    }
+
+    /**
+     * Syarat di atas dibuktikan bisa merah, pada entri buatan.
+     *
+     * Daftar sungguhannya kosong sejak modul aset selesai dianotasi pada F3-29, dan penjaga
+     * tanpa subjek adalah penjaga yang hijau tanpa menguji apa pun. Yang dijaga di sini
+     * aturannya, bukan daftarnya — sama seperti cara `test_tenggat_yang_lewat_terdeteksi`
+     * membuktikan cara berakhir yang pertama.
+     *
+     * @param  array{alasan: string, tenggat: string}  $entri
+     */
+    #[DataProvider('entriYangHarusDitolak')]
+    public function test_entri_yang_tidak_dapat_ditinjau_ditolak(array $entri, string $potongPesan): void
+    {
+        try {
+            $this->assertEntriDapatDitinjau('modul-uji', $entri);
+        } catch (AssertionFailedError $gagal) {
+            $this->assertStringContainsString($potongPesan, $gagal->getMessage());
+
+            return;
+        }
+
+        $this->fail('Entri ini seharusnya ditolak, tetapi pemeriksaannya diam.');
+    }
+
+    /**
+     * @return array<string, array{0: array{alasan: string, tenggat: string}, 1: string}>
+     */
+    public static function entriYangHarusDitolak(): array
+    {
+        return [
+            'alasan kosong' => [
+                ['alasan' => '   ', 'tenggat' => '2026-12-31'],
+                'tidak menyebut alasan',
+            ],
+            'alasan tanpa angka' => [
+                ['alasan' => 'Masih banyak temuan.', 'tenggat' => '2026-12-31'],
+                'tidak menyebut satu pun angka',
+            ],
+            'tenggat bukan tanggal' => [
+                ['alasan' => '405 temuan, diukur 9 September 2026.', 'tenggat' => 'nanti'],
+                'harus ditulis sebagai YYYY-MM-DD',
+            ],
+        ];
+    }
+
+    /**
+     * Bentuk bersama kedua test di atas, supaya aturannya hanya ditulis sekali.
+     *
+     * @param  array{alasan: string, tenggat: string}  $entri
+     */
+    private function assertEntriDapatDitinjau(string $nama, array $entri): void
+    {
+        $this->assertNotSame('', trim($entri['alasan']), sprintf(
+            'Entri "%s" tidak menyebut alasan. Pengecualian tanpa alasan tidak bisa ditinjau, hanya bisa diwarisi.',
+            $nama,
+        ));
+
+        $this->assertMatchesRegularExpression('/\d/', $entri['alasan'], sprintf(
+            'Alasan entri "%s" tidak menyebut satu pun angka. Sebut jumlah temuan dan kapan diukur, '.
+            'supaya orang berikutnya dapat memeriksa apakah keadaannya masih sama.',
+            $nama,
+        ));
+
+        $this->assertMatchesRegularExpression(
+            '/^\d{4}-\d{2}-\d{2}$/',
+            $entri['tenggat'],
+            sprintf('Tenggat entri "%s" harus ditulis sebagai YYYY-MM-DD.', $nama),
+        );
     }
 }

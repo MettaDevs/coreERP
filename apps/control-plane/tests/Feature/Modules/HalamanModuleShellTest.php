@@ -186,7 +186,7 @@ class HalamanModuleShellTest extends TestCase
 
         $this->assertStringNotContainsString(
             '<iframe',
-            (string) file_get_contents($akar.'/resources/js/pages/modules/host.tsx'),
+            (string) file_get_contents($akar.'/resources/js/lib/halaman-module.tsx'),
         );
         $this->assertStringNotContainsString(
             '<iframe',

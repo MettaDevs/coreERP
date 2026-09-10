@@ -31,14 +31,10 @@ final class ModulTanpaAnalisaTipe
      * @var array<string, array{alasan: string, tenggat: string}>
      */
     private const DAFTAR = [
-        'management-aset' => [
-            'alasan' => 'Dikecualikan sejak ditarik masuk pada F3-01, waktu itu bersama seluruh pengecualian '
-                .'lain. Diukur pada 9 September 2026 setelah modulnya lulus kelima penjaga batas: 405 temuan '
-                .'di 86 berkas, seluruhnya di modul dan nol di Core. Sebagian besar anotasi yang belum ditulis '
-                .'— 152 properti model yang tidak dinyatakan, 73 array tanpa tipe isi, 55 relasi tanpa generic '
-                .'— bukan kode yang salah. Dibereskan F3-29.',
-            'tenggat' => '2026-12-31',
-        ],
+        // Kosong sejak 9 September 2026. Modul aset — satu-satunya yang pernah terdaftar di
+        // sini — selesai dianotasi pada F3-29, dan sejak itu seluruh modul ikut analisa tipe
+        // tanpa kecuali. Kelasnya tetap ada karena modul berikutnya akan mendarat dengan
+        // keadaan yang sama.
     ];
 
     /**

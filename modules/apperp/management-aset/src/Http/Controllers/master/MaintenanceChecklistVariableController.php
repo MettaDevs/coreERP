@@ -8,6 +8,9 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariableValu
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
+/**
+ * @extends MasterDataController<MaintenanceChecklistVariable>
+ */
 class MaintenanceChecklistVariableController extends MasterDataController
 {
     protected function resource(): string

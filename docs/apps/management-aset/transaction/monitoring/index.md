@@ -10,7 +10,7 @@ Ini penting karena layar yang terdaftar di manifest **sudah muncul di navigasi S
 
 Ia **berfungsi**, hanya masih sederhana: belum ada penyaringan, pengelompokan, maupun ringkasan angka. Permission-nya `monitoring-aset.read`, terpisah dari `aset.read` supaya orang bisa diberi akses melihat ringkasan tanpa akses ke register lengkapnya.
 
-Kodenya di `ui/src/transactions/monitoring-aset/MonitoringPage.tsx`.
+Kodenya di `ui/transactions/monitoring-aset/MonitoringPage.tsx`.
 
 ## Dua layar setup yang sengaja kosong
 
@@ -21,7 +21,7 @@ Kodenya di `ui/src/transactions/monitoring-aset/MonitoringPage.tsx`.
 | **Parameter aset tetap** | Pengaturan pembulatan saat ini disimpan pada Buku penyusutan. Pengaturan lain menunggu kebutuhannya dipastikan |
 | **Profil posting aset** | Pemetaan akun menunggu modul Finance. App aset tidak menyimpan akun atau posting apa pun |
 
-Keduanya memakai satu komponen, `ui/src/fixed-assets-setup/FixedAssetSetupPlaceholderPage.tsx`.
+Keduanya memakai satu komponen, `ui/fixed-assets-setup/FixedAssetSetupPlaceholderPage.tsx`.
 
 ### Kenapa layarnya sudah ada padahal isinya belum
 

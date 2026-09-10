@@ -14,7 +14,7 @@ Workflow CI saat ini memasang trigger untuk `main`, `develop`, `master`, dan `wo
 
 ## Aturan yang mengikat semua repo
 
-Berlaku di `CoreERP` maupun di setiap repo app.
+Berlaku di `CoreERP` — termasuk seluruh isi `modules/` — maupun di setiap repo app yang belum dipindah.
 
 **Jaga perubahan dan dependency tetap minimal.** Jangan membuat abstraksi atau compatibility layer spekulatif. Kalau ada yang belum jelas, **berhenti dan tanya** — jangan menebak lalu terus jalan.
 
@@ -58,10 +58,12 @@ Dokumentasi ikut dalam PR yang sama dengan kodenya. Itu satu-satunya cara ia tet
 
 | Isi | Tempat |
 | --- | --- |
-| Kontrak yang mengikat semua repo | `CoreERP/docs/dev/` |
+| Kontrak yang mengikat semua module dan app | `CoreERP/docs/dev/` |
 | Orientasi, setup, glosarium | `CoreERP/docs/onboarding/` |
-| Domain spesifik satu app | `docs/` di repo app itu |
-| Cara menjalankan stack lokal | `erp-dev/README.md` |
+| Domain spesifik satu module | `CoreERP/docs/apps/<id module>/` — kode dan dokumennya satu repo |
+| Bentuk folder module, aturan namespace dan awalan tabel | `CoreERP/modules/README.md` |
+| Domain spesifik app yang belum dipindah | `docs/` di repo app itu |
+| Cara menjalankan stack lokal | `README.md` pada repo orkestrasi |
 
 **Aturan menulis:**
 

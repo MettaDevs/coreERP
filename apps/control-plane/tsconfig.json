@@ -140,15 +140,17 @@
         "../../modules/*/*/ui/**/*.tsx"
     ],
     /*
-     * Module yang sedang dipindah masuk dan belum dibentuk ulang dikecualikan.
+     * Module yang sedang dipindah masuk dan belum dibentuk ulang ditulis di sini.
      *
-     * UI-nya masih aplikasi React tersendiri dengan `package.json` dan `node_modules`
-     * miliknya sendiri, jadi memeriksanya dengan dependensi Core menghasilkan ratusan
-     * `TS2307 Cannot find module` yang tidak satu pun menunjuk kesalahan sungguhan.
+     * UI module semacam itu masih aplikasi React tersendiri dengan `package.json` dan
+     * `node_modules` miliknya sendiri, jadi memeriksanya dengan dependensi Core menghasilkan
+     * ratusan `TS2307 Cannot find module` yang tidak satu pun menunjuk kesalahan sungguhan.
      *
      * Daftar ini dijaga tetap sama dengan `ModulSedangDipindah` oleh
      * `ModulSedangDipindahTest`: entri yang tertinggal setelah modulnya selesai dipindah
      * membuat alur merah, jadi pengecualian ini tidak bisa hidup lebih lama dari sebabnya.
+     * Kosong sejak modul aset selesai dipindah pada 9 September 2026 — 47 berkas UI-nya
+     * diperiksa apa adanya di bawah setelan ini.
      */
-    "exclude": ["../../modules/apperp/management-aset/**"]
+    "exclude": []
 }

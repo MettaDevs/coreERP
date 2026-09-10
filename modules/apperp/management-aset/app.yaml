@@ -11,7 +11,9 @@ kind: business-app
 table_prefix: aset_
 requires:
   core: ^0.1
-depends_on: []
+# Peta id module ke rentang versi, bukan daftar. Bentuknya sama dengan yang dibaca
+# katalog provider; dua bentuk untuk satu jawaban pasti menyimpang.
+dependsOn: {}
 api:
   image: registry.apperp.local/apps/management-aset-api:0.1.0
   openapi: contracts/openapi.yaml
