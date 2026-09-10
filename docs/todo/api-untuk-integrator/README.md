@@ -107,11 +107,26 @@ menggantikannya.** Sebuah token tidak boleh dapat melakukan sesuatu yang penggun
 boleh. Kalau rantai `role → duty → privilege → permission` dapat dilewati token, seluruh model
 keamanan tenant kehilangan artinya.
 
-### 4. Batas laju, rotasi, dan jejak
+### 4. Batas laju, rotasi, dan jejak — prasyarat pintunya dibuka, bukan polesan
 
 Per token, bukan per IP. Pemanggil server-ke-server datang dari satu alamat dan dapat membanjiri
 sendiri; dan pelanggan yang tokennya dipakai berlebihan perlu melihat itu pada jejaknya sendiri,
 bukan pada telemetri kita.
+
+Ia berada di urutan terakhir karena ia bersandar pada ketiga langkah sebelumnya, **bukan karena ia
+boleh menyusul belakangan**. Alasannya ada di bagian terakhir halaman ini, "Kenapa on-prem D365 kehilangan OData": pembatas laju
+di sana dikunci pada identifier milik penyedia identitas, dan begitu penyedia identitasnya berganti
+di on-prem, pembatasnya ikut hilang — lalu pintunya ditutup.
+
+Keadaan kita berbeda pada penyebabnya, tetapi sama pada akibatnya. Kredensial mesin di sini adalah
+baris di database pelanggan, jadi kuncinya tidak pernah hilang. Yang hilang adalah **mata kita**:
+pembaruan on-prem dijalankan admin di tempat pelanggan, dan kotak itu tidak kita lihat. Maka
+pembatasnya harus **ikut terkirim di dalam image dan menyala sejak awal**, bukan dioperasikan
+belakangan oleh kita.
+
+Selama itu belum ada, membuka pintu sinkron ke sistem luar berarti menyerahkan ketersediaan layar
+pelanggan kepada kualitas kode integrator: `core-app` di kotak pelanggan **satu container**, dan
+permintaan API memakan proses yang sama yang melayani layar.
 
 ## Selesai bila
 
@@ -126,11 +141,14 @@ bukan pada telemetri kita.
 - Kontrak OpenAPI modul menyebutkan cara autentikasi yang baru, sehingga integrator tidak perlu
   membaca kode kita untuk tahu caranya.
 - Kedua modul tidak menuliskan middleware autentikasi sendiri lagi.
+- Pembatas laju per token **menyala di image bawaan tanpa disetel siapa pun**, dan batasnya
+  dibuktikan dengan permintaan yang benar-benar ditolak — bukan dengan membaca setelannya.
 
 ## Yang sudah dipecahkan orang lain, dan bagaimana
 
-Empat hal dari dokumentasi Dynamics 365 Finance & Operations yang langsung mengenai keputusan di
-atas. Dibaca dari sumbernya, bukan dari ingatan.
+Bacaan dari dokumentasi Dynamics 365 Finance & Operations yang langsung mengenai keputusan di atas.
+Dibaca dari sumbernya, bukan dari ingatan. Bagian terakhir memuat satu koreksi atas kesimpulan yang
+pernah ditulis di halaman ini sendiri.
 
 ### 1. API datanya CRUD penuh; yang read-only cuma katalognya
 
@@ -167,18 +185,101 @@ Untuk keadaan yang memunculkan halaman ini — backoffice pelanggan membaca dan 
 secara wajar — pintu sinkron memang yang benar. Catatan ini ada supaya pintu kedua tidak diminta
 terlalu awal, dan supaya ia tidak dilupakan kalau volumenya kelak naik.
 
-### Satu perbedaan yang menguntungkan kita
+### 5. Pola dipilih dengan tiga pertanyaan, dan angkanya bukan batas sistem
 
-> For **on-premises** deployments, the only supported API is the Data management package REST API.
+Halaman *Integration overview* mereka tidak menyuruh memilih pola berdasarkan selera. Ia menyebut
+tiga pertanyaan, lalu menjawabnya enam kali dengan tabel yang bentuknya sama:
 
-Pelanggan on-prem D365 **tidak** mendapat OData sama sekali. Skenario yang memunculkan halaman ini —
-pelanggan on-prem yang mau menyambungkan backoffice-nya sendiri — tidak dapat dilayani produk itu di
-tempat yang sama. Kalau kita melayaninya, itu bukan mengejar ketertinggalan.
+| Skenario | Real-time? | Volume puncak | Frekuensi | Pola |
+| --- | --- | --- | --- | --- |
+| Create dan update product information | Yes | 1.000 rec/jam | Unplanned | OData |
+| Read status customer order | Yes | 5.000 rec/jam | Unplanned | OData |
+| Approve BOM | Yes | 1.000 rec/jam | Unplanned | OData **action** |
+| Look up on-hand inventory | Yes | 1.000 rec/jam | Unplanned | Custom service |
+| Import sales order volume besar | **No** | 200.000 rec/jam | tiap 5 menit | Batch data API |
+| Export purchase order volume besar | **No** | 300.000 rec/jam | tiap jam | Batch data API |
+
+Angkanya sengaja tidak dijadikan aturan:
+
+> "Use these numbers only to gauge the pattern and don't consider them as hard system limits."
+
+Yang perlu ditiru bukan angkanya, melainkan **kebiasaan menuliskan ketiga jawabannya sebelum memilih
+pola**. Tabel yang sama, dikosongkan, adalah bentuk yang berguna untuk tiap skenario integrasi kita:
+
+| Keputusan | Jawaban |
+| --- | --- |
+| Butuh real-time? | |
+| Volume puncak | |
+| Frekuensi | |
+
+Satu hal yang mengikuti dari pilihan itu dan mudah terlewat: **penanganan galatnya berbeda**. Pola
+sinkron mengembalikan sukses atau gagal kepada pemanggil, dan pemanggil yang menanganinya. Pola
+asinkron hanya mengembalikan kabar bahwa **penjadwalannya** berhasil; sesudah itu status impor atau
+ekspornya tidak didorong ke mana pun, dan pemanggil **harus menanyakannya sendiri**. Membuka pintu
+asinkron berarti berutang satu endpoint status, bukan cuma satu endpoint kirim.
+
+### Kenapa on-prem D365 kehilangan OData, dan apa artinya bagi kita
+
+Bagian ini ada karena kesimpulan pertama yang ditulis di halaman ini **salah**, dan salahnya ke arah
+yang menyenangkan diri sendiri: ia berbunyi bahwa pelanggan on-prem D365 tidak dapat dilayani produk
+itu, jadi melayaninya membuat kita unggul. Yang benar lebih sempit, dan lebih berguna.
+
+**Yang memang tertulis** adalah pernyataan dukungan, bukan pernyataan kemampuan:
+
+> "For **on-premises** deployments, the only supported API is the Data management package REST API."
+
+**Mekanismenya justru bekerja, dan Microsoft sendiri yang menerbitkan caranya.** Artikel arsip mereka
+menjalankan contoh `OdataConsoleApplication` ke instance **on-premises**, memakai AD FS server
+application beserta shared secret, lalu mendaftarkan client id itu di tabel yang sama seperti di
+cloud (`System administration > Setup > Azure Active Directory applications`). Jadi yang dicabut
+adalah dukungannya, bukan kemampuannya.
+
+Sebabnya tidak dijelaskan Microsoft di mana pun yang ditemukan — halaman auth on-prem, halaman
+service endpoints, maupun halaman on-premises overview semuanya diam. Tetapi tiga fakta yang mereka
+tulis sendiri berbaris rapi:
+
+1. Autentikasi API-nya bersandar pada Entra ID, sampai ke prasyaratnya: *"You must have an Azure
+   subscription and admin access to Microsoft Entra ID."*
+2. Pembatas laju yang menjaga server mereka **dikunci pada identifier Entra**. Kunci throttle-nya
+   disusun dari *"the object ID of the Microsoft Entra user principal"*, atau — untuk kredensial
+   mesin — *"the object ID of the application in Microsoft Entra ID"*.
+3. On-prem menukar Entra dengan AD FS. Entra di sana hanya dipakai Lifecycle Services dan Azure
+   DevOps, bukan aplikasinya.
+
+Lalu kalimat ini menutupnya:
+
+> "Service protection API limits are available only for the finance and operations apps online
+> service … They aren't available for on-premises or development environments."
+
+**Kesimpulan berikut ini milik halaman ini, bukan kalimat Microsoft:** token on-prem mereka tetap
+tervalidasi, tetapi jaring pengamannya ikut hilang bersama penyedia identitasnya — dan satu-satunya
+pola yang mereka izinkan tersisa, batch data API, kebetulan pola yang memang tidak membutuhkan
+pembatas laju karena ia menjadwalkan batch job alih-alih mengeksekusi di dalam permintaan. Bacaan itu
+didukung satu detail lain: DIXF dan recurring integrations terdaftar sebagai **dikecualikan** dari
+throttling.
+
+#### Apa yang benar-benar berbeda pada kita
+
+**Kuncinya tidak pernah hilang.** Kredensial mesin di sistem ini adalah baris di database pelanggan,
+bukan objek di direktori luar. Pelanggan on-prem dan pelanggan SaaS memakai kunci yang bentuknya
+sama, karena tidak ada bagian dari identitas yang berada di luar kotak. Pemetaan `kredensial → satu
+user` yang mereka pakai tetap pantas ditiru; yang tidak perlu ditiru adalah ketergantungannya pada
+direktori luar.
+
+**Yang tidak boleh kita klaim.** Pengaman mereka dua lapis: per-user, dan berbasis resource dengan
+ambang CPU serta memori di **beberapa web server**. Di kotak pelanggan kita `core-app` cuma satu
+container, jadi lapisan kedua tidak punya tempat untuk berdiri. Dan sama seperti mereka, kita tidak
+melihat kotak itu. Karena itu pembatas lajunya menjadi prasyarat, bukan langkah terakhir; itulah yang dijelaskan
+langkah 4 di atas.
 
 **Sumber.**
 [Service endpoints overview](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/services-home-page) ·
 [Open Data Protocol (OData)](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/odata) ·
-[Integration between finance and operations apps and third-party services](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/integration-overview)
+[Integration between finance and operations apps and third-party services](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/integration-overview) ·
+[Service protection API limits](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/service-protection-api-limits) ·
+[Authentication in Dynamics 365 Finance + Operations (on-premises)](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/deployment/authentication-onprem) ·
+[On-premises deployment overview](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/deployment/on-premises-overview) ·
+[Authenticate with Dynamics 365 for Finance and Operations web services in on-premises](https://learn.microsoft.com/en-us/archive/blogs/axsa/authenticate-with-dynamics-365-for-finance-and-operations-web-services-in-on-premise)
 
 ## Yang sengaja tidak ada di sini
 
