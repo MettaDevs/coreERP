@@ -12,11 +12,11 @@ Business Partner adalah fondasi untuk identitas pihak bisnis yang dipakai lebih 
 | Kind | `business-app` |
 | Butuh Core | `^0.1` |
 | Bentuk | Belum diputuskan — app ini belum dibangun |
-| Database | `app_erp_business_partner` bila ia dibangun sebagai app berkontainer |
+| Database | database tenant Core, dengan awalan tabel `business_partner_` |
 | Dependency app | Tidak ada |
 
 ::: tip Halaman ini menggambarkan rencana
-Business Partner belum ada, baik sebagai module maupun sebagai app berkontainer. Bentuk penempatannya
+Business Partner belum ada. Bentuk penempatannya
 diputuskan saat ia dibangun, dan bentuk yang berlaku untuk pekerjaan baru adalah module di dalam repo
 Core. Batas domain di bawah tetap berlaku apa pun bentuknya.
 :::

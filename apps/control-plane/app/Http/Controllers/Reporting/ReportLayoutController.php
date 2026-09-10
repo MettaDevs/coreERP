@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Reporting;
 use App\Http\Controllers\Controller;
 use App\Models\TenantMembership;
 use App\Support\CurrentWorkspace;
-use App\Support\Reporting\AppReportClient;
 use App\Support\Reporting\LayoutRef;
 use App\Support\Reporting\LayoutStore;
 use App\Support\Reporting\PrintIdentityStore;
@@ -122,9 +121,9 @@ class ReportLayoutController extends Controller
         $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
         abort_unless(LayoutRef::isValid($ref) && $this->layouts->exists($report, $membership->tenant_id, $legalEntityId, $ref), 404);
 
-        $layout = AppReportClient::guard(fn () => $this->layouts->resolve(
+        $layout = $this->layouts->resolve(
             $report, $membership->tenant_id, $legalEntityId, $ref, $membership, $this->workspace->operatingUnit($request, $membership)?->id,
-        ), $report);
+        );
         $name = preg_replace('/[^A-Za-z0-9._-]+/', '-', $layout->name) ?? 'layout';
 
         return response()->download($layout->localPath, "{$report->code}-{$name}.{$layout->format}")->deleteFileAfterSend(true);
@@ -171,9 +170,9 @@ class ReportLayoutController extends Controller
     /** @return list<string> */
     private function knownKeys(Request $request, TenantMembership $membership, stdClass $report): array
     {
-        $definition = AppReportClient::guard(fn () => $this->client->definition(
+        $definition = $this->client->definition(
             $report, $membership, $this->workspace->legalEntity($request, $membership)?->id, $this->workspace->operatingUnit($request, $membership)?->id,
-        ), $report);
+        );
 
         return array_map(fn (array $field): string => (string) $field['key'], [...$definition['fields'], ...$this->identities->catalog()]);
     }

@@ -22,20 +22,6 @@ class LaunchableAppCatalog
     }
 
     /**
-     * Entry UI diturunkan dari placement yang melayani tenant ini, bukan dibaca
-     * dari kolom. Placement adalah unit silo/pool, jadi dua tenant pada
-     * placement berbeda memperoleh path berbeda tanpa nilai apa pun disimpan.
-     */
-    public function runtimeFor(TenantMembership $membership, string $appId): ?string
-    {
-        $placement = $this->readyPlacementQuery($membership)
-            ->where('placements.app_id', $appId)
-            ->value('placements.placement');
-
-        return $placement === null ? null : AppContentPath::for($appId, (string) $placement);
-    }
-
-    /**
      * @return list<array{id:string,label:string,href:string,items:list<array{id:string,label:string,href:string}>}>
      */
     public function navigationFor(TenantMembership $membership, CoreApp $app): array
@@ -43,15 +29,14 @@ class LaunchableAppCatalog
         $allowed = array_flip($this->permissionsFor($membership, $app->id));
         $navigation = $app->navigation ?? [];
         $sidebar = is_array($navigation['sidebar'] ?? null) ? $navigation['sidebar'] : [];
-        $sebagaiModule = $this->berjalanSebagaiModul($membership, $app->id);
 
-        return array_values(collect($navigation['rail'] ?? [])->map(function (array $rail) use ($allowed, $app, $sebagaiModule, $sidebar): ?array {
+        return array_values(collect($navigation['rail'] ?? [])->map(function (array $rail) use ($allowed, $app, $sidebar): ?array {
             $items = array_values(collect($sidebar[$rail['id']] ?? [])
                 ->filter(fn (array $item): bool => isset($allowed[$item['permission']]))
                 ->map(fn (array $item): array => [
                     'id' => $item['id'],
                     'label' => $item['label'],
-                    'href' => $this->tautanMenu($app->id, (string) $item['id'], $sebagaiModule),
+                    'href' => $this->tautanMenu($app->id, (string) $item['id']),
                 ])->all());
 
             return $items === [] ? null : [
@@ -66,23 +51,16 @@ class LaunchableAppCatalog
     /**
      * Tujuan sebuah entri menu.
      *
-     * Penyaringan menu tidak berubah sedikit pun antara app container dan module; yang
-     * berubah hanya baris ini. App container disajikan di dalam iframe, sehingga seluruh
-     * layarnya satu halaman shell dan entri menu hanya menggeser `?view=`. Module berjalan
-     * di runtime yang sama, jadi tiap entri menunjuk rute module sungguhan.
-     *
-     * Jalur module diturunkan dengan aturan tetap `/<id module>/<id entri menu>`, bukan
-     * dibaca dari kolom manifest tersendiri. Alasannya: sebuah kolom kedua yang berisi
-     * jalur akan menyimpang dari berkas rute module cepat atau lambat, dan penyimpangannya
-     * tidak terlihat sampai ada yang mengklik menunya. Dengan aturan tetap, berkas rute
-     * module adalah satu-satunya sumber kebenaran, dan test membuktikan tiap tautan menu
+     * Jalurnya diturunkan dengan aturan tetap `/<id module>/<id entri menu>`, bukan dibaca
+     * dari kolom manifest tersendiri. Alasannya: sebuah kolom kedua yang berisi jalur akan
+     * menyimpang dari berkas rute module cepat atau lambat, dan penyimpangannya tidak
+     * terlihat sampai ada yang mengklik menunya. Dengan aturan tetap, berkas rute module
+     * adalah satu-satunya sumber kebenaran, dan test membuktikan tiap tautan menu
      * benar-benar mendarat pada rute yang terdaftar.
      */
-    private function tautanMenu(string $appId, string $itemId, bool $sebagaiModule): string
+    private function tautanMenu(string $appId, string $itemId): string
     {
-        return $sebagaiModule
-            ? '/'.$appId.'/'.$itemId
-            : '/apps/'.$appId.'?view='.rawurlencode($itemId);
+        return '/'.$appId.'/'.$itemId;
     }
 
     /**
@@ -125,25 +103,13 @@ class LaunchableAppCatalog
             ->distinct()
             ->pluck('permissions.app_id');
 
-        // Dua jalur hidup berdampingan selama pemindahan. App yang masih berjalan sebagai
-        // container siap bila penempatannya siap; module yang berjalan di runtime Core siap
-        // bila catatan pemasangannya berstatus terpasang. Menghapus jalur lama sekarang akan
-        // mematikan app yang belum dipindah.
-        $siapSebagaiContainer = $this->readyPlacementQuery($membership)
-            ->whereIn('placements.app_id', $authorizedAppIds)
-            ->distinct()
-            ->pluck('placements.app_id')
-            ->all();
-
-        $siapSebagaiModul = array_values(array_intersect(
+        // Satu penentu kesiapan, karena sekarang hanya ada satu jalur: sebuah app siap
+        // diluncurkan bila catatan pemasangan module-nya berstatus terpasang. Tidak ada
+        // artifact yang ditempatkan dan tidak ada runtime kedua yang perlu dinyatakan siap.
+        $readyAppIds = array_values(array_intersect(
             $this->moduleTerpasang($membership),
             $authorizedAppIds->map(strval(...))->all(),
         ));
-
-        $readyAppIds = array_values(array_unique(array_merge(
-            array_map(strval(...), $siapSebagaiContainer),
-            $siapSebagaiModul,
-        )));
 
         return array_values(
             CoreApp::query()
@@ -211,28 +177,5 @@ class LaunchableAppCatalog
     public function berjalanSebagaiModul(TenantMembership $membership, string $appId): bool
     {
         return in_array($appId, $this->moduleTerpasang($membership), true);
-    }
-
-    private function readyPlacementQuery(TenantMembership $membership): Builder
-    {
-        return DB::table('tenant_app_entitlements as entitlements')
-            ->join('tenant_deployments as deployments', 'deployments.tenant_id', '=', 'entitlements.tenant_id')
-            ->join('app_placements as placements', 'placements.placement', '=', 'deployments.placement')
-            ->join('app_releases as releases', function ($join) {
-                $join->on('releases.app_id', '=', 'placements.app_id')
-                    ->on('releases.version', '=', 'placements.release_version')
-                    ->where('releases.status', 'available');
-            })
-            ->where('entitlements.tenant_id', $membership->tenant_id)
-            ->where('entitlements.status', 'active')
-            ->where('entitlements.starts_at', '<=', now())
-            ->where(fn ($query) => $query->whereNull('entitlements.ends_at')->orWhere('entitlements.ends_at', '>', now()))
-            ->where('deployments.status', 'active')
-            ->whereColumn('placements.app_id', 'entitlements.app_id')
-            ->whereColumn('placements.profile', 'deployments.profile')
-            ->where('placements.artifact_status', 'placed')
-            ->where('placements.migration_status', 'succeeded')
-            ->where('placements.runtime_status', 'ready')
-            ->whereNotNull('placements.ready_at');
     }
 }

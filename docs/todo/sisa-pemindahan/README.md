@@ -11,53 +11,49 @@ masih menuntut pekerjaan atau keputusan.
 Satu tugas yang belum pernah dibangun sama sekali punya halamannya sendiri:
 [bundle dan pemasangan di server pelanggan](../bundle-on-prem/).
 
-## 1. Jalur konten dan proxy — hidup di kode, tanpa subjek
+## 1. Jalur konten dan proxy — dibuang seluruhnya, selesai
 
-Rencana kerja menyebut tiga berkas yang harus dibuang bersama pembuangan jalur container:
+**Selesai pada 10 September 2026.** Pemilik produk memutuskan pada hari yang sama bahwa
+`app-erp-procurement` datang sebagai module, bukan sebagai app berkontainer. Dengan itu jalur hosting
+container tidak punya subjek di masa depan, dan ia dibuang **sekaligus** dalam satu pull request —
+bukan sepotong-sepotong, karena jalur yang setengah dibuang lebih berbahaya daripada jalur yang masih
+utuh.
 
-- `apps/control-plane/app/Support/AppContentPath.php`
-- `apps/control-plane/app/Console/Commands/RenderAppProxyConfigCommand.php`
+Yang dibuang:
+
+- `apps/control-plane/app/Support/AppContentPath.php` dan `AppContextToken.php`
+- `apps/control-plane/app/Console/Commands/RenderAppProxyConfigCommand.php` dan
+  `BootstrapLocalAppRuntimeCommand.php`
+- `apps/control-plane/app/Jobs/DeployAppPlacement.php`
+- `apps/control-plane/app/Support/Reporting/AppReportClient.php` beserta cabang HTTP pada
+  `SumberLaporan` — tidak ada lagi app di luar proses yang menyiapkan dataset laporan
+- pendaftaran rilis penyedia: `AppReleaseController`, `AppReleaseRequest`, model `AppRelease`,
+  rutenya, dan entri OpenAPI-nya
+- `apps/control-plane/resources/js/pages/apps/host.tsx` beserta pemeriksa pesan iframe pada
+  `resources/js/lib/notifications.ts`
 - `deploy/apps-content-proxy.md`
+- pemanggilan `app:render-proxy-config` pada `docker/entrypoint.sh`, dan dua modul Apache
+  (`proxy`, `proxy_http`) pada `Dockerfile`
+- setelan `reporting.app_api_endpoints` dan `reporting.app_timeout`
+- test yang menguji jalur itu
 
-Tugas itu tidak pernah punya pemilik: ia ditulis "dikerjakan pada fase 7", dan tidak ada satu pun
-tugas fase 7 yang memikulnya.
+Yang **tidak** dibuang, dan alasannya:
 
-**Diperiksa pada 10 September 2026, dan ketiganya belum boleh dibuang** — tetapi bukan karena alasan
-yang tertulis di rencana.
+- **Tabel `app_placements`, `app_releases`, dan `app_installations`.** Ditinggalkan sebagai tabel
+  yatim. Menghapusnya berarti migration yang membuang data di server setiap pelanggan, dan aturan
+  repo ini adalah semua penghapusan bersifat lunak. Tidak ada kode yang menulis maupun membacanya
+  lagi.
+- **Endpoint `/api/internal/v1/` beserta middleware `internal-app`.** Ia bukan bagian dari hosting
+  container; ia batas untuk integrasi luar dan addon pihak ketiga, dan
+  [API, event, dan integrasi module](../../dev/04-api-and-integration.md) sudah menyatakan ia
+  dipertahankan. Yang berubah hanya penentu kesiapannya: dari penempatan container menjadi catatan
+  pemasangan module.
+- **`tenant_deployments`.** Ia mencatat profile dan placement satu tenant, dan masih dibaca jalur
+  urutan nomor. Ia bukan bagian jalur container.
 
-Alasan yang tertulis di rencana ternyata **salah**: ia menyebut `app-erp-procurement` masih memakai
-jalur konten. Repo itu tidak menyebut jalur konten sama sekali, dan sebuah migration sudah
-mengeluarkan procurement dari katalog, penempatan, dan entitlement. Stack pengembangan lokal juga
-tidak lagi punya layanan untuk menjalankan app berkontainer mana pun. Jadi hari ini **tidak ada satu
-pun app yang benar-benar dilayani** jalur itu; perintah proxy-nya berjalan setiap container web naik
-dan merender konfigurasi kosong.
-
-Alasan yang sebenarnya bersifat struktural. Jalur konten bukan berkas yang berdiri sendiri — ia satu
-mata rantai dari jalur hosting container yang **masih utuh dan sengaja dipertahankan**: pendaftaran
-rilis oleh penyedia, penempatan app, penyusunan alamat konten oleh katalog peluncur, halaman shell
-yang memuat alamat itu sebagai iframe, dan dua modul Apache yang hanya ada untuk melayaninya.
-Membuang tiga berkas itu sendirian menghasilkan shell yang menerbitkan alamat yang tidak ada yang
-mem-proxy — jalur rusak, bukan jalur yang dibuang.
-
-Satu berkas yang **tidak** disebut rencana dan termasuk himpunan yang sama: dua modul Apache yang
-dinyalakan `Dockerfile` khusus untuk proxy ini.
-
-**Keputusan pemilik produk, 10 September 2026: procurement datang sebagai module.**
-
-Artinya jalur container tidak punya subjek di masa depan, dan ia dibuang **sekaligus**, bukan
-sepotong-sepotong. Yang termasuk himpunan itu, sejauh yang sudah ditelusuri:
-
-- ketiga berkas yang disebut rencana, ditambah dua modul Apache pada `Dockerfile`
-- halaman shell yang memuat konten app sebagai iframe
-- penyusunan alamat konten pada katalog peluncur
-- penempatan app dan rilis penyedia beserta endpoint-nya
-- token konteks app
-- perintah penyiapan runtime app lokal
-- test dan halaman dokumen yang menjelaskan semuanya
-
-Ini pekerjaan besar yang berdiri sendiri, dan ia **berdiri sendiri sebagai satu pull request**.
-Membuangnya bercampur dengan pekerjaan lain membuat diff-nya tidak bisa ditinjau, dan jalur yang
-setengah dibuang lebih berbahaya daripada jalur yang masih utuh.
+Satu akibat yang ikut diperbaiki karena pembuangan ini memaksanya: `EnsureNumberSequenceDrafts`
+membaca kesiapan dari `app_placements`, sehingga **module tidak pernah memperoleh urutan nomor lewat
+jalur itu**. Ia sekarang membaca catatan pemasangan module.
 
 ## 2. Penugasan role otomatis hilang — diterima, bukan ditunggu
 
@@ -131,8 +127,9 @@ mendapat berkas pengantar ke cetakan module di `modules/_template/`; yang kedua 
 repo pun di organisasi — diperiksa dengan pencarian kode, dan satu-satunya penyebutan yang tersisa
 ada di dokumen serta satu test di repo ini.
 
-Satu repo sengaja **tidak** disentuh: `app-erp-procurement`. Ia belum dipindah, dan pemindahannya
-adalah pekerjaan yang disebut bagian 1 di atas.
+Satu repo sengaja **tidak** disentuh: `app-erp-procurement`. Ia belum dipindah; keputusan pemilik
+produk pada 10 September 2026 adalah ia datang sebagai module, dan pemindahannya sendiri belum
+dikerjakan. Yang sudah selesai adalah pembuangan jalur container yang disebut bagian 1 di atas.
 
 ## 5. Tiga lubang pemeriksaan yang ditemukan saat menulis desain kanonik
 

@@ -39,7 +39,7 @@ Urutannya:
 
 **Hari pertama** — [Hari pertama](/onboarding/hari-pertama) → [Setup lingkungan lokal](/onboarding/setup) → [Glosarium](/onboarding/glosarium)
 
-**Minggu pertama** — [Grand design](/dev/01-grand-design) → [Empat kebenaran lifecycle](/onboarding/empat-kebenaran) → [Alur end-to-end](/onboarding/alur-end-to-end) → [Peta kode ke dokumen](/onboarding/peta-kode) → [Cara berkontribusi](/onboarding/kontribusi)
+**Minggu pertama** — [Grand design](/dev/01-grand-design) → [Tiga kebenaran lifecycle](/onboarding/tiga-kebenaran) → [Alur end-to-end](/onboarding/alur-end-to-end) → [Peta kode ke dokumen](/onboarding/peta-kode) → [Cara berkontribusi](/onboarding/kontribusi)
 
 **Saat dibutuhkan** — sisanya di [Desain kanonik](/dev/), dibuka sesuai tugas
 
@@ -51,7 +51,7 @@ Kalau kamu ditugaskan ke app tertentu, buka juga hub teknisnya: [Management Aset
 
 **1. Tenant bukan organization.** Tenant adalah pemegang kontrak dan batas isolasi data tertinggi. Organization adalah identitas bisnis di dalamnya. Keduanya beda tabel, beda tujuan, beda kolom scope. Lihat [Glosarium](/onboarding/glosarium) dan [Tenant dan hierarki organisasi](/dev/01a-tenant-and-org-hierarchy).
 
-**2. "Terpasang" bukan satu status.** Katalog, entitlement, installation, dan runtime health adalah empat fakta terpisah dengan sumber kebenaran masing-masing. Lihat [Empat kebenaran lifecycle](/onboarding/empat-kebenaran).
+**2. "Terpasang" bukan satu status.** Katalog, entitlement, dan pemasangan module adalah tiga fakta terpisah dengan sumber kebenaran masing-masing. Lihat [Tiga kebenaran lifecycle](/onboarding/tiga-kebenaran).
 
 **3. Parent-child organization tidak permanen.** Ia hidup pada node hierarchy berversi, bukan pada identitas organization. Jangan menyimpan `parent_id` permanen untuk organization Core.
 

@@ -426,7 +426,7 @@ seorang pelanggan, yang berubah adalah berkas edisinya, bukan alur rilisnya.
 Module muncul di katalog, `php artisan edition:resolve <berkas edisi>` memulangkannya untuk edisi yang memang membelinya, dan installation registry menyatakan `ready` setelah migration berhasil.
 :::
 
-Detail: [Menerbitkan release app](/dev/13-publishing-an-app-release) dan [Release dan on-prem](/dev/03-release-and-on-prem#dua-bentuk-rilis).
+Detail: [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) dan [Release dan on-prem](/dev/03-release-and-on-prem#dua-bentuk-rilis).
 
 ---
 
@@ -455,7 +455,7 @@ tautan mati.
 
 ## Yang tidak termasuk jalur ini
 
-**Upgrade versi.** Menaikkan versi release bukan bagian dari pembuatan modul. Ia memerlukan compatibility matrix, backup terverifikasi, traffic drain, dependency check, dan prosedur rollback. Selama module masih di release pengembangan, jalankan migration baru pada placement pengembangan dan jangan memperlakukannya sebagai upgrade produksi.
+**Upgrade versi.** Menaikkan versi release bukan bagian dari pembuatan modul. Ia memerlukan compatibility matrix, backup terverifikasi, traffic drain, dependency check, dan prosedur rollback. Selama module masih di release pengembangan, jalankan migration baru dengan `module:migrate` dan jangan memperlakukannya sebagai upgrade produksi.
 
 **Fork Core.** Kebutuhan khusus customer diselesaikan dengan konfigurasi, integration connector, atau addon.
 

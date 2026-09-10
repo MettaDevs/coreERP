@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ModuleInstallation;
 use App\Models\NumberSequenceReference;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -60,17 +61,11 @@ class SeedNumberSequenceLoad extends Command
             );
         }
 
-        DB::table('app_placements')->insertOrIgnore([
-            'id' => (string) Str::ulid(), 'app_id' => $appId, 'release_version' => '1.0.0', 'profile' => 'pooled',
-            'placement' => 'load-placement', 'artifact_status' => 'placed', 'migration_status' => 'succeeded',
-            'runtime_status' => 'ready', 'ready_at' => now(), 'created_at' => now(), 'updated_at' => now(),
-        ]);
-
         $bar = $this->output->createProgressBar($tenantCount);
         $now = now();
 
         foreach (array_chunk(range(1, $tenantCount), 100) as $chunk) {
-            $clients = $tenants = $entitlements = $deployments = $sequences = [];
+            $clients = $tenants = $entitlements = $deployments = $installations = $sequences = [];
 
             foreach ($chunk as $index) {
                 $clientId = (string) Str::ulid();
@@ -79,6 +74,9 @@ class SeedNumberSequenceLoad extends Command
                 $tenants[] = ['id' => $tenantId, 'client_id' => $clientId, 'name' => "Load Tenant {$index}", 'slug' => "load-tenant-{$index}", 'status' => 'active', 'created_at' => $now, 'updated_at' => $now];
                 $entitlements[] = ['tenant_id' => $tenantId, 'app_id' => $appId, 'status' => 'active', 'starts_at' => $now, 'created_at' => $now, 'updated_at' => $now];
                 $deployments[] = ['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'profile' => 'pooled', 'placement' => 'load-placement', 'status' => 'active', 'created_at' => $now, 'updated_at' => $now];
+                // Kesiapan sebuah app bagi satu tenant dibaca dari catatan pemasangan module, dan
+                // catatan itu per tenant — bukan satu baris penempatan yang dibagi seluruh estate.
+                $installations[] = ['tenant_id' => $tenantId, 'module_id' => $appId, 'version' => '1.0.0', 'status' => ModuleInstallation::STATUS_INSTALLED, 'installed_at' => $now, 'created_at' => $now, 'updated_at' => $now];
 
                 foreach ($references as $reference) {
                     $sequences[] = [
@@ -96,6 +94,7 @@ class SeedNumberSequenceLoad extends Command
             DB::table('tenants')->insert($tenants);
             DB::table('tenant_app_entitlements')->insert($entitlements);
             DB::table('tenant_deployments')->insert($deployments);
+            DB::table('core_module_installations')->insert($installations);
             DB::table('tenant_number_sequences')->insert($sequences);
             $bar->advance(count($chunk));
         }

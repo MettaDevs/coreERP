@@ -24,10 +24,10 @@ import type { ComponentType, ReactNode } from 'react';
  * `INEFFECTIVE_DYNAMIC_IMPORT`. Peringatan yang selalu muncul adalah peringatan yang berhenti
  * dibaca orang.
  *
- * Ini yang menggantikan `pages/apps/host.tsx`. Perbedaan yang paling penting bukan soal
- * gaya: iframe memuat aplikasi React kedua beserta salinan React dan `@apperp/ui`-nya
- * sendiri, sedangkan yang di sini berbagi satu React, satu tema, dan satu riwayat
- * peramban dengan shell.
+ * Ini yang menggantikan halaman tuan rumah beriframe yang dulu memuat UI app. Perbedaan yang
+ * paling penting bukan soal gaya: iframe memuat aplikasi React kedua beserta salinan React dan
+ * `@apperp/ui`-nya sendiri, sedangkan yang di sini berbagi satu React, satu tema, dan satu
+ * riwayat peramban dengan shell.
  */
 
 type PropsHalaman = Record<string, unknown>;

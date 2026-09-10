@@ -5,6 +5,7 @@ namespace Tests\Feature\ControlPlane;
 use App\Actions\FiscalCalendar\FiscalCalendarService;
 use App\Models\AppServiceCredential;
 use App\Models\FiscalCalendar;
+use App\Models\ModuleInstallation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -151,18 +152,14 @@ class FiscalCalendarDirectoryTest extends TestCase
     }
 
     /**
-     * Entitlement dan deployment bersifat per tenant, sedangkan penempatan artifact app
-     * unik per (app, placement). Karena itu penempatan hanya ditulis sekali, dan seluruh
-     * tenant memakai placement yang sama supaya app terbaca `ready` bagi keduanya.
+     * Sebuah app siap bagi satu tenant bila tenant itu berhak atasnya **dan** modulenya
+     * tercatat terpasang untuknya. Keduanya per tenant, jadi keduanya ditulis per tenant.
      */
     private function readyApp(?string $tenantId = null): void
     {
         $tenantId ??= $this->tenantId;
         DB::table('tenant_app_entitlements')->insert(['tenant_id' => $tenantId, 'app_id' => $this->appId, 'status' => 'active', 'starts_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         DB::table('tenant_deployments')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'profile' => 'pooled', 'placement' => 'sample-placement', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
-        DB::table('app_placements')->updateOrInsert(
-            ['app_id' => $this->appId, 'placement' => 'sample-placement'],
-            ['id' => (string) Str::ulid(), 'release_version' => '1.0.0', 'profile' => 'pooled', 'artifact_status' => 'placed', 'migration_status' => 'succeeded', 'runtime_status' => 'ready', 'ready_at' => now(), 'created_at' => now(), 'updated_at' => now()],
-        );
+        DB::table('core_module_installations')->insert(['tenant_id' => $tenantId, 'module_id' => $this->appId, 'version' => '1.0.0', 'status' => ModuleInstallation::STATUS_INSTALLED, 'installed_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     }
 }

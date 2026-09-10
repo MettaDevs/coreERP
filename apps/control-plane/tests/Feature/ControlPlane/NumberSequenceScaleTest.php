@@ -4,6 +4,7 @@ namespace Tests\Feature\ControlPlane;
 
 use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Actions\NumberSequence\NumberSequenceService;
+use App\Models\ModuleInstallation;
 use App\Models\NumberSequenceReference;
 use App\Models\TenantNumberSequence;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -139,6 +140,6 @@ class NumberSequenceScaleTest extends TestCase
     {
         DB::table('tenant_app_entitlements')->insert(['tenant_id' => $tenantId, 'app_id' => $appId, 'status' => 'active', 'starts_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         DB::table('tenant_deployments')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'profile' => 'pooled', 'placement' => 'sample-placement', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
-        DB::table('app_placements')->insertOrIgnore(['id' => (string) Str::ulid(), 'app_id' => $appId, 'release_version' => '1.0.0', 'profile' => 'pooled', 'placement' => 'sample-placement', 'artifact_status' => 'placed', 'migration_status' => 'succeeded', 'runtime_status' => 'ready', 'ready_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('core_module_installations')->insertOrIgnore(['tenant_id' => $tenantId, 'module_id' => $appId, 'version' => '1.0.0', 'status' => ModuleInstallation::STATUS_INSTALLED, 'installed_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     }
 }

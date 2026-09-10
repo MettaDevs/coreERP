@@ -16,7 +16,6 @@ use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\PrintIdentityController;
 use App\Http\Controllers\Organization\WorkspaceContextController;
 use App\Http\Controllers\Provider\AppCatalogController;
-use App\Http\Controllers\Provider\AppReleaseController;
 use App\Http\Controllers\Provider\AppServiceCredentialController;
 use App\Http\Controllers\Provider\IdentityMonitorController;
 use App\Http\Controllers\ReferenceData\UnitOfMeasureController;
@@ -26,9 +25,7 @@ use App\Http\Controllers\Reporting\ReportLayoutController;
 use App\Http\Controllers\Workflow\WorkflowConfigurationController;
 use App\Http\Controllers\Workflow\WorkflowInboxController;
 use App\Models\CoreApp;
-use App\Support\AppContextToken;
 use App\Support\CurrentWorkspace;
-use App\Support\DataPolicyAccessResolver;
 use App\Support\LaunchableAppCatalog;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 use Illuminate\Http\Request;
@@ -90,58 +87,28 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('apps/{app}', function (CoreApp $app, Request $request, CurrentWorkspace $workspace, LaunchableAppCatalog $catalog, AppContextToken $tokens) {
+    /*
+     * Tautan tunggal ke sebuah produk: `/apps/<id>`.
+     *
+     * Sebuah app tidak lagi punya halaman tuan rumah sendiri — tidak ada iframe, tidak ada
+     * runtime kedua, dan tidak ada alamat konten yang perlu disusun. Yang tersisa adalah satu
+     * pengalihan ke entri menu pertama yang boleh dilihat pengguna ini, karena halaman
+     * sesungguhnya dirender module pada rutenya sendiri.
+     *
+     * Rutenya tetap ada meski hanya mengalihkan: ia satu-satunya tautan yang benar untuk
+     * peluncur produk, yang tidak tahu—dan tidak perlu tahu—entri menu mana yang pertama boleh
+     * dilihat oleh pengguna yang sedang masuk.
+     */
+    Route::get('apps/{app}', function (CoreApp $app, Request $request, CurrentWorkspace $workspace, LaunchableAppCatalog $catalog) {
         $membership = $workspace->membership($request);
         abort_unless($membership && collect($catalog->for($membership))->contains('id', $app->id), 403);
 
-        /*
-         * App yang sudah berjalan sebagai module tidak punya halaman tuan rumah sendiri.
-         * Peluncur produk tetap menautkan `/apps/<id>` untuk keduanya — itu satu-satunya
-         * tautan yang tetap benar sebelum dan sesudah sebuah app dipindahkan — jadi di sini
-         * ia diteruskan ke entri menu pertama yang boleh dilihat pengguna ini.
-         *
-         * Tanpa cabang ini, sebuah module yang sudah terpasang membalas 404 dari
-         * `runtimeFor`, karena module memang tidak punya penempatan container.
-         */
-        if ($catalog->berjalanSebagaiModul($membership, $app->id)) {
-            $tujuan = collect($catalog->navigationFor($membership, $app))
-                ->flatMap(fn (array $rail): array => $rail['items'])
-                ->first();
-            abort_if($tujuan === null, 404);
+        $tujuan = collect($catalog->navigationFor($membership, $app))
+            ->flatMap(fn (array $rail): array => $rail['items'])
+            ->first();
+        abort_if($tujuan === null, 404);
 
-            return redirect($tujuan['href']);
-        }
-
-        $runtimeEntry = $catalog->runtimeFor($membership, $app->id);
-        abort_unless($runtimeEntry, 404);
-        $navigation = $catalog->navigationFor($membership, $app);
-        $items = collect($navigation)->flatMap(fn (array $rail): array => $rail['items']);
-        $activeItem = $items->firstWhere('id', $request->string('view')->toString()) ?? $items->first();
-        $contentEntry = $runtimeEntry;
-
-        if ($activeItem) {
-            $contentEntry = rtrim($contentEntry, '#/').'/#/'.rawurlencode($activeItem['id']);
-        }
-
-        return Inertia::render('apps/host', [
-            'app' => [
-                'id' => $app->id,
-                'name' => $app->name,
-                'contentEntry' => $contentEntry,
-                'navigation' => [
-                    'rails' => $navigation,
-                    'activeItemId' => $activeItem['id'] ?? null,
-                ],
-                'contextToken' => $tokens->issue(
-                    $membership,
-                    $app->id,
-                    $catalog->permissionsFor($membership, $app->id),
-                    $workspace->legalEntity($request, $membership)?->id,
-                    $workspace->operatingUnit($request, $membership)?->id,
-                    app(DataPolicyAccessResolver::class)->resolve($membership),
-                ),
-            ],
-        ]);
+        return redirect($tujuan['href']);
     })->name('apps.host');
 
     Route::inertia('dashboard', 'dashboard')->name('dashboard');
@@ -291,9 +258,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('provider/apps', [AppCatalogController::class, 'store'])
             ->middleware('throttle:20,1')
             ->name('provider.apps.store');
-        Route::post('provider/apps/{app}/releases', [AppReleaseController::class, 'store'])
-            ->middleware('throttle:20,1')
-            ->name('provider.app-releases.store');
         Route::post('provider/apps/{app}/service-credentials', [AppServiceCredentialController::class, 'store'])
             ->middleware('throttle:20,1')
             ->name('provider.app-service-credentials.store');

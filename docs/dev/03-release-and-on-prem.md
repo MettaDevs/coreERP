@@ -133,50 +133,26 @@ Installer membaca app manifest. Pada SaaS ia memperoleh placement dari control p
 ```text
 validate license/signature/version/dependency
 -> choose deployment target
--> pull API and UI artifact
--> create or resolve app database
--> backup and run migration
--> register API/UI/event subscription
+-> pull image edisi Core
+-> create or resolve tenant database
+-> backup and run module migration
+-> register manifest and event subscription
 -> health check
--> bind entitled tenant to ready placement
+-> record module installation for entitled tenant
 ```
 
 ### Perbedaan per profile
 
 | Langkah | Pooled cloud | Isolated cloud | On-prem perpetual |
 | --- | --- | --- | --- |
-| Artifact | Sudah dideploy global per release | Pull/deploy per tenant placement | Operator memperoleh bundle image/manifest bertanda tangan untuk edition customer lalu memuatnya secara lokal |
-| Database | Resolve `app_pool_db` | Create/resolve `app_tenant_db` | Create volume/database app di Compose |
+| Artifact | Image edisi Core sudah dideploy global | Image edisi Core per placement tenant | Operator memperoleh bundle image/manifest bertanda tangan untuk edition customer lalu memuatnya secara lokal |
+| Database | Resolve database tenant yang sudah ada | Create/resolve database khusus tenant | Create volume/database Core di Compose |
 | Enable | Entitlement per tenant | Entitlement + endpoint placement | Lisensi perpetual dan manifest instalasi lokal; tidak ada heartbeat vendor |
-| UI | Container UI per placement, di belakang path `/apps-content/<placement>/<app-id>/` | Sama, dengan placement khusus tenant | Static UI container pada server customer, path yang sama |
+| UI | Ikut build shell Core; tidak ada artifact UI tersendiri | Sama | Sama |
 
-Untuk module, tiga baris pertama menyusut: artifact-nya adalah image Core edisi itu, databasenya
-adalah database tenant yang sudah ada, dan yang dijalankan hanyalah `module:migrate` beserta
-registrasi manifest. Baris UI gugur sama sekali — halaman module ikut build shell.
-
-### Config reverse proxy adalah artifact rilis
-
-Bagian ini berlaku untuk app berkontainer; module tidak punya container UI untuk di-proxy.
-
-Path konten UI diturunkan dari `(app_id, placement)` dan tidak pernah disimpan.
-Yang perlu disiapkan operator hanyalah reverse proxy yang menerjemahkan path itu ke
-container UI milik placement bersangkutan — dan config-nya **dirender dari registry
-placement, bukan ditulis tangan**:
-
-```bash
-php artisan app:render-proxy-config --target=nginx --output=/etc/nginx/conf.d/coreerp-apps-content.conf
-```
-
-Command melaporkan setiap placement yang dilewati beserta alasannya, sehingga config
-yang belum lengkap tidak terbaca seolah sudah lengkap. Detail dan jebakan trailing
-slash ada pada berkas `deploy/apps-content-proxy.md`.
-
-Batasnya perlu diketahui sebelum jumlah tenant bertambah: config ini statis, jadi
-setiap provisioning menuntut render ulang dan reload proxy pada semua replica. Cukup
-untuk puluhan placement. Karena path sudah di-key placement, penggantian ke resolusi
-dinamis — `resolver` nginx dengan `proxy_pass` bervariabel, ingress controller dengan
-aturan per-placement, atau service router yang membaca `app_placements` — tidak
-menuntut perubahan skema maupun migrasi data.
+Baris artifact dan database menyusut untuk module: artifact-nya adalah image Core edisi itu,
+databasenya adalah database tenant yang sudah ada, dan yang dijalankan hanyalah `module:migrate`
+beserta registrasi manifest.
 
 ## Workflow tim dan release self-hosted
 
@@ -287,52 +263,43 @@ apps:
 
 Jika versi tersebut kompatibel, CI membuat **signed add-on bundle** yang memuat Backoffice, migration, manifest/lisensi baru, dan hanya dependency upgrade yang diwajibkan oleh compatibility matrix. POS dan Booking yang telah ada tidak dibangun atau dikirim ulang. Bila tidak ada kombinasi yang kompatibel, Release Manager menolak penerbitan bundle dan menuntut upgrade prerequisite yang eksplisit.
 
-Di server PT.LeakStudio, operator menjalankan installer add-on. Installer memverifikasi bundle, membuat `backoffice_db`, menjalankan migration, memuat image Backoffice, mendaftarkan API/UI/event subscription, melakukan bootstrap data melalui API/event contract pemilik data, lalu health check. Ia dilarang membaca `pos_db` atau `booking_db` secara langsung.
+Di server PT.LeakStudio, operator menjalankan installer add-on. Installer memverifikasi bundle, memuat image edisi baru yang sudah memuat module Backoffice, menjalankan `module:migrate` untuk module itu, mendaftarkan manifest dan event subscription, melakukan bootstrap data lewat kontrak pemilik datanya, lalu health check. Module Backoffice dilarang membaca tabel milik POS atau Booking secara langsung.
 
 ## Compose edition on-prem
 
 Edition manifest menjelaskan dengan tepat apa yang boleh hadir pada server customer.
 
-Untuk **module**, "hadir" berarti berkasnya ikut di dalam image Core edisi itu; ia tidak menambah
-satu pun service Compose, database, atau volume. Server pelanggan yang hanya membeli module
-menjalankan container Core saja beserta database, worker, scheduler, dan renderer-nya.
+"Hadir" berarti berkas module itu ikut di dalam image Core edisi tersebut; ia tidak menambah satu
+pun service Compose, database, atau volume. Karena itu bentuk Compose-nya tidak lagi tumbuh
+mengikuti jumlah produk yang dibeli: berapa pun module yang dibeli customer, service-nya sama.
 
-Contoh di bawah adalah bentuk untuk **app berkontainer** — customer membeli Core, POS, Booking, dan bridge:
+Sampai 10 September 2026 halaman ini memuat contoh kedua dengan enam service tambahan per app —
+API, UI, dan database masing-masing. Contoh itu dibuang bersama jalur hosting container: tidak ada
+lagi app yang dibangun sebagai image tersendiri, jadi bentuk itu tidak pernah muncul lagi pada
+server pelanggan mana pun.
 
 ```yaml
 services:
   gateway:
     image: coreerp/gateway:1.0.0
   core-api:
-    image: coreerp/core-api:1.0.0
+    image: coreerp/core-edition-leakstudio:1.0.0
+  core-worker:
+    image: coreerp/core-edition-leakstudio:1.0.0
+  core-scheduler:
+    image: coreerp/core-edition-leakstudio:1.0.0
   core-db:
     image: postgres:17
-  # Engine render PDF milik platform; stateless, dipakai semua app. Lihat 23-document-rendering.md.
+  # Engine render PDF milik platform; stateless, dipakai semua module. Lihat 23-document-rendering.md.
   core-renderer:
     image: gotenberg/gotenberg:8
-  pos-api:
-    image: coreerp/pos-api:1.0.0
-  pos-ui:
-    image: coreerp/pos-ui:1.0.0
-  pos-db:
-    image: postgres:17
-  booking-api:
-    image: coreerp/booking-api:1.0.0
-  booking-ui:
-    image: coreerp/booking-ui:1.0.0
-  booking-db:
-    image: postgres:17
-  pos-booking-bridge:
-    image: coreerp/pos-booking-bridge:1.0.0
-  bridge-db:
-    image: postgres:17
 ```
 
-Jika customer tidak membeli Booking, seluruh `booking-*` dan `pos-booking-bridge` tidak muncul pada manifest, inventaris bundle, Compose file, image cache, atau database server. Dalam production cloud, `pos-db` dapat berarti database logis pada cluster managed; Compose menunjukkan boundary yang mudah dipahami pada server customer.
+Jika customer tidak membeli Booking, berkas module Booking tidak ikut ke dalam image edisi itu, tidak muncul pada manifest maupun inventaris bundle, dan tabelnya tidak pernah dibuat pada database server. Yang menegakkan batas komersialnya adalah ketiadaan berkas, bukan sebuah sakelar.
 
-`core-renderer` adalah engine render dokumen milik Core: ia hanya mengubah berkas Office yang sudah diisi Core menjadi PDF, tidak menyimpan data, dan selalu ikut bundle. Ekspor laporan semua app dikerjakan `core-worker`; jumlah replica-nya adalah angka di compose customer, dan web serta worker Core berbagi volume storage.
+`core-renderer` adalah engine render dokumen milik Core: ia hanya mengubah berkas Office yang sudah diisi Core menjadi PDF, tidak menyimpan data, dan selalu ikut bundle. Ekspor laporan semua module dikerjakan `core-worker`; jumlah replica-nya adalah angka di compose customer, dan web serta worker Core berbagi volume storage.
 
-`core-api` menyimpan identitas administrator lokal, manifest app aktif, riwayat instalasi, dan lisensi perpetual yang telah diverifikasi. `core-db` adalah database milik platform core; ia bukan database POS atau Booking. Control plane vendor **tidak** dijalankan pada server customer, juga tidak dibutuhkan agar deployment berfungsi. Images dapat dimuat dari bundle release (misalnya `docker load`) sehingga server runtime tidak perlu memiliki akses registry vendor.
+`core-api` menyimpan identitas administrator lokal, manifest module aktif, riwayat pemasangan, dan lisensi perpetual yang telah diverifikasi. `core-db` adalah database platform beserta seluruh module yang dibeli, dipisahkan oleh awalan nama tabel per module. Control plane vendor **tidak** dijalankan pada server customer, juga tidak dibutuhkan agar deployment berfungsi. Images dapat dimuat dari bundle release (misalnya `docker load`) sehingga server runtime tidak perlu memiliki akses registry vendor.
 
 Jika customer secara eksplisit membeli managed support, Compose dapat menambahkan `support-connector` terpisah. Connector hanya membuat koneksi outbound mTLS dan mengirim allow-list health/version minimum; detail batas data dan aksesnya ada di [01-grand-design.md](01-grand-design.md#konektor-support-bukan-bagian-default-on-prem).
 
@@ -381,7 +348,7 @@ bila module masih menjadi dependency module lain yang terpasang pada tenant yang
 ## Lihat juga
 
 - [Standar module](02-module-standard.md) — definisi release unit yang dirilis di sini
-- [Menerbitkan release app](13-publishing-an-app-release.md) — kontrak CI untuk katalog dan release
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — kontrak CI untuk katalog dan release
 - [Development stack lokal](11-local-docker-development.md) — versi lokal dari mekanisme yang sama
 - [Gate fondasi Core](10-core-foundation-gates.md) — syarat sebelum deployment production aktif
-- [Empat kebenaran lifecycle](../onboarding/empat-kebenaran.md) — kenapa "terpasang" bukan satu status
+- [Tiga kebenaran lifecycle](../onboarding/tiga-kebenaran.md) — kenapa "terpasang" bukan satu status

@@ -17,15 +17,10 @@ use Throwable;
 /**
  * Dari mana definisi, layout bawaan, dan dataset sebuah laporan diambil.
  *
- * Ada dua jalur dan hanya satu yang dipilih per laporan. Bila `app_id`-nya adalah module
- * yang berjalan di dalam proses ini, laporannya dibaca langsung lewat
- * {@see PenyediaLaporanModul}. Bila tidak, ia app di luar proses dan {@see AppReportClient}
- * memanggilnya lewat HTTP seperti sebelumnya.
- *
- * Tanda tangan ketiga metodenya sengaja sama persis dengan milik `AppReportClient`. Itu
- * membuat pemanggil di Core tidak perlu tahu jalur mana yang dipakai — dan lebih penting,
- * membuat jalur in-process tidak bisa diam-diam menerima parameter yang berbeda dari yang
- * dulu dibawa token.
+ * Hanya ada satu jalur: `app_id` sebuah laporan selalu module yang berjalan di dalam proses
+ * ini, dan laporannya dibaca langsung lewat {@see PenyediaLaporanModul}. Jalur HTTP ke app di
+ * luar proses dibuang bersama seluruh jalur hosting container; tidak ada lagi app yang
+ * dilayaninya.
  *
  * **Tenant aktif diikat di sini, bukan dititipkan ke module.** Model module menyaring lewat
  * `TenantScope`, yang gagal-menutup: tanpa ikatan ini setiap query module melempar. Ekspor
@@ -38,7 +33,6 @@ final class SumberLaporan
 {
     public function __construct(
         private readonly DaftarLaporanModul $daftar,
-        private readonly AppReportClient $klien,
         private readonly LaunchableAppCatalog $apps,
         private readonly DataPolicyAccessResolver $kebijakan,
         private readonly PelaksanaTenant $pelaksana,
@@ -51,10 +45,6 @@ final class SumberLaporan
     {
         $penyedia = $this->penyedia($report);
 
-        if ($penyedia === null) {
-            return $this->klien->definition($report, $membership, $legalEntityId, $orgUnitId);
-        }
-
         return $this->jalankan($report, $membership, fn (array $konteks): array => $penyedia->definisi(
             $this->kodeLokal($report, $penyedia),
             $konteks,
@@ -64,10 +54,6 @@ final class SumberLaporan
     public function builtinLayout(stdClass $report, string $key, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId): string
     {
         $penyedia = $this->penyedia($report);
-
-        if ($penyedia === null) {
-            return $this->klien->builtinLayout($report, $key, $membership, $legalEntityId, $orgUnitId);
-        }
 
         return $this->jalankan($report, $membership, fn (array $konteks): string => $penyedia->layoutBawaan(
             $this->kodeLokal($report, $penyedia),
@@ -81,10 +67,6 @@ final class SumberLaporan
     {
         $penyedia = $this->penyedia($report);
 
-        if ($penyedia === null) {
-            return $this->klien->dataset($report, $membership, $legalEntityId, $orgUnitId, $parameters);
-        }
-
         $isi = $this->jalankan($report, $membership, fn (array $konteks): array => $penyedia->dataset(
             $this->kodeLokal($report, $penyedia),
             $konteks,
@@ -94,18 +76,23 @@ final class SumberLaporan
         return ReportData::fromArray($isi);
     }
 
-    private function penyedia(stdClass $report): ?PenyediaLaporanModul
+    private function penyedia(stdClass $report): PenyediaLaporanModul
     {
         $penyedia = $this->daftar->untuk((string) $report->app_id);
 
+        // Tidak ada jalur cadangan lagi. Laporan yang app-nya tidak terdaftar sebagai module
+        // di runtime ini berarti katalognya menyebut app yang tidak ada di edisi terpasang;
+        // dulu keadaan itu tersembunyi di balik panggilan HTTP ke alamat yang tidak menjawab.
         if ($penyedia === null) {
-            return null;
+            throw new RenderException(
+                "Laporan `{$report->code}` milik {$report->app_name}, yang tidak terpasang sebagai module ".
+                'pada runtime ini.'
+            );
         }
 
         // Module terdaftar tapi tidak mengenal kode laporannya berarti katalog dan module
         // sudah tidak sepakat — biasanya karena manifest lebih baru daripada kode yang
-        // terpasang. Jatuh ke HTTP di sini akan menyembunyikan itu di balik alamat yang
-        // tidak ada; lebih baik gagal dengan sebabnya.
+        // terpasang. Ia gagal dengan sebabnya, bukan dengan kode laporan yang kosong.
         if (! $penyedia->punya($this->kodeLokal($report, $penyedia))) {
             throw new RenderException(
                 "Laporan `{$report->code}` terdaftar di katalog tetapi tidak dikenal module {$report->app_name}. ".

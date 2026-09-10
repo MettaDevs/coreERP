@@ -35,44 +35,23 @@ dengan aturan `/<id module>/<id entri menu>` dari manifest yang sama.
 
 ## Bentuk lama: app dengan repository dan container sendiri
 
-App yang belum dipindah ke runtime Core tetap memakai bentuk ini, dan aturannya tetap berlaku penuh
-selama masih ada app yang menjalankannya. Satu app bisnis memiliki satu repository; API dan UI bukan
-repository terpisah karena keduanya perlu diuji, diberi versi, dan dirilis sebagai satu kemampuan
-bisnis.
+**Bentuk ini sudah tidak berlaku.** Ia dicatat di sini supaya sebuah repo `app-erp-*` lama yang
+ditemukan orang berikutnya dapat dikenali, bukan supaya ia dipakai lagi. Sejak 10 September 2026
+tidak ada satu pun app yang berjalan sebagai container tersendiri, dan seluruh kode yang melayaninya
+— penempatan app, pendaftaran rilis penyedia, path konten, reverse proxy, halaman tuan rumah
+beriframe, dan token konteks app — dibuang dari repo ini.
 
-```text
-app-erp-accounting/                 # satu repository app
-├── app.yaml
-├── api/                            # Laravel service milik Accounting
-│   ├── Dockerfile
-│   ├── app/
-│   ├── routes/api.php
-│   └── tests/
-├── ui/                             # React/Vite UI milik Accounting
-│   ├── package.json
-│   └── src/
-├── database/
-│   ├── migrations/
-│   └── seeders/
-├── contracts/
-│   ├── openapi.yaml
-│   └── asyncapi.yaml
-├── deploy/
-│   ├── compose.fragment.yaml
-│   └── migrate.sh
-└── README.md
-```
+Bentuknya dulu: satu repository per app bisnis, memuat `app.yaml`, service Laravel di `api/`, UI
+React di `ui/`, migration, contract, dan fragment Compose di `deploy/`. Setiap app menghasilkan
+artifact terpisah — image API, image UI, migration, contract, dan manifest — dan UI-nya disajikan di
+dalam iframe pada path `/apps-content/<placement>/<app-id>/`.
 
-Setiap app semacam itu menghasilkan artifact terpisah: image API, artifact/image UI, migration,
-contract, dan manifest. Cloud dapat menyajikan UI lewat CDN/artifact registry; on-prem perpetual
-menyajikannya dari image static UI yang hanya ada untuk app berlisensi dan didistribusikan dalam
-bundle release bertanda tangan.
-
-Jangan memakai Git submodule untuk menghubungkan repository. Contract yang dipakai pihak lain dipublish sebagai artifact berversi; source app tidak diambil langsung oleh app lain.
+Yang menggantikannya adalah folder module di `modules/<penerbit>/<module>/`, dijelaskan pada sisa
+halaman ini.
 
 Repository CoreERP ini menampung `apps/control-plane`, `apps/provider-console`, dan seluruh module
-di bawah `modules/`. Surface Web Shell — launcher dan halaman tuan rumah — hidup di dalam UI Control
-Plane, bukan folder tersendiri.
+di bawah `modules/`. Surface Web Shell — launcher dan kerangka layar module — hidup di dalam UI
+Control Plane, bukan folder tersendiri.
 
 ## Contoh manifest
 
@@ -167,9 +146,9 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 | `dependsOn` | Tidak, bila app berdiri sendiri | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu. |
 | `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
-| `reports` | Hanya bila app punya dokumen cetak atau ekspor | Laporan muncul di katalog Core; admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Datasetnya tetap milik app: module menyerahkannya lewat kontrak `PenyediaLaporanModul` di dalam proses, app berkontainer lewat `internal/v1/laporan`. Lihat [dokumen cetak](23-document-rendering.md) |
+| `reports` | Hanya bila module punya dokumen cetak atau ekspor | Laporan muncul di katalog Core; admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Datasetnya tetap milik module, diserahkan lewat kontrak `PenyediaLaporanModul` di dalam proses. Lihat [dokumen cetak](23-document-rendering.md) |
 
-App tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, module meminta nomor lewat kontrak `PenerbitNomor` di dalam proses yang sama, dan app berkontainer lewat API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`. `idempotency_key` wajib pada keduanya. Detailnya di [Number sequence](14-number-sequences.md).
+Module tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, module meminta nomor lewat kontrak `PenerbitNomor` di dalam proses yang sama. Addon pihak ketiga di luar runtime memakai API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`; `idempotency_key` wajib pada keduanya. Detailnya di [Number sequence](14-number-sequences.md).
 
 ### Dependency app
 
@@ -227,13 +206,12 @@ yang diturunkan dari nama folder module, misalnya `aset_` dan `hr_`. Awalan itu 
 katalog dan diperiksa penjaga batas di `apps/control-plane/tests/Feature/Boundary/`: tabel tanpa
 awalan yang benar, dan tabel milik module lain yang disentuh, ditolak sebelum pull request digabung.
 
-**App berkontainer** memakai database sendiri dengan pola `app_erp_<app>`; addon memakai
-`addon_<publisher>_<app>`. Setiap database mempunyai database user/secret sendiri, dan tidak ada
-foreign key, Eloquent relation, atau query langsung lintas database.
+Addon pihak ketiga yang berjalan di luar runtime ini memakai database sendiri dengan pola
+`addon_<publisher>_<app>`, dengan database user dan secret sendiri; tidak ada foreign key, Eloquent
+relation, atau query langsung lintas database.
 
-Larangannya sama pada kedua bentuk: sebuah module tidak boleh membaca atau menulis data milik
-module lain. Yang berbeda hanya siapa yang menolak — database pada bentuk yang satu, penjaga batas
-dan analisa statis pada bentuk yang lain.
+Larangannya tetap: sebuah module tidak boleh membaca atau menulis data milik module lain. Yang
+menolak adalah penjaga batas dan analisa statis.
 
 Perbedaan itu harus disebut apa adanya. **Batas antar module ditegakkan pemeriksaan otomatis, bukan
 mesin database.** Jangan menuliskan bahwa mesin database yang menjaganya: kalimat itu membuat
@@ -579,8 +557,8 @@ assertion pada test mana pun.
 | --- | --- |
 | API sync | REST/JSON di bawah `/api/v1`, lengkap dalam OpenAPI bila permukaannya dipanggil dari luar runtime. Rute module yang hanya dipanggil halamannya sendiri dijaga test module, bukan kontrak terbit. |
 | Event | Event dibuat melalui outbox setelah commit; payload dan channel ditulis dalam AsyncAPI. Antar module di satu runtime, ia berbentuk event Laravel yang dikirim di dalam proses — namanya, envelope-nya, dan aturan versinya tetap sama. |
-| UI | Halaman module ikut build shell dan dirender sebagai halaman Inertia; UI app berkontainer mendaftarkan route/menu melalui host SDK. Host menampilkan entry hanya bila entitlement aktif, installation registry `ready`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`. |
-| Auth | Semua endpoint memvalidasi `TenantContext`, entitlement, installation readiness, permission, dan organization scope. Module membacanya dari middleware konteks module lewat kontrak `KonteksTenant` dan `KonteksPermintaan`; app berkontainer memvalidasi token bertanda tangan. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
+| UI | Halaman module ikut build shell dan dirender sebagai halaman Inertia. Shell menampilkan entry hanya bila entitlement aktif, catatan pemasangan module berstatus `installed`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`. |
+| Auth | Semua endpoint memvalidasi `TenantContext`, entitlement, pemasangan module, permission, dan organization scope. Module membacanya dari middleware konteks module lewat kontrak `KonteksTenant` dan `KonteksPermintaan`. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
 | Data | Tidak ada akses ke data app lain. ID app lain hanya reference opaque. |
 | Jobs | Idempotent, membawa `tenant_id`, memiliki retry/dead-letter policy. |
 | Observability | Log, trace, metric, dan event menyertakan tenant/app/correlation ID. |
@@ -639,7 +617,7 @@ App tidak membuat ulang header atau kerangka navigasi. App hanya mendaftarkan id
 
 Kontrak host navigasi bersifat deklaratif melalui `ui.navigation` pada manifest. Control Plane memvalidasi bahwa setiap item sidebar menunjuk permission `read` milik app yang sama, menyimpannya di katalog, lalu Web Shell memfilter dan merendernya dengan komponen Core.
 
-Untuk module, **id entri menu adalah jalur rutenya**: Core menyusun tautan sidebar dengan aturan `/<id module>/<id entri menu>`, jadi berkas rute module wajib punya rute dengan jalur itu. Untuk app berkontainer, pemilihan item memakai query `view` pada route host dan hash pada UI artifact. Pada kedua bentuk, app tidak mengimpor komponen internal Control Plane dan tidak menggambar ulang rail/sidebar.
+**Id entri menu adalah jalur rutenya**: Core menyusun tautan sidebar dengan aturan `/<id module>/<id entri menu>`, jadi berkas rute module wajib punya rute dengan jalur itu. Module tidak mengimpor komponen internal Control Plane dan tidak menggambar ulang rail/sidebar.
 
 ## Lifecycle app
 
@@ -694,7 +672,7 @@ Customer extension pada managed cloud tidak boleh mengunggah arbitrary container
 
 - [Gate penemuan dan keputusan](18-module-discovery-and-decision-gate.md) — dilewati **sebelum** app dibuat
 - [Rantai keamanan modul transaksi](19-transaction-security-chain.md) — empat lapis di atas diteruskan sampai ke user
-- [Menerbitkan release app](13-publishing-an-app-release.md) — cara manifest app masuk katalog Core
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — cara manifest app masuk katalog Core
 - [API dan integration bridge](04-api-and-integration.md) — satu-satunya jalan komunikasi antar app
 - [Kustomisasi dan addon](05-customization-and-addons.md) — kebutuhan khusus customer tanpa fork
 - [Release dan on-prem](03-release-and-on-prem.md) — lifecycle install, upgrade, uninstall

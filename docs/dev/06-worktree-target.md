@@ -82,7 +82,7 @@ Control Plane mengoordinasi katalog, entitlement, placement, dan status runtime.
 ## Lihat juga
 
 - [Standar module](02-module-standard.md) — isi wajib satu module, dan isi wajib satu repository app
-- [Release dan on-prem](03-release-and-on-prem.md) — image edisi untuk module, bundle untuk app berkontainer
+- [Release dan on-prem](03-release-and-on-prem.md) — image edisi dan bundle on-prem
 - [Development stack lokal](11-local-docker-development.md) — bentuk stack yang benar-benar dijalankan hari ini
-- [Menerbitkan release app](13-publishing-an-app-release.md) — CI per repository app
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — CI per repository app
 - [Grand design](01-grand-design.md) — kenapa arah halaman ini dibalik
