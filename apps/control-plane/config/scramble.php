@@ -1,9 +1,7 @@
 <?php
 
+use App\Support\Docs\KeamananSesiCore;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
-use Dedoc\Scramble\SecurityDocumentation\MiddlewareAuthSecurityStrategy;
-use Dedoc\Scramble\Support\Generator\SecurityScheme;
-use Illuminate\Support\Str;
 
 return [
     /*
@@ -172,13 +170,14 @@ return [
      *     ],
      * ],
      */
-    'security_strategy' => [
-        MiddlewareAuthSecurityStrategy::class,
-        [
-            'middleware' => ['auth', 'auth:*'],
-            'scheme' => SecurityScheme::apiKey('cookie', config('session.cookie') ?: Str::slug((string) config('app.name', 'laravel')).'-session')
-                ->as('sessionCookie')
-                ->setDescription('Sign in through the web application to obtain the session cookie.'),
-        ],
-    ],
+    /*
+     * Hanya nama kelas, dan itu disengaja: berkas setelan tidak boleh memuat objek.
+     *
+     * Setelan yang di-cache ditulis Laravel dengan `var_export`, yang tidak dapat menuliskan
+     * ulang objek tanpa `__set_state()` — dan `SecurityScheme` tidak punya. Selama skemanya
+     * disusun di sini, `php artisan config:cache` berhenti dengan pesan yang menyebut
+     * `__set_state()` dan tidak menyebut berkas ini sama sekali. Skemanya kini disusun di dalam
+     * kelasnya, saat runtime; alasan lengkapnya ada di sana.
+     */
+    'security_strategy' => KeamananSesiCore::class,
 ];

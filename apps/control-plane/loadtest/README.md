@@ -174,9 +174,10 @@ Log nginx sesudah seluruh rangkaian run:
 
 Keempat instance menerima beban yang sama rata; tidak ada satu pun yang menjadi pemilik state.
 
-### Gate latensi — LULUS pada 12 concurrent
+### Gate latensi — LULUS pada 12 concurrent (F7-03, tanpa cache setelan dan rute)
 
-Diambil pada concurrency yang masih tertahan, bukan pada titik jenuh.
+Diambil pada concurrency yang masih tertahan, bukan pada titik jenuh. Diukur **sebelum** F7-10,
+jadi tanpa `config:cache` maupun `route:cache`; ukur ulang sesudahnya ada di bawah tabel ini.
 
 | Concurrency | rps | read p95 | read p99 | write p95 | write p99 | Status |
 | ---: | ---: | ---: | ---: | ---: | ---: | --- |
@@ -200,6 +201,129 @@ Biaya request tunggal tanpa beban (1 VU):
 Angka `/up` diukur dari Windows host lewat port forward Docker Desktop, jadi ia memuat ongkos
 yang tidak dimiliki jalur di dalam jaringan container. Ia disebut apa adanya, bukan dibulatkan
 ke bawah.
+
+### Ukur ulang sesudah setelan dan rute di-cache (F7-10) — gate tidak bergeser
+
+Diukur **10 September 2026 pukul 09.12–09.37**, cara dan ambang sama persis dengan tabel di atas:
+`PROFILE=latency`, `TENANTS=32`, `DURATION=60s`, `FIXTURE=g1`, `LATENCY_VUS` dinaikkan bertahap.
+
+```powershell
+docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=latency -e TENANTS=32 -e LATENCY_VUS=12 `
+  -e DURATION=60s -e RUN_ID=lat-cache-12 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/master-data.js
+```
+
+Kedua cache dipastikan ada di dalam keempat instance uji beban lebih dulu: container dibuat ulang
+di atas `erp-core-app:local` yang baru (`sha256:ecee33ee…`), entrypoint mencetak
+`Configuration cached successfully` dan `Routes cached successfully` tanpa satu pun peringatan,
+`php artisan about` menjawab Config **CACHED** dan Routes **CACHED** pada keempatnya,
+`bootstrap/cache/` memuat `config.php` (123 KB) dan `routes-v7.php` (543 KB), dan jumlah rute
+ter-cache tetap 383.
+
+Tiap tingkat dijalankan pada **kedua keadaan** — cache nyala dan cache mati — bergantian, pada
+mesin dan database yang sama, karena angka absolut hari ini tidak sebanding dengan F7-03 (lihat
+di bawah). Cache dimatikan dengan `config:clear` + `route:clear` pada keempat instance, dan
+dinyalakan kembali dengan `config:cache` + `route:cache`.
+
+| Concurrency | Cache | rps | read p95 | read p99 | write p95 | write p99 | Status |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | nyala | 20 | 89 ms | 103 ms | 110 ms | 123 ms | memenuhi SLO |
+| 1 | mati | 20 | 92 ms | 118 ms | 110 ms | 132 ms | memenuhi SLO |
+| 1 | mati (ulang) | 23 | 69 ms | 78 ms | 81 ms | 99 ms | memenuhi SLO |
+| 8 | nyala | 41 | 272 ms | 321 ms | 356 ms | 424 ms | read p95 lewat batas |
+| 8 | nyala (ulang) | 55 | 195 ms | 255 ms | 267 ms | 384 ms | memenuhi SLO (batas) |
+| 8 | mati | 52 | 190 ms | 234 ms | 252 ms | 320 ms | memenuhi SLO (batas) |
+| 8 | mati (ulang) | 52 | 203 ms | 251 ms | 264 ms | 318 ms | read p95 lewat batas |
+| 12 | nyala | 35 | 506 ms | 587 ms | 715 ms | 873 ms | jauh di atas batas |
+| 12 | nyala (ulang) | 63 | 242 ms | 285 ms | 343 ms | 399 ms | read p95 lewat batas |
+| 12 | mati | 45 | 319 ms | 374 ms | 464 ms | 542 ms | keduanya lewat batas |
+| 12 | mati (ulang) | 51 | 308 ms | 406 ms | 433 ms | 642 ms | keduanya lewat batas |
+| 16 | nyala | 64 | 306 ms | 368 ms | 445 ms | 553 ms | keduanya lewat batas |
+| 16 | mati | 51 | 400 ms | 467 ms | 570 ms | 668 ms | keduanya lewat batas |
+| 32 | nyala | 67 | 521 ms | 590 ms | 829 ms | 947 ms | jauh di atas batas |
+| 32 | mati | 61 | 610 ms | 695 ms | 933 ms | 1.058 ms | jauh di atas batas |
+
+Seluruh 15 run nol pelanggaran kebenaran, nol 5xx aplikasi, nol timeout klien.
+
+**Concurrency tertinggi yang lulus hari ini: 8, dan itu berlaku untuk kedua keadaan.** Pada 12
+tidak ada satu pun run yang lulus, dengan maupun tanpa cache. Turunnya ambang dari 12 ke 8
+**bukan** akibat cache — ia terjadi sama besar pada arm yang cache-nya mati.
+
+**Pada 8 VU kedua arm mengangkangi ambang 200 ms.** Cache nyala: 272 ms lalu 195 ms. Cache mati:
+190 ms lalu 203 ms. Lulus atau gagal di tingkat itu hari ini ditentukan run mana yang dilihat,
+bukan oleh cache. Sebaran dalam satu arm mencapai 2,1× (cache nyala pada 12 VU: 506 ms lalu
+242 ms), jadi selisih antar-arm di tingkat gate tidak dapat dipisahkan dari derau.
+
+#### Kondisi pengukuran, dan kenapa angka absolutnya tidak sebanding dengan F7-03
+
+| Hal | F7-03 (06.38–06.43) | F7-10 (09.12–09.37) |
+| --- | --- | --- |
+| Host | Windows 11, 12 vCPU / 16 GB | sama |
+| Memori Docker Desktop (WSL2) | 7,6 GB | 7,61 GB |
+| RAM host yang masih bebas | tidak dicatat | **0,58 GB dari 15,71 GB** |
+| Beban host dari aplikasi lain | tidak dicatat | **~51% CPU**; VS Code ×3, Discord, Chrome, Docker Desktop |
+| Stack lain yang menyala | tidak dicatat | stack `erp-dev` (6 container) **idle**, ~0,2% CPU, ~210 MB |
+| Ukuran database uji beban | 169 MB atau kurang | 169 MB di awal, **203 MB** di akhir |
+| `number_sequence_issues` | < 63.861 | 64.299 di awal, **81.023** di akhir |
+| PostgreSQL saat dibebani | 11–65% CPU | **77–150% CPU** |
+| pgbouncer saat dibebani | 17–71% CPU | 71–80% CPU |
+
+Dua sebab yang cukup untuk menjelaskan seluruh selisih absolutnya, dan keduanya bukan cache:
+
+1. **Host jauh lebih sibuk.** Run 1 VU tanpa cache hari ini — arm yang keadaannya *identik*
+   dengan F7-03 — memberi read p50/p95 = 62/92 ms, sedangkan F7-03 mencatat 47/55 ms pada
+   perintah yang sama. Mesinnya sendiri yang 33% lebih lambat.
+2. **Skenarionya menumbuhkan datanya sendiri.** Tiap run menulis master baru, jadi run berikutnya
+   melist dan menghitung tabel yang lebih besar. Sepanjang sesi ini `aset_m_group_aset` naik dari
+   2.770 ke 5.529 baris dan `aset_m_jenis_aset` dari 1.533 ke 2.997 — dua kali lipat sepanjang sesi ini.
+   Run latensi F7-03 juga mendahului `gate-sat-3`, jadi ia bekerja pada dataset yang lebih kecil
+   lagi.
+
+Karena itu tabel F7-03 **tidak diganti**. Ia tetap angka gate yang tercatat; tabel di atas adalah
+ukur ulang pada kondisi yang berbeda, dan nilainya ada pada perbandingan antar-arm di dalamnya,
+bukan pada angka absolutnya.
+
+#### Yang cache-nya benar-benar hemat: ongkos bootstrap
+
+Gate di atas tidak dapat memisahkan selisih sekecil beberapa milidetik. `/up` dapat: ia tidak
+memakai auth, tidak menyentuh database, dan karena itu tidak menumbuhkan dataset. Diukur dari
+dalam jaringan container, arm dibalik urutannya tiap putaran.
+
+Berurutan, satu per satu, 200 request per putaran:
+
+| Putaran | Cache nyala (min / p50) | Cache mati (min / p50) |
+| ---: | ---: | ---: |
+| 1 | 17,5 / 21,2 ms | 20,9 / 24,8 ms |
+| 2 | 17,9 / 23,6 ms | 22,8 / 29,2 ms |
+| 3 | 19,5 / 27,1 ms | 24,2 / 31,5 ms |
+| 4 | 20,4 / 27,5 ms | 23,0 / 34,9 ms |
+
+Pada concurrency 16, 25 detik per putaran:
+
+| Putaran | Arm pertama | Cache nyala (min / p50 / rps) | Cache mati (min / p50 / rps) |
+| ---: | --- | ---: | ---: |
+| 1 | nyala | 43,3 / 90,2 / 159 | 48,9 / 93,1 / 160 |
+| 2 | mati | 43,1 / 93,9 / 157 | 50,6 / 94,7 / 156 |
+| 3 | nyala | 44,1 / 90,4 / 161 | 59,1 / 112,8 / 130 |
+| 4 | mati | 48,2 / 89,0 / 167 | 51,3 / 108,2 / 139 |
+
+Cache menang **8 dari 8 putaran** pada `min` dan pada p50, dan urutan arm dibalik tiap putaran
+jadi pergeseran mesin tidak dapat menghasilkannya. Besarnya: **3–5 ms per request** saat
+berurutan, **8 ms pada `min` dan 11 ms pada p50** saat concurrency 16, dengan throughput rata-rata
+~10% lebih tinggi (161 vs 146 rps).
+
+**Tetapi penghematan itu tidak muncul lagi begitu ada database di jalurnya.** Pada 1 VU skenario
+terautentikasi, read p50 61,8 ms dengan cache dan 61,8 ms tanpa cache; ulangan arm tanpa cache
+malah 51,8 ms. Satu request baca menghabiskan ~60 ms, sebagian besar di database, dan 4 ms tidak
+terlihat di atas sebaran arm itu sendiri yang ~10 ms.
+
+Itu memperkuat temuan F7-03, bukan membatalkannya: yang jenuh lebih dulu adalah **CPU PHP di dalam
+badan request**, bukan I/O setelan. Cache setelan dan rute tetap benar untuk dipasang — ia
+menghapus pekerjaan yang memang sia-sia, dan penghematannya terukur pada jalur yang hanya berisi
+bootstrap — tetapi **ia tidak menggeser gate latensi**, dan tidak ada dasar untuk menjanjikan
+concurrency yang lebih tinggi karenanya.
 
 ### Perilaku pada 1000 VU
 
@@ -229,15 +353,24 @@ Diambil dengan `docker stats --no-stream` selama beban penuh:
 pooling menahan jumlah koneksi server, jadi badai fork PostgreSQL yang menjadi bottleneck app
 lama tidak terjadi di sini. Yang jenuh lebih dulu sekarang adalah CPU PHP.
 
-Satu sebab yang dapat diperbaiki di lapis deployment, dan bukan di kode module:
+Satu sebab sempat dicurigai di lapis deployment, dan **sudah diperbaiki pada F7-10** — angka di
+atas diukur sebelum perbaikan itu:
 
-> **`php artisan config:cache` gagal pada Core.** `config/scramble.php` memuat objek
-> `ApiKeySecurityScheme` yang tidak punya `__set_state()`, sehingga config tidak dapat
-> diserialisasi sama sekali (`value at "scramble.security_strategy.1.scheme" is
-> non-serializable`). `php artisan route:cache` juga gagal karena `routes/web.php` masih memuat
-> closure. Akibatnya setiap request membayar bootstrap Laravel penuh — pada stack ini, pada
-> stack pengembangan, dan pada image yang dikirim ke pelanggan. Angka latensi di atas diukur
-> dalam keadaan itu.
+> **Dulu `php artisan config:cache` gagal pada Core**, karena `config/scramble.php` memuat objek
+> `ApiKeySecurityScheme` yang tidak punya `__set_state()`. Sejak F7-10 skemanya disusun di dalam
+> kelasnya sendiri dan berkas setelan hanya memuat nama kelas, jadi keduanya berhasil — dan
+> entrypoint image membangunnya saat container naik, untuk ketiga peran.
+>
+> **Satu klaim yang dulu ditulis di sini salah, dan pantas disebut:** `route:cache` tidak pernah
+> gagal karena closure. Diuji pada F7-10, ia memulangkan **383 rute, sama dengan tanpa cache**.
+> Kalimat itu ditulis tanpa dijalankan.
+>
+> **Dan cache-nya tidak menggeser gate.** Diukur bergantian, cache menang 8 dari 8 putaran pada
+> endpoint tanpa autentikasi dan tanpa database — 3–5 ms per permintaan berurutan, 8 ms pada min
+> dan 11 ms pada p50 di konkurensi 16, throughput ~10% lebih tinggi. Pada skenario sungguhan
+> penghematan itu **hilang di belakang kerja database**: pada 1 VU, read p50 61,8 ms dengan cache
+> dan 61,8 ms tanpa. Itu menguatkan temuan di atas, bukan membatalkannya — yang jenuh lebih dulu
+> memang CPU PHP di dalam badan permintaan, bukan I/O setelan.
 
 ## Batas kejujuran hasil ini
 
@@ -252,8 +385,10 @@ Satu sebab yang dapat diperbaiki di lapis deployment, dan bukan di kode module:
   bila dijalankan, bukan hijau diam-diam. Permukaan work order dan penyusutan karena itu
   berstatus belum terverifikasi di bawah beban pada runtime ini.
 - UI tidak disentuh uji beban ini.
-- `config:cache` mati (lihat di atas), jadi angka latensi memuat ongkos bootstrap yang seharusnya
-  hilang di produksi.
+- Tabel gate latensi F7-03 diukur saat `config:cache` dan `route:cache` mati, jadi ia memuat ongkos
+  bootstrap penuh. F7-10 memasang keduanya dan mengukur ulang: ongkos bootstrap memang turun 3–11 ms
+  per request, tetapi **gate-nya tidak bergeser**. Angka ukur ulangnya ada di bagian F7-10 di atas,
+  beserta alasan kenapa angka absolutnya tidak sebanding dengan F7-03.
 
 ## Skenario Core lain di folder ini
 

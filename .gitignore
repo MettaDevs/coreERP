@@ -28,3 +28,8 @@ docs/.vitepress/cache/
 .codex-server-migrate*
 *-ed25519
 *-ed25519.pub
+
+# Penanda sekali pakai milik `scripts/periksa-sisa-mesin.sh`. Ia menanamnya ke dalam konteks
+# pembangunan lalu menghapusnya; baris ini menjaga agar satu jalan yang terhenti di tengah tidak
+# meninggalkan berkas yang ikut ter-commit.
+apps/control-plane/resources/penanda-kendali.txt

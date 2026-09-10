@@ -72,6 +72,41 @@ class MasterDataAsetTest extends TestCase
         ];
     }
 
+    /**
+     * Header `Location` pada jawaban 201 benar-benar dapat diikuti.
+     *
+     * Yang diuji bukan bentuk alamatnya melainkan **bahwa ia menjawab**. Sampai 10 September 2026
+     * nilainya `/api/v1/<resource>/<id>` — alamat modul waktu ia masih app tersendiri — sedangkan
+     * rutenya sudah pindah ke `/api/modules/management-aset/v1/`. Klien yang mengikutinya mendarat
+     * di 404, dan tidak satu pun test gagal karena tidak ada yang pernah membaca header ini.
+     *
+     * Inilah bentuk pemeriksaan yang tidak bisa basi: ia mengambil alamat dari jawaban dan
+     * memintanya. Sebuah test yang hanya membandingkan string alamat akan tetap hijau pada hari
+     * rutenya pindah lagi.
+     */
+    public function test_alamat_pada_location_dapat_diikuti(): void
+    {
+        $dibuat = $this->createRecord('pabrikan-aset', ['nama' => 'Komatsu'])->assertCreated();
+
+        $location = $dibuat->headers->get('Location');
+
+        $this->assertNotNull($location, 'Jawaban 201 harus menyebut alamat record yang baru dibuat.');
+
+        $jalur = parse_url((string) $location, PHP_URL_PATH);
+
+        $this->assertIsString($jalur);
+        $this->assertSame(
+            '/api/modules/management-aset/v1/pabrikan-aset/'.$dibuat->json('data.id'),
+            $jalur,
+            'Alamatnya harus berada di bawah awalan rute module, bukan di bawah awalan app lama.',
+        );
+
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('pabrikan-aset'))
+            ->getJson($jalur)
+            ->assertOk()
+            ->assertJsonPath('data.id', $dibuat->json('data.id'));
+    }
+
     #[DataProvider('standaloneMasters')]
     public function test_master_mandiri_menjalankan_crud_tanpa_induk(string $resource, string $table): void
     {

@@ -34,6 +34,7 @@ export default withMermaid({
       'todo/addNewRulestoCoreforFleksibilitas/index.md',
     'todo/entrypointPERMISSIONprevilage/README.md':
       'todo/entrypointPERMISSIONprevilage/index.md',
+    'todo/api-untuk-integrator/README.md': 'todo/api-untuk-integrator/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -229,6 +230,16 @@ export default withMermaid({
                 { text: 'Keputusan arsitektur', link: '/todo/satu-runtime/00-keputusan' },
                 { text: 'PRD dan daftar task', link: '/todo/satu-runtime/01-prd' },
                 { text: 'Bukti penjaga batas', link: '/todo/satu-runtime/02-bukti-penjaga' },
+              ],
+            },
+            {
+              text: 'API untuk sistem pelanggan',
+              collapsed: false,
+              items: [
+                {
+                  text: 'API yang dapat dipakai sistem pelanggan',
+                  link: '/todo/api-untuk-integrator/',
+                },
               ],
             },
             {

@@ -30,17 +30,19 @@ x-api: &api
   depends_on:
     pgbouncer:
       condition: service_started
-  # Entrypoint image dipakai apa adanya, dan itu keputusan yang dipaksa temuan:
+  # Entrypoint image dipakai apa adanya, dan sejak F7-10 itu berarti **setelan dan rute
+  # ter-cache**: entrypoint membangun keduanya saat container naik, untuk ketiga peran.
   #
-  # - `php artisan route:cache` gagal karena `routes/web.php` Core masih memuat closure;
-  # - `php artisan config:cache` gagal juga, tetapi bukan karena Core — `config/scramble.php`
-  #   memuat objek `ApiKeySecurityScheme` yang tidak punya `__set_state()`, jadi config
-  #   tidak dapat diserialisasi sama sekali ("value at scramble.security_strategy.1.scheme
-  #   is non-serializable").
+  # Sampai 10 September 2026 keadaannya sebaliknya, dan dua kalimat yang dulu ditulis di sini
+  # keduanya keliru. `config:cache` memang gagal — `config/scramble.php` memuat objek
+  # `ApiKeySecurityScheme` yang tidak punya `__set_state()` — dan itu dibereskan F7-10 dengan
+  # memindahkan penyusunan skemanya keluar dari berkas setelan. Tetapi `route:cache` **tidak**
+  # pernah gagal: ia memulangkan 383 rute, sama dengan tanpa cache, closure pada
+  # `routes/web.php` dan semuanya. Klaim itu ditulis tanpa dijalankan.
   #
-  # Artinya keempat instance membayar bootstrap Laravel penuh pada tiap request, sama seperti
-  # stack pengembangan. Itu menaikkan angka latensi absolut dan tidak mengubah satu pun gate
-  # kebenaran. Dicatat di README sebagai batas kejujuran hasil, bukan disembunyikan.
+  # Artinya angka latensi di sini tidak lagi mengukur bootstrap penuh. Yang diukur F7-10: cache
+  # menghemat 3–5 ms per permintaan pada endpoint tanpa database, dan hilang di belakang kerja
+  # database pada skenario sungguhan — ambang gate-nya tidak bergeser.
   volumes:
     - ./apache-loadtest.conf:/etc/apache2/conf-enabled/zz-loadtest.conf:ro
   environment: &api-environment

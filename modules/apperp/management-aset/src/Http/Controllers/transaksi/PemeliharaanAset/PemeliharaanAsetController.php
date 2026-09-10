@@ -172,7 +172,16 @@ class PemeliharaanAsetController extends Controller
         }
 
         return response()->json(['data' => $workOrder], 201, [
-            'Location' => url('/api/v1/'.self::RESOURCE.'/'.$workOrder['id']),
+            // Alamatnya diturunkan dari permintaan yang sedang dilayani, bukan ditulis tangan.
+            // Sampai 10 September 2026 baris ini menunjuk `/api/v1/<resource>/<id>` — alamat
+            // modul waktu ia masih app tersendiri, dan alamat yang tidak ada lagi sejak rutenya
+            // pindah ke `/api/modules/management-aset/v1/`. Klien yang mengikuti `Location`
+            // sesudah membuat record mendarat di 404, dan tidak ada yang gagal karenanya karena
+            // tidak ada yang memeriksa isi header ini.
+            //
+            // `$request->url()` adalah alamat koleksi yang baru saja dikirimi POST, jadi ia
+            // tidak dapat menyimpang dari awalan rutenya — termasuk bila awalannya berubah lagi.
+            'Location' => $request->url().'/'.$workOrder['id'],
         ]);
     }
 
