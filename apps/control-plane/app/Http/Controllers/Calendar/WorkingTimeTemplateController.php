@@ -267,8 +267,6 @@ class WorkingTimeTemplateController extends Controller
         return back()->with('success', 'Baris jam kerja berhasil disimpan.');
     }
 
-
-
     /**
      * @param  array<int, array{day_of_week: int, from_time?: ?string, to_time?: ?string, efficiency?: ?float, property?: ?string, closed_for_pickup?: ?bool, hours?: ?float}>  $lines
      */
