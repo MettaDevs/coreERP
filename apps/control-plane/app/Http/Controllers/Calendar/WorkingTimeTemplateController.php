@@ -301,7 +301,7 @@ class WorkingTimeTemplateController extends Controller
 
         if (str_contains($clean, ':')) {
             $parts = explode(':', $clean);
-            $h = (int) ($parts[0] ?? 0);
+            $h = (int) $parts[0];
             $m = (int) ($parts[1] ?? 0);
             if ($h === 24 && $m === 0) {
                 return '24:00';
