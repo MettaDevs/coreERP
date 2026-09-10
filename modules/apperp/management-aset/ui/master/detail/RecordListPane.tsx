@@ -8,7 +8,7 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import { MasterConfig, MasterRecord } from '../masters';
+import type { MasterConfig, MasterRecord } from '../masters';
 
 const STATUS_ITEMS = ['Semua status', 'Aktif', 'Tidak aktif'];
 
@@ -61,10 +61,16 @@ export default function RecordListPane({
      */
     useEffect(() => {
         const sentinel = sentinelRef.current;
-        if (!sentinel || !hasMore || loading) return;
+
+        if (!sentinel || !hasMore || loading) {
+            return;
+        }
+
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
+                if (entries.some((entry) => entry.isIntersecting)) {
+                    onLoadMore();
+                }
             },
             { rootMargin: '120px' },
         );

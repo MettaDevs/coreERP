@@ -1,7 +1,8 @@
 "use client"
 
+import { cva  } from "class-variance-authority"
+import type {VariantProps} from "class-variance-authority";
 import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "../utils"
 import { Button } from "./button"
@@ -73,6 +74,7 @@ function InputGroupAddon({
         if ((e.target as HTMLElement).closest("button")) {
           return
         }
+
         e.currentTarget.parentElement?.querySelector("input")?.focus()
       }}
       {...props}

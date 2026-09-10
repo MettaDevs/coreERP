@@ -125,8 +125,7 @@ bukan database terpisah. Aturannya di [standar module](02-module-standard.md#nam
 Tidak ada langkah menambah service Compose, mengalokasikan port, atau mendaftarkan alamat UI.
 Ketiganya hilang bersama container per app.
 
-Module tidak boleh menyentuh tabel milik module lain. Pada app berkontainer batas itu dijaga
-database terpisah; pada module ia dijaga penjaga batas di
+Module tidak boleh menyentuh tabel milik module lain. Yang menjaganya adalah penjaga batas di
 `apps/control-plane/tests/Feature/Boundary/` dan analisa statis.
 
 ## Image dibangun dari akar repo, dan menirukan susunannya
@@ -221,41 +220,26 @@ alias**: alias melewati peta `exports` paket dan menuntut jalur `dist/` ditulis 
 Alias `@modules` yang ada pada kedua berkas itu tujuannya lain — ia untuk kode yang menyebut satu
 berkas module secara langsung, bukan untuk menyelesaikan nama paket.
 
-## App yang masih berupa container
+## Tidak ada lagi app berkontainer
 
-App yang belum dipindah ke runtime Core tetap memakai jalur lama: tiga service Compose
-(`<app>-db`, `<app>-api`, `<app>-ui`), database sendiri, dan token layanan sendiri. Shell menyusun
-path kontennya dari pasangan `(app_id, placement)` lalu container `core-app` mem-proxy path itu ke
-container UI app:
+Sampai 10 September 2026 halaman ini menjelaskan jalur kedua: tiga service Compose per app
+(`<app>-db`, `<app>-api`, `<app>-ui`), database sendiri, token layanan sendiri, dan container
+`core-app` yang mem-proxy `/apps-content/<placement>/<app-id>/` ke container UI app.
+
+Jalur itu **dibuang seluruhnya**. Pemilik produk memutuskan pada hari yang sama bahwa app terakhir
+yang belum dipindah datang sebagai module, jadi jalur itu tidak punya subjek di masa depan — dan
+`compose.yaml` pada repo `erp-dev` memang sudah lama hanya menyusun layanan `core-*` beserta `docs`.
+Perintah proxy-nya sudah tidak dipanggil `docker/entrypoint.sh`, dan dua modul Apache yang hanya ada
+untuk melayaninya sudah tidak dinyalakan `Dockerfile`.
+
+Yang tersisa untuk membuka sebuah produk di stack lokal hanyalah satu tautan:
 
 ```text
-http://localhost:8000/apps-content/<placement>/<app-id>/
+http://localhost:8000/apps/<app-id>
 ```
 
-Konfigurasi proxy dirender saat container web naik, oleh `docker/entrypoint.sh` yang memanggil
-`app:render-proxy-config`. Karena config itu statis, **placement yang dibuat setelah container
-hidup baru dilayani setelah `core-app` di-restart**. Command melaporkan setiap placement yang
-dilewati beserta alasannya, jadi periksa lognya bila sebuah app tidak muncul.
-
-Dua akibat yang memudahkan pekerjaan sehari-hari:
-
-- Alamat tidak terikat IP mesin. Ganti jaringan, ganti lease DHCP, atau buka dari laptop lain di
-  LAN lewat `http://<ip-mesin>:8000` — semuanya tetap bekerja tanpa menyentuh database.
-- UI app harus di-build dengan base relatif (`base: './'` pada Vite). Prefix path memuat nama
-  placement, sedangkan satu image UI dipakai semua placement.
-
-Jalur ini tidak dihapus dan tidak boleh dihapus selama masih ada app yang menjalankannya.
-
-**Tetapi stack lokal hari ini tidak dapat menjalankannya.** `compose.yaml` pada repo `erp-dev` hanya
-menyusun layanan `core-*` beserta `docs`; tidak ada lagi trio `<app>-db`, `<app>-api`, dan
-`<app>-ui` yang bisa dinyalakan, dan skrip pengembangannya hanya memanggil pendaftaran manifest
-serta migration module. Perintah proxy-nya tetap berjalan setiap container web naik, dan ia merender
-konfigurasi kosong karena tidak ada satu pun penempatan yang dilayani.
-
-Artinya jalur ini **hidup di kode dan tidak punya subjek** — bukan mati, dan bukan pula bisa dicoba
-di sini. App berkontainer berikutnya yang benar-benar dijalankan lokal menuntut trio itu
-dikembalikan ke `compose.yaml`, atau app tersebut dipindah menjadi module lebih dulu. Keduanya
-keputusan, bukan pekerjaan yang tinggal dijalankan.
+Ia mengalihkan ke entri menu pertama yang boleh dilihat pengguna yang sedang masuk, dan halaman itu
+dirender module sebagai halaman Inertia biasa pada `/<id module>/<id entri menu>`.
 
 ## Git
 
@@ -268,5 +252,5 @@ menyunting `.env` dengan tangan.
 
 - [Menyiapkan lingkungan lokal](../onboarding/setup.md) — versi langkah demi langkah untuk anggota tim baru
 - [Standar module](02-module-standard.md) — isi wajib satu module
-- [Menerbitkan release app](13-publishing-an-app-release.md) — dari stack lokal ke katalog resmi
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — dari stack lokal ke katalog resmi
 - [Release dan on-prem](03-release-and-on-prem.md) — mekanisme yang sama di lingkungan nyata

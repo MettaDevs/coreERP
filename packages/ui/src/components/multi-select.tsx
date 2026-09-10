@@ -1,5 +1,6 @@
 import * as React from "react"
 
+import { cn } from "../utils"
 import {
   Combobox,
   ComboboxContent,
@@ -10,7 +11,6 @@ import {
   ComboboxTrigger,
   ComboboxValue,
 } from "./combobox"
-import { cn } from "../utils"
 
 type MultiSelectProps = {
   items: string[]
@@ -44,7 +44,10 @@ function MultiSelect({
   const selected = value ?? internalValue
 
   const updateValue = (nextValue: string[]) => {
-    if (value === undefined) setInternalValue(nextValue)
+    if (value === undefined) {
+setInternalValue(nextValue)
+}
+
     onValueChange?.(nextValue)
   }
 

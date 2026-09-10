@@ -10,7 +10,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -84,7 +83,6 @@ class ReportingTest extends TestCase
             'queue.default' => 'sync',
             'reporting.disk' => 'reporting-test',
             'reporting.renderer_url' => 'http://renderer.test',
-            'coreerp.app_context_signing_key' => str_repeat('k', 40),
         ]);
         Storage::fake('reporting-test');
 
@@ -95,7 +93,6 @@ class ReportingTest extends TestCase
             'app_ids' => ['management-aset'], 'email' => 'owner@laporan.test', 'password' => 'password',
         ]);
         $this->membership = $this->owner->activeMembership();
-        $this->bootstrapRuntime();
 
         $this->legalEntityId = $this->buatLegalEntity('CV Surya Jaya');
         // Unit penanggung jawab cukup sebuah id: pemilik memegang kebijakan data tanpa batas
@@ -360,8 +357,7 @@ class ReportingTest extends TestCase
         // yang sudah terisi membuat Core tidak lagi meminta berkasnya ke module, jadi yang
         // dirender pasti template ini.
         $version = DB::table('apps')->where('id', 'management-aset')->value('version');
-        $releaseKey = substr(sha1('local/api@sha256:'.str_repeat('a', 64)), 0, 12);
-        Storage::disk('reporting-test')->put("reporting/builtin/management-aset/{$version}-{$releaseKey}/".self::KODE_LAPORAN.'-standar.docx', $this->docxTemplateWithKop());
+        Storage::disk('reporting-test')->put("reporting/builtin/management-aset/{$version}/".self::KODE_LAPORAN.'-standar.docx', $this->docxTemplateWithKop());
         $response = $this->actingAs($this->owner)
             ->postJson('/api/v1/reports/'.self::KODE_LAPORAN.'/exports', ['format' => 'docx', 'parameters' => ['id' => $this->workOrderId]])
             ->assertStatus(202)->json('data');
@@ -399,22 +395,6 @@ class ReportingTest extends TestCase
     private function daftarkanKatalogDariManifest(): void
     {
         $this->artisan('app:register-manifest', ['module' => 'management-aset'])->assertSuccessful();
-    }
-
-    /**
-     * Perintah ini dipakai sebagai persiapan saja: laporan hanya jalan setelah ada baris
-     * release dan placement yang siap. Bentuk rilisnya sendiri tidak diuji di berkas ini,
-     * jadi yang berubah di sini hanya cara memanggil perintahnya — satu image edisi,
-     * tanpa nama layanan.
-     */
-    private function bootstrapRuntime(): void
-    {
-        $manifest = tempnam(sys_get_temp_dir(), 'coreerp-manifest-');
-        File::put($manifest, "id: management-aset\nversion: 0.1.0\n");
-        $this->artisan('app:bootstrap-local-runtime', [
-            'manifest' => $manifest,
-            '--edition-image' => 'local/edisi@sha256:'.str_repeat('a', 64),
-        ])->assertSuccessful();
     }
 
     /**

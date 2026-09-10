@@ -1,10 +1,9 @@
 "use client"
 
-import * as React from "react"
-import useEmblaCarousel, {
-  type UseEmblaCarouselType,
-} from "embla-carousel-react"
+import useEmblaCarousel from "embla-carousel-react"
+import type {UseEmblaCarouselType} from "embla-carousel-react";
 import { ArrowLeft, ArrowRight } from "lucide-react"
+import * as React from "react"
 
 import { cn } from "../utils"
 import { Button } from "./button"
@@ -58,14 +57,37 @@ function Carousel({
     },
     plugins
   )
-  const [canScrollPrev, setCanScrollPrev] = React.useState(false)
-  const [canScrollNext, setCanScrollNext] = React.useState(false)
+  // Kemampuan menggulir dibaca langsung dari Embla sebagai snapshot, bukan disalin ke
+  // state di dalam effect. Salinan lewat effect membuat render pertama selalu disusul
+  // render kedua hanya untuk mengoreksi kedua tombol panah; dibaca sebagai snapshot,
+  // nilainya sudah benar pada render pertama. Berlangganan di satu tempat juga membuat
+  // `reInit` ikut dilepas saat pembersihan — sebelumnya hanya `select` yang dilepas.
+  const subscribe = React.useCallback(
+    (onStoreChange: () => void) => {
+      if (!api) {
+        return () => {}
+      }
 
-  const onSelect = React.useCallback((api: CarouselApi) => {
-    if (!api) return
-    setCanScrollPrev(api.canScrollPrev())
-    setCanScrollNext(api.canScrollNext())
-  }, [])
+      api.on("reInit", onStoreChange)
+      api.on("select", onStoreChange)
+
+      return () => {
+        api.off("reInit", onStoreChange)
+        api.off("select", onStoreChange)
+      }
+    },
+    [api]
+  )
+  const canScrollPrev = React.useSyncExternalStore(
+    subscribe,
+    () => api?.canScrollPrev() ?? false,
+    () => false
+  )
+  const canScrollNext = React.useSyncExternalStore(
+    subscribe,
+    () => api?.canScrollNext() ?? false,
+    () => false
+  )
 
   const scrollPrev = React.useCallback(() => {
     api?.scrollPrev()
@@ -89,20 +111,12 @@ function Carousel({
   )
 
   React.useEffect(() => {
-    if (!api || !setApi) return
+    if (!api || !setApi) {
+return
+}
+
     setApi(api)
   }, [api, setApi])
-
-  React.useEffect(() => {
-    if (!api) return
-    onSelect(api)
-    api.on("reInit", onSelect)
-    api.on("select", onSelect)
-
-    return () => {
-      api?.off("select", onSelect)
-    }
-  }, [api, onSelect])
 
   return (
     <CarouselContext.Provider

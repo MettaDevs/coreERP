@@ -11,16 +11,17 @@ Procurement akan memiliki proses pengadaan. Satu record Procurement nantinya mew
 | Versi | `0.1.0` — release pengembangan |
 | Kind | `business-app` |
 | Butuh Core | `^0.1` |
-| Bentuk | App berkontainer — belum dipindah ke runtime Core |
-| Repository | `app-erp-procurement` |
-| Database | `app_erp_procurement` |
+| Bentuk | Belum dibangun; akan datang sebagai module di runtime Core |
+| Repository | `app-erp-procurement` — repo lama, belum dipindah |
+| Database | database tenant Core, dengan awalan tabel `procurement_` |
 | Dependency app | `business-partner: ^0.1` |
 
-::: warning App terakhir yang masih berkontainer
+::: warning Belum dipindah, dan akan datang sebagai module
 Modul bisnis lain sudah pindah ke runtime Core dan memakai database tenant yang sama. Procurement
-belum, jadi jalur lama — container sendiri, database sendiri, token layanan, proxy konten, dan token
-konteks — masih hidup untuknya. Aturan yang berlaku untuk app itu ada di
-[Standar module](/dev/02-module-standard#bentuk-lama-app-dengan-repository-dan-container-sendiri).
+belum. **Keputusan pemilik produk, 10 September 2026: ia datang sebagai module, bukan sebagai app
+berkontainer** — dan dengan keputusan itu jalur hosting container dibuang seluruhnya dari repo ini.
+Aturan yang berlaku untuknya karena itu adalah aturan module penuh, di
+[Standar module](/dev/02-module-standard).
 :::
 
 ## Batas domain
@@ -32,7 +33,7 @@ Pemecahan ini menghindari dua kesalahan yang sering tampak sama pada tahap awal:
 - Membuat tabel vendor sendiri di setiap app. Hasilnya, nama atau alamat satu pemasok mudah berbeda antara Procurement dan Accounts Payable.
 - Memindahkan seluruh fakta pemasok ke Business Partner. Hasil prakualifikasi, penawaran, atau status pengadaan lalu kehilangan pemilik proses yang jelas.
 
-Ketika Procurement mulai memakai party, ia memakai contract Business Partner. Tidak ada foreign key, Eloquent relation, atau query langsung ke database `app_erp_business_partner`.
+Ketika Procurement mulai memakai party, ia memakai kontrak Business Partner. Tidak ada foreign key, Eloquent relation, atau query langsung ke tabel milik module lain.
 
 ## Status fondasi saat ini
 

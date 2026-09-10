@@ -1,13 +1,15 @@
 <?php
 
 return [
-    // Canonical official apps. Entitlements and releases reference these IDs.
+    // Canonical official apps. Entitlements and module installations reference these IDs.
     'database' => 'core_erp',
+    // Profile dan placement satu deployment. Keduanya dicatat pada `tenant_deployments` saat
+    // usaha mendaftar, dan dibaca jalur urutan nomor. `pull_images` dan `release_root` dibuang
+    // pada 10 September 2026 bersama job penempatan container yang menjadi satu-satunya
+    // pembacanya.
     'deployment' => [
         'profile' => env('COREERP_DEPLOYMENT_PROFILE', 'pooled'),
         'placement' => env('COREERP_DEPLOYMENT_PLACEMENT', 'pooled-primary'),
-        'pull_images' => env('COREERP_DEPLOYMENT_PULL_IMAGES', true),
-        'release_root' => env('COREERP_RELEASE_ROOT'),
     ],
     'provider' => [
         'email' => env('COREERP_PROVIDER_EMAIL', 'provider@coreerp.local'),

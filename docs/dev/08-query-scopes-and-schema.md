@@ -21,8 +21,7 @@ control_plane_db
 ├── tenants
 ├── tenant_app_entitlements
 ├── tenant_deployments
-├── app_placements
-└── app_installations
+└── core_module_installations
 
 organization_db
 ├── organizations

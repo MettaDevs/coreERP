@@ -31,8 +31,8 @@ features:
     linkText: Tenant dan hierarki organisasi
   - title: Mau merilis atau memasang app?
     details: Katalog, entitlement, installation, dan runtime health adalah empat kebenaran terpisah. Jangan disamakan.
-    link: /onboarding/empat-kebenaran
-    linkText: Empat kebenaran lifecycle
+    link: /onboarding/tiga-kebenaran
+    linkText: Tiga kebenaran lifecycle
 ---
 
 ## Dokumentasi ini terbagi lima
@@ -41,7 +41,7 @@ features:
 | --- | --- | --- |
 | [Mulai di sini](/onboarding/) | Orientasi, setup, glosarium, cara berkontribusi | Panduan |
 | [App](/apps/) | Hub teknis per app dan jalur membangun modul baru | Teknis, per app |
-| [Desain kanonik](/dev/) | Kontrak platform yang mengikat module maupun app berkontainer | **Mengikat** |
+| [Desain kanonik](/dev/) | Kontrak platform yang mengikat setiap module | **Mengikat** |
 | [Referensi](/references/) | Sumber eksternal dan dokumen konsep lama | Rujukan |
 | [Backlog](/todo/) | Temuan audit yang menunggu review | **Belum disetujui** |
 

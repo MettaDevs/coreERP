@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -9,17 +10,17 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { api, errorMessage } from '../../api';
-import {
+import type {
     MasterAction,
     MasterConfig,
     MasterRecord,
     Permission,
-    permission,
 } from '../masters';
-import RecordDetailPane, { DetailMode } from './RecordDetailPane';
+import { permission } from '../masters';
+import type { DetailMode } from './RecordDetailPane';
+import RecordDetailPane from './RecordDetailPane';
 import RecordListPane from './RecordListPane';
 
 const FORM_ID = 'master-detail-form';
@@ -45,7 +46,7 @@ export default function MasterDetailPage({
     const [error, setError] = useState('');
     const loadingMoreRef = useRef(false);
 
-    const [selectedId, setSelectedId] = useState<string | null>(null);
+    const [selectedIdDipilih, setSelectedId] = useState<string | null>(null);
     const [mode, setMode] = useState<DetailMode>('view');
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -62,14 +63,21 @@ export default function MasterDetailPage({
             per_page: String(PER_PAGE),
             page: String(page),
         });
-        if (search.trim()) params.set('q', search.trim());
-        if (activeFilter !== 'semua') params.set('aktif', activeFilter);
+
+        if (search.trim()) {
+            params.set('q', search.trim());
+        }
+
+        if (activeFilter !== 'semua') {
+            params.set('aktif', activeFilter);
+        }
 
         return params.toString();
     }, [page, search, activeFilter]);
 
     const load = useCallback(async () => {
         setLoading(true);
+
         try {
             const list = await api<{
                 data: MasterRecord[];
@@ -106,17 +114,13 @@ export default function MasterDetailPage({
         return () => window.clearTimeout(timer);
     }, [load]);
 
-    useEffect(() => {
-        setPage(1);
-    }, [search, activeFilter]);
-
-    // Pilihan awal jatuh ke record pertama supaya panel detail tidak menyambut dengan layar
-    // kosong. Tidak pernah menimpa pilihan yang sudah ada.
-    useEffect(() => {
-        if (mode === 'create' || selectedId !== null || items.length === 0)
-            return;
-        setSelectedId(items[0].id);
-    }, [items, mode, selectedId]);
+    // Pilihan awal jatuh ke record pertama supaya panel detail tidak menyambut dengan
+    // layar kosong. Dihitung saat render, jadi tidak ada satu frame pun yang sempat
+    // memperlihatkan panel kosong sebelum pilihan otomatisnya jadi. Pilihan yang sudah
+    // ada tidak pernah ditimpa, dan saat sedang membuat record baru tidak ada pilihan.
+    const selectedId =
+        selectedIdDipilih ??
+        (mode === 'create' ? null : (items[0]?.id ?? null));
 
     const selected = items.find((item) => item.id === selectedId) ?? null;
 
@@ -130,20 +134,29 @@ export default function MasterDetailPage({
     function requestSelect(id: string) {
         if (mode !== 'view' && dirty) {
             setPendingSelect(id);
+
             return;
         }
+
         commitSelect(id);
     }
 
     function cancelEditing() {
         setDirty(false);
         setFormNonce((current) => current + 1);
-        if (mode === 'create') setSelectedId(items[0]?.id ?? null);
+
+        if (mode === 'create') {
+            setSelectedId(items[0]?.id ?? null);
+        }
+
         setMode('view');
     }
 
     async function toggleStatus() {
-        if (!selected) return;
+        if (!selected) {
+            return;
+        }
+
         try {
             await api(`/${config.resource}/${selected.id}`, {
                 method: 'PATCH',
@@ -158,7 +171,10 @@ export default function MasterDetailPage({
     }
 
     async function archive() {
-        if (!selected) return;
+        if (!selected) {
+            return;
+        }
+
         try {
             await api(`/${config.resource}/${selected.id}`, {
                 method: 'DELETE',
@@ -181,7 +197,10 @@ export default function MasterDetailPage({
             const existingIndex = current.findIndex(
                 (item) => item.id === savedRecord.id,
             );
-            if (existingIndex === -1) return [savedRecord, ...current];
+
+            if (existingIndex === -1) {
+                return [savedRecord, ...current];
+            }
 
             return current.map((item, index) =>
                 index === existingIndex ? savedRecord : item,
@@ -197,7 +216,10 @@ export default function MasterDetailPage({
     }
 
     const loadMore = useCallback(() => {
-        if (loading || loadingMoreRef.current || page >= lastPage) return;
+        if (loading || loadingMoreRef.current || page >= lastPage) {
+            return;
+        }
+
         loadingMoreRef.current = true;
         setPage((current) => current + 1);
     }, [lastPage, loading, page]);
@@ -280,9 +302,17 @@ export default function MasterDetailPage({
                     loading={loading}
                     error={error}
                     search={search}
-                    onSearchChange={setSearch}
+                    onSearchChange={(next) => {
+                        setSearch(next);
+                        // Nomor halaman disetel ulang di tempat filternya diubah,
+                        // bukan lewat effect susulan.
+                        setPage(1);
+                    }}
                     activeFilter={activeFilter}
-                    onActiveFilterChange={setActiveFilter}
+                    onActiveFilterChange={(next) => {
+                        setActiveFilter(next);
+                        setPage(1);
+                    }}
                     selectedId={selectedId}
                     creating={mode === 'create'}
                     onSelect={requestSelect}

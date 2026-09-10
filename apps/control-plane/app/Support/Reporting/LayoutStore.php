@@ -13,8 +13,8 @@ use RuntimeException;
 use stdClass;
 
 /**
- * Katalog layout satu laporan untuk satu tenant: layout bawaan dari release app
- * digabung dengan layout unggahan tenant, ditambah pilihan default per legal entity.
+ * Katalog layout satu laporan untuk satu tenant: layout bawaan dari module digabung
+ * dengan layout unggahan tenant, ditambah pilihan default per legal entity.
  *
  * Padanan halaman Report Layouts dan Report Selections Business Central, disatukan
  * karena keduanya menjawab pertanyaan yang sama: "layout mana yang dipakai kalau saya
@@ -106,9 +106,9 @@ final class LayoutStore
     }
 
     /**
-     * Berkas layout siap dibaca renderer. Layout bawaan diambil dari app sekali per versi
-     * release lalu disimpan di disk laporan, supaya worker tidak memanggil app untuk
-     * berkas yang sama berulang kali. Pemanggil wajib memanggil {@see LayoutFile::cleanup()}.
+     * Berkas layout siap dibaca renderer. Layout bawaan diambil dari module sekali per versi
+     * katalog lalu disimpan di disk laporan, supaya worker tidak membaca ulang berkas yang
+     * sama. Pemanggil wajib memanggil {@see LayoutFile::cleanup()}.
      */
     public function resolve(stdClass $report, string $tenantId, ?string $legalEntityId, string $ref, TenantMembership $membership, ?string $orgUnitId): LayoutFile
     {
@@ -116,10 +116,13 @@ final class LayoutStore
         if (LayoutRef::isBuiltin($ref)) {
             $layout = $this->builtin($report, $ref)
                 ?? throw new RuntimeException("Layout bawaan `{$ref}` tidak ada pada laporan {$report->code}.");
-            // Kunci cache memuat digest image API release yang terpasang, bukan hanya versi:
-            // pada stack lokal image dibangun ulang tanpa menaikkan versi, dan layout bawaan
-            // lama tidak boleh tertinggal di cache Core.
-            $cached = "reporting/builtin/{$report->app_id}/{$report->app_version}-{$this->releaseKey($report)}/{$report->code}-{$layout['key']}.{$layout['format']}";
+            // Kuncinya versi module yang terdaftar di katalog. Dulu ia juga memuat digest
+            // image release yang terpasang, karena berkasnya datang dari container lain yang
+            // bisa dibangun ulang tanpa menaikkan versi. Berkasnya sekarang dibaca dari kode
+            // module di proses ini, dan katalog module didaftarkan ulang setiap kode module
+            // berubah — jadi versi katalog adalah sidik jari yang benar, dan satu-satunya
+            // yang masih punya sumber.
+            $cached = "reporting/builtin/{$report->app_id}/{$report->app_version}/{$report->code}-{$layout['key']}.{$layout['format']}";
             if (! $disk->exists($cached)) {
                 $disk->put($cached, $this->client->builtinLayout($report, $layout['key'], $membership, $legalEntityId, $orgUnitId));
             }
@@ -253,22 +256,6 @@ final class LayoutStore
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-    }
-
-    /** Sidik jari release yang sedang melayani app: berubah setiap image edisi diganti. */
-    private function releaseKey(stdClass $report): string
-    {
-        $image = DB::table('app_placements as placements')
-            ->join('app_releases as releases', function ($join): void {
-                $join->on('releases.app_id', '=', 'placements.app_id')
-                    ->on('releases.version', '=', 'placements.release_version');
-            })
-            ->where('placements.app_id', $report->app_id)
-            ->where('placements.runtime_status', 'ready')
-            ->orderByDesc('placements.updated_at')
-            ->value('releases.edition_image');
-
-        return substr(sha1((string) $image), 0, 12);
     }
 
     /** @return array{key:string,name:string,description:?string,format:string}|null */

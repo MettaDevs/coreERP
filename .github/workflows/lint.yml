@@ -42,6 +42,12 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          # Riwayat penuh dibutuhkan satu langkah saja: penjaga baseline analisa tipe
+          # membandingkan berkasnya terhadap cabang basis. Mengambilnya belakangan lewat
+          # `git fetch` tidak mungkin, karena `persist-credentials: false` sengaja tidak
+          # meninggalkan kredensial — dan itu keputusan yang tidak diubah demi kenyamanan
+          # satu langkah.
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -94,6 +100,20 @@ jobs:
       # hasil yang pasti sama. Pembangunan aset TIDAK ikut pindah: test membutuhkannya.
       - name: Run Type Analysis
         run: composer types:check
+
+      # Baseline analisa tipe hanya boleh menyusut. Aturannya sudah lama tertulis; sampai
+      # langkah ini ada, tidak satu pun mesin menegakkannya — pull request yang menambah
+      # bungkaman tetap hijau dan hanya tertangkap kalau peninjau kebetulan membuka berkasnya.
+      #
+      # Dibandingkan per entri, bukan totalnya. Rancangan pertama membandingkan total dan
+      # terbukti tidak menjaga apa pun: pada cabang yang membuang tujuh belas bungkaman,
+      # menambahkan tiga bungkaman baru masih terbaca "menyusut" dan lolos.
+      #
+      # Riwayatnya diambil dangkal untuk basis yang dipakai membandingkan saja; `fetch-depth: 0`
+      # akan mengunduh seluruh riwayat repo demi satu berkas.
+      - name: Periksa baseline analisa tipe tidak bertambah
+        working-directory: .
+        run: node scripts/periksa-baseline-phpstan.mjs "origin/${{ github.base_ref || 'main' }}"
 
       # `.agents/skills` dan `.claude/skills` dibaca alat yang berbeda dan isinya sudah
       # menyimpang diam-diam sekali. Tidak ada test yang gagal karena aturan di satu

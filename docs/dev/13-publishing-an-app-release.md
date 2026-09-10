@@ -1,110 +1,92 @@
-# Mendaftarkan app dari repository terpisah
+# Mendaftarkan katalog sebuah produk
 
-::: warning Halaman ini menggambarkan bentuk lama
-Module bisnis tidak lagi berasal dari repository terpisah. Manifestnya didaftarkan dari dalam repo
-Core dengan `app:register-manifest <id module>` — bentuk berjalur berkas sudah ditolak — dan
-kodenya ikut image edisi Core, bukan image sendiri. Alurnya ada di
+::: warning Bentuk repository terpisah sudah tidak ada
+Module bisnis tidak berasal dari repository terpisah. Manifestnya didaftarkan dari dalam repo Core
+dengan `app:register-manifest <id module>` — bentuk berjalur berkas sudah ditolak — dan kodenya ikut
+image edisi Core, bukan image sendiri. Alurnya ada di
 [jalur membangun modul baru](../apps/membangun-app-baru.md) dan
 [Release dan on-prem](03-release-and-on-prem.md#dua-bentuk-rilis).
 
-Halaman ini tetap berlaku untuk app yang belum dipindah dan masih punya repository sendiri.
+**Pendaftaran rilis oleh penyedia dibuang pada 10 September 2026** bersama seluruh jalur hosting
+container: endpoint `POST /api/v1/provider/apps/{app}/releases`, model `AppRelease`, dan job
+penempatan app tidak ada lagi. Yang tersisa dari halaman ini adalah pendaftaran **katalog**, yang
+masih berjalan dan masih punya endpoint penyedianya.
 :::
 
-Dokumen ini adalah kontrak kerja antara tim app berkontainer dan CoreERP. Tujuannya agar satu tim dapat membuat app bisnis pada repository sendiri tanpa menaruh source domain, database, atau UI app di repository CoreERP.
+Halaman ini menjelaskan apa yang dicatat platform tentang sebuah produk, siapa yang mencatatnya, dan
+batas mana yang tidak boleh dilewati saat mencatatnya.
 
 ## Batas ownership
 
 | Pemilik | Tanggung jawab |
 | --- | --- |
-| Tim app | `app.yaml`, API, UI, database, contract, test, image, dan bundle deployment app. |
-| CI app | Memvalidasi manifest, membangun image digest immutable, lalu mengirim metadata katalog/release ke Control Plane. |
-| CoreERP Control Plane | Katalog, entitlement tenant, role metadata, placement, installation registry, dan launcher. |
+| Tim module | `app.yaml`, rute, halaman UI, migration, contract, dan test module. |
+| CI | Memvalidasi manifest lalu mengirim metadata katalog ke Control Plane. |
+| CoreERP Control Plane | Katalog, entitlement tenant, role metadata, catatan pemasangan module, dan launcher. |
 
-App tidak mengakses database CoreERP. CoreERP tidak mengakses database app. Keduanya bertukar konteks dan kontrak yang dipublikasikan.
+Sebuah module tidak menyentuh tabel module lain. Keduanya bertukar kontrak PHP dan event in-process;
+permukaan yang dipanggil dari luar runtime tetap dikontrakkan.
 
-## Yang ada di repository app
+## Yang ada di folder module
 
-Setiap app memakai struktur minimum berikut.
+`app.yaml` menyatakan ID module, versi, dependency, entri menu UI, serta permission dan entry point.
+Strukturnya lengkap ada di [Standar module](02-module-standard.md).
 
-```text
-app-erp-<app-key>/
-├─ app.yaml
-├─ api/
-├─ ui/
-├─ database/
-├─ contracts/
-│  ├─ openapi.yaml
-│  └─ asyncapi.yaml
-└─ deploy/
-```
+## Registrasi katalog
 
-`app.yaml` menyatakan ID app, versi, dependency, UI entry, logical database, serta permission/entry point. CI menghitung SHA-256 file manifest yang diloloskan dan membangun image API/UI dengan digest immutable. Tag mutable tidak boleh didaftarkan sebagai release.
+Registrasi dilakukan oleh service account CI atau provider, bukan developer yang mengubah repository
+CoreERP.
 
-## Registrasi katalog dan release
+**Katalog sekali per module.** CI atau operator provider memanggil `POST /api/v1/provider/apps` dengan
+metadata dari manifest: ID, nama produk, versi, URL repository dan contract, `dependsOn`, serta keempat
+lapis keamanan `security.entry_points`, `security.permissions`, `security.privileges`, dan
+`security.duties`. Untuk dependency, key payload sama persis dengan `app.yaml`: map ID module ke
+rentang versi. Control Plane menyimpan relasinya, memeriksa target tersedia dan cocok versinya, lalu
+menolak cycle.
 
-Registrasi dilakukan oleh service account CI/provider, bukan developer yang mengubah repository CoreERP.
+Di dalam repo ini jalur yang sama dipanggil `app:register-manifest <id module>`, dan itu perintah yang
+sama dengan yang dijalankan admin on-prem.
 
-1. **Katalog sekali per app.** CI atau operator provider memanggil `POST /api/v1/provider/apps` dengan metadata dari manifest: ID, nama produk, versi awal, database logis, URL repository/contract, `dependsOn`, serta keempat lapis keamanan `security.entry_points`, `security.permissions`, `security.privileges`, dan `security.duties`. Untuk dependency, key payload sama persis dengan `app.yaml`: map ID app ke rentang versi. Control Plane menyimpan relasinya, memeriksa target tersedia dan cocok versinya, lalu menolak cycle. Blok manifest lain masih dipetakan oleh CI ke payload katalog yang berlaku; Control Plane belum membaca YAML langsung.
-2. **Release sekali per versi.** Setelah artifact siap, CI memanggil `POST /api/v1/provider/apps/{app}/releases`.
-3. **Placement.** Hanya release yang tercatat dapat dipakai worker placement. Entitlement tetap tidak berarti app sudah terpasang atau siap.
-
-Payload release minimum:
-
-```json
-{
-  "version": "1.0.0",
-  "manifest_sha256": "<64-character-sha256>",
-  "edition_image": "registry.example/edition@sha256:<64-character-sha256>",
-  "bundle_path": "app-key/1.0.0",
-  "compose_file": "compose.yaml",
-  "compose_project": "app-key"
-}
-```
-
-Satu image edisi menggantikan pasangan `api_image` dan `ui_image`: module berjalan di dalam
-runtime Core dan UI-nya ikut dibangun ke dalam shell, jadi hanya ada satu artifact yang bisa
-disebut sidik jarinya. `api_service`, `ui_service`, dan `database_service` masih boleh
-dikirim, tetapi tidak lagi wajib — ketiganya hanya berarti untuk app yang masih berjalan
-sebagai container sendiri.
-
-`bundle_path` selalu relatif terhadap `COREERP_RELEASE_ROOT`, yaitu lokasi artifact yang sudah dibuat CI dan tersedia untuk worker deployment. Bundle berisi Compose lengkap, termasuk service database. Image API wajib membawa skrip `deploy/migrate.sh` pada `/coreerp/migrate.sh`; worker menjalankannya setelah database sehat dan sebelum API/UI dinyalakan. Bundle bukan path source repository developer.
+**Tidak ada pendaftaran rilis.** Sampai 10 September 2026 ada langkah kedua —
+`POST /api/v1/provider/apps/{app}/releases` — yang mencatat digest image, berkas Compose, dan nama
+service per app supaya worker penempatan bisa menariknya. Langkah itu dibuang bersama jalur hosting
+container: kode module ikut image edisi Core, jadi sidik jari yang berarti adalah sidik jari image
+edisi itu, bukan sidik jari per app.
 
 ## Batas lifecycle
 
 Control Plane menyimpan fakta berbeda berikut:
 
 ```text
-catalogued  = app dan kontraknya tercatat pada katalog
-release known = artifact deployable untuk versi tersebut tercatat
-entitled   = tenant berhak memakai app
-installed  = artifact + migration berhasil pada placement
-ready      = runtime health berhasil dan app dapat diroute
+catalogued = module dan kontraknya tercatat pada katalog
+entitled   = tenant berhak memakai module
+installed  = migration module berhasil dijalankan untuk tenant itu
 ```
 
-Launcher hanya menampilkan app ketika entitlement aktif, release yang terdaftar cocok dengan placement, dan placement telah `ready`. Katalog atau entitlement saja tidak membuat app terlihat sebagai terpasang.
+Launcher hanya menampilkan sebuah produk ketika entitlement aktif **dan** catatan pemasangan module
+untuk tenant itu berstatus `installed`. Katalog atau entitlement saja tidak membuat produk terlihat
+sebagai terpasang. Rinciannya di [Tiga kebenaran lifecycle](../onboarding/tiga-kebenaran.md).
 
-Jika pembeli memilih app yang memiliki `dependsOn`, onboarding menambahkan semua
-prerequisite transitif sebagai entitlement teknis dan menjadwalkan placement dalam
-urutan dependency. Job app turunan tidak dapat menandai placement `ready` sebelum
-seluruh prerequisite tersebut `ready` pada placement yang sama. Katalog/marketing
-tetap harus menyajikannya sebagai produk utama beserta bagian yang sudah termasuk,
-bukan sebagai daftar app teknis yang harus dipilih pelanggan.
+Jika pembeli memilih produk yang memiliki `dependsOn`, onboarding menambahkan semua prerequisite
+transitif sebagai entitlement teknis. Katalog dan marketing tetap harus menyajikannya sebagai produk
+utama beserta bagian yang sudah termasuk, bukan sebagai daftar module teknis yang harus dipilih
+pelanggan.
 
 ## Pekerjaan yang masih bukan otomatis
 
-Upgrade belum dapat didaftarkan melalui endpoint ini: versi release harus sama dengan versi katalog. Upgrade memerlukan compatibility matrix, backup, dan workflow rollback terverifikasi; jangan menyamarkan perubahan versi sebagai instalasi biasa.
+Upgrade memerlukan compatibility matrix, backup, dan workflow rollback terverifikasi; jangan
+menyamarkan perubahan versi sebagai pemasangan biasa.
 
-Disable dan uninstall juga belum tersedia. `dependsOn` sudah melindungi registrasi,
-onboarding, dan placement, tetapi belum dapat menolak pelepasan app karena belum
-ada operasi pelepasan yang bisa dijalankan.
+Disable dan uninstall juga belum tersedia. `dependsOn` sudah melindungi registrasi dan onboarding,
+tetapi belum dapat menolak pelepasan sebuah module karena belum ada operasi pelepasan yang bisa
+dijalankan.
 
-App juga wajib menyediakan middleware/gateway yang menerima `TenantContext` tepercaya dari CoreERP dan menegakkan tenant serta organization scope pada API-nya. Jangan menerima `tenant_id` bebas dari request browser.
+Halaman module menerima konteks tenant dari request Core yang sama, dan setiap query module menyaring
+`tenant_id` lewat `MilikTenant`. Tidak ada `tenant_id` bebas yang boleh datang dari request browser.
 
-Untuk UI app yang dimuat Web Shell, Core menerbitkan token konteks HS256 berumur lima menit dan mengirimkannya ke iframe dengan `postMessage` yang dibatasi ke origin UI app. Token memuat app audience, tenant aktif, organization aktif, serta permission efektif. UI meneruskan token sebagai bearer token ke API app; API memverifikasi signature, expiry, audience, dan tenant sebelum menjalankan query. Core dan API app menerima `COREERP_APP_CONTEXT_SIGNING_KEY` yang sama melalui secret store deployment, bukan source code. Web Shell memperbarui token setiap empat menit selama app masih terbuka.
+Metadata keamanan adalah milik manifest module, bukan daftar yang ditulis di kode Core. CI mengubah `app.yaml` menjadi payload registrasi; Control Plane memvalidasi bahwa setiap kode memakai awalan ID app, bahwa permission menunjuk entry point yang dideklarasikan, privilege hanya memakai permission app tersebut, dan duty hanya memakai privilege app tersebut. Menambah rule bisnis atau permission pada sebuah module tidak memerlukan perubahan source Core.
 
-Metadata keamanan adalah milik repository app, bukan daftar yang ditulis di CoreERP. CI mengubah `app.yaml` menjadi payload registrasi; Control Plane memvalidasi bahwa setiap kode memakai awalan ID app, bahwa permission menunjuk entry point yang dideklarasikan, privilege hanya memakai permission app tersebut, dan duty hanya memakai privilege app tersebut. Menambah rule bisnis atau permission pada Procurement, Finance, POS, maupun app lain tidak memerlukan perubahan source CoreERP.
-
-CI boleh mengirim ulang registrasi katalog untuk app yang sama saat metadata keamanan berubah. Manifest adalah sumber kebenaran: metadata yang tidak lagi dideklarasikan akan dihapus. Pengecualiannya adalah duty yang masih dipakai security role tenant — registrasi ditolak dengan menyebut duty tersebut, supaya hak yang sedang berjalan tidak hilang diam-diam. Registrasi katalog bukan upgrade release aplikasi.
+CI boleh mengirim ulang registrasi katalog untuk module yang sama saat metadata keamanan berubah. Manifest adalah sumber kebenaran: metadata yang tidak lagi dideklarasikan akan dihapus. Pengecualiannya adalah duty yang masih dipakai security role tenant — registrasi ditolak dengan menyebut duty tersebut, supaya hak yang sedang berjalan tidak hilang diam-diam. Registrasi katalog bukan upgrade versi module.
 
 ## Lihat juga
 

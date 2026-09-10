@@ -19,10 +19,10 @@
 // sesi itu milik satu pengguna. Yang dulu dilakukan dengan menukar token per iterasi kini
 // dilakukan dengan menukar VU.
 
-import http from 'k6/http';
 import { check, fail } from 'k6';
-import { Counter, Trend } from 'k6/metrics';
 import exec from 'k6/execution';
+import http from 'k6/http';
+import { Counter, Trend } from 'k6/metrics';
 import { siapkanTenant, sempitkanTenant, paramsUntuk, bangunJar, tenantVu, urlModule, RUN_ID } from '../lib.js';
 
 const PROFILE = __ENV.PROFILE || 'saturation';
@@ -261,6 +261,7 @@ function listMaster(tenant) {
 
     if (response.status === 200) {
         const rows = response.json('data') || [];
+
         for (const row of rows) {
             // Prefix kode berasal dari reference Number Sequence milik master ini. Prefix
             // asing di sini berarti daftar memuat baris master lain — atau nomor terbit dari
@@ -268,6 +269,7 @@ function listMaster(tenant) {
             if (KODE_PREFIX[resource] && !String(row.kode).startsWith(KODE_PREFIX[resource])) {
                 violation('wrong_sequence_prefix', { resource });
             }
+
             if (chained && row[chained.parentField] !== tenant[chained.seed]) {
                 violation('parent_filter_ignored', { resource });
             }
@@ -291,6 +293,7 @@ function createMaster(tenant) {
     const chained = CHAINED[resource];
     const kunci = `vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}-${resource}`;
     const body = { nama: `${resource} ${kunci}`, keterangan: 'load test' };
+
     if (chained) {
         body[chained.parentField] = tenant[chained.seed];
     }
@@ -323,6 +326,7 @@ function replaceMatrix(tenant) {
         paramsUntuk(tenant, { tags: { op: 'replace_link', resource: 'group-buku-penyusutan' } }),
     );
     record(response, writeLatency, 200, 'replace matrix 200');
+
     if (response.status >= 500 && response.status !== 502 && response.status !== 504) {
         violation('link_replace_conflict', { status: response.status });
     }
@@ -350,6 +354,7 @@ function idempotencyRace(tenant) {
 
     [first, second].forEach((response) => writeLatency.add(response.timings.duration));
     const ok = (response) => response.status >= 200 && response.status < 300;
+
     if (!ok(first) || !ok(second)) {
         recordFailure(first, 'race');
         recordFailure(second, 'race');
@@ -360,6 +365,7 @@ function idempotencyRace(tenant) {
     if (first.json('data.id') !== second.json('data.id')) {
         violation('idempotency_produced_two_records');
     }
+
     if (first.status === 200 || second.status === 200) {
         idempotencyReplays.add(1);
     }
@@ -376,6 +382,7 @@ function crossTenantProbe(tenant, victim) {
         tags: { op: 'probe_read', resource: 'model-aset' },
         responseCallback: http.expectedStatuses(404),
     }));
+
     if (read.status === 200) {
         violation('cross_tenant_read');
     }
@@ -387,6 +394,7 @@ function crossTenantProbe(tenant, victim) {
         `steal-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}`,
         { tags: { op: 'probe_write', resource: 'model-aset' }, responseCallback: http.expectedStatuses(422) },
     );
+
     if (write.status === 201) {
         violation('cross_tenant_parent_accepted');
     }
@@ -398,6 +406,7 @@ function crossTenantProbe(tenant, victim) {
         `steal-plan-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}`,
         { tags: { op: 'probe_write', resource: 'perencanaan-aset' }, responseCallback: http.expectedStatuses(422) },
     );
+
     if (plan.status === 201) {
         violation('cross_tenant_plan_type_accepted');
     }
@@ -408,6 +417,7 @@ function permissionScopeProbe(sempit) {
     scopeProbes.add(1);
 
     const boleh = http.get(`${ASET('group-aset')}?per_page=1`, paramsUntuk(sempit, { tags: { op: 'probe_scope_allowed', resource: 'group-aset' } }));
+
     // Hanya penolakan yang benar-benar dijawab server yang dihitung. Status 0 berarti klien
     // menyerah menunggu — itu kapasitas, bukan hak yang dicabut, dan menghitungnya sebagai
     // pelanggaran membuat gate kebenaran ikut memerah setiap kali mesin kehabisan napas.
@@ -419,6 +429,7 @@ function permissionScopeProbe(sempit) {
         tags: { op: 'probe_scope_denied', resource: 'model-aset' },
         responseCallback: http.expectedStatuses(403),
     }));
+
     if (ditolak.status === 200) {
         violation('permission_scope_escalation');
     }
@@ -441,10 +452,12 @@ function lifecycleTransaction(tenant) {
     const kunci = `plan-vu${exec.vu.idInTest}-it${exec.scenario.iterationInTest}`;
     const response = post(tenant, 'perencanaan-aset', planningBody(tenant), kunci);
     record(response, writeLatency, 201, 'planning create 201');
+
     if (response.status === 201) {
         if (!String(response.json('data.kode')).startsWith('PLNA')) {
             violation('wrong_sequence_prefix_on_plan');
         }
+
         // Perencanaan membawa tenant_id di payload; masters tidak. Selama ia ada, ia dipakai.
         if (String(response.json('data.tenant_id')) !== String(tenant.id)) {
             violation('plan_written_to_other_tenant');
@@ -462,12 +475,14 @@ function planningIdempotencyRace(tenant) {
     ]);
     [first, second].forEach((response) => writeLatency.add(response.timings.duration));
     const ok = (response) => response.status >= 200 && response.status < 300;
+
     if (!ok(first) || !ok(second)) {
         recordFailure(first, 'plan-race');
         recordFailure(second, 'plan-race');
 
         return;
     }
+
     if (first.json('data.id') !== second.json('data.id')) {
         violation('plan_idempotency_produced_two_records');
     }
@@ -507,6 +522,7 @@ function attributeConstraintRace(tenant) {
     });
     const tidakTersedia = [values, asset].some((response) => response.status === 0 || response.status === 502 || response.status === 504);
     const sah = (values.status === 200 && asset.status === 422) || (values.status === 409 && asset.status === 200);
+
     if (!tidakTersedia && !sah) {
         violation('attribute_values_race', { values: values.status, asset: asset.status });
     }

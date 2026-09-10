@@ -9,8 +9,7 @@ bergantung pada batas mana yang dilewati:
 | --- | --- |
 | Module ke Core, di satu runtime | Pemanggilan fungsi lewat antarmuka di `App\Support\Modules\Contracts` |
 | Module ke module, di satu runtime | Event Laravel yang dikirim di dalam proses, dengan nama dan envelope yang sama seperti event terbit |
-| App berkontainer ke Core | REST `internal/v1` dengan token layanan |
-| App berkontainer ke app berkontainer | REST/OpenAPI atau event/AsyncAPI |
+| Addon pihak ketiga ke Core | REST `internal/v1` dengan token layanan |
 | Sistem eksternal milik tenant | REST/OpenAPI, lihat [integrasi sistem eksternal](12-external-module-integration.md) |
 
 Yang **tidak** berubah karena bentuknya: nama event `module.aggregate.action.vN`, isi envelope, dan
@@ -111,8 +110,14 @@ Rute API module hidup di bawah `/api/modules/<id module>/v1`. Awalan `/api/v1` m
 dan tidak dibagi dua pemilik: dua pemilik pada satu awalan berarti setiap penambahan rute Core harus
 memeriksa dulu apakah sebuah module sudah memakainya.
 
-Endpoint `/api/internal/v1/` **tidak dihapus**. Ia tetap ada untuk integrasi luar dan addon pihak
-ketiga, dan kontraknya tetap dijaga pemeriksa cakupan.
+Endpoint `/api/internal/v1/` **tidak dihapus** bersama jalur hosting container. Ia tetap ada untuk
+integrasi luar dan addon pihak ketiga, dan kontraknya tetap dijaga pemeriksa cakupan.
+
+Satu hal berubah di dalamnya: penentu kesiapan. Dulu sebuah pemanggil diterima bila tenantnya
+berhak **dan** ada penempatan container yang berstatus siap. Penempatan itu tidak ada lagi, jadi
+yang dibaca sekarang adalah catatan pemasangan module — tenant berhak dan module-nya terpasang.
+Mempertahankan penentu lama berarti menolak setiap pemanggil, karena tidak ada lagi yang menulis
+tabel penempatan.
 
 ### Setelan yang tetap ada meski pemakaiannya menyusut
 

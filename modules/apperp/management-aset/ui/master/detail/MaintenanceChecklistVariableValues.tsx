@@ -53,6 +53,7 @@ export default function MaintenanceChecklistVariableValues({
     async function save() {
         setSaving(true);
         setError('');
+
         try {
             await api(`/maintenance-checklist-variables/${variableId}/values`, {
                 method: 'PUT',
@@ -67,12 +68,16 @@ export default function MaintenanceChecklistVariableValues({
             setSaving(false);
         }
     }
-    if (error && values.length === 0)
+
+    if (error && values.length === 0) {
         return <p className="text-destructive text-sm">{error}</p>;
+    }
+
     const labelHasil = (result: Value['result_code']): string =>
         ({ pass: 'Lulus', fail: 'Gagal', none: 'Tidak dinilai' })[result];
     const kodeHasil = (label: string | null): Value['result_code'] =>
         label === 'Lulus' ? 'pass' : label === 'Gagal' ? 'fail' : 'none';
+
     return (
         <div className="space-y-3">
             <div className="flex items-center justify-between">

@@ -1,4 +1,4 @@
-import { Context } from './workOrder';
+import type { Context } from './workOrder';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
 import WorkOrderListPage from './WorkOrderListPage';
 
@@ -25,7 +25,9 @@ export default function WorkOrderPage({
 }) {
     const [pertama, kedua, ketiga] = segments;
 
-    if (!pertama) return <WorkOrderListPage permissions={permissions} />;
+    if (!pertama) {
+        return <WorkOrderListPage permissions={permissions} />;
+    }
 
     if (pertama === 'baru') {
         return (

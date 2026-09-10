@@ -2,12 +2,9 @@
 
 Halaman di bagian ini bersifat **teknis dan internal** — ditujukan untuk developer yang membangun atau merawat app, bukan panduan pemakaian untuk pengguna bisnis.
 
-Sebuah app bisa berjalan dalam dua bentuk, dan aturannya berbeda:
+Sebuah app berjalan dalam satu bentuk: **module** di `modules/<penerbit>/<module>/` pada repo CoreERP, di dalam runtime Core, memakai database tenant yang sama.
 
-- **Module** hidup di `modules/<penerbit>/<module>/` pada repo CoreERP, berjalan di runtime Core, dan memakai database tenant yang sama. Ini bentuk yang berlaku untuk pekerjaan baru.
-- **App berkontainer** punya repository, database, image, dan token layanan sendiri. Bentuk lama, dipertahankan selama masih ada app yang menjalankannya.
-
-Tabel perbandingan lengkapnya ada di [Grand design](/dev/01-grand-design#dua-bentuk-yang-hidup-berdampingan).
+Bentuk lama — app dengan repository, database, image, dan token layanan sendiri di belakang reverse proxy — dibuang pada 10 September 2026 beserta seluruh kode yang melayaninya. Rinciannya di [Grand design](/dev/01-grand-design#satu-bentuk-penempatan).
 
 ## Katalog
 
@@ -16,7 +13,7 @@ Tabel perbandingan lengkapnya ada di [Grand design](/dev/01-grand-design#dua-ben
 | [Management Aset](/apps/management-aset/) | `management-aset` | Module di `modules/apperp/management-aset/` | Release pengembangan `0.1.0` |
 | [Human Resources](/apps/human-resources/) | `human-resources` | Module di `modules/apperp/human-resources/` | Release pengembangan `0.1.0` |
 | [Business Partner](/apps/business-partner/) | `business-partner` | Belum dipindah | Fondasi release pengembangan `0.1.0` |
-| [Procurement](/apps/procurement/) | `procurement` | App berkontainer, repo `app-erp-procurement` | Fondasi release pengembangan `0.1.0` |
+| [Procurement](/apps/procurement/) | `procurement` | Belum dipindah; akan datang sebagai module | Fondasi release pengembangan `0.1.0` |
 
 Daftar module yang benar-benar terpasang di sebuah runtime dibaca dari `php artisan module:list`,
 bukan dari tabel ini. Tabel ini menunjuk halamannya; runtime yang menyebut isinya.
@@ -54,10 +51,9 @@ repo yang sama dengan kodenya, karena kalau tidak, memperbaruinya butuh dua pull
 
 ## Aturan yang berlaku untuk semua app
 
-Tiga hal yang tidak bisa ditawar, apa pun bentuk penempatannya:
+Tiga hal yang tidak bisa ditawar:
 
-**Satu app tidak menyentuh data app lain.** Pada app berkontainer yang menolak adalah database
-terpisah; pada module yang menolak adalah penjaga batas di
+**Satu module tidak menyentuh data module lain.** Yang menolak adalah penjaga batas di
 `apps/control-plane/tests/Feature/Boundary/` dan analisa statis. Satu database yang sama bukan izin
 untuk melakukan `join` ke tabel modul sebelah.
 
@@ -69,5 +65,5 @@ untuk melakukan `join` ke tabel modul sebelah.
 
 - [Standar module](/dev/02-module-standard) — kontrak lengkap satu module
 - [Gate penemuan dan keputusan](/dev/18-module-discovery-and-decision-gate) — sebelum module dibuat
-- [Menerbitkan release app](/dev/13-publishing-an-app-release) — dari manifest ke katalog Core
+- [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) — dari manifest ke katalog Core
 - [Grand design](/dev/01-grand-design#dua-bentuk-yang-hidup-berdampingan) — dua bentuk penempatan dan aturannya

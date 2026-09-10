@@ -7,6 +7,7 @@ use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Actions\NumberSequence\NumberSequenceService;
 use App\Models\AppServiceCredential;
 use App\Models\FiscalCalendar;
+use App\Models\ModuleInstallation;
 use App\Models\NumberSequenceReference;
 use App\Models\TenantMembership;
 use App\Models\TenantNumberSequence;
@@ -752,10 +753,23 @@ class NumberSequenceTest extends TestCase
         return $id;
     }
 
+    /**
+     * Tenant yang berhak atas sebuah module **dan** sudah memasangnya.
+     *
+     * Baris pemasangan module inilah yang menentukan, bukan baris `app_placements`. Sampai
+     * 10 September 2026 penentunya adalah penempatan container, dan module tidak pernah punya
+     * penempatan container — jadi tidak satu pun urutan nomor dibuat untuk module mana pun,
+     * tanpa satu pun kesalahan terlihat. Kegagalannya baru muncul sebagai dokumen pertama yang
+     * gagal disimpan di tangan pengguna.
+     *
+     * Dibuktikan merah: dengan perabot ini apa adanya, query lama memulangkan nol tenant dan
+     * kedua test yang memakainya gagal dengan `No query results for model
+     * [App\Models\TenantNumberSequence]`.
+     */
     private function readyAppForTenant(string $tenantId, string $appId): void
     {
         DB::table('tenant_app_entitlements')->insert(['tenant_id' => $tenantId, 'app_id' => $appId, 'status' => 'active', 'starts_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
         DB::table('tenant_deployments')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'profile' => 'pooled', 'placement' => 'sample-placement', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
-        DB::table('app_placements')->insert(['id' => (string) Str::ulid(), 'app_id' => $appId, 'release_version' => '1.0.0', 'profile' => 'pooled', 'placement' => 'sample-placement', 'artifact_status' => 'placed', 'migration_status' => 'succeeded', 'runtime_status' => 'ready', 'ready_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('core_module_installations')->insert(['tenant_id' => $tenantId, 'module_id' => $appId, 'version' => '1.0.0', 'status' => ModuleInstallation::STATUS_INSTALLED, 'installed_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     }
 }

@@ -2,29 +2,35 @@
 
 namespace App\Actions\NumberSequence;
 
+use App\Models\ModuleInstallation;
 use App\Models\NumberSequenceReference;
 use App\Models\TenantNumberSequence;
 use Illuminate\Support\Facades\DB;
 
 class EnsureNumberSequenceDrafts
 {
+    /**
+     * Tenant yang berhak atas app ini **dan** sudah memasangnya sebagai module.
+     *
+     * Sampai 10 September 2026 penentunya adalah baris `app_placements` yang berstatus siap,
+     * dan itu penentu yang salah bagi module: module tidak pernah punya penempatan container,
+     * jadi jalur ini diam-diam tidak menemukan tenant mana pun dan tidak satu pun urutan nomor
+     * dibuat. Akibatnya tidak terlihat sebagai pendaftaran katalog yang gagal, melainkan
+     * sebagai dokumen pertama yang gagal disimpan di tangan pengguna.
+     */
     public function forReadyApp(string $appId): void
     {
-        $tenantIds = DB::table('tenant_deployments as deployments')
-            ->join('tenant_app_entitlements as entitlements', 'entitlements.tenant_id', '=', 'deployments.tenant_id')
-            ->join('app_placements as placements', 'placements.placement', '=', 'deployments.placement')
-            ->where('entitlements.app_id', $appId)
+        $tenantIds = DB::table('core_module_installations as installations')
+            ->join('tenant_app_entitlements as entitlements', function ($join) use ($appId): void {
+                $join->on('entitlements.tenant_id', '=', 'installations.tenant_id')
+                    ->where('entitlements.app_id', '=', $appId);
+            })
+            ->where('installations.module_id', $appId)
+            ->where('installations.status', ModuleInstallation::STATUS_INSTALLED)
             ->where('entitlements.status', 'active')
             ->where('entitlements.starts_at', '<=', now())
             ->where(fn ($query) => $query->whereNull('entitlements.ends_at')->orWhere('entitlements.ends_at', '>', now()))
-            ->where('deployments.status', 'active')
-            ->whereColumn('placements.profile', 'deployments.profile')
-            ->where('placements.app_id', $appId)
-            ->where('placements.artifact_status', 'placed')
-            ->where('placements.migration_status', 'succeeded')
-            ->where('placements.runtime_status', 'ready')
-            ->whereNotNull('placements.ready_at')
-            ->pluck('deployments.tenant_id');
+            ->pluck('installations.tenant_id');
 
         foreach ($tenantIds->unique() as $tenantId) {
             $this->forTenantAndApp((string) $tenantId, $appId);
@@ -40,20 +46,16 @@ class EnsureNumberSequenceDrafts
      */
     public function forReadyTenant(string $tenantId): void
     {
-        $appIds = DB::table('tenant_deployments as deployments')
-            ->join('tenant_app_entitlements as entitlements', 'entitlements.tenant_id', '=', 'deployments.tenant_id')
-            ->join('app_placements as placements', 'placements.placement', '=', 'deployments.placement')
-            ->where('deployments.tenant_id', $tenantId)
-            ->whereColumn('placements.app_id', 'entitlements.app_id')
+        $appIds = DB::table('core_module_installations as installations')
+            ->join('tenant_app_entitlements as entitlements', function ($join): void {
+                $join->on('entitlements.tenant_id', '=', 'installations.tenant_id')
+                    ->on('entitlements.app_id', '=', 'installations.module_id');
+            })
+            ->where('installations.tenant_id', $tenantId)
+            ->where('installations.status', ModuleInstallation::STATUS_INSTALLED)
             ->where('entitlements.status', 'active')
             ->where('entitlements.starts_at', '<=', now())
             ->where(fn ($query) => $query->whereNull('entitlements.ends_at')->orWhere('entitlements.ends_at', '>', now()))
-            ->where('deployments.status', 'active')
-            ->whereColumn('placements.profile', 'deployments.profile')
-            ->where('placements.artifact_status', 'placed')
-            ->where('placements.migration_status', 'succeeded')
-            ->where('placements.runtime_status', 'ready')
-            ->whereNotNull('placements.ready_at')
             ->pluck('entitlements.app_id');
 
         foreach ($appIds->unique() as $appId) {

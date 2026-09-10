@@ -22,10 +22,10 @@
 // arenanya: VU genap menulis himpunan A, VU ganjil menulis himpunan B, keduanya pada tenant
 // dan job type yang sama.
 
-import http from 'k6/http';
 import { check, fail } from 'k6';
-import { Counter, Trend } from 'k6/metrics';
 import exec from 'k6/execution';
+import http from 'k6/http';
+import { Counter, Trend } from 'k6/metrics';
 import { siapkanTenant, paramsUntuk, bangunJar, tenantVu, urlModule, RUN_ID } from '../lib.js';
 
 const PROFILE = __ENV.PROFILE || 'link-race';
@@ -109,6 +109,7 @@ export const options =
 
 function record(response, latency, op) {
     latency.add(response.timings.duration, { op });
+
     if (response.status === 0) {
         timeouts.add(1);
     } else if (response.status === 502 || response.status === 504) {
@@ -138,16 +139,20 @@ export function setup() {
         // Kunci seed stabil per RUN_ID: menjalankan ulang pada database yang sama memakai
         // kembali record yang sama, bukan menumbuhkan data seed.
         const jobType = buatMaster(tenant, 'maintenance-job-types', `Race job type ${RUN_ID}`, `mnt-race-job-${RUN_ID}-${index}`);
+
         if (jobType.status !== 200 && jobType.status !== 201) {
             fail(`setup job type gagal: ${jobType.status} ${String(jobType.body).slice(0, 300)}`);
         }
 
         const jenisAset = [];
+
         for (let slot = 0; slot < 4; slot++) {
             const aset = buatMaster(tenant, 'jenis-aset', `Race jenis aset ${RUN_ID}-${slot}`, `mnt-race-asset-${RUN_ID}-${index}-${slot}`);
+
             if (aset.status !== 200 && aset.status !== 201) {
                 fail(`setup jenis aset gagal: ${aset.status} ${String(aset.body).slice(0, 300)}`);
             }
+
             jenisAset.push(aset.json('data.id'));
         }
 
@@ -197,6 +202,7 @@ function linkRace(data) {
         readLatency,
         'read',
     );
+
     if (baca.status !== 200) {
         return;
     }
@@ -208,10 +214,12 @@ function linkRace(data) {
     const isA = himpunanSama(terpilih, arena.setA);
     const isB = himpunanSama(terpilih, arena.setB);
     const gabungan = !isA && !isB && terpilih.length > 0;
+
     if (gabungan) {
         mergedSets.add(1);
         console.error(`link_merged_sets: ${JSON.stringify(terpilih)}`);
     }
+
     check(baca, { 'kaitan tetap satu himpunan utuh': () => !gabungan });
 }
 
@@ -221,15 +229,18 @@ function saturation(data) {
 
     const jobType = buatMaster(tenant, 'maintenance-job-types', `Job type ${unik}`, `mnt-sat-job-${unik}`);
     check(jobType, { 'job type dibuat': (response) => response.status === 200 || response.status === 201 });
+
     if (jobType.status !== 200 && jobType.status !== 201) {
         return;
     }
+
     if (!String(jobType.json('data.kode')).startsWith('JPMA')) {
         violations.add(1, { kind: 'wrong_sequence_prefix_job_type' });
     }
 
     const variabel = buatMaster(tenant, 'maintenance-checklist-variables', `Variabel ${unik}`, `mnt-sat-var-${unik}`);
     check(variabel, { 'variabel dibuat': (response) => response.status === 200 || response.status === 201 });
+
     if (variabel.status === 200 || variabel.status === 201) {
         const nilai = record(
             http.put(
@@ -248,12 +259,14 @@ function saturation(data) {
         readLatency,
         'list',
     );
+
     if (daftar.status === 200) {
         // Master tidak memuat `tenant_id` di payload, jadi kebocoran diperiksa dua arah:
         // prefix nomor di sini, dan probe baca lintas tenant di bawah. Oracle SQL sesudah run
         // memeriksa hal yang sama langsung pada tabel.
         const rows = daftar.json('data') || [];
         const asing = rows.filter((row) => !String(row.kode).startsWith('JPMA'));
+
         if (asing.length > 0) {
             violations.add(asing.length, { kind: 'wrong_sequence_prefix_in_list' });
         }
@@ -261,6 +274,7 @@ function saturation(data) {
 
     // Job type milik tenant sebelah tidak boleh terbaca, juga saat sistem jenuh.
     const korban = data.tenants[(tenant.index + 1) % data.tenants.length];
+
     if (korban && korban.index !== tenant.index) {
         const curi = record(
             http.get(`${ASET('maintenance-job-types')}/${jobType.json('data.id')}`, {
@@ -270,6 +284,7 @@ function saturation(data) {
             readLatency,
             'probe',
         );
+
         if (curi.status === 200) {
             violations.add(1, { kind: 'cross_tenant_read' });
             console.error('correctness violation: cross_tenant_read');

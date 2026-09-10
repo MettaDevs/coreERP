@@ -6,16 +6,12 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { config as permintaanPembelianAset } from './transactions/permintaan-pembelian-aset/config';
+import type { Permission } from './master/masters';
+import { DETAIL_LAYOUT_RESOURCES, MASTERS, permission } from './master/masters';
 import { config as dekomisioningAset } from './transactions/dekomisioning-aset/config';
-import { config as penjualanAset } from './transactions/penjualan-aset/config';
 import { config as pemusnahanAset } from './transactions/pemusnahan-aset/config';
-import {
-    DETAIL_LAYOUT_RESOURCES,
-    MASTERS,
-    Permission,
-    permission,
-} from './master/masters';
+import { config as penjualanAset } from './transactions/penjualan-aset/config';
+import { config as permintaanPembelianAset } from './transactions/permintaan-pembelian-aset/config';
 
 /**
  * Properti yang dikirim `HalamanModulController` pada setiap layar module ini.
@@ -131,10 +127,11 @@ export default function App({
             </main>
         );
     }
+
     if (
         view === 'penyusutan' &&
         permissions.includes('management-aset.penyusutan.read')
-    )
+    ) {
         return (
             <main>
                 <DepreciationPage
@@ -150,69 +147,82 @@ export default function App({
                 />
             </main>
         );
+    }
+
     if (
         view === 'fixed-asset-parameters' &&
         permissions.includes('management-aset.fixed-asset-parameters.read')
-    )
+    ) {
         return (
             <main>
                 <FixedAssetSetupPlaceholderPage kind="parameters" />
             </main>
         );
+    }
+
     if (
         view === 'fixed-asset-posting-profiles' &&
         permissions.includes(
             'management-aset.fixed-asset-posting-profiles.read',
         )
-    )
+    ) {
         return (
             <main>
                 <FixedAssetSetupPlaceholderPage kind="posting-profiles" />
             </main>
         );
+    }
 
     if (
         view === 'mutasi-aset' &&
         permissions.includes('management-aset.mutasi-aset.read')
-    )
+    ) {
         return (
             <main>
                 <MutationPage />
             </main>
         );
+    }
+
     if (
         view === 'monitoring-aset' &&
         permissions.includes('management-aset.monitoring-aset.read')
-    )
+    ) {
         return (
             <main>
                 <MonitoringPage />
             </main>
         );
+    }
+
     if (
         view === 'perencanaan-aset' &&
         permissions.includes('management-aset.perencanaan-aset.read')
-    )
+    ) {
         return (
             <main>
                 <PlanningPage context={konteks} permissions={permissions} />
             </main>
         );
+    }
+
     if (
         view === 'validasi-status-work-order' &&
         permissions.includes('management-aset.validasi-status-work-order.read')
-    )
+    ) {
         return (
             <main>
                 <StatusValidationPage permissions={permissions} />
             </main>
         );
+    }
+
     // Pemeliharaan aset tidak lagi memakai halaman dokumen siklus generik: ia kini work
     // order dengan baris pekerjaan, checklist, penugasan, dan status pengerjaan sendiri.
     if (
         view === 'pemeliharaan-aset' &&
         permissions.includes('management-aset.pemeliharaan-aset.read')
-    )
+    ) {
         return (
             <main
                 data-layout="full-height"
@@ -225,7 +235,12 @@ export default function App({
                 />
             </main>
         );
-    if (LIFECYCLE[view] && permissions.includes(`management-aset.${view}.read`))
+    }
+
+    if (
+        LIFECYCLE[view] &&
+        permissions.includes(`management-aset.${view}.read`)
+    ) {
         return (
             <main>
                 <LifecycleDocumentPage
@@ -234,6 +249,7 @@ export default function App({
                 />
             </main>
         );
+    }
 
     if (!active) {
         return (

@@ -16,13 +16,12 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * Kesiapan sebuah produk kini bisa datang dari dua arah, dan keduanya harus hidup
- * berdampingan sampai app terakhir dipindah.
+ * Kesiapan sebuah produk datang dari satu arah: catatan pemasangan module.
  *
- * App yang masih berjalan sebagai container siap bila penempatannya siap. Module yang
- * berjalan di runtime Core siap bila catatan pemasangannya berstatus terpasang. Tanpa jalur
- * kedua, setiap halaman module akan 404 untuk semua orang begitu container per app hilang —
- * dan tanpa jalur pertama, app yang belum dipindah ikut mati.
+ * Sampai 10 September 2026 ada arah kedua — penempatan container yang berstatus siap — dan
+ * keduanya hidup berdampingan selama pemindahan. Arah itu dibuang bersama app berkontainer
+ * terakhir, dan test ini menjaga agar ia tidak kembali: tidak boleh ada satu pun baris
+ * penempatan yang dibuat, dan pemasangan module sendirian harus cukup.
  */
 class ModuleReadinessTest extends TestCase
 {

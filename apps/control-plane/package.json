@@ -10,8 +10,8 @@
         "ui:build": "npm --prefix ../../packages/ui run build",
         "format": "npm run ui:build && prettier --write resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --write \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
         "format:check": "npm run ui:build && prettier --check resources/ && prettier --config .prettierrc --no-error-on-unmatched-pattern --check \"../../modules/*/*/ui/**/*.{ts,tsx}\"",
-        "lint": "npm run ui:build && eslint . --fix",
-        "lint:check": "npm run ui:build && eslint .",
+        "lint": "npm run ui:build && eslint ../.. --fix",
+        "lint:check": "npm run ui:build && eslint ../.. && node ../../scripts/periksa-jangkauan-eslint.mjs",
         "types:check": "npm run ui:build && tsc --noEmit",
         "bundle:check": "node scripts/periksa-bundel.mjs"
     },
