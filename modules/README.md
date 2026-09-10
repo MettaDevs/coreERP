@@ -6,7 +6,7 @@ container, database, maupun token layanan sendiri.
 
 Ini berbeda dari app di repo `app-erp-*`, yang sampai hari ini masih punya container dan database
 sendiri. Perbedaan lengkapnya ada pada **Dua bentuk module yang hidup berdampingan** di
-[AGENTS.md](../AGENTS.md); alasannya pada [keputusan satu runtime](../docs/todo/satu-runtime/00-keputusan.md).
+[AGENTS.md](../AGENTS.md); aturan lengkapnya pada [standar module](../docs/dev/02-module-standard.md).
 
 ## Bentuk folder
 

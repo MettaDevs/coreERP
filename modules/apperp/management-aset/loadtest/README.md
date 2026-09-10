@@ -13,8 +13,8 @@ dijelaskan di sini hanya yang khas modul ini.
 | --- | --- | --- |
 | `k6/master-data.js` | Penjenuhan master + transaksi: CRUD, idempotency, batas tenant, eskalasi hak | dijalankan pada runtime baru |
 | `k6/maintenance.js` | Setup maintenance, dan perlombaan penggantian kaitan | dijalankan pada runtime baru |
-| `k6/depreciation.js` | Proposal dan finalisasi penyusutan | **belum dipindah** |
-| `k6/work-order.js` | Dokumen work order di bawah beban | **belum dipindah** |
+| `k6/depreciation.js` | Proposal, finalisasi, dan saldo penyusutan; perlombaan finalisasi | dijalankan pada runtime baru |
+| `k6/work-order.js` | Siklus dokumen work order, transisi terlarang, perlombaan transisi | dijalankan pada runtime baru |
 | `verify.sql` | Oracle kebenaran modul, dibaca langsung dari database | dipakai sebagai gate |
 | `check-manifest.py` | Pemeriksa `app.yaml`; tidak ada hubungannya dengan beban | — |
 
@@ -57,8 +57,38 @@ docker run --rm -i --network core-loadtest_default `
   -e RUN_ID=gate-race-1 -e FIXTURE=g1 `
   grafana/k6:0.55.0 run /scripts/aset/maintenance.js
 
+docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=64 -e VUS=256 -e DURATION=90s `
+  -e RUN_ID=gate-wo-sat-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/work-order.js
+
+docker run --rm -i --network core-loadtest_default `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=transition-race -e VUS=32 -e DURATION=90s -e RACE_TENANTS=4 `
+  -e RUN_ID=gate-wo-race-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/work-order.js
+
+docker run --rm -i --network core-loadtest_default --ulimit nofile=65536:65536 `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=saturation -e TENANTS=64 -e VUS=256 -e DURATION=90s `
+  -e RUN_ID=gate-dep-sat-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/depreciation.js
+
+docker run --rm -i --network core-loadtest_default `
+  -v "${core}:/scripts" -v "${aset}:/scripts/aset" -v "$PWD\results:/results" `
+  -e BASE_URL=http://lb -e PROFILE=finalize-race -e VUS=32 -e DURATION=90s -e RACE_TENANTS=4 `
+  -e RUN_ID=gate-dep-race-1 -e FIXTURE=g1 `
+  grafana/k6:0.55.0 run /scripts/aset/depreciation.js
+
 docker compose exec -T db psql -U core_erp -d core_erp -f - < ..\..\..\modules\apperp\management-aset\loadtest\verify.sql
 ```
+
+`depreciation.js` menyiapkan fixture yang jawabannya sudah diketahui: satu aset bernilai 1.000
+dengan residu 0, garis lurus sisa umur, masa manfaat tiga periode, dan round-off 100 pada matriks
+group x buku. Nilainya karena itu wajib 300, 300, 400 dan saldo akhirnya akumulasi 1.000 dengan
+nilai buku 0. Kunci seed-nya diikat ke `FIXTURE`, bukan ke `RUN_ID`, supaya run berikutnya memakai
+kembali aset dan ketiga periode yang sama alih-alih menumbuhkan data.
 
 ## Profil
 
@@ -67,6 +97,8 @@ docker compose exec -T db psql -U core_erp -d core_erp -f - < ..\..\..\modules\a
 | `saturation` | Apakah modul tetap **benar** saat jenuh? | 0 pelanggaran, 0 error aplikasi |
 | `link-race` | Apakah dua penulis yang berebut kaitan yang sama saling merusak? | 0 himpunan gabungan |
 | `attribute-race` | Apakah Values dan nilai aset tetap cocok saat diubah bersamaan? | 0 nilai di luar Values |
+| `transition-race` | Apakah dua transisi dari versi yang sama dapat sama-sama menang? | 0 `transition_double_wins` |
+| `finalize-race` | Apakah satu periode dapat menambah saldo buku dua kali? | 0 posting kedua, akumulasi tetap |
 | `latency` | Berapa concurrency yang masih memenuhi SLO? | p95/p99 per jenis operasi |
 
 Latensi pada beban jenuh mengukur kedalaman antrean, bukan biaya kode. Karena itu gate latensi
@@ -83,17 +115,26 @@ Tiga sumber terpisah, tidak ada yang memakai kode yang sedang diuji sebagai haki
 2. **`verify.sql` Core** — batas tenant, materialisasi sequence per entitlement, dan terbitan nomor
    yang menembus batas tenant.
 3. **Probe di dalam k6** — sesi tenant A membaca record tenant B (harus 404), menulis anak di bawah
-   induk tenant B (harus 422), dan tenant yang role-nya dipersempit ke satu duty membuka master
-   sebelahnya (harus 403). Semuanya berjalan **selama** beban penuh, bukan sesudahnya.
+   induk tenant B (harus 422), memindahkan status work order tenant B (harus 404), memfinalkan
+   periode penyusutan tenant B (harus 404), dan tenant yang role-nya dipersempit ke satu duty
+   membuka master atau permukaan sebelahnya (harus 403). Semuanya berjalan **selama** beban penuh,
+   bukan sesudahnya.
 
 Ketiganya sudah dibuktikan bisa merah; caranya dan angkanya ada di README stack. Jalankan
 `SELFTEST=1` untuk mengulang pembuktian itu.
 
+> **`SELFTEST=1` pada `depreciation.js` merusak fixture-nya.** Salah satu pembuktian merah
+> mengirim `reversal`, dan pembalikan memang menggeser saldo untuk selamanya. Jalankan dengan
+> `FIXTURE` tersendiri; sesudahnya fixture itu tidak dapat dipakai untuk run sungguhan, dan
+> setup-nya akan berhenti dengan galat — yang memang diinginkan, bukan dibiarkan hijau.
+
 ## Batas kejujuran
 
-- `depreciation.js` dan `work-order.js` belum dipindahkan. Keduanya berhenti dengan galat pada
-  `open('./tenants.json')` bila dijalankan — sengaja, supaya tidak ada skenario yang hijau tanpa
-  menguji apa pun. Permukaan penyusutan dan work order berstatus belum terverifikasi di bawah beban.
+- Skenario work order menumbuhkan datanya sendiri: tiap iterasi siklus, balapan transisi, dan
+  probe transisi terlarang membuat dokumen baru. Angka latensi antar-sesi karena itu tidak
+  sebanding begitu tabelnya jauh lebih besar; angka kebenarannya tetap sebanding.
+- Penyusutan diuji pada satu aset per tenant dengan satu buku. Tutup bulan massal
+  (`penyusutan/proposal-massal`) dan aset dengan beberapa buku sekaligus belum diukur di bawah beban.
 - Satu sesi dipakai banyak VU (limiter login berlaku per email + IP). Yang tidak diuji karenanya:
   pembuatan sesi serentak dalam jumlah besar.
 - UI tidak disentuh uji beban ini.

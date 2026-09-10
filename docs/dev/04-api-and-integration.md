@@ -23,6 +23,115 @@ jalurnya.** Listener berjalan sebelum pemanggilnya selesai, jadi ia ikut ke dala
 sedang berjalan. Itu keuntungan — dokumen dan akibatnya berpindah status bersama atau tidak sama
 sekali — tetapi ia juga berarti listener yang lambat menahan transaksi.
 
+## Kontrak module ke Core
+
+### Satu namespace, dan hanya satu
+
+Module hanya boleh menyebut **`App\Support\Modules\Contracts`**. Bukan `App\Support\Modules`,
+bukan `App\Models`, bukan apa pun yang lain di dalam Core. Kelonggaran ke seluruh
+`App\Support\Modules` sudah dicoba dan dibuang: begitu satu folder pembantu ikut terbuka, batasnya
+berhenti bisa dijelaskan dalam satu kalimat, dan batas yang tidak bisa dijelaskan dalam satu kalimat
+tidak akan dipatuhi.
+
+Penjaganya `ModuleNamespaceBoundaryTest`. Ia **membaca berkas**, bukan menganalisa tipe: baris `use`
+dan pemanggilan statis tidak sampai ke aturan PHPStan, jadi aturan tipe akan melaporkan bersih
+sambil melewatkan justru bentuk yang paling sering dipakai. Yang boleh disebut module hanya kelas
+Core di dalam `Contracts`, kerangka kerja, dan kelasnya sendiri.
+
+### Antarmuka menerima id dan memulangkan baris biasa
+
+Antarmuka kontrak menerima **id**, bukan model Core, dan memulangkan **baris biasa**, bukan model
+Core. Alasannya bukan kerapian: memulangkan model berarti module memegang objek Core dan bisa
+memanggil apa pun padanya — relasi, `save()`, scope — sehingga batas yang dijaga namespace bocor
+lewat objek yang sudah telanjur diberikan.
+
+Daftar layanan Core yang boleh dipanggil module ada di folder itu sendiri; jangan menuliskan
+salinannya di sini, karena salinan akan menyimpang pada hari sebuah antarmuka bertambah. Satu baris
+yang paling mudah terlewat pantas disebut: **konteks tenant**. Setiap module membutuhkannya sebelum
+bisa melakukan apa pun, dan ia **gagal menutup**: tanpa tenant aktif, query dibatalkan dengan
+pengecualian alih-alih dijalankan tanpa penyaringan. Kontraknya tidak boleh memulangkan `null` —
+`null` memaksa setiap pemanggil memutuskan sendiri apa artinya, dan sebagian akan memutuskan
+"berarti semua tenant".
+
+### Kontrak dibangun dari kebutuhan pemanggilnya
+
+Kontrak yang disusun dari **yang kebetulan tersedia** di layanan Core akan kehilangan hal yang
+justru dipakai. Ini pernah terjadi: antarmuka kalender fiskal dibentuk mengikuti bentuk kembalian
+layanan Core-nya, dan diam-diam kehilangan tanggal awal tahun fiskal yang dipakai pemanggilnya.
+Bacalah pemanggilnya dulu, baru tulis antarmukanya.
+
+Akibat wajar dari itu: kontrak harus punya pintu untuk kebutuhan yang nyata. Module yang tidak punya
+pintu resmi tidak akan berhenti membutuhkannya — ia akan menyentuh model Core langsung, dan penjaga
+namespace baru menangkapnya setelah kodenya ditulis.
+
+### Pembungkus per module menerjemahkan kegagalan Core
+
+Exception Core yang membocorkan nama field milik Core, atau perbedaan antara "memulangkan `null`"
+dan "melempar" pada keadaan yang sama, tidak boleh diteruskan apa adanya ke pemanggil module. Itu
+salah satu alasan pembungkus per module ada: ia menerjemahkan kegagalan Core menjadi kegagalan yang
+masuk akal di dalam bahasa module.
+
+### Module tidak melompat lewat HTTP ke Core
+
+Module berada di proses yang sama dengan Core, jadi memanggil Core lewat HTTP berarti membayar
+serialisasi, jaringan, dan satu jalur kegagalan baru untuk sesuatu yang sebenarnya pemanggilan
+fungsi. Penjaganya `NoInternalHttpTest`, dan ia mencari **dua bahan sekaligus** — klien yang membuka
+koneksi, serta alamat atau kredensial Core — karena satu bahan saja terlalu sering muncul pada kode
+yang sah. Komentar dibuang sebelum diperiksa, dan **module yang sedang dipindah tidak dikecualikan**.
+
+Akibat yang mengikuti: penerbitan nomor yang gagal menjawab **422, bukan 503**. Core tidak lagi
+"tidak terjangkau", jadi kode kesalahan jaringan pada jalur itu bukan sekadar berhenti dipakai — ia
+dibuat tidak bisa ditulis lagi.
+
+### Nomor, dokumen, dan pengajuan workflow satu transaksi
+
+Penerbitan nomor boleh dipanggil dari dalam transaksi pemanggilnya dan tidak wajib berada di
+dalamnya; transaksi layanan nomor menjadi savepoint. Yang mengikat adalah hasilnya: nomor, dokumen,
+dan pengajuan workflow berada dalam **satu** transaksi. Invarian yang dijaga test: ketika transaksi
+gagal, nilai berikutnya kembali seperti semula dan tidak ada baris penerbitan yang selamat.
+
+Pengaju dan korelasi adalah **parameter wajib**, bukan kunci opsional di dalam array — kunci opsional
+yang lupa diisi menghasilkan jejak audit tanpa pelaku. Pengaju disebut dengan id pengguna, bukan id
+keanggotaan; keanggotaan tenant milik Core dan bentuknya boleh berubah tanpa memberi tahu module.
+
+### Event yang didengarkan module
+
+Event yang didengarkan module tinggal di `Contracts`, karena ia bagian dari permukaan yang
+dijanjikan Core. Listener keputusan berjalan **di dalam** transaksi keputusan, dan amplopnya disusun
+sekali untuk baris outbox maupun event yang dikirim — dua penyusunan berarti dua bentuk yang akan
+menyimpang.
+
+Satu akibat yang mudah terlewat: listener wajib menerima dokumen yang id instance workflow-nya
+**belum tercatat**. Pengiriman seketika memunculkan urutan yang dulu mustahil, karena dulu event
+selalu tiba setelah transaksi pengirimnya selesai.
+
+### Rute module dan rute Core tidak berbagi awalan
+
+Rute API module hidup di bawah `/api/modules/<id module>/v1`. Awalan `/api/v1` milik Core sendiri
+dan tidak dibagi dua pemilik: dua pemilik pada satu awalan berarti setiap penambahan rute Core harus
+memeriksa dulu apakah sebuah module sudah memakainya.
+
+Endpoint `/api/internal/v1/` **tidak dihapus**. Ia tetap ada untuk integrasi luar dan addon pihak
+ketiga, dan kontraknya tetap dijaga pemeriksa cakupan.
+
+### Setelan yang tetap ada meski pemakaiannya menyusut
+
+`COREERP_APP_CONTEXT_SIGNING_KEY` tetap ada dan tidak boleh dihapus: ia masih menandatangani HMAC
+event yang keluar dari proses ini. Menghapusnya tidak menjatuhkan apa pun dengan berisik — antrean
+menumpuk tanpa satu pun kesalahan terlihat.
+
+`COREERP_EVENT_ENDPOINTS` juga dipertahankan, dan nilainya `[]` bila tidak ada penerima luar. Module
+di dalam image tidak lewat sini; mereka menerima event sebagai pemanggilan fungsi. Penerima di dalam
+proses dikenali lewat kunci `module` pada setelan endpoint, **bukan** ditebak dari bentuk URL-nya,
+dan barisnya tetap ditandai terkirim.
+
+### Kontrak berkas untuk module bukan kontrak yang dijaga CI
+
+Untuk module di dalam runtime, berkas `contracts/*.json` adalah **dokumentasi**, bukan kontrak yang
+dijaga pemeriksa cakupan. Permukaan yang benar-benar melewati batas berpindah menjadi kontrak PHP di
+dalam proses, dan di sanalah penyimpangannya ketahuan — pada waktu analisa tipe, bukan pada waktu
+seseorang ingat membandingkan dua berkas.
+
 ## Satu aturan utama per jenis komunikasi
 
 | Kebutuhan | Standar | Contoh |

@@ -47,12 +47,16 @@ Yang **tetap berlaku pada keduanya**, dan tidak boleh dilonggarkan dengan alasan
 - Nama event, envelope, dan aturan versinya tidak berubah.
 
 **Pull request yang memindahkan sebuah app menjadi module adalah pengecualian yang sah** terhadap aturan
-app, bukan pelanggaran. Ia wajib menyebut nomor task pada
-[PRD pemindahan ke satu runtime](docs/todo/satu-runtime/01-prd.md) di badan pull request-nya, supaya
-peninjau tahu ia sedang membaca pekerjaan yang direncanakan.
+app, bukan pelanggaran. Ia wajib menyebutkan itu di badan pull request-nya beserta alasannya, supaya
+peninjau tahu ia sedang membaca pemindahan yang disengaja, bukan aturan yang dilanggar.
+
+Sebelum sebuah repo app ditarik masuk, repo itu wajib bersih dan seluruh commit-nya sudah terdorong ke
+remote. Itu langkah pertama pemindahannya, bukan anggapan: penarikan yang berjalan di atas repo yang
+belum terdorong menelan pekerjaan yang belum ada di mana pun.
 
 Aturan app **tidak dihapus** dan tidak boleh dihapus selama masih ada app yang menjalankannya. Setelah
-app terakhir pindah, aturan ini dipindahkan menjadi desain kanonik di `docs/dev` dan bagian ini dibuang.
+app terakhir pindah, bagian ini dibuang; aturan module-nya sendiri sudah menjadi desain kanonik di
+[`docs/dev/02-module-standard.md`](docs/dev/02-module-standard.md).
 
 ## UI overlay dropdowns
 

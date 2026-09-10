@@ -21,12 +21,41 @@ yang satu dengan aturan yang lain adalah kesalahan yang paling mudah terjadi.
 **Module adalah bentuk yang berlaku untuk pekerjaan baru.** Daftar module yang ada hidup di
 `modules/`; `php artisan module:list` memulangkannya dari runtime. App berkontainer belum semuanya
 pindah, jadi aturannya masih berlaku penuh untuk yang tersisa dan halaman ini tidak menghapusnya.
-Latar belakang dan urutan pemindahannya ada di
-[keputusan satu runtime](../todo/satu-runtime/00-keputusan.md).
 
 Yang **tetap berlaku pada keduanya**: sebuah module tidak boleh menyentuh data milik module lain,
 setiap tabel tenant membawa `tenant_id` dan setiap query menyaringnya, dan nama event beserta
 aturan versinya tidak berubah.
+
+### Masalah yang harus tetap terpecahkan
+
+Bentuk apa pun yang dipilih kelak, empat hal ini yang membuatnya layak atau tidak:
+
+- Pelanggan boleh membeli **sebagian** module, bukan seluruh produk.
+- Yang dibelinya dipasang di server pelanggan atau di cloud kita, dengan bentuk data yang sama.
+- Tidak ada penghapusan kode atau tabel manual per pelanggan. Menyiapkan pelanggan baru bukan
+  pekerjaan tangan.
+- Pelanggan **tidak bisa** menyalakan sendiri module yang tidak dibayarnya — dan bukan karena
+  sakelarnya dikunci, melainkan karena berkasnya memang tidak ada di sana.
+
+Butir terakhir yang membedakan model ini dari kebanyakan: yang menegakkan batas komersialnya adalah
+komposisi image, bukan pemeriksaan lisensi saat berjalan.
+
+### Kapan bentuk satu runtime ditinjau ulang
+
+Menjalankan Core beserta seluruh module dalam satu proses adalah pilihan yang benar untuk ukuran tim
+dan beban hari ini. Ia tidak benar selamanya, dan syarat peninjauannya ditulis lebih dulu supaya
+peninjauan itu dipicu bukti, bukan suasana hati:
+
+- Jumlah engineer tumbuh melewati kira-kira lima belas orang yang saling menghambat pada satu repo,
+  atau
+- satu module terbukti punya beban dengan kelas yang berbeda — dibuktikan uji beban, bukan dugaan —
+  atau
+- ada kebutuhan menjalankan sebagian kemampuan dalam bahasa atau runtime yang berbeda.
+
+Ketika salah satunya benar-benar terjadi, yang ditarik keluar adalah **module itu saja**, bukan
+seluruh susunan. Batas yang dijaga hari ini — satu namespace kontrak, tidak ada foreign key lintas
+module, nama event yang tidak berubah bentuknya di dalam maupun di luar proses — memang dirancang
+supaya penarikan satu module tidak menuntut penulisan ulang yang lain.
 
 ## Cara membaca grand design
 

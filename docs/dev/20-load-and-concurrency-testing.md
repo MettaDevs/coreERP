@@ -92,6 +92,52 @@ Periksa ini pertama, setiap kali:
 
 Nyatakan terus terang bahwa modul belum terverifikasi di bawah concurrency, dan jangan melaporkannya selesai. Lingkungan yang tidak lengkap adalah gap yang dilaporkan, bukan gate yang dilewati.
 
+## Setiap angka menyebut dirinya terukur atau perhitungan
+
+Angka yang tidak menyebut asalnya akan dikutip ulang sebagai fakta oleh orang berikutnya. Karena itu
+setiap angka di dokumen mana pun wajib menyebut tiga hal: apakah ia **terukur** atau **perhitungan**,
+kapan ia diambil, dan bagaimana mengulanginya.
+
+Tabel yang mengalikan sebuah angka terukur — misalnya memperkirakan kebutuhan memori untuk sekian
+tenant dari satu bacaan — wajib menyebut dirinya perhitungan, menyebut angka dasar mana yang terukur,
+dan menyebut kapan angka dasar itu diambil. Tanpa ketiganya, tabel perhitungan tidak bisa dibedakan
+dari tabel hasil pengukuran, dan itu jenis kesalahan yang bertahan lama karena tidak ada yang gagal.
+
+Nama sebuah pengukuran juga mengikat. Tidak ada angka yang boleh dinamai "waktu pasang" kecuali ia
+diambil dari mesin yang benar-benar bersih; angka dari mesin yang sudah punya image, dependency, atau
+cache mengukur hal yang berbeda dengan nama yang sama.
+
+## Cara membaca angka dari container tanpa merusaknya
+
+Dua kebiasaan yang keduanya lahir dari kesalahan nyata:
+
+**Ambil bacaan idle sebelum menjalankan pengukuran apa pun.** Memori proses pengukur ikut dihitung
+oleh cgroup container yang sedang diukur, jadi bacaan yang diambil sambil menjalankan sesuatu di
+dalam container mencampur keduanya. Bacaan tepat setelah stack menyala juga salah — angkanya masih
+bergerak. Tunggu sampai berhenti bergerak, dan itu memakan waktu beberapa menit, bukan beberapa
+detik.
+
+**Pengukuran bundel wajib dapat diulang.** Bangun ulang susunan penuh sebagai kontrol dan pastikan
+jumlah bytes-nya sama persis dengan bacaan sebelumnya. Kalau kontrolnya tidak sama, yang berubah
+bukan hal yang sedang diukur, dan perbandingannya tidak berarti apa-apa.
+
+## Oracle kebenaran dibuktikan merah lebih dulu
+
+Sebuah oracle yang belum pernah terlihat gagal tidak dapat dibedakan dari oracle yang tidak memeriksa
+apa pun. Setiap oracle karena itu dibuktikan bisa merah sebelum hasilnya dipercaya, dan oracle yang
+**tidak dapat** dibuat merah dicatat apa adanya sebagai tidak terbukti — bukan dihitung sebagai
+pembuktian yang berhasil.
+
+Beberapa aturan yang mengikuti dari pengalaman menjalankannya:
+
+- Uji beban berjalan di runtime yang sebenarnya, tanpa tiruan Core. Skenario menyiapkan tenant lewat
+  alur pendaftaran usaha sungguhan, lalu memakai sesi seperti pengguna biasa.
+- Oracle nomor membaca tabel penerbitan nomor dan menuntut setiap kode terikat pada satu penerbitan,
+  untuk tenant **dan** reference yang benar. Menuntut keunikan saja akan lolos ketika dua tenant
+  saling meminjam urutan.
+- Status 0 dari sisi klien berarti permintaannya tidak pernah dijawab. Ia bukan jawaban, dan tidak
+  boleh dihitung sebagai jawaban pada probe apa pun.
+
 ## Implementasi rujukan
 
 `apps/control-plane/loadtest/` adalah stack-nya, dan sejak 10 September 2026 hanya ada satu: Compose dengan empat instance runtime Core di belakang nginx, PgBouncer, PostgreSQL, `prepare.sh` yang menjalankan urutan bootstrap yang sama dengan stack pengembangan, dan `verify.sql` sebagai oracle sisi Core. `README.md` di dalam folder itu mencatat hasil terukur, perintah persis yang menghasilkannya, dan batas kejujurannya.

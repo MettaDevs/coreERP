@@ -61,8 +61,8 @@ final class ModulSedangDipindah
     /**
      * Nama folder modul dipetakan ke alasan dan tenggatnya.
      *
-     * Angka pada `alasan` bukan perkiraan. Semuanya diukur pada repo aset apa adanya sebelum
-     * pemindahan, dan dicatat di `docs/todo/satu-runtime/01-prd.md` bagian F3-00.
+     * Angka pada `alasan` bukan perkiraan; semuanya diukur pada repo asalnya apa adanya sebelum
+     * pemindahan. Aturan pengecualian ini ada di `docs/dev/26-modul-yang-sedang-dipindah.md`.
      *
      * **`pemblokir` opsional, dan sebaiknya tetap kosong.** Ia diisi hanya ketika modulnya sudah
      * bersih menurut pemindaian berkas tetapi entrinya masih belum boleh dibuang karena sesuatu

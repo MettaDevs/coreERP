@@ -56,7 +56,8 @@ What holds for **both**, and is never relaxed:
 - Event names, envelopes, and versioning rules do not change.
 
 A pull request that turns an app into a module is a **legitimate exception** to the app rules, not a
-violation. It must name its task number from `docs/todo/satu-runtime/01-prd.md`.
+violation. It must say so in its description, so a reviewer knows they are reading a deliberate move
+rather than a broken rule.
 
 The app rules are **not deleted** while any app still runs on them.
 

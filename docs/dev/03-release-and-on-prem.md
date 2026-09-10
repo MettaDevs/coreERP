@@ -24,6 +24,108 @@ App yang masih berupa container tetap memakai jalur di bawah: image API dan UI s
 sendiri, dan bundle yang menyusunnya. Jalur itu tidak dihapus selama masih ada app yang
 menjalankannya.
 
+### Satu repo, satu `main`, rilis lewat edisi
+
+Seluruh Core dan seluruh module hidup di satu repo dengan satu cabang utama. Yang membedakan satu
+pelanggan dari pelanggan lain bukan cabang, melainkan **manifest edisi**.
+
+Pemeliharaan versi lama memakai cabang tersendiri per edisi, dan **paling banyak dua edisi ke
+belakang**. Hotfix untuk pelanggan yang belum naik versi dibuat dari cabang pemeliharaannya, bukan
+dari `main` — mengambilnya dari `main` berarti mengirim perubahan yang belum pernah diuji bersama
+versi yang sedang berjalan di sana. Batas dua edisi bukan angka teknis; ia batas berapa banyak versi
+yang benar-benar sanggup dijaga tim sebesar ini.
+
+### Apa yang ditulis manifest, dan apa yang dihitung mesin
+
+Manifest edisi menyebut pelanggan, profil penempatan, nomor rilis, dan **daftar module yang dibeli**.
+Yang sengaja **tidak** ditulis di sana: dependency, module penghubung, dan penolakan module bahan
+uji. Ketiganya dihitung `edition:resolve`, karena daftar yang ditulis tangan akan ketinggalan pada
+hari sebuah module menambah dependency baru — dan ketinggalannya baru terasa sebagai layar yang
+kosong di tempat pelanggan.
+
+Sumber kebenaran dependency adalah `depends_on` pada `app.yaml` tiap module, bukan tabel di database.
+Alasannya sederhana dan mengikat: image edisi dibangun di CI, tempat tidak ada database mana pun.
+
+Dua bentuk masukan ditolak, bukan disaring diam-diam: id module yang tidak ada di repo, dan module
+bertanda `kind: internal-fixture`. Yang kedua penting — sebuah menu bernama "Contoh A" di layar
+pelanggan adalah kegagalan yang tidak boleh mungkin terjadi, jadi ia harus gagal saat membangun,
+bukan hilang tanpa suara.
+
+Module penghubung dikenali dari `kind: link`. Ia ikut **hanya** bila seluruh sisinya terpilih, dan ia
+**tidak pernah** menarik sisinya ikut masuk. Aturan itu berlaku juga untuk penghubung berlapis:
+penghubung yang menarik sisinya akan diam-diam mengirim module yang tidak dibeli.
+
+### Bagaimana image edisi dibangun
+
+Pembangunannya menerima daftar module dan mengenal tiga bentuk nilai: semua module, kosong yang
+berarti Core saja, dan daftar eksplisit. Pemangkasan `composer.json` beserta lockfile-nya terjadi
+**sebelum** pemasangan dependency, lewat penghapusan paket tanpa memasang ulang — bukan lewat
+pembaruan lockfile, yang akan ikut menaikkan versi paket lain tanpa diminta. Tahap akhir menyalin
+dari tahap yang sudah dipangkas, bukan dari konteks pembangunan, supaya module yang dipangkas tidak
+masuk lewat pintu belakang.
+
+Image runtime tidak boleh memuat Dockerfile maupun suite test. Keduanya menyebut namespace module
+secara harfiah, jadi keduanya adalah calon kebocoran yang akan lolos setiap pemeriksaan yang hanya
+melihat folder `modules/`.
+
+Isi `storage/` juga tidak ikut. Yang dikirim hanya rangka foldernya; berkas di dalamnya milik mesin
+pembangun, dan Docker menyalin isi image ke named volume yang masih kosong — sehingga berkas mesin
+pengembang berakhir di storage pelanggan pada boot pertama.
+
+### Apa yang diperiksa sebelum sebuah edisi boleh terbit
+
+Pemeriksaan kebocoran dijalankan pada image yang benar-benar dikirim, dan daftar module yang
+dipakainya dihitung **di luar** image — image yang bocor tidak boleh menilai dirinya sendiri. Yang
+diperiksa lebih dari satu jalur, karena satu module meninggalkan jejak di tempat yang berbeda dan
+ketiganya bisa bocor sendiri-sendiri: berkas dan nama namespace di dalam image, tabel yang terbentuk
+ketika migration dijalankan ke database kosong, dan bundel JavaScript.
+
+Dua rincian yang menentukan apakah pemeriksanya berguna:
+
+- Pemeriksaan tabel menjalankan migration tiap module **dari dalam image** lebih dulu. Tanpa itu, ia
+  memeriksa database yang tidak pernah menerima satu pun tabel dan melaporkan bersih.
+- Bundel dicari lewat bentuk yang khas — nama module diikuti pemisah — bukan lewat id telanjang. Id
+  telanjang cocok dengan potongan kata yang kebetulan sama dan membanjiri hasilnya.
+
+Pembuktian bahwa pemeriksanya **bisa merah** adalah langkah CI permanen, bukan catatan manual sekali
+jalan: sebuah module yang memang dibeli diperlakukan seolah tidak dibeli, dan alurnya gagal bila
+pemeriksanya tetap hijau.
+
+Urutannya mengikat: bangun, periksa kebocoran, **baru** dorong. Satu image dibangun per **rilis**,
+bukan satu image lengkap yang dipangkas per pelanggan — lapisan yang dibuang dari image lengkap tetap
+ikut terkirim di dalam riwayat lapisannya.
+
+Awalan versi yang bergerak seperti `latest` dilarang untuk penempatan, dan penjaganya berjalan
+**sebelum** apa pun didorong.
+
+### Pembaruan on-prem berbentuk satu perintah, dan aman diulang
+
+Tidak ada saluran pembaruan otomatis, dan tidak direncanakan ada. **Pembaruan bersifat tarik, bukan
+dorong**: server pelanggan tidak dibuka dari luar, dan admin di tempat pelangganlah yang
+menjalankannya.
+
+Karena admin itu tidak punya cara mengetahui apakah sebuah perintah sudah pernah jalan, **setiap
+perintah pembaruan wajib aman diulang** — dijalankan dua kali harus memberi hasil yang sama persis
+dengan sekali. Ini bukan anjuran gaya; ia yang membuat pembaruan bisa dilanjutkan setelah gagal di
+tengah tanpa memulai dari awal.
+
+Dua akibat langsung:
+
+- **Migration yang sudah pernah dijalankan tidak disunting.** Perubahan skema datang lewat migration
+  baru. Menyunting yang lama membuat dua server pelanggan berakhir dengan skema berbeda dari
+  riwayat yang sama.
+- **Fitur berparameter tidak boleh menuntut migration per parameter.** Simpan baris per kode dengan
+  registry, sehingga parameter baru berarti satu entri registry dan satu titik penegakan — nol
+  migration. Setiap migration harus berhasil di server setiap pelanggan, dan itu ongkos yang tidak
+  sebanding untuk sebuah sakelar.
+
+### Bentuk on-prem dan SaaS harus tetap sama
+
+Penempatan gabungan dan penempatan terpisah memakai **skema yang persis sama**. Perbedaannya hanya
+berapa banyak tenant yang tinggal di satu database, bukan bentuk tabelnya. Begitu keduanya boleh
+berbeda, setiap migration harus dipikirkan dua kali dan setiap laporan bug harus menyebut profilnya
+lebih dulu.
+
 ## Install bukan sekadar `composer install`
 
 Installer membaca app manifest. Pada SaaS ia memperoleh placement dari control plane; pada on-prem perpetual ia memakai manifest dan lisensi yang tersedia lokal. Ia selalu menjalankan langkah idempotent berikut:
@@ -250,10 +352,24 @@ Rollback image hanya boleh dilakukan bila migration kompatibel mundur. Jika tida
 disable entitlement -> hide UI / reject API -> drain workers
 -> block new events -> validate dependents -> export/archive data
 -> deregister routes/subscriptions -> remove placement/artifact
--> optional explicit purge database
 ```
 
+Urutan itu **berhenti di situ**. Tidak ada langkah yang menghapus data, dan tidak ada opsi untuk
+menambahkannya. Baris terakhir dokumen ini dulu berbunyi `optional explicit purge database`, dan itu
+menjanjikan tombol yang memang tidak ada — [standar module](02-module-standard.md#mencabut-modul-tidak-menyentuh-data)
+melarangnya, penjaganya menolak perintah pencabutan yang punya opsi bernama `purge`, `delete`,
+`drop`, atau `hapus`, dan retensi rekam medis menuntut data bertahan jauh lebih lama daripada masa
+langganan. Memasang ulang app atau module yang sama pada tenant yang sama mengembalikan datanya
+seperti sedia kala.
+
+Kalau data memang harus benar-benar pergi — pelanggan berhenti dan memintanya — jalannya bukan
+perintah pencabutan, melainkan serah terima atau ekspor lengkap yang ditulis di kontrak sebelum
+pelanggan pergi.
+
 Uninstall harus ditolak jika app lain masih declared dependency atau memiliki integration mapping aktif. Salesforce menerapkan prinsip serupa: package tidak dapat dilepas ketika komponen lain masih mereferensikannya. [Salesforce package uninstall](https://help.salesforce.com/s/articleView?id=000392277&language=en_US&type=1)
+
+Untuk module, penolakan itu diperiksa **terhadap tenant, bukan terhadap katalog**: pencabutan ditolak
+bila module masih menjadi dependency module lain yang terpasang pada tenant yang sama.
 
 ## License dan source protection
 
