@@ -35,6 +35,7 @@ export default withMermaid({
     'todo/entrypointPERMISSIONprevilage/README.md':
       'todo/entrypointPERMISSIONprevilage/index.md',
     'todo/api-untuk-integrator/README.md': 'todo/api-untuk-integrator/index.md',
+    'todo/bundle-on-prem/README.md': 'todo/bundle-on-prem/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -239,6 +240,16 @@ export default withMermaid({
                 {
                   text: 'API yang dapat dipakai sistem pelanggan',
                   link: '/todo/api-untuk-integrator/',
+                },
+              ],
+            },
+            {
+              text: 'Bundle dan pemasangan on-prem',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Bundle dan pemasangan di server pelanggan',
+                  link: '/todo/bundle-on-prem/',
                 },
               ],
             },
