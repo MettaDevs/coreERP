@@ -6,7 +6,7 @@ Dokumen ini mencatat kemampuan Core yang memang diperlukan tetapi belum boleh di
 
 | Fondasi | Keadaan | Gate mulai | Pemilik kebenaran |
 | --- | --- | --- | --- |
-| Placement dan deployment worker | Fondasi Compose tersedia | Module manifest, entitlement, queue, migration, health check, dan installation registry tersedia. Production baru diaktifkan setelah image digest immutable, target Dokploy, secret reference, dan endpoint health tersedia. | Control Plane untuk desired state; deployment target untuk hasil runtime |
+| Pemasangan module | Tersedia | Manifest module, entitlement, migration per module, dan catatan pemasangan tersedia; pendaftaran usaha memasang module di proses yang sama. | Control Plane; `core_module_installations` sebagai catatannya |
 | Upgrade dan uninstall worker | Belum | Compatibility matrix, backup terverifikasi, traffic drain, dependency check, serta prosedur rollback/forward-fix tersedia. | Control Plane mengoordinasi; module dan deployment target mengeksekusi |
 | Bootstrap tenant di dalam module | Belum | Module bisnis membutuhkan data awal dan menyediakan API/event provisioning internal yang idempotent; Control Plane tetap dilarang menulis database module. | Module pemilik data |
 | Workforce, job, dan position | Belum | HRD/Admin HRD mempunyai model worker, job, position, dan beberapa worker-position assignment aktif berbatas waktu; satu position hanya satu worker aktif; event contract stabil. | Module HRD/Admin HRD |
@@ -25,26 +25,30 @@ Dokumen ini mencatat kemampuan Core yang memang diperlukan tetapi belum boleh di
 1. Gate yang belum terpenuhi tidak menghasilkan compatibility layer, tabel placeholder, atau status UI palsu.
 2. Core menyimpan policy dan koordinasi global; data bisnis dan enforcement record tetap berada pada module pemiliknya.
 3. Sebuah pekerjaan dianggap selesai hanya ketika mempunyai writer, reader, failure state, dan test yang membuktikan state sebelumnya tidak dapat menyamar sebagai state berikutnya.
-4. Untuk deployment, urutannya tetap `catalogued -> entitled -> placed + migrated -> ready`; setiap fakta memiliki sumber kebenaran sendiri.
+4. Untuk pemasangan, urutannya tetap `catalogued -> entitled -> installed`; setiap fakta memiliki sumber kebenaran sendiri.
 
-## Gate deployment saat ini
+## Gate pemasangan saat ini
 
-Fondasi worker dapat dibangun karena dua release unit awal sudah memiliki manifest, API/UI artifact definition, migration, Compose fragment, dan health endpoint. Worker wajib:
+Jalur penempatan container — worker deployment, penempatan artifact, dan status runtime — dibuang pada
+10 September 2026 bersama app berkontainer terakhir. Yang menggantikannya jauh lebih pendek karena
+module berjalan di proses yang sama: `InstallModule` wajib
 
-1. memvalidasi module, release, placement, dan entitlement aktif;
-2. menjalankan pekerjaan melalui queue setelah transaksi onboarding selesai;
-3. memasang artifact dan menjalankan migration secara idempotent;
-4. menunggu health check nyata;
-5. mencatat setiap percobaan serta hanya mengubah placement menjadi `ready` setelah seluruh tahap berhasil;
-6. menyimpan kegagalan tanpa mengubah entitlement atau memberikan role.
+1. memvalidasi module ada di registry runtime dan entitlement tenant aktif;
+2. menjalankan migration module secara idempotent, dengan riwayat terpisah dari milik Core;
+3. membuat urutan nomor module untuk tenant itu sebelum data awal disemai;
+4. mencatat pemasangannya, dan hanya menandainya `installed` setelah seluruh tahap berhasil;
+5. menyimpan kegagalan tanpa mengubah entitlement atau memberikan role.
 
-Deployment SaaS production belum boleh dinyatakan aktif hanya karena worker tersedia. Aktivasi production menunggu image digest hasil CI, target/environment Dokploy yang terdaftar, secret reference dari secret store, domain/routing, serta health probe dari jaringan production. Installer on-prem tetap proses lokal terpisah dan tidak bergantung pada worker Control Plane vendor.
+Aktivasi SaaS production tetap menunggu image digest hasil CI, target/environment Dokploy yang
+terdaftar, secret reference dari secret store, domain/routing, serta health probe dari jaringan
+production. Installer on-prem tetap proses lokal terpisah dan tidak bergantung pada Control Plane
+vendor.
 
 ## Lihat juga
 
 - [Standar module](02-module-standard.md) — lifecycle yang gate-nya diatur di sini
-- [Release dan on-prem](03-release-and-on-prem.md) — gate deployment dan upgrade
+- [Release dan on-prem](03-release-and-on-prem.md) — gate pemasangan dan upgrade
 - [Identity dan access](09-identity-and-access.md) — fondasi akses yang masih menunggu gate
 - [Load dan concurrency testing](20-load-and-concurrency-testing.md) — gate terakhir sebelum module disebut selesai
-- [Empat kebenaran lifecycle](../onboarding/empat-kebenaran.md) — ringkasan aturan keputusan nomor 4
+- [Tiga kebenaran lifecycle](../onboarding/tiga-kebenaran.md) — ringkasan aturan keputusan nomor 4
 - [Backlog audit fondasi](../todo/README.md) — temuan yang menunggu review, bukan keputusan

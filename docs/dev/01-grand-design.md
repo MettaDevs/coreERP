@@ -4,25 +4,28 @@
 
 CoreERP dibangun sebagai **app platform API-first**. Setiap app adalah kemampuan bisnis yang dapat dijual, dipasang, dan dicabut sendiri, bukan sekadar folder fitur. Satu versi rilis dapat dipakai pada cloud pooled, cloud isolated, maupun on-prem perpetual; yang berubah adalah placement, manifest instalasi, dan kanal update, bukan source business logic.
 
-## Dua bentuk yang hidup berdampingan
+## Satu bentuk penempatan
 
-Batas produk di atas tidak menentukan bentuk penempatannya. Hari ini ada dua bentuk, dan menilai
-yang satu dengan aturan yang lain adalah kesalahan yang paling mudah terjadi.
+Batas produk di atas tidak menentukan bentuk penempatannya. Sampai 10 September 2026 ada dua bentuk;
+sejak hari itu hanya ada satu. Bentuk yang berlaku adalah **module di `modules/`**.
 
-| | Module di `modules/` | App di repo `app-erp-*` |
-| --- | --- | --- |
-| Proses | ikut runtime Core | container sendiri |
-| Database | database tenant yang sama dengan Core | database sendiri |
-| Pemisah tabel | awalan nama tabel dan `MilikTenant` | database terpisah |
-| Memanggil Core | pemanggilan fungsi lewat `App\Support\Modules\Contracts\*` | REST `internal/v1` dengan token layanan |
-| UI | halaman React yang ikut build shell | container UI sendiri di belakang proxy |
-| Rilis | ikut image edisi Core | image API dan UI sendiri |
+| | Module di `modules/` |
+| --- | --- |
+| Proses | ikut runtime Core |
+| Database | database tenant yang sama dengan Core |
+| Pemisah tabel | awalan nama tabel dan `MilikTenant` |
+| Memanggil Core | pemanggilan fungsi lewat `App\Support\Modules\Contracts\*` |
+| UI | halaman React yang ikut build shell |
+| Rilis | ikut image edisi Core |
 
-**Module adalah bentuk yang berlaku untuk pekerjaan baru.** Daftar module yang ada hidup di
-`modules/`; `php artisan module:list` memulangkannya dari runtime. App berkontainer belum semuanya
-pindah, jadi aturannya masih berlaku penuh untuk yang tersisa dan halaman ini tidak menghapusnya.
+Daftar module yang ada hidup di `modules/`; `php artisan module:list` memulangkannya dari runtime.
 
-Yang **tetap berlaku pada keduanya**: sebuah module tidak boleh menyentuh data milik module lain,
+Bentuk lama — app dengan repo, container, dan database sendiri di belakang reverse proxy — sudah
+tidak ada satu pun subjeknya, dan kodenya dibuang seluruhnya. Ia dicatat di
+[Standar module](02-module-standard.md) sebagai bentuk yang pernah ada, supaya sebuah repo lama
+yang ditemukan orang berikutnya dapat dikenali, bukan supaya ia dipakai lagi.
+
+Yang berlaku pada module: sebuah module tidak boleh menyentuh data milik module lain,
 setiap tabel tenant membawa `tenant_id` dan setiap query menyaringnya, dan nama event beserta
 aturan versinya tidak berubah.
 
@@ -61,11 +64,11 @@ supaya penarikan satu module tidak menuntut penulisan ulang yang lain.
 
 Untuk orang yang baru masuk ke CoreERP, gunakan tiga kalimat ini sebagai peta:
 
-1. **Control Plane mengatur lingkungan**: tenant, identity, entitlement, katalog app, placement, installation, operasi, dan metering.
-2. **Application Plane menjalankan pekerjaan bisnis**: UI, API, database, migration, dan kontrak milik setiap app.
+1. **Control Plane mengatur lingkungan**: tenant, identity, entitlement, katalog app, deployment, pemasangan module, operasi, dan metering.
+2. **Application Plane menjalankan pekerjaan bisnis**: UI, API, migration, dan kontrak milik setiap module.
 3. **Tenant adalah batas isolasi**: organisasi berada di dalam tenant, sedangkan `TenantContext` tepercaya ikut menentukan data apa yang boleh disentuh oleh request.
 
-Control Plane dan Application Plane bukan dua nama untuk satu aplikasi besar. Keduanya adalah batas tanggung jawab. Control Plane mengetahui release dan placement, tetapi tidak boleh mengambil alih database bisnis app. Application Plane menjalankan fitur bisnis, tetapi tidak boleh membuat keputusan komersial atau deployment global sendiri.
+Control Plane dan Application Plane bukan dua nama untuk satu aplikasi besar. Keduanya adalah batas tanggung jawab. Control Plane mengetahui katalog, entitlement, dan pemasangan, tetapi tidak boleh mengambil alih data bisnis module. Application Plane menjalankan fitur bisnis, tetapi tidak boleh membuat keputusan komersial atau deployment global sendiri.
 
 ```mermaid
 flowchart LR
@@ -74,17 +77,16 @@ flowchart LR
         ADMA["Administration app"]
         ID["Identity + TenantContext"]
         TEN["Tenant + entitlement"]
-        CAT["App catalog + releases"]
-        PLC["Placement + installation"]
+        CAT["App catalog"]
+        PLC["Deployment + pemasangan module"]
         MTR["Usage records + billing + operations"]
     end
 
     subgraph AP["Application Plane - per placement"]
         GW["Tenant UI shell / gateway"]
-        APPA["App A API + UI"]
-        APPB["App B API + UI"]
-        DBA[("App A database")]
-        DBB[("App B database")]
+        MODA["Module A: rute + halaman"]
+        MODB["Module B: rute + halaman"]
+        DBT[("Database tenant, tabel berawalan per module")]
         PROV["Tenant provisioning adapter"]
     end
 
@@ -95,14 +97,14 @@ flowchart LR
     CAT --> PLC
     PLC --> PROV
     ID --> GW
-    GW --> APPA
-    GW --> APPB
-    PROV --> APPA
-    PROV --> APPB
-    APPA --> DBA
-    APPB --> DBB
-    APPA -. "usage / health in SaaS" .-> MTR
-    APPB -. "usage / health in SaaS" .-> MTR
+    GW --> MODA
+    GW --> MODB
+    PROV --> MODA
+    PROV --> MODB
+    MODA --> DBT
+    MODB --> DBT
+    MODA -. "usage / health in SaaS" .-> MTR
+    MODB -. "usage / health in SaaS" .-> MTR
 ```
 
 Pemisahan ini mengikuti AWS untuk **SaaS yang dikelola vendor**: control plane mengelola onboarding, identity, tenant, billing, metering, dan operasi secara terpadu; application plane menyajikan fitur multi-tenant dan melakukan provisioning resource tenant. AWS juga memperbolehkan kombinasi pool dan silo pada service yang berbeda, selama pengalaman operasionalnya tetap terpadu. Lihat whitepaper lokal, bagian "Control plane vs application plane" dan "Pool and silo".
@@ -113,27 +115,27 @@ Diagram di atas berlaku untuk profile SaaS (`pooled` dan `isolated`). On-prem pe
 
 | Bagian | Memiliki | Tidak boleh mengambil alih |
 | --- | --- | --- |
-| Control Plane | Tenant, identity, catalog, entitlement, release, placement, installation registry, usage records | Database transaksi app, aturan bisnis app, atau query lintas database app |
-| Application Plane | UI, API, database, migration, business rule, dan kontrak app | Keputusan entitlement, penerbitan release, atau status `ready` tanpa registry |
-| Deployment/runtime | Container, endpoint, secret reference, health, dan routing pada placement | Mengubah source app hanya karena tenant ditempatkan pada silo |
+| Control Plane | Tenant, identity, catalog, entitlement, deployment, pemasangan module, usage records | Data transaksi module, aturan bisnis module, atau query lintas module |
+| Application Plane | UI, API, migration, business rule, dan kontrak module | Keputusan entitlement, atau mengaku terpasang tanpa catatan pemasangan |
+| Deployment/runtime | Container Core, endpoint, secret reference, health, dan routing pada placement | Mengubah source module hanya karena tenant ditempatkan pada silo |
 
 ## Dari tenant baru sampai aplikasi siap dipakai
 
-Status lifecycle harus dibaca berurutan. `catalogued`, `entitled`, `installed`, dan `ready` adalah fakta berbeda; satu status tidak boleh ditebak dari status sebelumnya.
+Status lifecycle harus dibaca berurutan. `catalogued`, `entitled`, dan `installed` adalah fakta berbeda; satu status tidak boleh ditebak dari status sebelumnya.
 
 ```mermaid
 flowchart TB
     A["1. Onboarding tenant"] --> B["2. Identity + tenant context"]
     B --> C["3. Entitlement aktif"]
     C --> D["4. Pilih placement pooled / isolated"]
-    D --> E["5. Install release + jalankan migration"]
-    E --> F{"Readiness checks lulus?"}
-    F -- "Tidak" --> G["Tetap installed / not ready<br/>dan laporkan gap"]
-    F -- "Ya" --> H["Ready + launch manifest"]
-    H --> I["Request app memakai TenantContext tepercaya"]
+    D --> E["5. Pasang module + jalankan migration"]
+    E --> F{"Migration dan data awal berhasil?"}
+    F -- "Tidak" --> G["Pemasangan gagal dicatat<br/>dan gap dilaporkan"]
+    F -- "Ya" --> H["Installed + launch manifest"]
+    H --> I["Request module memakai TenantContext tepercaya"]
 ```
 
-Urutan ini menjelaskan kenapa launcher tidak boleh menampilkan app sebagai "terpasang" hanya karena tenant memiliki entitlement. Sumber kebenaran install adalah installation/deployment registry; sumber kebenaran readiness adalah runtime/placement status. Jika registry belum ada, dokumentasi dan UI harus menyebut gap, bukan membuat state optimistis.
+Urutan ini menjelaskan kenapa launcher tidak boleh menampilkan app sebagai "terpasang" hanya karena tenant memiliki entitlement. Sumber kebenaran install **dan** readiness adalah catatan pemasangan module (`core_module_installations`): sebuah produk siap dibuka bila module-nya tercatat terpasang untuk tenant itu. Entitlement menjawab pertanyaan lain — boleh atau tidak — dan menyimpulkan yang satu dari yang lain adalah kesalahan yang dilarang di sini.
 
 ## Pooled, isolated, dan on-prem
 
@@ -207,9 +209,9 @@ flowchart LR
 
 - Mulai dari `TenantContext` yang tepercaya; `tenant_id` dari body atau query string bukan bukti akses.
 - Organization berada di dalam tenant. Legal entity dan operating unit bukan pengganti tenant dan tidak boleh dijadikan satu pohon universal.
-- Setiap app memiliki datanya sendiri. Pada app berkontainer batas itu berupa database terpisah; pada module ia berupa awalan tabel yang dijaga penjaga batas dan analisa statis. Integrasi lintas app berkontainer memakai REST/OpenAPI untuk query atau perintah dan event/AsyncAPI untuk fakta yang sudah terjadi; antar module di satu runtime ia berupa kontrak PHP dan event in-process.
-- App tidak boleh menebak state global. Catalog, entitlement, installation, dan readiness punya sumber kebenaran masing-masing.
-- Silo bukan fork source. Semua placement menjalankan release yang kompatibel; yang berubah adalah resource dan placement, bukan business logic secara diam-diam.
+- Setiap module memiliki datanya sendiri, dan batasnya berupa awalan tabel yang dijaga penjaga batas serta analisa statis. Integrasi antar module memakai kontrak PHP untuk query atau perintah dan event in-process untuk fakta yang sudah terjadi. REST/OpenAPI dan event/AsyncAPI tetap dipakai untuk sistem di luar runtime ini.
+- Module tidak boleh menebak state global. Katalog, entitlement, dan pemasangan punya sumber kebenaran masing-masing.
+- Silo bukan fork source. Semua placement menjalankan image edisi yang kompatibel; yang berubah adalah resource dan placement, bukan business logic secara diam-diam.
 
 ## Sumber dan diagram editable
 
@@ -219,35 +221,30 @@ Versi diagram yang dapat diedit di draw.io: [coreerp-saas-grand-design.drawio](.
 
 ## Invarian yang tidak boleh dilanggar
 
-1. App tidak membaca atau menulis data app lain. Pada app berkontainer yang menolak adalah database terpisah; pada module yang menolak adalah penjaga batas dan analisa statis. Batas yang dijaga mesin dan batas yang dijaga pemeriksaan sama-sama batas.
+1. Sebuah module tidak membaca atau menulis data module lain. Yang menolaknya adalah penjaga batas dan analisa statis. Batas yang dijaga pemeriksaan tetap batas.
 2. Semua request business API membawa `TenantContext` yang diterbitkan identity service; `tenant_id` dari body request tidak dipercaya. Pada module, konteks itu dibaca dari kontrak `KonteksTenant` dan `KonteksPermintaan`, bukan dari isi permintaan.
 3. Database credential hanya tersedia untuk service pemiliknya. Control plane menyimpan `secret_ref`, bukan password database.
 4. Semua integrasi antar-app memakai OpenAPI, event contract, atau extension point yang dipublikasikan. Permukaan module yang hanya dipanggil di dalam runtime yang sama dikontrakkan sebagai antarmuka PHP di `App\Support\Modules\Contracts`.
-5. Aplikasi customer tidak mendapatkan source/artifact app yang tidak dilisensikan pada deployment on-prem.
+5. Server customer tidak memuat berkas module yang tidak dilisensikan pada deployment on-prem.
 6. On-prem perpetual tidak memiliki telemetry, heartbeat, atau validasi lisensi online yang wajib. Server customer boleh online untuk penggunanya tanpa membuka koneksi ke vendor.
-7. Silo bukan izin fork source. Semua profile menjalankan release app yang kompatibel dengan matriks versi yang sama.
+7. Silo bukan izin fork source. Semua profile menjalankan image edisi yang kompatibel dengan matriks versi yang sama.
 8. Organization identity tidak menyimpan parent/depth permanen; relasi parent-child berada dalam purpose-scoped hierarchy version.
-9. Katalog, entitlement, installation, dan runtime readiness adalah fakta berbeda dengan sumber kebenaran berbeda.
+9. Katalog, entitlement, dan pemasangan module adalah fakta berbeda dengan sumber kebenaran berbeda.
 
 ## Deployment profile
 
 | Profile | Compute | Data | Kapan dipilih |
 | --- | --- | --- | --- |
-| `pooled` | Runtime Core dipakai banyak tenant; app berkontainer memakai service bersama | Satu database logis per tenant untuk Core beserta module-nya; app berkontainer memakai database sendiri. Setiap row tenant-scoped membawa `tenant_id` | Default cloud, biaya efisien |
+| `pooled` | Runtime Core dipakai banyak tenant | Satu database logis per tenant untuk Core beserta module-nya. Setiap row tenant-scoped membawa `tenant_id` | Default cloud, biaya efisien |
 | `isolated` | Shared atau dedicated menurut SLA | Database dedicated untuk satu tenant; optional compute dedicated | Regulasi, noisy neighbor, data residency, SLA |
-| `onprem-perpetual` | Docker Compose di infrastruktur customer, memakai manifest dan state instalasi lokal | Database hanya memuat module dan app yang dibeli customer | Customer membeli putus, menjalankan dan memperbarui sendiri |
+| `onprem-perpetual` | Docker Compose di infrastruktur customer, memakai manifest dan state instalasi lokal | Database hanya memuat module yang dibeli customer | Customer membeli putus, menjalankan dan memperbarui sendiri |
 
-Untuk app yang masih berupa container, **satu app satu database** berarti satu ownership database
-logis dan satu database role per app. Ia tidak selalu berarti satu VM atau satu PostgreSQL cluster
-per app.
+Ownership data pada bentuk module: satu database per tenant, dan pemisahnya adalah awalan nama
+tabel per module. Larangannya tetap — sebuah module tidak boleh membaca atau menulis tabel milik
+module lain.
 
-- Pool dapat menempatkan `pos_pool_db` dan `booking_pool_db` dalam cluster PostgreSQL managed yang sama, dengan role dan credential berbeda.
-- Isolated/on-prem dapat menempatkan `pos_tenant_acme_db` dan `booking_tenant_acme_db` pada PostgreSQL instance/container khusus bila tier mensyaratkannya.
-- Citus adalah opsi scale-out untuk database pooled sebuah app setelah volume memerlukannya. Tabel dalam database app itu tetap didistribusikan oleh `tenant_id` agar data tenant colocated.
-
-Untuk module, ownership itu berpindah bentuk: satu database per tenant, dan pemisahnya adalah
-awalan nama tabel per module. Yang tidak berubah adalah larangannya — sebuah module tetap tidak
-boleh membaca atau menulis tabel milik module lain.
+Citus adalah opsi scale-out untuk database pooled setelah volume memerlukannya. Tabelnya tetap
+didistribusikan oleh `tenant_id` agar data satu tenant colocated.
 
 ## Control-plane model
 
@@ -257,10 +254,10 @@ Pada SaaS, control plane merupakan sumber kebenaran placement, entitlement, dan 
 | --- | --- |
 | `tenants` | Kontrak customer, status, edition, dan isolation profile. |
 | `tenant_app_entitlements` | Hak komersial tenant, masa berlaku, dan quota; bukan installation state. |
-| `app_catalog` / `app_releases` | Publisher, manifest, image digest, kontrak, dan compatibility matrix. |
+| `app_catalog` | Publisher, manifest, kontrak, dan versi katalog satu produk. |
 | `tenant_deployments` | Satu tenant SaaS ditempatkan pada target pooled atau isolated mana. |
-| `app_placements` | Endpoint API, secret reference database, image release, dan health per app deployment. Path UI tidak disimpan di sini; lihat [Routing UI per placement](#routing-ui-per-placement). |
-| `app_installations` | Riwayat install, migration, enable, disable, upgrade, dan uninstall. |
+| `core_module_installations` | Module apa yang terpasang untuk satu tenant, versinya, dan statusnya. Ini satu-satunya penentu kesiapan sebuah produk bagi tenant. |
+| `app_releases`, `app_placements`, `app_installations` | **Tabel yatim.** Milik jalur hosting container yang dibuang pada 10 September 2026. Tidak ada kode yang menulis maupun membacanya. Tabelnya sengaja ditinggalkan, bukan di-drop, karena migration yang membuang data pelanggan melanggar aturan penghapusan lunak repo ini. |
 | `usage_records` | Metering per tenant/app untuk billing dan observability SaaS. |
 
 ## Application-plane model
@@ -269,15 +266,13 @@ Setiap app memiliki:
 
 ```text
 module = rute + halaman UI + migration bertabel berawalan + kontrak + manifest
-app    = API service + UI artifact + database + migrator + contracts + manifest
 ```
 
-Bentuk kiri berjalan di runtime Core; bentuk kanan berjalan sebagai container sendiri. Keduanya
-mendaftarkan diri ke katalog lewat `app.yaml` yang sama bentuknya.
+Module berjalan di runtime Core dan mendaftarkan diri ke katalog lewat `app.yaml`.
 
-Pada SaaS, gateway/UI shell meminta launch manifest setelah token tervalidasi. Entry app hanya dapat dimuat bila entitlement aktif, installation registry menyatakan release pada placement `ready`, dan user memiliki permission entry point. Pada on-prem perpetual, gateway membaca manifest bertanda tangan serta installation state lokal; local core runtime menyimpan administrator dan lisensi lokal.
+Pada SaaS, gateway/UI shell meminta launch manifest setelah token tervalidasi. Entry sebuah produk hanya dapat dimuat bila entitlement aktif, catatan pemasangan module menyatakan module itu terpasang untuk tenant tersebut, dan user memiliki permission entry point. Pada on-prem perpetual, gateway membaca manifest bertanda tangan serta installation state lokal; local core runtime menyimpan administrator dan lisensi lokal.
 
-Dalam pooled cloud, code app boleh dideploy satu kali untuk satu placement yang melayani banyak tenant. Installation registry tetap mencatat artifact, release, migration, dan readiness placement; tenant binding serta entitlement dicatat terpisah. Dalam isolated cloud, install juga membentuk resource dan menjalankan migration database khusus. Dalam on-prem perpetual, installer lokal memverifikasi bundle dan lisensi bertanda tangan, lalu mencatat lifecycle pada installation state lokal; ia tidak melaporkan runtime health ke vendor.
+Dalam pooled cloud, satu runtime Core melayani banyak tenant; yang dicatat per tenant adalah pemasangan module beserta migration-nya, sedangkan tenant binding dan entitlement dicatat terpisah. Dalam isolated cloud, penyiapan juga membentuk resource dan database khusus tenant itu. Dalam on-prem perpetual, installer lokal memverifikasi bundle dan lisensi bertanda tangan, lalu mencatat lifecycle pada installation state lokal; ia tidak melaporkan runtime health ke vendor.
 
 ## Routing UI
 
@@ -286,63 +281,24 @@ Halaman **module** ikut build shell. Shell merendernya sebagai halaman Inertia b
 termuat sekali. Id entri menu pada `app.yaml` **adalah** jalur rutenya, jadi mengganti salah satu
 tanpa yang lain membuat menunya mendarat di 404.
 
-Sisa bagian ini berlaku untuk **app yang masih berupa container**.
+Tidak ada bentuk kedua. Jalur hosting container — iframe, path konten `/apps-content/...`,
+reverse proxy yang dirender dari registry, dan token konteks yang menyertainya — dibuang seluruhnya
+pada 10 September 2026, setelah pemilik produk memutuskan bahwa app terakhir yang belum dipindah
+datang sebagai module. Yang tersisa untuk sebuah produk hanyalah tautan `/apps/<id>`, dan itu satu
+pengalihan ke entri menu pertama yang boleh dilihat pengguna yang sedang masuk.
 
-### Routing UI per placement
-
-Shell menyajikan UI app berkontainer di dalam iframe pada path yang selalu berbentuk:
-
-```text
-/apps-content/<placement>/<app-id>/
-```
-
-Path ini **diturunkan**, bukan disimpan. `App\Support\AppContentPath` menyusunnya
-dari pasangan `(app_id, placement)`, dan itu satu-satunya tempat di seluruh
-control plane yang menyusun URL konten app.
-
-Penurunan ini bukan penghematan kolom. Ia menutup tiga kegagalan yang pernah
-terjadi atau pasti terjadi:
-
-- **Nilai tersimpan bisa basi.** Path yang pernah dicatat pada environment lokal
-  menunjuk alamat IP yang sudah tidak dipegang mesin mana pun, dan app tampak mati
-  padahal seluruh containernya sehat.
-- **Placement adalah unit silo/pool.** Satu app boleh punya banyak placement —
-  shard pooled kedua, atau silo milik satu tenant. Path yang hanya di-key app id
-  akan membuat dua runtime berbeda berebut alamat yang sama.
-- **Path bebas bisa bertabrakan dengan route host.** Nilai `/apps/<id>/` membuat
-  iframe memuat ulang halaman host-nya sendiri. Segmen `apps-content` berbeda dari
-  segmen `apps`, sehingga tabrakan itu tidak mungkin terjadi lagi.
-
-Reverse proxy menerjemahkan path tersebut ke container UI milik placement
-bersangkutan. Konfigurasinya di-generate dari registry, bukan ditulis tangan —
-lihat [Release dan on-prem](03-release-and-on-prem.md) dan berkas
-`deploy/apps-content-proxy.md` pada repository ini.
-
-Karena path relatif, ia mewarisi host mana pun tempat shell disajikan. Isolasi
-tenant tetap ditegakkan sebelum path ini dipakai: shell hanya memancarkannya
-setelah entitlement aktif, placement `ready`, dan user memiliki permission entry
-point.
-
-Readiness app di dalam frame diukur dari pengumuman `coreerp.ready` milik app,
-bukan dari `onLoad` iframe. Saat container UI mati, reverse proxy membalas halaman
-errornya sendiri dan halaman itu berhasil dimuat — `onLoad` akan menyatakan sukses
-untuk kegagalan. Pengumuman app adalah satu-satunya sinyal yang tidak bisa
-dipalsukan halaman error.
+Tabel `app_placements`, `app_releases`, dan `app_installations` sengaja **ditinggalkan sebagai tabel
+yatim**, tidak dihapus. Menghapusnya berarti migration yang membuang data di server setiap
+pelanggan, dan aturan repo ini adalah semua penghapusan bersifat lunak. Tidak ada kode yang
+menulisnya lagi, dan tidak ada kode yang membacanya sebagai penentu kesiapan.
 
 ### Keputusan yang belum diambil: cara mengalamati tenant
 
 Hari ini seluruh tenant berbagi satu host shell dan dibedakan lewat path. Apakah
 nanti kita memakai subdomain per tenant, custom domain milik pelanggan, atau tetap
-seperti sekarang, **belum diputuskan**.
-
-Path relatif membuat ketiganya tetap terbuka tanpa perubahan skema maupun migrasi
-data. Bila keputusan itu diambil, yang perlu berubah hanya `AppContentPath` dan
-perhitungan origin pada `apps/control-plane/resources/js/pages/apps/host.tsx`.
-
-Satu konsekuensi perlu dicatat sejak sekarang: karena konten app disajikan
-same-origin dengan shell, atribut `sandbox` pada iframe adalah pembatas tambahan,
-bukan batas isolasi. Isolasi origin yang sungguhan menuntut host terpisah, dan itu
-bagian dari keputusan yang sama.
+seperti sekarang, **belum diputuskan**. Jalur halaman module bersifat relatif, jadi ia mewarisi
+host mana pun tempat shell disajikan dan ketiga pilihan itu tetap terbuka tanpa perubahan skema
+maupun migrasi data.
 
 ## Silo dan customisasi
 
@@ -364,7 +320,7 @@ Customer dapat memilih paket **managed support** secara terpisah. Hanya pada mod
 ## Lihat juga
 
 - [Tenant dan hierarki organisasi](01a-tenant-and-org-hierarchy.md) — model organisasi di dalam tenant
-- [Standar module](02-module-standard.md) — app sebagai release unit mandiri
+- [Standar module](02-module-standard.md) — isi wajib satu module
 - [Release dan on-prem](03-release-and-on-prem.md) — profile deployment dalam praktik
-- [Reporting dan read replica](07-reporting-and-replicas.md) — konsekuensi boundary data lintas app
+- [Reporting dan read replica](07-reporting-and-replicas.md) — konsekuensi boundary data lintas module
 - [Gate fondasi Core](10-core-foundation-gates.md) — fondasi mana yang belum boleh dibangun

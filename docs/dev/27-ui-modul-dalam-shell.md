@@ -2,18 +2,18 @@
 
 Halaman ini untuk developer yang menulis atau mengubah layar sebuah module. Sejak module bisnis pindah ke dalam runtime Core, layarnya bukan lagi aplikasi React tersendiri di dalam iframe: ia halaman Inertia di dalam build shell, berbagi satu salinan React, satu tema, dan satu riwayat peramban dengan Core. Yang dijelaskan di sini adalah aturan yang menjaga perpindahan itu tetap benar, beserta alasan tiap aturan ada — bukan bentuk visual layarnya, yang diatur [standar app dan addon app](02-module-standard.md) beserta pola UI bersama.
 
-## Konsep yang mudah tertukar: module dan app berkontainer
+## Bentuk lama yang sudah tidak ada
 
-Dua bentuk hidup berdampingan di repo ini, dan hampir semua kesalahan di area ini berasal dari menilai yang satu dengan aturan yang lain.
+Sampai 10 September 2026 dua bentuk hidup berdampingan, dan hampir semua kesalahan di area ini berasal dari menilai yang satu dengan aturan yang lain. Bentuk app berkontainer dibuang pada hari itu; tabel di bawah disimpan supaya layar lama yang ditemukan orang berikutnya dapat dikenali.
 
-| | Module di dalam runtime Core | App berkontainer |
+| | Module di dalam runtime Core | App berkontainer (dibuang) |
 | --- | --- | --- |
 | Layarnya | halaman Inertia di build shell | aplikasi Vite sendiri di dalam iframe |
 | Alamat layar | rute module, `/<id module>/<id entri menu>` | `/apps/<id>?view=<id entri menu>` lalu hash di dalam bingkai |
 | Salinan React | satu, milik shell | dua, satu di shell dan satu di dalam bingkai |
 | Token konteks | tidak ada | ada, beserta muat ulang berkalanya |
 
-Yang **sama** untuk keduanya: menu tetap datang dari blok `ui.navigation` pada manifest lewat `App\Support\LaunchableAppCatalog`, tetap disaring permission, dan `/apps/<id>` tetap menjadi tautan peluncur produk. Untuk module, rute `apps/{app}` di `apps/control-plane/routes/web.php` meneruskan ke entri menu pertama yang boleh dilihat pengguna — module tidak punya penempatan container, jadi jalur runtime akan membalas 404. Satu tautan peluncur yang tetap benar sebelum dan sesudah sebuah app dipindah lebih murah daripada dua tautan yang harus diganti bersamaan.
+Yang **tidak** berubah oleh pembuangan itu: menu tetap datang dari blok `ui.navigation` pada manifest lewat `App\Support\LaunchableAppCatalog`, tetap disaring permission, dan `/apps/<id>` tetap menjadi tautan peluncur produk. Rute `apps/{app}` di `apps/control-plane/routes/web.php` sekarang hanya mengalihkan ke entri menu pertama yang boleh dilihat pengguna. Satu tautan peluncur yang tetap benar lebih murah daripada peluncur yang harus tahu entri menu mana yang pertama boleh dilihat tiap pengguna.
 
 ## Nama halaman dan satu tuan rumah Inertia
 
@@ -84,9 +84,9 @@ Layar module memanggil endpoint module-nya dengan sesi Core, bukan token pembawa
 
 ## Yang tidak dimiliki halaman module
 
-Halaman module **tidak** punya token konteks dan **tidak** punya muat ulang berkala. Keduanya milik jalur app berkontainer saja, dan keduanya masih hidup di `apps/control-plane/resources/js/pages/apps/host.tsx`: muat ulang berkala di sana ada semata-mata untuk menyegarkan token berumur pendek sebelum kedaluwarsa. Halaman module tidak punya token yang perlu disegarkan, jadi menambahkan pemuatan ulang berkala padanya hanya menambah lalu lintas tanpa satu pun masalah yang diselesaikan.
+Halaman module **tidak** punya token konteks dan **tidak** punya muat ulang berkala. Keduanya milik jalur app berkontainer, yang dibuang pada 10 September 2026 bersama halaman tuan rumah beriframe-nya: muat ulang berkala di sana ada semata-mata untuk menyegarkan token berumur pendek sebelum kedaluwarsa. Halaman module tidak punya token yang perlu disegarkan, jadi menambahkan pemuatan ulang berkala padanya hanya menambah lalu lintas tanpa satu pun masalah yang diselesaikan.
 
-Berkas `host.tsx` sengaja tidak dihapus selama masih ada app yang berjalan sebagai container. Kriteria yang berlaku adalah "tidak ada elemen `iframe` pada halaman **module**", dan `apps/control-plane/tests/Feature/Modules/LayarManagementAsetTest.php` membuktikannya pada modul produk yang sungguhan, bukan pada module contoh.
+Kriteria yang berlaku adalah "tidak ada elemen `iframe` pada halaman **module**", dan `apps/control-plane/tests/Feature/Modules/LayarManagementAsetTest.php` membuktikannya pada modul produk yang sungguhan, bukan pada module contoh. Kendali positif pemeriksaan itu dulu berkas halaman iframe yang lama; setelah berkas itu dibuang, kendalinya berpindah ke penanda yang wajib ada pada berkas yang diperiksa sendiri.
 
 ## Ukuran bundel: dipecah per entri menu, satu React
 

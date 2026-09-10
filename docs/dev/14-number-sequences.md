@@ -2,12 +2,12 @@
 
 Number Sequence adalah layanan Control Plane untuk menerbitkan kode bisnis yang dapat dipakai app mana pun. Ia bukan tabel bersama: app meminta nomor lewat pintu resmi dan tidak pernah membaca atau menulis tabel sequence Core secara langsung.
 
-Ada dua pintu, dan yang menentukan bukan selera melainkan tempat app itu berjalan:
+Ada dua pintu, dan yang menentukan bukan selera melainkan tempat pemanggilnya berjalan:
 
 | Pemanggil | Pintu |
 | --- | --- |
 | Module di runtime Core | Kontrak `App\Support\Modules\Contracts\PenerbitNomor` — pemanggilan fungsi biasa |
-| App berkontainer | API internal `POST /api/internal/v1/number-sequences/...` dengan token layanan |
+| Addon pihak ketiga di luar runtime | API internal `POST /api/internal/v1/number-sequences/...` dengan token layanan |
 
 ## Pemilik kebenaran
 
@@ -169,11 +169,13 @@ Core tetap memeriksa entitlement dan readiness app untuk tenant tersebut pada se
 
 ## Rekonsiliasi
 
-Bagian ini berlaku untuk app berkontainer. Core dan app semacam itu memiliki database terpisah, sehingga commit transaksi app dan confirm ke Core bukan satu transaksi database. Untuk continuous, app wajib menyimpan transaksi bisnis dan outbox `confirm` atau `cancel` dalam satu transaksi database app. Worker app mengirim outbox tersebut ulang sampai Core menjawab; endpoint Core idempotent.
+Bagian ini berlaku untuk pemanggil di luar runtime ini. Core dan pemanggil semacam itu memiliki database terpisah, sehingga commit transaksinya dan confirm ke Core bukan satu transaksi database. Untuk continuous, ia wajib menyimpan transaksi bisnis dan outbox `confirm` atau `cancel` dalam satu transaksi database miliknya. Worker-nya mengirim outbox tersebut ulang sampai Core menjawab; endpoint Core idempotent.
+
+Untuk module, keadaan itu tidak ada: penerbitan nomor dan transaksi bisnisnya berada di satu database dan satu transaksi.
 
 `php artisan number-sequences:recover` mencari reservation continuous yang melewati masa tunggu lalu mengubahnya menjadi `reconciliation_pending`. Job ini **tidak** mengembalikan nomor ke pool. Reservation `reconciliation_pending` masih boleh dikonfirmasi oleh outbox terlambat, atau dibatalkan bila app membuktikan transaksi tidak pernah tersimpan. Core tidak boleh mendaur ulangnya hanya berdasarkan TTL, karena TTL habis bukan bukti transaksi gagal.
 
-Setiap kali job berjalan ia mencatat `number-sequence.recover.completed` berisi jumlah yang ditandai dan **backlog rekonsiliasi** saat itu. Backlog yang naik terus berarti ada app yang tidak pernah menyelesaikan outbox-nya, dan nomor pool tertahan. Jadikan angka itu alert.
+Setiap kali job berjalan ia mencatat `number-sequence.recover.completed` berisi jumlah yang ditandai dan **backlog rekonsiliasi** saat itu. Backlog yang naik terus berarti ada pemanggil luar yang tidak pernah menyelesaikan outbox-nya, dan nomor pool tertahan. Jadikan angka itu alert.
 
 ## Scale-out dan high availability
 
@@ -327,17 +329,17 @@ Layanan ini mengasumsikan pemanggilnya bisa salah, termasuk salah yang merusak. 
 | Nomor melampaui lebar segmen | Ditolak, bukan melebar diam-diam |
 | Membuka halaman pengaturan berulang kali | Konstan per tenant, tidak menyentuh tenant lain |
 
-## Aturan implementasi app
+## Aturan implementasi module
 
-1. Nyatakan reference dan allowed scope di manifest app.
-2. Minta nomor hanya lewat pintu resminya — kontrak `PenerbitNomor` untuk module, API internal untuk app berkontainer. Jangan query tabel sequence Core.
-3. Gunakan idempotency key yang **stabil** dari transaksi app. Key yang dibuat ulang tiap percobaan membatalkan seluruh manfaat idempotency dan membakar satu nomor per retry.
+1. Nyatakan reference dan allowed scope di manifest module.
+2. Minta nomor hanya lewat pintu resminya — kontrak `PenerbitNomor`. Jangan query tabel sequence Core.
+3. Gunakan idempotency key yang **stabil** dari transaksi module. Key yang dibuat ulang tiap percobaan membatalkan seluruh manfaat idempotency dan membakar satu nomor per retry.
 4. Jangan menyimpulkan reservation kedaluwarsa berarti transaksi gagal. Hanya cancel bila transaksi memang tidak tersimpan.
-5. Jangan mengaktifkan atau mengubah format dari kode app; itu keputusan owner/admin tenant.
+5. Jangan mengaktifkan atau mengubah format dari kode module; itu keputusan owner/admin tenant.
 
-Dua aturan tambahan **hanya** untuk app berkontainer:
+Dua aturan tambahan **hanya** untuk pemanggil di luar runtime ini:
 
-6. Untuk continuous, simpan transaksi bisnis dan catatan outbox confirm/cancel dalam satu transaksi database app; worker mengirimnya sampai sukses.
+6. Untuk continuous, simpan transaksi bisnis dan catatan outbox confirm/cancel dalam satu transaksi database miliknya; worker mengirimnya sampai sukses.
 7. Set timeout eksplisit pada HTTP client ke Core.
 
 ## Lihat juga

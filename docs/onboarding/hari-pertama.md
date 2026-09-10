@@ -44,7 +44,7 @@ sedang kamu buka.
 ## Peta repo CoreERP
 
 ```text
-apps/control-plane/    Laravel. Identity, tenant, entitlement, placement, release registry. Sekaligus shell UI yang merender halaman module.
+apps/control-plane/    Laravel. Identity, tenant, entitlement, katalog app, pemasangan module. Sekaligus shell UI yang merender halaman module.
 apps/provider-console/ Konsol vendor.
 packages/ui/           SDK UI bersama (@apperp/ui).
 modules/               Module bisnis, satu folder per module di bawah <penerbit>/. Baca modules/README.md dulu.
@@ -70,4 +70,4 @@ Perintah itu ikut menjangkau `modules/`: `composer lint:check` menjalankan Pint 
 
 ## Besok
 
-[Empat kebenaran lifecycle](/onboarding/empat-kebenaran), lalu [Alur end-to-end](/onboarding/alur-end-to-end). Dua dokumen itu yang paling cepat membuat arsitekturnya masuk akal.
+[Tiga kebenaran lifecycle](/onboarding/tiga-kebenaran), lalu [Alur end-to-end](/onboarding/alur-end-to-end). Dua dokumen itu yang paling cepat membuat arsitekturnya masuk akal.

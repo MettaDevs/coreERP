@@ -25,7 +25,7 @@ drop_to_www_data() {
 # Ketiga peran membayar bootstrap yang sama — web, scheduler, dan worker semuanya memuat Laravel —
 # jadi keduanya dibangun di sini, sebelum peran dipilih. Sampai 10 September 2026 tidak ada satu
 # pun langkah penyebaran yang memanggil keduanya, jadi setiap permintaan membaca dan menggabungkan
-# ulang seluruh berkas `config/` lalu mendaftarkan ulang 383 rute. Itu tidak pernah terlihat
+# ulang seluruh berkas `config/` lalu mendaftarkan ulang ratusan rute. Itu tidak pernah terlihat
 # sebagai kesalahan, hanya sebagai latensi.
 #
 # Gagal dengan peringatan, bukan dengan berhenti: tanpa cache aplikasi tetap benar, hanya lebih
@@ -41,16 +41,6 @@ bangun_cache
 
 case "${CONTAINER_ROLE:-web}" in
     web)
-        # Konten UI app disajikan same-origin di /apps-content/<placement>/<app>/, dari registry
-        # placement — bukan dari nilai yang ditulis tangan. Config ini statis, jadi placement yang
-        # dibuat setelah container hidup baru dilayani setelah restart. Bila registry belum bisa
-        # dibaca (DB belum siap, migrasi belum jalan), core tetap naik dengan config kosong: shell
-        # sendiri masih berfungsi, hanya iframe app-nya yang gagal dengan pesan yang jelas.
-        php artisan app:render-proxy-config \
-            --target=apache \
-            --allow-empty \
-            --output=/etc/apache2/conf-enabled/coreerp-apps-content.conf \
-            || echo "Peringatan: config proxy /apps-content gagal dirender; app tidak akan termuat." >&2
         exec apache2-foreground
         ;;
     scheduler)

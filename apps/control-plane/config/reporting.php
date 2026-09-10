@@ -16,20 +16,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Alamat API app
-    |--------------------------------------------------------------------------
-    |
-    | Core memanggil app untuk meminta dataset laporan. Alamatnya diturunkan dari nama
-    | service API pada release yang terpasang (`http://<api_service>`), yang pada Compose
-    | selalu dapat di-resolve dari container Core. Deployment yang service-nya tidak
-    | satu network dengan Core dapat menimpanya lewat JSON `{"<app_id>": "<url>"}`.
-    |
-    */
-    'app_api_endpoints' => json_decode((string) env('COREERP_APP_API_ENDPOINTS', '{}'), true) ?: [],
-    'app_timeout' => (int) env('COREERP_APP_REPORT_TIMEOUT', 60),
-
-    /*
-    |--------------------------------------------------------------------------
     | Penyimpanan berkas
     |--------------------------------------------------------------------------
     |
@@ -47,7 +33,7 @@ return [
     */
     // Hasil ekspor dihapus setelah lewat masa ini; dokumen selalu dapat dibuat ulang.
     'retention_days' => (int) env('COREERP_REPORTING_RETENTION_DAYS', 7),
-    // Dataset melewati HTTP dari app ke Core; batas ini menjaga satu ekspor tidak
+    // Dataset dibaca dari module di proses yang sama; batas ini menjaga satu ekspor tidak
     // menguasai worker dan memori.
     'max_rows' => (int) env('COREERP_REPORTING_MAX_ROWS', 50000),
     'max_layout_kb' => (int) env('COREERP_REPORTING_MAX_LAYOUT_KB', 5120),

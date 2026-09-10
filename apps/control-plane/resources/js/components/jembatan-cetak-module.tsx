@@ -5,9 +5,8 @@ import { isPrintMessage, requestPrint } from '@/lib/print-requests';
 /**
  * Menyambungkan permintaan cetak dari layar module ke dialog cetak Shell.
  *
- * Selama UI module berada di dalam iframe, permintaannya datang sebagai `postMessage` dan
- * yang menampungnya `pages/apps/host.tsx`. Halaman module tidak punya bingkai, jadi tidak ada
- * `postMessage` dan tidak ada halaman tuan rumah — permintaannya datang sebagai
+ * Halaman module tidak punya bingkai: ia dirender di dalam shell yang sama, jadi tidak ada
+ * `postMessage` dan tidak ada halaman tuan rumah. Permintaannya datang sebagai
  * `CustomEvent('coreerp:print')` pada `window`.
  *
  * **Kenapa event, bukan module memanggil `requestPrint()` langsung.** Keduanya berada dalam
@@ -16,7 +15,7 @@ import { isPrintMessage, requestPrint } from '@/lib/print-requests';
  * yang gagal saat itu terjadi. Aturan module — hanya boleh menyebut `@apperp/ui` dan React —
  * tetap utuh bila jalurnya sebuah event peramban.
  *
- * **Bentuk pesannya diperiksa dengan pemeriksa yang sama** yang dipakai jalur iframe. Isi
+ * **Bentuk pesannya tetap diperiksa.** Isi
  * `detail` datang dari kode module, dan kode module ikut berubah tanpa perubahan di sini;
  * pemeriksa itu yang menahan bentuk yang menyimpang supaya tidak sampai ke dialog cetak
  * sebagai parameter yang setengah benar.

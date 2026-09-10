@@ -51,4 +51,4 @@ Jika custom feature diminta beberapa tenant dan domainnya umum, pindahkan ke cor
 
 - [Standar module](02-module-standard.md) — batas app, addon app, dan extension
 - [API dan integration bridge](04-api-and-integration.md) — kontrak yang boleh dipakai addon
-- [Menerbitkan release app](13-publishing-an-app-release.md) — pendaftaran addon ke katalog
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — pendaftaran addon ke katalog

@@ -108,7 +108,7 @@ FROM php:8.4-apache
 RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev unzip \
     && docker-php-ext-configure gd --with-jpeg \
     && docker-php-ext-install bcmath gd intl pdo_pgsql pgsql zip \
-    && a2enmod rewrite proxy proxy_http \
+    && a2enmod rewrite \
     && sed -ri 's!/var/www/html!/var/www/repo/apps/control-plane/public!g' /etc/apache2/sites-available/000-default.conf \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /repo

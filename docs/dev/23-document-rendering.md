@@ -20,14 +20,14 @@ Karena itu mesinnya milik Core, seperti Number Sequence, Workflow, dan Fiscal Ca
 
 | Lapis | Padanan BC | Pemilik | Di mana |
 | --- | --- | --- | --- |
-| Dataset | Report dataset | Developer app | Kelas definisi laporan di app. Module menyerahkannya lewat kontrak `PenyediaLaporanModul` di dalam proses; app berkontainer lewat `internal/v1/laporan` |
+| Dataset | Report dataset | Developer module | Kelas definisi laporan di module, diserahkan lewat kontrak `PenyediaLaporanModul` di dalam proses |
 | Katalog laporan | Report object | Manifest app | Blok `reports` di `app.yaml`, disalin ke tabel `app_reports` Core saat registrasi |
 | Layout bawaan | Extension layout | Release app | Berkas `.docx`/`.xlsx` di app, dibaca Core lewat kontrak yang sama dan disimpan per versi release |
 | Layout unggahan | User-defined layout | Tenant | Tabel `report_layouts` Core, ber-`tenant_id`, opsional `legal_entity_id` |
 | Layout default | Report Selections + Document Layouts | Tenant per legal entity | Tabel `report_layout_defaults` Core; legal entity mengalahkan tenant |
 | Antrean ekspor dan hasilnya | Report scheduling | Core | Tabel `report_exports` dan disk `reporting`; dikerjakan `core-worker` |
 | Engine render PDF | Report rendering | Platform | Container `core-renderer` (Gotenberg + LibreOffice), stateless |
-| Dialog cetak, tray, lonceng, halaman layout dan riwayat | Request page, Report Layouts | Shell | Komponen di Control Plane. App hanya meminta: module mengirim `CustomEvent('coreerp:print')` pada `window`, app berkontainer mengirim `postMessage` bertipe `coreerp.print` |
+| Dialog cetak, tray, lonceng, halaman layout dan riwayat | Request page, Report Layouts | Shell | Komponen di Control Plane. Module hanya meminta, dengan mengirim `CustomEvent('coreerp:print')` pada `window` |
 | Identitas cetak (nama kop, baris induk, footer, logo) | Company Information | Tenant per legal entity atau operating unit | Tabel `print_identities` Core, digabung alamat dan kontak dari buku alamat, disuntikkan ke dataset sebagai `kop.*` |
 
 Dua batas yang mengikat semua app:
@@ -37,7 +37,6 @@ Dua batas yang mengikat semua app:
 Bentuk permintaannya bergantung pada tempat app berjalan:
 
 - **Module** mendaftarkan `PenyediaLaporanModul` ke `DaftarLaporan` sekali saat boot, dan Core memanggilnya sebagai fungsi. Konteks pengguna dibawa **sebagai argumen**, bukan dibaca dari permintaan — ekspor berjalan di worker antrean, tempat tidak ada `Request` maupun sesi, dan keadaan global yang benar pada permintaan biasa tetapi kosong pada worker adalah persis kegagalan yang paling sulit ditemukan. Isi konteksnya sama dengan yang dulu dibawa token: tenant, entitas legal, unit kerja, id pengguna, permission efektif, dan lingkup kebijakan data.
-- **App berkontainer** dipanggil lewat HTTP ke endpoint `internal/v1/laporan` dengan **token konteks pengguna yang meminta cetak**, bukan token service.
 
 Pemeriksaan izin tetap terjadi dua kali pada kedua bentuk, dan itu bukan pemeriksaan ganda yang mubazir: Core memeriksa "boleh menjalankan laporan ini", app memeriksa "boleh membaca data yang dilaporkan".
 
@@ -50,7 +49,7 @@ Tidak ada framework yang dibangun ulang. Untuk satu laporan:
 1. Satu kelas dataset: kode, nama, permission datanya, aturan parameter, daftar placeholder, dan query yang memakai scope organisasi yang sama dengan endpoint detailnya.
 2. Satu layout bawaan `.docx` atau `.xlsx`, dibangkitkan dari kode lewat command supaya perubahannya terbaca di review.
 3. Blok `reports` di `app.yaml`.
-4. Cara Core mencapainya: module mendaftarkan `PenyediaLaporanModul` dari penyedia layanannya; app berkontainer menyediakan tiga rute `internal/v1/laporan` yang dikontrak di OpenAPI-nya.
+4. Cara Core mencapainya: module mendaftarkan `PenyediaLaporanModul` dari penyedia layanannya.
 5. Tombol Cetak pada halaman record yang meminta Shell mencetak.
 
 Blok manifestnya:
@@ -68,7 +67,7 @@ reports:
         format: docx
 ```
 
-Tiga hal yang diminta Core, apa pun bentuk permintaannya:
+Tiga hal yang diminta Core:
 
 | Yang diminta | Guna |
 | --- | --- |
@@ -76,10 +75,10 @@ Tiga hal yang diminta Core, apa pun bentuk permintaannya:
 | Berkas layout bawaan | Isi `.docx`/`.xlsx` yang ikut rilis |
 | Dataset | Data yang sudah disaring; kegagalan disampaikan sebagai pesan siap-baca bila record tidak ada atau di luar scope |
 
-Pada app berkontainer ketiganya berupa `GET internal/v1/laporan/{kode}`,
-`GET internal/v1/laporan/{kode}/layouts/{key}`, dan `POST internal/v1/laporan/{kode}/dataset`,
-dengan middleware konteks yang sama seperti `/api/v1`. Pada module ketiganya adalah tiga method
-pada `PenyediaLaporanModul`.
+Ketiganya adalah tiga method pada `PenyediaLaporanModul`. Sampai 10 September 2026 ada bentuk kedua
+— `GET internal/v1/laporan/{kode}`, `GET internal/v1/laporan/{kode}/layouts/{key}`, dan
+`POST internal/v1/laporan/{kode}/dataset` — untuk app yang berjalan sebagai container tersendiri. Ia
+dibuang bersama app berkontainer terakhir.
 
 ## Identitas cetak: kop dan footer bukan bagian layout
 
@@ -137,10 +136,10 @@ Berkas hasil disimpan sebagai riwayat ekspor milik pemintanya, bukan sebagai lam
 | Profil | Engine render | Worker | Layout dan hasil ekspor | Catatan |
 | --- | --- | --- | --- | --- |
 | Pooled cloud | Satu `core-renderer` untuk semua tenant | Replica `core-worker` sesuai antrean | Database Core dan object storage bersama, dipisah `tenant_id` | Engine berada di network internal tanpa jalan keluar, supaya dokumen unggahan tenant tidak dapat memancingnya mengambil sumber dari internet |
-| Isolated cloud | Bersama atau per placement, mengikuti tier | Sama | Per placement | Tidak ada perubahan kode; hanya keputusan placement |
+| Isolated cloud | Bersama atau per tenant, mengikuti tier | Sama | Per tenant | Tidak ada perubahan kode; hanya keputusan penempatan |
 | On-prem perpetual | Satu container tambahan dalam bundle Core | Angka `replicas` di compose customer | Database Core dan volume lokal | Tidak ada dependensi Office 365 atau SharePoint; ini alasan utama model BC dipilih |
 
-Module tidak punya alamat: Core memanggilnya di dalam proses yang sama. Untuk app berkontainer, alamat API yang dipanggil Core diturunkan dari nama service API pada release yang terpasang (`http://<api_service>`), yang pada Compose selalu dapat di-resolve dari container Core. Deployment yang service-nya tidak satu network dengan Core menimpanya lewat `COREERP_APP_API_ENDPOINTS`.
+Module tidak punya alamat: Core memanggilnya di dalam proses yang sama. Tidak ada setelan alamat app yang perlu benar sebelum sebuah laporan bisa dicetak — `COREERP_APP_API_ENDPOINTS` dan batas waktunya ikut dibuang bersama jalur HTTP ke app berkontainer pada 10 September 2026.
 
 ## Trade-off yang diterima secara sadar
 
@@ -148,13 +147,13 @@ Module tidak punya alamat: Core memanggilnya di dalam proses yang sama. Untuk ap
 - Kontrak dataset per app ditulis tangan dan dirawat.
 - Konteks pengguna diteruskan Core ke app; ini jalur keamanan sendiri yang diuji sendiri.
 - Kalau worker Core mati, tidak ada app yang bisa mencetak.
-- Untuk app berkontainer, tambahan dua lompatan jaringan per dokumen dan dataset yang lewat sebagai JSON. Untuk module, keduanya gugur — dan yang menggantikannya adalah alamat yang tidak perlu benar lagi sebelum laporan bisa dicetak.
+- Dua lompatan jaringan per dokumen dan dataset yang lewat sebagai JSON **gugur**: dataset module dibaca dengan pemanggilan fungsi di proses yang sama.
 
 ## Gate yang berlaku saat menambah laporan
 
 1. **Permission.** Laporan menyebut permission data app yang wajib dipegang pengguna; Core memeriksanya saat tombol ditekan, app memeriksanya lagi saat dataset diminta.
 2. **Data policy.** Dataset memakai scope organisasi yang sama dengan endpoint detail; jalur dataset tidak punya jalan pintas.
-3. **Kontrak.** Untuk app berkontainer, tiga rute `internal/v1/laporan` didokumentasikan di OpenAPI app dan lolos pemeriksa cakupan. Untuk module, `PenyediaLaporanModul` terdaftar saat boot dan ada test yang membuktikan ketiga methodnya menjawab dari jalur yang sungguhan.
+3. **Kontrak.** `PenyediaLaporanModul` terdaftar saat boot, dan ada test yang membuktikan ketiga methodnya menjawab dari jalur yang sungguhan.
 4. **Load.** Endpoint permintaan ekspor Core dan endpoint dataset app masuk skenario load test; `apps/control-plane/loadtest/k6/reporting-e2e.js` menjalankan alur penuh pada stack lokal.
 5. **Dokumentasi.** Halaman fitur di `docs/apps/<app>/` menyebut kode laporan, placeholder, dan permission-nya.
 
