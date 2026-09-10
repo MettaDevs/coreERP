@@ -11,18 +11,15 @@ App bisnis pertama. Mengelola entitas, kategori, dan maintenance aset perusahaan
 | Versi | `0.1.0` — release pengembangan |
 | Kind | `business-app` |
 | Butuh Core | `^0.1` |
-| Repository | `app-erp-management-**asset**` |
-| Nama folder lokal | `app-erp-management-**aset**` |
-| Database | `management_aset` |
-| UI entry | ditentukan platform: `/apps-content/<placement>/management-aset/` |
-
-::: warning
-Nama repository dan nama folder berbeda satu huruf. `compose.yaml` build dari `../app-erp-management-aset`, jadi `git clone` tanpa menyebut nama folder akan menghasilkan folder yang tidak ditemukan build.
-:::
+| Bentuk | Module di runtime Core |
+| Folder | `modules/apperp/management-aset/` |
+| Namespace PHP | `Modules\Apperp\ManagementAset\` |
+| Awalan tabel | `aset_` |
+| Jalur layar | `/management-aset/<id entri menu>` |
 
 ## Domain yang dimiliki
 
-**Milik app ini** — master data aset, register aset, penyusutan, setup dan pelaksanaan maintenance, serta dokumen siklus aset. Daftar master yang berlaku ada di `api/routes/api.php` pada array `$masters`; jumlahnya berubah seiring modul tumbuh, jadi angkanya tidak disalin ke sini.
+**Milik app ini** — master data aset, register aset, penyusutan, setup dan pelaksanaan maintenance, serta dokumen siklus aset. Daftar master yang berlaku ada di `routes/api.php` pada array `$masters`; jumlahnya berubah seiring modul tumbuh, jadi angkanya tidak disalin ke sini.
 
 Klasifikasi aset memakai **dua sumbu yang saling lepas**, mengikuti model Dynamics 365 F&O: **group aset** membawa perlakuan uang (penyusutan, kelompok harta fiskal, pembebanan), **jenis aset** membawa perlakuan teknis (atribut, pekerjaan maintenance). Keduanya ditunjuk langsung dari aset, dan tidak ada yang menyaring yang lain. Rantai lama `group → kategori → jenis → entitas` sudah dibongkar.
 
@@ -32,7 +29,7 @@ Klasifikasi itu **struktur domain app**, bukan organization hierarchy Core. Kare
 
 Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, aturan apa yang dijaga kode, dan **kenapa** aturannya begitu.
 
-**Mulai dari sini kalau baru pertama membuka repo** — [Peta modul](/apps/management-aset/arsitektur/).
+**Mulai dari sini kalau baru pertama membuka foldernya** — [Peta modul](/apps/management-aset/arsitektur/).
 
 | Arsitektur | Isi |
 | --- | --- |
@@ -67,87 +64,90 @@ Semuanya ditulis untuk orang yang akan menyentuh kodenya: apa yang disimpan, atu
 
 Kalau menambah halaman baru, ikuti [Pola dokumen fitur](/apps/management-aset/pola-dokumen).
 
-**Bukan milik app ini** — identity, tenant membership, security role, scope organisasi, dan penerbitan nomor. Semuanya milik Core dan diterima lewat token konteks bertanda tangan.
+**Bukan milik app ini** — identity, tenant membership, security role, scope organisasi, dan penerbitan nomor. Semuanya milik Core dan diterima lewat kontrak di `App\Support\Modules\Contracts`, bukan lewat jaringan.
 
 ## Kontrak
 
 | | |
 | --- | --- |
-| OpenAPI | `contracts/openapi.yaml` |
+| OpenAPI | `contracts/openapi.yaml` — gabungan, sumbernya `contracts/src/` |
 | AsyncAPI | `contracts/asyncapi.yaml` |
-| Health | `GET /api/v1/health` |
-| Master data | `GET /api/v1/{resource}` |
+| Prefix rute JSON | `/api/modules/management-aset/v1/...` |
+| Master data | `GET /api/modules/management-aset/v1/{resource}` |
 
-Semua master memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, `keterangan`, dan penanda `aktif`. Data selalu dibatasi tenant pada token konteks.
+Rute itu hanya dipanggil halaman modul ini sendiri, di dalam proses dan repo yang sama; kontraknya
+dipertahankan sebagai catatan, bukan sebagai janji ke pemanggil luar. Pemeriksa cakupannya sudah
+dihapus — alasannya di [Kontrak](/apps/management-aset/arsitektur/kontrak).
+
+Semua master memakai bentuk yang sama: `kode` (diterbitkan Number Sequence Core, read-only), `nama`, `keterangan`, dan penanda `aktif`. Data selalu dibatasi tenant lewat trait `MilikTenant`.
 
 **Reference nomor** — daftar lengkapnya di `app.yaml` bagian `number_sequences.references`; jumlahnya bertambah tiap kali ada master baru, jadi jangan menyalin angkanya ke sini. Dokumen dekomisioning memakai `management-aset.dekomisioning-aset` dengan prefix `DKMA`. Admin tenant mengaktifkan dan mengatur formatnya lewat **Nomor dokumen** di Control Plane.
 
-**Workflow** — manifest mendaftarkan tipe **Verifikasi usulan pemusnahan aset**. Admin tenant memilih approver dan mengaktifkan versinya di Core. App mengonsumsi keputusan lewat event bertanda tangan `core.workflow.decision.v2`; setelah `approved` diterima, aset menjadi `decommissioned` dan baru boleh dijual atau dimusnahkan.
+**Workflow** — manifest mendaftarkan tipe **Verifikasi usulan pemusnahan aset**. Admin tenant memilih approver dan mengaktifkan versinya di Core. Modul mengonsumsi keputusannya lewat event `KeputusanWorkflowDiambil` yang dipancarkan di dalam transaksi keputusan Core; setelah `approved` diterapkan, aset menjadi `decommissioned` dan baru boleh dijual atau dimusnahkan.
 
 ## Struktur kode
 
+Semuanya relatif terhadap `modules/apperp/management-aset/`.
+
 | Path | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/MasterDataController.php` | Base controller — hak akses per resource, batas tenant, idempotency, penerbitan nomor, validasi induk, penjagaan arsip |
-| `api/app/Http/Controllers/master/` | Controller khusus tiap master |
-| `api/app/Models/master/` | Model master |
-| `ui/src/master/` | UI master |
-| `api/tests/Feature` | Test feature |
-| `loadtest/` | Stack load test lengkap |
+| `src/Http/Controllers/MasterDataController.php` | Base controller — hak akses per resource, batas tenant, idempotency, penerbitan nomor, validasi induk, penjagaan arsip |
+| `src/Http/Controllers/HalamanModulController.php` | Satu-satunya penyaji layar; membaca daftar menu dari manifest |
+| `src/Http/Controllers/master/` | Controller khusus tiap master |
+| `src/Models/master/` | Model master |
+| `ui/Pages/` | Halaman React, ikut build shell Core |
+| `tests/Feature/` | Test feature, dijalankan bersama test Core |
+| `loadtest/` | Stack load test |
 
-Test feature menjaga hal yang tidak boleh regresi: induk lintas tenant tertolak, hak satu master tidak merembet ke master lain, induk beranak yang belum diarsipkan tidak dapat diarsipkan, dan `kode` selalu berasal dari Core.
+Test feature menjaga hal yang tidak boleh regresi: induk lintas tenant tertolak, daftar tidak pernah memuat baris tenant lain, hak satu master tidak merembet ke master lain, induk beranak yang belum diarsipkan tidak dapat diarsipkan, dan `kode` selalu berasal dari Core.
 
 ## Status terhadap gate
 
 | Gate | Status | Bukti |
 | --- | --- | --- |
-| Gate penemuan | ✅ Lewat | App terdaftar di katalog dengan manifest lengkap |
-| Migration PostgreSQL | ✅ Ada | `deploy/migrate.sh` tersedia dan dibawa image API |
-| Kontrak | ✅ Ada | `contracts/openapi.yaml`, `contracts/asyncapi.yaml` |
-| Test feature | ✅ Ada | `api/tests/Feature` |
-| **Gate concurrency** | ✅ **Lewat** | 1000 VU pada 128 tenant, empat instance API di belakang nginx, PostgreSQL asli |
+| Gate penemuan | ✅ Lewat | Modul terdaftar di katalog dengan manifest lengkap |
+| Migration PostgreSQL | ✅ Ada | `php artisan module:migrate management-aset` |
+| Penjaga batas | ✅ Hijau | `apps/control-plane/tests/Feature/Boundary/`, ikut tiap `php artisan test` |
+| Test feature | ✅ Ada | `tests/Feature/`, berjalan pada PostgreSQL bersama test Core |
+| **Gate concurrency** | ✅ Lewat | 1000 VU pada 128 tenant, empat instance runtime Core di belakang nginx, PostgreSQL asli — diukur ulang 10 September 2026 pada runtime satu proses |
 | Scope organisasi | ⏳ Belum | Baru menerapkan batas tenant dan permission; scope organisasi menunggu contract Core |
 | Upgrade release | ⏳ Belum tersedia | Versi `0.1.0`; menaikkan versi butuh compatibility matrix, backup, dan rollback terverifikasi |
 
-**Hasil load test pada 1000 VU:** nol pelanggaran lintas tenant, nol nomor ganda dari 4.342 nomor terbit, nol eskalasi hak, nol error 5xx aplikasi. SLO latensi terpenuhi sampai 16 request serentak pada laptop 12 core; di atas itu yang bertambah antrean, bukan hasil.
+**Hasil load test pada 1000 VU (10 September 2026):** nol pelanggaran lintas tenant, nol nomor ganda dari 63.861 nomor terbit, nol eskalasi hak dari 73 probe, nol error 5xx aplikasi. Skenario perlombaan tautan: nol himpunan gabungan dari 3.920 pembacaan balik. SLO latensi terpenuhi sampai 12 request serentak pada laptop 12 core; di atas itu yang bertambah antrean, bukan hasil.
 
-Load test ini menemukan bahwa **penanganan koneksi database jenuh lebih dulu daripada kode modul** — tanpa koneksi persisten, PostgreSQL membakar 5,5 core hanya untuk fork proses baru tiap request. Karena itu tersedia `DB_PERSISTENT` pada `api/config/database.php`, default mati, dinyalakan pada deployment dengan worker proses tetap.
+Pengukuran ulang ini mengubah jawaban atas pertanyaan **apa yang jenuh lebih dulu**: sekarang CPU PHP, bukan database. Dengan PgBouncer session pooling, 1000 pengguna serentak hanya memakai 39 koneksi PostgreSQL, sementara keempat instance API menghabiskan hampir seluruh 12 vCPU mesin.
 
-::: warning Gap yang diketahui
-`deploy/compose.fragment.yaml` hanya mendefinisikan `management-aset-api` dan `management-aset-ui` — belum ada service database di dalamnya. Statusnya terlacak di [backlog lifecycle dan deployment](/todo/general/03-lifecycle-dan-deployment).
+::: warning Dua permukaan belum ikut diukur
+Skenario penyusutan dan work order belum dipindahkan ke harness baru; keduanya berhenti dengan galat
+bila dijalankan, bukan hijau diam-diam. Kedua permukaan itu berstatus belum terverifikasi di bawah
+beban. Lihat [Pengujian](/apps/management-aset/arsitektur/pengujian).
 :::
 
 ## Menjalankan
 
-Bagian dari stack lokal. Dari folder `erp-dev`:
+Bagian dari stack lokal. Dari folder orkestrasi:
 
 ```powershell
 .\start.ps1 -Build
 ```
 
-| Layanan | Alamat |
-| --- | --- |
-| API | `localhost:18091` |
-| UI | `localhost:18092` |
-| Database | `localhost:5544` — `management_aset` |
-
-Diakses lewat shell Core di `http://localhost:8000`.
+Modul tidak punya alamat sendiri. Layarnya dibuka lewat shell Core di `http://localhost:8000` pada
+jalur `/management-aset/<id entri menu>`, setelah modul dipasang untuk tenant yang sedang dibuka.
+Datanya ada di database Core, pada tabel berawalan `aset_`.
 
 ### Setup terhadap Core
 
-1. Daftarkan `app.yaml` lewat alur publish sampai installation registry menyatakan release `ready`. Kirim ulang registrasi setiap kali permission, duty, atau reference nomor bertambah.
-2. Buat service credential untuk `management-aset`, isi `COREERP_SERVICE_TOKEN` pada API.
-3. Pakai nilai `COREERP_APP_CONTEXT_SIGNING_KEY` yang sama pada Core dan API Aset.
-4. Aktifkan semua reference nomor pada **Nomor dokumen** di Control Plane. Reference yang belum aktif membuat pembuatan record gagal dengan 503, bukan diam-diam memakai nomor buatan sendiri.
-5. Jalankan migration API dan build UI.
+1. Daftarkan manifest dengan `app:register-manifest management-aset`. Kirim ulang registrasi setiap kali permission, duty, atau reference nomor bertambah.
+2. Jalankan `php artisan module:migrate management-aset`.
+3. Pasang modul untuk tenant dengan `php artisan module:install management-aset <id tenant>`.
+4. Aktifkan semua reference nomor pada **Nomor dokumen** di Control Plane. Reference yang belum aktif membuat pembuatan record gagal dengan pesan yang menyebut sebabnya, bukan diam-diam memakai nomor buatan sendiri.
+
+Tidak ada lagi service credential, `COREERP_SERVICE_TOKEN`, maupun kunci penandatangan bersama untuk
+disamakan. Ketiganya milik app yang berjalan sebagai proses terpisah.
 
 ## Dokumen terkait
 
-**Di repository app** — `README.md` (master data, workflow, struktur kode), `docs/rancangan-scope-data-aset.md` (rancangan pemisahan data per organisasi), `loadtest/README.md` (cara menjalankan, hasil terukur, batas kejujurannya).
-
-::: tip Tautan usang di README app
-`README.md` app menyebut pola folder tercatat di `docs/agent.md`, tetapi berkas itu tidak ada di repository. Perlu diperbaiki atau dihapus dari README.
-:::
+**Di dalam folder modul** — `README.md` (master data, workflow, struktur kode), `loadtest/README.md` (cara menjalankan, hasil terukur, batas kejujurannya).
 
 **Aturan platform yang berlaku:**
 
@@ -160,5 +160,5 @@ Diakses lewat shell Core di `http://localhost:8000`.
 ## Lihat juga
 
 - [Katalog app](/apps/)
-- [Human Resources](/apps/human-resources/) — app bisnis kedua
-- [Membangun app baru](/apps/membangun-app-baru) — jalur yang dilewati app ini
+- [Human Resources](/apps/human-resources/) — modul bisnis kedua
+- [Membangun modul baru](/apps/membangun-app-baru) — jalur yang dilewati modul ini

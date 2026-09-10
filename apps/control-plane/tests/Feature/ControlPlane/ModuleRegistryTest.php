@@ -43,7 +43,7 @@ class ModuleRegistryTest extends TestCase
         $registry = $this->app->make(ModuleRegistry::class);
 
         $this->assertSame(
-            ['contoh-a', 'contoh-b', 'management-aset'],
+            ['contoh-a', 'contoh-b', 'human-resources', 'management-aset'],
             array_map(static fn ($m): string => $m->id, $registry->semua()),
         );
     }

@@ -11,10 +11,11 @@
 | Versi | `0.1.0` — release pengembangan |
 | Kind | `business-app` |
 | Butuh Core | `^0.1` |
-| Repository | `app-erp-<app-key>` |
-| Nama folder lokal | `<isi bila berbeda dari nama repository>` |
-| Database | `app_erp_<app>` |
-| UI entry | ditentukan platform: `/apps-content/<placement>/<app-id>/` |
+| Bentuk | Module di runtime Core |
+| Folder | `modules/<penerbit>/<module-key>/` |
+| Namespace PHP | `Modules\<Penerbit>\<ModuleKey>\` |
+| Awalan tabel | `<awalan>_` |
+| Jalur layar | `/<module-id>/<id entri menu>` |
 
 ## Domain yang dimiliki
 
@@ -26,9 +27,8 @@
 
 | | |
 | --- | --- |
-| OpenAPI | `contracts/openapi.yaml` |
-| AsyncAPI | `contracts/asyncapi.yaml` |
-| Health | `GET /api/v1/health` |
+| Prefix rute JSON | `/api/modules/<module-id>/v1/...` |
+| Berkas kontrak | `contracts/` — hanya bila ada permukaan yang dipanggil dari luar runtime |
 
 **Reference nomor** — <daftar reference yang dideklarasikan manifest, beserta prefix-nya. Kalau tidak ada, tulis "tidak ada" dan sebutkan alasannya.>
 
@@ -43,12 +43,15 @@
 
 ## Struktur kode
 
+Semuanya relatif terhadap folder module.
+
 | Path | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/` | |
-| `api/app/Models/` | |
-| `ui/src/` | |
-| `api/tests/Feature` | |
+| `src/Http/Controllers/` | |
+| `src/Models/` | |
+| `routes/web.php`, `routes/api.php` | |
+| `ui/Pages/` | |
+| `tests/Feature/` | |
 | `loadtest/` | |
 
 ## Status terhadap gate
@@ -57,7 +60,7 @@
 | --- | --- | --- |
 | Gate penemuan | | |
 | Migration PostgreSQL | | |
-| Kontrak | | |
+| Penjaga batas | | |
 | Test feature | | |
 | **Gate concurrency** | | |
 | Scope organisasi | | |
@@ -67,19 +70,15 @@ Pakai ✅ / ⏳ / ❌ dan **selalu sertakan buktinya**. Status tanpa bukti sama 
 
 ## Menjalankan
 
-Bagian dari stack lokal. Dari folder `erp-dev`:
+Bagian dari stack lokal. Dari folder orkestrasi:
 
 ```powershell
 .\start.ps1 -Build
 ```
 
-| Layanan | Alamat |
-| --- | --- |
-| API | `localhost:<port>` |
-| UI | `localhost:<port>` |
-| Database | `localhost:<port>` — `<nama database>` |
-
-Diakses lewat shell Core di `http://localhost:8000`.
+Module tidak punya alamat sendiri. Layarnya dibuka lewat shell Core di `http://localhost:8000` pada
+jalur `/<module-id>/<id entri menu>`, setelah module dipasang untuk tenant yang sedang dibuka.
+Datanya ada di database Core, pada tabel berawalan `<awalan>_`.
 
 ## Halaman untuk developer
 
@@ -101,7 +100,7 @@ Halaman baru wajib didaftarkan di `docs/.vitepress/config.ts` — sidebar disusu
 
 ## Dokumen terkait
 
-**Di repository app** — <daftar berkas dokumen di repo app, dengan satu kalimat isi masing-masing.>
+**Di dalam folder module** — <daftar berkas dokumen di folder module, dengan satu kalimat isi masing-masing.>
 
 **Aturan platform yang berlaku:**
 
@@ -113,13 +112,13 @@ Halaman baru wajib didaftarkan di `docs/.vitepress/config.ts` — sidebar disusu
 ## Lihat juga
 
 - [Katalog app](/apps/)
-- [Membangun app baru](/apps/membangun-app-baru)
+- [Membangun modul baru](/apps/membangun-app-baru)
 - [Pola dokumen fitur](/apps/management-aset/pola-dokumen) — cara menulis halaman fitur
 
 ---
 
 ::: info Cara memakai cetakan ini
-Salin folder ini menjadi `docs/apps/<app-key>/`, isi seluruh placeholder `<...>`, lalu daftarkan halamannya pada sidebar `/apps/` di `.vitepress/config.ts` dan pada tabel katalog di `/apps/index.md`.
+Salin folder ini menjadi `docs/apps/<module-id>/`, isi seluruh placeholder `<...>`, lalu daftarkan halamannya pada sidebar `/apps/` di `.vitepress/config.ts` dan pada tabel katalog di `/apps/index.md`.
 
 Isi hanya yang benar-benar ada. Bagian yang belum ada ditulis "belum ada" beserta alasannya — jangan dihapus dan jangan dikarang.
 

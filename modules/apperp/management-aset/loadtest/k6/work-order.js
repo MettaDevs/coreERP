@@ -1,3 +1,18 @@
+// ==================================================================================
+// BELUM DIPINDAHKAN KE RUNTIME BARU — skrip ini TIDAK akan berjalan apa adanya.
+//
+// Ia masih memakai harness lama: berkas fixture `tenants.json` berisi token konteks dan
+// header `Authorization: Bearer`. Keduanya tidak ada lagi sejak module masuk ke runtime
+// Core; identitas datang dari sesi Core dan alamat rutenya berawalan
+// `/api/modules/management-aset/v1/`. Pola penggantinya ada di `master-data.js` dan
+// `maintenance.js` — keduanya memakai `../lib.js`.
+//
+// Dibiarkan berhenti dengan galat pada baris `open('./tenants.json')`, dan itu disengaja:
+// skenario yang tidak dapat berjalan harus GAGAL keras, bukan hijau diam-diam. F7-03
+// menjalankan skenario penjenuhan dan skenario perlombaan tautan; kedua skenario di bawah
+// ini belum diukur ulang pada runtime baru dan berstatus BELUM TERVERIFIKASI.
+// ==================================================================================
+
 // Scale-out test Work Order maintenance.
 //
 // Setup membuat satu fixture Work Order per tenant dari aset yang sudah disiapkan

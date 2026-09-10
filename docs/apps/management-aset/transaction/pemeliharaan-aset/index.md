@@ -92,17 +92,17 @@ erDiagram
 
 | Endpoint | Gunanya |
 | --- | --- |
-| `GET /api/v1/pemeliharaan-aset` | Daftar work order, mendukung `?status=`, `?q=`, dan pagination |
-| `GET /api/v1/pemeliharaan-aset/saya` | Daftar pekerjaan yang ditugaskan ke pengguna yang sedang login |
-| `POST /api/v1/pemeliharaan-aset` | Membuat work order baru beserta baris pekerjaannya |
-| `GET /api/v1/pemeliharaan-aset/{id}` | Detail work order, baris pekerjaan, checklist, dan status log |
-| `PATCH /api/v1/pemeliharaan-aset/{id}` | Mengubah isi work order (hanya untuk status `draft`) |
+| `GET /api/modules/management-aset/v1/pemeliharaan-aset` | Daftar work order, mendukung `?status=`, `?q=`, dan pagination |
+| `GET /api/modules/management-aset/v1/pemeliharaan-aset/saya` | Daftar pekerjaan yang ditugaskan ke pengguna yang sedang login |
+| `POST /api/modules/management-aset/v1/pemeliharaan-aset` | Membuat work order baru beserta baris pekerjaannya |
+| `GET /api/modules/management-aset/v1/pemeliharaan-aset/{id}` | Detail work order, baris pekerjaan, checklist, dan status log |
+| `PATCH /api/modules/management-aset/v1/pemeliharaan-aset/{id}` | Mengubah isi work order (hanya untuk status `draft`) |
 | `DELETE /api/v1/pemeliharaan-aset/{id}` | Menghapus dokumen, hanya untuk `draft` dan `dibatalkan` |
-| `POST /api/v1/pemeliharaan-aset/{id}/status` | Memindahkan status (misal `draft` $\rightarrow$ `dijadwalkan`) |
-| `GET /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist` | Membaca daftar checklist pada satu baris pekerjaan |
-| `PUT /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist` | Mengisi dan menyimpan jawaban checklist |
-| `PATCH /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/execution` | Menyimpan hasil pelaksanaan (sebab kerusakan & tindakan) |
-| `POST /api/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template` | Mengisi checklist dari template yang dipilih |
+| `POST /api/modules/management-aset/v1/pemeliharaan-aset/{id}/status` | Memindahkan status (misal `draft` $\rightarrow$ `dijadwalkan`) |
+| `GET /api/modules/management-aset/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist` | Membaca daftar checklist pada satu baris pekerjaan |
+| `PUT /api/modules/management-aset/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist` | Mengisi dan menyimpan jawaban checklist |
+| `PATCH /api/modules/management-aset/v1/pemeliharaan-aset/{id}/jobs/{jobId}/execution` | Menyimpan hasil pelaksanaan (sebab kerusakan & tindakan) |
+| `POST /api/modules/management-aset/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template` | Mengisi checklist dari template yang dipilih |
 
 ---
 
@@ -113,9 +113,8 @@ erDiagram
 Wajib membawa header `Idempotency-Key` dan permission `management-aset.pemeliharaan-aset.create`.
 
 ```http
-POST /api/v1/pemeliharaan-aset HTTP/1.1
+POST /api/modules/management-aset/v1/pemeliharaan-aset HTTP/1.1
 Host: localhost:8000
-Authorization: Bearer <context_token>
 Idempotency-Key: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
 Content-Type: application/json
 
@@ -139,9 +138,8 @@ Content-Type: application/json
 ### 2. Memindahkan Status Work Order
 
 ```http
-POST /api/v1/pemeliharaan-aset/01JMB8W9A1B2C3D4E5F6G7H8J9/status HTTP/1.1
+POST /api/modules/management-aset/v1/pemeliharaan-aset/01JMB8W9A1B2C3D4E5F6G7H8J9/status HTTP/1.1
 Host: localhost:8000
-Authorization: Bearer <context_token>
 Content-Type: application/json
 
 {
@@ -155,9 +153,8 @@ Content-Type: application/json
 Ketika teknisi memilih nilai variabel yang menghasilkan `result: "none"` (**Tidak dinilai**), kolom `catatan` **wajib** diisi dengan alasan kenapa item tersebut tidak dapat dinilai.
 
 ```http
-PUT /api/v1/pemeliharaan-aset/01JMB8W9A1B2C3D4E5F6G7H8J9/jobs/01JMB8W9JOB123/checklist HTTP/1.1
+PUT /api/modules/management-aset/v1/pemeliharaan-aset/01JMB8W9A1B2C3D4E5F6G7H8J9/jobs/01JMB8W9JOB123/checklist HTTP/1.1
 Host: localhost:8000
-Authorization: Bearer <context_token>
 Content-Type: application/json
 
 {
@@ -181,9 +178,8 @@ Content-Type: application/json
 ### 4. Menyimpan Pelaksanaan Pekerjaan (Sebab & Tindakan)
 
 ```http
-PATCH /api/v1/pemeliharaan-aset/01JMB8W9A1B2C3D4E5F6G7H8J9/jobs/01JMB8W9JOB123/execution HTTP/1.1
+PATCH /api/modules/management-aset/v1/pemeliharaan-aset/01JMB8W9A1B2C3D4E5F6G7H8J9/jobs/01JMB8W9JOB123/execution HTTP/1.1
 Host: localhost:8000
-Authorization: Bearer <context_token>
 Content-Type: application/json
 
 {
@@ -229,7 +225,7 @@ Karena mode dan checklist yang terbuka dibaca dari alamat URL, tombol kembali pe
 
 ## Aturan Validasi Status (`StatusValidationPage`)
 
-Peralihan status dijaga oleh matriks aturan di `m_validasi_status_work_order`. Tenant dapat mengatur tingkat keparahan untuk tiap aturan:
+Peralihan status dijaga oleh matriks aturan di `aset_m_validasi_status_work_order`. Tenant dapat mengatur tingkat keparahan untuk tiap aturan:
 
 | Tingkat Keparahan | Perilaku saat Validasi Gagal |
 | --- | --- |
@@ -266,17 +262,17 @@ Contoh aturan yang diperiksa saat menuju status `selesai`:
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Support/WorkOrderStatus.php` | Grafik transisi dan hak penjaganya |
-| `api/app/Http/Controllers/transaksi/PemeliharaanAset/PemeliharaanAsetController.php` | Dokumen work order dan CRUD baris pekerjaan |
-| `api/app/Http/Controllers/transaksi/PemeliharaanAset/PelaksanaanController.php` | Pengisian checklist, pemekaran template, dan eksekusi |
-| `api/app/Http/Controllers/master/ValidasiStatusWorkOrderController.php` | Controller matriks validasi status |
-| `ui/src/transactions/pemeliharaan-aset/WorkOrderPage.tsx` | Router hash pemilih tampilan |
-| `ui/src/transactions/pemeliharaan-aset/WorkOrderListPage.tsx` | Layar daftar work order dan tab Pekerjaan Saya |
-| `ui/src/transactions/pemeliharaan-aset/WorkOrderDetailPage.tsx` | Layar detail, form job lines, dan drawer checklist |
-| `ui/src/transactions/pemeliharaan-aset/StatusValidationPage.tsx` | Layar konfigurasi matriks validasi status |
-| `ui/src/transactions/pemeliharaan-aset/workOrder.tsx` | Tipe data TypeScript, helper route, dan badge status |
+| `src/Support/WorkOrderStatus.php` | Grafik transisi dan hak penjaganya |
+| `src/Http/Controllers/transaksi/PemeliharaanAset/PemeliharaanAsetController.php` | Dokumen work order dan CRUD baris pekerjaan |
+| `src/Http/Controllers/transaksi/PemeliharaanAset/PelaksanaanController.php` | Pengisian checklist, pemekaran template, dan eksekusi |
+| `src/Http/Controllers/master/ValidasiStatusWorkOrderController.php` | Controller matriks validasi status |
+| `ui/transactions/pemeliharaan-aset/WorkOrderPage.tsx` | Router hash pemilih tampilan |
+| `ui/transactions/pemeliharaan-aset/WorkOrderListPage.tsx` | Layar daftar work order dan tab Pekerjaan Saya |
+| `ui/transactions/pemeliharaan-aset/WorkOrderDetailPage.tsx` | Layar detail, form job lines, dan drawer checklist |
+| `ui/transactions/pemeliharaan-aset/StatusValidationPage.tsx` | Layar konfigurasi matriks validasi status |
+| `ui/transactions/pemeliharaan-aset/workOrder.tsx` | Tipe data TypeScript, helper route, dan badge status |
 | `database/migrations/2026_08_15_110000_create_work_order_tables.php` | Skema database tabel work order |
-| `api/tests/Feature/WorkOrderTest.php`, `WorkOrderExecutionTest.php` | Pengujian fitur dan konkurensi |
+| `tests/Feature/WorkOrderTest.php`, `WorkOrderExecutionTest.php` | Pengujian fitur dan konkurensi |
 
 ---
 

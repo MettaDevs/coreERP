@@ -2,13 +2,20 @@
 
 > **Baru bergabung dengan tim?** Mulai dari [panduan onboarding](../onboarding/index.md), bukan dari halaman ini. Dokumen di bawah adalah spesifikasi, bukan orientasi.
 >
-> **Mau membuat app atau modul baru?** Langkah teknisnya ada di [jalur membangun app baru](../apps/membangun-app-baru.md) — persiapan, konvensi penamaan dan alokasi, berkas yang wajib ada, lalu sepuluh tahap dengan gate keluar. Dokumen di halaman ini adalah aturannya; halaman itu urutan mengerjakannya.
+> **Mau membuat modul baru?** Langkah teknisnya ada di [jalur membangun modul baru](../apps/membangun-app-baru.md) — persiapan, konvensi penamaan, berkas yang wajib ada, lalu sepuluh tahap dengan gate keluar. Dokumen di halaman ini adalah aturannya; halaman itu urutan mengerjakannya.
 
-Dokumen ini adalah **desain kanonik** untuk CoreERP. Ia menggantikan asumsi awal bahwa seluruh modul adalah Composer package dalam satu Laravel runtime dan satu data-plane bersama.
+Dokumen ini adalah **desain kanonik** untuk CoreERP.
+
+> **Dua bentuk hidup berdampingan.** Module bisnis berjalan di dalam runtime Core dan memakai
+> database tenant yang sama; app yang belum dipindah masih berjalan sebagai container dengan
+> database dan token layanan sendiri. Aturan di bawah berlaku untuk keduanya kecuali disebutkan
+> lain, dan tabel perbandingannya ada di
+> [Grand design](01-grand-design.md#dua-bentuk-yang-hidup-berdampingan). Menilai yang satu dengan
+> aturan yang lain adalah kesalahan yang paling mudah terjadi di repo ini.
 
 Target yang dikunci:
 
-1. Satu app adalah **release unit mandiri** dan memiliki repository sendiri: API, UI artifact, database, migration, kontrak, dan image Docker.
+1. Satu app adalah **kemampuan bisnis yang dapat dipasang dan dicabut sendiri**, dengan datanya sendiri, kontraknya sendiri, dan siklus rilisnya sendiri.
 2. App dapat di-install, di-enable, di-upgrade, di-disable, dan di-uninstall secara aman.
 3. Cloud SaaS mendukung profile `pooled` dan `isolated`; on-prem perpetual memakai profile `onprem-perpetual` dan dapat beroperasi tanpa koneksi runtime ke vendor.
 4. API sync menggunakan REST/JSON dengan OpenAPI; dampak lintas database menggunakan event contract. gRPC dan GraphQL adalah opsi melalui ADR, bukan standar v1.

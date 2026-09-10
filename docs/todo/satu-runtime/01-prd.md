@@ -5456,6 +5456,61 @@ misalnya direktori anggota dan unit organisasi, membuktikannya.
 
 **Bergantung pada.** F4-10.
 
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026. **Dua module bisnis kini dilayani bersamaan.**
+
+**Fase 3 memakan berminggu-minggu; ini satu hari.** Bukan karena dikerjakan lebih cepat, melainkan
+karena hampir seluruh keputusannya sudah diambil: bentuk module, kontrak Core, penjaga batas,
+halaman Inertia, rute layar, dan penerbitan nomor di dalam transaksi. Yang tersisa menerapkannya.
+Ukuran yang paling berguna dari `ModulSedangDipindah` ternyata bukan berapa lama ia kosong,
+melainkan berapa lama sebuah entri bertahan — modul aset berbulan-bulan, HR kurang dari sehari.
+
+**Satu langkah fase 3 tidak perlu diulang.** Tabel HR sudah berawalan `hr_` sejak migration
+pertamanya, jadi penggantian nama tabel — bagian yang paling lama pada modul aset — gugur.
+
+**Penjaga tabel merah pada menit pertama, dan itu nilainya.** Begitu subtree mendarat, migration
+kerangka Laravel HR (`cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`) terbaca sebagai
+tabrakan dengan tabel Core. Kerangka itu memang dibuang seluruhnya di langkah berikutnya, tetapi
+tanpa penjaga itu tabrakannya baru muncul saat module dipasang pada tenant sungguhan.
+
+**Angka.** 15 pemanggilan `DB::table()` menjadi nol, digantikan empat model Eloquent — `Worker`,
+`Job`, `Position`, `WorkerPositionAssignment` — yang seluruhnya `HasUlids`, `SoftDeletes`, dan
+`MilikTenant`. Tiga klien HTTP menjadi dua pembungkus kontrak (`PenerbitNomor`,
+`DirektoriOrganisasi`); yang ketiga dibuang tanpa pengganti, lihat di bawah. Kolom `deleted_at`
+ditambahkan migration tersendiri, bukan dengan menyunting migration lama yang sudah pernah
+berjalan di database app lama.
+
+**Test lama dibuang, dan penggantinya menguji sesuatu yang dulu tidak mungkin diuji.**
+`HumanResourcesScopeTest` mencetak JWT sendiri dan menandatanganinya dengan kunci yang ia pasang
+sendiri — jalur yang tidak ada lagi. Penggantinya membuktikan tiga hal pada jalur yang sungguhan:
+lingkup kebijakan data menyaring daftar posisi, daftar pekerja tidak pernah memuat baris tenant
+lain, dan menyimpan atas nama tenant lain dibatalkan sisi tulis `MilikTenant`. Yang kedua **tidak
+pernah bisa diuji sebelumnya**, karena tiap tenant punya databasenya sendiri.
+
+#### Yang hilang, dan menunggu keputusan pemilik
+
+**Sinkronisasi role otomatis berhenti berjalan.** `CoreAccessClient` dulu memanggil Core lewat HTTP
+untuk menerapkan `automatic_role_assignment_rules`: pekerja berakun Core mendapat role beserta
+lingkup unit kerjanya begitu ditugaskan ke sebuah posisi. **Core belum punya kontrak untuk itu** —
+keempat belas antarmuka di `Contracts` tidak satu pun menyentuh penugasan role.
+
+Mempertahankan klien HTTP-nya bukan pilihan yang lebih aman: `services.coreerp` ikut hilang bersama
+kerangka app lama, jadi pemanggilan itu sekarang menembak alamat kosong dan **selalu** melempar —
+setiap penugasan untuk pekerja berakun akan 500, bukan tersimpan. Yang dipilih: penugasannya
+tersimpan, rolenya ditugaskan admin tenant. Yang mengembalikannya adalah antarmuka baru di Core
+yang menerima id keanggotaan, id posisi, id unit kerja, id penugasan, dan status aktif.
+
+**Dua saringan `status = 'active'` hilang**, dan keduanya tidak dapat dipulihkan dari sisi module:
+`DirektoriOrganisasi::unitOperasi()` tidak memulangkan status organisasi, dan `anggotaSatu()` tidak
+memulangkan status keanggotaan. Akibatnya daftar unit kerja dapat memuat organisasi non-aktif, dan
+penautan akun dapat menunjuk keanggotaan yang sudah tidak aktif. Keduanya menuntut kolom tambahan
+pada kontrak Core.
+
+Dua perbedaan kecil yang disengaja: `core-members` kini berurut nama sebelum dipotong 20 — batasnya
+sama, urutannya jadi pasti — dan `created_at`/`updated_at` pada GET kini ISO-8601, sama dengan
+jawaban POST yang memang sudah begitu.
+
 ### F7-02 — Ukur ulang dan ganti proyeksi
 
 **Kenapa.** Prinsip P5. Dokumen keputusan memuat baris proyeksi yang ditandai jelas; sekarang ada angka
@@ -5477,6 +5532,64 @@ nyata untuk menggantikannya.
 
 **Bergantung pada.** F7-01.
 
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026, **kecuali langkah 3**. Angkanya ada di
+[dokumen keputusan](00-keputusan.md); yang dicatat di sini cara mendapatkannya dan apa yang tidak
+didapat.
+
+**Langkah 3 tidak dikerjakan, dan tidak diganti angka lain.** Waktu pasang dari mesin virtual
+bersih sampai halaman masuk terbuka menuntut mesin virtual, dan pemilik produk menunda bagian
+itu. Tidak ada pengukuran lain yang boleh dinamai "waktu pasang": membangun ulang image di laptop
+yang cache-nya sudah panas mengukur laptop ini, bukan pemasangan di server pelanggan. Barisnya
+tetap kosong sampai mesin virtualnya ada.
+
+**Ternyata hanya ada satu baris berlabel proyeksi di seluruh dokumen**, pada tabel "Satu server
+Postgres, tanpa mengubah source": `Satu runtime, proyeksi | 5 | sekitar 225 MiB`. Ia sekarang
+terukur pada 5 container dan 202,7 MiB — dan menanggung **dua** modul, sementara dua baris
+pembandingnya di atasnya menanggung satu app. Proyeksinya meleset ke arah yang aman.
+
+**Sisanya bukan proyeksi melainkan perhitungan, dan itu perbedaan yang dijaga.** Baris yang
+menyebut lima modul atau seratus tenant mengalikan angka terukur dengan jumlah yang belum pernah
+ada di mesin mana pun. Menuliskannya sebagai "terukur" akan menjadi kebohongan yang rapi, jadi
+tiap tabel semacam itu kini dibuka satu kalimat yang menyebut dirinya perhitungan, menyebut angka
+dasar mana yang terukur, dan kapan. Judul bagiannya ikut berganti dari "Proyeksi production"
+menjadi "Perhitungan production".
+
+**RAM idle diukur setelah stack diam, dan "diam" itu ada angkanya.** Bacaan tiap menit selama enam
+menit sesudah 40 request pemanasan menunjukkan `core-app` masih naik dari 52,5 ke 55,2 MiB pada dua
+menit pertama, lalu berhenti. Membaca `docker stats` tepat sesudah stack menyala memberi angka yang
+lebih kecil dan salah. Satu jebakan kedua ditemukan sesudahnya: begitu tabel opcache diukur lewat
+`docker exec`, `core-app` melonjak ke 67,7 MiB, karena memori proses pengukur ikut dihitung cgroup
+container. Urutannya karena itu penting — baca idle dulu, ukur yang lain kemudian.
+
+**Selisih 191 → 202,7 MiB sengaja tidak diklaim sebagai biaya modul.** Di antara 7 dan 10 September
+Core sendiri bertambah kode fase 5 dan 6, dan `core-db` kini memegang tabel kedua modul. Yang bisa
+dipisahkan dengan bersih adalah biaya kode modul di dalam proses, dan itu diukur tersendiri:
+management-aset 2,04 MB dari 165 berkas, human-resources 0,13 MB dari 15 berkas.
+
+**Satu kalimat lama di dokumen keputusan terbukti salah dan diganti.** "Tiap modul menambah sekitar
+2 MB" adalah ukuran satu modul, bukan aturan; modul kedua lima belas kali lebih kecil. Angka 2 MB
+tetap dipakai untuk perhitungan lima modul justru karena ia sisi mahalnya.
+
+**Ukuran bundel diukur ulang dengan cara F4-10, dan caranya terbukti masih sahih.** Dua baris
+tabelnya kembali persis ke bytes yang sama dengan 9 September — 3.256.361 dan 3.451.081 — sehingga
+selisih yang tersisa benar-benar milik modul kedua. Modul aset menyumbang 194.720 bytes dan 3 aset,
+HR 1.824 bytes dan 1 aset.
+
+**Angka HR itu jujur tetapi mudah disalahbaca, jadi dibaca lantang di tempatnya.** 1.824 bytes
+bukan bukti bahwa modul HR murah; layarnya belum dipindah dan halaman Inertia-nya masih penampung.
+Yang terukur biaya jalur masuknya. Menaruh angka itu tanpa kalimat ini akan membuat orang
+berikutnya menganggarkan modul ketiga dengan angka yang salah satu urutan besaran.
+
+**Jumlah container: enam, lima yang dihitung.** `docs` tidak ikut, sama seperti 7 September.
+`php artisan module:list` memulangkan empat entri — dua modul bisnis, dua bahan uji — dari lima
+container yang sama.
+
+Satu catatan perkakas: image `erp-core-app:local` di laptop masih dibangun sebelum F7-01 mendarat,
+jadi stack harus dibangun ulang (`start.ps1 -Build`) sebelum ada yang diukur. Mengukur RAM "dengan
+dua modul" di atas image yang belum memuat modul kedua adalah kesalahan yang tidak akan berbunyi.
+
 ### F7-03 — Uji beban di runtime baru
 
 **Kenapa.** Skenario beban yang ada menguji hal yang benar: kebocoran antar tenant, idempotensi, dan
@@ -5497,6 +5610,52 @@ perlombaan penguncian. Semuanya harus tetap lulus setelah pemindahan, dan sekara
 
 **Bergantung pada.** F7-01.
 
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026. Seluruh oracle kebenaran nol, dan **tiap oracle dibuktikan bisa
+merah lebih dulu**.
+
+**Bentuk stack gabungannya.** Satu compose menjalankan runtime nyata: k6 → nginx → empat instance
+`erp-core-app:local` (image yang sama dengan stack pengembangan, memuat Core beserta kedua modul) →
+pgbouncer → PostgreSQL. Tiruan Core dibuang seluruhnya; nomor kini diterbitkan proses yang sama.
+
+Bersamanya hilang seluruh mekanisme token konteks. Rute modul kini di belakang `['web','auth']`,
+jadi skenario menyiapkan tenant lewat **alur pendaftaran usaha yang sungguhan**, login, lalu
+menurunkan cookie sesi ke tiap VU. Oracle nomor pindah dari `/__stats` milik tiruan ke tabel
+`number_sequence_issues`, dan menguat: tiap kode tersimpan harus terikat ke satu baris terbitan
+pada tenant **dan** reference yang benar.
+
+**Hasil (12 vCPU, Docker Desktop 7,6 GB).**
+
+| Skenario | Hasil |
+| --- | --- |
+| Penjenuhan, 1000 VU / 128 tenant / 90 detik / 4 instance | nol pelanggaran, nol galat server; 225 probe lintas tenant ditolak, 73 probe eskalasi 403, 162 replay idempotency |
+| Perlombaan tautan, 32 VU pada 4 tenant | 0 himpunan tergabung dari 3.920 pembacaan balik |
+| `verify.sql` Core (12 pemeriksaan) dan modul (26) | semuanya nol; 63.861 nomor terbit, 63.861 unik |
+| Gate latensi | lulus sampai 12 permintaan bersamaan; gagal di 16 |
+
+**Bottleneck-nya berpindah, dan itu temuan tersendiri.** Dulu PostgreSQL; sekarang **CPU PHP** —
+keempat instance 165–330% CPU sementara PostgreSQL 11–65%, dan hanya 39 backend untuk 1000 VU
+berkat session pooling. Nol 5xx aplikasi dan nol 502/504.
+
+**Pembuktian oracle bisa merah**, empat cara: mode swauji pada dua skenario menangkap 42/42, 21/21,
+dan 841/841 pelanggaran yang sengaja dibuat; suntikan satu baris SQL lintas tenant menaikkan dua
+pemeriksaan `verify.sql` dan membuat exit-nya bukan nol; dan satu ekspektasi yang memang salah
+sempat membuat skripnya berhenti merah pada 903.
+
+Satu temuan sampingan dari upaya suntikan: **kunci asing komposit menolak induk lintas tenant di
+lapis database**, jadi satu pemeriksaan tidak dapat dibuat merah lewat suntikan sama sekali. Itu
+dicatat apa adanya, bukan dihitung sebagai pembuktian.
+
+Juga ditemukan dan diperbaiki: run pertama melaporkan delapan pelanggaran **palsu** karena probe
+eskalasi memperlakukan status 0 — timeout di sisi klien — sebagai jawaban. Aturannya kini tertulis
+di dokumen uji beban.
+
+**Yang ditinggalkan.** Dua skenario, work order dan penyusutan, belum dipindahkan; keduanya masih
+memakai berkas tenant dan bearer token yang tidak ada lagi. Keduanya sengaja dibiarkan **gagal
+keras** alih-alih hijau diam-diam, dengan pemberitahuan di kepala berkasnya. Permukaan work order
+dan penyusutan karena itu belum terverifikasi di bawah beban.
+
 ### F7-04 — Arsipkan repo lama
 
 **Kenapa.** Repo yang masih bisa ditulis akan menerima perubahan yang hilang, dan itu terjadi diam-diam.
@@ -5514,6 +5673,30 @@ perlombaan penguncian. Semuanya harus tetap lulus setelah pemindahan, dan sekara
 **Rujukan.** Bagian 5.1 dokumen ini.
 
 **Bergantung pada.** F7-01.
+
+#### Catatan pelaksanaan
+
+Langkah 1 selesai pada 10 September 2026 untuk dua repo yang kodenya benar-benar sudah pindah:
+`app-erp-management-aset` dan `app-erp-hr`. Berkas pengantarnya diganti penunjuk ke lokasi baru
+di dalam repo utama, lengkap dengan tabel "yang dicari → tempatnya sekarang" dan daftar apa yang
+**hilang** di sana — kerangka Laravel, container, database sendiri, panggilan HTTP ke Core, token
+konteks — supaya orang tidak mencari sesuatu yang memang tidak ada lagi.
+
+Penunjuk HR juga menyebut satu kemampuan yang hilang dan belum kembali: penugasan role otomatis
+berbasis posisi. Itu ditulis di sana, bukan hanya di PRD ini, karena orang yang mencarinya akan
+tiba di repo lamanya lebih dulu.
+
+**Langkah 2 dan 3 menunggu pemiliknya, dan sengaja begitu.** Menyetel repo menjadi arsip dan
+menghapus repo kerangka kosong adalah tindakan yang tidak dapat dibatalkan dari sisi ini, dan
+keduanya menyentuh repo di luar repo utama. Berkas pengantarnya juga sengaja **belum di-commit**:
+mengarsipkan repo membuatnya hanya-baca, jadi penunjuknya harus mendarat lebih dulu — urutannya
+milik pemilik repo.
+
+**Dua repo yang belum boleh disentuh.** `app-erp-procurement` masih app berkontainer yang berjalan;
+ia baru menyusul setelah dipindah. `app-erp-template` dipensiunkan oleh F7-08, bukan oleh task ini.
+
+`app-erp-ci-workflows` sudah tidak dipanggil siapa pun — diperiksa, dan satu-satunya pemanggil yang
+tersisa adalah alur mati di dalam folder modul aset yang dibuang pada F7-06.
 
 ### F7-05 — Perbarui dokumen yang terpengaruh
 
@@ -5566,6 +5749,48 @@ sebenarnya dipakai.
 **Rujukan.** Bagian 5.6 dokumen ini.
 
 **Bergantung pada.** F7-05.
+
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026 untuk seluruh bagian yang ada di repo ini.
+
+**Yang dibuang, dan apa yang ternyata ada di baliknya.**
+
+| Yang dibuang | Kenapa ia mati |
+| --- | --- |
+| `resources/js/hooks/use-mobile.tsx` | Duplikat. Resolusi modul memilih `.ts` lebih dulu, jadi berkas ini tidak pernah dimuat siapa pun — dua bentuk `useIsMobile`, satu yang berjalan |
+| `resources/js/pages/lottie-gallery.tsx` beserta 33 berkas `.lottie` dan rutenya | Galeri contoh peninggalan templat lama; nama animasinya dari aplikasi pendidikan yang tidak ada hubungannya dengan ERP |
+| `@lottiefiles/dotlottie-react` | Tidak ada lagi yang mengimpornya sesudah galerinya hilang |
+| `modules/apperp/management-aset/.github/workflows/ci.yml` | Alur CI peninggalan masa modul aset punya repo sendiri |
+
+**Galeri contoh itu menanggung 26% seluruh bundel.** Membuangnya memangkas 911.870 bytes dan 30
+aset — dari 3.452.905 menjadi 2.541.035. Satu halaman yang tidak pernah dipakai siapa pun,
+tersembunyi di balik rute `/lottie` yang tidak disebut menu mana pun, lebih berat daripada seluruh
+sumbangan kedua modul bisnis digabung (196.498 bytes). Angka bundel pada [dokumen
+keputusan](00-keputusan.md) diukur ulang sesudah pembuangan ini, dan sumbangan tiap modul terbukti
+tidak berubah karenanya.
+
+**Alur CI di dalam folder modul tidak pernah berjalan, dan itu yang membuatnya berbahaya.** GitHub
+hanya menjalankan alur dari `.github/workflows/` di akar repo. Berkas itu terlihat seperti
+pemeriksaan yang menjaga modul aset, memanggil `app-erp-ci-workflows` yang sudah digantikan satu
+alur di akar pada F6-04, dan tidak menjaga apa pun. Ia juga akan ikut mendarat lagi bersama subtree
+setiap kali sebuah modul dipindah masuk — karena itu ditambahkan penjaga di
+`SusunanManifestModulTest` yang menolak alur di dalam folder modul, dan penjaganya dibuktikan merah
+pada berkas yang sungguhan sebelum berkasnya dibuang.
+
+**Dua yang tertulis di daftar tetapi sudah tidak ada.** `deploy/ci/workflows/` tidak ada di repo —
+folder `deploy/` hanya memuat `apps-content-proxy.md` dan `compose/README.md`.
+
+#### Langkah 2 belum dikerjakan, dan ini yang paling perlu diketahui
+
+Repo `app-erp-deployment` masih menggambarkan cara pasang yang **tidak ada lagi**:
+`compose.yaml` dan `compose.server.yaml` menyebut enam image per app — `ASSET_API_IMAGE`,
+`ASSET_UI_IMAGE`, `HR_API_IMAGE`, `HR_UI_IMAGE`, dan seterusnya — sementara sejak F5-03 yang
+dibangun adalah **satu image per edisi** yang sudah memuat modul yang dibeli.
+
+Akibatnya bukan kerapian: siapa pun yang memasang on-prem mengikuti repo itu akan menarik image
+yang tidak dibangun lagi. Menggantinya menyentuh repo di luar repo ini dan menuntut keputusan
+pemiliknya, jadi ia ditinggalkan sebagai pekerjaan tersendiri alih-alih dikerjakan setengah.
 
 ### F7-07 — Dokumentasi di luar folder desain ikut diperbarui
 
@@ -5624,6 +5849,81 @@ diubah.
 **Rujukan.** Bagian 5.1 dokumen ini.
 
 **Bergantung pada.** F7-04.
+
+#### Catatan pelaksanaan
+
+Selesai pada 10 September 2026.
+
+`modules/_template/` memuat bentuk minimal satu modul, dan `php artisan module:make <id>`
+menyalinnya sambil mengganti enam penanda sekaligus — id, namespace, nama kelas, awalan tabel,
+nama penerbit, dan nama tampilan — dengan satu `strtr`, bukan rantai `str_replace` yang urutannya
+menentukan hasil.
+
+**Folder berawalan garis bawah ternyata tidak dipindai penjaga mana pun**: registry dan kelima
+penjaga sama-sama memakai pola `modules/*/*`, sedangkan `modules/_template/` satu tingkat lebih
+dangkal. Id `change-me` tetap dipakai sebagai lapis kedua. **Tetapi Pint dan PHPStan menyapu
+`modules/` apa adanya**, jadi cetakannya tetap harus lulus keduanya — dan itu dipertahankan
+dengan sengaja: cetakan yang tidak lulus pemeriksaan akan melahirkan modul yang tidak lulus juga.
+
+**Modul baru harus benar di dua tempat di luar foldernya sendiri**, dan itu yang paling mudah
+terlewat kalau menyalin dengan tangan: satu baris pada tabel awalan tabel di `modules/README.md`,
+dan satu entri `require` pada `composer.json` Core — tanpa yang kedua, kelasnya tidak pernah
+`class_exists` dan `ModuleAutoloadTest` merah. Perintah menulis keduanya; `composer update`
+disebutkan sebagai satu langkah tersisa, tidak dijalankan sendiri.
+
+**Yang ditolak sebelum satu berkas pun ditulis**, seluruhnya dilaporkan sekaligus: id di luar
+bentuk yang sah, huruf besar (ditolak, bukan dikecilkan diam-diam), kata yang tidak dapat menjadi
+penggal namespace PHP, penanda cetakan itu sendiri, awalan tabel yang tidak berakhir garis bawah,
+nama tampilan yang dapat merusak YAML, id yang sudah dipakai, folder yang sudah ada, dan **awalan
+tabel yang saling menelan** dengan awalan modul lain (`contoh_` terhadap `contoh_a_`) — bukan
+hanya yang sama persis, karena kepemilikan tabel diperiksa dengan awalan.
+
+**Dibuktikan dengan menjalankannya**: modul hasil lulus Pint, PHPStan, Prettier, `tsc`, keenam
+puluh enam penjaga batas, dan keempat testnya sendiri — tanpa satu pun berkas hasil disunting.
+Sesudah itu modulnya dihapus dan keadaan repo dikembalikan; `composer.lock` dan `modules/README.md`
+identik byte-per-byte dengan sebelumnya.
+
+Satu hal untuk modul sungguhan berikutnya: `ModuleRegistryTest` menyatakan daftar id modul
+**persis**, dan perintah ini sengaja tidak menyuntingnya — sebuah perintah yang menyunting
+assertion test membuat test itu berhenti menjaga apa pun.
+
+### F7-10 — Setelan dan rute di-cache saat penyebaran
+
+**Kenapa.** Diukur pada F7-03: **tidak ada satu pun langkah penyebaran yang memanggil
+`config:cache` maupun `route:cache`** — tidak `Dockerfile`, tidak `docker/entrypoint.sh`, tidak
+skrip repo penyebaran. Setiap permintaan karena itu membayar bootstrap penuh: membaca dan
+menggabungkan seluruh berkas `config/`, lalu mendaftarkan ulang seluruh rute. Pada gate latensi,
+angka yang tercatat — lulus sampai 12 permintaan bersamaan, gagal di 16 — diukur dalam keadaan itu.
+
+**Dan kalau langkah itu ditambahkan hari ini, ia gagal.** `config:cache` berhenti dengan
+`Call to undefined method Dedoc\Scramble\Support\Generator\SecurityScheme\ApiKeySecurityScheme::__set_state()`:
+`config/scramble.php` menyimpan **objek hidup** pada `security_strategy`, dan setelan yang di-cache
+ditulis dengan `var_export`. `route:cache` sendiri sudah berhasil — jadi yang menghalangi tepat
+satu berkas setelan.
+
+**Berkas.**
+- `apps/control-plane/config/scramble.php`
+- `apps/control-plane/Dockerfile` atau `apps/control-plane/docker/entrypoint.sh`
+- `apps/control-plane/contracts/openapi.json` bila bentuk keluarannya berubah
+
+**Langkah.**
+1. Pindahkan penyusunan `SecurityScheme` keluar dari berkas setelan. Komentar pada berkas itu
+   sendiri sudah menyebut jalannya: setel `security_strategy` menjadi `null` dan susun skemanya
+   lewat `extendOpenApi`/`afterOpenApiGenerated` di sebuah penyedia layanan.
+2. Buktikan `php artisan config:cache` berhasil, lalu **buktikan dokumen OpenAPI yang dihasilkan
+   masih membawa skema keamanan yang sama** — bandingkan dengan `contracts/openapi.json` yang
+   ter-commit. Ini bagian yang tidak boleh dilewat: memperbaiki cache sambil diam-diam
+   menghilangkan skema keamanan dari dokumen API adalah pertukaran yang salah arah.
+3. Tambahkan `config:cache` dan `route:cache` sebagai langkah penyebaran, di tempat yang berjalan
+   pada image produksi **dan** pada stack pengembangan.
+4. Ukur ulang gate latensi dengan cara yang sama seperti F7-03 dan catat selisihnya.
+
+**Selesai bila.** `config:cache` berhasil, dokumen API tidak kehilangan skema keamanannya, kedua
+cache dibangun saat penyebaran, dan angka latensi barunya tercatat di sebelah angka lama.
+
+**Rujukan.** Catatan pelaksanaan F7-03.
+
+**Bergantung pada.** F7-03.
 
 ### F7-09 — Keputusan yang mengeras dipindahkan ke desain kanonik
 

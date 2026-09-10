@@ -81,6 +81,7 @@ Setiap module memakai satu namespace dan satu awalan tabel, dan keduanya diturun
 | --- | --- | --- |
 | `apperp/contoh-a` | `Modules\Apperp\ContohA\` | `contoh_a_` |
 | `apperp/contoh-b` | `Modules\Apperp\ContohB\` | `contoh_b_` |
+| `apperp/human-resources` | `Modules\Apperp\HumanResources\` | `hr_` |
 | `apperp/management-aset` | `Modules\Apperp\ManagementAset\` | `aset_` |
 
 Namespace mengikuti `StudlyCase` dari nama folder. Awalan tabel **tidak** selalu sama dengan nama folder:

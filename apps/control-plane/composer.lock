@@ -4,11 +4,11 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a429afa702b28795d33c128b5d27b654",
+    "content-hash": "952c2d11daa4cfca0d9a6bdd169753c7",
     "packages": [
         {
             "name": "apperp/contoh-a",
-            "version": "dev-main",
+            "version": "dev-feat/f7-hr-modul-kedua",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/contoh-a",
@@ -40,7 +40,7 @@
         },
         {
             "name": "apperp/contoh-b",
-            "version": "dev-main",
+            "version": "dev-feat/f7-hr-modul-kedua",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/contoh-b",
@@ -71,8 +71,39 @@
             }
         },
         {
+            "name": "apperp/human-resources",
+            "version": "dev-feat/f7-hr-modul-kedua",
+            "dist": {
+                "type": "path",
+                "url": "../../modules/apperp/human-resources",
+                "reference": "863fb967a3473918a5ded7fb4693ee861511d2f5"
+            },
+            "require": {
+                "php": "^8.4"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Modules\\Apperp\\HumanResources\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Modules\\Apperp\\HumanResources\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Module Human Resources: pekerja, jabatan, posisi, dan penugasan kerja.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
             "name": "apperp/management-aset",
-            "version": "dev-main",
+            "version": "dev-feat/f7-hr-modul-kedua",
             "dist": {
                 "type": "path",
                 "url": "../../modules/apperp/management-aset",
@@ -11178,6 +11209,7 @@
     "stability-flags": {
         "apperp/contoh-a": 20,
         "apperp/contoh-b": 20,
+        "apperp/human-resources": 20,
         "apperp/management-aset": 20
     },
     "prefer-stable": true,

@@ -2,7 +2,7 @@
 
 Halaman ini untuk developer. Isinya bukan cara memakai layar, melainkan cara kerja register aset di dalam: data apa yang disimpan, aturan mana yang dijaga kode, dan kenapa aturannya begitu.
 
-Di menu app, layarnya bernama **Inventarisasi aset** (`?view=inventarisasi-aset`). Nama "register aset" dipakai di sini dan di kode untuk datanya, bukan untuk layarnya.
+Di menu modul, layarnya bernama **Inventarisasi aset** dan jalurnya `/management-aset/inventarisasi-aset` — id entri menu pada `app.yaml` sekaligus jalur rutenya. Nama "register aset" dipakai di sini dan di kode untuk datanya, bukan untuk layarnya.
 
 Register aset adalah **catatan satu barang fisik milik perusahaan**, sejak diterima sampai dilepas. Satu baris di sini mewakili satu benda nyata: satu mesin, satu mobil, satu laptop. Bukan stok, bukan kuantitas agregat — kalau perusahaan membeli sepuluh laptop yang sama, ada sepuluh baris record.
 
@@ -76,7 +76,7 @@ Status `decommissioned` tidak diputuskan app ini. Ia datang dari keputusan workf
 
 ## Data yang disimpan
 
-Tabel utamanya `t_aset` (alias `tr_penerimaan_aset`). Model PHP-nya `Asset`.
+Tabel utamanya `aset_tr_penerimaan_aset`, dan model PHP-nya `Asset`. Namanya menyebut kejadian penerimaannya, bukan asetnya — peninggalan penggantian nama tabel yang belum dirapikan, dan sering menyulitkan waktu mencari.
 
 Kolom yang perlu Anda kenali:
 
@@ -97,9 +97,9 @@ Tabel pendukung:
 
 | Tabel | Isi |
 | --- | --- |
-| `tr_penempatan_aset` | Riwayat penempatan. Satu baris per perpindahan, tidak pernah ditimpa |
-| `tr_aset_atribut` | Nilai atribut teknis dinamis milik aset ini |
-| `tr_buku_aset` | Buku penyusutan yang dibentuk otomatis saat aset dibuat |
+| `aset_tr_penempatan_aset` | Riwayat penempatan. Satu baris per perpindahan, tidak pernah ditimpa |
+| `aset_tr_aset_atribut` | Nilai atribut teknis dinamis milik aset ini |
+| `aset_tr_buku_aset` | Buku penyusutan yang dibentuk otomatis saat aset dibuat |
 
 ---
 
@@ -123,9 +123,8 @@ Semuanya di bawah `/api/v1`:
 ### 1. Menerima Aset Baru dengan Atribut Dinamis
 
 ```http
-POST /api/v1/aset HTTP/1.1
+POST /api/modules/management-aset/v1/aset HTTP/1.1
 Host: localhost:8000
-Authorization: Bearer <context_token>
 Idempotency-Key: f47ac10b-58cc-4372-a567-0e02b2c3d479
 Content-Type: application/json
 
@@ -160,9 +159,8 @@ Content-Type: application/json
 ### 2. Memindahkan / Mutasi Aset
 
 ```http
-POST /api/v1/aset/01JMB8W9A1B2C3D4E5F6G7H8J9/penempatan HTTP/1.1
+POST /api/modules/management-aset/v1/aset/01JMB8W9A1B2C3D4E5F6G7H8J9/penempatan HTTP/1.1
 Host: localhost:8000
-Authorization: Bearer <context_token>
 Content-Type: application/json
 
 {
@@ -205,7 +203,7 @@ graph TD
 
 Punya permission belum cukup. Setiap pembacaan dan penulisan aset masih disaring lagi lewat `OrganizationScope`, memakai kebijakan `management-aset.asset-responsibility`.
 
-Core mengirim daftar badan hukum dan unit kerja yang boleh diakses pengguna di dalam token konteks yang ditandatangani. App menyaring kueri berdasarkan itu. Dua orang dengan permission yang sama persis tetap melihat daftar aset yang berbeda sesuai unit kerja mereka. **Jangan pernah mempercayai id organisasi yang dikirim dari browser.**
+Core menyusun daftar badan hukum dan unit kerja yang boleh diakses pengguna, dan modul membacanya lewat kontrak `KonteksPermintaan`. Kueri disaring berdasarkan daftar itu. Dua orang dengan permission yang sama persis tetap melihat daftar aset yang berbeda sesuai unit kerja mereka. **Jangan pernah mempercayai id organisasi yang dikirim dari browser.**
 
 ---
 
@@ -234,10 +232,10 @@ Core mengirim daftar badan hukum dan unit kerja yang boleh diakses pengguna di d
 ## Atribut per jenis aset
 
 Kolom aset sudah tetap, tapi tiap perusahaan punya data tambahan yang berbeda. Itu ditampung lewat atribut empat tabel:
-1. `m_tipe_atribut`: Definisi nama, tipe data, dan satuan Core.
-2. `m_tipe_atribut_nilai`: Daftar pilihan untuk tipe dropdown.
-3. `m_jenis_aset_atribut`: Matriks atribut apa yang berlaku untuk jenis apa, dan mana yang `wajib`.
-4. `tr_aset_atribut`: Nilai sebenarnya milik aset, disimpan pada kolom tipe data aslinya (`nilai_text`, `nilai_number`, `nilai_boolean`, `nilai_date`, `tipe_atribut_nilai_id`).
+1. `aset_m_tipe_atribut`: Definisi nama, tipe data, dan satuan Core.
+2. `aset_m_tipe_atribut_nilai`: Daftar pilihan untuk tipe dropdown.
+3. `aset_m_jenis_aset_atribut`: Matriks atribut apa yang berlaku untuk jenis apa, dan mana yang `wajib`.
+4. `aset_tr_aset_atribut`: Nilai sebenarnya milik aset, disimpan pada kolom tipe data aslinya (`nilai_text`, `nilai_number`, `nilai_boolean`, `nilai_date`, `tipe_atribut_nilai_id`).
 
 Nilai divalidasi oleh `AssetAttributeValidator`.
 
@@ -250,7 +248,7 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 | Nomor aset (`kode`) | Number Sequence Core | Diminta dengan `legal_entity_id`, karena penomorannya bisa direset per tahun buku |
 | Tahun buku | Fiscal calendar Core | Dipakai untuk menentukan periode penyusutan |
 | Satuan ukur atribut | Unit of Measure Core | Memastikan standar satuan seragam lintas modul |
-| Hak akses dan batas organisasi | Token konteks bertanda tangan | Tidak pernah dibaca dari database Core langsung |
+| Hak akses dan batas organisasi | Kontrak `KonteksTenant` dan `KonteksPermintaan` | Tidak pernah dibaca dari tabel Core langsung, walau berada di database yang sama |
 
 ---
 
@@ -258,12 +256,12 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/transaksi/InventarisasiAset/AssetController.php` | Seluruh logika register aset, penempatan, dan history |
-| `api/app/Models/transaksi/InventarisasiAset/Asset.php` | Model `Asset` (tabel `tr_penerimaan_aset`) |
-| `api/app/Support/OrganizationScope.php` | Penyaringan berdasarkan tanggung jawab organisasi |
-| `api/app/Support/AssetAttributeValidator.php` | Validasi nilai atribut |
-| `api/app/Services/NumberSequenceClient.php` | Permintaan nomor ke Core |
-| `ui/src/transactions/inventarisasi-aset/AssetPage.tsx` | Layar register aset, tabel, dan Sheet detail |
+| `src/Http/Controllers/transaksi/InventarisasiAset/AssetController.php` | Seluruh logika register aset, penempatan, dan history |
+| `src/Models/transaksi/InventarisasiAset/Asset.php` | Model `Asset` (tabel `aset_tr_penerimaan_aset`) |
+| `src/Support/OrganizationScope.php` | Penyaringan berdasarkan tanggung jawab organisasi |
+| `src/Support/AssetAttributeValidator.php` | Validasi nilai atribut |
+| `src/Services/PenerbitNomorAset.php` | Permintaan nomor ke Core |
+| `ui/transactions/inventarisasi-aset/AssetPage.tsx` | Layar register aset, tabel, dan Sheet detail |
 | `database/migrations/2026_07_28_090000_create_asset_register_and_depreciation_tables.php` | Tabel aset dan penyusutan |
 | `database/migrations/2026_08_07_130000_create_asset_attribute_tables.php` | Tabel atribut dinamis |
 | `contracts/src/paths/aset.yaml` | Kontrak OpenAPI endpoint aset |

@@ -78,10 +78,10 @@ final class ModulSedangDipindah
      * @var array<string, array{alasan: string, tenggat: string, pemblokir?: string}>
      */
     private const DAFTAR = [
-        // Kosong sejak 9 September 2026, dan itu keadaan yang benar: modul aset — satu-satunya
-        // yang pernah terdaftar di sini — selesai dipindah pada F3-30. Kelasnya tetap ada karena
-        // modul berikutnya akan mendarat dengan keadaan yang sama, dan penjaganya sudah terbukti
-        // bisa merah pada modul palsu di `ModulSedangDipindahTest`.
+        // Kosong lagi sejak 10 September 2026. Dua module sudah melewati daftar ini — aset pada
+        // F3-30, human-resources pada F7-01 — dan yang kedua tinggal di sini kurang dari satu hari.
+        // Itu ukuran yang paling berguna dari daftar ini: bukan berapa lama ia kosong, melainkan
+        // berapa lama sebuah entri bertahan.
     ];
 
     /**

@@ -1,5 +1,29 @@
 # Release, provisioning, dan on-prem perpetual
 
+## Dua bentuk rilis
+
+Module yang berjalan di runtime Core **ikut image edisi Core**; ia tidak punya image sendiri. Satu
+edisi adalah satu berkas manifest di `editions/`, berisi nama pelanggan, profil penempatan, nomor
+rilis, dan id modul yang dibeli. Modul yang tidak disebut di sana **tidak ada di dalam image** —
+bukan disembunyikan lisensi, melainkan berkasnya memang tidak ikut.
+
+```bash
+php artisan edition:resolve <nama berkas edisi>
+```
+
+Perintah itu yang menghitung daftar akhirnya: dependency ditutup transitif, modul penghubung ikut
+hanya bila kedua sisinya ada, dan modul bahan uji ditolak. Bentuk dan aturannya ada di
+`editions/README.md`.
+
+Alur terbitnya dijaga CI, dan pembuktiannya dua arah: satu edisi dengan modul bisnis dan satu edisi
+tanpa modul bisnis sama-sama dibangun, lalu pemeriksa kebocoran dijalankan pada keduanya — dan
+sesudahnya pemeriksa itu sengaja dibuat merah untuk membuktikan ia masih memeriksa. Lihat
+[CI/CD](22-ci-cd.md#yang-benar-benar-ada-hari-ini).
+
+App yang masih berupa container tetap memakai jalur di bawah: image API dan UI sendiri, database
+sendiri, dan bundle yang menyusunnya. Jalur itu tidak dihapus selama masih ada app yang
+menjalankannya.
+
 ## Install bukan sekadar `composer install`
 
 Installer membaca app manifest. Pada SaaS ia memperoleh placement dari control plane; pada on-prem perpetual ia memakai manifest dan lisensi yang tersedia lokal. Ia selalu menjalankan langkah idempotent berikut:
@@ -24,7 +48,13 @@ validate license/signature/version/dependency
 | Enable | Entitlement per tenant | Entitlement + endpoint placement | Lisensi perpetual dan manifest instalasi lokal; tidak ada heartbeat vendor |
 | UI | Container UI per placement, di belakang path `/apps-content/<placement>/<app-id>/` | Sama, dengan placement khusus tenant | Static UI container pada server customer, path yang sama |
 
+Untuk module, tiga baris pertama menyusut: artifact-nya adalah image Core edisi itu, databasenya
+adalah database tenant yang sudah ada, dan yang dijalankan hanyalah `module:migrate` beserta
+registrasi manifest. Baris UI gugur sama sekali — halaman module ikut build shell.
+
 ### Config reverse proxy adalah artifact rilis
+
+Bagian ini berlaku untuk app berkontainer; module tidak punya container UI untuk di-proxy.
 
 Path konten UI diturunkan dari `(app_id, placement)` dan tidak pernah disimpan.
 Yang perlu disiapkan operator hanyalah reverse proxy yang menerjemahkan path itu ke
@@ -159,7 +189,13 @@ Di server PT.LeakStudio, operator menjalankan installer add-on. Installer memver
 
 ## Compose edition on-prem
 
-Edition manifest menjelaskan dengan tepat apa yang boleh hadir pada server customer. Contoh customer membeli Core, POS, Booking, dan bridge:
+Edition manifest menjelaskan dengan tepat apa yang boleh hadir pada server customer.
+
+Untuk **module**, "hadir" berarti berkasnya ikut di dalam image Core edisi itu; ia tidak menambah
+satu pun service Compose, database, atau volume. Server pelanggan yang hanya membeli module
+menjalankan container Core saja beserta database, worker, scheduler, dan renderer-nya.
+
+Contoh di bawah adalah bentuk untuk **app berkontainer** — customer membeli Core, POS, Booking, dan bridge:
 
 ```yaml
 services:

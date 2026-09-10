@@ -2,7 +2,7 @@
 
 > **Status:** panduan desain. Endpoint hanya dipublikasikan pada OpenAPI modul setelah diimplementasikan dan modul berstatus `ready` pada placement tenant.
 
-Panduan ini berlaku untuk modul CoreERP apa pun yang menerima data dari atau mengirim data ke sistem eksternal milik tenant. Sistem eksternal dan modul CoreERP tetap memiliki database serta pemilik data masing-masing. Tidak ada query atau foreign key lintas database.
+Panduan ini berlaku untuk modul CoreERP apa pun yang menerima data dari atau mengirim data ke sistem eksternal milik tenant. Sistem eksternal dan modul CoreERP tetap memiliki pemilik data masing-masing; tidak ada query atau foreign key yang menyeberang di antara keduanya. Bentuk penempatan modul — di dalam runtime Core atau sebagai container sendiri — tidak mengubah satu pun aturan di halaman ini, karena batas yang dibicarakan di sini adalah batas ke luar organisasi.
 
 ## Tentukan pemilik data lebih dahulu
 

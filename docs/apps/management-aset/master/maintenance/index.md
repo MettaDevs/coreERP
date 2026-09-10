@@ -8,12 +8,12 @@ Setup maintenance menjawab satu pertanyaan: **kalau ada pekerjaan pada aset jeni
 
 | Master | Tabel | Isi |
 | --- | --- | --- |
-| **Tipe pekerjaan** | `m_maintenance_job_type` | Jenis pekerjaan, misalnya "Servis berkala" |
-| **Varian** | `m_maintenance_job_type_variant` | Turunan pekerjaan, misalnya "Servis 10.000 km" |
-| **Default** | `m_maintenance_job_type_default` | Nilai bawaan saat pekerjaan dibuat |
-| **Variabel checklist** | `m_maintenance_checklist_variable`, pilihan nilainya di `m_maintenance_checklist_variable_value` | Hal yang diukur atau dinilai |
-| **Template checklist** | `m_maintenance_checklist_template`, barisnya di `m_maintenance_checklist_template_line` | Susunan baris pemeriksaan |
-| **Kaitan ke jenis aset** | `m_maintenance_job_type_asset_type` | Pekerjaan mana berlaku untuk jenis aset mana |
+| **Tipe pekerjaan** | `aset_m_maintenance_job_type` | Jenis pekerjaan, misalnya "Servis berkala" |
+| **Varian** | `aset_m_maintenance_job_type_variant` | Turunan pekerjaan, misalnya "Servis 10.000 km" |
+| **Default** | `aset_m_maintenance_job_type_default` | Nilai bawaan saat pekerjaan dibuat |
+| **Variabel checklist** | `aset_m_maintenance_checklist_variable`, pilihan nilainya di `aset_m_maintenance_checklist_variable_value` | Hal yang diukur atau dinilai |
+| **Template checklist** | `aset_m_maintenance_checklist_template`, barisnya di `aset_m_maintenance_checklist_template_line` | Susunan baris pemeriksaan |
+| **Kaitan ke jenis aset** | `aset_m_maintenance_job_type_asset_type` | Pekerjaan mana berlaku untuk jenis aset mana |
 
 ::: tip Tabel yang sudah dihapus
 `m_maintenance_job_type_requirement` pernah ada untuk menyimpan syarat keahlian dan sertifikat, lalu dihapus migration `2026_08_15_140000`. Alasannya ada di [Master work order](/apps/management-aset/master/work-order/): kompetensi itu milik Human Resources dan dipasang pada pekerja, bukan ditulis sebagai teks bebas di sini.
@@ -77,7 +77,7 @@ Kalau Anda menambah endpoint sejenis, ikuti pola itu. Lihat [gate concurrency](/
 
 ## Data awal
 
-Setup maintenance ikut diisi saat tenant disiapkan, dari template `id:maintenance:starter:v1` di `api/config/management_aset.php`. Bisa juga dijalankan manual untuk tenant yang sudah ada:
+Setup maintenance ikut diisi saat tenant disiapkan, dari template `id:maintenance:starter:v1` di `config/management-aset.php`. Bisa juga dijalankan manual untuk tenant yang sudah ada:
 
 ```bash
 php artisan management-aset:seed-maintenance --tenant=<ULID>
@@ -89,13 +89,13 @@ Sifatnya idempoten dan tidak menimpa perubahan tenant.
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/master/MaintenanceJobTypeController.php` | Tipe pekerjaan |
-| `api/app/Http/Controllers/master/MaintenanceJobTypeVariantController.php` | Varian |
-| `api/app/Http/Controllers/master/MaintenanceJobTypeDefaultController.php` | Nilai bawaan |
-| `api/app/Http/Controllers/master/MaintenanceChecklistVariableController.php` | Variabel checklist |
-| `api/app/Http/Controllers/master/MaintenanceChecklistTemplateController.php` | Template checklist |
-| `api/app/Http/Controllers/master/MaintenanceSetupLinkController.php` | Semua endpoint penautan dan penguncian barisnya |
-| `api/app/Http/Controllers/master/ItemChecklistMaintenanceController.php`, `AnalisaMaintenanceController.php` | Dua master lama yang disebut di peringatan atas |
+| `src/Http/Controllers/master/MaintenanceJobTypeController.php` | Tipe pekerjaan |
+| `src/Http/Controllers/master/MaintenanceJobTypeVariantController.php` | Varian |
+| `src/Http/Controllers/master/MaintenanceJobTypeDefaultController.php` | Nilai bawaan |
+| `src/Http/Controllers/master/MaintenanceChecklistVariableController.php` | Variabel checklist |
+| `src/Http/Controllers/master/MaintenanceChecklistTemplateController.php` | Template checklist |
+| `src/Http/Controllers/master/MaintenanceSetupLinkController.php` | Semua endpoint penautan dan penguncian barisnya |
+| `src/Http/Controllers/master/ItemChecklistMaintenanceController.php`, `AnalisaMaintenanceController.php` | Dua master lama yang disebut di peringatan atas |
 | `database/migrations/2026_08_14_110000_create_maintenance_setup_tables.php` | Tabel setup |
 | `loadtest/k6/maintenance.js` | Uji beban, termasuk balapan penautan |
 

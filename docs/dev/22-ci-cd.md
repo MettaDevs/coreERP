@@ -44,6 +44,10 @@ migrasi per app sudah tidak berlaku sama sekali.
 
 ## Keputusan
 
+> Mulai dari sini sampai akhir halaman, "repository app" berarti repo `app-erp-*` yang masih
+> berjalan sebagai container sendiri. Module di bawah `modules/` tidak punya pipeline sendiri:
+> ia diuji, di-lint, dan diterbitkan bersama Core lewat empat alur di atas.
+
 Target platform adalah **Forgejo LTS + Forgejo Actions runner terpisah + Harbor +
 Dokploy**. Semua komponennya self-hosted. GitHub yang sudah dipakai saat ini boleh
 menjadi bootstrap dan mirror sampai layanan Forgejo, backup, dan restore-nya
@@ -299,7 +303,9 @@ bukan karena jumlah repository bertambah.
 - CoreERP baru memiliki GitHub workflow untuk lint dan test Control Plane.
 - Repository app yang diaudit belum mempunyai workflow CI.
 - Hanya satu app pilot yang memiliki contract coverage checker berbasis route
-  Laravel; checker ini harus menjadi standar semua repository app.
+  Laravel. Untuk repository app yang tersisa, checker itu tetap standar. Untuk module
+  ia tidak dipasang lagi: permukaan yang dipanggil dari luar runtime sudah bukan HTTP,
+  dan rute yang hanya dipanggil halamannya sendiri dijaga test module.
 - Repository deployment masih mempunyai mode yang clone dan build source pada
   server deployment. Mode itu adalah gap transisi dan tidak boleh menjadi jalur
   Production setelah Harbor tersedia.
