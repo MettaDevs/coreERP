@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Calendar;
 
 use App\Http\Controllers\Controller;
+use App\Models\Organization;
 use App\Models\WorkingTimeLine;
 use App\Models\WorkingTimeTemplate;
 use App\Support\CurrentWorkspace;
@@ -20,10 +21,21 @@ class WorkingTimeTemplateController extends Controller
     {
         $membership = $this->currentMembership($request);
 
-        // Ambil entitas legal aktif dari sesi user (CurrentWorkspace)
+        // Ambil entitas legal aktif dari sesi user (CurrentWorkspace) atau fallback organisasi pertama
         $workspaceLegalEntity = app(CurrentWorkspace::class)->legalEntity($request, $membership);
+        if (! $workspaceLegalEntity) {
+            $workspaceLegalEntity = Organization::query()
+                ->where('tenant_id', $membership->tenant_id)
+                ->where('classification', 'legal_entity')
+                ->where('status', 'active')
+                ->first();
+        }
 
         $selectedLegalEntityId = $workspaceLegalEntity?->id;
+
+        if ($selectedLegalEntityId) {
+            $this->ensureInitialTemplates($membership->tenant_id, $selectedLegalEntityId);
+        }
 
         $templates = $selectedLegalEntityId
             ? WorkingTimeTemplate::query()
@@ -60,7 +72,7 @@ class WorkingTimeTemplateController extends Controller
             'company_code' => $workspaceLegalEntity->legalEntity?->company_code,
         ] : null;
 
-        if ($request->is('api/*')) {
+        if ($request->wantsJson() || $request->is('api/*')) {
             return response()->json([
                 'data' => [
                     'templates' => $templates,
@@ -82,6 +94,14 @@ class WorkingTimeTemplateController extends Controller
         abort_unless(in_array($membership->system_role, ['owner', 'admin'], true), 403);
 
         $workspaceLegalEntity = app(CurrentWorkspace::class)->legalEntity($request, $membership);
+        if (! $workspaceLegalEntity) {
+            $workspaceLegalEntity = Organization::query()
+                ->where('tenant_id', $membership->tenant_id)
+                ->where('classification', 'legal_entity')
+                ->where('status', 'active')
+                ->first();
+        }
+
         $legalEntityId = $request->input('legal_entity_id', $workspaceLegalEntity?->id);
 
         abort_unless($legalEntityId, 422, 'Legal entity / perusahaan aktif tidak ditemukan pada sesi.');
@@ -110,7 +130,7 @@ class WorkingTimeTemplateController extends Controller
             'is_active' => true,
         ]);
 
-        if ($request->is('api/*')) {
+        if ($request->wantsJson() || $request->is('api/*')) {
             return response()->json(['data' => $template], 201);
         }
 
@@ -151,7 +171,7 @@ class WorkingTimeTemplateController extends Controller
             }
         });
 
-        if ($request->is('api/*')) {
+        if ($request->wantsJson() || $request->is('api/*')) {
             return response()->json(['data' => $template->load('lines')]);
         }
 
@@ -166,7 +186,7 @@ class WorkingTimeTemplateController extends Controller
 
         $template->delete();
 
-        if ($request->is('api/*')) {
+        if ($request->wantsJson() || $request->is('api/*')) {
             return response()->json(['data' => ['archived' => true]]);
         }
 
@@ -211,7 +231,7 @@ class WorkingTimeTemplateController extends Controller
             return $new;
         });
 
-        if ($request->is('api/*')) {
+        if ($request->wantsJson() || $request->is('api/*')) {
             return response()->json(['data' => $newTemplate], 201);
         }
 
@@ -239,11 +259,88 @@ class WorkingTimeTemplateController extends Controller
             $this->syncLines($template, $membership->tenant_id, $validated['lines']);
         });
 
-        if ($request->is('api/*')) {
+        if ($request->wantsJson() || $request->is('api/*')) {
             return response()->json(['data' => $template->load('lines')]);
         }
 
         return back()->with('success', 'Baris jam kerja berhasil disimpan.');
+    }
+
+    private function ensureInitialTemplates(string $tenantId, string $legalEntityId): void
+    {
+        $existingCount = WorkingTimeTemplate::query()
+            ->where('tenant_id', $tenantId)
+            ->where('legal_entity_id', $legalEntityId)
+            ->count();
+
+        if ($existingCount > 0) {
+            return;
+        }
+
+        DB::transaction(function () use ($tenantId, $legalEntityId): void {
+            $t24 = WorkingTimeTemplate::create([
+                'tenant_id' => $tenantId,
+                'legal_entity_id' => $legalEntityId,
+                'code' => '24HR-DAY',
+                'name' => '24 Hours Day',
+                'description' => 'Template pola 24 jam sehari.',
+                'is_active' => true,
+            ]);
+
+            for ($d = 0; $d <= 6; $d++) {
+                WorkingTimeLine::create([
+                    'tenant_id' => $tenantId,
+                    'working_time_template_id' => $t24->id,
+                    'day_of_week' => $d,
+                    'from_time' => '00:00',
+                    'to_time' => '24:00',
+                    'efficiency' => 100.0,
+                    'closed_for_pickup' => false,
+                    'hours' => 24.0,
+                ]);
+            }
+
+            $tProd = WorkingTimeTemplate::create([
+                'tenant_id' => $tenantId,
+                'legal_entity_id' => $legalEntityId,
+                'code' => 'PROD-DAY',
+                'name' => 'Production Day',
+                'description' => 'Pola jam kerja standar produksi (Senin - Jumat).',
+                'is_active' => true,
+            ]);
+
+            for ($d = 0; $d <= 4; $d++) {
+                WorkingTimeLine::create([
+                    'tenant_id' => $tenantId,
+                    'working_time_template_id' => $tProd->id,
+                    'day_of_week' => $d,
+                    'from_time' => '08:00',
+                    'to_time' => '12:00',
+                    'efficiency' => 100.0,
+                    'closed_for_pickup' => false,
+                    'hours' => 4.0,
+                ]);
+                WorkingTimeLine::create([
+                    'tenant_id' => $tenantId,
+                    'working_time_template_id' => $tProd->id,
+                    'day_of_week' => $d,
+                    'from_time' => '13:00',
+                    'to_time' => '17:00',
+                    'efficiency' => 100.0,
+                    'closed_for_pickup' => false,
+                    'hours' => 4.0,
+                ]);
+            }
+
+            WorkingTimeTemplate::create([
+                'tenant_id' => $tenantId,
+                'legal_entity_id' => $legalEntityId,
+                'code' => 'STD-DAY',
+                'name' => 'Standard Day',
+                'description' => 'Pola jam kerja standar (kosong).',
+                'is_active' => true,
+            ]);
+        });
     }
 
     /**
