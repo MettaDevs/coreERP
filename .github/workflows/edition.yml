@@ -85,11 +85,32 @@ jobs:
         run: |
           echo "APP_KEY=$(grep '^APP_KEY=' apps/control-plane/.env | cut -d= -f2-)" >> "$GITHUB_ENV"
 
+      # Ditanam sebelum kedua image dibangun, dan diperiksa sesudahnya. Runner melakukan checkout
+      # bersih, jadi sisa mesin pembangun tidak pernah ada di sini dengan sendirinya — sebuah
+      # pemeriksa yang hanya lulus karena keadaannya tidak pernah terjadi tidak memeriksa apa pun.
+      # Langkah ini yang membuat keadaannya terjadi.
+      - name: Tanam penanda sisa mesin pembangun
+        run: bash scripts/periksa-sisa-mesin.sh tanam
+
       - name: Bangun edisi apotek-sejahtera
         run: bash scripts/build-edition.sh apotek-sejahtera coreerp-edisi:apotek-sejahtera
 
       - name: Bangun edisi praktek-dr-budi
         run: bash scripts/build-edition.sh praktek-dr-budi coreerp-edisi:praktek-dr-budi
+
+      - name: Periksa sisa mesin pembangun, kedua edisi
+        run: |
+          bash scripts/periksa-sisa-mesin.sh periksa coreerp-edisi:apotek-sejahtera
+          bash scripts/periksa-sisa-mesin.sh periksa coreerp-edisi:praktek-dr-budi
+
+      # Pasangan merah untuk pemeriksaan di atas, dan ia tidak membangun ulang image edisi: satu
+      # image sekali pakai berisi tiga baris sudah cukup untuk membuktikan pemeriksanya bisa gagal.
+      - name: Buktikan pemeriksa sisa mesin bisa merah
+        run: bash scripts/periksa-sisa-mesin.sh buktikan-merah
+
+      - name: Bersihkan penanda sisa mesin pembangun
+        if: always()
+        run: bash scripts/periksa-sisa-mesin.sh bersihkan
 
       - name: Periksa kebocoran, edisi apotek-sejahtera
         run: bash scripts/verify-edition.sh apotek-sejahtera coreerp-edisi:apotek-sejahtera
