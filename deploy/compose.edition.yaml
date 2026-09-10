@@ -1,0 +1,166 @@
+name: coreerp
+
+# Berkas compose yang **ikut di dalam bundle**, bukan yang ditarik dari repo lain.
+#
+# Perbedaannya dengan compose di repo penyebaran bukan bentuk layanannya — keduanya sama — melainkan
+# dari mana image-nya datang. Di sana image dibangun di server pelanggan lewat git dan `docker
+# build`; di sini seluruh image sudah dimuat dari `images.tar.gz` oleh `update.sh` sebelum satu
+# container pun dinyalakan.
+#
+# Dua image di bawah ditulis **harfiah**, bukan lewat variabel, dan itu disengaja: `build-bundle.sh`
+# membacanya dari berkas ini untuk menentukan apa saja yang harus ikut disimpan ke dalam bundle.
+# Menggantinya menjadi variabel membuat keduanya lolos dari pembacaan itu, dan bundle-nya akan
+# terlihat lengkap sampai ia dicoba di mesin tanpa internet.
+#
+# `docs` sengaja tidak ada di sini. Ia satu image lagi yang harus ikut menyeberang, dan dokumentasi
+# bukan bagian yang membuat aplikasi berjalan; pelanggan yang memintanya mendapat bundle terpisah.
+
+x-edition-environment: &edition-environment
+  APP_ENV: ${APP_ENV:-production}
+  APP_DEBUG: ${APP_DEBUG:-false}
+  APP_URL: ${APP_URL}
+  APP_KEY: ${CORE_APP_KEY}
+  DB_CONNECTION: pgsql
+  DB_HOST: core-db
+  DB_PORT: 5432
+  DB_DATABASE: core_erp
+  DB_USERNAME: core_erp
+  DB_PASSWORD: ${CORE_DB_PASSWORD}
+  SESSION_DRIVER: database
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  COREERP_DEPLOYMENT_PROFILE: ${COREERP_DEPLOYMENT_PROFILE:-on-prem}
+  COREERP_DEPLOYMENT_PLACEMENT: ${COREERP_DEPLOYMENT_PLACEMENT:-on-prem-primary}
+  COREERP_PROVIDER_EMAIL: ${COREERP_PROVIDER_EMAIL}
+  COREERP_PROVIDER_PASSWORD: ${COREERP_PROVIDER_PASSWORD}
+  COREERP_TRUSTED_PROXIES: ${COREERP_TRUSTED_PROXIES:-}
+  # Engine PDF milik platform. Tanpa layanan ini ekspor laporan gagal — dan gagalnya baru terlihat
+  # saat pengguna menekan cetak, bukan saat pemasangan.
+  COREERP_RENDERER_URL: http://core-renderer:3000
+  # Penerima event di **luar** proses ini. Module di dalam image tidak lewat sini; mereka menerima
+  # event sebagai pemanggilan fungsi. Biarkan `[]` kecuali ada sistem luar yang berlangganan.
+  COREERP_EVENT_ENDPOINTS: ${COREERP_EVENT_ENDPOINTS:-[]}
+
+services:
+  core-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: core_erp
+      POSTGRES_USER: core_erp
+      POSTGRES_PASSWORD: ${CORE_DB_PASSWORD}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U core_erp -d core_erp']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - core-db-data:/var/lib/postgresql/data
+
+  # Sekali jalan, dan aman diulang. Pembaruan on-prem dijalankan admin pelanggan yang tidak punya
+  # cara mengetahui apakah sebuah perintah sudah pernah jalan, jadi menjalankannya dua kali harus
+  # menghasilkan keadaan yang sama persis dengan sekali.
+  #
+  # `app:register-manifest` tanpa argumen mendaftarkan **seluruh module yang ada di dalam image
+  # ini**, jadi berkas compose tidak perlu tahu edisi mana yang sedang dipasang. Tabel milik module
+  # sendiri dibuat saat module dipasang untuk sebuah tenant, lewat jalur pendaftaran usaha.
+  core-migrate:
+    image: ${EDITION_IMAGE}
+    restart: 'no'
+    depends_on:
+      core-db:
+        condition: service_healthy
+    environment: *edition-environment
+    entrypoint: ['sh', '-c']
+    command:
+      - >-
+        php artisan migrate --force --no-interaction &&
+        php artisan db:seed --force --no-interaction &&
+        php artisan app:register-manifest --no-interaction
+
+  core-app:
+    image: ${EDITION_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      core-db:
+        condition: service_healthy
+      core-migrate:
+        condition: service_completed_successfully
+    environment: *edition-environment
+    networks:
+      - default
+      - renderer
+    volumes:
+      # Layout unggahan dan hasil ekspor laporan ditulis worker lalu disajikan web, jadi keduanya
+      # harus melihat storage yang sama. Tanpa volume bersama, unduhan menjawab 410 untuk berkas
+      # yang sebenarnya ada — hanya ada di container yang salah.
+      - core-storage:/repo/apps/control-plane/storage/app
+    ports:
+      - '${CORE_APP_PORT:-8000}:80'
+    healthcheck:
+      test: ['CMD', 'php', '-r', "exit(@file_get_contents('http://127.0.0.1/up') === false);"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  core-worker:
+    image: ${EDITION_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      core-db:
+        condition: service_healthy
+      core-migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *edition-environment
+      CONTAINER_ROLE: worker
+    networks:
+      - default
+      - renderer
+    volumes:
+      - core-storage:/repo/apps/control-plane/storage/app
+
+  # Tepat satu replika. Tanpa penjadwal, `number-sequences:recover` tidak pernah berjalan dan
+  # reservasi nomor berkelanjutan yang kedaluwarsa tidak pernah dilepas.
+  core-scheduler:
+    image: ${EDITION_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      core-db:
+        condition: service_healthy
+      core-migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *edition-environment
+      CONTAINER_ROLE: scheduler
+
+  # Stateless, tidak mengenal tenant, dan **tidak punya jalan keluar** — lihat network `renderer`
+  # di bawah. Ia hanya mengubah dokumen yang sudah diisi menjadi PDF.
+  core-renderer:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --api-timeout=120s
+      - --libreoffice-restart-after=50
+      - --chromium-disable-routes=true
+    networks:
+      - renderer
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+networks:
+  default:
+  # Tanpa jalan keluar: container di sini hanya dapat dihubungi container lain pada network yang
+  # sama. Perender menerima dokumen milik pelanggan, jadi ia tidak boleh dapat menghubungi apa pun
+  # di luar.
+  renderer:
+    internal: true
+
+volumes:
+  core-db-data:
+  core-storage:

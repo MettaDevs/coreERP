@@ -201,3 +201,74 @@ Urutan pengerjaan yang disarankan, karena tiap langkah membuat langkah berikutny
 3. `update.sh` sampai health check — tanpa jalur mundur dulu.
 4. Jalur mundurnya, dibuktikan dengan sengaja membuat health check gagal.
 5. Penolakan lokasi cadangan yang sefilesystem dengan data database.
+
+## Keadaan pada 10 September 2026
+
+Ketiga berkas sudah ada: `scripts/build-bundle.sh`, `scripts/update.sh`, dan
+`deploy/compose.edition.yaml`. Seluruh jalur di bawah **dijalankan**, bukan dibaca.
+
+### Satu koreksi terhadap rencana di atas
+
+Bagian "Bentuk yang dituju" menyebut bundle berisi **image edisi**. Itu tidak cukup: `core-db` dan
+`core-renderer` memakai image dari registry publik, jadi bundle satu-image gagal menyala di mesin
+tanpa internet — dan gagalnya pada langkah menyalakan container, sesudah admin mengira pemasangannya
+berhasil.
+
+Bundle sekarang membawa **seluruh** image, dan daftarnya **dibaca dari berkas compose** yang ikut di
+dalamnya. Daftar yang ditulis tangan akan menyimpang pada hari sebuah layanan ditambahkan, dan
+menyimpangnya baru ketahuan di mesin yang tidak punya internet untuk menambalnya. Akibat yang
+mengikat: kedua image pendamping ditulis **harfiah** di `deploy/compose.edition.yaml`, bukan lewat
+variabel — variabel membuat keduanya lolos dari pembacaan itu.
+
+Ongkosnya disebut apa adanya: bundle edisi apotek menjadi **329 MB**.
+
+### Dua cacat yang hanya ketahuan karena dijalankan
+
+Keduanya lolos pembacaan berulang kali, dan keduanya muncul pada percobaan mundur yang pertama.
+
+**Mundur memakai compose milik bundle yang baru saja ditolak.** Bundle yang gagal justru karena
+compose-nya sendiri bermasalah akan membawa masalah itu ikut ke dalam pemulihannya: aplikasi tidak
+menyala kembali sesudah mundur — kegagalan kedua yang lahir dari kegagalan pertama. Sekarang berkas
+compose milik versi sehat ikut disimpan bersama nama image-nya, dan jalur mundur memakai yang itu.
+Mundur menuntut keduanya: image yang terbukti sehat, dan berkas compose yang terbukti
+menyalakannya.
+
+**Pemulihan database tidak membuang apa yang ditambahkan migrasi yang gagal.** `pg_restore --clean`
+hanya membuang objek yang ada **di dalam dump**; tabel yang dibuat migrasi yang gagal lahir sesudah
+cadangan diambil, jadi ia tidak pernah tersentuh dan tetap berdiri sesudah mundur. Skema hasil mundur
+karena itu bukan skema versi lama, melainkan campuran keduanya — dan campuran itu tidak pernah diuji
+siapa pun. Sekarang database dibuang lalu dibuat ulang sebelum dipulihkan, dan container aplikasi
+dihentikan lebih dulu supaya koneksinya tidak menahan penghapusan itu.
+
+Percobaan pertama membuktikan tabel migrasi **masih ada** sesudah mundur; percobaan sesudah
+perbaikan membuktikan ia **hilang**, sementara data sebelum pembaruan tetap utuh.
+
+### Kelima jalur merah, dijalankan
+
+| Yang dibuktikan | Hasil |
+| --- | --- |
+| Bundle ditandatangani kunci lain | ditolak, keluar dengan kode 1, sebelum apa pun disentuh |
+| Tanda tangan sah, satu berkas diubah | tanda tangan **lolos**, checksum yang menolak — dua jalur yang memang berbeda |
+| Pembaruan gagal | mundur: image kembali, database dibuang dan dipulihkan, aplikasi sehat lagi |
+| Belum ada versi sehat | berhenti, bukan menebak |
+| Cadangan sefilesystem dengan data | ditolak; di filesystem berbeda, lanjut |
+
+Sesudah mundur: data sebelum pembaruan utuh, tabel buatan migrasi yang gagal hilang, `core-app`
+sehat kembali pada image lama, dan modulnya masih dilayani.
+
+### Yang masih menunggu mesin bersih
+
+Pemasangan di mesin yang **tidak punya git, composer, maupun npm** belum diuji. Yang sudah terbukti
+adalah urutan, penolakan, dan pemulihannya; yang belum adalah klaim bahwa bundle-nya benar-benar
+berdiri sendiri.
+
+Satu keadaan yang ditemui saat menguji dan pantas diketahui admin: memasang ke proyek compose yang
+volume databasenya sudah ada dari pemasangan lain akan gagal dengan `password authentication
+failed`. PostgreSQL hanya memakai `POSTGRES_PASSWORD` saat inisialisasi pertama; volume lama tetap
+memegang sandi lama.
+
+### Satu jebakan pada cara memverifikasinya, bukan pada kodenya
+
+Pembangunan bundle pertama terbaca "selesai dengan kode 0" padahal `docker build` di dalamnya gagal.
+Sebabnya bukan skripnya — ia dijalankan lewat `| tail`, dan **kode keluar sebuah pipeline adalah
+milik perintah terakhirnya**. Jalankan tanpa pipa ketika yang dipercaya adalah kode keluarnya.
