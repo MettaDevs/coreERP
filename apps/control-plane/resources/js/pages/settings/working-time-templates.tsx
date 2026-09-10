@@ -28,17 +28,10 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, router } from '@inertiajs/react';
-import {
-    Copy,
-    Plus,
-    Save,
-    Search,
-    Trash2,
-    X,
-} from 'lucide-react';
+import { Copy, Plus, Save, Search, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { BreadcrumbItem } from '@/types/navigation';
 import { cn } from '@/lib/utils';
+import type { BreadcrumbItem } from '@/types/navigation';
 
 // Urutan hari standar Dynamics 365: Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu
 const DAYS = [
@@ -53,7 +46,10 @@ const DAYS = [
 
 function formatTimeString(raw: string): string {
     const clean = raw.trim().replace(/[^0-9:]/g, '');
-    if (!clean) return '';
+
+    if (!clean) {
+        return '';
+    }
 
     if (clean === '24' || clean === '24:00' || clean === '2400') {
         return '24:00';
@@ -63,27 +59,38 @@ function formatTimeString(raw: string): string {
         const parts = clean.split(':');
         const h = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
-        if (isNaN(h) || isNaN(m)) return '';
-        if (h === 24 && m === 0) return '24:00';
+
+        if (isNaN(h) || isNaN(m)) {
+            return '';
+        }
+
+        if (h === 24 && m === 0) {
+            return '24:00';
+        }
+
         const validH = Math.min(23, Math.max(0, h));
         const validM = Math.min(59, Math.max(0, m));
+
         return `${String(validH).padStart(2, '0')}:${String(validM).padStart(2, '0')}`;
     }
 
     if (/^\d{1,2}$/.test(clean)) {
         const h = Math.min(23, Math.max(0, parseInt(clean, 10)));
+
         return `${String(h).padStart(2, '0')}:00`;
     }
 
     if (/^\d{3}$/.test(clean)) {
         const h = parseInt(clean.slice(0, 1), 10);
         const m = Math.min(59, Math.max(0, parseInt(clean.slice(1, 3), 10)));
+
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
 
     if (/^\d{4}$/.test(clean)) {
         const h = Math.min(23, Math.max(0, parseInt(clean.slice(0, 2), 10)));
         const m = Math.min(59, Math.max(0, parseInt(clean.slice(2, 4), 10)));
+
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
 
@@ -91,18 +98,26 @@ function formatTimeString(raw: string): string {
 }
 
 function computeHours(fromTime: string | null, toTime: string | null): number {
-    if (!fromTime || !toTime) return 0;
+    if (!fromTime || !toTime) {
+        return 0;
+    }
+
     const f = formatTimeString(fromTime);
     const t = formatTimeString(toTime);
-    if (!f || !t) return 0;
+
+    if (!f || !t) {
+        return 0;
+    }
 
     const [h1, m1] = f.split(':').map(Number);
     const [h2, m2] = t.split(':').map(Number);
     const min1 = h1 * 60 + m1;
     const min2 = h2 * 60 + m2;
+
     if (min2 > min1) {
         return Math.round(((min2 - min1) / 60) * 100) / 100;
     }
+
     return 0;
 }
 
@@ -246,6 +261,7 @@ export default function WorkingTimeTemplates({
         return lines.reduce((acc, line) => {
             if (line.from_time && line.to_time) {
                 const hrs = computeHours(line.from_time, line.to_time);
+
                 if (hrs > 0) {
                     return acc + hrs;
                 }
@@ -301,15 +317,12 @@ export default function WorkingTimeTemplates({
             .map((l, i) => (l.day_of_week === dayIndex ? i : -1))
             .filter((i) => i !== -1);
         const targetIdx = dayIndices[indexInDay];
+
         if (targetIdx !== undefined) {
             setDraftLines((prev) => prev.filter((_, i) => i !== targetIdx));
             setSelectedRowIndex(null);
         }
     };
-
-    const handleExpandAllDays = () =>
-        setExpandedDays(DAYS.map((d) => String(d.index)));
-    const handleCollapseAllDays = () => setExpandedDays([]);
 
     const handleUpdateLine = (
         dayIndex: number,
@@ -319,7 +332,7 @@ export default function WorkingTimeTemplates({
     ) => {
         const dayIndices = draftLines
             .map((l, i) => (l.day_of_week === dayIndex ? i : -1))
-            .filter((l, i) => l !== -1);
+            .filter((l) => l !== -1);
         const actualIdx = dayIndices[indexInDay];
 
         if (actualIdx !== undefined) {
@@ -744,7 +757,7 @@ export default function WorkingTimeTemplates({
                                                                 )
                                                             }
                                                             disabled={isClosed}
-                                                            className="text-primary hover:text-primary hover:bg-primary/10 gap-1.5 font-medium"
+                                                            className="gap-1.5 font-medium text-primary hover:bg-primary/10 hover:text-primary"
                                                         >
                                                             <Plus className="size-3.5" />
                                                             Tambah
@@ -766,7 +779,7 @@ export default function WorkingTimeTemplates({
                                                                     0 ||
                                                                 isClosed
                                                             }
-                                                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5 font-medium"
+                                                            className="gap-1.5 font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                                                         >
                                                             <Trash2 className="size-3.5" />
                                                             Hapus
@@ -790,7 +803,7 @@ export default function WorkingTimeTemplates({
                                                                 );
                                                             }}
                                                             disabled={isClosed}
-                                                            className="text-muted-foreground hover:text-foreground hover:bg-muted gap-1.5 font-medium"
+                                                            className="gap-1.5 font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
                                                         >
                                                             <Copy className="size-3.5" />
                                                             Salin hari
@@ -811,7 +824,8 @@ export default function WorkingTimeTemplates({
                                                                     Sampai
                                                                 </TableHead>
                                                                 <TableHead className="w-28 font-medium">
-                                                                    Efisiensi (%)
+                                                                    Efisiensi
+                                                                    (%)
                                                                 </TableHead>
                                                                 <TableHead className="font-medium">
                                                                     Properti
@@ -833,7 +847,12 @@ export default function WorkingTimeTemplates({
                                                                         }
                                                                         className="py-6 text-center text-xs text-muted-foreground"
                                                                     >
-                                                                        Belum ada jam kerja untuk hari ini.
+                                                                        Belum
+                                                                        ada jam
+                                                                        kerja
+                                                                        untuk
+                                                                        hari
+                                                                        ini.
                                                                         {isEditing &&
                                                                             ' Klik "Tambah" di atas untuk menambahkan.'}
                                                                     </TableCell>
@@ -915,6 +934,7 @@ export default function WorkingTimeTemplates({
                                                                                                             /[^0-9:]/g,
                                                                                                             '',
                                                                                                         );
+
                                                                                                     if (
                                                                                                         val.length >
                                                                                                         5
@@ -925,6 +945,7 @@ export default function WorkingTimeTemplates({
                                                                                                                 5,
                                                                                                             );
                                                                                                     }
+
                                                                                                     handleUpdateLine(
                                                                                                         day.index,
                                                                                                         idx,
@@ -947,6 +968,7 @@ export default function WorkingTimeTemplates({
                                                                                                         'from_time',
                                                                                                         formatted,
                                                                                                     );
+
                                                                                                     if (
                                                                                                         formatted &&
                                                                                                         line.to_time
@@ -994,6 +1016,7 @@ export default function WorkingTimeTemplates({
                                                                                                             /[^0-9:]/g,
                                                                                                             '',
                                                                                                         );
+
                                                                                                     if (
                                                                                                         val.length >
                                                                                                         5
@@ -1004,6 +1027,7 @@ export default function WorkingTimeTemplates({
                                                                                                                 5,
                                                                                                             );
                                                                                                     }
+
                                                                                                     handleUpdateLine(
                                                                                                         day.index,
                                                                                                         idx,
@@ -1026,6 +1050,7 @@ export default function WorkingTimeTemplates({
                                                                                                         'to_time',
                                                                                                         formatted,
                                                                                                     );
+
                                                                                                     if (
                                                                                                         line.from_time &&
                                                                                                         formatted
@@ -1078,6 +1103,7 @@ export default function WorkingTimeTemplates({
                                                                                                 ) => {
                                                                                                     const val =
                                                                                                         e.target.value.trim();
+
                                                                                                     if (
                                                                                                         !val ||
                                                                                                         isNaN(
@@ -1161,13 +1187,12 @@ export default function WorkingTimeTemplates({
                                                                                                 : '-'}
                                                                                         </TableCell>
                                                                                         <TableCell className="text-xs">
-                                                                                            {Number(
+                                                                                            {`${Number(
                                                                                                 line.efficiency ||
                                                                                                     0,
                                                                                             ).toFixed(
                                                                                                 2,
-                                                                                            )}
-                                                                                            %
+                                                                                            )}%`}
                                                                                         </TableCell>
                                                                                         <TableCell className="text-xs">
                                                                                             {line.property ||
@@ -1227,7 +1252,8 @@ export default function WorkingTimeTemplates({
                                                             htmlFor={`closed-${day.index}`}
                                                             className="cursor-pointer text-xs font-medium text-muted-foreground select-none"
                                                         >
-                                                            Tutup untuk pengambilan
+                                                            Tutup untuk
+                                                            pengambilan
                                                         </label>
                                                     </div>
 
@@ -1268,7 +1294,8 @@ export default function WorkingTimeTemplates({
                             <div>
                                 <DialogTitle>Pola Jam Kerja Baru</DialogTitle>
                                 <DialogDescription>
-                                    Buat template pola jam kerja baru untuk kalender kerja.
+                                    Buat template pola jam kerja baru untuk
+                                    kalender kerja.
                                 </DialogDescription>
                             </div>
                         </div>
@@ -1361,7 +1388,9 @@ export default function WorkingTimeTemplates({
                         >
                             {isCopying ? 'Menyalin...' : 'Salin template'}
                         </DialogAction>
-                        <DialogCancel onClick={() => setIsCopyTemplateOpen(false)} />
+                        <DialogCancel
+                            onClick={() => setIsCopyTemplateOpen(false)}
+                        />
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -1377,14 +1406,19 @@ export default function WorkingTimeTemplates({
                             <div>
                                 <DialogTitle>
                                     Salin Jam Kerja Hari{' '}
-                                    {DAYS.find((d) => d.index === copyFromDay)?.name}
+                                    {
+                                        DAYS.find(
+                                            (d) => d.index === copyFromDay,
+                                        )?.name
+                                    }
                                 </DialogTitle>
                                 <DialogDescription>
                                     Salin jadwal jam kerja dari hari{' '}
                                     <span className="font-semibold text-primary">
                                         {
-                                            DAYS.find((d) => d.index === copyFromDay)
-                                                ?.name
+                                            DAYS.find(
+                                                (d) => d.index === copyFromDay,
+                                            )?.name
                                         }
                                     </span>{' '}
                                     ke hari lainnya.
@@ -1394,7 +1428,7 @@ export default function WorkingTimeTemplates({
                     </DialogHeader>
 
                     <DialogToolbar className="flex items-center gap-2 px-6 py-2.5">
-                        <span className="text-xs font-medium text-muted-foreground mr-1">
+                        <span className="mr-1 text-xs font-medium text-muted-foreground">
                             Pilih cepat:
                         </span>
                         <Button
@@ -1444,13 +1478,15 @@ export default function WorkingTimeTemplates({
                         <div className="grid grid-cols-2 gap-2.5">
                             {DAYS.filter((d) => d.index !== copyFromDay).map(
                                 (d) => {
-                                    const isChecked = copyToDays.includes(d.index);
+                                    const isChecked = copyToDays.includes(
+                                        d.index,
+                                    );
 
                                     return (
                                         <label
                                             key={d.index}
                                             className={cn(
-                                                'flex cursor-pointer select-none items-center gap-3 rounded-lg border p-3 text-xs transition-colors',
+                                                'flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-xs transition-colors select-none',
                                                 isChecked
                                                     ? 'border-primary/50 bg-primary/5 font-medium text-foreground shadow-xs'
                                                     : 'border-border/70 bg-card text-foreground hover:border-border hover:bg-accent/40',
@@ -1460,21 +1496,26 @@ export default function WorkingTimeTemplates({
                                                 checked={isChecked}
                                                 onCheckedChange={(checked) => {
                                                     if (checked === true) {
-                                                        setCopyToDays((prev) => [
-                                                            ...prev,
-                                                            d.index,
-                                                        ]);
+                                                        setCopyToDays(
+                                                            (prev) => [
+                                                                ...prev,
+                                                                d.index,
+                                                            ],
+                                                        );
                                                     } else {
                                                         setCopyToDays((prev) =>
                                                             prev.filter(
                                                                 (idx) =>
-                                                                    idx !== d.index,
+                                                                    idx !==
+                                                                    d.index,
                                                             ),
                                                         );
                                                     }
                                                 }}
                                             />
-                                            <span className="text-xs">{d.name}</span>
+                                            <span className="text-xs">
+                                                {d.name}
+                                            </span>
                                         </label>
                                     );
                                 },
