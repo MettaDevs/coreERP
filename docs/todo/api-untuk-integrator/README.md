@@ -62,12 +62,28 @@ perubahan di Core saja.
 ### 2. Konteks yang tidak bersandar pada sesi
 
 `CurrentWorkspace` dan `ResolveModuleContext` butuh jalur yang mengambil tenant, legal entity, dan
-unit operasi dari **kredensialnya**, bukan dari sesi — dan **menolak** bila ketiganya tidak
-disebutkan, alih-alih memilih yang pertama.
+unit operasi dari **kredensialnya**, bukan dari sesi.
 
-Ini langkah yang paling mudah dikerjakan setengah jadi, dan setengah jadi di sini berarti data
-tertulis ke entitas yang salah tanpa satu pun kesalahan yang terlihat. Penjaganya harus dibuktikan
-bisa merah: sebuah token tanpa lingkup tidak boleh berhasil menulis apa pun.
+**Aturannya: sempit dulu, melebar hanya kalau diminta.** Bawaannya satu legal entity — milik
+kredensial itu sendiri — dan permintaan yang mau menjangkau lebih dari itu harus **menyebutnya**,
+lalu tetap dibatasi kebijakan data yang dipegang penggunanya. Yang tidak boleh adalah bawaan yang
+memilihkan: `?? first()` yang ada di `CurrentWorkspace` hari ini menebak untuk peramban, dan tebakan
+yang sama untuk pemanggil mesin berarti data tertulis ke entitas yang salah tanpa satu pun kesalahan
+terlihat.
+
+Bentuk itu bukan karangan sendiri; ia yang dipakai D365 F&O, dan kalimatnya tegas:
+
+> By default, OData returns only data that belongs to **the user's default company**. To see data
+> from outside the user's default company, specify the `?cross-company=true` query option. This
+> option returns data from **all companies that the user has access to**.
+
+Perhatikan batas atasnya: melebar pun tidak melewati apa yang penggunanya boleh akses. Menyaring ke
+satu perusahaan tertentu dilakukan pada kuerinya —
+`?$filter=dataAreaId eq 'usrt'&cross-company=true` — bukan dengan menerbitkan kredensial baru.
+
+Ini langkah yang paling mudah dikerjakan setengah jadi. Penjaganya harus dibuktikan bisa merah:
+sebuah permintaan yang menjangkau entitas di luar hak penggunanya tidak boleh berhasil menulis apa
+pun.
 
 ### 3. Kredensial token
 
@@ -101,14 +117,68 @@ bukan pada telemetri kita.
 
 - Sebuah backoffice di luar dapat membaca dan menulis data modul yang dibeli tenantnya, tanpa
   peramban dan tanpa sesi.
-- Token menyebut tenant, legal entity, dan unit operasinya; token tanpa lingkup **ditolak**, dan
-  penolakan itu diuji.
+- Kredensialnya membawa satu legal entity bawaan, dan permintaan yang menjangkau lebih dari itu
+  harus menyebutnya. Permintaan yang menjangkau entitas **di luar hak penggunanya ditolak**, dan
+  penolakan itu diuji — bukan hanya jalur yang berhasil.
 - Token tidak dapat melakukan apa pun di luar izin penggunanya, dan itu diuji pada permission yang
   memang tidak dipegang.
 - Token dapat dicabut, dan pencabutannya berlaku pada permintaan berikutnya.
 - Kontrak OpenAPI modul menyebutkan cara autentikasi yang baru, sehingga integrator tidak perlu
   membaca kode kita untuk tahu caranya.
 - Kedua modul tidak menuliskan middleware autentikasi sendiri lagi.
+
+## Yang sudah dipecahkan orang lain, dan bagaimana
+
+Empat hal dari dokumentasi Dynamics 365 Finance & Operations yang langsung mengenai keputusan di
+atas. Dibaca dari sumbernya, bukan dari ingatan.
+
+### 1. API datanya CRUD penuh; yang read-only cuma katalognya
+
+Mudah salah baca, karena keduanya ada di halaman yang sama. Endpoint **Metadata** memang hanya
+menerima GET — gunanya menjelaskan label dan daftar data entity. API datanya endpoint lain:
+
+> It supports complete CRUD (create, retrieve, update, and delete) functionality that you can use to
+> insert and retrieve data from the system.
+>
+> CRUD support works through HTTP verb support for **POST, PATCH, PUT, and DELETE**.
+
+Jadi "API untuk sistem pelanggan" memang berarti baca **dan** tulis, bukan sekadar jendela laporan.
+
+### 2. Menulis lewat API menjalankan validasi yang sama dengan layar
+
+Dokumen OData mendaftar urutan yang dipanggil tiap operasi tulis: `validateField()` → `defaultRow()`
+→ `validateWrite()` → `write()`, dan untuk hapus `validateDelete()` lebih dulu.
+
+Artinya API bukan pintu samping yang melewati aturan bisnis. Itu prinsip yang sama dengan
+"izin token berpotongan, tidak menggantikan" di atas — dan di sini ia bukan pendapat, melainkan
+bagaimana produk sebesar itu memang dibangun.
+
+### 3. Lingkup perusahaan dipilih per-permintaan, dibatasi hak penggunanya
+
+Sudah dikutip pada langkah 2. Yang perlu digarisbawahi: bawaannya **sempit**, melebarnya **eksplisit**,
+dan batas atasnya tetap hak pengguna.
+
+### 4. Sinkron bukan untuk volume besar
+
+OData sinkron dan tidak berbatch; untuk impor besar mereka menyuruh pindah ke batch data API yang
+asinkron, dengan ancar-ancar **di atas beberapa ratus ribu record**.
+
+Untuk keadaan yang memunculkan halaman ini — backoffice pelanggan membaca dan menulis data aset
+secara wajar — pintu sinkron memang yang benar. Catatan ini ada supaya pintu kedua tidak diminta
+terlalu awal, dan supaya ia tidak dilupakan kalau volumenya kelak naik.
+
+### Satu perbedaan yang menguntungkan kita
+
+> For **on-premises** deployments, the only supported API is the Data management package REST API.
+
+Pelanggan on-prem D365 **tidak** mendapat OData sama sekali. Skenario yang memunculkan halaman ini —
+pelanggan on-prem yang mau menyambungkan backoffice-nya sendiri — tidak dapat dilayani produk itu di
+tempat yang sama. Kalau kita melayaninya, itu bukan mengejar ketertinggalan.
+
+**Sumber.**
+[Service endpoints overview](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/services-home-page) ·
+[Open Data Protocol (OData)](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/odata) ·
+[Integration between finance and operations apps and third-party services](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/data-entities/integration-overview)
 
 ## Yang sengaja tidak ada di sini
 
