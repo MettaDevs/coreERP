@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Calendar;
 
-use App\Models\Membership;
+use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Tenant;
+use App\Models\TenantMembership;
 use App\Models\User;
 use App\Models\WorkingTimeTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class WorkingTimeTemplateTest extends TestCase
@@ -16,15 +18,24 @@ class WorkingTimeTemplateTest extends TestCase
 
     private function createTenantUser(string $role = 'admin'): array
     {
+        $slug = 'tenant-'.strtolower(Str::random(6));
+
+        $client = Client::create([
+            'legal_name' => 'PT MettaDevs Indonesia',
+            'slug' => $slug,
+            'status' => 'active',
+        ]);
+
         $tenant = Tenant::create([
+            'client_id' => $client->id,
             'name' => 'PT MettaDevs Indonesia',
-            'edition' => 'enterprise',
+            'slug' => $slug,
             'status' => 'active',
         ]);
 
         $user = User::factory()->create();
 
-        $membership = Membership::create([
+        $membership = TenantMembership::create([
             'tenant_id' => $tenant->id,
             'user_id' => $user->id,
             'system_role' => $role,

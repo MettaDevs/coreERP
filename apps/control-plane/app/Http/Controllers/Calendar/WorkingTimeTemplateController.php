@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Calendar;
 
 use App\Http\Controllers\Controller;
-use App\Models\Organization;
 use App\Models\WorkingTimeLine;
 use App\Models\WorkingTimeTemplate;
 use App\Support\CurrentWorkspace;
@@ -11,10 +10,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
-
-use Illuminate\Validation\Rule;
 
 class WorkingTimeTemplateController extends Controller
 {
@@ -26,7 +24,6 @@ class WorkingTimeTemplateController extends Controller
         $workspaceLegalEntity = app(CurrentWorkspace::class)->legalEntity($request, $membership);
 
         $selectedLegalEntityId = $workspaceLegalEntity?->id;
-
 
         $templates = $selectedLegalEntityId
             ? WorkingTimeTemplate::query()
@@ -250,7 +247,7 @@ class WorkingTimeTemplateController extends Controller
     }
 
     /**
-     * @param array<int, array{day_of_week: int, from_time?: ?string, to_time?: ?string, efficiency?: ?float, property?: ?string, closed_for_pickup?: ?bool, hours?: ?float}> $lines
+     * @param  array<int, array{day_of_week: int, from_time?: ?string, to_time?: ?string, efficiency?: ?float, property?: ?string, closed_for_pickup?: ?bool, hours?: ?float}>  $lines
      */
     private function syncLines(WorkingTimeTemplate $template, string $tenantId, array $lines): void
     {
