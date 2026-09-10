@@ -1,8 +1,8 @@
 # API yang dapat dipakai sistem pelanggan
 
-> **Ini di luar pemindahan satu runtime.** Folder [satu-runtime](../satu-runtime/) adalah rencana
-> memindahkan app menjadi modul; pekerjaan di halaman ini tidak memindahkan apa pun. Ia membuka
-> permukaan yang sudah ada untuk pemanggil yang bukan peramban.
+> **Ini di luar pemindahan satu runtime.** Pemindahan itu mengubah app menjadi modul; pekerjaan di
+> halaman ini tidak memindahkan apa pun. Ia membuka permukaan yang sudah ada untuk pemanggil yang
+> bukan peramban.
 
 ## Keadaan yang memunculkannya
 

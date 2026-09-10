@@ -235,14 +235,47 @@ Larangannya sama pada kedua bentuk: sebuah module tidak boleh membaca atau menul
 module lain. Yang berbeda hanya siapa yang menolak — database pada bentuk yang satu, penjaga batas
 dan analisa statis pada bentuk yang lain.
 
+Perbedaan itu harus disebut apa adanya. **Batas antar module ditegakkan pemeriksaan otomatis, bukan
+mesin database.** Jangan menuliskan bahwa mesin database yang menjaganya: kalimat itu membuat
+pembaca berikutnya menganggap sebuah `JOIN` lintas module akan ditolak PostgreSQL, padahal ia akan
+berjalan mulus sampai seseorang menjalankan penjaganya.
+
+Tiga aturan yang mengikuti dari satu database bersama:
+
+- **Foreign key dari tabel module hanya boleh menunjuk tabel milik Core**, tidak pernah ke tabel
+  module lain. Foreign key lintas module membuat dua module tidak bisa dipasang atau dicabut
+  sendiri-sendiri, dan itu justru yang sedang dihindari.
+- **Runtime memakai satu koneksi database.** Module menulis tabelnya sendiri lewat koneksi yang sama
+  dengan Core. Schema PostgreSQL per module dan peran database per module pernah dipertimbangkan dan
+  dibatalkan: keduanya menambah bagian yang harus disiapkan admin pelanggan tanpa menambah satu pun
+  batas yang tidak sudah dijaga penjaga di atas.
+- **Laporan lintas tenant tidak ada.** Konsolidasi terjadi **di dalam** satu tenant, lewat legal
+  entity dan operating unit. Jangan merancang federasi database untuk kebutuhan yang tidak ada.
+
 ### Nama tabel
 
 Nama tabel memakai `snake_case` dan menyatakan jenis data, bukan nama layar atau
 nama controller.
 
 Untuk module, **awalan module wajib dan itulah yang diperiksa mesin**; sisa namanya mengikuti
-konvensi di bawah. Awalan yang berlaku diturunkan dari nama folder module — daftarnya ada pada
-`app.yaml` tiap module dan pada katalog Core setelah registrasi.
+konvensi di bawah. Awalan yang berlaku dinyatakan module pada `app.yaml`-nya, dan tercatat di
+katalog Core setelah registrasi.
+
+Empat hal tentang awalan itu yang menghemat banyak waktu bila diketahui lebih dulu:
+
+- **Ia dipilih pendek, dan boleh berbeda dari nama folder.** Folder `management-aset` memakai awalan
+  `aset_`. Nama tabel dibaca berkali-kali sehari oleh orang yang sedang menelusuri masalah; awalan
+  sepanjang nama folder membuat setiap nama tabel lebih panjang tanpa menambah satu pun kejelasan.
+- **Ia tidak boleh berubah setelah module pertama kali dipasang di tempat pelanggan.** Mengubahnya
+  berarti mengganti nama seluruh tabel pada setiap server pelanggan lewat migration, dan migration
+  yang sudah pernah berjalan tidak disunting.
+- **Pemetaan namespace ke awalan didaftarkan di `modules/README.md` pada pull request yang membuat
+  module itu**, bukan sesudahnya. Tabrakan awalan hanya murah kalau ketahuan saat peninjauan.
+- **Pemeriksanya menguji saling-menelan, bukan hanya kesamaan persis.** Awalan `aset_` dan
+  `aset_lama_` bukan awalan yang sama, tetapi tabel `aset_lama_barang` cocok dengan keduanya, dan
+  penjaga yang hanya membandingkan kesamaan persis akan melewatkannya.
+
+Tabel lama yang lahir tanpa awalan diganti nama **satu kali**, saat module-nya dipindah masuk.
 
 Bentuk yang dipakai sesudah awalan:
 
@@ -292,7 +325,23 @@ berlebihan, tetapi karena query seperti itu tetap benar walau traitnya dicabut �
 berhenti terukur, dan tidak ada test yang gagal ketika perlindungannya hilang.
 
 Penjagaan ini hidup di lapisan model. `DB::table()` melewatinya sepenuhnya, dan itulah sebabnya query
-mentah pada tabel module dilarang.
+mentah pada tabel module dilarang — `DB::table()`, `DB::select()`, dan `DB::statement()` sama saja.
+Migration dikecualikan, karena ia memang menulis SQL langsung dan berjalan sebelum ada satu pun
+tenant.
+
+Kalau sebuah laporan memang menuntut SQL langsung, dua hal wajib dilakukan bersama: **saring tenant
+secara eksplisit**, dan **daftarkan pengecualiannya di berkas test penjaganya**. Yang kedua sama
+pentingnya dengan yang pertama. Pengecualian yang hidup di berkas konfigurasi tidak terlihat pada
+diff pull request berikutnya; pengecualian yang hidup di berkas test muncul di depan mata peninjau
+setiap kali daftarnya bertambah.
+
+Larangan ini tidak boleh dilonggarkan diam-diam. Melonggarkannya berarti mengubah berkas test dan
+menjelaskan alasannya pada pull request — bukan menambahkan satu baris `DB::table()` yang kebetulan
+lolos.
+
+Satu bentuk query yang juga dilarang: **memberi alias pada tabel utama**. Penyaringan tenant
+disisipkan dengan nama tabel yang sebenarnya, jadi tabel utama yang beralias membuat penyaringannya
+menunjuk nama yang tidak ada lagi di query itu. Tabel yang di-`join` tetap boleh beralias.
 
 ### Penghapusan lunak
 
@@ -402,6 +451,128 @@ Satu hal yang tidak selesai dengan penghapusan lunak: tenant yang berhenti berla
 ada tanpa batas waktu, dan jalan keluarnya—ekspor lengkap yang bisa dibaca sistem lain, atau serah
 terima database—ditulis di kontrak sebelum pelanggan pergi, bukan sesudah.
 
+## Bentuk folder dan pendaftaran module
+
+### Yang ada di dalam folder module, dan yang dilarang ada
+
+Satu module berisi `app.yaml`, `src/`, `database/migrations/`, `routes/`, `ui/`, `tests/`,
+`contracts/`, dan `composer.json`. Bentuk minimalnya ada di `modules/_template/`, dan
+`module:make` yang menyalinnya.
+
+Yang **dilarang** ada di dalam folder module: `bootstrap/`, `public/`, `config/app.php`, Dockerfile,
+berkas compose, dan `artisan`. Semuanya adalah kerangka aplikasi mandiri, dan module bukan aplikasi
+mandiri — ia dimuat oleh satu aplikasi yang sudah punya kerangkanya sendiri. Larangan ini berlaku
+untuk **semua** module tanpa kecuali, termasuk module yang sedang dipindah dari repo lain, karena
+justru di sanalah kerangka lama paling mungkin ikut terbawa.
+
+Satu lagi yang dilarang dan mudah lolos: **alur CI di dalam folder module**. GitHub tidak pernah
+menjalankan berkas alur di luar `.github/workflows/` pada akar repo, jadi berkas seperti itu terlihat
+seperti pemeriksaan yang berjalan padahal tidak pernah dijalankan siapa pun. Ia ikut mendarat lagi
+setiap kali sebuah module ditarik masuk, jadi penjaganya perlu ada, bukan sekadar diingat.
+
+Migration module juga tidak boleh membuat tabel milik Core — `users`, `jobs`, `cache`, dan
+kerabatnya. Module yang membuat ulang tabel Core akan berhasil di mesinnya sendiri dan gagal di
+server pelanggan yang tabelnya sudah ada.
+
+### Namespace dan autoload
+
+Namespace module berbentuk `Modules\<Penerbit>\<Modul>\`, dan setiap berkas PHP wajib
+mendeklarasikan namespace yang sesuai jalur PSR-4-nya. Module **tidak boleh menyumbang kelas ke
+namespace milik Core**: sebuah kelas di dalam `App\` yang berasal dari folder module akan lolos
+setiap penjaga namespace, karena penjaganya memeriksa siapa yang disebut, bukan siapa yang menulis.
+
+Module di-autoload lewat repositori Composer bertipe `path`, tiap module mendeklarasikan
+`autoload.psr-4`-nya sendiri, dan Core memintanya dengan `@dev` — bukan `*`. Paket lokal yang diminta
+dengan `*` akan dicari di packagist lebih dulu.
+
+Namespace **test** module didaftarkan pada `autoload-dev` milik **Core**, bukan milik module.
+Composer tidak memuat `autoload-dev` sebuah dependensi, jadi blok yang ditulis di `composer.json`
+module tidak akan pernah dibaca. Kelas dasar test yang dipakai juga milik Core.
+
+### Satu penyedia layanan per module
+
+Rute, perintah artisan, listener, dan registry laporan module didaftarkan oleh penyedia layanan
+module itu sendiri, bukan oleh satu penyedia pusat yang mengenal semua module. Penyedia pusat berarti
+biaya menyalakan aplikasi tumbuh seiring jumlah module, dan setiap module baru menyentuh satu berkas
+yang sama.
+
+Konfigurasi module digabungkan dengan awalan `modules.<id module>`. Nol kunci konfigurasi module
+berdiri di akar: kunci di akar akan bertabrakan dengan kunci Core pada hari namanya kebetulan sama,
+dan yang kalah tidak memberi tahu siapa pun.
+
+`resource_path()` tidak boleh dipakai untuk jalur berkas module. Ia menunjuk folder Core, jadi
+pemanggilannya berhasil dan memulangkan jalur yang salah.
+
+### Registry melewatkan manifest yang rusak
+
+Manifest yang tidak terbaca **dilewati**, bukan menjatuhkan runtime. Pilihan itu benar — satu berkas
+salah tulis tidak boleh mematikan seluruh aplikasi di tempat pelanggan — tetapi ia punya harga:
+module yang hilang tidak mengumumkan dirinya. Karena itu `module:list` wajib ada; ia satu-satunya
+jawaban atas pertanyaan "kenapa module saya tidak muncul". Module yang masih ber-`id: change-me`,
+sisa cetakan yang belum diganti, juga dilewati.
+
+### Riwayat migration module
+
+Riwayat migration module dicatat di `core_module_migrations`, dengan kolom `module_id`, dan **wajib
+disaring per module pada setiap pembacaan**. Ia bukan sekadar tabel `migrations` milik Core yang
+diberi kolom tambahan, dan ia tidak boleh menumpang tabel itu: dua module yang kebetulan punya
+migration bernama sama akan saling menganggap migration lawannya sudah dijalankan.
+
+### Data awal module
+
+Seed module hanya dipanggil oleh **pemasangan module**, tidak pernah oleh `db:seed` global. Seed
+dilewati bila catatan pemasangannya sudah menyimpan waktu pengisian, sehingga memasang ulang tidak
+menggandakan data awal.
+
+Seeder module memakai model biasa — turunan kontrak seeder module — bukan query mentah, supaya
+barisnya ikut tersaring tenant seperti baris lain. Tabel master module membawa kolom penanda
+`bawaan`, supaya baris hasil seed bisa dibedakan dari baris yang diketik pengguna. Ini bagian dari
+standar tabel master module, bukan kebiasaan satu module contoh: tanpa penanda itu, pembaruan yang
+ingin memperbaiki data bawaan tidak punya cara membedakan mana yang boleh disentuh.
+
+### Aturan model
+
+Model module memakai `HasULids`, `SoftDeletes`, dan `MilikTenant` sejak migration pertama, dan tidak
+memakai `DB::table()` sama sekali. Setiap kelas module yang `extends Model` **wajib** memakai
+`MilikTenant`; penjaganya memeriksa itu untuk semua module, termasuk yang sedang dipindah.
+Akibatnya module **tidak menulis `tenant_id` sama sekali** — trait itu yang mengisinya, dan trait itu
+juga yang membatalkan penyimpanan ke tenant lain.
+
+Model tabel penghubung ikut bersoft-delete. Kolom baru ditambahkan lewat migration tersendiri;
+migration yang sudah pernah berjalan di database pelanggan tidak disunting.
+
+Satu jebakan yang berulang: **model berkunci gabungan tidak boleh memakai pembantu Eloquent yang
+bersandar pada primary key** — `find()`, `fresh()`, `refresh()`, dan `save()` pada model yang sudah
+ada. Semuanya menyusun `where` dari satu kolom kunci, dan pada kunci gabungan yang satu kolom itu
+menunjuk lebih dari satu baris.
+
+### Rute dan test module
+
+Rute module berada di grup `web`, dengan `auth` **di depan** middleware konteks module. Urutannya
+menentukan jawabannya: `auth` di depan menghasilkan 401 untuk permintaan tanpa pengguna dan 403 untuk
+pengguna tanpa izin. Urutan terbalik menghasilkan 403 untuk keduanya, dan klien tidak bisa
+membedakan "belum masuk" dari "tidak berhak". Setiap alias middleware pada berkas rute module wajib
+terdaftar di Core, atau tercatat sengaja-belum beserta nomor task yang membereskannya.
+
+Test module berjalan di suite Core, di atas PostgreSQL. Cabang berdasarkan mesin database dilarang —
+hanya ada satu mesin database, dan cabang seperti itu menghasilkan jalur yang tidak pernah diuji di
+tempat ia benar-benar berjalan.
+
+Test module membangun **rantai izin sungguhan** — permission, privilege, duty, role, penugasan role,
+lalu bertindak sebagai penggunanya — dan membangun rantai baru per pemanggilan, bukan memakai satu
+rantai bersama. Rantai bersama membuat sebuah test lulus karena test lain sudah menyiapkan izinnya.
+
+### Cetakan module baru
+
+`module:make` mengganti seluruh penanda pada cetakan sekaligus; mengganti sebagian menghasilkan
+module yang setengah bernama cetakan dan gagal jauh di kemudian hari. Cetakan itu sendiri wajib lulus
+pemeriksa gaya dan analisa tipe, karena keduanya menyapu `modules/` — cetakan yang tidak lulus
+membuat setiap module baru lahir dalam keadaan merah.
+
+Module baru wajib benar di **dua tempat di luar foldernya sendiri**: baris awalan tabel pada
+`modules/README.md`, dan `require` pada `composer.json` Core. Perintahnya tidak boleh menyunting
+assertion pada test mana pun.
+
 ## Contract dan dependency
 
 | Area | Aturan |
@@ -481,10 +652,32 @@ Lifecycle tidak dimodelkan sebagai satu status linear karena empat fakta mempuny
 | Installed | Installation registry mencatat artifact dan migration berhasil pada placement/release. |
 | Ready | Placement/runtime health menyatakan release dapat diroute. |
 
-Disable dan uninstall belum memiliki worker. Saat worker itu dibuat, uninstall harus
-menolak app yang masih menjadi dependency app lain, mengarsipkan data default, dan
-memerlukan backup serta approval eksplisit untuk `purge`; jangan menganggap aturan
-masa depan itu sudah berjalan.
+Untuk module, ketiga perpindahan itu sudah ada dan dijalankan perintah artisan:
+`module:install`, `module:disable`, dan `module:uninstall`, masing-masing menerima id module dan id
+tenant — module dibeli **per tenant**, jadi tidak ada bentuk yang berlaku untuk seluruh instalasi
+sekaligus.
+
+Catatan pemasangan hidup di `core_module_installations`, berkunci `tenant_id` bersama kode module.
+Tiga status yang sah — `installed`, `disabled`, `uninstalled` — dijaga `CHECK` di database, bukan
+hanya di model, dan barisnya **tidak pernah dihapus**: pencabutan mengubah status, bukan membuang
+catatannya. Kolom `seeded_at` yang menahan data awal terisi dua kali membuat pemasangan aman
+dijalankan dua kali; menjalankannya lagi mengembalikan status tanpa menyentuh data dan tanpa
+mengisi ulang data awal.
+
+Penonaktifan hanya mengubah status beserta `disabled_at`. Pencabutan ditolak bila module masih
+menjadi dependency module lain yang terpasang **pada tenant yang sama** — diperiksa terhadap tenant,
+bukan terhadap katalog, karena katalog tidak tahu apa yang dibeli siapa.
+
+Tidak satu pun dari ketiganya menghapus data, dan tidak ada opsi untuk menambahkannya. Aturannya ada
+di [Mencabut modul tidak menyentuh data](#mencabut-modul-tidak-menyentuh-data) beserta penjaganya.
+
+Satu hal yang sering disimpulkan terbalik: **pemasangan bukan izin**. Module yang terpasang tidak
+memberi seorang pun hak apa pun; hak tetap datang dari rantai `role → duty → privilege → permission`.
+Menyimpulkan izin dari pemasangan adalah kesalahan yang sama bentuknya dengan menyimpulkan
+pemasangan dari entitlement.
+
+Untuk app yang masih berupa container, ketiga perpindahan itu belum punya worker; jangan menganggap
+aturan module di atas sudah berjalan di sana.
 
 ## Jenis app
 

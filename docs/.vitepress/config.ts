@@ -36,6 +36,7 @@ export default withMermaid({
       'todo/entrypointPERMISSIONprevilage/index.md',
     'todo/api-untuk-integrator/README.md': 'todo/api-untuk-integrator/index.md',
     'todo/bundle-on-prem/README.md': 'todo/bundle-on-prem/index.md',
+    'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -172,6 +173,8 @@ export default withMermaid({
             { text: 'Jalur membangun modul baru', link: '/apps/membangun-app-baru' },
             { text: 'Gate penemuan dan keputusan', link: '/dev/18-module-discovery-and-decision-gate' },
             { text: 'Standar module', link: '/dev/02-module-standard' },
+            { text: 'Modul yang sedang dipindah', link: '/dev/26-modul-yang-sedang-dipindah' },
+            { text: 'UI modul di dalam shell', link: '/dev/27-ui-modul-dalam-shell' },
             { text: 'Rantai keamanan modul transaksi', link: '/dev/19-transaction-security-chain' },
             { text: 'Visual workflow engine', link: '/dev/21-visual-workflow-engine' },
             { text: 'Dokumen cetak, layout, dan ekspor', link: '/dev/23-document-rendering' },
@@ -206,6 +209,7 @@ export default withMermaid({
           text: 'Gate kualitas',
           collapsed: true,
           items: [
+            { text: 'Standar penjaga dan pengujian', link: '/dev/25-standar-penjaga-dan-pengujian' },
             { text: 'Load dan concurrency testing', link: '/dev/20-load-and-concurrency-testing' },
           ],
         },
@@ -224,22 +228,22 @@ export default withMermaid({
           items: [
             { text: 'Cara membaca folder ini', link: '/todo/' },
             {
-              text: 'Pemindahan ke satu runtime',
-              collapsed: false,
-              items: [
-                { text: 'Ikhtisar', link: '/todo/satu-runtime/' },
-                { text: 'Keputusan arsitektur', link: '/todo/satu-runtime/00-keputusan' },
-                { text: 'PRD dan daftar task', link: '/todo/satu-runtime/01-prd' },
-                { text: 'Bukti penjaga batas', link: '/todo/satu-runtime/02-bukti-penjaga' },
-              ],
-            },
-            {
               text: 'API untuk sistem pelanggan',
               collapsed: false,
               items: [
                 {
                   text: 'API yang dapat dipakai sistem pelanggan',
                   link: '/todo/api-untuk-integrator/',
+                },
+              ],
+            },
+            {
+              text: 'Sisa pemindahan ke satu runtime',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Yang belum selesai saat rencana dibubarkan',
+                  link: '/todo/sisa-pemindahan/',
                 },
               ],
             },

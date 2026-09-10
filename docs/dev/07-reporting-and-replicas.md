@@ -5,7 +5,7 @@
 > yang sama berlaku pada kumpulan tabel berawalan, bukan pada database terpisah: laporan gabungan
 > tetap dibangun dari projection event, bukan dari join langsung ke tabel module lain. Yang hilang
 > hanyalah lag replikasi antar database; ownership dan larangan join lintas module tidak hilang.
-> Lihat [keputusan satu runtime](../todo/satu-runtime/00-keputusan.md).
+> Lihat [grand design](01-grand-design.md).
 
 ## Tiga sumber baca yang berbeda
 

@@ -233,6 +233,35 @@ work_order_duplikat as (
 work_order_prefix_salah as (
     select count(*) as n from aset_tr_pemeliharaan_aset where kode not like 'PMHA%'
 ),
+work_order_transisi_tidak_sah as (
+    -- Grafik transisi `WorkOrderStatus` ditulis ulang di sini sebagai data, bukan dibaca dari
+    -- kodenya: oracle yang memanggil kode yang sedang diuji hanya membuktikan kode itu
+    -- konsisten dengan dirinya sendiri. Satu baris di luar daftar ini berarti sebuah dokumen
+    -- melompati status, dan tidak ada batasan basis data yang menolaknya — baris status log-nya
+    -- tetap satu baris yang sah.
+    select count(*) as n
+    from aset_tr_pemeliharaan_aset_status_log l
+    where (l.dari_status, l.ke_status) not in (
+        ('draft', 'dijadwalkan'), ('draft', 'dibatalkan'),
+        ('dijadwalkan', 'dikerjakan'), ('dijadwalkan', 'dibatalkan'),
+        ('dikerjakan', 'selesai'), ('dikerjakan', 'dibatalkan'),
+        ('selesai', 'ditutup'), ('selesai', 'dibatalkan')
+    )
+),
+saldo_buku_tidak_cocok_periode as (
+    -- Akumulasi penyusutan pada buku aset wajib sama dengan jumlah nilai seluruh periode final
+    -- miliknya, termasuk periode pembalik yang nilainya negatif. Penambahannya dikerjakan
+    -- `incrementEach` di dalam `finalize()`, di luar kunci buku; kalau satu periode pernah
+    -- ditambahkan dua kali — misalnya karena kunci barisnya tidak menahan dua finalisasi
+    -- serentak — baris periodenya tetap satu dan tetap sah, dan hanya perbandingan ini yang
+    -- memperlihatkannya.
+    select count(*) as n
+    from aset_tr_buku_aset b
+    where b.accumulated_depreciation <> coalesce((
+        select sum(p.amount) from aset_tr_penyusutan_aset p
+        where p.asset_book_id = b.id and p.status = 'final'
+    ), 0)
+),
 work_order_child_tidak_sah as (
     select
         (select count(*) from aset_tr_pemeliharaan_aset_details d join aset_tr_pemeliharaan_aset h on h.id = d.pemeliharaan_aset_id where d.tenant_id <> h.tenant_id)
@@ -265,7 +294,9 @@ union all select 'nilai pecahan tersimpan pada integer', n from integer_fraction
 union all select 'atribut menunjuk data tenant lain', n from attribute_cross_tenant
 union all select 'kode atau kunci work order ganda', n from work_order_duplikat
 union all select 'prefix nomor work order salah', n from work_order_prefix_salah
-union all select 'detail/checklist/status log work order lintas tenant atau yatim', n from work_order_child_tidak_sah;
+union all select 'detail/checklist/status log work order lintas tenant atau yatim', n from work_order_child_tidak_sah
+union all select 'transisi status work order di luar grafik', n from work_order_transisi_tidak_sah
+union all select 'akumulasi buku aset tidak sama dengan jumlah periode final', n from saldo_buku_tidak_cocok_periode;
 
 select pemeriksaan, pelanggaran from hasil_aset order by pemeriksaan;
 
@@ -289,6 +320,11 @@ union all select 'aset_tr_penempatan_aset', count(*), count(distinct tenant_id) 
 union all select 'aset_tr_perencanaan_aset', count(*), count(distinct tenant_id) from aset_tr_perencanaan_aset
 union all select 'aset_tr_perencanaan_aset_details', count(*), count(distinct tenant_id) from aset_tr_perencanaan_aset_details
 union all select 'aset_tr_pemeliharaan_aset', count(*), count(distinct tenant_id) from aset_tr_pemeliharaan_aset
+union all select 'aset_tr_pemeliharaan_aset_details', count(*), count(distinct tenant_id) from aset_tr_pemeliharaan_aset_details
+union all select 'aset_tr_pemeliharaan_aset_status_log', count(*), count(distinct tenant_id) from aset_tr_pemeliharaan_aset_status_log
+union all select 'aset_tr_buku_aset', count(*), count(distinct tenant_id) from aset_tr_buku_aset
+union all select 'aset_tr_penyusutan_aset', count(*), count(distinct tenant_id) from aset_tr_penyusutan_aset
+union all select 'aset_tr_export_penyusutan', count(*), count(distinct tenant_id) from aset_tr_export_penyusutan
 order by 1;
 
 \echo

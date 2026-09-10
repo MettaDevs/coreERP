@@ -207,6 +207,22 @@ Aturan operasional:
 
 Uji failover sebelum produksi: setelah primary dipromosikan, retry request dengan `idempotency_key` yang sama harus mengembalikan nomor atau reservation yang sama, bukan nomor baru.
 
+## Kegagalan menjawab 422, bukan 503
+
+Ketika penerbitan nomor masih berupa panggilan HTTP dari app ke Core, sebuah kegagalan bisa berarti
+"Core tidak terjangkau", dan 503 adalah jawaban yang jujur. Untuk module di dalam runtime, keadaan
+itu tidak ada lagi: Core adalah pemanggilan fungsi di proses yang sama, dan kalau ia tidak ada, tidak
+akan ada permintaan HTTP yang sampai untuk dijawab.
+
+Karena itu kegagalan penerbitan menjawab **422**. Kode kesalahan jaringan pada jalur ini bukan
+sekadar berhenti dipakai — ia dibuat **tidak bisa ditulis lagi**, supaya jawaban yang mustahil tidak
+bisa lahir kembali dari kode yang disalin.
+
+Penerbitan boleh dipanggil dari dalam transaksi pemanggilnya, dan tidak wajib berada di dalamnya:
+transaksinya menjadi savepoint. Yang mengikat adalah hasilnya — nomor, dokumen, dan pengajuan
+workflow berada dalam satu transaksi, sehingga transaksi yang gagal mengembalikan nilai berikutnya
+seperti semula dan tidak meninggalkan satu pun baris penerbitan.
+
 ## Pengujian
 
 Test suite berjalan di **PostgreSQL sungguhan**, pada schema terpisah (`DB_TEST_SCHEMA`, default `coreerp_test`). Ini bukan preferensi gaya. Pada SQLite, `lockForUpdate`, `sharedLock`, dan `FOR UPDATE SKIP LOCKED` semuanya dikompilasi menjadi string kosong, sehingga suite SQLite tidak membuktikan satu pun jaminan konkurensi yang menjadi dasar desain ini. Pemindahan ke PostgreSQL langsung menemukan satu bug produksi: kolom `status` selebar 20 karakter tidak muat menampung `reconciliation_pending` (23 karakter), jadi seluruh jalur recovery gagal di produksi sementara test SQLite lulus.
@@ -223,6 +239,13 @@ psql -d core_erp -c "CREATE SCHEMA IF NOT EXISTS coreerp_test;"
 - instance kedua benar-benar diblokir pada row lock counter;
 - unique index idempotency menolak nomor kedua untuk satu key;
 - blok preallocation tidak pernah mengulang nomor.
+
+### Bahan uji dibaca dari manifest, bukan disalin ke test
+
+Daftar reference nomor milik sebuah module beserta awalannya dibaca dari `app.yaml` module itu, tidak
+ditulis ulang di dalam berkas test. Daftar kedua akan menyimpang dari yang pertama, dan yang
+menyimpang lebih berbahaya daripada yang tidak ada. Membacanya dari manifest juga membuat assertion
+sekaligus membuktikan bahwa reference yang benar memang dipakai.
 
 ## Load test
 
