@@ -64,8 +64,6 @@ x-api: &api
     SESSION_DRIVER: database
     CACHE_STORE: database
     QUEUE_CONNECTION: database
-    COREERP_DEPLOYMENT_PROFILE: pooled
-    COREERP_DEPLOYMENT_PLACEMENT: pooled-primary
     COREERP_PROVIDER_EMAIL: provider@load.test
     COREERP_PROVIDER_PASSWORD: Loadtest-Provider-2026!
     COREERP_APP_CONTEXT_SIGNING_KEY: loadtest-context-signing-key-32b!!

@@ -159,7 +159,6 @@ class FiscalCalendarDirectoryTest extends TestCase
     {
         $tenantId ??= $this->tenantId;
         DB::table('tenant_app_entitlements')->insert(['tenant_id' => $tenantId, 'app_id' => $this->appId, 'status' => 'active', 'starts_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
-        DB::table('tenant_deployments')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'profile' => 'pooled', 'placement' => 'sample-placement', 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
         DB::table('core_module_installations')->insert(['tenant_id' => $tenantId, 'module_id' => $this->appId, 'version' => '1.0.0', 'status' => ModuleInstallation::STATUS_INSTALLED, 'installed_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
     }
 }

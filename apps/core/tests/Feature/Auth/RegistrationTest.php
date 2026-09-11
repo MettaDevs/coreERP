@@ -43,7 +43,13 @@ class RegistrationTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
         $this->assertDatabaseHas('tenant_memberships', ['system_role' => 'owner']);
         $this->assertDatabaseCount('tenant_app_entitlements', 1);
-        $this->assertDatabaseCount('tenant_deployments', 1);
+        $this->assertDatabaseCount('environments', 1);
+        $this->assertDatabaseHas('environments', [
+            'kind' => 'production',
+            'status' => 'active',
+            'outbound_allowed' => true,
+            'database_name' => null,
+        ]);
         $this->assertDatabaseCount('organizations', 0);
         $this->assertDatabaseCount('roles', 1);
     }
