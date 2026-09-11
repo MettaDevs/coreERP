@@ -3,17 +3,20 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
-use PusatAdmin\Http\Controllers\LingkunganController;
-use PusatAdmin\Http\Controllers\LoginController;
+use PusatAdmin\Http\Controllers\Keluar;
+use PusatAdmin\Http\Controllers\Lingkungan\Daftar;
+use PusatAdmin\Http\Controllers\Lingkungan\Rincian;
+use PusatAdmin\Http\Controllers\Lingkungan\Simpan;
+use PusatAdmin\Http\Controllers\Masuk;
 
 Route::redirect('/', '/lingkungan');
 
 Route::middleware('guest')->group(function (): void {
-    Route::get('/login', [LoginController::class, 'form'])->name('login');
-    Route::post('/login', [LoginController::class, 'masuk']);
+    Route::get('/login', [Masuk::class, 'form'])->name('login');
+    Route::post('/login', [Masuk::class, 'kirim']);
 });
 
-Route::post('/logout', [LoginController::class, 'keluar'])->middleware('auth');
+Route::post('/logout', Keluar::class)->middleware('auth');
 
 /*
  * Setiap alamat di bawah lewat `auth` DAN `operator`.
@@ -24,7 +27,7 @@ Route::post('/logout', [LoginController::class, 'keluar'])->middleware('auth');
  * menampilkan data yang sama dijaga gate.
  */
 Route::middleware(['auth', 'operator'])->group(function (): void {
-    Route::get('/lingkungan', [LingkunganController::class, 'index'])->name('lingkungan.daftar');
-    Route::post('/lingkungan', [LingkunganController::class, 'store'])->name('lingkungan.simpan');
-    Route::get('/lingkungan/{lingkungan}', [LingkunganController::class, 'show'])->name('lingkungan.rincian');
+    Route::get('/lingkungan', Daftar::class)->name('lingkungan.daftar');
+    Route::post('/lingkungan', Simpan::class)->name('lingkungan.simpan');
+    Route::get('/lingkungan/{lingkungan}', Rincian::class)->name('lingkungan.rincian');
 });

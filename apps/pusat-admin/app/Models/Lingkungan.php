@@ -37,6 +37,9 @@ class Lingkungan extends Model
 {
     use HasUlids;
 
+    /** Jenis yang dikenal registry. Sama persis dengan CHECK `environments_kind_dikenal`. */
+    public const JENIS = ['production', 'sandbox', 'demo'];
+
     protected $table = 'environments';
 
     protected $fillable = [
@@ -85,6 +88,34 @@ class Lingkungan extends Model
      */
     public function database(): string
     {
-        return $this->database_name ?? config('database.connections.pgsql.database');
+        return $this->database_name ?? (string) config('database.connections.pgsql.database');
+    }
+
+    /**
+     * Bentuk yang dikirim ke layar.
+     *
+     * Ditaruh di model, bukan diulang di tiap controller. Dua layar yang memetakan baris yang sama
+     * dengan tangan akan menyimpang diam-diam, dan yang menyimpang biasanya kolom yang paling
+     * jarang dilihat — persis yang akan salah dibaca ketika akhirnya dilihat.
+     *
+     * Nilai mentah dari database ikut apa adanya (`production`, `provisioning`); penerjemahannya ke
+     * bahasa layar dikerjakan satu berkas di sisi React. Menerjemahkannya di sini berarti layar
+     * tidak dapat lagi membedakan dua status yang kebetulan berbunyi mirip.
+     *
+     * @return array<string, mixed>
+     */
+    public function untukLayar(): array
+    {
+        return [
+            'id' => $this->id,
+            'nama' => $this->name,
+            'slug' => $this->slug,
+            'jenis' => $this->kind,
+            'status' => $this->status,
+            'keluar' => $this->outbound_allowed,
+            'database' => $this->database(),
+            'berakhir' => $this->expires_at?->toDateString(),
+            'tenant' => $this->tenant->name ?? 'Tanpa tenant',
+        ];
     }
 }

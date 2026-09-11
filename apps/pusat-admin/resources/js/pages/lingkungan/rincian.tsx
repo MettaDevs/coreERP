@@ -63,11 +63,24 @@ export default function Rincian({
             <Head title={lingkungan.nama} />
 
             {!lingkungan.databaseSendiri && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                    Lingkungan ini baru tercatat di registry. Ia belum punya
-                    database sendiri, jadi belum ada yang dapat memasukinya —
-                    hanya lingkungan berstatus Aktif yang dapat dirutekan.
-                    Langkah menyiapkan databasenya adalah pekerjaan berikutnya.
+                <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <p>
+                        Lingkungan ini baru tercatat di registry. Ia belum punya
+                        database sendiri, jadi belum ada yang dapat memasukinya
+                        — hanya lingkungan berstatus Aktif yang dapat dirutekan.
+                    </p>
+                    {/*
+                        Perintahnya ditampilkan, bukan disembunyikan di balik tombol, dan itu
+                        bukan kemalasan. Panggilan dari konsol ini ke Core menyeberangi batas
+                        control plane ke application plane, dan jalur autentikasi untuk arah
+                        itu belum ada — `internal-app` milik Core terikat pada satu app dan
+                        satu tenant, jadi ia tidak cocok. Tombol yang memanggilnya lebih dulu
+                        berarti memutuskan bentuk kredensialnya sambil lalu.
+                    */}
+                    <p>Siapkan databasenya dari Core:</p>
+                    <code className="block overflow-x-auto rounded bg-amber-100 px-3 py-2 font-mono text-xs">
+                        php artisan environment:siapkan {lingkungan.id}
+                    </code>
                 </div>
             )}
 

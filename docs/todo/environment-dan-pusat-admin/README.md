@@ -198,9 +198,26 @@ are created and configured in the application plane."*
 
 Yang tahu cara membuat database, menjalankan migration, membaca registry module, dan menyemai data
 awal hanyalah Core. Jadi pusat admin **memerintah** dan Core **mengerjakan**: pusat admin menulis
-baris `environments`, memanggil Core lewat `/api/internal/v1/...` memakai kredensial layanan yang
-sudah ada, lalu mencatat hasilnya di `environment_operations`. Tidak ada mekanisme baru yang perlu
-ditemukan; `AuthenticateAppService` sudah melakukan persis autentikasi mesin-ke-mesin ini.
+baris `environments`, memerintahkan Core mengerjakan langkah beratnya, lalu mencatat hasilnya di
+`environment_operations`.
+
+::: warning Transportnya belum diputuskan, dan klaim sebelumnya salah
+Versi terdahulu halaman ini menulis bahwa perintahnya lewat `/api/internal/v1/...` memakai
+`AuthenticateAppService` yang sudah ada, dan bahwa "tidak ada mekanisme baru yang perlu ditemukan".
+Itu keliru, dan baru ketahuan saat hendak menyambungkannya.
+
+Middleware `internal-app` menuntut **tiga** header — `X-CoreERP-App-Id`, `X-CoreERP-Service-Token`,
+dan `X-CoreERP-Tenant-Id` — lalu memeriksa bahwa app itu **terpasang pada tenant itu**. Ia dirancang
+untuk app module yang memanggil Core atas nama satu tenant. Pusat admin bukan app module, tidak
+terpasang pada tenant mana pun, dan justru sedang bekerja pada environment yang tenant-nya belum
+punya apa-apa. Memaksakannya berarti menerbitkan kredensial app palsu untuk setiap pelanggan.
+
+Arah control plane → application plane karena itu **memang** menuntut jalur autentikasinya sendiri,
+dan itu keputusan yang belum diambil. Sampai ia diambil, perintahnya dijalankan sebagai perintah
+artisan di Core (`environment:siapkan`), dan konsol menampilkan perintahnya di halaman rincian.
+Tombol yang memanggilnya lebih dulu berarti memutuskan bentuk kredensialnya sambil lalu — dan batas
+jaringan yang seharusnya menopangnya (`internal: true`) juga belum berdiri.
+:::
 
 ### Ditegakkan mesin, bukan diniatkan
 

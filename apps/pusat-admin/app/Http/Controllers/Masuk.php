@@ -18,14 +18,14 @@ use Inertia\Response as HalamanInertia;
  * tetap di Core dan tidak disentuh. Selama keputusan tentang letak identitas belum diambil,
  * menaruh salinan kedua dari jalur-jalur itu di sini hanya menambah tempat yang bisa salah.
  */
-class LoginController extends Controller
+class Masuk extends Controller
 {
     public function form(): HalamanInertia
     {
         return Inertia::render('login');
     }
 
-    public function masuk(Request $request): RedirectResponse
+    public function kirim(Request $request): RedirectResponse
     {
         $isian = $request->validate([
             'email' => ['required', 'string', 'email'],
@@ -44,14 +44,5 @@ class LoginController extends Controller
         $request->session()->regenerate();
 
         return redirect()->intended('/lingkungan');
-    }
-
-    public function keluar(Request $request): RedirectResponse
-    {
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect('/login');
     }
 }

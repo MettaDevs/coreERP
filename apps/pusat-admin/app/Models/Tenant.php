@@ -22,6 +22,22 @@ class Tenant extends Model
 
     protected $table = 'tenants';
 
+    /**
+     * Pilihan pelanggan untuk formulir, urut nama.
+     *
+     * @return list<array{id: string, nama: string}>
+     */
+    public static function pilihan(): array
+    {
+        return array_values(
+            self::query()
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (self $t): array => ['id' => $t->id, 'nama' => $t->name])
+                ->all()
+        );
+    }
+
     /** @return HasMany<Lingkungan, $this> */
     public function lingkungan(): HasMany
     {
