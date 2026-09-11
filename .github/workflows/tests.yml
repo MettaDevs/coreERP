@@ -97,6 +97,22 @@ jobs:
       DB_TEST_PASSWORD: core_erp
       DB_TEST_SCHEMA: coreerp_test
 
+      # CI tidak menjalankan OpenTelemetry, dan tidak boleh membayar biayanya. Ekstensi
+      # `opentelemetry` hanya ada pada image runtime, bukan pada runner; memasangnya di sini
+      # berarti kompilasi PECL pada setiap job demi instrumentasi yang tidak seorang pun baca.
+      #
+      # Nilai ini yang mematikannya, bukan sekadar meredam keluarannya. `_register.php` milik
+      # tiap paket auto-instrumentation memeriksa `Sdk::isInstrumentationDisabled()` lebih dulu
+      # dan langsung `return`, sebelum sampai ke pemeriksaan ekstensi yang memanggil
+      # `trigger_error(..., E_USER_WARNING)`. Peringatan itu bukan sekadar berisik: selama fase
+      # `post-autoload-dump`, penangan error milik Composer mengubahnya menjadi exception dan
+      # seluruh langkah gagal.
+      #
+      # Dipakai `all`, bukan `laravel,psr3`, karena yang dinyatakan di sini adalah niat — CI
+      # tidak pernah punya telemetri — sehingga paket auto-instrumentation ketiga yang
+      # ditambahkan nanti tidak perlu diingat untuk didaftarkan ulang.
+      OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
+
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -134,8 +150,13 @@ jobs:
         run: npm ci
         working-directory: .
 
+      # `--ignore-platform-req=ext-opentelemetry` menjawab separuh masalah yang berbeda dari
+      # env di atas: dua paket `open-telemetry/*` mendeklarasikan ekstensi itu sebagai
+      # platform requirement keras, dan penyelesai dependency menolak jauh sebelum satu baris
+      # kode pun dijalankan. Bentuk ini menyamai tahap vendor pada `apps/control-plane/Dockerfile`,
+      # supaya masalah yang sama tidak ditangani dengan dua mekanisme berbeda.
       - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-opentelemetry
 
       - name: Copy Environment File
         run: cp .env.example .env

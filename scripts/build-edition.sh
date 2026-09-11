@@ -113,9 +113,15 @@ printf 'Tag image: %s\n\n' "$tag"
 
 # Konteks pembangunan adalah akar repo, bukan folder app. Alasannya ada di komentar paling atas
 # `apps/control-plane/Dockerfile`.
+#
+# `PASANG_OTEL` diteruskan apa adanya dari lingkungan dan bawaannya `1`, jadi siapa pun yang
+# menjalankan skrip ini dengan tangan — termasuk pelanggan yang membangun dari sumber —
+# mendapat image utuh tanpa perlu tahu variabel ini ada. Yang menyetelnya ke `0` hanya alur
+# `edition.yml`, yang membangun untuk memverifikasi lalu membuang hasilnya.
 docker build \
     --file "$akar/apps/control-plane/Dockerfile" \
     --build-arg "MODUL=$daftar" \
+    --build-arg "PASANG_OTEL=${PASANG_OTEL:-1}" \
     --tag "$tag" \
     "$akar"
 

@@ -9,6 +9,7 @@ use App\Support\DataPolicyAccessResolver;
 use App\Support\LaunchableAppCatalog;
 use App\Support\Modules\ModuleRequestContext;
 use App\Support\Modules\TenantScope;
+use App\Support\Observabilitas\LaporanKesalahan;
 use Closure;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -94,6 +95,23 @@ final class ResolveModuleContext
         $request->attributes->set(ModuleRequestContext::ORG_UNIT_ID, $orgUnit?->id);
         $request->attributes->set(ModuleRequestContext::USER_ID, (string) $membership->user_id);
         $request->attributes->set(ModuleRequestContext::PERMISSIONS, $izin);
+
+        /*
+         * Nama yang bersanding dengan id di atas, disimpan sekarang karena sekarang gratis.
+         *
+         * `$membership->tenant` sudah ikut termuat (`CurrentWorkspace::memberships()` memakai
+         * `with('tenant')`), dan `$legalEntity` serta `$orgUnit` adalah objek yang baru saja
+         * diambil beberapa baris di atas. Membaca namanya di sini tidak menambah satu query
+         * pun; membacanya nanti akan menambah tiga.
+         *
+         * "Nanti" itu bukan hipotesis. Laporan kesalahan membutuhkannya, dan ia sering berjalan
+         * justru ketika database sedang tidak bisa ditanya — sehingga satu-satunya nama yang
+         * aman baginya adalah nama yang sudah berada di memori sebelum kegagalan terjadi.
+         */
+        $request->attributes->set(LaporanKesalahan::NAMA_TENANT, $membership->tenant->name);
+        $request->attributes->set(LaporanKesalahan::NAMA_LEGAL_ENTITY, $legalEntity?->name);
+        $request->attributes->set(LaporanKesalahan::NAMA_ORG_UNIT, $orgUnit?->name);
+        $request->attributes->set(LaporanKesalahan::NAMA_PENGGUNA, $request->user()?->name);
         $request->attributes->set(ModuleRequestContext::DATA_POLICIES, $this->kebijakan->resolve($membership));
 
         /*

@@ -38,6 +38,33 @@ return [
     'confirmed_pool_retention_days' => env('COREERP_CONFIRMED_POOL_RETENTION_DAYS', 30),
     'audit_retention_days' => env('COREERP_AUDIT_RETENTION_DAYS', 400),
 
+    /*
+     * Alamat antarmuka SigNoz, dipakai untuk menaruh tautan di dalam laporan kesalahan.
+     *
+     * Bukan alamat collector: yang ini dibuka manusia di peramban, yang itu menerima OTLP dan
+     * porta keduanya berbeda. Kosong berarti laporannya tidak memuat tautan — benar untuk
+     * pemasangan yang tidak punya SigNoz.
+     */
+    'signoz_url' => env('COREERP_SIGNOZ_URL'),
+
+    /*
+     * Pengiriman laporan kesalahan ke Discord.
+     *
+     * Kosong berarti mati, dan itulah bawaannya — termasuk pada pemasangan on-prem, yang
+     * channel Discord-nya bukan milik kita. Lihat App\Support\Observabilitas\PengirimDiscord.
+     */
+    'discord' => [
+        'webhook_url' => env('COREERP_DISCORD_WEBHOOK_URL'),
+
+        // Ditulis apa adanya di depan ringkasan. `@everyone`, `@here`, `<@id_orang>`, atau
+        // `<@&id_role>`; boleh digabung. Menulis `@nama` biasa tidak menjadi sebutan.
+        'mention' => env('COREERP_DISCORD_MENTION', ''),
+
+        // Jeda minimal antara dua kiriman untuk kesalahan yang sama. Lihat PenjedaKiriman —
+        // ini yang memisahkan peringatan dari banjir. Nol mematikan penjedanya.
+        'jeda_detik' => env('COREERP_DISCORD_JEDA_DETIK', 60),
+    ],
+
     'operating_unit_types' => [
         'business_unit' => 'Business unit',
         'department' => 'Department',

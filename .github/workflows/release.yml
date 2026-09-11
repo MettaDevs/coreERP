@@ -35,6 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
+    # Alasannya ditulis lengkap di alur tests. Perhatikan bedanya dengan alur edition: di sana
+    # ekstensi `opentelemetry` juga dilewatkan saat membangun image, karena image-nya hanya
+    # dipakai untuk verifikasi. Di sini tidak — image yang dibangun alur ini adalah image yang
+    # benar-benar dikirim ke pelanggan, dan ia harus utuh.
+    env:
+      OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -72,7 +79,7 @@ jobs:
           coverage: none
 
       - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-opentelemetry
         working-directory: apps/control-plane
 
       - name: Copy Environment File
