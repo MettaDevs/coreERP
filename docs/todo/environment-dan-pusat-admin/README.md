@@ -497,8 +497,8 @@ berhenti benar pada hari sebuah module mengirim email, yang pada hari itu menamb
 daftar pelucutan di atas.
 
 **Telemetri tidak dapat dimatikan per environment lewat env var**, karena
-pengaturannya bersifat proses — lihat `docs/dev/28-pelaporan-kesalahan.md` — dan satu proses
-environment. Itu justru alasan benderanya harus ada sama sekali.
+[pengaturannya bersifat proses](../../dev/28-pelaporan-kesalahan.md) dan satu proses melayani
+semua environment. Itu justru alasan benderanya harus ada sama sekali.
 :::
 
 ### Di mana pg_dump dijalankan
@@ -894,5 +894,5 @@ Dibaca dari sumbernya pada 11 September 2026.
 - [Gate fondasi Core](../../dev/10-core-foundation-gates.md) — definisi selesai yang dipakai di atas
 - [Bundle dan pemasangan di server pelanggan](../bundle-on-prem/README.md) — jalur on-prem yang tidak boleh terganggu
 - [Peta app dan kemampuan Core](../general/08-peta-app.md) — kenapa multi-produk sudah ditangani module
-- `docs/dev/28-pelaporan-kesalahan.md` — kenapa telemetri bersifat proses
+- [Pelaporan kesalahan](../../dev/28-pelaporan-kesalahan.md) — kenapa telemetri bersifat proses
 - [Tiga kebenaran lifecycle](../../onboarding/tiga-kebenaran.md) — `catalogued`, `entitled`, `installed`
