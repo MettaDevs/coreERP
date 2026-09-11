@@ -1,0 +1,21 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app/
+        - bootstrap/app.php
+        - config/
+        - routes/
+        - tests/
+
+    level: 7
+
+    # Tidak ada `phpstan-baseline.neon` di sini, dan tidak boleh ada.
+    #
+    # Baseline milik Core membekukan temuan yang sudah berdiri sejak commit pertama — ia menebus
+    # utang yang sudah telanjur ada. Konsol ini lahir hari ini; utang yang dibekukan di hari
+    # pertama tidak pernah dibayar siapa pun.
+    #
+    # `tests/` ikut dianalisa, tidak seperti di Core. Permukaannya kecil, dan test adalah tempat
+    # kesalahan tipe paling mudah lolos justru karena ia hijau.

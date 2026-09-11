@@ -1,0 +1,27 @@
+{
+    "$schema": "https://www.schemastore.org/package.json",
+    "name": "@coreerp/pusat-admin",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "npm run ui:build && vite build",
+        "dev": "npm run ui:build && vite",
+        "ui:build": "npm --prefix ../../packages/ui run build",
+        "types:check": "npm run ui:build && tsc --noEmit"
+    },
+    "dependencies": {
+        "@apperp/ui": "*",
+        "@inertiajs/react": "^3.0.0",
+        "@inertiajs/vite": "^3.0.0",
+        "@tailwindcss/vite": "^4.1.11",
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
+        "@vitejs/plugin-react": "^5.2.0",
+        "laravel-vite-plugin": "^3.0.0",
+        "react": "^19.2.0",
+        "react-dom": "^19.2.0",
+        "tailwindcss": "^4.0.0",
+        "typescript": "^5.7.2",
+        "vite": "^8.0.0"
+    }
+}

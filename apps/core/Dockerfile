@@ -81,6 +81,17 @@ ENV WAYFINDER_COMMAND=true
 # skrip `install` milik dependensi ikut berjalan di dalam image.
 COPY package.json package-lock.json .npmrc ./
 COPY apps/core/package.json ./apps/core/
+# Manifest pusat admin ikut, dan **hanya** manifestnya — nol berkas sumber.
+#
+# Ia disebut `workspaces` pada `package.json` akar, dan `npm ci` berhenti sebelum satu paket pun
+# terpasang bila sebuah workspace yang disebut di sana tidak ada di konteks pembangunan. Kegagalannya
+# menuduh lockfile, bukan folder yang hilang, jadi ia mahal didiagnosa.
+#
+# Yang menjaga pusat admin tetap di luar image pelanggan bukan baris ini melainkan tahap akhir, yang
+# hanya menyalin `COPY --from=vendor /repo/apps/core`. Jalur 1 `scripts/verify-edition.sh` menagih
+# hasilnya: ia menghitung folder di `/repo/apps` pada image yang sudah jadi dan menolak apa pun
+# selain `core`.
+COPY apps/pusat-admin/package.json ./apps/pusat-admin/
 COPY packages/ui ./packages/ui
 # npm dapat diam-diam melewatkan optional native binding ketika unduhannya gagal
 # (npm/cli#4828): instalasinya tetap melapor sukses, lalu build meledak jauh

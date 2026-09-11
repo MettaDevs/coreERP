@@ -1,0 +1,15 @@
+@import 'tailwindcss' source(none);
+@import '@apperp/ui/styles.css';
+
+@source '../js';
+@source '../views';
+
+/*
+ * Kelas milik `@apperp/ui` hanya lahir kalau sumbernya ikut dipindai.
+ *
+ * Tanpa baris ini `npm run build` tetap hijau dan CSS keluarannya kehilangan setiap kelas yang
+ * cuma dipakai komponen paket. Kegagalannya tidak berbunyi di mana pun; yang terlihat hanya
+ * halaman yang tata letaknya berantakan. Jalurnya ditulis ke folder paket yang sungguhan, bukan
+ * lewat tautan simbolik npm, supaya ia tidak bergantung pada apakah pemindai mau menembusnya.
+ */
+@source '../../../../packages/ui/src';

@@ -223,3 +223,72 @@ jobs:
       # jarang; biayanya dibayar pada setiap perubahan apa pun.
       - name: Tests
         run: php artisan test --parallel ${{ github.event_name == 'pull_request' && '--exclude-group=lambat' || '' }}
+
+  # Konsol operator diuji terpisah dari Core, dan itu sengaja.
+  #
+  # Ia tidak punya skema sendiri — suitenya membangun skema Core dari folder migration Core,
+  # satu-satunya sumbernya. Menyatukannya ke job di atas berarti dua aplikasi berebut satu
+  # schema `coreerp_test` dalam satu job, dan `RefreshDatabase` milik yang satu akan menghapus
+  # tabel yang sedang dipakai yang lain. Job terpisah memberi masing-masing servernya sendiri.
+  konsol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: apps/pusat-admin
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: core_erp
+          POSTGRES_USER: core_erp
+          POSTGRES_PASSWORD: core_erp
+          PGDATA: /var/lib/postgresql/data/pgdata
+        ports:
+          - 5432:5432
+        options: >-
+          --tmpfs /var/lib/postgresql/data:rw
+          --health-cmd "pg_isready -U core_erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_TEST_HOST: 127.0.0.1
+      DB_TEST_PORT: 5432
+      DB_TEST_DATABASE: core_erp
+      DB_TEST_USERNAME: core_erp
+      DB_TEST_PASSWORD: core_erp
+      DB_TEST_SCHEMA: coreerp_test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      # `search_path` koneksi test menunjuk schema tersendiri, dan PostgreSQL tidak membuatnya
+      # sendiri. Tanpa langkah ini migration gagal dengan "no schema has been selected to create
+      # in" — pesan yang tidak menyebut schema mana pun yang hilang.
+      - name: Create Test Schema
+        env:
+          PGPASSWORD: core_erp
+        run: psql -h 127.0.0.1 -p 5432 -U core_erp -d core_erp -c "CREATE SCHEMA IF NOT EXISTS coreerp_test;"
+
+      # Tanpa `--parallel`: suitenya sepuluh test, dan tiap pekerja paralel membayar satu
+      # pembangunan skema Core penuh lebih dulu. Paralelisasi di sini menambah waktu, bukan
+      # memotongnya.
+      - name: Tests
+        run: php artisan test

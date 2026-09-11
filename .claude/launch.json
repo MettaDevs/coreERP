@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "docs:dev"],
       "cwd": "docs",
       "port": 5173
+    },
+    {
+      "name": "pusat-admin",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "serve", "--port=8001"],
+      "cwd": "apps/pusat-admin",
+      "port": 8001
     }
   ]
 }
