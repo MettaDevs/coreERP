@@ -37,6 +37,8 @@ export default withMermaid({
     'todo/api-untuk-integrator/README.md': 'todo/api-untuk-integrator/index.md',
     'todo/bundle-on-prem/README.md': 'todo/bundle-on-prem/index.md',
     'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
+    'todo/environment-dan-pusat-admin/README.md':
+      'todo/environment-dan-pusat-admin/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -255,6 +257,16 @@ export default withMermaid({
                 {
                   text: 'Bundle dan pemasangan di server pelanggan',
                   link: '/todo/bundle-on-prem/',
+                },
+              ],
+            },
+            {
+              text: 'Pusat admin',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Environment dan pusat admin',
+                  link: '/todo/environment-dan-pusat-admin/',
                 },
               ],
             },
