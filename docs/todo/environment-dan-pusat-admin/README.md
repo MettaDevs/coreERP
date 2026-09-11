@@ -759,20 +759,91 @@ Ditambah satu batasan alat: penjaga baseline PHPStan membandingkan entri per ent
 jadi **tidak ada entri baseline baru yang boleh ditambahkan.** Seluruh kode baru harus bersih, dan
 resolver koneksi dinamis persis bentuk yang dikeluhkan analisa statis.
 
+## Urutan pemisahan: batas dulu, database, baru repo
+
+Bagian ini lahir dari pertanyaan yang berulang tiga kali dalam satu hari — "pisah repo atau tidak?"
+— dan ia ditulis di sini supaya tidak perlu dijawab keempat kalinya.
+
+**Ketiganya hal yang berbeda, dan urutannya mengikat:**
+
+| Langkah | Apa yang dipisah | Pemicunya |
+| --- | --- | --- |
+| 1. Batas | Penanda `MilikPusat` pada tabel sisi pusat; nama koneksi jadi setelan | Sudah, di Irisan 1 |
+| 2. Database | Tabel sisi pusat pindah ke database sendiri | Saat environment kedua lahir dan butuh penyimpanan terpisah |
+| 3. Repo | `apps/pusat-admin` pindah keluar | **Saat control plane memiliki skemanya sendiri** — yaitu sesudah langkah 2 |
+
+### Kenapa repo tidak dipisah sekarang
+
+Arah ketergantungannya masih terbalik: skema dimiliki Core, control plane cuma membacanya. Repo
+terpisah membuat setiap penambahan satu kolom menjadi dua pull request di dua repo yang harus
+mendarat berurutan — memperburuk *development-time coupling*, bukan mengurangi.
+
+Begitu langkah 2 selesai, arahnya membalik dan pemindahannya jadi mekanis.
+
+### Ongkos langkah 2, diukur bukan ditaksir
+
+**28 foreign key menunjuk `tenants`. 10 menunjuk `users`.** PostgreSQL tidak mengenal foreign key
+lintas database, jadi memisahkan penyimpanannya berarti membuang ketiga puluh delapan constraint
+itu dan menggantinya dengan id opaque — dan setiap `cascadeOnDelete` yang ikut hilang harus lahir
+kembali sebagai logika aplikasi yang seseorang harus ingat menulisnya.
+
+Itu bukan satu migration. Itu merancang ulang integritas referensial seluruh skema, dan karena itu
+ia berdiri sebagai irisannya sendiri.
+
+### Aturan yang menjaga langkah 2 tetap murah
+
+Selama batasnya belum jadi batas fisik, satu aturan menahan ongkosnya agar tidak tumbuh:
+**tidak boleh ada foreign key maupun join baru yang menyeberang batas.** Tabel sisi environment
+tidak menunjuk tabel sisi pusat, dan sebaliknya.
+
+Ia murah dijaga — satu pemindai migration — dan tanpanya angka 38 di atas akan bertambah diam-diam
+setiap kali seseorang menambah tabel.
+
+### Yang tidak berubah setelah pemisahan
+
+Pembagian kerjanya tetap: **pusat admin memerintah, Core mengerjakan.** Yang pindah hanyalah
+kepemilikan skema. Menjalankan migration, membaca registry module, dan menyemai data awal tetap
+pekerjaan runtime Core, sesuai penempatan AWS yang dikutip di
+[siapa memerintah, siapa mengerjakan](#siapa-memerintah-siapa-mengerjakan).
+
+Itu juga sebabnya repo terpisah tidak pernah membuat pusat admin mandiri — ia selalu pemberi
+perintah, tidak pernah pelaksana.
+
+### Tentang `users`
+
+Tempatnya di sisi pusat, dan SSO memperkuatnya: bila identitas datang dari penyedia luar, Core
+tidak butuh tabel pendaftaran sama sekali — ia hanya perlu tahu siapa yang masuk.
+
+Untuk sekarang skema pendaftaran di Core **dibiarkan berdiri** sebagai jaring pengaman. Ia dibuang
+hanya setelah jalur SSO terbukti menggantikannya sepenuhnya, bukan sebelum.
+
+### Stack konsolnya
+
+Laravel + Inertia + React + `@apperp/ui` — sama persis dengan Core. Blade polos sempat
+dipertimbangkan karena menghapus enam penghalang integrasi sekaligus, dan **ditolak**: konsol ini
+akan dilihat dan dipelajari orang, dan stack yang berbeda memaksa tim belajar dua dunia untuk satu
+produk. Stack TS penuh di sisi backend ditolak dengan alasan yang sama, ditambah satu lagi — ia
+berarti ORM kedua yang membaca database yang sama.
+
 ## Irisan pengerjaan
 
 Lima, dan masing-masing berguna serta dapat dibuktikan sendiri. Urutannya bukan selera.
 
-### `[ ]` Irisan 0 — rename `apps/core` menjadi `apps/core`
+### `[x]` Irisan 0 — rename folder app menjadi `apps/core`
 
 Mekanis, nol perubahan perilaku, tetapi **lebar**: ia menyentuh Dockerfile, berkas compose edisi,
 seluruh workflow CI, `start.ps1` di repo `erp-dev` beserta jalur sumbernya, repo penyebaran, dan
 rujukan di seluruh `docs/`.
 
-Ia **paling murah dikerjakan sekarang**, sebelum ada satu baris pun kode pusat admin yang ikut
-bergerak, dan tiap minggu ia bertambah mahal.
-
 *Terbukti oleh:* stack lokal menyala, alur edisi hijau, dan tidak ada satu pun perubahan perilaku.
+
+::: tip Satu pelajaran dari mengerjakannya
+Skrip pengganti massal ikut menyentuh **halaman ini sendiri**, sehingga judul irisan ini sempat
+berbunyi "rename `apps/core` menjadi `apps/core`" — kalimat yang tidak berarti apa-apa dan lolos
+karena tidak ada yang membaca ulang dokumennya sesudah skrip berjalan. Penggantian massal yang
+mencakup `docs/` wajib diperiksa matanya, bukan hanya build-nya: tautan tetap hidup, jadi
+`npm run docs:build` tetap hijau.
+:::
 
 ### `[ ]` Irisan 1 — registry, tanpa database kedua
 
