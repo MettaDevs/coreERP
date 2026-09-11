@@ -6,6 +6,7 @@ use App\Support\Pusat\MilikPusat;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Satu tindakan terhadap sebuah environment, beserta hasilnya.
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $status
  * @property ?string $step
  * @property ?string $failure_message
+ * @property ?Carbon $lease_until
  */
 class EnvironmentOperation extends Model
 {
@@ -42,6 +44,7 @@ class EnvironmentOperation extends Model
         'detail',
         'started_at',
         'finished_at',
+        'lease_until',
     ];
 
     /** @return array<string, string> */
@@ -50,6 +53,7 @@ class EnvironmentOperation extends Model
         return [
             'detail' => 'array',
             'started_at' => 'datetime',
+            'lease_until' => 'datetime',
             'finished_at' => 'datetime',
         ];
     }
