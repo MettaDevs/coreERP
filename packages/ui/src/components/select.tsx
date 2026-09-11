@@ -1,5 +1,6 @@
 import * as React from 'react';
 
+import { cn } from '../utils';
 import {
     Combobox,
     ComboboxContent,
@@ -10,7 +11,6 @@ import {
     ComboboxTrigger,
     ComboboxValue,
 } from './combobox';
-import { cn } from '../utils';
 
 type SelectItem = string | { value: string; label: string };
 
@@ -58,7 +58,10 @@ function Select({
     ) ?? null;
 
     const updateValue = (nextValue: string | null) => {
-        if (value === undefined) setInternalValue(nextValue);
+        if (value === undefined) {
+setInternalValue(nextValue);
+}
+
         onValueChange?.(nextValue);
     };
 

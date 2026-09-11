@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class MasterDataAsetTest extends TestCase
@@ -69,6 +70,41 @@ class MasterDataAsetTest extends TestCase
         return [
             'model aset' => ['model-aset', 'pabrikan_aset_id'],
         ];
+    }
+
+    /**
+     * Header `Location` pada jawaban 201 benar-benar dapat diikuti.
+     *
+     * Yang diuji bukan bentuk alamatnya melainkan **bahwa ia menjawab**. Sampai 10 September 2026
+     * nilainya `/api/v1/<resource>/<id>` — alamat modul waktu ia masih app tersendiri — sedangkan
+     * rutenya sudah pindah ke `/api/modules/management-aset/v1/`. Klien yang mengikutinya mendarat
+     * di 404, dan tidak satu pun test gagal karena tidak ada yang pernah membaca header ini.
+     *
+     * Inilah bentuk pemeriksaan yang tidak bisa basi: ia mengambil alamat dari jawaban dan
+     * memintanya. Sebuah test yang hanya membandingkan string alamat akan tetap hijau pada hari
+     * rutenya pindah lagi.
+     */
+    public function test_alamat_pada_location_dapat_diikuti(): void
+    {
+        $dibuat = $this->createRecord('pabrikan-aset', ['nama' => 'Komatsu'])->assertCreated();
+
+        $location = $dibuat->headers->get('Location');
+
+        $this->assertNotNull($location, 'Jawaban 201 harus menyebut alamat record yang baru dibuat.');
+
+        $jalur = parse_url((string) $location, PHP_URL_PATH);
+
+        $this->assertIsString($jalur);
+        $this->assertSame(
+            '/api/modules/management-aset/v1/pabrikan-aset/'.$dibuat->json('data.id'),
+            $jalur,
+            'Alamatnya harus berada di bawah awalan rute module, bukan di bawah awalan app lama.',
+        );
+
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('pabrikan-aset'))
+            ->getJson($jalur)
+            ->assertOk()
+            ->assertJsonPath('data.id', $dibuat->json('data.id'));
     }
 
     #[DataProvider('standaloneMasters')]
@@ -643,7 +679,10 @@ class MasterDataAsetTest extends TestCase
         return $id;
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function createRecord(string $resource, array $payload, ?string $tenantId = null): TestResponse
     {
         return $this->sebagaiPengguna($tenantId ?? $this->tenantId, $this->permissionsFor($resource))
@@ -651,7 +690,10 @@ class MasterDataAsetTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function postWithKey(string $resource, array $payload, string $key): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
@@ -659,7 +701,10 @@ class MasterDataAsetTest extends TestCase
             ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
     }
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function request(string $resource, string $method, string $uri, array $payload = []): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))

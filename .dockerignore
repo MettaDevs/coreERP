@@ -11,5 +11,14 @@ artifacts
 packages/ui/dist
 **/.env
 apps/control-plane/public/build
-apps/control-plane/storage/logs
+# Seluruh isi `storage/` milik mesin pembangun, bukan milik rilis. Yang dikirim hanya rangka
+# foldernya, lewat berkas `.gitignore` yang dikecualikan di baris berikutnya.
+#
+# Mengirim isinya bukan sekadar kotor. Docker mengisi named volume yang masih kosong dari isi
+# image pada path yang sama, jadi berkas di `storage/app` berakhir di storage pelanggan pada boot
+# pertama; dan view Blade terkompilasi dipilih berdasarkan waktu ubah, sehingga satu view basi
+# dari mesin pengembang dapat menggantikan template yang sebenarnya dikirim tanpa satu pun pesan
+# galat. `scripts/periksa-sisa-mesin.sh` yang menjaga baris-baris ini.
+apps/control-plane/storage/**
+!apps/control-plane/storage/**/.gitignore
 apps/control-plane/bootstrap/cache/*.php

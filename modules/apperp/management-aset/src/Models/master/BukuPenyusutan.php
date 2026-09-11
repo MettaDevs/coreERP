@@ -9,6 +9,16 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * Buku penyusutan; padanan "Book" di Dynamics 365 F&O. Satu aset dapat memiliki
  * beberapa buku sekaligus — lazimnya satu komersial dan satu fiskal — dan tiap buku
  * melacak nilai aset secara mandiri dengan aturannya sendiri.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan
+ * pada `MasterData`. `round_off_depreciation` di-cast `decimal:2`, jadi Eloquent
+ * memulangkannya sebagai string dan bukan float.
+ *
+ * @property string $posting_layer
+ * @property bool $export_to_backoffice
+ * @property string $round_off_depreciation
+ * @property ?string $depreciation_profile_id
+ * @property ?string $alternative_profile_id
  */
 class BukuPenyusutan extends MasterData
 {
@@ -46,11 +56,13 @@ class BukuPenyusutan extends MasterData
         ];
     }
 
+    /** @return BelongsTo<ProfilPenyusutan, $this> */
     public function profil(): BelongsTo
     {
         return $this->belongsTo(ProfilPenyusutan::class, 'depreciation_profile_id');
     }
 
+    /** @return BelongsTo<ProfilPenyusutan, $this> */
     public function profilAlternatif(): BelongsTo
     {
         return $this->belongsTo(ProfilPenyusutan::class, 'alternative_profile_id');

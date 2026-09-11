@@ -1,7 +1,7 @@
 import * as React from "react"
 
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./accordion"
 import { cn } from "../utils"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./accordion"
 
 /**
  * A titled section that collapses, and keeps a summary of its contents readable while
@@ -36,7 +36,10 @@ function CollapsibleSectionGroup({
         type="multiple"
         value={open}
         onValueChange={(next: string[]) => {
-          if (value === undefined) setUncontrolled(next)
+          if (value === undefined) {
+setUncontrolled(next)
+}
+
           onValueChange?.(next)
         }}
         data-slot="collapsible-section-group"

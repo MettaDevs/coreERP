@@ -2,12 +2,17 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterLinkController;
+use Modules\Apperp\ManagementAset\Models\master\JenisAset;
+use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
 
 /**
  * Atribut yang menempel pada satu jenis aset. Aset mewarisi daftar ini dari jenisnya,
  * sehingga menambah pembeda baru cukup dengan menambah atribut, bukan tabel.
+ *
+ * @extends MasterLinkController<JenisAsetAtribut>
  */
 class JenisAsetAtributController extends MasterLinkController
 {
@@ -16,9 +21,9 @@ class JenisAsetAtributController extends MasterLinkController
         return 'jenis-aset';
     }
 
-    protected function ownerTable(): string
+    protected function ownerModel(): string
     {
-        return 'aset_m_jenis_aset';
+        return JenisAset::class;
     }
 
     protected function ownerColumn(): string
@@ -26,9 +31,9 @@ class JenisAsetAtributController extends MasterLinkController
         return 'jenis_aset_id';
     }
 
-    protected function table(): string
+    protected function query(bool $termasukArsip = false): Builder
     {
-        return 'aset_m_jenis_aset_atribut';
+        return $termasukArsip ? JenisAsetAtribut::withTrashed() : JenisAsetAtribut::query();
     }
 
     protected function rowRules(string $tenantId): array

@@ -8,8 +8,8 @@ Lokasi menjawab **di mana barangnya berada**. Yang membuatnya lebih menarik dari
 
 | Master | Tabel | Isi |
 | --- | --- | --- |
-| `tipe-lokasi-aset` | `m_tipe_lokasi_aset` | Golongan lokasi, misalnya gudang, kantor, area produksi |
-| `lokasi-aset` | `m_lokasi_aset` | Lokasi sebenarnya, boleh berinduk lokasi lain |
+| `tipe-lokasi-aset` | `aset_m_tipe_lokasi_aset` | Golongan lokasi, misalnya gudang, kantor, area produksi |
+| `lokasi-aset` | `aset_m_lokasi_aset` | Lokasi sebenarnya, boleh berinduk lokasi lain |
 
 Lokasi bisa bersarang: gedung berisi lantai, lantai berisi ruang. Karena itu ia punya `parent_id` yang menunjuk tabelnya sendiri.
 
@@ -53,8 +53,8 @@ Group aset boleh menentukan lokasi bawaan. Nilai itu hanya mengisi kekosongan sa
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/master/LokasiAsetController.php` | Master lokasi |
-| `api/app/Http/Controllers/master/TipeLokasiAsetController.php` | Tipe lokasi |
+| `src/Http/Controllers/master/LokasiAsetController.php` | Master lokasi |
+| `src/Http/Controllers/master/TipeLokasiAsetController.php` | Tipe lokasi |
 | `database/migrations/2026_08_07_110000_create_asset_location_type_and_dimension_bridge.php` | Tipe lokasi dan jembatan dimensi |
 | `AssetController::locationDimension()` | Pemetaan lokasi ke unit kerja |
 

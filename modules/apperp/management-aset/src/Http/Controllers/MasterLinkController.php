@@ -2,10 +2,11 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Base tipis untuk tabel penghubung yang disunting di dalam form pemiliknya, misalnya
@@ -18,6 +19,11 @@ use Illuminate\Support\Str;
  * Karena itu permintaan yang sama dapat diulang tanpa efek tambahan, sehingga tidak
  * memerlukan idempotency key per baris. Hak akses memakai permission pemiliknya,
  * sebab baris ini memang bagian dari pengelolaan pemilik.
+ *
+ * `TModel` adalah model baris penghubung milik satu controller turunan; anak
+ * menyebutkannya lewat `@extends MasterLinkController<GroupBukuPenyusutan>`.
+ *
+ * @template TModel of Model
  */
 abstract class MasterLinkController extends Controller
 {
@@ -26,13 +32,31 @@ abstract class MasterLinkController extends Controller
     /** Slug pemilik, dipakai untuk permission. Contoh: `group-aset`. */
     abstract protected function ownerResource(): string;
 
-    /** Tabel pemilik, untuk memastikan pemilik ada pada tenant aktif. */
-    abstract protected function ownerTable(): string;
+    /**
+     * Model pemilik, untuk memastikan pemilik ada pada tenant aktif.
+     *
+     * @return class-string<Model>
+     */
+    abstract protected function ownerModel(): string;
 
     /** Kolom foreign key ke pemilik pada tabel penghubung. */
     abstract protected function ownerColumn(): string;
 
-    abstract protected function table(): string;
+    /**
+     * Query baris penghubung; `$termasukArsip` membuka baris yang sudah diarsipkan.
+     *
+     * Model baris penghubung **wajib** memakai soft delete, sebab penggantian himpunan di
+     * `replace()` menghidupkan kembali baris yang identitasnya sama alih-alih menyisipkan
+     * yang kedua di bawah unique index yang sama.
+     *
+     * Syarat itu ditegakkan di sini, bukan sekadar ditulis: satu-satunya cara anak
+     * memenuhi kontrak ini adalah menyebut `withTrashed()` pada model konkretnya, dan
+     * `withTrashed()` hanya ada pada model yang memakai soft delete. Model yang melepas
+     * `SoftDeletes` membuat analisa tipe gagal di controller-nya sendiri.
+     *
+     * @return Builder<TModel>
+     */
+    abstract protected function query(bool $termasukArsip = false): Builder;
 
     /**
      * Aturan validasi tiap baris, tanpa kolom pemilik.
@@ -49,7 +73,11 @@ abstract class MasterLinkController extends Controller
      */
     abstract protected function rowPayload(array $row): array;
 
-    /** Kolom yang disajikan pada respons. @return list<string> */
+    /**
+     * Kolom yang disajikan pada respons.
+     *
+     * @return list<string>
+     */
     abstract protected function columns(): array;
 
     /**
@@ -64,17 +92,16 @@ abstract class MasterLinkController extends Controller
     public function index(Request $request, string $ownerId): JsonResponse
     {
         $this->requirePermission($request, 'read');
-        $tenantId = $this->tenantId($request);
-        $this->findOwner($tenantId, $ownerId);
+        $this->findOwner($ownerId);
 
-        return response()->json(['data' => $this->rows($tenantId, $ownerId)]);
+        return response()->json(['data' => $this->rows($ownerId)]);
     }
 
     public function replace(Request $request, string $ownerId): JsonResponse
     {
         $this->requirePermission($request, 'update');
         $tenantId = $this->tenantId($request);
-        $this->findOwner($tenantId, $ownerId);
+        $this->findOwner($ownerId);
 
         $rules = ['rows' => ['present', 'array']];
         foreach ($this->rowRules($tenantId) as $column => $rule) {
@@ -89,10 +116,8 @@ abstract class MasterLinkController extends Controller
             // commit, lalu sama-sama menyisipkan baris dengan identitas yang sama dan yang
             // kalah menabrak unique index sebagai 500. Kunci pada pemilik, bukan pada
             // barisnya, karena baris yang bertabrakan justru yang belum ada.
-            DB::table($this->ownerTable())
-                ->where(['tenant_id' => $tenantId, 'id' => $ownerId])
-                ->lockForUpdate()
-                ->first();
+            $ownerModel = $this->ownerModel();
+            $ownerModel::query()->whereKey($ownerId)->lockForUpdate()->first();
 
             // Aturan yang membaca keadaan pemilik/anak harus diperiksa setelah lock agar
             // hasilnya tetap benar bila ada penulisan lain pada saat yang sama.
@@ -100,32 +125,37 @@ abstract class MasterLinkController extends Controller
 
             // Baris yang hilang dari kiriman diarsipkan, bukan dihapus fisik, supaya
             // buku aset yang sudah terlanjur menyalin aturannya tetap dapat ditelusuri.
-            DB::table($this->table())
-                ->where(['tenant_id' => $tenantId, $this->ownerColumn() => $ownerId])
-                ->whereNull('deleted_at')
-                ->update(['deleted_at' => now(), 'updated_at' => now()]);
+            $this->query()->where($this->ownerColumn(), $ownerId)->delete();
 
             foreach ($data['rows'] as $row) {
                 $payload = $this->rowPayload($row);
-                $keys = ['tenant_id' => $tenantId, $this->ownerColumn() => $ownerId, ...$this->identity($row)];
-                $existing = DB::table($this->table())->where($keys)->first();
+                // Baris terarsip ikut dicari: baris yang identitasnya sama boleh saja baru
+                // diarsipkan beberapa baris di atas, atau pada penyimpanan sebelumnya. Ia
+                // dihidupkan kembali, bukan disisipkan kedua kalinya di bawah unique index
+                // yang sama.
+                $existing = $this->query(termasukArsip: true)
+                    ->where($this->ownerColumn(), $ownerId)
+                    ->where($this->identity($row))
+                    ->first();
                 if ($existing) {
-                    DB::table($this->table())->where('id', $existing->id)
-                        ->update([...$payload, 'deleted_at' => null, 'updated_at' => now()]);
+                    $existing->fill($payload);
+                    // Jalur yang sama dengan `$existing->deleted_at = null`, hanya disebut
+                    // langsung: kolom arsip berada di luar `$fillable`, jadi `fill()` di atas
+                    // tidak menyentuhnya, dan ia bukan kolom yang dikenal `Model`.
+                    $existing->setAttribute('deleted_at', null);
+                    $existing->save();
 
                     continue;
                 }
-                DB::table($this->table())->insert([
-                    'id' => (string) Str::ulid(),
-                    ...$keys,
+                $this->query()->create([
+                    $this->ownerColumn() => $ownerId,
+                    ...$this->identity($row),
                     ...$payload,
-                    'created_at' => now(),
-                    'updated_at' => now(),
                 ]);
             }
         });
 
-        return response()->json(['data' => $this->rows($tenantId, $ownerId)]);
+        return response()->json(['data' => $this->rows($ownerId)]);
     }
 
     /**
@@ -137,25 +167,24 @@ abstract class MasterLinkController extends Controller
     abstract protected function identity(array $row): array;
 
     /** @return list<array<string, mixed>> */
-    private function rows(string $tenantId, string $ownerId): array
+    private function rows(string $ownerId): array
     {
-        return DB::table($this->table())
-            ->where(['tenant_id' => $tenantId, $this->ownerColumn() => $ownerId])
-            ->whereNull('deleted_at')
+        // `array_values()` tidak mengubah isi maupun urutannya: kunci hasil `get()` memang
+        // sudah 0..n. Ia yang membuat bentuk list itu terbaca, dan bentuk list yang menjaga
+        // respons tetap terbit sebagai array JSON, bukan object.
+        return array_values($this->query()
+            ->where($this->ownerColumn(), $ownerId)
             ->orderBy('id')
             ->get($this->columns())
-            ->map(fn (object $row): array => (array) $row)
-            ->all();
+            ->map(fn (Model $row): array => $row->only($this->columns()))
+            ->all());
     }
 
-    private function findOwner(string $tenantId, string $ownerId): void
+    private function findOwner(string $ownerId): void
     {
-        $exists = DB::table($this->ownerTable())
-            ->where(['tenant_id' => $tenantId, 'id' => $ownerId])
-            ->whereNull('deleted_at')
-            ->exists();
+        $ownerModel = $this->ownerModel();
 
-        abort_unless($exists, 404);
+        abort_unless($ownerModel::query()->whereKey($ownerId)->exists(), 404);
     }
 
     private function requirePermission(Request $request, string $action): void

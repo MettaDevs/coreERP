@@ -6,7 +6,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class WorkOrderExecutionTest extends TestCase
@@ -47,7 +49,11 @@ class WorkOrderExecutionTest extends TestCase
         });
     }
 
-    /** Master disemai saat pertama dipakai supaya kegagalan seeding tampil di titik pemakaiannya. */
+    /**
+     * Master disemai saat pertama dipakai supaya kegagalan seeding tampil di titik pemakaiannya.
+     *
+     * @return array<string, string>
+     */
     private function masters(): array
     {
         return $this->tersemai ??= $this->seedMasters();
@@ -388,7 +394,10 @@ class WorkOrderExecutionTest extends TestCase
 
     // ---------- alur bantu ----------
 
-    /** @param array<string, mixed> $ubah */
+    /**
+     * @param  array<string, mixed>  $ubah
+     * @return array<string, mixed>
+     */
     private function buatWorkOrder(array $ubah = []): array
     {
         return $this->headers(self::SEMUA, 'montir-1')
@@ -401,6 +410,8 @@ class WorkOrderExecutionTest extends TestCase
      * Work order yang checklist-nya sudah disusun, lalu dijadwalkan dan mulai dikerjakan;
      * version berakhir di 3. Checklist sengaja disalin lebih dahulu karena prosedur disusun
      * sebelum pekerjaan dimulai, bukan setelahnya.
+     *
+     * @return array<string, mixed>
      */
     private function siapDikerjakan(?string $tipe = null): array
     {
@@ -412,7 +423,11 @@ class WorkOrderExecutionTest extends TestCase
         return $workOrder;
     }
 
-    private function pindah(string $id, string $ke, int $version, ?array $permissions = null, ?string $alasan = null)
+    /**
+     * @param  list<string>|null  $permissions
+     * @return TestResponse<Response>
+     */
+    private function pindah(string $id, string $ke, int $version, ?array $permissions = null, ?string $alasan = null): TestResponse
     {
         return $this->headers($permissions ?? self::SEMUA, 'penyelia-1')
             ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/status', array_filter([
@@ -420,7 +435,8 @@ class WorkOrderExecutionTest extends TestCase
             ], static fn ($value) => $value !== null));
     }
 
-    private function salinTemplate(string $id, string $jobId)
+    /** @return TestResponse<Response> */
+    private function salinTemplate(string $id, string $jobId): TestResponse
     {
         return $this->headers(self::SEMUA, 'montir-1')
             ->postJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist/dari-template', [
@@ -428,7 +444,11 @@ class WorkOrderExecutionTest extends TestCase
             ]);
     }
 
-    private function simpanChecklist(string $id, string $jobId, array $baris)
+    /**
+     * @param  array<int, array<string, mixed>>  $baris
+     * @return TestResponse<Response>
+     */
+    private function simpanChecklist(string $id, string $jobId, array $baris): TestResponse
     {
         return $this->headers(self::SEMUA, 'montir-1')
             ->putJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$id.'/jobs/'.$jobId.'/checklist', ['baris' => $baris]);
@@ -449,17 +469,21 @@ class WorkOrderExecutionTest extends TestCase
         return (string) DB::table('aset_tr_pemeliharaan_aset_details')->where('pemeliharaan_aset_id', $workOrderId)->value('id');
     }
 
-    /** @return array<string, string> */
     /**
      * Identitas pengguna tidak lagi dioper sebagai klaim; tiap pemanggilan membuat pengguna
      * sungguhan di Core. Parameter lama dibuang karena nilainya tidak lagi menentukan apa pun.
+     *
+     * @param  list<string>  $permissions
      */
     private function headers(array $permissions, string $sebagai = 'penyelia-1'): static
     {
         return $this->sebagaiPenggunaBernama($sebagai, $this->tenantId, $permissions);
     }
 
-    /** @param array<string, mixed> $ubah */
+    /**
+     * @param  array<string, mixed>  $ubah
+     * @return array<string, mixed>
+     */
     private function payload(array $ubah = []): array
     {
         return [

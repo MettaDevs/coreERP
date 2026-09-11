@@ -1,39 +1,57 @@
 # Standar app dan addon app
 
-Dokumen ini memakai istilah **app**. App adalah produk atau kemampuan bisnis yang dapat dipasang dan dirilis mandiri. Istilah `module` pada nama tabel, endpoint, atau kode yang sudah ada adalah nama teknis lama; jangan memakainya untuk desain baru atau komunikasi produk.
+Dokumen ini memakai istilah **app** untuk produk atau kemampuan bisnis yang dapat dijual, dipasang,
+dan dicabut sendiri, dan **module** untuk bentuk teknis yang menjalankannya di dalam runtime Core.
 
-## Repository dan release unit wajib
+## Bentuk yang berlaku untuk pekerjaan baru: module di dalam repo Core
 
-Satu app bisnis memiliki satu repository. API dan UI bukan repository terpisah karena keduanya perlu diuji, diberi versi, dan dirilis sebagai satu kemampuan bisnis.
+Satu module adalah satu folder di `modules/<penerbit>/<module>/` di dalam repo ini. Ia berjalan di
+runtime Core dan memakai database tenant yang sama: punya rute, halaman, migration, dan manifest
+sendiri, tetapi **tidak** punya container, database, maupun token layanan sendiri.
 
 ```text
-app-erp-accounting/                 # satu repository app
-├── app.yaml
-├── api/                            # Laravel service milik Accounting
-│   ├── Dockerfile
-│   ├── app/
-│   ├── routes/api.php
-│   └── tests/
-├── ui/                             # React/Vite UI milik Accounting
-│   ├── package.json
-│   └── src/
-├── database/
-│   ├── migrations/
-│   └── seeders/
-├── contracts/
-│   ├── openapi.yaml
-│   └── asyncapi.yaml
-├── deploy/
-│   ├── compose.fragment.yaml
-│   └── migrate.sh
-└── README.md
+modules/
+└─ apperp/                        # penerbit
+   └─ management-aset/            # module
+      ├─ app.yaml                 # manifest: entry point, permission, privilege, duty, nomor, workflow
+      ├─ composer.json            # package lokal, autoload PSR-4 untuk namespace module
+      ├─ src/                     # PHP: Http/, Models/, Services/, Listeners/, Reporting/
+      ├─ database/migrations/     # migration module saja
+      ├─ routes/                  # web.php dan api.php, dimuat penyedia layanan module
+      ├─ ui/                      # halaman React, di-import build shell Core
+      ├─ tests/                   # Feature/ dan Unit/
+      └─ contracts/               # hanya bila ada permukaan yang dipanggil dari luar runtime
 ```
 
-Repository CoreERP ini adalah repository platform. Ia menampung `control-plane` dan `provider-console`; ia tidak berisi domain atau database app bisnis. Surface Web Shell — launcher dan halaman tuan rumah app — hidup di dalam UI Control Plane, bukan folder `apps/` tersendiri.
+Yang **tidak boleh ada** di akar module, beserta sebabnya: `bootstrap/`, `public/`, dan `artisan`
+karena module bukan aplikasi Laravel; `config/app.php` karena daftar provider dan alias dimiliki
+Core; `Dockerfile`, `compose.yaml`, dan `nginx.conf` karena module tidak punya container; `.env`
+karena module tidak punya proses sendiri; `vendor/` karena dependency diselesaikan sekali di akar
+repo. Daftar berjalannya ada di `modules/README.md`.
 
-Setiap app menghasilkan artifact terpisah: image API, artifact/image UI, migration, contract, dan manifest. Cloud dapat menyajikan UI lewat CDN/artifact registry; on-prem perpetual menyajikannya dari image static UI yang hanya ada untuk app berlisensi dan didistribusikan dalam bundle release bertanda tangan.
+Halaman module ikut build shell Core. Tidak ada iframe dan tidak ada aplikasi React kedua; module
+merender halaman Inertia dengan nama `<id module>::<nama berkas>`, dan Core menyusun tautan sidebar
+dengan aturan `/<id module>/<id entri menu>` dari manifest yang sama.
 
-Jangan memakai Git submodule untuk menghubungkan repository. Contract yang dipakai pihak lain dipublish sebagai artifact berversi; source app tidak diambil langsung oleh app lain.
+## Bentuk lama: app dengan repository dan container sendiri
+
+**Bentuk ini sudah tidak berlaku.** Ia dicatat di sini supaya sebuah repo `app-erp-*` lama yang
+ditemukan orang berikutnya dapat dikenali, bukan supaya ia dipakai lagi. Sejak 10 September 2026
+tidak ada satu pun app yang berjalan sebagai container tersendiri, dan seluruh kode yang melayaninya
+— penempatan app, pendaftaran rilis penyedia, path konten, reverse proxy, halaman tuan rumah
+beriframe, dan token konteks app — dibuang dari repo ini.
+
+Bentuknya dulu: satu repository per app bisnis, memuat `app.yaml`, service Laravel di `api/`, UI
+React di `ui/`, migration, contract, dan fragment Compose di `deploy/`. Setiap app menghasilkan
+artifact terpisah — image API, image UI, migration, contract, dan manifest — dan UI-nya disajikan di
+dalam iframe pada path `/apps-content/<placement>/<app-id>/`.
+
+Yang menggantikannya adalah folder module di `modules/<penerbit>/<module>/`, dijelaskan pada sisa
+halaman ini.
+
+Repository CoreERP ini menampung `apps/control-plane`, `apps/provider-console`, dan seluruh module
+di bawah `modules/`. Surface Web Shell — launcher dan kerangka layar module — hidup di dalam UI
+Control Plane, bukan folder tersendiri.
 
 ## Contoh manifest
 
@@ -128,9 +146,9 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 | `dependsOn` | Tidak, bila app berdiri sendiri | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu. |
 | `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
 | `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
-| `reports` | Hanya bila app punya dokumen cetak atau ekspor | Laporan muncul di katalog Core; admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Dataset tetap diminta ke app; lihat [dokumen cetak](23-document-rendering.md) |
+| `reports` | Hanya bila module punya dokumen cetak atau ekspor | Laporan muncul di katalog Core; admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Datasetnya tetap milik module, diserahkan lewat kontrak `PenyediaLaporanModul` di dalam proses. Lihat [dokumen cetak](23-document-rendering.md) |
 
-App tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, app meminta nomor lewat API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`, dengan `idempotency_key` wajib. Detailnya di [Number sequence](14-number-sequences.md).
+Module tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, module meminta nomor lewat kontrak `PenerbitNomor` di dalam proses yang sama. Addon pihak ketiga di luar runtime memakai API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`; `idempotency_key` wajib pada keduanya. Detailnya di [Number sequence](14-number-sequences.md).
 
 ### Dependency app
 
@@ -154,10 +172,10 @@ semua prerequisite `ready` pada placement yang sama. Ini mekanisme teknis; layar
 penjualan harus menerangkan prerequisite sebagai bagian dari paket, bukan meminta
 pembeli mencari atau membeli app teknis satu per satu.
 
-Contoh manifest utuh yang sudah berjalan ada di `app-erp-management-aset/app.yaml` — 787 baris, dengan blok `security` sepanjang 600 baris. Contoh di atas sengaja dipersingkat.
+Contoh manifest utuh yang sudah berjalan ada di `modules/apperp/management-aset/app.yaml`; blok `security`-nya jauh lebih panjang dari contoh di atas, yang sengaja dipersingkat.
 
-#::: tip Mencari langkah mengerjakannya?
-Halaman ini menetapkan **aturannya**. Urutan mengerjakan beserta persiapan teknis, konvensi penamaan dan alokasi port, berkas yang wajib ada, dan gate per tahap ada di [jalur membangun app baru](../apps/membangun-app-baru.md).
+::: tip Mencari langkah mengerjakannya?
+Halaman ini menetapkan **aturannya**. Urutan mengerjakan beserta persiapan teknis, konvensi penamaan, berkas yang wajib ada, dan gate per tahap ada di [jalur membangun modul baru](../apps/membangun-app-baru.md).
 :::
 
 ## Empat lapis keamanan tidak boleh diringkas
@@ -179,25 +197,76 @@ Kode privilege tidak boleh sama dengan kode permission. Tanpa aturan ini, manife
 
 Nama key manifest sama persis dengan payload API katalog Core, sehingga `app.yaml` dapat dikirim apa adanya tanpa lapisan transformasi.
 
-## Ownership dan database
+## Ownership dan data
 
-Setiap app memiliki owner yang bertanggung jawab atas code review, contract, database, release, rollback, dan incident app tersebut. Core Platform memiliki `core_erp`. Setiap app resmi memiliki database dengan pola `app_erp_<app>`, misalnya `app_erp_procurement` dan `app_erp_management_aset`; addon memakai `addon_<publisher>_<app>`. Setiap database mempunyai database user/secret sendiri. Tidak ada foreign key, Eloquent relation, atau query langsung lintas database.
+Setiap app memiliki owner yang bertanggung jawab atas code review, contract, data, release, rollback, dan incident app tersebut.
+
+**Module** memakai database tenant yang sama dengan Core. Pemisahnya adalah **awalan nama tabel**
+yang diturunkan dari nama folder module, misalnya `aset_` dan `hr_`. Awalan itu didaftarkan pada
+katalog dan diperiksa penjaga batas di `apps/control-plane/tests/Feature/Boundary/`: tabel tanpa
+awalan yang benar, dan tabel milik module lain yang disentuh, ditolak sebelum pull request digabung.
+
+Addon pihak ketiga yang berjalan di luar runtime ini memakai database sendiri dengan pola
+`addon_<publisher>_<app>`, dengan database user dan secret sendiri; tidak ada foreign key, Eloquent
+relation, atau query langsung lintas database.
+
+Larangannya tetap: sebuah module tidak boleh membaca atau menulis data milik module lain. Yang
+menolak adalah penjaga batas dan analisa statis.
+
+Perbedaan itu harus disebut apa adanya. **Batas antar module ditegakkan pemeriksaan otomatis, bukan
+mesin database.** Jangan menuliskan bahwa mesin database yang menjaganya: kalimat itu membuat
+pembaca berikutnya menganggap sebuah `JOIN` lintas module akan ditolak PostgreSQL, padahal ia akan
+berjalan mulus sampai seseorang menjalankan penjaganya.
+
+Tiga aturan yang mengikuti dari satu database bersama:
+
+- **Foreign key dari tabel module hanya boleh menunjuk tabel milik Core**, tidak pernah ke tabel
+  module lain. Foreign key lintas module membuat dua module tidak bisa dipasang atau dicabut
+  sendiri-sendiri, dan itu justru yang sedang dihindari.
+- **Runtime memakai satu koneksi database.** Module menulis tabelnya sendiri lewat koneksi yang sama
+  dengan Core. Schema PostgreSQL per module dan peran database per module pernah dipertimbangkan dan
+  dibatalkan: keduanya menambah bagian yang harus disiapkan admin pelanggan tanpa menambah satu pun
+  batas yang tidak sudah dijaga penjaga di atas.
+- **Laporan lintas tenant tidak ada.** Konsolidasi terjadi **di dalam** satu tenant, lewat legal
+  entity dan operating unit. Jangan merancang federasi database untuk kebutuhan yang tidak ada.
 
 ### Nama tabel
 
 Nama tabel memakai `snake_case` dan menyatakan jenis data, bukan nama layar atau
-nama controller. Setiap tabel app memakai salah satu bentuk berikut:
+nama controller.
+
+Untuk module, **awalan module wajib dan itulah yang diperiksa mesin**; sisa namanya mengikuti
+konvensi di bawah. Awalan yang berlaku dinyatakan module pada `app.yaml`-nya, dan tercatat di
+katalog Core setelah registrasi.
+
+Empat hal tentang awalan itu yang menghemat banyak waktu bila diketahui lebih dulu:
+
+- **Ia dipilih pendek, dan boleh berbeda dari nama folder.** Folder `management-aset` memakai awalan
+  `aset_`. Nama tabel dibaca berkali-kali sehari oleh orang yang sedang menelusuri masalah; awalan
+  sepanjang nama folder membuat setiap nama tabel lebih panjang tanpa menambah satu pun kejelasan.
+- **Ia tidak boleh berubah setelah module pertama kali dipasang di tempat pelanggan.** Mengubahnya
+  berarti mengganti nama seluruh tabel pada setiap server pelanggan lewat migration, dan migration
+  yang sudah pernah berjalan tidak disunting.
+- **Pemetaan namespace ke awalan didaftarkan di `modules/README.md` pada pull request yang membuat
+  module itu**, bukan sesudahnya. Tabrakan awalan hanya murah kalau ketahuan saat peninjauan.
+- **Pemeriksanya menguji saling-menelan, bukan hanya kesamaan persis.** Awalan `aset_` dan
+  `aset_lama_` bukan awalan yang sama, tetapi tabel `aset_lama_barang` cocok dengan keduanya, dan
+  penjaga yang hanya membandingkan kesamaan persis akan melewatkannya.
+
+Tabel lama yang lahir tanpa awalan diganti nama **satu kali**, saat module-nya dipindah masuk.
+
+Bentuk yang dipakai sesudah awalan:
 
 | Bentuk | Dipakai untuk | Contoh |
 | --- | --- | --- |
-| `m_<resource>` | Master, reference, setup, konfigurasi, atau tabel relasi milik master yang bukan fakta transaksi mandiri. | `m_group_aset`, `m_jenis_aset_atribut` |
-| `tr_<transaction>` | Header atau fakta transaksi mandiri. | `tr_penerimaan_aset` |
-| `tr_<transaction>_details` | Baris/detail yang selalu dimiliki satu header transaksi. Bentuk ini selalu jamak: `_details`, bukan `_detail`. | `tr_perencanaan_aset_details` |
-| `tr_<aggregate>_<record>` | Catatan transaksi turunan yang bukan daftar baris header, misalnya nilai atribut, log, atau fakta operasional lain milik aggregate transaksi. | `tr_aset_atribut` |
+| `m_<resource>` | Master, reference, setup, konfigurasi, atau tabel relasi milik master yang bukan fakta transaksi mandiri. | `aset_m_group_aset`, `aset_m_jenis_aset_atribut` |
+| `tr_<transaction>` | Header atau fakta transaksi mandiri. | `aset_tr_penerimaan_aset` |
+| `tr_<transaction>_details` | Baris/detail yang selalu dimiliki satu header transaksi. Bentuk ini selalu jamak: `_details`, bukan `_detail`. | `aset_tr_perencanaan_aset_details` |
+| `tr_<aggregate>_<record>` | Catatan transaksi turunan yang bukan daftar baris header, misalnya nilai atribut, log, atau fakta operasional lain milik aggregate transaksi. | `aset_tr_aset_atribut` |
 
 `m_` bukan berarti setiap tabelnya adalah master yang mendapat menu, permission,
 atau Number Sequence sendiri. Tabel konfigurasi dan relasi—misalnya
-`m_jenis_aset_atribut`—tetap memakai `m_` bila ia bukan fakta transaksi mandiri.
+`aset_m_jenis_aset_atribut`—tetap memakai `m_` bila ia bukan fakta transaksi mandiri.
 Sebaliknya, tabel `tr_` harus menyimpan fakta proses bisnis; jangan memakai `tr_`
 untuk sekadar cache atau data tampilan.
 
@@ -206,7 +275,7 @@ Nama tidak memakai bentuk generik atau ambigu seperti `tbl_aset`, `aset_data`, a
 putusan naming-nya dibuat pada proposal app sebelum migration ditulis; jangan
 menciptakan prefix baru diam-diam.
 
-Di dalam database sendiri, app boleh memakai transaksi, foreign key, dan table desain normal. Semua tabel tenant-scoped membawa `tenant_id`; data dengan konsekuensi hukum/akuntansi membawa `legal_entity_id`; data operasional membawa `org_unit_id` bila ownership terjadi pada operating unit. ID organisasi adalah reference opaque ke Organization service, bukan foreign key lintas database. Lihat [model tenant dan organisasi](01a-tenant-and-org-hierarchy.md).
+Di dalam kumpulan tabel miliknya sendiri, sebuah app boleh memakai transaksi, foreign key, dan desain tabel normal. Semua tabel tenant-scoped membawa `tenant_id`; data dengan konsekuensi hukum/akuntansi membawa `legal_entity_id`; data operasional membawa `org_unit_id` bila ownership terjadi pada operating unit. ID organisasi adalah reference opaque ke Organization service, bukan foreign key lintas database. Lihat [model tenant dan organisasi](01a-tenant-and-org-hierarchy.md).
 
 ### Penyaringan tenant
 
@@ -234,7 +303,23 @@ berlebihan, tetapi karena query seperti itu tetap benar walau traitnya dicabut �
 berhenti terukur, dan tidak ada test yang gagal ketika perlindungannya hilang.
 
 Penjagaan ini hidup di lapisan model. `DB::table()` melewatinya sepenuhnya, dan itulah sebabnya query
-mentah pada tabel module dilarang.
+mentah pada tabel module dilarang — `DB::table()`, `DB::select()`, dan `DB::statement()` sama saja.
+Migration dikecualikan, karena ia memang menulis SQL langsung dan berjalan sebelum ada satu pun
+tenant.
+
+Kalau sebuah laporan memang menuntut SQL langsung, dua hal wajib dilakukan bersama: **saring tenant
+secara eksplisit**, dan **daftarkan pengecualiannya di berkas test penjaganya**. Yang kedua sama
+pentingnya dengan yang pertama. Pengecualian yang hidup di berkas konfigurasi tidak terlihat pada
+diff pull request berikutnya; pengecualian yang hidup di berkas test muncul di depan mata peninjau
+setiap kali daftarnya bertambah.
+
+Larangan ini tidak boleh dilonggarkan diam-diam. Melonggarkannya berarti mengubah berkas test dan
+menjelaskan alasannya pada pull request — bukan menambahkan satu baris `DB::table()` yang kebetulan
+lolos.
+
+Satu bentuk query yang juga dilarang: **memberi alias pada tabel utama**. Penyaringan tenant
+disisipkan dengan nama tabel yang sebenarnya, jadi tabel utama yang beralias membuat penyaringannya
+menunjuk nama yang tidak ada lagi di query itu. Tabel yang di-`join` tetap boleh beralias.
 
 ### Penghapusan lunak
 
@@ -344,15 +429,137 @@ Satu hal yang tidak selesai dengan penghapusan lunak: tenant yang berhenti berla
 ada tanpa batas waktu, dan jalan keluarnya—ekspor lengkap yang bisa dibaca sistem lain, atau serah
 terima database—ditulis di kontrak sebelum pelanggan pergi, bukan sesudah.
 
+## Bentuk folder dan pendaftaran module
+
+### Yang ada di dalam folder module, dan yang dilarang ada
+
+Satu module berisi `app.yaml`, `src/`, `database/migrations/`, `routes/`, `ui/`, `tests/`,
+`contracts/`, dan `composer.json`. Bentuk minimalnya ada di `modules/_template/`, dan
+`module:make` yang menyalinnya.
+
+Yang **dilarang** ada di dalam folder module: `bootstrap/`, `public/`, `config/app.php`, Dockerfile,
+berkas compose, dan `artisan`. Semuanya adalah kerangka aplikasi mandiri, dan module bukan aplikasi
+mandiri — ia dimuat oleh satu aplikasi yang sudah punya kerangkanya sendiri. Larangan ini berlaku
+untuk **semua** module tanpa kecuali, termasuk module yang sedang dipindah dari repo lain, karena
+justru di sanalah kerangka lama paling mungkin ikut terbawa.
+
+Satu lagi yang dilarang dan mudah lolos: **alur CI di dalam folder module**. GitHub tidak pernah
+menjalankan berkas alur di luar `.github/workflows/` pada akar repo, jadi berkas seperti itu terlihat
+seperti pemeriksaan yang berjalan padahal tidak pernah dijalankan siapa pun. Ia ikut mendarat lagi
+setiap kali sebuah module ditarik masuk, jadi penjaganya perlu ada, bukan sekadar diingat.
+
+Migration module juga tidak boleh membuat tabel milik Core — `users`, `jobs`, `cache`, dan
+kerabatnya. Module yang membuat ulang tabel Core akan berhasil di mesinnya sendiri dan gagal di
+server pelanggan yang tabelnya sudah ada.
+
+### Namespace dan autoload
+
+Namespace module berbentuk `Modules\<Penerbit>\<Modul>\`, dan setiap berkas PHP wajib
+mendeklarasikan namespace yang sesuai jalur PSR-4-nya. Module **tidak boleh menyumbang kelas ke
+namespace milik Core**: sebuah kelas di dalam `App\` yang berasal dari folder module akan lolos
+setiap penjaga namespace, karena penjaganya memeriksa siapa yang disebut, bukan siapa yang menulis.
+
+Module di-autoload lewat repositori Composer bertipe `path`, tiap module mendeklarasikan
+`autoload.psr-4`-nya sendiri, dan Core memintanya dengan `@dev` — bukan `*`. Paket lokal yang diminta
+dengan `*` akan dicari di packagist lebih dulu.
+
+Namespace **test** module didaftarkan pada `autoload-dev` milik **Core**, bukan milik module.
+Composer tidak memuat `autoload-dev` sebuah dependensi, jadi blok yang ditulis di `composer.json`
+module tidak akan pernah dibaca. Kelas dasar test yang dipakai juga milik Core.
+
+### Satu penyedia layanan per module
+
+Rute, perintah artisan, listener, dan registry laporan module didaftarkan oleh penyedia layanan
+module itu sendiri, bukan oleh satu penyedia pusat yang mengenal semua module. Penyedia pusat berarti
+biaya menyalakan aplikasi tumbuh seiring jumlah module, dan setiap module baru menyentuh satu berkas
+yang sama.
+
+Konfigurasi module digabungkan dengan awalan `modules.<id module>`. Nol kunci konfigurasi module
+berdiri di akar: kunci di akar akan bertabrakan dengan kunci Core pada hari namanya kebetulan sama,
+dan yang kalah tidak memberi tahu siapa pun.
+
+`resource_path()` tidak boleh dipakai untuk jalur berkas module. Ia menunjuk folder Core, jadi
+pemanggilannya berhasil dan memulangkan jalur yang salah.
+
+### Registry melewatkan manifest yang rusak
+
+Manifest yang tidak terbaca **dilewati**, bukan menjatuhkan runtime. Pilihan itu benar — satu berkas
+salah tulis tidak boleh mematikan seluruh aplikasi di tempat pelanggan — tetapi ia punya harga:
+module yang hilang tidak mengumumkan dirinya. Karena itu `module:list` wajib ada; ia satu-satunya
+jawaban atas pertanyaan "kenapa module saya tidak muncul". Module yang masih ber-`id: change-me`,
+sisa cetakan yang belum diganti, juga dilewati.
+
+### Riwayat migration module
+
+Riwayat migration module dicatat di `core_module_migrations`, dengan kolom `module_id`, dan **wajib
+disaring per module pada setiap pembacaan**. Ia bukan sekadar tabel `migrations` milik Core yang
+diberi kolom tambahan, dan ia tidak boleh menumpang tabel itu: dua module yang kebetulan punya
+migration bernama sama akan saling menganggap migration lawannya sudah dijalankan.
+
+### Data awal module
+
+Seed module hanya dipanggil oleh **pemasangan module**, tidak pernah oleh `db:seed` global. Seed
+dilewati bila catatan pemasangannya sudah menyimpan waktu pengisian, sehingga memasang ulang tidak
+menggandakan data awal.
+
+Seeder module memakai model biasa — turunan kontrak seeder module — bukan query mentah, supaya
+barisnya ikut tersaring tenant seperti baris lain. Tabel master module membawa kolom penanda
+`bawaan`, supaya baris hasil seed bisa dibedakan dari baris yang diketik pengguna. Ini bagian dari
+standar tabel master module, bukan kebiasaan satu module contoh: tanpa penanda itu, pembaruan yang
+ingin memperbaiki data bawaan tidak punya cara membedakan mana yang boleh disentuh.
+
+### Aturan model
+
+Model module memakai `HasULids`, `SoftDeletes`, dan `MilikTenant` sejak migration pertama, dan tidak
+memakai `DB::table()` sama sekali. Setiap kelas module yang `extends Model` **wajib** memakai
+`MilikTenant`; penjaganya memeriksa itu untuk semua module, termasuk yang sedang dipindah.
+Akibatnya module **tidak menulis `tenant_id` sama sekali** — trait itu yang mengisinya, dan trait itu
+juga yang membatalkan penyimpanan ke tenant lain.
+
+Model tabel penghubung ikut bersoft-delete. Kolom baru ditambahkan lewat migration tersendiri;
+migration yang sudah pernah berjalan di database pelanggan tidak disunting.
+
+Satu jebakan yang berulang: **model berkunci gabungan tidak boleh memakai pembantu Eloquent yang
+bersandar pada primary key** — `find()`, `fresh()`, `refresh()`, dan `save()` pada model yang sudah
+ada. Semuanya menyusun `where` dari satu kolom kunci, dan pada kunci gabungan yang satu kolom itu
+menunjuk lebih dari satu baris.
+
+### Rute dan test module
+
+Rute module berada di grup `web`, dengan `auth` **di depan** middleware konteks module. Urutannya
+menentukan jawabannya: `auth` di depan menghasilkan 401 untuk permintaan tanpa pengguna dan 403 untuk
+pengguna tanpa izin. Urutan terbalik menghasilkan 403 untuk keduanya, dan klien tidak bisa
+membedakan "belum masuk" dari "tidak berhak". Setiap alias middleware pada berkas rute module wajib
+terdaftar di Core, atau tercatat sengaja-belum beserta nomor task yang membereskannya.
+
+Test module berjalan di suite Core, di atas PostgreSQL. Cabang berdasarkan mesin database dilarang —
+hanya ada satu mesin database, dan cabang seperti itu menghasilkan jalur yang tidak pernah diuji di
+tempat ia benar-benar berjalan.
+
+Test module membangun **rantai izin sungguhan** — permission, privilege, duty, role, penugasan role,
+lalu bertindak sebagai penggunanya — dan membangun rantai baru per pemanggilan, bukan memakai satu
+rantai bersama. Rantai bersama membuat sebuah test lulus karena test lain sudah menyiapkan izinnya.
+
+### Cetakan module baru
+
+`module:make` mengganti seluruh penanda pada cetakan sekaligus; mengganti sebagian menghasilkan
+module yang setengah bernama cetakan dan gagal jauh di kemudian hari. Cetakan itu sendiri wajib lulus
+pemeriksa gaya dan analisa tipe, karena keduanya menyapu `modules/` — cetakan yang tidak lulus
+membuat setiap module baru lahir dalam keadaan merah.
+
+Module baru wajib benar di **dua tempat di luar foldernya sendiri**: baris awalan tabel pada
+`modules/README.md`, dan `require` pada `composer.json` Core. Perintahnya tidak boleh menyunting
+assertion pada test mana pun.
+
 ## Contract dan dependency
 
 | Area | Aturan |
 | --- | --- |
-| API sync | REST/JSON di bawah `/api/v1`, lengkap dalam OpenAPI. |
-| Event | Event dibuat melalui outbox setelah commit; payload dan channel ditulis dalam AsyncAPI. |
-| UI | UI entry mendaftarkan route/menu melalui host SDK; host memuat artifact hanya bila entitlement aktif, installation registry `ready`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`; CSS app hanya mengatur layout dan domain. |
-| Auth | Semua endpoint memvalidasi token, `TenantContext`, entitlement, installation readiness, permission, dan organization scope. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
-| Data | Tidak ada database access lintas app. ID app lain hanya reference opaque. |
+| API sync | REST/JSON di bawah `/api/v1`, lengkap dalam OpenAPI bila permukaannya dipanggil dari luar runtime. Rute module yang hanya dipanggil halamannya sendiri dijaga test module, bukan kontrak terbit. |
+| Event | Event dibuat melalui outbox setelah commit; payload dan channel ditulis dalam AsyncAPI. Antar module di satu runtime, ia berbentuk event Laravel yang dikirim di dalam proses — namanya, envelope-nya, dan aturan versinya tetap sama. |
+| UI | Halaman module ikut build shell dan dirender sebagai halaman Inertia. Shell menampilkan entry hanya bila entitlement aktif, catatan pemasangan module berstatus `installed`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`. |
+| Auth | Semua endpoint memvalidasi `TenantContext`, entitlement, pemasangan module, permission, dan organization scope. Module membacanya dari middleware konteks module lewat kontrak `KonteksTenant` dan `KonteksPermintaan`. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
+| Data | Tidak ada akses ke data app lain. ID app lain hanya reference opaque. |
 | Jobs | Idempotent, membawa `tenant_id`, memiliki retry/dead-letter policy. |
 | Observability | Log, trace, metric, dan event menyertakan tenant/app/correlation ID. |
 | Compatibility | `dependsOn` dengan versi tepat atau caret divalidasi saat katalog terdaftar; Core menolak cycle dan perubahan versi yang merusak dependent. `requires.core` belum divalidasi oleh Control Plane. |
@@ -404,11 +611,13 @@ Web Shell memiliki layout bersama agar pengguna tidak berpindah-pindah pola saat
 | Sidebar di kanan rail | App aktif | Navigasi turunan dari pilihan pada rail, yang didaftarkan UI artifact melalui host SDK. |
 | Konten utama | App aktif | Halaman dan alur bisnis app aktif. |
 
-Contoh: saat user memilih `Akses` pada rail, sidebar dapat berisi `Anggota`, `Role`, dan `Undangan`. Pada Management Aset, rail memuat `Master data`; sidebar kemudian berisi kedelapan master pada `app.yaml`-nya, mulai `Entitas aset` sampai `Analisa maintenance`. Setiap entry sidebar membawa `entryPoint` berupa permission `read` master tersebut, sehingga menu yang tidak boleh dibuka user tidak ikut tampil. Saat user berpindah aplikasi melalui header, kedua navigasi tersebut diganti seluruhnya oleh navigasi aplikasi aktif.
+Contoh: saat user memilih `Akses` pada rail, sidebar dapat berisi `Anggota`, `Role`, dan `Undangan`. Pada Management Aset, rail memuat `Master data`; isi sidebarnya adalah daftar master pada blok `ui.navigation` di `modules/apperp/management-aset/app.yaml`. Setiap entry sidebar membawa `entryPoint` berupa permission `read` master tersebut, sehingga menu yang tidak boleh dibuka user tidak ikut tampil. Saat user berpindah aplikasi melalui header, kedua navigasi tersebut diganti seluruhnya oleh navigasi aplikasi aktif.
 
 App tidak membuat ulang header atau kerangka navigasi. App hanya mendaftarkan identitas, route, menu utama pada rail, menu turunan pada sidebar, dan permission entry point-nya. Nama, ikon, urutan, dan label menu berasal dari metadata app/host SDK, bukan daftar app yang di-hardcode di Web Shell.
 
-Kontrak host navigasi versi awal bersifat deklaratif melalui `ui.navigation` pada manifest. Control Plane memvalidasi bahwa setiap item sidebar menunjuk permission `read` milik app yang sama, menyimpannya di katalog, lalu Web Shell memfilter dan merendernya dengan komponen Core. Pemilihan item memakai query `view` pada route host dan hash pada UI artifact. App tidak mengimpor komponen internal Control Plane dan tidak menggambar ulang rail/sidebar.
+Kontrak host navigasi bersifat deklaratif melalui `ui.navigation` pada manifest. Control Plane memvalidasi bahwa setiap item sidebar menunjuk permission `read` milik app yang sama, menyimpannya di katalog, lalu Web Shell memfilter dan merendernya dengan komponen Core.
+
+**Id entri menu adalah jalur rutenya**: Core menyusun tautan sidebar dengan aturan `/<id module>/<id entri menu>`, jadi berkas rute module wajib punya rute dengan jalur itu. Module tidak mengimpor komponen internal Control Plane dan tidak menggambar ulang rail/sidebar.
 
 ## Lifecycle app
 
@@ -421,10 +630,32 @@ Lifecycle tidak dimodelkan sebagai satu status linear karena empat fakta mempuny
 | Installed | Installation registry mencatat artifact dan migration berhasil pada placement/release. |
 | Ready | Placement/runtime health menyatakan release dapat diroute. |
 
-Disable dan uninstall belum memiliki worker. Saat worker itu dibuat, uninstall harus
-menolak app yang masih menjadi dependency app lain, mengarsipkan data default, dan
-memerlukan backup serta approval eksplisit untuk `purge`; jangan menganggap aturan
-masa depan itu sudah berjalan.
+Untuk module, ketiga perpindahan itu sudah ada dan dijalankan perintah artisan:
+`module:install`, `module:disable`, dan `module:uninstall`, masing-masing menerima id module dan id
+tenant — module dibeli **per tenant**, jadi tidak ada bentuk yang berlaku untuk seluruh instalasi
+sekaligus.
+
+Catatan pemasangan hidup di `core_module_installations`, berkunci `tenant_id` bersama kode module.
+Tiga status yang sah — `installed`, `disabled`, `uninstalled` — dijaga `CHECK` di database, bukan
+hanya di model, dan barisnya **tidak pernah dihapus**: pencabutan mengubah status, bukan membuang
+catatannya. Kolom `seeded_at` yang menahan data awal terisi dua kali membuat pemasangan aman
+dijalankan dua kali; menjalankannya lagi mengembalikan status tanpa menyentuh data dan tanpa
+mengisi ulang data awal.
+
+Penonaktifan hanya mengubah status beserta `disabled_at`. Pencabutan ditolak bila module masih
+menjadi dependency module lain yang terpasang **pada tenant yang sama** — diperiksa terhadap tenant,
+bukan terhadap katalog, karena katalog tidak tahu apa yang dibeli siapa.
+
+Tidak satu pun dari ketiganya menghapus data, dan tidak ada opsi untuk menambahkannya. Aturannya ada
+di [Mencabut modul tidak menyentuh data](#mencabut-modul-tidak-menyentuh-data) beserta penjaganya.
+
+Satu hal yang sering disimpulkan terbalik: **pemasangan bukan izin**. Module yang terpasang tidak
+memberi seorang pun hak apa pun; hak tetap datang dari rantai `role → duty → privilege → permission`.
+Menyimpulkan izin dari pemasangan adalah kesalahan yang sama bentuknya dengan menyimpulkan
+pemasangan dari entitlement.
+
+Untuk app yang masih berupa container, ketiga perpindahan itu belum punya worker; jangan menganggap
+aturan module di atas sudah berjalan di sana.
 
 ## Jenis app
 
@@ -441,7 +672,7 @@ Customer extension pada managed cloud tidak boleh mengunggah arbitrary container
 
 - [Gate penemuan dan keputusan](18-module-discovery-and-decision-gate.md) — dilewati **sebelum** app dibuat
 - [Rantai keamanan modul transaksi](19-transaction-security-chain.md) — empat lapis di atas diteruskan sampai ke user
-- [Menerbitkan release app](13-publishing-an-app-release.md) — cara manifest app masuk katalog Core
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — cara manifest app masuk katalog Core
 - [API dan integration bridge](04-api-and-integration.md) — satu-satunya jalan komunikasi antar app
 - [Kustomisasi dan addon](05-customization-and-addons.md) — kebutuhan khusus customer tanpa fork
 - [Release dan on-prem](03-release-and-on-prem.md) — lifecycle install, upgrade, uninstall

@@ -1,17 +1,48 @@
+# Stack uji beban CoreERP — satu untuk seluruh runtime.
+#
+# Dulu ada dua: satu di sini untuk Core, satu lagi di dalam folder module Management Aset
+# dengan database, image, dan tiruan Core sendiri. Bentuk itu masuk akal ketika module masih
+# aplikasi berkontainer yang memanggil Core lewat HTTP. Ia tidak masuk akal lagi: module
+# dimuat runtime Core, memakai database yang sama, dan menerbitkan nomor lewat kontrak
+# `PenerbitNomor` di dalam proses yang sama. Yang ditiru `stub-core` karena itu tidak ada lagi
+# yang bisa ditiru, dan tiruannya dihapus pada F7-03 bersama compose keduanya.
+#
+# Yang tetap dipertahankan dari keduanya adalah satu-satunya hal yang tidak dapat dipalsukan
+# test suite: BEBERAPA instance API di belakang satu load balancer, berbagi SATU database dan
+# SATU tabel sesi. Itulah yang membuktikan runtime tidak menyimpan counter, identitas tenant,
+# atau cache izin pada memori satu proses.
+#
+#   k6 ──► nginx (least_conn) ──► api1..api4 ──► pgbouncer ──► PostgreSQL
+#                                     │
+#                                     └── worker (queue) dan scheduler tidak dipakai
+#                                         skenario ini, jadi tidak dinyalakan.
 name: core-loadtest
 
 x-api: &api
+  # Image yang sama dengan yang dijalankan stack pengembangan dan yang dikirim ke pelanggan.
+  # Ia dibangun dari akar repo, jadi seluruh module di `modules/` ikut termuat. Bangun ulang
+  # hanya bila kode berubah: `docker compose build api1` atau `start.ps1 -Build` di erp-dev.
+  image: ${CORE_IMAGE:-erp-core-app:local}
   build:
-    context: ..
-    dockerfile: Dockerfile
-  image: coreerp-loadtest-api:local
+    context: ../../..
+    dockerfile: apps/control-plane/Dockerfile
   restart: unless-stopped
   depends_on:
-    db:
-      condition: service_healthy
     pgbouncer:
       condition: service_started
-  command: sh -c "php artisan config:cache && apache2-foreground"
+  # Entrypoint image dipakai apa adanya, dan sejak F7-10 itu berarti **setelan dan rute
+  # ter-cache**: entrypoint membangun keduanya saat container naik, untuk ketiga peran.
+  #
+  # Sampai 10 September 2026 keadaannya sebaliknya, dan dua kalimat yang dulu ditulis di sini
+  # keduanya keliru. `config:cache` memang gagal — `config/scramble.php` memuat objek
+  # `ApiKeySecurityScheme` yang tidak punya `__set_state()` — dan itu dibereskan F7-10 dengan
+  # memindahkan penyusunan skemanya keluar dari berkas setelan. Tetapi `route:cache` **tidak**
+  # pernah gagal: ia memulangkan 383 rute, sama dengan tanpa cache, closure pada
+  # `routes/web.php` dan semuanya. Klaim itu ditulis tanpa dijalankan.
+  #
+  # Artinya angka latensi di sini tidak lagi mengukur bootstrap penuh. Yang diukur F7-10: cache
+  # menghemat 3–5 ms per permintaan pada endpoint tanpa database, dan hilang di belakang kerja
+  # database pada skenario sungguhan — ambang gate-nya tidak bergeser.
   volumes:
     - ./apache-loadtest.conf:/etc/apache2/conf-enabled/zz-loadtest.conf:ro
   environment: &api-environment
@@ -27,16 +58,23 @@ x-api: &api
     DB_DATABASE: core_erp
     DB_USERNAME: core_erp
     DB_PASSWORD: core_erp
+    # Sesi di database, bukan berkas: empat instance harus melihat sesi yang sama, dan
+    # itu satu-satunya cara membuktikan tidak ada identitas yang tersimpan di memori
+    # instance. Sama untuk cache.
     SESSION_DRIVER: database
     CACHE_STORE: database
-    QUEUE_CONNECTION: sync
+    QUEUE_CONNECTION: database
     COREERP_DEPLOYMENT_PROFILE: pooled
     COREERP_DEPLOYMENT_PLACEMENT: pooled-primary
     COREERP_PROVIDER_EMAIL: provider@load.test
     COREERP_PROVIDER_PASSWORD: Loadtest-Provider-2026!
     COREERP_APP_CONTEXT_SIGNING_KEY: loadtest-context-signing-key-32b!!
+    COREERP_EVENT_ENDPOINTS: "[]"
+    # Limiter registrasi dilonggarkan karena harness menyiapkan ratusan tenant dari satu
+    # alamat IP. Nilai produksinya tetap default di config; yang dilonggarkan hanya di sini.
     COREERP_REGISTRATION_RATE_LIMIT: "1000000"
     COREERP_TRUSTED_PROXIES: 172.16.0.0/12
+    # Gate mengukur CoreERP, bukan layanan kebocoran password pihak ketiga.
     COREERP_PASSWORD_BREACH_CHECK: "false"
 
 services:
@@ -69,6 +107,10 @@ services:
     ports:
       - "15543:5432"
 
+  # Mode session, bukan transaction: PDO memakai prepared statement sisi server, dan
+  # transaction pooling memutus statement itu antar request. Laravel membuka lalu menutup
+  # koneksi per request; tanpa pooler, PostgreSQL fork satu proses per request dan itu
+  # menjadi bottleneck jauh sebelum kode aplikasi.
   pgbouncer:
     image: edoburu/pgbouncer:v1.23.1-p3
     restart: unless-stopped
@@ -88,8 +130,10 @@ services:
       AUTH_TYPE: scram-sha-256
       LISTEN_PORT: "6432"
 
+  # Migrasi, seed, dan pendaftaran katalog module. Urutannya sama persis dengan yang
+  # dijalankan `start.ps1` pada stack pengembangan; lihat prepare.sh.
   init:
-    image: coreerp-loadtest-api:local
+    image: ${CORE_IMAGE:-erp-core-app:local}
     profiles: [tools]
     depends_on:
       db:
@@ -97,10 +141,14 @@ services:
     entrypoint: ["sh", "/loadtest/prepare.sh"]
     volumes:
       - ./prepare.sh:/loadtest/prepare.sh:ro
-      - ${APP_MANIFEST_PATH}:/workspace/app.yaml:ro
     environment:
       <<: *api-environment
-      APP_ENV: testing
+      # `migrate:fresh` menolak berjalan pada APP_ENV=production, dan penolakan itu benar.
+      # Yang dijalankan di sini adalah penyiapan database sekali pakai, bukan instance yang
+      # melayani beban; instance yang melayani beban tetap production.
+      APP_ENV: local
+      # Langsung ke PostgreSQL: migrasi memakai advisory lock dan DDL, dua hal yang tidak
+      # ada urusannya dengan pooler.
       DB_HOST: db
       DB_PORT: "5432"
 
@@ -126,12 +174,15 @@ services:
     image: grafana/k6:0.55.0
     profiles: [tools]
     volumes:
-      - ./k6:/scripts:ro
+      - ./k6:/scripts
+      # Skenario module tinggal di folder module — di sanalah dokumentasinya menunjuk —
+      # tetapi ia berjalan pada stack ini dan mengimpor `../lib.js` yang sama.
+      - ../../../modules/apperp/management-aset/loadtest/k6:/scripts/aset
       - ./results:/results
     environment:
       BASE_URL: http://lb
-      PROFILE: ${PROFILE:-registration}
-      TENANTS: ${TENANTS:-100}
+      PROFILE: ${PROFILE:-saturation}
+      TENANTS: ${TENANTS:-128}
       VUS: ${VUS:-1000}
       LATENCY_VUS: ${LATENCY_VUS:-1}
       DURATION: ${DURATION:-90s}

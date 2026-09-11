@@ -6,7 +6,7 @@ container, database, maupun token layanan sendiri.
 
 Ini berbeda dari app di repo `app-erp-*`, yang sampai hari ini masih punya container dan database
 sendiri. Perbedaan lengkapnya ada pada **Dua bentuk module yang hidup berdampingan** di
-[AGENTS.md](../AGENTS.md); alasannya pada [keputusan satu runtime](../docs/todo/satu-runtime/00-keputusan.md).
+[AGENTS.md](../AGENTS.md); aturan lengkapnya pada [standar module](../docs/dev/02-module-standard.md).
 
 ## Bentuk folder
 
@@ -79,14 +79,24 @@ Setiap module memakai satu namespace dan satu awalan tabel, dan keduanya diturun
 
 | Folder | Namespace PHP | Awalan tabel |
 | --- | --- | --- |
-| `apperp/management-aset` | `Modules\Apperp\ManagementAset\` | `aset_` |
-| `apperp/human-resources` | `Modules\Apperp\HumanResources\` | `hr_` |
 | `apperp/contoh-a` | `Modules\Apperp\ContohA\` | `contoh_a_` |
+| `apperp/contoh-b` | `Modules\Apperp\ContohB\` | `contoh_b_` |
+| `apperp/human-resources` | `Modules\Apperp\HumanResources\` | `hr_` |
+| `apperp/management-aset` | `Modules\Apperp\ManagementAset\` | `aset_` |
 
 Namespace mengikuti `StudlyCase` dari nama folder. Awalan tabel **tidak** selalu sama dengan nama folder:
 ia dipilih pendek dan tidak berubah setelah module pertama kali dipasang, karena mengubahnya berarti
 mengganti nama tabel di setiap instalasi pelanggan. Awalan baru dicatat di tabel ini pada pull request
 yang membuat module-nya, supaya tabrakan ketahuan saat peninjauan, bukan saat migrasi jalan.
+
+Tabel ini memuat module yang **ada hari ini**, tidak lebih dan tidak kurang, dan itu dijaga
+`SusunanManifestModulTest` di `apps/control-plane/tests/Feature/Boundary/`. Baris yang kurang membuat
+awalan yang sudah dipakai tampak masih bebas; baris untuk module yang belum ada membuat awalan yang
+masih bebas tampak sudah terpakai. Keduanya menyesatkan orang berikutnya, dan sebelum penjaga itu ada,
+tidak ada satu pun test yang gagal karenanya.
+
+Awalan `hr_` dicadangkan untuk `apperp/human-resources`, module kedua yang mendarat pada F7-01. Ia
+ditulis sebagai kalimat, bukan sebagai baris tabel, sampai foldernya benar-benar ada.
 
 Konvensi `m_`, `tr_`, dan `tr_*_details` pada [standar app](../docs/dev/02-module-standard.md) tetap
 berlaku; awalan module ditulis di depannya, misalnya `aset_m_group` dan `aset_tr_penerimaan`.

@@ -1,12 +1,19 @@
 name: tests
 
 on:
-  push:
-    branches:
-      - develop
-      - main
-      - master
-      - workos
+  # Tidak ada pemicu `push` ke `main`, dan itu keputusan sadar tentang kuota.
+  #
+  # GitHub menjalankan `pull_request` terhadap `refs/pull/N/merge` — yaitu pull request yang
+  # **sudah digabungkan** ke basisnya. Jadi menjalankan alur yang sama lagi setelah merge
+  # menguji pohon yang praktis identik dengan yang barusan hijau, dan repo ini privat di paket
+  # gratis: separuh kuota habis untuk mengulang hal yang sama.
+  #
+  # Yang dilepas: bila `main` bergerak antara run sebuah pull request dan saat ia digabungkan,
+  # pohon yang diuji menjadi basi. Dengan merge berurutan oleh satu orang, jendela itu nyaris
+  # nol; kalau GitHub menandai cabangnya tertinggal, jalankan ulang pemeriksaannya sebelum
+  # merge.
+  #
+  # Konsekuensi kedua: push langsung ke `main` tanpa pull request tidak diperiksa sama sekali.
   # Tanpa daftar cabang. Pull request yang basisnya cabang fitur — pull request
   # bertumpuk, yang dipakai saat sebuah task bergantung pada task sebelumnya — tidak
   # mendapat pemeriksaan sama sekali selama daftar ini ada, dan itu tidak terlihat
@@ -30,6 +37,13 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    # Tanpa batas ini, job yang menggantung berjalan sampai batas bawaan GitHub — enam jam —
+    # dan repo ini ada di paket gratis, jadi jam itu diambil dari kuota yang sama yang dipakai
+    # seluruh pemeriksaan berikutnya. Langkah Tests pernah menyentuh 47 menit di sini, jadi
+    # batasnya diberi ruang lebar; ia menahan yang menggantung, bukan yang sekadar lambat.
+    timeout-minutes: 30
+
     defaults:
       run:
         working-directory: apps/control-plane
@@ -49,6 +63,15 @@ jobs:
     # dipakai penerbitan nomor (lockForUpdate, FOR UPDATE SKIP LOCKED) berubah menjadi
     # string kosong di SQLite, sehingga test tidak membuktikan apa pun. Alasannya
     # ditulis juga di apps/control-plane/phpunit.xml.
+    #
+    # Database test tidak perlu tahan mati listrik. Ia dibuat, dipakai beberapa menit, lalu
+    # dibuang bersama runnernya — jadi seluruh jaminan durabilitas PostgreSQL di sini dibayar
+    # tanpa pernah dipakai. Data directory ditaruh di RAM lewat tmpfs.
+    #
+    # `PGDATA` sengaja menunjuk subfolder di dalam mount, bukan mount itu sendiri: entrypoint
+    # postgres menjalankan initdb hanya bila foldernya kosong dan kepemilikannya benar, dan
+    # sebuah tmpfs yang dipasang langsung sebagai data directory gagal pada salah satu dari
+    # keduanya tergantung versi Docker.
     services:
       postgres:
         image: postgres:16-alpine
@@ -56,9 +79,11 @@ jobs:
           POSTGRES_DB: core_erp
           POSTGRES_USER: core_erp
           POSTGRES_PASSWORD: core_erp
+          PGDATA: /var/lib/postgresql/data/pgdata
         ports:
           - 5432:5432
         options: >-
+          --tmpfs /var/lib/postgresql/data:rw
           --health-cmd "pg_isready -U core_erp"
           --health-interval 5s
           --health-timeout 5s
@@ -71,6 +96,22 @@ jobs:
       DB_TEST_USERNAME: core_erp
       DB_TEST_PASSWORD: core_erp
       DB_TEST_SCHEMA: coreerp_test
+
+      # CI tidak menjalankan OpenTelemetry, dan tidak boleh membayar biayanya. Ekstensi
+      # `opentelemetry` hanya ada pada image runtime, bukan pada runner; memasangnya di sini
+      # berarti kompilasi PECL pada setiap job demi instrumentasi yang tidak seorang pun baca.
+      #
+      # Nilai ini yang mematikannya, bukan sekadar meredam keluarannya. `_register.php` milik
+      # tiap paket auto-instrumentation memeriksa `Sdk::isInstrumentationDisabled()` lebih dulu
+      # dan langsung `return`, sebelum sampai ke pemeriksaan ekstensi yang memanggil
+      # `trigger_error(..., E_USER_WARNING)`. Peringatan itu bukan sekadar berisik: selama fase
+      # `post-autoload-dump`, penangan error milik Composer mengubahnya menjadi exception dan
+      # seluruh langkah gagal.
+      #
+      # Dipakai `all`, bukan `laravel,psr3`, karena yang dinyatakan di sini adalah niat — CI
+      # tidak pernah punya telemetri — sehingga paket auto-instrumentation ketiga yang
+      # ditambahkan nanti tidak perlu diingat untuk didaftarkan ulang.
+      OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
 
     steps:
       - name: Checkout code
@@ -93,10 +134,15 @@ jobs:
           # daripada xdebug untuk coverage baris, dan nyalakan hanya pada job yang memakainya.
           coverage: none
 
+      # `cache: npm` menyimpan unduhan npm antar run. Lockfile-nya ada di akar repo, bukan
+      # di folder app, jadi jalurnya disebut eksplisit — tanpa itu cache tidak pernah kena
+      # dan langkah ini tetap mengunduh semuanya sambil terlihat seolah sudah di-cache.
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       # Berjalan di akar repo, bukan di folder app. `@apperp/ui` adalah workspace npm,
       # dan lockfile yang memuatnya hanya ada satu — di akar.
@@ -104,8 +150,13 @@ jobs:
         run: npm ci
         working-directory: .
 
+      # `--ignore-platform-req=ext-opentelemetry` menjawab separuh masalah yang berbeda dari
+      # env di atas: dua paket `open-telemetry/*` mendeklarasikan ekstensi itu sebagai
+      # platform requirement keras, dan penyelesai dependency menolak jauh sebelum satu baris
+      # kode pun dijalankan. Bentuk ini menyamai tahap vendor pada `apps/control-plane/Dockerfile`,
+      # supaya masalah yang sama tidak ditangani dengan dua mekanisme berbeda.
       - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-opentelemetry
 
       - name: Copy Environment File
         run: cp .env.example .env
@@ -119,6 +170,13 @@ jobs:
       - name: Build Assets
         run: npm run build
 
+      # React hanya boleh termuat sekali. Kegagalannya tidak berbunyi — build tetap hijau,
+      # halaman tetap tampil, lalu hook melempar "Invalid hook call" pada komponen yang
+      # kebetulan melintasi batas salinan. Selama UI module berada di dalam iframe, dua
+      # salinan memang selalu ada; sejak fase 4 tidak boleh lagi, dan ini yang menagihnya.
+      - name: Periksa Bundel
+        run: npm run bundle:check
+
       # Koneksi test menunjuk schema tersendiri lewat search_path, dan PostgreSQL tidak
       # membuat schema itu sendiri. Di mesin pengembang langkah ini dilakukan tangan
       # sekali, sesuai catatan pada apps/control-plane/.env.example.
@@ -129,11 +187,39 @@ jobs:
       - name: Create Test Schema
         run: PGPASSWORD=$DB_TEST_PASSWORD psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" -c "CREATE SCHEMA IF NOT EXISTS $DB_TEST_SCHEMA;"
 
+      # Melengkapi tmpfs di atas: yang tersisa dari biaya durabilitas setelah data directory
+      # berada di RAM. Ketiganya `sighup`, jadi cukup dimuat ulang tanpa merestart server.
+      #
+      # Ini **hanya** untuk database yang umurnya sepanjang satu job CI. Menyalakannya di mesin
+      # sungguhan berarti kehilangan data pada mati listrik, dan `full_page_writes=off`
+      # merusak database pada mati listrik di tengah penulisan halaman.
+      #
+      # Tiap pernyataan memakai `-c` sendiri, bukan satu `-c` berisi empat baris. psql
+      # mengirim isi satu `-c` sebagai **satu blok transaksi**, dan ALTER SYSTEM dilarang
+      # berjalan di dalam transaksi: "ALTER SYSTEM cannot run inside a transaction block".
+      - name: Relax Test Database Durability
+        env:
+          PGPASSWORD: ${{ env.DB_TEST_PASSWORD }}
+        run: |
+          psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" \
+            -c "ALTER SYSTEM SET fsync = off;" \
+            -c "ALTER SYSTEM SET synchronous_commit = off;" \
+            -c "ALTER SYSTEM SET full_page_writes = off;" \
+            -c "SELECT pg_reload_conf();"
+
       # `--parallel`, bukan serial. Terukur di mesin pengembang pada keadaan yang sama:
       # 9 menit 3 detik menjadi 1 menit 27 detik untuk 499 test yang sama — tidak satu pun
       # dilewatkan. Yang dipotong waktu tunggu, bukan cakupannya.
       #
       # Tiap pekerja mendapat databasenya sendiri, dan di sana database itulah batas
       # isolasinya — schema `coreerp_test` tidak dipakai; lihat config/database.php.
+      #
+      # `--exclude-group=lambat` pada pull request. Satu berkas — DepreciationScaleTest —
+      # menyapu 40 kombinasi penyusutan sampai akhir masa manfaat, dan satu methodnya sendiri
+      # 56 detik: tujuh persen seluruh suite. Dengan dua pekerja, satu pekerja menjalankannya
+      # sendirian sementara yang lain selesai, dan itulah ekor yang menggantung di akhir run.
+      #
+      # Jadwal mingguan menjalankan semuanya tanpa pengecualian. Yang dijaga sapuan itu berubah
+      # jarang; biayanya dibayar pada setiap perubahan apa pun.
       - name: Tests
-        run: php artisan test --parallel
+        run: php artisan test --parallel ${{ github.event_name == 'pull_request' && '--exclude-group=lambat' || '' }}

@@ -68,7 +68,7 @@ Jangan menulis "delapan master data" atau "dua puluh sembilan reference". Angka 
 
 Tunjuk sumbernya:
 
-> Daftar master yang berlaku ada di `api/routes/api.php` pada array `$masters`.
+> Daftar master yang berlaku ada di `routes/api.php` pada array `$masters`.
 
 Hal yang sama berlaku untuk daftar kolom, daftar permission, dan versi paket.
 
@@ -93,10 +93,13 @@ Halaman baru wajib didaftarkan di `docs/.vitepress/config.ts` — sidebar disusu
 
 ```powershell
 cd docs
-npx vitepress build .
+npm run docs:build
 ```
 
 Harus lolos tanpa peringatan tautan mati.
+
+Jangan memakai `npx vitepress build .`: perintah itu menarik VitePress baru ke cache npx tanpa
+`vitepress-plugin-mermaid`, dan build gagal pada halaman pertama yang memuat diagram.
 
 ## Contoh yang sudah ada
 

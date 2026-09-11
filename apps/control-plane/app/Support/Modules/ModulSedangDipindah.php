@@ -61,23 +61,31 @@ final class ModulSedangDipindah
     /**
      * Nama folder modul dipetakan ke alasan dan tenggatnya.
      *
-     * Angka pada `alasan` bukan perkiraan. Semuanya diukur pada repo aset apa adanya sebelum
-     * pemindahan, dan dicatat di `docs/todo/satu-runtime/01-prd.md` bagian F3-00.
+     * Angka pada `alasan` bukan perkiraan; semuanya diukur pada repo asalnya apa adanya sebelum
+     * pemindahan. Aturan pengecualian ini ada di `docs/dev/26-modul-yang-sedang-dipindah.md`.
      *
-     * @var array<string, array{alasan: string, tenggat: string}>
+     * **`pemblokir` opsional, dan sebaiknya tetap kosong.** Ia diisi hanya ketika modulnya sudah
+     * bersih menurut pemindaian berkas tetapi entrinya masih belum boleh dibuang karena sesuatu
+     * yang tidak dapat dilihat pemindai mana pun. Premis semula — "bersih berarti entrinya basi" —
+     * terbukti salah pada 9 September 2026: modul aset lulus seluruh pemindaian, tetapi membuang
+     * entrinya membuatnya **dilayani**, dan itu menjatuhkan 84 test Core yang fixture katalognya
+     * belum menggambarkannya sebagai app yang dapat dipasang. Sebabnya dibereskan F3-30 —
+     * fixture itu berhenti memakai id modul sungguhan — dan entrinya dibuang bersamanya.
+     *
+     * Isinya wajib menyebut nomor task yang membuangnya, supaya ia tidak bisa menjadi alasan yang
+     * berlaku selamanya. Tenggat tetap berlaku penuh.
+     *
+     * @var array<string, array{alasan: string, tenggat: string, pemblokir?: string}>
      */
     private const DAFTAR = [
-        'management-aset' => [
-            'alasan' => 'Ditarik masuk apa adanya pada F3-01 supaya riwayat 35 commit-nya ikut pindah. '
-                .'Saat diukur, isinya 131 berkas PHP ber-namespace App\\, 200 pemanggilan DB::table(, '
-                .'dan app.yaml yang tidak menyatakan table_prefix — ketiga penjaga merah sekaligus. '
-                .'Dibereskan bertahap pada F3-02 sampai F3-05, dan entri ini dibuang setelahnya.',
-            'tenggat' => '2026-12-31',
-        ],
+        // Kosong lagi sejak 10 September 2026. Dua module sudah melewati daftar ini — aset pada
+        // F3-30, human-resources pada F7-01 — dan yang kedua tinggal di sini kurang dari satu hari.
+        // Itu ukuran yang paling berguna dari daftar ini: bukan berapa lama ia kosong, melainkan
+        // berapa lama sebuah entri bertahan.
     ];
 
     /**
-     * @param  array<string, array{alasan: string, tenggat: string}>  $daftar
+     * @param  array<string, array{alasan: string, tenggat: string, pemblokir?: string}>  $daftar
      */
     private function __construct(private readonly array $daftar) {}
 
@@ -96,7 +104,7 @@ final class ModulSedangDipindah
      * melonggarkan untuk modul lain" adalah menambah modul sungguhan ke daftar sungguhan,
      * dan itu berarti test-nya ikut berubah setiap kali daftarnya berubah.
      *
-     * @param  array<string, array{alasan: string, tenggat: string}>  $daftar
+     * @param  array<string, array{alasan: string, tenggat: string, pemblokir?: string}>  $daftar
      */
     public static function buatan(array $daftar): self
     {
@@ -112,7 +120,7 @@ final class ModulSedangDipindah
     }
 
     /**
-     * @return array<string, array{alasan: string, tenggat: string}>
+     * @return array<string, array{alasan: string, tenggat: string, pemblokir?: string}>
      */
     public function semua(): array
     {

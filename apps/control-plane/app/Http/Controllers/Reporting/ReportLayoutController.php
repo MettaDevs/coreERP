@@ -5,15 +5,16 @@ namespace App\Http\Controllers\Reporting;
 use App\Http\Controllers\Controller;
 use App\Models\TenantMembership;
 use App\Support\CurrentWorkspace;
-use App\Support\Reporting\AppReportClient;
 use App\Support\Reporting\LayoutRef;
 use App\Support\Reporting\LayoutStore;
 use App\Support\Reporting\PrintIdentityStore;
 use App\Support\Reporting\ReportCatalog;
+use App\Support\Reporting\SumberLaporan;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use stdClass;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
@@ -29,7 +30,7 @@ class ReportLayoutController extends Controller
     public function __construct(
         private readonly ReportCatalog $catalog,
         private readonly LayoutStore $layouts,
-        private readonly AppReportClient $client,
+        private readonly SumberLaporan $client,
         private readonly CurrentWorkspace $workspace,
         private readonly PrintIdentityStore $identities,
     ) {}
@@ -120,9 +121,9 @@ class ReportLayoutController extends Controller
         $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
         abort_unless(LayoutRef::isValid($ref) && $this->layouts->exists($report, $membership->tenant_id, $legalEntityId, $ref), 404);
 
-        $layout = AppReportClient::guard(fn () => $this->layouts->resolve(
+        $layout = $this->layouts->resolve(
             $report, $membership->tenant_id, $legalEntityId, $ref, $membership, $this->workspace->operatingUnit($request, $membership)?->id,
-        ), $report);
+        );
         $name = preg_replace('/[^A-Za-z0-9._-]+/', '-', $layout->name) ?? 'layout';
 
         return response()->download($layout->localPath, "{$report->code}-{$name}.{$layout->format}")->deleteFileAfterSend(true);
@@ -144,7 +145,7 @@ class ReportLayoutController extends Controller
         return $this->listing($request, $membership, $report);
     }
 
-    /** @return array{0: TenantMembership, 1: object} */
+    /** @return array{0: TenantMembership, 1: stdClass} */
     private function report(Request $request, string $code): array
     {
         $membership = $this->currentMembership($request);
@@ -156,7 +157,7 @@ class ReportLayoutController extends Controller
         return [$membership, $report];
     }
 
-    private function listing(Request $request, TenantMembership $membership, object $report): JsonResponse
+    private function listing(Request $request, TenantMembership $membership, stdClass $report): JsonResponse
     {
         $legalEntityId = $this->workspace->legalEntity($request, $membership)?->id;
 
@@ -167,11 +168,11 @@ class ReportLayoutController extends Controller
     }
 
     /** @return list<string> */
-    private function knownKeys(Request $request, TenantMembership $membership, object $report): array
+    private function knownKeys(Request $request, TenantMembership $membership, stdClass $report): array
     {
-        $definition = AppReportClient::guard(fn () => $this->client->definition(
+        $definition = $this->client->definition(
             $report, $membership, $this->workspace->legalEntity($request, $membership)?->id, $this->workspace->operatingUnit($request, $membership)?->id,
-        ), $report);
+        );
 
         return array_map(fn (array $field): string => (string) $field['key'], [...$definition['fields'], ...$this->identities->catalog()]);
     }

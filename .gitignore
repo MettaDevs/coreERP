@@ -11,7 +11,12 @@ storage/*.key
 storage/pail/
 .phpunit.cache/
 .phpunit.result.cache
-/graphify-out
+# Keluaran alat, bukan sumber. Polanya sengaja tidak berjangkar di akar: 22 berkas
+# sempat ter-commit di dalam `modules/apperp/management-aset/` justru karena pola
+# lamanya `/graphify-out` hanya cocok di akar repo.
+graphify-out/
+__pycache__/
+*.pyc
 .vite-wayfinder.stdout.log
 .vite-wayfinder.stderr.log
 
@@ -23,3 +28,8 @@ docs/.vitepress/cache/
 .codex-server-migrate*
 *-ed25519
 *-ed25519.pub
+
+# Penanda sekali pakai milik `scripts/periksa-sisa-mesin.sh`. Ia menanamnya ke dalam konteks
+# pembangunan lalu menghapusnya; baris ini menjaga agar satu jalan yang terhenti di tengah tidak
+# meninggalkan berkas yang ikut ter-commit.
+apps/control-plane/resources/penanda-kendali.txt

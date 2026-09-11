@@ -1,3 +1,11 @@
+# Sisa kerangka aplikasi lama. Ia tidak membangun apa pun hari ini: `api/composer.json`,
+# `api/composer.lock`, dan `deploy/migrate.sh` yang disebut di bawah sudah dibuang saat
+# module dibentuk ulang, jadi build gagal pada baris COPY pertama.
+#
+# Ia tetap ada karena `loadtest/docker-compose.yml` masih menunjuk ke sini. Folder itu
+# dibekukan sampai F7-03, yang menggabungkannya dengan `apps/control-plane/loadtest/`;
+# berkas ini ikut hilang pada task yang sama, bukan sebelumnya.
+
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY api/composer.json api/composer.lock ./

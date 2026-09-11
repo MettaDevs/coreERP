@@ -8,7 +8,9 @@ use App\Models\TenantMembership;
 use App\Models\User;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
@@ -66,31 +68,14 @@ trait BerinteraksiDenganKonteksCore
 
     /**
      * Tenant untuk test ini.
-     */
-    /**
-     * Setelan klien HTTP ke Core yang masih tersisa.
      *
-     * Yang masih membacanya tinggal satu: verifikasi tanda tangan pada panggilan balik
-     * penyediaan data awal tenant, yang menjadi event pada F3-11. Penerbitan nomor, kalender
-     * fiskal, satuan, dan workflow sudah lewat kontrak sejak F3-06 sampai F3-09, dan tidak
-     * satu pun dari keempatnya lagi peduli pada setelan ini.
-     *
-     * Sisanya dibuang pada F3-19, bersama seluruh konfigurasi klien HTTP module.
+     * Tidak ada lagi setelan klien HTTP yang perlu dipasang di sini. Keempat pemakainya —
+     * penerbitan nomor, kalender fiskal, satuan, dan workflow — sudah lewat kontrak di dalam
+     * proses sejak F3-06 sampai F3-09, dan pemakai terakhirnya, verifikasi tanda tangan pada
+     * panggilan balik penyediaan tenant, ikut hilang bersama endpointnya di F3-11.
      */
-    protected function konfigurasiKlienCore(): void
-    {
-        config([
-            'services.coreerp.url' => 'http://core.test',
-            'services.coreerp.app_id' => 'management-aset',
-            'services.coreerp.service_token' => 'service-token',
-            'services.coreerp.context_signing_key' => 'test-context-signing-key-32-bytes',
-        ]);
-    }
-
     protected function buatTenantUji(): string
     {
-        $this->konfigurasiKlienCore();
-
         return $this->tenantUjiId = $this->pastikanTenantAda((string) Str::ulid());
     }
 
@@ -345,8 +330,38 @@ trait BerinteraksiDenganKonteksCore
     /**
      * Tenant beserta client pemiliknya, dibuat hanya bila belum ada.
      */
+    /**
+     * Tabel module dibuat oleh test ini sendiri, bukan oleh migration Core.
+     *
+     * Selama module masih terdaftar sedang dipindah, `ModuleServiceProvider` menjalankan
+     * migrationnya bersama migration Core — satu-satunya cara tabelnya ada, karena module yang
+     * sedang dipindah belum boleh dipasang untuk tenant mana pun. Entri itu dibuang pada 9
+     * September 2026, dan bersamanya jalur tersebut.
+     *
+     * Di produksi tabel ini dibuat `ModuleMigrator` saat module dipasang. Test tidak memasang
+     * module, jadi ia menjalankan migrationnya sendiri — pola yang sama dipakai
+     * `TenantScopeBoundaryTest` untuk module contoh.
+     *
+     * Dijalankan sekali per proses, bukan per tenant: tabelnya milik seluruh database dan
+     * dipisahkan `tenant_id`, bukan dibuat per tenant.
+     */
+    private function pastikanTabelModuleAda(): void
+    {
+        if (Schema::hasTable('aset_m_group_aset')) {
+            return;
+        }
+
+        Artisan::call('migrate', [
+            '--path' => dirname(__DIR__, 2).'/database/migrations',
+            '--realpath' => true,
+            '--force' => true,
+        ]);
+    }
+
     private function pastikanTenantAda(string $tenantId): string
     {
+        $this->pastikanTabelModuleAda();
+
         if (DB::table('tenants')->where('id', $tenantId)->exists()) {
             return $tenantId;
         }
@@ -430,6 +445,10 @@ trait BerinteraksiDenganKonteksCore
         );
     }
 
+    /**
+     * @param  list<string>  $izin
+     * @param  list<array{policy_code:string,legal_entity_id?:?string,organization_id?:?string,include_descendants?:bool}>  $kebijakanData
+     */
     protected function sebagaiPengguna(string $tenantId, array $izin, array $kebijakanData = [], ?string $nama = null): static
     {
         // Test isolasi antar tenant menyusun tenant kedua dengan `Str::ulid()` dan menaruh
@@ -743,12 +762,22 @@ trait BerinteraksiDenganKonteksCore
                 ['from' => 'periksa', 'to' => 'selesai', 'outcome' => 'approve'],
             ];
 
+        // Langkah dan tepi disusun dari kondisi yang sama, jadi setiap kunci yang disebut tepi
+        // pasti sudah punya elemen. Yang dicari di sini tetap dibaca dengan penjagaan: bila
+        // suatu saat kedua daftar itu tidak lagi sejalan, test harus berhenti dengan sebab
+        // yang jelas, bukan memasukkan baris transisi dengan kunci asing yang kosong.
+        $idElemen = static function (string $kunci) use ($elemen): string {
+            return $elemen[$kunci] ?? throw new \RuntimeException(
+                sprintf('Graf workflow uji tidak punya elemen "%s".', $kunci),
+            );
+        };
+
         foreach ($tepiGraf as $tepi) {
             DB::table('workflow_transitions')->insert([
                 'id' => (string) Str::ulid(),
                 'version_id' => $versiId,
-                'from_element_id' => $elemen[$tepi['from']],
-                'to_element_id' => $elemen[$tepi['to']],
+                'from_element_id' => $idElemen($tepi['from']),
+                'to_element_id' => $idElemen($tepi['to']),
                 'outcome' => $tepi['outcome'],
                 'created_at' => now(),
                 'updated_at' => now(),
@@ -759,7 +788,7 @@ trait BerinteraksiDenganKonteksCore
     /**
      * Tugas persetujuan yang sedang menunggu seorang pemeriksa.
      */
-    protected function tugasMenunggu(string $tenantId, string $idKeanggotaanPemeriksa): ?object
+    protected function tugasMenunggu(string $tenantId, string $idKeanggotaanPemeriksa): ?\stdClass
     {
         return DB::table('workflow_work_items')
             ->where('tenant_id', $tenantId)

@@ -35,7 +35,7 @@ Penjelasan lengkapnya di [Penyusutan: profil, buku, dan matriks](/apps/managemen
 
 **Group tidak bisa diganti setelah aset dibuat.** Buku penyusutan aset sudah terbentuk dari matriks group lama. Permintaan yang mencobanya ditolak dengan pesan yang menyebut alasannya — bukan diabaikan diam-diam, supaya pengguna tidak mengira group sudah berganti.
 
-**Kelompok harta fiskal harus ada di referensi tenant.** Divalidasi terhadap `m_kelompok_harta_fiskal`, yang diisi otomatis saat tenant disiapkan.
+**Kelompok harta fiskal harus ada di referensi tenant.** Divalidasi terhadap `aset_m_kelompok_harta_fiskal`, yang diisi otomatis saat tenant disiapkan.
 
 **Group yang masih dipakai aset tidak bisa diarsipkan.** Berlaku sebagai aturan induk-beranak biasa.
 
@@ -43,10 +43,10 @@ Penjelasan lengkapnya di [Penyusutan: profil, buku, dan matriks](/apps/managemen
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/master/GroupAsetController.php` | Master group beserta kolom khususnya |
-| `api/app/Http/Controllers/master/GroupBukuPenyusutanController.php` | Matriks group × buku |
-| `api/app/Models/master/GroupAset.php` | Model, termasuk daftar `PROPERTY_TYPE` |
-| `ui/src/master/GroupBookMatrix.tsx` | Layar matriks |
+| `src/Http/Controllers/master/GroupAsetController.php` | Master group beserta kolom khususnya |
+| `src/Http/Controllers/master/GroupBukuPenyusutanController.php` | Matriks group × buku |
+| `src/Models/master/GroupAset.php` | Model, termasuk daftar `PROPERTY_TYPE` |
+| `ui/master/GroupBookMatrix.tsx` | Layar matriks |
 
 ## Halaman terkait
 

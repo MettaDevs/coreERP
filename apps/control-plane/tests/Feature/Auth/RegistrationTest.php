@@ -33,7 +33,7 @@ class RegistrationTest extends TestCase
         $response = $this->post(route('register.store'), [
             'name' => 'Test User',
             'business_name' => 'PT Test',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',

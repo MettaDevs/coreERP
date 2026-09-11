@@ -6,6 +6,9 @@ use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\PabrikanAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
+/**
+ * @extends MasterDataController<PabrikanAset>
+ */
 class PabrikanAsetController extends MasterDataController
 {
     protected function resource(): string

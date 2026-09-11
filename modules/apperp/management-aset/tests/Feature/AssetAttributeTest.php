@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
@@ -447,7 +448,10 @@ class AssetAttributeTest extends TestCase
         return ['jenis' => $jenis, 'atribut' => [$kapasitas, $bergaransi], 'model' => $model];
     }
 
-    /** @param list<string> $permissions */
+    /**
+     * @param  list<string>  $permissions
+     * @return TestResponse<Response>
+     */
     private function detail(string $jenisId, array $permissions): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $permissions)
@@ -463,14 +467,20 @@ class AssetAttributeTest extends TestCase
             ->assertCreated()->json('data.id');
     }
 
-    /** @param list<array<string, mixed>> $rows */
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return TestResponse<Response>
+     */
     private function attach(string $jenisId, array $rows): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('jenis-aset'))
             ->putJson('/api/modules/management-aset/v1/jenis-aset/'.$jenisId.'/atribut', ['rows' => $rows]);
     }
 
-    /** @param list<array<string, mixed>> $rows */
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return TestResponse<Response>
+     */
     private function values(string $atributId, array $rows): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('tipe-atribut'))
@@ -483,7 +493,10 @@ class AssetAttributeTest extends TestCase
         return $this->receiveRaw($jenisId, $atribut)->assertCreated()->json('data.id');
     }
 
-    /** @param list<array<string, mixed>> $atribut */
+    /**
+     * @param  list<array<string, mixed>>  $atribut
+     * @return TestResponse<Response>
+     */
     private function receiveRaw(string $jenisId, array $atribut): TestResponse
     {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(5)]);

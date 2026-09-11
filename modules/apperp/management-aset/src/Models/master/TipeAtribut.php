@@ -9,6 +9,18 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  *
  * Inilah cara menambah pembeda aset tanpa menambah tingkat klasifikasi baru: tenant
  * membuat atributnya sendiri, menempelkannya ke jenis aset, dan aset mewarisinya.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan pada
+ * `MasterData`. `min_value` dan `max_value` di-cast `decimal:6`, jadi Eloquent memulangkannya
+ * sebagai string dan bukan float. `satuan` adalah salinan kode satuan untuk tampilan,
+ * sedangkan `satuan_id` yang menunjuk satuan milik Core.
+ *
+ * @property string $data_type
+ * @property bool $data_type_locked
+ * @property ?string $satuan_id
+ * @property ?string $satuan
+ * @property ?string $min_value
+ * @property ?string $max_value
  */
 class TipeAtribut extends MasterData
 {

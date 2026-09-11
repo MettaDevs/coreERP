@@ -6,6 +6,10 @@ namespace Modules\Apperp\ManagementAset\Reporting\Layouts;
  * Layout yang ikut release app, setara "extension layout" Business Central: dapat
  * dipakai dan disalin, tetapi tidak dapat diubah atau dihapus tenant. Berkasnya ada di
  * `resources/laporan/<kode laporan>/<kunci>.<format>`.
+ *
+ * Yang disimpan di sini hanya kuncinya. Rujukan yang tersimpan di database dan dikirim UI
+ * (`bawaan:<kunci>`) disusun Core dari kunci itu, jadi module tidak menyusunnya sendiri —
+ * awalannya milik Core dan bukan bagian dari kontrak module.
  */
 final class BuiltinLayout
 {
@@ -15,11 +19,6 @@ final class BuiltinLayout
         public readonly string $description,
         public readonly string $format,
     ) {}
-
-    public function ref(): string
-    {
-        return LayoutRef::BUILTIN_PREFIX.$this->key;
-    }
 
     public function path(string $reportCode): string
     {

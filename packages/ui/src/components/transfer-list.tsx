@@ -1,10 +1,10 @@
 "use client"
 
-import * as React from "react"
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
+import * as React from "react"
 
-import { Button } from "./button"
 import { cn } from "../utils"
+import { Button } from "./button"
 
 export type TransferListItem = {
   id: string
@@ -113,26 +113,40 @@ function TransferList({
 
   function moveToSelected(id: string) {
     const item = remaining.find((candidate) => candidate.id === id)
-    if (!item) return
+
+    if (!item) {
+return
+}
+
     setHighlightedRemaining(null)
     onChange({ remaining: remaining.filter((candidate) => candidate.id !== id), selected: [...selected, item] })
   }
 
   function moveToRemaining(id: string) {
     const item = selected.find((candidate) => candidate.id === id)
-    if (!item) return
+
+    if (!item) {
+return
+}
+
     setHighlightedSelected(null)
     onChange({ remaining: [...remaining, item], selected: selected.filter((candidate) => candidate.id !== id) })
   }
 
   function moveAllToSelected() {
-    if (remaining.length === 0) return
+    if (remaining.length === 0) {
+return
+}
+
     setHighlightedRemaining(null)
     onChange({ remaining: [], selected: [...selected, ...remaining] })
   }
 
   function moveAllToRemaining() {
-    if (selected.length === 0) return
+    if (selected.length === 0) {
+return
+}
+
     setHighlightedSelected(null)
     onChange({ remaining: [...remaining, ...selected], selected: [] })
   }

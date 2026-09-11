@@ -2,14 +2,17 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\MasterData;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
+/**
+ * @extends MasterDataController<BukuPenyusutan>
+ */
 class BukuPenyusutanController extends MasterDataController
 {
     protected function resource(): string
@@ -64,9 +67,7 @@ class BukuPenyusutanController extends MasterDataController
             return;
         }
 
-        $used = DB::table('aset_tr_buku_aset')
-            ->where(['tenant_id' => $tenantId, 'buku_id' => $record->getKey()])
-            ->exists();
+        $used = AssetBook::query()->where('buku_id', $record->getKey())->exists();
         if ($used) {
             throw ValidationException::withMessages([
                 'depreciation_profile_id' => 'Buku ini sudah dipakai aset. Buat buku baru untuk perubahan aturan agar histori aset lama tetap utuh.',

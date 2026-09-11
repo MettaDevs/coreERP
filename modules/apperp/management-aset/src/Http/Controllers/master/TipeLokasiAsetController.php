@@ -6,6 +6,9 @@ use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\TipeLokasiAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 
+/**
+ * @extends MasterDataController<TipeLokasiAset>
+ */
 class TipeLokasiAsetController extends MasterDataController
 {
     protected function resource(): string

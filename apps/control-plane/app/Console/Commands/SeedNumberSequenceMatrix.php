@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Actions\FiscalCalendar\FiscalCalendarService;
 use App\Models\AppServiceCredential;
 use App\Models\FiscalCalendar;
+use App\Models\ModuleInstallation;
 use App\Models\NumberSequenceReference;
 use App\Models\TenantNumberSequence;
 use App\Support\NumberSequenceMatrix;
@@ -48,12 +49,6 @@ class SeedNumberSequenceMatrix extends Command
             'id' => $appId, 'name' => 'Matrix app', 'version' => '1.0.0', 'status' => 'available',
             'database_name' => 'matrix_app', 'created_at' => now(), 'updated_at' => now(),
         ]);
-        DB::table('app_placements')->insertOrIgnore([
-            'id' => (string) Str::ulid(), 'app_id' => $appId, 'release_version' => '1.0.0', 'profile' => 'pooled',
-            'placement' => 'matrix-placement', 'artifact_status' => 'placed', 'migration_status' => 'succeeded',
-            'runtime_status' => 'ready', 'ready_at' => now(), 'created_at' => now(), 'updated_at' => now(),
-        ]);
-
         $references = [];
         foreach ($shapes as $shape) {
             $references[$shape['key']] = NumberSequenceReference::query()->firstOrCreate(
@@ -114,6 +109,8 @@ class SeedNumberSequenceMatrix extends Command
         DB::table('tenants')->insert(['id' => $tenantId, 'client_id' => $clientId, 'name' => "Matrix Tenant {$index}", 'slug' => "matrix-tenant-{$index}", 'status' => 'active', 'created_at' => $now, 'updated_at' => $now]);
         DB::table('tenant_app_entitlements')->insert(['tenant_id' => $tenantId, 'app_id' => $appId, 'status' => 'active', 'starts_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
         DB::table('tenant_deployments')->insert(['id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'profile' => 'pooled', 'placement' => 'matrix-placement', 'status' => 'active', 'created_at' => $now, 'updated_at' => $now]);
+        // Kesiapan app bagi tenant ini: catatan pemasangan module, bukan penempatan container.
+        DB::table('core_module_installations')->insert(['tenant_id' => $tenantId, 'module_id' => $appId, 'version' => '1.0.0', 'status' => ModuleInstallation::STATUS_INSTALLED, 'installed_at' => $now, 'created_at' => $now, 'updated_at' => $now]);
 
         // Fiscal years start in a month that varies per tenant, so the simulation covers calendars that do not line
         // up with January and cannot be satisfied by a calendar-year shortcut.

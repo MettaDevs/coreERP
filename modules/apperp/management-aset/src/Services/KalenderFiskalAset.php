@@ -28,16 +28,21 @@ class KalenderFiskalAset
     public function __construct(private readonly KalenderFiskal $kalender) {}
 
     /**
-     * @return array{calendar: array<string,mixed>, year: array<string,mixed>, period: array<string,mixed>}|null
-     *                                                                                                           `null` bila entitas legal belum punya kalender atau tanggalnya belum tercakup.
+     * `null` bila entitas legal belum punya kalender atau tanggalnya belum tercakup.
+     *
+     * Bentuknya tidak ditulis ulang di sini: ia milik kontrak, dan menuliskannya dua kali
+     * berarti dua tempat yang akan menyimpang.
+     *
+     * @return (array{
+     *     calendar: array{id: mixed, code: mixed, name: mixed},
+     *     year: array{id: mixed, name: mixed, starts_on: string, ends_on: string},
+     *     period: array{id: mixed, ordinal: mixed, name: mixed, starts_on: string, ends_on: string},
+     * })|null
      */
     public function resolve(string $tenantId, string $legalEntityId, string $date): ?array
     {
         try {
-            /** @var array{calendar: array<string,mixed>, year: array<string,mixed>, period: array<string,mixed>} $hasil */
-            $hasil = $this->kalender->periode($legalEntityId, $date);
-
-            return $hasil;
+            return $this->kalender->periode($legalEntityId, $date);
         } catch (ValidationException) {
             return null;
         }

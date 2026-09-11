@@ -28,18 +28,12 @@ parameters:
     scanDirectories:
         - ../../modules/
 
-    # Module yang sedang dipindah masuk dan belum dibentuk ulang tidak dianalisa. Ia masih
-    # membawa kerangka Laravel dan namespace `App\` repo asalnya, jadi menganalisanya di sini
-    # memulangkan ratusan temuan yang semuanya menunjuk keadaan yang memang sedang diperbaiki
-    # bertahap pada F3-02 sampai F3-05 — dan menenggelamkan temuan sungguhan pada kode Core.
+    # Module yang belum ikut analisa tipe ditulis di sini, dan daftarnya dijaga tetap sama
+    # dengan `App\Support\Modules\ModulTanpaAnalisaTipe` oleh `ModulTanpaAnalisaTipeTest`,
+    # beserta tenggatnya. Alasan lengkapnya, beserta angka terukurnya, ada di kelas itu.
     #
-    # Ia tetap ada di `scanDirectories` di atas, jadi kelasnya tetap dikenali bila kode Core
-    # menyebutnya.
-    #
-    # Daftar ini dijaga tetap sama dengan `ModulSedangDipindah` oleh `ModulSedangDipindahTest`:
-    # entri yang tertinggal setelah modulnya selesai dipindah membuat alur merah.
+    # Kosong sejak 9 September 2026: modul aset selesai dianotasi pada F3-29, dan sejak itu
+    # seluruh isi `modules/` dianalisa tanpa kecuali. Entri yang tertinggal setelah modulnya
+    # selesai membuat modul itu lolos pemeriksaan selamanya, dan tidak ada yang gagal karenanya.
     excludePaths:
-        analyse:
-            # Tanda `(?)` menyatakan jalur ini boleh belum ada. Ia memang belum ada sampai
-            # F3-01 menariknya masuk, dan tanpa tanda itu PHPStan menolak jalan sama sekali.
-            - ../../modules/apperp/management-aset (?)
+        analyse: []

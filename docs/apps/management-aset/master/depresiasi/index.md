@@ -12,7 +12,7 @@ Penyusutan di modul ini punya tiga lapis yang sering tertukar:
 
 Satu aset bisa disusutkan beberapa kali dengan cara berbeda — sekali untuk laporan keuangan, sekali untuk pajak. Itu sebabnya buku dan profil terpisah.
 
-Tabelnya: `m_profil_penyusutan`, `m_buku_penyusutan`, `m_group_buku_penyusutan` untuk matriksnya, dan `tr_buku_aset` untuk buku milik tiap aset.
+Tabelnya: `aset_m_profil_penyusutan`, `aset_m_buku_penyusutan`, `aset_m_group_buku_penyusutan` untuk matriksnya, dan `aset_tr_buku_aset` untuk buku milik tiap aset.
 
 ## Profil penyusutan
 
@@ -56,7 +56,7 @@ Buku hanya dibentuk saat aset diterima. Menambah baris matriks kemudian **tidak 
 
 ## Buku aset
 
-Saat sebuah aset diterima, app membentuk baris `tr_buku_aset` untuk tiap buku yang berlaku bagi group-nya. Isinya:
+Saat sebuah aset diterima, app membentuk baris `aset_tr_buku_aset` untuk tiap buku yang berlaku bagi group-nya. Isinya:
 
 | Kolom | Isi |
 | --- | --- |
@@ -93,13 +93,13 @@ Ia hanya referensi: menentukan kelompok mana yang berlaku, bukan menghitung apa 
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/master/ProfilPenyusutanController.php` | Master profil |
-| `api/app/Http/Controllers/master/BukuPenyusutanController.php` | Master buku |
-| `api/app/Http/Controllers/master/GroupBukuPenyusutanController.php` | Matriks group × buku |
-| `api/app/Services/DepreciationCalculator.php` | Hitungan |
-| `api/app/Services/FiscalCalendarClient.php` | Tahun buku dari Core |
+| `src/Http/Controllers/master/ProfilPenyusutanController.php` | Master profil |
+| `src/Http/Controllers/master/BukuPenyusutanController.php` | Master buku |
+| `src/Http/Controllers/master/GroupBukuPenyusutanController.php` | Matriks group × buku |
+| `src/Services/DepreciationCalculator.php` | Hitungan |
+| `src/Services/KalenderFiskalAset.php` | Tahun buku dari Core |
 | `database/migrations/2026_07_28_090000_create_asset_register_and_depreciation_tables.php` | Tabel profil, buku, dan periode |
-| `ui/src/master/GroupBookMatrix.tsx` | Layar matriks |
+| `ui/master/GroupBookMatrix.tsx` | Layar matriks |
 
 ## Halaman terkait
 

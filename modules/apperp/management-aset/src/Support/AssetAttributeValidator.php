@@ -2,45 +2,85 @@
 
 namespace Modules\Apperp\ManagementAset\Support;
 
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
+use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
+use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
 
 /**
  * Menegakkan nilai atribut aset terhadap definisi milik jenis asetnya.
  *
  * Definisi atribut dibuat tenant saat berjalan, jadi aturannya tidak dapat dituliskan
  * sebagai rule statis di controller; ia harus dibaca dari database tiap kali.
+ *
+ * Kolom yang datang dari database ditulis `mixed` dengan sengaja. Ia dibaca lewat
+ * `getAttributes()`, yaitu nilai mentah apa adanya dari driver — `decimal` dapat berupa
+ * string maupun float tergantung driver — sehingga menuliskannya `string` atau `float`
+ * akan menjadi anotasi yang meyakinkan sekaligus keliru. Dua kunci yang dilekatkan di
+ * sini, `wajib` dan `nilai_pilihan`, tipenya diketahui dan karena itu dituliskan.
+ *
+ * @phpstan-type DefinisiAtribut array{
+ *     tipe_atribut_id: mixed,
+ *     kode: mixed,
+ *     nama: mixed,
+ *     data_type: mixed,
+ *     satuan: mixed,
+ *     min_value: mixed,
+ *     max_value: mixed,
+ *     wajib: bool,
+ *     urutan: mixed,
+ *     nilai_pilihan: list<array{id: string, nilai: string}>,
+ * }
  */
 final class AssetAttributeValidator
 {
     /**
      * Definisi atribut satu jenis aset, terurut sesuai tampilan.
      *
-     * @return list<array<string, mixed>>
+     * @return list<DefinisiAtribut>
      */
     public function definitions(string $tenantId, string $jenisAsetId): array
     {
-        $rows = DB::table('aset_m_jenis_aset_atribut as link')
-            ->join('aset_m_tipe_atribut as tipe', function ($join): void {
-                $join->on('tipe.id', '=', 'link.tipe_atribut_id')->on('tipe.tenant_id', '=', 'link.tenant_id');
+        // Tabel yang di-`join` tidak ikut tersaring scope tenant, jadi batas tenant dan
+        // soft delete tipe atribut ditulis eksplisit di sini. Tabel utamanya tidak boleh
+        // dialiaskan: scope menyaring dengan nama tabel yang sebenarnya.
+        $rows = JenisAsetAtribut::query()
+            ->join('aset_m_tipe_atribut as tipe', function ($join) use ($tenantId): void {
+                $join->on('tipe.id', '=', 'aset_m_jenis_aset_atribut.tipe_atribut_id')
+                    ->where('tipe.tenant_id', $tenantId);
             })
-            ->where(['link.tenant_id' => $tenantId, 'link.jenis_aset_id' => $jenisAsetId])
-            ->whereNull('link.deleted_at')
+            ->where('aset_m_jenis_aset_atribut.jenis_aset_id', $jenisAsetId)
             ->whereNull('tipe.deleted_at')
             ->where('tipe.aktif', true)
-            ->orderBy('link.urutan')->orderBy('tipe.nama')
-            ->select('tipe.id as tipe_atribut_id', 'tipe.kode', 'tipe.nama', 'tipe.data_type', 'tipe.satuan', 'tipe.min_value', 'tipe.max_value', 'link.wajib', 'link.urutan')
-            ->get();
+            ->orderBy('aset_m_jenis_aset_atribut.urutan')->orderBy('tipe.nama')
+            ->get([
+                'tipe.id as tipe_atribut_id', 'tipe.kode', 'tipe.nama', 'tipe.data_type', 'tipe.satuan',
+                'tipe.min_value', 'tipe.max_value', 'aset_m_jenis_aset_atribut.wajib', 'aset_m_jenis_aset_atribut.urutan',
+            ]);
 
-        $choices = $this->choices($tenantId, $rows->pluck('tipe_atribut_id')->all());
+        $choices = $this->choices(array_values($rows->map(fn (JenisAsetAtribut $row): string => $row->tipe_atribut_id)->all()));
 
-        return $rows->map(fn (object $row): array => [
-            ...(array) $row,
-            'wajib' => (bool) $row->wajib,
-            'nilai_pilihan' => $choices[$row->tipe_atribut_id] ?? [],
-        ])->all();
+        // Kunci disebut satu per satu, bukan disebar dari `getAttributes()`, supaya bentuk
+        // yang dijanjikan docblock benar-benar terbukti. Urutannya sama dengan urutan kolom
+        // pada `get()` di atas, jadi bentuk jawaban endpoint definisi atribut tidak berubah.
+        return array_values($rows->map(function (JenisAsetAtribut $row) use ($choices): array {
+            $atribut = $row->getAttributes();
+
+            return [
+                'tipe_atribut_id' => $atribut['tipe_atribut_id'],
+                'kode' => $atribut['kode'],
+                'nama' => $atribut['nama'],
+                'data_type' => $atribut['data_type'],
+                'satuan' => $atribut['satuan'],
+                'min_value' => $atribut['min_value'],
+                'max_value' => $atribut['max_value'],
+                'wajib' => $row->wajib,
+                'urutan' => $atribut['urutan'],
+                'nilai_pilihan' => $choices[$row->tipe_atribut_id] ?? [],
+            ];
+        })->all());
     }
 
     /**
@@ -51,15 +91,16 @@ final class AssetAttributeValidator
      */
     public function rowsFor(string $tenantId, string $jenisAsetId, array $submitted): array
     {
-        $typeIds = DB::table('aset_m_jenis_aset_atribut')
-            ->where(['tenant_id' => $tenantId, 'jenis_aset_id' => $jenisAsetId])
-            ->whereNull('deleted_at')
+        $typeIds = JenisAsetAtribut::query()
+            ->where('jenis_aset_id', $jenisAsetId)
             ->orderBy('tipe_atribut_id')
             ->pluck('tipe_atribut_id');
         if ($typeIds->isNotEmpty()) {
-            DB::table('aset_m_tipe_atribut')
-                ->where('tenant_id', $tenantId)
-                ->whereIn('id', $typeIds->all())
+            // `withTrashed()`: tipe atribut yang sudah diarsipkan tetap dikunci, karena
+            // baris nilai yang sedang ditulis merujuk padanya dan `data_type_locked`-nya
+            // ikut disetel setelah penyimpanan.
+            TipeAtribut::query()->withTrashed()
+                ->whereKey($typeIds->all())
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get(['id']);
@@ -115,7 +156,7 @@ final class AssetAttributeValidator
     }
 
     /**
-     * @param  array<string, mixed>  $definition
+     * @param  DefinisiAtribut  $definition
      * @param  array<string, list<string>>  $errors
      * @return array<string, mixed>|null
      */
@@ -182,20 +223,18 @@ final class AssetAttributeValidator
      * @param  list<string>  $typeIds
      * @return array<string, list<array{id: string, nilai: string}>>
      */
-    private function choices(string $tenantId, array $typeIds): array
+    private function choices(array $typeIds): array
     {
         if ($typeIds === []) {
             return [];
         }
 
-        return DB::table('aset_m_tipe_atribut_nilai')
-            ->where('tenant_id', $tenantId)
+        return TipeAtributNilai::query()
             ->whereIn('tipe_atribut_id', $typeIds)
-            ->whereNull('deleted_at')
             ->orderBy('urutan')->orderBy('nilai')
             ->get(['id', 'tipe_atribut_id', 'nilai'])
             ->groupBy('tipe_atribut_id')
-            ->map(fn ($group) => $group->map(fn (object $row): array => ['id' => $row->id, 'nilai' => $row->nilai])->all())
+            ->map(fn ($group) => $group->map(fn (TipeAtributNilai $row): array => ['id' => $row->id, 'nilai' => $row->nilai])->all())
             ->all();
     }
 }

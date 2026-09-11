@@ -6,7 +6,7 @@ Penempatan menjawab: **pada tanggal tertentu, aset ini ada di mana dan tanggung 
 
 ## Riwayat, bukan keadaan sekarang
 
-Tabel `tr_penempatan_aset` menyimpan **satu baris per perpindahan**, tidak pernah menimpa baris lama. Baris pertama dibuat otomatis saat aset diterima, dengan alasan "Penerimaan aset".
+Tabel `aset_tr_penempatan_aset` menyimpan **satu baris per perpindahan**, tidak pernah menimpa baris lama. Baris pertama dibuat otomatis saat aset diterima, dengan alasan "Penerimaan aset".
 
 Keadaan sekarang memang juga disalin ke kolom pada aset (`responsible_org_unit_id`, `asset_location_id`, `financial_dimension_org_unit_id`) supaya daftar tidak perlu menelusuri riwayat tiap baris. Tetapi **riwayat yang berwenang**, bukan salinan itu.
 
@@ -25,7 +25,7 @@ Butuh permission `management-aset.aset.mutate` — terpisah dari `update`. Orang
 
 ## Yang berubah saat mutasi
 
-1. Baris baru di `tr_penempatan_aset` dengan tanggal berlaku dan alasannya.
+1. Baris baru di `aset_tr_penempatan_aset` dengan tanggal berlaku dan alasannya.
 2. Unit penanggung jawab pada aset ikut berubah.
 3. Lokasi ikut berubah kalau disebut.
 4. **Dimensi keuangan ikut dihitung ulang** — dari unit yang dipetakan pada lokasi baru, atau kalau tidak ada, dari unit pemakai.
@@ -52,7 +52,7 @@ Ini disengaja dan sering ditanyakan: kenapa pemeriksaan penyusutan muncul saat m
 | `AssetController::place()` | Mutasi |
 | `AssetController::history()` | Riwayat |
 | `AssetController::assertDepreciationReady()` | Pemeriksaan buku sebelum mutasi |
-| `ui/src/transactions/mutasi-aset/MutationPage.tsx` | Layar |
+| `ui/transactions/mutasi-aset/MutationPage.tsx` | Layar |
 
 ## Halaman terkait
 

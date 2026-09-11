@@ -6,6 +6,9 @@ use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\TindakanPerbaikan;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 
+/**
+ * @extends MasterDataController<TindakanPerbaikan>
+ */
 class TindakanPerbaikanController extends MasterDataController
 {
     protected function resource(): string

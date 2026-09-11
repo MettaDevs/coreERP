@@ -1,0 +1,19 @@
+asyncapi: 3.0.0
+info:
+  title: Human Resources events
+  version: 0.1.0
+channels:
+  human-resources.worker-position-assignment.changed:
+    address: human-resources.worker-position-assignment.changed
+    messages:
+      changed:
+        payload:
+          type: object
+          required: [tenant_id, membership_id, assignment_id, position_id, operating_unit_id, active]
+          properties:
+            tenant_id: { type: string }
+            membership_id: { type: string, description: ID anggota Core yang ditautkan ke worker; email bukan foreign key. }
+            assignment_id: { type: string }
+            position_id: { type: string }
+            operating_unit_id: { type: string }
+            active: { type: boolean }

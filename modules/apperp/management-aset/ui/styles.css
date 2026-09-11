@@ -1,0 +1,45 @@
+/*
+ * Gaya milik layar module ini.
+ *
+ * Tiga baris pertama — `@import 'tailwindcss'`, `@import '@apperp/ui/styles.css'`, dan
+ * `@source` yang menunjuk `node_modules` sendiri — dibuang pada F4-03. Ketiganya ada selama
+ * UI ini dibangun sebagai aplikasi Vite tersendiri; sekarang ia ikut build shell, dan shell
+ * yang menyusun Tailwind beserta sumber pemindaiannya. Membiarkannya berarti Tailwind
+ * dibangun dua kali dalam satu bundel.
+ *
+ * Tiga aturan lain ikut dibuang pada pemindahan yang sama, dan ketiganya dibuktikan tidak
+ * mengubah apa pun, bukan diperkirakan:
+ *
+ * - `* { box-sizing: border-box }` dan `body { margin: 0 }` sudah disetel preflight Tailwind
+ *   dengan nilai yang sama persis (lihat `node_modules/tailwindcss/preflight.css`).
+ * - `#root { height: 100% }` menunjuk elemen yang tidak ada lagi: shell memasang aplikasinya
+ *   di `#app`.
+ *
+ * **Yang tersisa berlaku untuk seluruh dokumen, bukan hanya layar module, dan itu diketahui.**
+ * Begitu satu potongan module termuat, berkas ini ikut termuat dan tidak pernah dilepas lagi.
+ * Aturan `:has()` di bawah memang harus begitu — ia menyetel `html` dan `body` berdasarkan
+ * sesuatu yang ada di dalamnya. Dua aturan sisanya tidak: menyempitkannya ke dalam layar
+ * module adalah perbaikan yang benar, tetapi ia menggeser tata letak dan menuntut pemeriksaan
+ * di peramban, jadi ia tidak dititipkan pada pull request yang katanya tidak mengubah
+ * perilaku.
+ */
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    min-width: 320px;
+}
+
+main {
+    width: 100%;
+}
+
+/* Halaman yang menggulir isinya sendiri — daftar-detail master, daftar dan rincian work
+   order — mematikan gulir dokumen supaya bar aksinya tetap terlihat di atas. */
+html:has([data-layout='full-height']),
+body:has([data-layout='full-height']) {
+    overflow: hidden;
+}

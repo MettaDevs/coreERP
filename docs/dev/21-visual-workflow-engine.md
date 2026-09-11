@@ -90,9 +90,9 @@ graph LR
 ::: warning Sudah berubah untuk modul di dalam runtime
 Contoh di bawah menggambarkan app yang berjalan sebagai proses tersendiri. Modul yang dimuat
 runtime yang sama mengajukan lewat kontrak `App\Support\Modules\Contracts\MesinWorkflow` dan
-menerima keputusannya sebagai event `KeputusanWorkflowDiambil`, bukan lewat HTTP; lihat F3-09
-pada `docs/todo/satu-runtime/01-prd.md`. Jalur HTTP di bawah tetap berlaku untuk app di luar
-proses.
+menerima keputusannya sebagai event `KeputusanWorkflowDiambil`, bukan lewat HTTP; lihat
+[kontrak module ke Core](04-api-and-integration.md#kontrak-module-ke-core). Jalur HTTP di bawah tetap
+berlaku untuk app di luar proses.
 :::
 
 App bisnis di luar proses memicu alur persetujuan melalui service client internal `WorkflowClient`:
@@ -167,6 +167,35 @@ Pengguna tidak perlu memeriksa aplikasi bisnis satu per satu untuk mengetahui pe
 * Menyediakan pratinjau ringkasan dokumen dan tombol aksi instan: **Setujui (*Approve*)**, **Tolak (*Reject*)**, dan **Delegasikan (*Delegate*)**.
 
 ---
+
+## Parameter workflow per tenant
+
+Sebagian perilaku workflow dapat disetel per tenant. Tiga aturan menjaga agar setelan itu tidak
+menjadi lubang diam-diam.
+
+**Bawaannya mengikuti Dynamics 365: pengaju boleh menyetujui, kecuali tenant melarang.** Yang
+menentukan bukan bawaannya, melainkan **kapan larangan itu ditegakkan** — di waktu **penugasan**,
+bukan di waktu keputusan. Kalau ia ditegakkan di waktu keputusan, sebuah tugas yang jatuh ke
+pengajunya sendiri tanpa jalur delegasi menjadi jalan buntu: tidak bisa disetujui, dan tidak ada
+orang lain yang bisa mengambilnya. Persetujuan oleh pengaju sendiri, ketika memang diizinkan, selalu
+tercatat pada riwayat workflow — izin bukan alasan untuk diam.
+
+**Perubahan setelan diaudit, dan pelakunya wajib.** Setiap perubahan tercatat ke jejak audit akses
+dengan aksi tersendiri, dan pelaku adalah **parameter wajib** pada perintah penyimpanannya — bukan
+kunci opsional yang lupa diisi lalu menghasilkan jejak tanpa siapa pun di dalamnya. Sakelar yang
+disimpan tetapi **tidak berubah nilainya** tidak dicatat; jejak yang penuh baris tanpa perubahan
+menyembunyikan baris yang benar-benar mengubah sesuatu.
+
+**Tipe nilai ditegakkan saat dibaca, bukan hanya saat ditulis.** Nilai setelan disimpan sebagai
+`jsonb`, dan `jsonb` menerima apa saja. Registry-lah yang menegakkan tipe yang dijanjikan setiap kali
+nilai dibaca, dan pesan penolakannya menyebut nama parameter beserta tipe yang dijanjikan — tanpa
+itu, penolakan hanya memberi tahu bahwa ada sesuatu yang salah, bukan apa.
+
+Bentuk penyimpanan ini juga yang membuat parameter baru **tidak menuntut migration**: satu entri
+registry dan satu titik penegakan sudah cukup. Alasannya ada di
+[release dan on-prem](03-release-and-on-prem.md) — setiap migration harus berhasil di server setiap
+pelanggan yang menjalankan pembaruannya sendiri, dan itu ongkos yang tidak sebanding untuk sebuah
+sakelar.
 
 ## Di mana kodenya
 

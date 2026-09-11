@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Jobs\DeployAppPlacement;
 use App\Models\ModuleInstallation;
 use App\Models\Tenant;
 use Database\Seeders\AppCatalogSeeder;
@@ -14,12 +13,12 @@ use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
- * Pendaftaran tenant baru memasang module, bukan mengantre penempatan container.
+ * Pendaftaran tenant baru memasang module — satu-satunya jalur yang tersisa.
  *
- * Dua jalur dipilih dari satu pertanyaan: apakah id itu ada sebagai folder di `modules/`.
- * Jalur container dipertahankan selama masih ada app yang belum dipindah, dan dibuang pada
- * fase 7 — bukan sekarang. Test ini menjaga keduanya sekaligus, karena membuang salah
- * satunya lebih awal akan mematikan produk yang sedang dipakai.
+ * Sebuah id app yang tidak ada sebagai folder di `modules/` dilewati tanpa suara:
+ * entitlement-nya tercatat, tetapi tidak ada apa pun yang dipasang untuknya dan ia tidak
+ * muncul di peluncur. Test ini juga menjaga jalur container yang sudah dibuang tidak kembali
+ * hidup: ia akan terlihat di sini sebagai baris penempatan yang tidak seharusnya ada.
  */
 class TenantRegistrationInstallsModulesTest extends TestCase
 {
@@ -61,36 +60,41 @@ class TenantRegistrationInstallsModulesTest extends TestCase
     {
         $this->daftarkan(['contoh-a']);
 
-        Queue::assertNotPushed(DeployAppPlacement::class);
+        Queue::assertNothingPushed();
         $this->assertSame(0, DB::table('app_placements')->count());
     }
 
-    public function test_app_yang_belum_dipindah_tetap_memakai_jalur_penempatan_container(): void
+    public function test_app_yang_bukan_module_tidak_memasang_apa_pun(): void
     {
-        $this->daftarkan(['management-aset']);
+        $this->daftarkan(['app-uji']);
 
-        Queue::assertPushed(DeployAppPlacement::class);
+        Queue::assertNothingPushed();
         $this->assertSame(
             0,
             DB::table('core_module_installations')->count(),
-            'App yang masih berjalan sebagai container tidak boleh dicatat sebagai module.'
+            'App yang tidak ada sebagai module tidak boleh dicatat sebagai terpasang.'
+        );
+        $this->assertSame(
+            0,
+            DB::table('app_placements')->count(),
+            'Tidak ada lagi penempatan container yang boleh dibuat untuk app mana pun.'
         );
     }
 
-    public function test_mendaftar_dengan_module_dan_app_lama_sekaligus_memakai_kedua_jalur(): void
+    public function test_mendaftar_dengan_module_dan_app_bukan_module_sekaligus(): void
     {
-        $this->daftarkan(['contoh-a', 'management-aset']);
+        $this->daftarkan(['contoh-a', 'app-uji']);
 
         $tenantId = (string) Tenant::query()->value('id');
 
-        Queue::assertPushed(DeployAppPlacement::class);
+        Queue::assertNothingPushed();
         $this->assertDatabaseHas('core_module_installations', [
             'tenant_id' => $tenantId,
             'module_id' => 'contoh-a',
         ]);
         $this->assertDatabaseMissing('core_module_installations', [
             'tenant_id' => $tenantId,
-            'module_id' => 'management-aset',
+            'module_id' => 'app-uji',
         ]);
     }
 
@@ -111,7 +115,7 @@ class TenantRegistrationInstallsModulesTest extends TestCase
                     // `database_name` sengaja tidak diisi. Module memakai database Core,
                     // jadi ia tidak punya nama database untuk disebutkan, dan sejak F2-12
                     // katalog tidak lagi menuntutnya. App container yang sudah ada di
-                    // katalog (mis. management-aset dari AppCatalogSeeder) tidak tersentuh
+                    // katalog (mis. app-uji dari AppCatalogSeeder) tidak tersentuh
                     // di sini, sehingga nama databasenya tetap seperti yang dideklarasikan.
                     'created_at' => now(),
                     'updated_at' => now(),

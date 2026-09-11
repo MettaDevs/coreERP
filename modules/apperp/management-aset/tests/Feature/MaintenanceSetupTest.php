@@ -2,12 +2,15 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Services\ProvisionIndonesiaStarterData;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 class MaintenanceSetupTest extends TestCase
@@ -111,7 +114,7 @@ class MaintenanceSetupTest extends TestCase
 
     public function test_aturan_validasi_status_disemai_dan_dapat_diubah_tenant(): void
     {
-        $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
+        $this->semaiMaintenance();
 
         // Matriks lengkap disemai dan seluruh aturannya aktif secara bawaan.
         $this->assertDatabaseCount('aset_m_validasi_status_work_order', 12);
@@ -135,7 +138,7 @@ class MaintenanceSetupTest extends TestCase
         ]);
 
         // Seed ulang tidak boleh membatalkan keputusan tenant.
-        $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
+        $this->semaiMaintenance();
         $this->assertDatabaseHas('aset_m_validasi_status_work_order', [
             'status' => 'selesai', 'aturan' => 'sebab_kerusakan', 'aktif' => true, 'keparahan' => 'peringatan',
         ]);
@@ -143,19 +146,22 @@ class MaintenanceSetupTest extends TestCase
 
     public function test_seed_maintenance_manual_idempotent_dan_tidak_menimpa_data_custom(): void
     {
-        $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
+        $this->semaiMaintenance();
         $this->assertDatabaseCount('aset_m_maintenance_job_type', 7);
 
         $custom = $this->postMaster('maintenance-job-types', ['nama' => 'Pekerjaan tenant'])->assertCreated()->json('data.id');
-        $this->app->make(ProvisionIndonesiaStarterData::class)->maintenanceForTenant($this->tenantId);
+        $this->semaiMaintenance();
 
         $this->assertDatabaseCount('aset_m_maintenance_job_type', 8);
         $this->assertDatabaseHas('aset_m_maintenance_job_type', ['id' => $custom, 'nama' => 'Pekerjaan tenant']);
         $this->assertDatabaseCount('aset_m_maintenance_checklist_variable_value', 3);
     }
 
-    /** @param array<string, mixed> $payload */
-    private function postMaster(string $resource, array $payload)
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
+    private function postMaster(string $resource, array $payload): TestResponse
     {
         return $this->withContext(array_merge($this->permissions($resource), $resource === 'jenis-aset' ? [] : []))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::lower(Str::random(12)))
@@ -163,7 +169,7 @@ class MaintenanceSetupTest extends TestCase
     }
 
     /** @param list<string> $permissions */
-    private function withContext(array $permissions)
+    private function withContext(array $permissions): static
     {
         return $this->sebagaiPengguna($this->tenantId, $permissions);
     }
@@ -172,5 +178,22 @@ class MaintenanceSetupTest extends TestCase
     private function permissions(string $resource): array
     {
         return array_map(fn (string $action): string => 'management-aset.'.$resource.'.'.$action, ['read', 'create', 'update', 'archive']);
+    }
+
+    /**
+     * Menyemai setup maintenance seperti perintah artisan menyemainya.
+     *
+     * Lewat `PelaksanaUntukTenant`, bukan panggilan langsung, karena test ini tidak selalu
+     * didahului permintaan HTTP — dan hanya permintaan HTTP yang menetapkan tenant aktif.
+     * Memanggilnya langsung membuat test lulus atau gagal tergantung apakah kebetulan ada
+     * permintaan sebelumnya di metode yang sama, yang bukan perbedaan yang ingin diuji.
+     */
+    private function semaiMaintenance(): void
+    {
+        $this->app->make(PelaksanaUntukTenant::class)->jalankanUntuk(
+            $this->tenantId,
+            fn (): array => $this->app->make(ProvisionIndonesiaStarterData::class)
+                ->maintenanceForTenant($this->tenantId),
+        );
     }
 }

@@ -9,6 +9,11 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  * F&O. Ia membawa aturan, bukan sekadar label: apa yang wajib diisi sebelum pekerjaan
  * boleh dinyatakan selesai ditentukan di sini, sebagai data tenant, bukan sebagai
  * percabangan di controller.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan pada
+ * `MasterData`.
+ *
+ * @property bool $satu_pekerja
  */
 class TipeWorkOrder extends MasterData
 {

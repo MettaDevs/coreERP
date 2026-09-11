@@ -4,6 +4,7 @@ namespace Tests\Feature\ControlPlane;
 
 use App\Models\CoreApp;
 use App\Models\User;
+use App\Support\Modules\ModuleRegistry;
 use Database\Seeders\ProviderAdminSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -222,26 +223,35 @@ class AppCatalogManagementTest extends TestCase
         ]);
     }
 
+    /**
+     * Manifest datang dari folder module di dalam repo, bukan dari jalur berkas yang diketik
+     * pemakai; karena itu test ini menaruh manifestnya sebagai module dan membiarkan registry
+     * menemukannya.
+     */
     public function test_manifest_command_stores_versioned_dependencies(): void
     {
         $this->availableApp('business-partner', '1.2.0');
-        $path = tempnam(sys_get_temp_dir(), 'coreerp-manifest-');
+        $akar = sys_get_temp_dir().'/coreerp-modul-manifest-'.bin2hex(random_bytes(6));
+        $folder = $akar.'/apperp/sample-app';
+        mkdir($folder, 0777, true);
 
         try {
             $manifest = $this->manifest([
                 'dependsOn' => ['business-partner' => '^1.0'],
             ]);
-            $manifest['database'] = ['logical_name' => $manifest['database_name']];
             $manifest['ui'] = ['navigation' => $manifest['navigation']];
+            $manifest['table_prefix'] = 'sample_';
             unset($manifest['database_name'], $manifest['has_ui'], $manifest['navigation']);
-            file_put_contents($path, Yaml::dump($manifest, 8, 2));
+            file_put_contents($folder.'/app.yaml', Yaml::dump($manifest, 8, 2));
 
-            $this->artisan('app:register-manifest', ['path' => $path])
-                ->assertSuccessful();
+            $this->app->instance(ModuleRegistry::class, new ModuleRegistry($akar));
+
+            $this->artisan('app:register-manifest')->assertSuccessful();
         } finally {
-            if (is_string($path) && is_file($path)) {
-                unlink($path);
-            }
+            @unlink($folder.'/app.yaml');
+            @rmdir($folder);
+            @rmdir($akar.'/apperp');
+            @rmdir($akar);
         }
 
         $this->assertDatabaseHas('app_dependencies', [

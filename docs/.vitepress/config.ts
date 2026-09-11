@@ -34,6 +34,11 @@ export default withMermaid({
       'todo/addNewRulestoCoreforFleksibilitas/index.md',
     'todo/entrypointPERMISSIONprevilage/README.md':
       'todo/entrypointPERMISSIONprevilage/index.md',
+    'todo/api-untuk-integrator/README.md': 'todo/api-untuk-integrator/index.md',
+    'todo/bundle-on-prem/README.md': 'todo/bundle-on-prem/index.md',
+    'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
+    'todo/environment-dan-pusat-admin/README.md':
+      'todo/environment-dan-pusat-admin/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -71,7 +76,7 @@ export default withMermaid({
           items: [
             { text: 'Peta kode ke dokumen', link: '/onboarding/peta-kode' },
             { text: 'Alur end-to-end', link: '/onboarding/alur-end-to-end' },
-            { text: 'Empat kebenaran lifecycle', link: '/onboarding/empat-kebenaran' },
+            { text: 'Tiga kebenaran lifecycle', link: '/onboarding/tiga-kebenaran' },
           ],
         },
         {
@@ -88,7 +93,7 @@ export default withMermaid({
           text: 'App',
           items: [
             { text: 'Katalog app', link: '/apps/' },
-            { text: 'Membangun app baru', link: '/apps/membangun-app-baru' },
+            { text: 'Membangun modul baru', link: '/apps/membangun-app-baru' },
           ],
         },
         {
@@ -105,6 +110,8 @@ export default withMermaid({
           items: [
             { text: 'Peta modul', link: '/apps/management-aset/arsitektur/' },
             { text: 'Batas tenant dan organisasi', link: '/apps/management-aset/arsitektur/batas-tenant-dan-organisasi' },
+            { text: 'Rancangan scope data', link: '/apps/management-aset/arsitektur/rancangan-scope-data-aset' },
+            { text: 'Struktur fitur', link: '/apps/management-aset/arsitektur/struktur-fitur' },
             { text: 'Integrasi dengan Core', link: '/apps/management-aset/arsitektur/integrasi-core' },
             { text: 'Kontrak', link: '/apps/management-aset/arsitektur/kontrak' },
             { text: 'Database dan migration', link: '/apps/management-aset/arsitektur/database' },
@@ -162,12 +169,14 @@ export default withMermaid({
           ],
         },
         {
-          text: 'Membangun app',
+          text: 'Membangun modul',
           collapsed: false,
           items: [
-            { text: 'Jalur membangun app baru', link: '/apps/membangun-app-baru' },
+            { text: 'Jalur membangun modul baru', link: '/apps/membangun-app-baru' },
             { text: 'Gate penemuan dan keputusan', link: '/dev/18-module-discovery-and-decision-gate' },
             { text: 'Standar module', link: '/dev/02-module-standard' },
+            { text: 'Modul yang sedang dipindah', link: '/dev/26-modul-yang-sedang-dipindah' },
+            { text: 'UI modul di dalam shell', link: '/dev/27-ui-modul-dalam-shell' },
             { text: 'Rantai keamanan modul transaksi', link: '/dev/19-transaction-security-chain' },
             { text: 'Visual workflow engine', link: '/dev/21-visual-workflow-engine' },
             { text: 'Dokumen cetak, layout, dan ekspor', link: '/dev/23-document-rendering' },
@@ -191,7 +200,7 @@ export default withMermaid({
           collapsed: true,
           items: [
             { text: 'Release dan on-prem', link: '/dev/03-release-and-on-prem' },
-            { text: 'Menerbitkan release app', link: '/dev/13-publishing-an-app-release' },
+            { text: 'Mendaftarkan katalog produk', link: '/dev/13-publishing-an-app-release' },
             { text: 'CI/CD polyrepo', link: '/dev/22-ci-cd' },
             { text: 'Development stack lokal', link: '/dev/11-local-docker-development' },
             { text: 'Reporting dan read replica', link: '/dev/07-reporting-and-replicas' },
@@ -202,6 +211,8 @@ export default withMermaid({
           text: 'Gate kualitas',
           collapsed: true,
           items: [
+            { text: 'Standar penjaga dan pengujian', link: '/dev/25-standar-penjaga-dan-pengujian' },
+            { text: 'Pelaporan kesalahan', link: '/dev/28-pelaporan-kesalahan' },
             { text: 'Load dan concurrency testing', link: '/dev/20-load-and-concurrency-testing' },
           ],
         },
@@ -220,13 +231,43 @@ export default withMermaid({
           items: [
             { text: 'Cara membaca folder ini', link: '/todo/' },
             {
-              text: 'Pemindahan ke satu runtime',
+              text: 'API untuk sistem pelanggan',
               collapsed: false,
               items: [
-                { text: 'Ikhtisar', link: '/todo/satu-runtime/' },
-                { text: 'Keputusan arsitektur', link: '/todo/satu-runtime/00-keputusan' },
-                { text: 'PRD dan daftar task', link: '/todo/satu-runtime/01-prd' },
-                { text: 'Bukti penjaga batas', link: '/todo/satu-runtime/02-bukti-penjaga' },
+                {
+                  text: 'API yang dapat dipakai sistem pelanggan',
+                  link: '/todo/api-untuk-integrator/',
+                },
+              ],
+            },
+            {
+              text: 'Sisa pemindahan ke satu runtime',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Yang belum selesai saat rencana dibubarkan',
+                  link: '/todo/sisa-pemindahan/',
+                },
+              ],
+            },
+            {
+              text: 'Bundle dan pemasangan on-prem',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Bundle dan pemasangan di server pelanggan',
+                  link: '/todo/bundle-on-prem/',
+                },
+              ],
+            },
+            {
+              text: 'Pusat admin',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Environment dan pusat admin',
+                  link: '/todo/environment-dan-pusat-admin/',
+                },
               ],
             },
             {

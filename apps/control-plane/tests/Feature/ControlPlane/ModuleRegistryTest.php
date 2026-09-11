@@ -30,12 +30,20 @@ class ModuleRegistryTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_registry_menemukan_kedua_module_contoh_di_repo(): void
+    /**
+     * Yang dilayani adalah seluruh module di repo, termasuk modul produk.
+     *
+     * Daftarnya ditulis lengkap dan bukan sekadar "berisi", supaya module yang **hilang** dari
+     * runtime ikut terlihat. `management-aset` masuk sejak F3-30: selama entrinya ada di
+     * `ModulSedangDipindah` ia dimuat tetapi tidak dilayani, dan test ini yang menandai
+     * perpindahannya.
+     */
+    public function test_registry_menemukan_seluruh_module_di_repo(): void
     {
         $registry = $this->app->make(ModuleRegistry::class);
 
         $this->assertSame(
-            ['contoh-a', 'contoh-b'],
+            ['contoh-a', 'contoh-b', 'human-resources', 'management-aset'],
             array_map(static fn ($m): string => $m->id, $registry->semua()),
         );
     }

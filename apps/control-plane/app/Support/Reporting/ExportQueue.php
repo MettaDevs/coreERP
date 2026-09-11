@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use stdClass;
 
 /**
  * Membuat, membaca, dan membersihkan permintaan ekspor. Yang dilihat seorang pengguna
@@ -21,7 +22,7 @@ final class ExportQueue
      * @param  array<string, mixed>  $parameters
      * @return array<string, mixed>
      */
-    public function enqueue(object $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, string $format, ?string $layoutRef, array $parameters): array
+    public function enqueue(stdClass $report, TenantMembership $membership, ?string $legalEntityId, ?string $orgUnitId, string $format, ?string $layoutRef, array $parameters): array
     {
         $tenantId = $membership->tenant_id;
         $active = DB::table('report_exports')

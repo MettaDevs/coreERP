@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use PHPUnit\Framework\Attributes\Group;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
@@ -25,7 +27,18 @@ use Tests\TestCase;
  *   1. nilai buku mendarat TEPAT di residu, bukan sekitar residu;
  *   2. nilai buku tidak pernah menembus residu di periode mana pun;
  *   3. jumlah seluruh periode final sama persis dengan akumulasi penyusutan.
+ *
+ * **Ditandai `lambat` dan dikecualikan dari pemeriksaan tiap pull request.** Sapuannya 40
+ * kombinasi yang masing-masing dijalankan sampai akhir masa manfaat — 460 periode, sekitar
+ * 920 permintaan HTTP — dan itu 56 detik, tujuh persen dari seluruh suite dalam satu method.
+ * Dengan dua pekerja di CI, satu pekerja menjalankannya sendirian sementara yang lain sudah
+ * selesai; itulah ekor yang menggantung di akhir tiap run.
+ *
+ * Ia tetap dijalankan penuh pada jadwal mingguan. Yang dijaganya berubah jarang — kalkulator
+ * penyusutan — sedangkan biayanya dibayar pada setiap perubahan apa pun. Ini penjadwalan
+ * ulang, bukan pengurangan cakupan: tidak satu kombinasi pun dibuang.
  */
+#[Group('lambat')]
 class DepreciationScaleTest extends TestCase
 {
     use BerinteraksiDenganKonteksCore, RefreshDatabase;
@@ -45,7 +58,6 @@ class DepreciationScaleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->konfigurasiKlienCore();
         $this->tenants = array_map(fn (): string => (string) Str::ulid(), range(1, self::TENANTS));
         $this->legalEntityId = (string) Str::ulid();
         $this->orgUnitId = (string) Str::ulid();
@@ -248,6 +260,7 @@ class DepreciationScaleTest extends TestCase
         return (string) DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
     }
 
+    /** @return TestResponse<Response> */
     private function propose(string $tenant, string $book, int $monthOffset, ?float $consumption = null): TestResponse
     {
         $start = Carbon::parse('2026-07-01')->addMonthsNoOverflow($monthOffset - 1);
@@ -261,6 +274,7 @@ class DepreciationScaleTest extends TestCase
             ], fn ($value) => $value !== null));
     }
 
+    /** @param TestResponse<Response> $proposal */
     private function finalizeAmount(string $tenant, TestResponse $proposal): float
     {
         $proposal->assertSuccessful();

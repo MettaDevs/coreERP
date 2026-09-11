@@ -47,9 +47,12 @@ class PenerbitNomorAset
             throw $this->gagal('number_sequence_failed', $kegagalan->getMessage(), $reference, $tenantId, $kegagalan);
         }
 
-        $nomor = $hasil['number'] ?? null;
+        // Kontrak `PenerbitNomor` sudah menjamin kunci `number` ada dan berupa string, jadi
+        // yang tersisa untuk diperiksa hanyalah nomor kosong — satu-satunya bentuk jawaban
+        // tidak valid yang masih mungkin lolos dari penerbit.
+        $nomor = $hasil['number'];
 
-        if (! is_string($nomor) || $nomor === '') {
+        if ($nomor === '') {
             throw $this->gagal('number_sequence_invalid_response', 'Layanan nomor mengembalikan data yang tidak valid.', $reference, $tenantId);
         }
 
@@ -64,9 +67,10 @@ class PenerbitNomorAset
             'tenant_id' => $tenantId,
         ]);
 
-        // Status 422, bukan 503. Core berada di proses yang sama, jadi kegagalan di sini tidak
-        // pernah lagi berarti "layanan belum dapat dihubungi" — ia berarti permintaannya sendiri
-        // tidak bisa dipenuhi, misalnya reference yang belum terdaftar untuk tenant ini.
-        return new NumberSequenceException($code, $message, 422, $sebab);
+        // Statusnya tidak lagi dioper dari sini. Core berada di proses yang sama, jadi kegagalan
+        // penerbitan nomor tidak pernah lagi berarti "layanan belum dapat dihubungi" — ia selalu
+        // berarti permintaannya sendiri tidak bisa dipenuhi, misalnya reference yang belum
+        // terdaftar untuk tenant ini. Satu jawaban, jadi satu tempat: NumberSequenceException.
+        return new NumberSequenceException($code, $message, $sebab);
     }
 }

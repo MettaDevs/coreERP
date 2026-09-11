@@ -7,9 +7,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Models\master\JenisAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
+use stdClass;
 
+/**
+ * Permintaan pengadaan aset.
+ *
+ * Penyaringan tenant datang dari scope model, jadi tidak ada lagi `where tenant_id` yang
+ * ditulis tangan di sini.
+ */
 class PermintaanPengadaanAsetController extends Controller
 {
     private const RESOURCE = 'permintaan-pembelian-aset';
@@ -17,17 +27,17 @@ class PermintaanPengadaanAsetController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->guard($request, 'read');
-        $q = DB::table('aset_tr_permintaan_pengadaan_aset')->where('tenant_id', $this->tenant($request))->whereNull('deleted_at');
+        $q = PermintaanPengadaanAset::query();
         app(OrganizationScope::class)->query($q, $request, 'legal_entity_id', 'requesting_org_unit_id');
 
-        return response()->json(['data' => $q->latest('requested_on')->get()]);
+        return response()->json(['data' => $q->toBase()->latest('requested_on')->get()]);
     }
 
     public function show(Request $request, string $id): JsonResponse
     {
         $this->guard($request, 'read');
         $record = $this->record($request, $id);
-        $record->details = DB::table('aset_tr_permintaan_pengadaan_aset_details')->where(['tenant_id' => $this->tenant($request), 'request_id' => $id])->orderBy('line_number')->get();
+        $record->details = PermintaanPengadaanAsetDetail::query()->where('request_id', $id)->orderBy('line_number')->toBase()->get();
 
         return response()->json(['data' => $record]);
     }
@@ -37,16 +47,19 @@ class PermintaanPengadaanAsetController extends Controller
         $this->guard($request, 'create');
         $key = $this->key($request);
         $tenant = $this->tenant($request);
-        if ($existing = DB::table('aset_tr_permintaan_pengadaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first()) {
+        // `withTrashed`: replay idempoten harus tetap menemukan permintaan yang sudah
+        // diarsipkan, kalau tidak permintaan ulang mencoba menyisipkan baris kembar.
+        if ($existing = PermintaanPengadaanAset::withTrashed()->where('creation_key', $key)->toBase()->first()) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
-        } $data = $this->data($request);
+        }
+        $data = $this->data($request);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['requesting_org_unit_id']);
-        $this->validateTypes($tenant, $data['details']);
+        $this->validateTypes($data['details']);
         $kode = $numbers->issue('management-aset.permintaan-pembelian-aset', $tenant, self::RESOURCE.':'.$key, $data['legal_entity_id']);
         $record = DB::transaction(function () use ($request, $data, $key, $kode, $tenant): array {
             $record = ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'creation_key' => $key, 'kode' => $kode, 'legal_entity_id' => $data['legal_entity_id'], 'requesting_org_unit_id' => $data['requesting_org_unit_id'], 'requester_user_id' => (string) $request->attributes->get('coreerp.user_id'), 'requested_on' => $data['requested_on'], 'status' => 'draft', 'description' => $data['description'] ?? null, 'version' => 1, 'created_at' => now(), 'updated_at' => now()];
-            DB::table('aset_tr_permintaan_pengadaan_aset')->insert($record);
-            $this->replaceDetails($record['id'], $tenant, $data['details']);
+            (new PermintaanPengadaanAset)->forceFill($record)->save();
+            $this->replaceDetails($record['id'], $data['details']);
 
             return $record;
         });
@@ -62,17 +75,17 @@ class PermintaanPengadaanAsetController extends Controller
         $data = $this->data($request);
         $version = (int) $request->validate(['version' => ['required', 'integer']])['version'];
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['requesting_org_unit_id']);
-        $this->validateTypes($this->tenant($request), $data['details']);
-        $changed = DB::transaction(function () use ($request, $id, $data, $version) {
-            $changed = DB::table('aset_tr_permintaan_pengadaan_aset')->where(['id' => $id, 'tenant_id' => $this->tenant($request), 'version' => $version, 'status' => 'draft'])->update(['legal_entity_id' => $data['legal_entity_id'], 'requesting_org_unit_id' => $data['requesting_org_unit_id'], 'requested_on' => $data['requested_on'], 'description' => $data['description'] ?? null, 'version' => $version + 1, 'updated_at' => now()]);
+        $this->validateTypes($data['details']);
+        $changed = DB::transaction(function () use ($id, $data, $version) {
+            $changed = PermintaanPengadaanAset::query()->where(['id' => $id, 'version' => $version, 'status' => 'draft'])->update(['legal_entity_id' => $data['legal_entity_id'], 'requesting_org_unit_id' => $data['requesting_org_unit_id'], 'requested_on' => $data['requested_on'], 'description' => $data['description'] ?? null, 'version' => $version + 1, 'updated_at' => now()]);
             if ($changed) {
-                DB::table('aset_tr_permintaan_pengadaan_aset_details')->where(['tenant_id' => $this->tenant($request), 'request_id' => $id])->delete();
-                $this->replaceDetails($id, $this->tenant($request), $data['details']);
+                PermintaanPengadaanAsetDetail::query()->where('request_id', $id)->delete();
+                $this->replaceDetails($id, $data['details']);
             }
 
             return $changed;
         });
-        abort_unless($changed, 409, 'Permintaan telah berubah.');
+        abort_unless($changed > 0, 409, 'Permintaan telah berubah.');
 
         return $this->show($request, $id);
     }
@@ -82,33 +95,37 @@ class PermintaanPengadaanAsetController extends Controller
         $this->guard($request, 'cancel');
         $record = $this->record($request, $id);
         abort_unless(in_array($record->status, ['draft', 'submitted'], true), 422, 'Permintaan ini tidak dapat dibatalkan.');
-        DB::table('aset_tr_permintaan_pengadaan_aset')->where('id', $id)->update(['status' => 'cancelled', 'updated_at' => now()]);
+        PermintaanPengadaanAset::query()->where('id', $id)->update(['status' => 'cancelled', 'updated_at' => now()]);
 
         return $this->show($request, $id);
     }
 
+    /** @return array<string, mixed> */
     private function data(Request $request): array
     {
         return $request->validate(['legal_entity_id' => ['required', 'ulid'], 'requesting_org_unit_id' => ['required', 'ulid'], 'requested_on' => ['required', 'date'], 'description' => ['nullable', 'string', 'max:2000'], 'details' => ['required', 'array', 'min:1'], 'details.*.planning_detail_id' => ['nullable', 'ulid'], 'details.*.jenis_aset_id' => ['required', 'ulid'], 'details.*.satuan_id' => ['required', 'ulid'], 'details.*.quantity' => ['required', 'numeric', 'gt:0'], 'details.*.specification' => ['required', 'string', 'max:2000'], 'details.*.note' => ['nullable', 'string', 'max:2000']]);
     }
 
-    private function replaceDetails(string $id, string $tenant, array $details): void
+    /** @param list<array<string, mixed>> $details */
+    private function replaceDetails(string $id, array $details): void
     {
-        $names = DB::table('aset_m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
-        DB::table('aset_tr_permintaan_pengadaan_aset_details')->insert(collect($details)->values()->map(fn ($detail, $i) => ['id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'request_id' => $id, 'line_number' => $i + 1, 'planning_detail_id' => $detail['planning_detail_id'] ?? null, 'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'], 'asset_name' => $names[$detail['jenis_aset_id']], 'quantity' => $detail['quantity'], 'specification' => $detail['specification'], 'note' => $detail['note'] ?? null, 'created_at' => now(), 'updated_at' => now()])->all());
+        $names = JenisAset::query()->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
+        collect($details)->values()->each(fn ($detail, $i) => PermintaanPengadaanAsetDetail::create(['request_id' => $id, 'line_number' => $i + 1, 'planning_detail_id' => $detail['planning_detail_id'] ?? null, 'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'], 'asset_name' => $names[$detail['jenis_aset_id']], 'quantity' => $detail['quantity'], 'specification' => $detail['specification'], 'note' => $detail['note'] ?? null]));
     }
 
-    private function validateTypes(string $tenant, array $details): void
+    /** @param list<array<string, mixed>> $details */
+    private function validateTypes(array $details): void
     {
-        abort_unless(DB::table('aset_m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', array_unique(array_column($details, 'jenis_aset_id')))->where('aktif', true)->whereNull('deleted_at')->count() === count(array_unique(array_column($details, 'jenis_aset_id'))), 422, 'Jenis aset tidak ditemukan atau tidak aktif.');
+        abort_unless(JenisAset::query()->whereIn('id', array_unique(array_column($details, 'jenis_aset_id')))->where('aktif', true)->count() === count(array_unique(array_column($details, 'jenis_aset_id'))), 422, 'Jenis aset tidak ditemukan atau tidak aktif.');
     }
 
-    private function record(Request $request, string $id): object
+    /** Baris mentah hasil `toBase()`: sebuah `stdClass`, bukan model. */
+    private function record(Request $request, string $id): stdClass
     {
-        $q = DB::table('aset_tr_permintaan_pengadaan_aset')->where(['tenant_id' => $this->tenant($request), 'id' => $id])->whereNull('deleted_at');
+        $q = PermintaanPengadaanAset::query()->where('id', $id);
         app(OrganizationScope::class)->query($q, $request, 'legal_entity_id', 'requesting_org_unit_id');
 
-        return $q->firstOrFail();
+        return $q->toBase()->firstOrFail();
     }
 
     private function guard(Request $request, string $action): void

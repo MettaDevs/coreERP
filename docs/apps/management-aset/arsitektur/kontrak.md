@@ -26,7 +26,7 @@ contracts/src/
 └── components/                     schema, response, parameter, security
 ```
 
-Urutan berkas di `paths/` ditentukan `x-bundle` pada `src/openapi.yaml`; berkas baru harus didaftarkan di sana, kalau tidak isinya tidak ikut tergabung dan pemeriksa cakupan akan melaporkan rutenya sebagai tak terdokumentasi.
+Urutan berkas di `paths/` ditentukan `x-bundle` pada `src/openapi.yaml`; berkas baru harus didaftarkan di sana, kalau tidak isinya tidak ikut tergabung.
 
 Setelah menyunting `src/`, bangun ulang:
 
@@ -34,25 +34,28 @@ Setelah menyunting `src/`, bangun ulang:
 python contracts/bundle.py
 ```
 
-Berkas gabungan ikut di-commit supaya perkakas yang tidak bisa menyelesaikan `$ref` lintas berkas tetap terlayani. Kalau ia tertinggal dari sumbernya, konsumen membaca janji yang sudah tidak berlaku — karena itu CI memeriksanya.
+Berkas gabungan ikut di-commit supaya perkakas yang tidak bisa menyelesaikan `$ref` lintas berkas tetap terlayani. Kalau ia tertinggal dari sumbernya, pembacanya melihat gambaran yang sudah tidak berlaku. Tidak ada CI yang memeriksanya lagi; lihat bagian berikutnya.
 
-## Pemeriksa cakupan
+## Tidak ada lagi pemeriksa cakupan di sini
 
-Tidak ada satu test pun yang gagal ketika sebuah endpoint absen dari kontrak. Persis begitulah `PUT /api/v1/jenis-aset/{id}/models` sempat ada tanpa dokumentasi sementara 181 test tetap hijau.
+Dulu `contracts/check-contract-coverage.py` membandingkan daftar rute Laravel dengan
+`openapi.yaml` dan gagal bila keduanya berbeda. Skrip itu **dihapus pada F3-23**, dan
+alasannya bukan karena pemeriksaan kontrak jadi kurang penting.
 
-```bash
-python contracts/check-contract-coverage.py
-```
+Ia dibaca dari `api/` dan menjalankan `php artisan route:list --json` di sana. Sejak module
+masuk ke dalam runtime Core, `api/` tidak lagi memuat `artisan`, jadi skripnya berhenti
+sebelum membandingkan satu rute pun. Ditambah lagi, tidak ada alur CI yang pernah
+memanggilnya: langkah `Check internal API contract coverage` pada
+`.github/workflows/lint.yml` berjalan dengan `working-directory: apps/control-plane`, jadi
+yang dijalankan adalah pemeriksa milik Core atas `contracts/openapi-internal.yaml` Core.
 
-Tiga hal yang membuatnya berguna, dan yang perlu Anda pertahankan kalau menyuntingnya:
+Yang menggantikannya adalah batas permukaannya sendiri: rute `/api/v1/...` module hanya
+dipanggil UI module ini, di dalam proses dan repo yang sama, sehingga penyimpangan terlihat
+pada test module dan pada UI yang memanggilnya. Permukaan yang benar-benar melewati batas
+module tidak lagi berbentuk HTTP — ia kontrak PHP (`PenyediaLaporanModul`) dan event
+Laravel in-process.
 
-**Rute dibaca dari Laravel**, lewat `php artisan route:list --json`, bukan dari teks `routes/api.php`. Sebagian besar master didaftarkan lewat loop atas array `$masters`, jadi jalurnya tidak pernah muncul sebagai literal — pendekatan pencocokan teks akan melapor bersih sambil melewatkan puluhan rute.
-
-**Jalur bertemplat ber-`enum` dimekarkan** sebelum dibandingkan. `/api/v1/{lifecycleDocument}` mendokumentasikan empat resource nyata lewat satu jalur. Dibandingkan apa adanya, ia melaporkan endpoint yang sebenarnya terdokumentasi sebagai hilang. Pemeriksa yang sering salah memberi peringatan akan berhenti dipercaya, lalu diabaikan — dan itu lebih buruk daripada tidak punya pemeriksa sama sekali.
-
-**Celah yang ditunda disebut, bukan dimaafkan diam-diam.** Daftar `DEFERRED` memuat alasannya dan dicetak tiap kali pemeriksa jalan. Entry yang tidak lagi cocok dengan rute hidup dilaporkan sebagai galat, supaya pengecualian basi tidak memaafkan rute lain yang kelak memakai jalur itu.
-
-Keduanya dijalankan `.github/workflows/contracts.yml` pada tiap PR.
+Rinciannya ada di `modules/apperp/management-aset/contracts/README.md`.
 
 ## Aturan menulis kontrak
 
@@ -70,7 +73,7 @@ Keduanya dijalankan `.github/workflows/contracts.yml` pada tiap PR.
 
 Tiga rute `permintaan-pembelian-aset/{id}` belum masuk kontrak karena perilaku yang akan dijanjikannya belum diputuskan. Kontrak yang mendahului keputusan menggambarkan bentuk yang tidak bisa diandalkan pemanggil.
 
-Statusnya tercatat di `DEFERRED` dan dicetak tiap kali pemeriksa jalan.
+Dulu statusnya tercatat di daftar `DEFERRED` milik pemeriksa cakupan. Setelah pemeriksa itu dihapus, satu-satunya catatannya adalah halaman ini.
 
 ## Di mana kodenya
 
@@ -78,8 +81,7 @@ Statusnya tercatat di `DEFERRED` dan dicetak tiap kali pemeriksa jalan.
 | --- | --- |
 | `contracts/src/` | Sumber yang disunting |
 | `contracts/bundle.py` | Penggabung |
-| `contracts/check-contract-coverage.py` | Pemeriksa cakupan |
-| `.github/workflows/contracts.yml` | Penjalan keduanya di CI |
+| `contracts/README.md` | Keputusan F3-23: status berkas di folder ini |
 
 ## Halaman terkait
 

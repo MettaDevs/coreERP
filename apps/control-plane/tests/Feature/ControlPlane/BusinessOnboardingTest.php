@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Jobs\DeployAppPlacement;
 use App\Models\CoreApp;
+use App\Models\ModuleInstallation;
 use App\Models\Tenant;
 use App\Models\User;
 use Database\Seeders\AppCatalogSeeder;
@@ -30,7 +30,7 @@ class BusinessOnboardingTest extends TestCase
         $response = $this->postJson('/api/v1/business-registrations', [
             'name' => 'Owner Metta',
             'business_name' => 'PT Metta',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'owner@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -65,21 +65,7 @@ class BusinessOnboardingTest extends TestCase
         $this->assertDatabaseCount('security_role_duties', 2);
     }
 
-    public function test_registration_dispatches_placement_jobs_after_the_transaction_commits(): void
-    {
-        $this->postJson('/api/v1/business-registrations', [
-            'name' => 'Owner Metta',
-            'business_name' => 'PT Metta',
-            'app_ids' => ['management-aset'],
-            'email' => 'after-commit@metta.test',
-            'password' => 'password',
-            'password_confirmation' => 'password',
-        ])->assertCreated();
-
-        Queue::assertPushed(DeployAppPlacement::class, 1);
-    }
-
-    public function test_registration_includes_and_deploys_transitive_app_dependencies_before_the_selected_product(): void
+    public function test_registration_includes_transitive_app_dependencies(): void
     {
         CoreApp::query()->create([
             'id' => 'business-partner',
@@ -90,7 +76,7 @@ class BusinessOnboardingTest extends TestCase
             'has_ui' => false,
         ]);
         DB::table('app_dependencies')->insert([
-            'app_id' => 'management-aset',
+            'app_id' => 'app-uji',
             'depends_on_app_id' => 'business-partner',
             'version_range' => '^1.0',
             'created_at' => now(),
@@ -100,7 +86,7 @@ class BusinessOnboardingTest extends TestCase
         $this->postJson('/api/v1/business-registrations', [
             'name' => 'Owner Dependency',
             'business_name' => 'PT Dependency',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'dependency@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -108,34 +94,37 @@ class BusinessOnboardingTest extends TestCase
 
         $tenant = Tenant::query()->where('slug', 'pt-dependency')->firstOrFail();
         $this->assertDatabaseHas('tenant_app_entitlements', ['tenant_id' => $tenant->id, 'app_id' => 'business-partner']);
-        $this->assertDatabaseHas('tenant_app_entitlements', ['tenant_id' => $tenant->id, 'app_id' => 'management-aset']);
-        Queue::assertPushed(DeployAppPlacement::class, 2);
-        Queue::assertPushed(DeployAppPlacement::class, fn (DeployAppPlacement $job): bool => $job->appId === 'business-partner');
-        Queue::assertPushed(DeployAppPlacement::class, fn (DeployAppPlacement $job): bool => $job->appId === 'management-aset');
+        $this->assertDatabaseHas('tenant_app_entitlements', ['tenant_id' => $tenant->id, 'app_id' => 'app-uji']);
+        Queue::assertNothingPushed();
     }
 
-    public function test_registration_reuses_an_existing_ready_pooled_placement(): void
+    /**
+     * Urutan nomor tenant dibuat saat module dipasang, bukan saat sebuah penempatan
+     * container dinyatakan siap.
+     *
+     * `contoh-a` dipakai di sini karena ia benar-benar ada sebagai folder di `modules/`;
+     * hanya id yang ada di sana yang dipasang pendaftaran usaha.
+     */
+    public function test_registration_creates_number_sequence_drafts_for_installed_modules(): void
     {
+        DB::table('apps')->updateOrInsert(
+            ['id' => 'contoh-a'],
+            [
+                'name' => 'Contoh A',
+                'description' => 'Module contoh untuk test pendaftaran.',
+                'version' => '0.1.0',
+                'status' => 'available',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        );
         DB::table('app_number_sequence_references')->insert([
             'id' => (string) Str::ulid(),
-            'app_id' => 'management-aset',
-            'code' => 'management-aset.entity-code',
-            'name' => 'Kode entitas aset',
+            'app_id' => 'contoh-a',
+            'code' => 'contoh-a.entity-code',
+            'name' => 'Kode entitas',
             'default_prefix' => 'ETA',
             'allowed_scopes' => json_encode(['tenant']),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('app_placements')->insert([
-            'id' => (string) Str::ulid(),
-            'app_id' => 'management-aset',
-            'release_version' => '0.1.0',
-            'placement' => 'pooled-primary',
-            'profile' => 'pooled',
-            'artifact_status' => 'placed',
-            'migration_status' => 'succeeded',
-            'runtime_status' => 'ready',
-            'ready_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -143,13 +132,14 @@ class BusinessOnboardingTest extends TestCase
         $this->postJson('/api/v1/business-registrations', [
             'name' => 'Pooled Owner',
             'business_name' => 'Pooled Tenant',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['contoh-a'],
             'email' => 'pooled@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertCreated();
 
-        Queue::assertNotPushed(DeployAppPlacement::class);
+        Queue::assertNothingPushed();
+        $this->assertSame(0, DB::table('app_placements')->count());
         $this->assertDatabaseHas('tenant_number_sequences', [
             'status' => 'active',
             'minimum_number' => 0,
@@ -162,7 +152,7 @@ class BusinessOnboardingTest extends TestCase
         $payload = [
             'name' => 'Owner Metta',
             'business_name' => 'PT Metta',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'owner@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -178,14 +168,14 @@ class BusinessOnboardingTest extends TestCase
         $this->postJson('/api/v1/business-registrations', [
             'name' => 'Asset Owner',
             'business_name' => 'Asset Only',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'asset@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertCreated();
 
         $this->assertDatabaseCount('tenant_app_entitlements', 1);
-        $this->assertDatabaseHas('tenant_app_entitlements', ['app_id' => 'management-aset']);
+        $this->assertDatabaseHas('tenant_app_entitlements', ['app_id' => 'app-uji']);
         $this->assertDatabaseCount('roles', 1);
         $this->assertDatabaseCount('role_assignments', 1);
 
@@ -194,107 +184,53 @@ class BusinessOnboardingTest extends TestCase
             ->get('/dashboard')
             ->assertInertia(fn (Assert $page) => $page
                 ->has('entitledProducts', 1)
-                ->where('entitledProducts.0.id', 'management-aset')
-                ->where('entitledProducts.0.href', '/apps/management-aset')
+                ->where('entitledProducts.0.id', 'app-uji')
+                ->where('entitledProducts.0.href', '/apps/app-uji')
                 ->has('launchableProducts', 0)
             );
     }
 
-    public function test_owner_can_launch_an_entitled_product_after_the_placement_is_ready(): void
+    public function test_owner_can_launch_an_entitled_product_after_the_module_is_installed(): void
     {
         $this->postJson('/api/v1/business-registrations', [
             'name' => 'Owner',
             'business_name' => 'PT Ready',
-            'app_ids' => ['management-aset'],
+            'app_ids' => ['app-uji'],
             'email' => 'ready@metta.test',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertCreated();
         $owner = User::query()->where('email', 'ready@metta.test')->firstOrFail();
-        DB::table('app_releases')->insert([
-            'id' => (string) Str::ulid(),
-            'app_id' => 'management-aset',
+        $tenantId = (string) Tenant::query()->where('slug', 'pt-ready')->value('id');
+        DB::table('core_module_installations')->insert([
+            'tenant_id' => $tenantId,
+            'module_id' => 'app-uji',
             'version' => '0.1.0',
-            'manifest_sha256' => str_repeat('a', 64),
-            'api_image' => 'registry.example/management-aset-api@sha256:'.str_repeat('a', 64),
-            'ui_image' => 'registry.example/management-aset-ui@sha256:'.str_repeat('b', 64),
-            'bundle_path' => 'management-aset/0.1.0',
-            'compose_file' => 'compose.yaml',
-            'compose_project' => 'management-aset',
-            'api_service' => 'management-aset-api',
-            'ui_service' => 'management-aset-ui',
-            'database_service' => 'management-aset-db',
-            'status' => 'available',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('app_placements')->insert([
-            'id' => (string) Str::ulid(),
-            'app_id' => 'management-aset',
-            'release_version' => '0.1.0',
-            'placement' => 'pooled-primary',
-            'profile' => 'pooled',
-            'artifact_status' => 'placed',
-            'migration_status' => 'succeeded',
-            'runtime_status' => 'ready',
-            'ready_at' => now(),
+            'status' => ModuleInstallation::STATUS_INSTALLED,
+            'installed_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
         $this->actingAs($owner)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
             ->has('launchableProducts', 1)
-            ->where('launchableProducts.0.id', 'management-aset'));
+            ->where('launchableProducts.0.id', 'app-uji'));
 
         $this->actingAs($owner)->getJson('/api/v1/launch-manifest')
             ->assertOk()
-            ->assertJsonPath('data.apps.0.id', 'management-aset')
-            ->assertJsonPath('data.apps.0.entry', '/apps/management-aset');
+            ->assertJsonPath('data.apps.0.id', 'app-uji')
+            ->assertJsonPath('data.apps.0.entry', '/apps/app-uji');
 
-        config()->set('coreerp.app_context_signing_key', str_repeat('k', 48));
+        // `/apps/<id>` tidak lagi menyajikan halaman apa pun. Ia satu pengalihan ke entri
+        // menu pertama yang boleh dilihat pengguna ini, dan jalurnya diturunkan dengan
+        // aturan tetap `/<id module>/<id entri menu>`.
         $this->actingAs($owner)
-            ->get('/apps/management-aset?view=group-aset')
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('apps/host')
-                ->where('app.navigation.rails.0.label', 'Master data')
-                ->where('app.navigation.rails.0.items.1.label', 'Group aset')
-                ->where('app.navigation.activeItemId', 'group-aset')
-                // Entry diturunkan dari placement yang melayani tenant ini, jadi
-                // path membawa nama placement — bukan nilai yang pernah disimpan.
-                ->where('app.contentEntry', '/apps-content/pooled-primary/management-aset/#/group-aset')
-            );
+            ->get('/apps/app-uji')
+            ->assertRedirect('/app-uji/entitas');
 
-        DB::table('app_placements')->where('app_id', 'management-aset')->update(['runtime_status' => 'starting']);
-        $this->actingAs($owner)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-            ->has('launchableProducts', 0));
-    }
-
-    public function test_ready_placement_without_a_registered_release_is_not_launchable(): void
-    {
-        $this->postJson('/api/v1/business-registrations', [
-            'name' => 'Owner',
-            'business_name' => 'Unregistered release',
-            'app_ids' => ['management-aset'],
-            'email' => 'unregistered@metta.test',
-            'password' => 'password',
-            'password_confirmation' => 'password',
-        ])->assertCreated();
-
-        DB::table('app_placements')->insert([
-            'id' => (string) Str::ulid(),
-            'app_id' => 'management-aset',
-            'release_version' => '0.1.0',
-            'placement' => 'pooled-primary',
-            'profile' => 'pooled',
-            'artifact_status' => 'placed',
-            'migration_status' => 'succeeded',
-            'runtime_status' => 'ready',
-            'ready_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $owner = User::query()->where('email', 'unregistered@metta.test')->firstOrFail();
+        DB::table('core_module_installations')
+            ->where('tenant_id', $tenantId)
+            ->update(['status' => ModuleInstallation::STATUS_DISABLED]);
         $this->actingAs($owner)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
             ->has('launchableProducts', 0));
     }

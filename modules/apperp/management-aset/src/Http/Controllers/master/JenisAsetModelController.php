@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Models\master\JenisAset;
+use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 
 /**
  * Hubungan model ke jenis aset disunting dari pemiliknya, yaitu jenis aset.
@@ -23,13 +25,7 @@ class JenisAsetModelController extends Controller
         abort_unless(in_array('management-aset.model-aset.read', $permissions, true), 403);
 
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
-        abort_unless(
-            DB::table('aset_m_jenis_aset')
-                ->where(['tenant_id' => $tenantId, 'id' => $jenisAsetId])
-                ->whereNull('deleted_at')
-                ->exists(),
-            404,
-        );
+        abort_unless(JenisAset::query()->whereKey($jenisAsetId)->exists(), 404);
 
         $data = $request->validate([
             'model_ids' => ['present', 'array', 'max:100'],
@@ -42,34 +38,29 @@ class JenisAsetModelController extends Controller
         ]);
         $modelIds = array_values($data['model_ids']);
 
-        DB::transaction(function () use ($tenantId, $jenisAsetId, $modelIds): void {
-            DB::table('aset_m_jenis_aset')
-                ->where(['tenant_id' => $tenantId, 'id' => $jenisAsetId])
-                ->lockForUpdate()
-                ->first();
+        DB::transaction(function () use ($jenisAsetId, $modelIds): void {
+            JenisAset::query()->whereKey($jenisAsetId)->lockForUpdate()->first();
 
-            $models = DB::table('aset_m_model_aset')
-                ->where('tenant_id', $tenantId)
-                ->whereIn('id', $modelIds)
-                ->whereNull('deleted_at')
+            $models = ModelAset::query()
+                ->whereKey($modelIds)
                 ->lockForUpdate()
                 ->get(['id', 'jenis_aset_id']);
-            $conflict = $models->first(fn (object $model): bool => $model->jenis_aset_id !== null && $model->jenis_aset_id !== $jenisAsetId);
+            $conflict = $models->first(fn (ModelAset $model): bool => $model->jenis_aset_id !== null && $model->jenis_aset_id !== $jenisAsetId);
             if ($conflict) {
                 throw ValidationException::withMessages([
                     'model_ids' => 'Salah satu model sudah dikaitkan dengan jenis aset lain.',
                 ]);
             }
 
-            DB::table('aset_m_model_aset')
-                ->where(['tenant_id' => $tenantId, 'jenis_aset_id' => $jenisAsetId])
-                ->update(['jenis_aset_id' => null, 'updated_at' => now()]);
+            // `withTrashed()`: model yang sudah diarsipkan ikut dilepas dari jenis ini.
+            // Membiarkannya menunjuk ke sini membuat jenis aset terlihat masih dipakai
+            // oleh baris yang tidak pernah muncul lagi di layar mana pun.
+            ModelAset::query()->withTrashed()
+                ->where('jenis_aset_id', $jenisAsetId)
+                ->update(['jenis_aset_id' => null]);
 
             if ($modelIds !== []) {
-                DB::table('aset_m_model_aset')
-                    ->where('tenant_id', $tenantId)
-                    ->whereIn('id', $modelIds)
-                    ->update(['jenis_aset_id' => $jenisAsetId, 'updated_at' => now()]);
+                ModelAset::query()->whereKey($modelIds)->update(['jenis_aset_id' => $jenisAsetId]);
             }
         });
 

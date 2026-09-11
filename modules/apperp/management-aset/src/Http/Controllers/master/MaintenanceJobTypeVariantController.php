@@ -7,6 +7,9 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
 
+/**
+ * @extends MasterDataController<MaintenanceJobTypeVariant>
+ */
 class MaintenanceJobTypeVariantController extends MasterDataController
 {
     protected function resource(): string

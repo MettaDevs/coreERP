@@ -2,12 +2,29 @@
 
 namespace Modules\Apperp\ManagementAset\Models\master;
 
+use Illuminate\Support\Carbon;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 
 /**
  * Aturan penyusutan yang dapat dipakai ulang lintas aset; padanan "Depreciation profile"
  * di Dynamics 365 F&O. Aturannya hidup di sini, bukan pada group aset: group hanya
  * menunjuk profil mana yang menjadi default.
+ *
+ * Kolom di bawah adalah tambahan atas bentuk dasar master; bentuk dasarnya disebutkan pada
+ * `MasterData`. `rate_percent` di-cast `decimal:4`, jadi Eloquent memulangkannya sebagai
+ * string dan bukan float. Isi `manual_schedule` dibiarkan `mixed`: kolomnya `json` dan
+ * migration tidak menjanjikan bentuk apa pun, sedangkan bentuk yang divalidasi API hanya
+ * berlaku untuk baris yang masuk lewat API.
+ *
+ * @property string $method
+ * @property string $frequency
+ * @property string $year_basis
+ * @property ?string $convention
+ * @property ?int $useful_life_periods
+ * @property ?string $rate_percent
+ * @property ?array<array-key, mixed> $manual_schedule
+ * @property ?Carbon $effective_from
+ * @property ?Carbon $effective_to
  */
 class ProfilPenyusutan extends MasterData
 {

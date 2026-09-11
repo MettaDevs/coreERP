@@ -116,7 +116,7 @@ final class PemindaiModul
      *
      * @return list<SplFileInfo>
      */
-    public function berkasPhp(string $folder, bool $tanpaMigration = false): array
+    public function berkasPhp(string $folder, bool $tanpaMigration = false, bool $tanpaTest = false): array
     {
         if (! is_dir($folder)) {
             return [];
@@ -131,7 +131,13 @@ final class PemindaiModul
                 continue;
             }
 
-            if ($tanpaMigration && str_contains(str_replace('\\', '/', $item->getPathname()), '/database/migrations/')) {
+            $jalur = str_replace('\\', '/', $item->getPathname());
+
+            if ($tanpaMigration && str_contains($jalur, '/database/migrations/')) {
+                continue;
+            }
+
+            if ($tanpaTest && str_contains($jalur, '/tests/')) {
                 continue;
             }
 
@@ -143,6 +149,12 @@ final class PemindaiModul
 
     /**
      * Berkas modul yang menyebut namespace modul lain.
+     *
+     * **Test ikut dipindai di sini**, berbeda dari dua penjaga di bawah. Bedanya bukan
+     * ketidakkonsistenan: sebuah test yang menyebut namespace modul lain adalah modul yang
+     * bergantung pada modul lain, persis pelanggaran yang sama seperti di kode produksi, dan
+     * tidak ada satu pun kebutuhan sah yang menuntutnya. Yang dilonggarkan pada dua penjaga
+     * lain adalah hal yang memang tidak punya jalan lain; ini punya.
      *
      * @return list<string>
      */
@@ -167,13 +179,27 @@ final class PemindaiModul
     /**
      * Berkas modul yang menyentuh kelas Core di luar kontrak.
      *
+     * **Berkas test tidak ikut dipindai, dan itu keputusan yang perlu alasannya ditulis.**
+     * Yang dijaga aturan ini adalah kode yang berjalan di produksi: di sanalah menyentuh kelas
+     * Core berarti modul mengikat dirinya pada bentuk dalam Core, dan di sanalah batasnya punya
+     * arti. Test modul membuat tenant, pengguna, dan keanggotaan — ketiganya milik Core, dan
+     * tidak ada satu pun cara membuatnya tanpa menyebut model Core.
+     *
+     * Alternatifnya menambah kontrak yang hanya dipakai test. Itu memperbesar permukaan janji
+     * Core demi sesuatu yang tidak pernah berjalan di produksi, dan permukaan janji yang lebih
+     * besar adalah harga yang dibayar selamanya. Batasnya karena itu ditarik di kode produksi.
+     *
+     * Yang hilang jujur disebut: sebuah test modul kini boleh menyentuh kelas Core mana pun,
+     * termasuk yang kelak berubah bentuk. Test yang rusak karenanya akan terlihat sebagai test
+     * merah, bukan sebagai kebocoran — dan itu jenis kegagalan yang bisa ditunggu.
+     *
      * @return list<string>
      */
     public function pelanggaranKelasCore(string $folder): array
     {
         $pelanggaran = [];
 
-        foreach ($this->berkasPhp($folder) as $berkas) {
+        foreach ($this->berkasPhp($folder, tanpaTest: true) as $berkas) {
             $isi = (string) file_get_contents($berkas->getPathname());
 
             foreach (self::kelasCoreYangDisebut($isi) as $kelas) {
@@ -190,13 +216,20 @@ final class PemindaiModul
      * Migration tidak ikut diperiksa: ia memang menulis SQL langsung dan berjalan sebelum ada
      * tenant mana pun, jadi tidak masuk akal menuntutnya tersaring.
      *
+     * **Test juga tidak, dan alasannya berbeda dari migration.** Test menyemai baris untuk
+     * tenant yang ditentukannya sendiri — termasuk tenant kedua, yang justru dipakai untuk
+     * membuktikan data tenant pertama tidak bocor. Menyimpan baris itu lewat model dibatalkan
+     * `MilikTenant`, karena menulis ke tenant selain tenant aktif memang yang dilarangnya.
+     * Menuntut test memakai model berarti membuat test isolasi tenant mustahil ditulis, yaitu
+     * membuang penjagaan yang paling penting demi menegakkan aturannya.
+     *
      * @return list<string>
      */
     public function pelanggaranQueryMentah(string $folder): array
     {
         $pelanggaran = [];
 
-        foreach ($this->berkasPhp($folder, tanpaMigration: true) as $berkas) {
+        foreach ($this->berkasPhp($folder, tanpaMigration: true, tanpaTest: true) as $berkas) {
             $isi = (string) file_get_contents($berkas->getPathname());
 
             foreach (self::queryMentahYangDipakai($isi) as $pola) {
@@ -208,7 +241,57 @@ final class PemindaiModul
     }
 
     /**
+     * Berkas modul yang masih melompat ke Core lewat HTTP.
+     *
+     * **Yang dilarang, dan kenapa batasnya di situ.** Bukan kata `Http::`, melainkan dua hal
+     * yang keduanya diperlukan sebuah lompatan HTTP ke Core: klien yang membuka koneksi, dan
+     * setelan yang menyebut alamat serta kredensial Core. Salah satu saja sudah cukup untuk
+     * merah, karena masing-masing sendirian sudah tidak punya alasan hidup di dalam satu
+     * runtime — Core berada di proses yang sama, jadi tidak ada yang perlu dihubungi dan tidak
+     * ada token service yang perlu dibawa.
+     *
+     * Dua hal dipindai, bukan satu, karena masing-masing menutup lubang yang dilewatkan yang
+     * lain. Memindai klien saja melewatkan orang yang memakai Guzzle langsung lewat variabel;
+     * memindai alamat saja melewatkan orang yang menuliskan URL-nya di berkas setelan.
+     *
+     * **Berkas test tidak ikut dipindai.** Yang dijaga adalah kode yang berjalan di produksi.
+     * `Http::fake` dan `Http::preventStrayRequests()` di dalam test bukan lompatan; keduanya
+     * justru alat yang membuat ketiadaan lompatan bisa dibuktikan, dan melarangnya akan
+     * menghapus persis penjagaan yang diminta task ini. Pemalsuan yang sudah tidak dipakai
+     * siapa pun memang menyesatkan, tetapi itu kebersihan test dan bukan batas arsitektur.
+     *
+     * **Komentar tidak ikut dihitung, dan ini bukan kelonggaran melainkan syarat.** Satu-satunya
+     * `Http::` yang tersisa di `src/` module aset hari ini berada di dalam docblock yang
+     * menceritakan jalur lama. Penjaga yang mencocokkan teks mentah akan merah karena kalimat
+     * sejarah, dan orang yang membacanya akan menghapus kalimat itu — bukan memperbaiki apa
+     * pun. Karena itu berkasnya dibaca sebagai token PHP dan komentarnya dibuang lebih dulu,
+     * sehingga yang tersisa hanya kode yang benar-benar dijalankan.
+     *
+     * @return list<string>
+     */
+    public function pelanggaranLompatanHttp(string $folder): array
+    {
+        $pelanggaran = [];
+
+        foreach ($this->berkasPhp($folder, tanpaTest: true) as $berkas) {
+            $isi = (string) file_get_contents($berkas->getPathname());
+
+            foreach (self::lompatanHttpYangDipakai($isi) as $pola) {
+                $pelanggaran[] = self::jalurRingkas($berkas->getPathname()).' memakai '.$pola;
+            }
+        }
+
+        return array_values(array_unique($pelanggaran));
+    }
+
+    /**
      * Seluruh pelanggaran berkas sebuah modul, lintas ketiga pemeriksaan pembaca berkas.
+     *
+     * `pelanggaranLompatanHttp()` sengaja **tidak** ikut di sini. Daftar ini adalah dasar
+     * pemeriksaan basi `ModulSedangDipindah`, dan pemeriksaan itu hanya boleh menghitung
+     * dimensi yang memang dikecualikan daftar tersebut. Penjaga lompatan HTTP tidak
+     * mengecualikan siapa pun, jadi memasukkannya ke sini akan membuat "modul ini sudah bersih"
+     * berarti sesuatu yang lain daripada "pengecualiannya sudah boleh dibuang".
      *
      * Dipakai pemeriksaan basi. Sengaja digabung, bukan diperiksa satu per satu: sebuah entri
      * pengecualian berlaku untuk satu modul secara utuh, jadi ia baru boleh dinyatakan basi
@@ -306,6 +389,98 @@ final class PemindaiModul
         }
 
         return $hasil;
+    }
+
+    /**
+     * Pola lompatan HTTP ke Core yang dipakai sebuah isi berkas.
+     *
+     * Dipisahkan sebagai fungsi statis, seperti tiga pemeriksaan tetangganya, supaya ia bisa
+     * diuji atas potongan kode yang ditulis di dalam test. Tanpa itu, satu-satunya cara
+     * membuktikan penjaga ini bisa merah adalah menyisipkan pelanggaran ke berkas modul
+     * sungguhan — sesuatu yang hanya bisa dilakukan orang, tidak bisa dilakukan alur CI.
+     *
+     * @return list<string>
+     */
+    public static function lompatanHttpYangDipakai(string $isi): array
+    {
+        $kode = self::kodeTanpaKomentar($isi);
+        $hasil = [];
+
+        // Klien yang membuka koneksi keluar.
+        //
+        // Lookbehind-nya hanya menolak huruf, angka, dan garis bawah — **bukan** garis miring
+        // terbalik. Versi pertama menolak garis miring juga, dan itu melewatkan justru bentuk
+        // yang paling mungkin dipakai untuk menembus batas:
+        // `\Illuminate\Support\Facades\Http::get(...)` yang ditulis lengkap tanpa `use`. Lubang
+        // itu ditemukan dengan menyisipkan pemanggilan sungguhan ke berkas module dan melihat
+        // penjaganya tetap tidak menyebutnya. Yang ditolak sekarang hanya nama lain yang
+        // kebetulan berakhiran Http, misalnya `ClientHttp::`.
+        $klien = [
+            'Http::' => '/(?<![A-Za-z0-9_])Http::/',
+            'GuzzleHttp' => '/(?<![A-Za-z0-9_])GuzzleHttp\\\\{1,2}/',
+            'curl_init(' => '/(?<![A-Za-z0-9_])curl_(init|exec|setopt)\s*\(/',
+            'fsockopen(' => '/(?<![A-Za-z0-9_])fsockopen\s*\(/',
+            'file_get_contents( ke URL' => '/(?<![A-Za-z0-9_])(file_get_contents|fopen)\s*\(\s*[\'"]https?:\/\//',
+        ];
+
+        // Alamat dan kredensial Core. Semuanya hanya berguna untuk satu hal: menghubungi Core
+        // dari luar prosesnya. Di dalam satu runtime, menyebutnya berarti jalur lamanya kembali.
+        $alamat = [
+            'services.coreerp' => '/services\.coreerp/',
+            'COREERP_URL' => '/COREERP_(URL|BASE_URL|SERVICE_TOKEN|APP_ID)/',
+            'X-CoreERP-Service-Token' => '/X-CoreERP-Service-Token/i',
+            '/api/internal/v1/' => '#/api/internal/v1/#',
+        ];
+
+        foreach (array_merge($klien, $alamat) as $nama => $pola) {
+            if (preg_match($pola, $kode) === 1) {
+                $hasil[] = $nama;
+            }
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Isi berkas PHP tanpa komentarnya, dirangkai kembali menjadi teks.
+     *
+     * String literal sengaja **dipertahankan**: alamat endpoint dan kunci setelan Core justru
+     * hidup di dalam string, dan membuangnya akan membuat separuh aturan tidak bisa ditegakkan.
+     * Yang dibuang hanya komentar, karena cerita tentang jalur lama bukan jalur lama.
+     *
+     * Berkas yang tidak bisa ditokenisasi dikembalikan apa adanya. Itu pilihan yang disengaja:
+     * lebih baik penjaga ini terlalu galak pada berkas yang rusak daripada diam-diam melewatkan
+     * seluruh isinya.
+     */
+    private static function kodeTanpaKomentar(string $isi): string
+    {
+        try {
+            $token = @token_get_all($isi);
+        } catch (\Throwable) {
+            return $isi;
+        }
+
+        $kode = '';
+
+        foreach ($token as $bagian) {
+            if (is_string($bagian)) {
+                $kode .= $bagian;
+
+                continue;
+            }
+
+            if (in_array($bagian[0], [T_COMMENT, T_DOC_COMMENT], true)) {
+                // Diganti satu spasi, bukan dihapus, supaya dua token yang mengapitnya tidak
+                // menempel dan membentuk pola yang tidak pernah ditulis siapa pun.
+                $kode .= ' ';
+
+                continue;
+            }
+
+            $kode .= $bagian[1];
+        }
+
+        return $kode;
     }
 
     public static function jalurRingkas(string $jalur): string

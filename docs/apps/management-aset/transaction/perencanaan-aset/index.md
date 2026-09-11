@@ -8,10 +8,10 @@ Rencana aset adalah daftar barang yang akan diadakan beserta jumlah dan satuanny
 
 | Tabel | Isi |
 | --- | --- |
-| `tr_perencanaan_aset` | Dokumennya: nomor rencana, entitas, unit kerja, status, versi |
-| `tr_perencanaan_aset_details` | Baris: barang apa, berapa banyak, satuan apa |
+| `aset_tr_perencanaan_aset` | Dokumennya: nomor rencana, entitas, unit kerja, status, versi |
+| `aset_tr_perencanaan_aset_details` | Baris: barang apa, berapa banyak, satuan apa |
 
-Dokumen permintaan pembelian memakai bentuk yang sama — `tr_permintaan_pengadaan_aset` dan `tr_permintaan_pengadaan_aset_details` — tetapi perilakunya belum diputuskan.
+Dokumen permintaan pembelian memakai bentuk yang sama — `aset_tr_permintaan_pengadaan_aset` dan `aset_tr_permintaan_pengadaan_aset_details` — tetapi perilakunya belum diputuskan.
 
 Satuan diambil dari Core lewat `UnitOfMeasureClient`, bukan disimpan sebagai teks bebas. Kalau layanan satuan belum bisa dihubungi, permintaan gagal 503 — bukan menyimpan satuan yang tidak bisa diverifikasi.
 
@@ -60,9 +60,9 @@ Lihat catatan di [Dokumen siklus aset](/apps/management-aset/transaction/siklus-
 
 | Berkas | Isinya |
 | --- | --- |
-| `api/app/Http/Controllers/transaksi/PerencanaanAset/PerencanaanAsetController.php` | Seluruh logika |
-| `api/app/Services/UnitOfMeasureClient.php` | Satuan dari Core |
-| `ui/src/transactions/perencanaan-aset/PlanningPage.tsx` | Layar |
+| `src/Http/Controllers/transaksi/PerencanaanAset/PerencanaanAsetController.php` | Seluruh logika |
+| `src/Services/DaftarSatuanAset.php` | Satuan dari Core |
+| `ui/transactions/perencanaan-aset/PlanningPage.tsx` | Layar |
 
 ## Halaman terkait
 

@@ -11,25 +11,37 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Models\master\JenisAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAsetDetail;
 use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
+use stdClass;
 
+/**
+ * Rencana pengadaan aset satu tahun anggaran.
+ *
+ * Penyaringan tenant datang dari scope model; yang masih menyebut `tenant_id` hanyalah
+ * tabel yang di-`join`, yang memang tidak ikut tersaring.
+ */
 class PerencanaanAsetController extends Controller
 {
     private const RESOURCE = 'perencanaan-aset';
+
+    private const TABEL_BARIS = 'aset_tr_perencanaan_aset_details';
 
     public function index(Request $request): JsonResponse
     {
         $this->guard($request, 'read');
 
-        $query = DB::table('aset_tr_perencanaan_aset')
-            ->where('tenant_id', $this->tenant($request))->whereNull('deleted_at');
+        $query = PerencanaanAset::query();
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
 
         return response()->json(['data' => $query
+            ->toBase()
             ->latest('planned_on')->latest('created_at')
             ->get()]);
     }
@@ -38,14 +50,15 @@ class PerencanaanAsetController extends Controller
     {
         $this->guard($request, 'read');
         $plan = $this->plan($request, $id);
-        $plan->details = DB::table('aset_tr_perencanaan_aset_details as detail')
+        $plan->details = PerencanaanAsetDetail::query()
             ->leftJoin('aset_m_jenis_aset as jenis', function ($join): void {
-                $join->on('jenis.id', '=', 'detail.jenis_aset_id')->on('jenis.tenant_id', '=', 'detail.tenant_id');
+                $join->on('jenis.id', '=', self::TABEL_BARIS.'.jenis_aset_id')->on('jenis.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
             })
-            ->where('detail.tenant_id', $this->tenant($request))->where('detail.planning_id', $id)
-            ->orderBy('detail.line_number')
+            ->where(self::TABEL_BARIS.'.planning_id', $id)
+            ->orderBy(self::TABEL_BARIS.'.line_number')
+            ->toBase()
             ->get([
-                'detail.*', 'jenis.kode as jenis_aset_kode', 'jenis.nama as jenis_aset_nama',
+                self::TABEL_BARIS.'.*', 'jenis.kode as jenis_aset_kode', 'jenis.nama as jenis_aset_nama',
             ]);
 
         return response()->json(['data' => $plan]);
@@ -56,7 +69,7 @@ class PerencanaanAsetController extends Controller
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
-        if ($existing = DB::table('aset_tr_perencanaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first()) {
+        if ($existing = $this->replay($key)) {
             return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
         }
 
@@ -66,19 +79,19 @@ class PerencanaanAsetController extends Controller
         try {
             $kode = $numbers->issue('management-aset.perencanaan-aset', $tenant, 'perencanaan-aset:'.$key, $data['legal_entity_id']);
         } catch (NumberSequenceException $exception) {
-            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], $exception->status);
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         }
 
         try {
-            $plan = DB::transaction(function () use ($request, $data, $key, $tenant, $kode, $unitMap): array {
+            $plan = DB::transaction(function () use ($request, $data, $key, $kode, $unitMap): array {
                 $record = $this->header($request, $data, $key, $kode);
-                DB::table('aset_tr_perencanaan_aset')->insert($record);
-                $this->replaceDetails($record['id'], $tenant, $data['details'], $unitMap);
+                (new PerencanaanAset)->forceFill($record)->save();
+                $this->replaceDetails($record['id'], $data['details'], $unitMap);
 
                 return $record;
             });
         } catch (QueryException $exception) {
-            $existing = DB::table('aset_tr_perencanaan_aset')->where(['tenant_id' => $tenant, 'creation_key' => $key])->first();
+            $existing = $this->replay($key);
             if (! $existing) {
                 throw $exception;
             }
@@ -99,21 +112,20 @@ class PerencanaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['planning_org_unit_id']);
         $unitMap = $this->validateLookupMasters($this->tenant($request), $data['details'], $units);
         $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
-        $tenant = $this->tenant($request);
 
-        $changed = DB::transaction(function () use ($request, $id, $tenant, $version, $data, $unitMap): int {
+        $changed = DB::transaction(function () use ($request, $id, $version, $data, $unitMap): int {
             $changes = $this->header($request, $data, '', '', false);
             unset($changes['responsible_user_id']);
-            $updated = DB::table('aset_tr_perencanaan_aset')->where([
-                'id' => $id, 'tenant_id' => $tenant, 'version' => $version,
-            ])->whereNull('deleted_at')->update([
+            $updated = PerencanaanAset::query()->where([
+                'id' => $id, 'version' => $version,
+            ])->update([
                 ...$changes,
                 'version' => $version + 1,
                 'updated_at' => now(),
             ]);
             if ($updated) {
-                DB::table('aset_tr_perencanaan_aset_details')->where(['tenant_id' => $tenant, 'planning_id' => $id])->delete();
-                $this->replaceDetails($id, $tenant, $data['details'], $unitMap);
+                PerencanaanAsetDetail::query()->where('planning_id', $id)->delete();
+                $this->replaceDetails($id, $data['details'], $unitMap);
             }
 
             return $updated;
@@ -132,14 +144,25 @@ class PerencanaanAsetController extends Controller
         abort_unless($plan->status === 'draft', 422, 'Hanya rencana draf yang dapat diarsipkan.');
         $version = (int) $request->validate(['version' => ['required', 'integer', 'min:1']])['version'];
         app(OrganizationScope::class)->require($request, $plan->legal_entity_id, $plan->planning_org_unit_id);
-        $updated = DB::table('aset_tr_perencanaan_aset')->where([
-            'id' => $id, 'tenant_id' => $this->tenant($request), 'version' => $version,
-        ])->whereNull('deleted_at')->update(['deleted_at' => now(), 'version' => $version + 1, 'updated_at' => now()]);
+        $updated = PerencanaanAset::query()->where([
+            'id' => $id, 'version' => $version,
+        ])->update(['deleted_at' => now(), 'version' => $version + 1, 'updated_at' => now()]);
         if (! $updated) {
             return response()->json(['error' => ['code' => 'stale_version', 'message' => 'Rencana telah berubah. Muat ulang lalu coba lagi.']], 409);
         }
 
         return response()->json(status: 204);
+    }
+
+    /**
+     * Rencana yang pernah dibuat dengan kunci yang sama.
+     *
+     * `withTrashed` karena replay idempoten harus tetap menemukan rencana yang sudah
+     * diarsipkan; tanpa itu permintaan ulang mencoba menyisipkan baris kembar.
+     */
+    private function replay(string $key): ?stdClass
+    {
+        return PerencanaanAset::withTrashed()->where('creation_key', $key)->toBase()->first();
     }
 
     /** @return array<string, mixed> */
@@ -167,11 +190,14 @@ class PerencanaanAsetController extends Controller
         return $data;
     }
 
-    /** @param list<array<string, mixed>> $details */
+    /**
+     * @param  list<array<string, mixed>>  $details
+     * @return array<string, array{id: string, code: string, name: string, symbol: ?string, decimal_places: int}>
+     */
     private function validateLookupMasters(string $tenant, array $details, DaftarSatuanAset $units): array
     {
         $ids = array_values(array_unique(array_column($details, 'jenis_aset_id')));
-        $count = DB::table('aset_m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', $ids)->where('aktif', true)->whereNull('deleted_at')->count();
+        $count = JenisAset::query()->whereIn('id', $ids)->where('aktif', true)->count();
         if ($count !== count($ids)) {
             throw ValidationException::withMessages(['details' => 'Jenis aset tidak ditemukan atau sudah tidak aktif.']);
         }
@@ -182,11 +208,12 @@ class PerencanaanAsetController extends Controller
         }
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     private function header(Request $request, array $data, string $key, string $kode, bool $new = true): array
     {
-        $total = collect($data['details'])->sum(fn (array $detail): float => (float) $detail['quantity'] * (float) ($detail['estimated_unit_price'] ?? 0));
-
         return array_filter([
             'id' => $new ? (string) Str::ulid() : null,
             'tenant_id' => $new ? $this->tenant($request) : null,
@@ -195,24 +222,43 @@ class PerencanaanAsetController extends Controller
             'legal_entity_id' => $data['legal_entity_id'], 'planning_org_unit_id' => $data['planning_org_unit_id'],
             'planned_on' => $data['planned_on'], 'planning_year' => $data['planning_year'], 'planning_type' => $data['planning_type'],
             'funding_source' => $data['funding_source'] ?? null, 'responsible_user_id' => (string) $request->attributes->get('coreerp.user_id'),
-            'total_estimated_value' => $total, 'description' => $data['description'] ?? null,
+            'total_estimated_value' => $this->totalEstimasi($data['details']), 'description' => $data['description'] ?? null,
             'status' => $new ? 'draft' : null, 'version' => $new ? 1 : null,
             'created_at' => $new ? now() : null, 'updated_at' => now(),
         ], static fn ($value) => $value !== null);
     }
 
-    /** @param list<array<string, mixed>> $details */
-    private function replaceDetails(string $planId, string $tenant, array $details, array $units): void
+    /**
+     * Nilai rencana seluruh baris.
+     *
+     * Berdiri sendiri karena `header()` menerima hasil `validate()` yang nilainya tidak
+     * bertipe; barisnya baru dapat dinyatakan bentuknya di sini.
+     *
+     * @param  list<array<string, mixed>>  $details
+     */
+    private function totalEstimasi(array $details): float
     {
-        $types = DB::table('aset_m_jenis_aset')->where('tenant_id', $tenant)->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
-        DB::table('aset_tr_perencanaan_aset_details')->insert(collect($details)->values()->map(fn (array $detail, int $index): array => [
-            'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'planning_id' => $planId, 'line_number' => $index + 1,
-            'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'], 'asset_name' => $types[$detail['jenis_aset_id']], 'unit' => $units[$detail['satuan_id']]['name'],
+        return collect($details)->sum(fn (array $detail): float => (float) $detail['quantity'] * (float) ($detail['estimated_unit_price'] ?? 0));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $details
+     * @param  array<string, array{id: string, code: string, name: string, symbol: ?string, decimal_places: int}>  $units
+     */
+    private function replaceDetails(string $planId, array $details, array $units): void
+    {
+        $types = JenisAset::query()->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
+        collect($details)->values()->each(fn (array $detail, int $index) => PerencanaanAsetDetail::create([
+            'planning_id' => $planId, 'line_number' => $index + 1,
+            'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'],
+            'asset_name' => $types[$detail['jenis_aset_id']],
+            // `unit` snapshot kode satuan untuk tampilan; `satuan_id` di atas yang menunjuk
+            // satuan milik Core. Keduanya tidak saling menggantikan.
+            'unit' => $units[$detail['satuan_id']]['name'],
             'quantity' => $detail['quantity'], 'requested_specification' => $detail['requested_specification'],
             'estimated_unit_price' => $detail['estimated_unit_price'] ?? 0,
             'estimated_total_price' => (float) $detail['quantity'] * (float) ($detail['estimated_unit_price'] ?? 0),
-            'created_at' => now(), 'updated_at' => now(),
-        ])->all());
+        ]));
     }
 
     private function creationKey(Request $request): string
@@ -220,12 +266,13 @@ class PerencanaanAsetController extends Controller
         return (string) validator(['key' => $request->header('Idempotency-Key')], ['key' => ['required', 'string', 'max:154', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate()['key'];
     }
 
-    private function plan(Request $request, string $id): object
+    /** Baris mentah hasil `toBase()`: sebuah `stdClass`, bukan model. */
+    private function plan(Request $request, string $id): stdClass
     {
-        $query = DB::table('aset_tr_perencanaan_aset')->where(['id' => $id, 'tenant_id' => $this->tenant($request)])->whereNull('deleted_at');
+        $query = PerencanaanAset::query()->where('id', $id);
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
 
-        return $query->firstOrFail();
+        return $query->toBase()->firstOrFail();
     }
 
     private function guard(Request $request, string $action): void

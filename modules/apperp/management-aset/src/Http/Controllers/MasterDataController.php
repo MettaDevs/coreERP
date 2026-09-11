@@ -3,23 +3,45 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
+use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\GroupAset;
+use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
+use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariableValue;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
+use Modules\Apperp\ManagementAset\Models\master\ModelAset;
+use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
 use Modules\Apperp\ManagementAset\Models\MasterData;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
+use RuntimeException;
 
 /**
  * Perilaku bersama seluruh master Management Aset: hak akses per resource, batas
  * tenant, idempotency, kode dari Number Sequence Core, induk rantai klasifikasi,
  * dan arsip yang tidak memutus referensi aktif.
+ *
+ * `TModel` adalah model master yang dipegang satu controller turunan. Tanda tangan PHP
+ * di bawah tetap menyebut `MasterData` — kontravariansi melarang anak menyempitkannya —
+ * sehingga tanpa parameter tipe ini analisa statis membaca setiap `$record` sebagai
+ * kelas induk yang abstrak, lalu menolak kolom yang sebenarnya milik anak. Anak
+ * menyebutkan modelnya lewat `@extends MasterDataController<GroupAset>`.
+ *
+ * @template TModel of MasterData
  */
 abstract class MasterDataController extends Controller
 {
@@ -30,10 +52,35 @@ abstract class MasterDataController extends Controller
      */
     protected const APP_ID = 'management-aset';
 
+    /**
+     * Model pemilik tiap tabel yang dapat menjadi anak sebuah master.
+     *
+     * `MasterChild` menyebut anaknya dengan nama tabel, sedangkan penyaringan tenant baru
+     * ikut berjalan bila query berangkat dari model. Peta ini yang menyambung keduanya, dan
+     * ia dapat dibuang begitu `MasterChild` sendiri membawa nama kelas modelnya.
+     *
+     * @var array<string, class-string<Model>>
+     */
+    private const MODEL_ANAK = [
+        'aset_m_buku_penyusutan' => BukuPenyusutan::class,
+        'aset_m_group_aset' => GroupAset::class,
+        'aset_m_group_buku_penyusutan' => GroupBukuPenyusutan::class,
+        'aset_m_jenis_aset_atribut' => JenisAsetAtribut::class,
+        'aset_m_lokasi_aset' => LokasiAset::class,
+        'aset_m_maintenance_checklist_template_line' => MaintenanceChecklistTemplateLine::class,
+        'aset_m_maintenance_checklist_variable_value' => MaintenanceChecklistVariableValue::class,
+        'aset_m_maintenance_job_type_default' => MaintenanceJobTypeDefault::class,
+        'aset_m_maintenance_job_type_variant' => MaintenanceJobTypeVariant::class,
+        'aset_m_model_aset' => ModelAset::class,
+        'aset_m_tipe_atribut_nilai' => TipeAtributNilai::class,
+        'aset_tr_buku_aset' => AssetBook::class,
+        'aset_tr_penerimaan_aset' => Asset::class,
+    ];
+
     /** Slug resource pada route, kode permission, dan reference nomor. */
     abstract protected function resource(): string;
 
-    /** @return class-string<MasterData> */
+    /** @return class-string<TModel> */
     abstract protected function model(): string;
 
     /**
@@ -69,7 +116,7 @@ abstract class MasterDataController extends Controller
             ...$parentFilterRules,
         ]);
 
-        $query = $this->prepareQuery($this->tenantQuery($request), $request);
+        $query = $this->prepareQuery($this->masterQuery(), $request);
         // Perbandingan eksplisit terhadap string kosong, bukan truthiness: pencarian "0"
         // adalah kata kunci yang sah dan tidak boleh diperlakukan sebagai tanpa filter.
         $search = trim((string) ($validated['q'] ?? ''));
@@ -116,7 +163,7 @@ abstract class MasterDataController extends Controller
         $data = $request->validate($this->writeRules($tenantId, creating: true));
         $payload = $this->payload($data);
 
-        if ($existing = $this->creationKeyQuery($tenantId, $creationKey)->first()) {
+        if ($existing = $this->creationKeyQuery($creationKey)->first()) {
             return $this->replay($existing, $payload);
         }
         $this->afterWriteValidation($data, $tenantId, creating: true);
@@ -145,9 +192,9 @@ abstract class MasterDataController extends Controller
                 ]);
             });
         } catch (NumberSequenceException $exception) {
-            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], $exception->status);
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         } catch (QueryException $exception) {
-            $existing = $this->creationKeyQuery($tenantId, $creationKey)->first();
+            $existing = $this->creationKeyQuery($creationKey)->first();
             if (! $existing) {
                 throw $exception;
             }
@@ -156,7 +203,16 @@ abstract class MasterDataController extends Controller
         }
 
         return response()->json(['data' => $this->present($record)], 201, [
-            'Location' => url('/api/v1/'.$this->resource().'/'.$record->getKey()),
+            // Alamatnya diturunkan dari permintaan yang sedang dilayani, bukan ditulis tangan.
+            // Sampai 10 September 2026 baris ini menunjuk `/api/v1/<resource>/<id>` — alamat
+            // modul waktu ia masih app tersendiri, dan alamat yang tidak ada lagi sejak rutenya
+            // pindah ke `/api/modules/management-aset/v1/`. Klien yang mengikuti `Location`
+            // sesudah membuat record mendarat di 404, dan tidak ada yang gagal karenanya karena
+            // tidak ada yang memeriksa isi header ini.
+            //
+            // `$request->url()` adalah alamat koleksi yang baru saja dikirimi POST, jadi ia
+            // tidak dapat menyimpang dari awalan rutenya — termasuk bila awalannya berubah lagi.
+            'Location' => $request->url().'/'.$record->getKey(),
         ]);
     }
 
@@ -203,18 +259,34 @@ abstract class MasterDataController extends Controller
         return response()->json(status: 204);
     }
 
-    /** @return Builder<MasterData> */
-    private function newQuery(): Builder
+    /**
+     * Builder master ini, dengan pilihan ikut memuat baris yang sudah diarsipkan.
+     *
+     * `setModel()` di akhir menyerahkan instance yang sama seperti yang baru dipakai
+     * `newQuery()`, jadi saat berjalan ia tidak mengubah apa pun: model dan nama tabelnya
+     * persis sama. Ia yang mengembalikan tipe anak pada builder ini. Larastan menyimpulkan
+     * tipe `Model::newQuery()` dan `withTrashed()` dari kelas nyata pemanggilnya, dan pada
+     * sebuah parameter tipe ia hanya melihat batas atasnya — `MasterData` — sehingga tanpa
+     * langkah ini seluruh rantai query di bawah kehilangan kolom milik anak.
+     *
+     * @return Builder<TModel>
+     */
+    private function newQuery(bool $termasukArsip = false): Builder
     {
         $model = $this->model();
+        $instance = new $model;
+        $query = $instance->newQuery();
+        if ($termasukArsip) {
+            $query->withTrashed();
+        }
 
-        return $model::query();
+        return $query->setModel($instance);
     }
 
-    /** @return Builder<MasterData> */
-    private function tenantQuery(Request $request): Builder
+    /** @return Builder<TModel> */
+    private function masterQuery(): Builder
     {
-        $query = $this->newQuery()->where('tenant_id', $this->tenantId($request));
+        $query = $this->newQuery();
         foreach ($this->parentMasters() as $parent) {
             $query->with($parent->eagerLoad());
         }
@@ -224,25 +296,31 @@ abstract class MasterDataController extends Controller
 
     /**
      * Unique (tenant_id, creation_key) juga mencakup record yang sudah diarsipkan, jadi
-     * pencarian replay wajib menembus soft delete. Tanpa `withTrashed()`, retry dengan
+     * pencarian replay wajib menembus soft delete. Tanpa baris terarsip, retry dengan
      * kunci milik record yang sudah diarsipkan tidak menemukan apa pun, menerbitkan nomor
      * kedua, lalu menabrak unique index dan berakhir sebagai 500.
      *
-     * @return Builder<MasterData>
+     * @return Builder<TModel>
      */
-    private function creationKeyQuery(string $tenantId, string $creationKey): Builder
+    private function creationKeyQuery(string $creationKey): Builder
     {
-        return $this->newQuery()->withTrashed()->where('tenant_id', $tenantId)->where('creation_key', $creationKey);
+        return $this->newQuery(termasukArsip: true)->where('creation_key', $creationKey);
     }
 
+    /** @return TModel */
     private function find(Request $request, string $id, bool $lock = false): MasterData
     {
-        $query = $this->prepareQuery($this->tenantQuery($request), $request);
+        $query = $this->prepareQuery($this->masterQuery(), $request);
 
         return ($lock ? $query->lockForUpdate() : $query)->findOrFail($id);
     }
 
-    /** Master yang menunjuk dirinya sendiri (contohnya lokasi) tidak boleh membentuk siklus. */
+    /**
+     * Master yang menunjuk dirinya sendiri (contohnya lokasi) tidak boleh membentuk siklus.
+     *
+     * @param  TModel  $record
+     * @param  array<string, mixed>  $data
+     */
     private function rejectParentCycle(MasterData $record, array $data): void
     {
         foreach ($this->parentMasters() as $parent) {
@@ -256,7 +334,10 @@ abstract class MasterDataController extends Controller
             abort_if($parentId === $record->getKey(), 422, 'Data tidak dapat menjadi induk dirinya sendiri.');
             while ($parentId) {
                 abort_if($parentId === $record->getKey(), 422, 'Lokasi induk tidak boleh membentuk siklus.');
-                $parentId = DB::table($parent->table)->where('tenant_id', $record->tenant_id)->where('id', $parentId)->value($parent->column);
+                // Induk yang sudah diarsipkan tetap menjadi mata rantai yang sah.
+                // Menghentikan penelusuran di situ berarti siklus yang melewatinya lolos,
+                // dan record itu masih ditunjuk anaknya.
+                $parentId = $this->newQuery(termasukArsip: true)->whereKey($parentId)->value($parent->column);
             }
         }
     }
@@ -354,17 +435,21 @@ abstract class MasterDataController extends Controller
         return $trimmed === '' ? null : $trimmed;
     }
 
-    /** Yang menahan arsip adalah anak yang belum diarsipkan, terlepas dari penanda `aktif`. */
+    /**
+     * Yang menahan arsip adalah anak yang belum diarsipkan, terlepas dari penanda `aktif`.
+     *
+     * @param  TModel  $record
+     */
     private function unarchivedChild(MasterData $record): ?MasterChild
     {
         foreach ($this->childMasters() as $child) {
-            $referenced = DB::table($child->table)
-                ->where('tenant_id', $record->tenant_id)
-                ->where($child->column, $record->getKey());
-            if (Schema::hasColumn($child->table, 'deleted_at')) {
-                $referenced->whereNull('deleted_at');
-            }
-            if ($referenced->exists()) {
+            $model = self::MODEL_ANAK[$child->table] ?? throw new RuntimeException(
+                'Tabel anak '.$child->table.' belum punya model pada '.static::class.'::MODEL_ANAK.'
+            );
+            // Tanpa pemeriksaan kolom `deleted_at` lagi: model yang memakai soft delete
+            // menyembunyikan baris terarsip sendiri, dan tabel yang tidak mengenalnya
+            // memang tidak punya apa pun untuk disaring.
+            if ($model::query()->where($child->column, $record->getKey())->exists()) {
                 return $child;
             }
         }
@@ -378,6 +463,7 @@ abstract class MasterDataController extends Controller
      * "1000.00" dari database sementara payload membawa float 1000.0, dan perbandingan
      * strict di bawah menganggapnya berbeda.
      *
+     * @param  TModel  $record
      * @param  array<string, mixed>  $payload
      */
     private function replay(MasterData $record, array $payload): JsonResponse
@@ -395,7 +481,10 @@ abstract class MasterDataController extends Controller
         return response()->json(['data' => $this->present($record)], 200, ['Idempotent-Replayed' => 'true']);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  TModel  $record
+     * @return array<string, mixed>
+     */
     private function present(MasterData $record): array
     {
         $data = [
@@ -428,7 +517,7 @@ abstract class MasterDataController extends Controller
      * group aset dan profil penyusutan, supaya subclass tidak perlu menimpa
      * writeRules() secara penuh dan kehilangan aturan induk.
      *
-     * @return array<string, array<int, mixed>>
+     * @return array<string, list<mixed>>
      */
     protected function extraRules(string $tenantId, bool $creating): array
     {
@@ -441,6 +530,7 @@ abstract class MasterDataController extends Controller
      * transaksi atau kombinasi beberapa field.
      *
      * @param  array<string, mixed>  $data
+     * @param  TModel|null  $record
      */
     protected function afterWriteValidation(array $data, string $tenantId, bool $creating, ?MasterData $record = null): void {}
 
@@ -458,6 +548,7 @@ abstract class MasterDataController extends Controller
     /**
      * Kolom tambahan yang disajikan pada respons.
      *
+     * @param  TModel  $record
      * @return array<string, mixed>
      */
     protected function extraPresent(MasterData $record): array
@@ -465,7 +556,12 @@ abstract class MasterDataController extends Controller
         return [];
     }
 
-    /** Memperkaya query master tanpa menambah query per baris. */
+    /**
+     * Memperkaya query master tanpa menambah query per baris.
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
+     */
     protected function prepareQuery(Builder $query, ?Request $request = null): Builder
     {
         return $query;

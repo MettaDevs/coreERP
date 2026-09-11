@@ -1,6 +1,6 @@
 ---
 name: coreerp-architecture
-description: Guard CoreERP architecture boundaries, organization model, authorization, contracts, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, installation, placement, deployment, product launcher, upgrades, SaaS/on-prem packaging, or module availability UI/API. Also use when touching any cross-module surface — OpenAPI/AsyncAPI contract files, `internal/v1` endpoints, published events, webhooks, event envelopes or versions — or when adding a route another app calls.
+description: Guard CoreERP architecture boundaries, organization model, authorization, contracts, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, module installation, deployment, product launcher, upgrades, SaaS/on-prem packaging, or module availability UI/API. Also use when touching any cross-module surface — OpenAPI/AsyncAPI contract files, `internal/v1` endpoints, published events, webhooks, event envelopes or versions — or when adding a route another module calls.
 ---
 
 # CoreERP Architecture
@@ -33,32 +33,36 @@ The Dynamics reference governs organization, workforce, and responsibility-based
 
 If a requested model conflicts with these rules, stop and report the conflict against the canonical source instead of adding a compatibility layer.
 
-## Two module shapes coexist during the move to one runtime
+## One module shape
 
-CoreERP is moving from one process and one database per app to one runtime with modules. Both shapes are
-live at the same time, and judging one by the other's rules is the mistake this repository invites most.
+CoreERP finished moving from one process and one database per app to one runtime with modules. As of
+10 September 2026 there is a single shape: a module under `modules/`.
 
-| | App in an `app-erp-*` repository | Module under `modules/` |
-| --- | --- | --- |
-| Process | its own container | the Core runtime |
-| Database | its own | the same tenant database as Core |
-| Table separation | separate databases | a table name prefix, e.g. `aset_` |
-| Calling Core | REST `internal/v1` with an app token | an ordinary function call in-process |
-| Contract required | every surface another app calls | only surfaces reachable from outside the runtime |
-| Its own service token | yes | no |
+| | Module under `modules/` |
+| --- | --- |
+| Process | the Core runtime |
+| Database | the same tenant database as Core |
+| Table separation | a table name prefix, e.g. `aset_` |
+| Calling Core | an ordinary function call in-process |
+| Contract required | only surfaces reachable from outside the runtime |
+| Its own service token | no |
 
-What holds for **both**, and is never relaxed:
+What holds, and is never relaxed:
 
-- A module never touches another module's tables. For an app that is enforced by a separate database;
-  for a module it is enforced by tests and static analysis. Say which one is enforcing it — never write
-  that the database engine guards a boundary it does not guard.
+- A module never touches another module's tables. It is enforced by tests and static analysis — say so;
+  never write that the database engine guards a boundary it does not guard.
 - Every module table carries `tenant_id`, and every query filters on it.
 - Event names, envelopes, and versioning rules do not change.
 
-A pull request that turns an app into a module is a **legitimate exception** to the app rules, not a
-violation. It must name its task number from `docs/todo/satu-runtime/01-prd.md`.
+The older shape — an app in an `app-erp-*` repository with its own container, database, and service
+token behind a reverse proxy — has no subject left, and every line that served it was removed: app
+placement, provider release registration, the `/apps-content/...` content path, the iframe host page,
+the app context token, and the two Apache modules that existed only to proxy it. The tables
+`app_placements`, `app_releases`, and `app_installations` were deliberately left behind as orphan
+tables, because every deletion in this repository is soft.
 
-The app rules are **not deleted** while any app still runs on them.
+The `internal/v1` REST surface **stays**. It is not part of container hosting; it is the boundary for
+outside integrations and third-party addons, and its coverage check still guards it.
 
 ## Module lifecycle states
 
@@ -66,15 +70,17 @@ The app rules are **not deleted** while any app still runs on them.
 | --- | --- | --- |
 | Catalogued | CoreERP knows the product and its contracts. | Canonical module catalog/manifest |
 | Entitled | A tenant is allowed to use the module. | Tenant entitlement |
-| Installed | Release artifacts and database migrations were successfully applied to a placement. | Installation/deployment registry |
-| Ready | The installed module passed readiness checks and is routable. | Runtime/placement status |
+| Installed | Module migrations ran successfully for that tenant and the installation row says so. | `core_module_installations` |
 
 Never derive a later state from an earlier state:
 
 - Entitlement is not installation.
-- Installation is not runtime readiness.
-- A manifest entry is not proof that its container or database exists. For a module in the Core runtime there is no container and no database of its own; what must exist is the migration record and the installation row for that tenant.
+- A manifest entry is not proof that the module is installed for a tenant. A module in the Core runtime has no container and no database of its own; what must exist is the migration record and the installation row for that tenant.
 - `active` or `trial` entitlement cannot drive UI labelled "installed".
+
+There is no separate "ready" state any more. It belonged to the container hosting path, where an
+artifact had to be placed and a second runtime declared healthy. A module runs in this process: if
+Core is up, the module is up.
 
 ## Required workflow
 
@@ -275,7 +281,7 @@ Before implementing module-availability UI or API:
 
 1. Translate the user's exact noun into a lifecycle state.
 2. Locate that state's persisted source of truth.
-3. Check tenant, placement, release, and expiry scope where applicable.
+3. Check tenant and expiry scope where applicable.
 4. Name props, methods, endpoints, and labels after the actual state.
 5. Add a test proving one lifecycle state cannot impersonate another.
 
@@ -390,4 +396,4 @@ A module is finished when its behaviour is documented under `docs/apps/<app-id>/
 
 ## Launcher rule
 
-A launcher labelled "produk terpasang" must query installation records for the active tenant and placement, normally filtering `status=ready`. Entitlement may be checked additionally for authorization, never as installation evidence.
+A launcher labelled "produk terpasang" must query `core_module_installations` for the active tenant, filtering `status=installed`. Entitlement may be checked additionally for authorization, never as installation evidence.

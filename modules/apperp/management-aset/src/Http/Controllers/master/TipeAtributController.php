@@ -4,16 +4,20 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
+use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
+use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Services\DaftarSatuanAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use RuntimeException;
 
+/**
+ * @extends MasterDataController<TipeAtribut>
+ */
 class TipeAtributController extends MasterDataController
 {
     /**
@@ -94,9 +98,8 @@ class TipeAtributController extends MasterDataController
                     'message' => 'Tipe data tidak dapat diubah karena atribut ini sudah pernah diisi pada aset. Buat tipe atribut baru bila bentuk datanya berbeda.',
                 ]], 409));
             }
-            if ($record->data_type === 'string' && DB::table('aset_m_tipe_atribut_nilai')
-                ->where(['tenant_id' => $tenantId, 'tipe_atribut_id' => $record->id])
-                ->whereNull('deleted_at')->exists()) {
+            if ($record->data_type === 'string' && TipeAtributNilai::query()
+                ->where('tipe_atribut_id', $record->id)->exists()) {
                 abort(response()->json(['error' => [
                     'code' => 'attribute_type_has_values',
                     'message' => 'Kosongkan pilihan nilai lebih dahulu sebelum mengganti tipe data.',
@@ -193,17 +196,15 @@ class TipeAtributController extends MasterDataController
 
     protected function prepareQuery(Builder $query, ?Request $request = null): Builder
     {
+        // Tanpa alias tabel: scope tenant menyaring dengan nama tabel yang sebenarnya, dan
+        // alias akan menyembunyikan nama itu dari klausa yang disisipkannya.
         return $query->addSelect([
-            'values_count' => DB::table('aset_m_tipe_atribut_nilai as nilai')
+            'values_count' => TipeAtributNilai::query()
                 ->selectRaw('count(*)')
-                ->whereColumn('nilai.tenant_id', 'aset_m_tipe_atribut.tenant_id')
-                ->whereColumn('nilai.tipe_atribut_id', 'aset_m_tipe_atribut.id')
-                ->whereNull('nilai.deleted_at'),
-            'asset_types_count' => DB::table('aset_m_jenis_aset_atribut as link')
+                ->whereColumn('aset_m_tipe_atribut_nilai.tipe_atribut_id', 'aset_m_tipe_atribut.id'),
+            'asset_types_count' => JenisAsetAtribut::query()
                 ->selectRaw('count(*)')
-                ->whereColumn('link.tenant_id', 'aset_m_tipe_atribut.tenant_id')
-                ->whereColumn('link.tipe_atribut_id', 'aset_m_tipe_atribut.id')
-                ->whereNull('link.deleted_at'),
+                ->whereColumn('aset_m_jenis_aset_atribut.tipe_atribut_id', 'aset_m_tipe_atribut.id'),
         ]);
     }
 

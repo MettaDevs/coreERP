@@ -10,9 +10,17 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\GroupAset;
+use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
+use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetAttribute;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetPlacement;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
 use Modules\Apperp\ManagementAset\Services\DepreciationCalculator;
 use Modules\Apperp\ManagementAset\Services\KalenderFiskalAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
@@ -20,6 +28,7 @@ use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\AssetAttributeValidator;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use RuntimeException;
+use stdClass;
 
 class AssetController extends Controller
 {
@@ -29,7 +38,7 @@ class AssetController extends Controller
     {
         $this->requirePermission($request, 'read');
         $data = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
-        $query = app(OrganizationScope::class)->assetQuery(Asset::query()->where('tenant_id', $this->tenantId($request)), $request);
+        $query = app(OrganizationScope::class)->assetQuery(Asset::query(), $request);
         if (($q = trim((string) ($data['q'] ?? ''))) !== '') {
             $query->where(fn ($builder) => $builder
                 ->whereRaw('LOWER(kode) LIKE ?', ['%'.mb_strtolower($q).'%'])
@@ -49,20 +58,19 @@ class AssetController extends Controller
         $data = $request->validate($this->rules($tenantId));
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['usage_org_unit_id']);
         $this->assertModelCombination(
-            $tenantId,
             $data['jenis_aset_id'],
             $data['pabrikan_aset_id'] ?? null,
             $data['model_aset_id'] ?? null,
         );
         $legalEntityId = (string) $data['legal_entity_id'];
-        $defaults = $this->groupDefaults($tenantId, (string) $data['group_aset_id']);
-        if ($existing = Asset::withTrashed()->where(['tenant_id' => $tenantId, 'creation_key' => $key])->first()) {
+        $defaults = $this->groupDefaults((string) $data['group_aset_id']);
+        if ($existing = Asset::withTrashed()->where('creation_key', $key)->first()) {
             return response()->json(['data' => $this->present($existing)], 200, ['Idempotent-Replayed' => 'true']);
         }
         try {
             $kode = $numbers->issue('management-aset.aset', $tenantId, 'aset:'.$key, $legalEntityId);
         } catch (NumberSequenceException $exception) {
-            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], $exception->status);
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
         }
 
         // Lokasi bawaan group hanya mengisi kekosongan. Begitu aset terbentuk, lokasinya
@@ -88,7 +96,7 @@ class AssetController extends Controller
                 'model_aset_id' => $data['model_aset_id'] ?? null,
                 'parent_asset_id' => $data['parent_asset_id'] ?? null,
                 'asset_location_id' => $locationId,
-                'financial_dimension_org_unit_id' => $this->locationDimension($tenantId, $locationId)
+                'financial_dimension_org_unit_id' => $this->locationDimension($locationId)
                     ?? $data['usage_org_unit_id'],
                 'serial_number' => $data['serial_number'] ?? null,
                 'model_number' => $data['model_number'] ?? null,
@@ -99,7 +107,10 @@ class AssetController extends Controller
                 'lifecycle_state' => 'received',
                 'keterangan' => $data['keterangan'] ?? null,
             ]);
-            DB::table('aset_tr_penempatan_aset')->insert([
+            // Id tetap diterbitkan di sini, bukan diserahkan ke model: `orderByDesc('id')`
+            // dipakai sebagai pemecah seri penempatan bertanggal sama, dan ULID dari model
+            // ditulis huruf kecil sehingga tidak berurut terhadap baris lama yang huruf besar.
+            (new AssetPlacement)->forceFill([
                 'id' => (string) Str::ulid(),
                 'tenant_id' => $tenantId,
                 'asset_id' => $asset->id,
@@ -112,7 +123,7 @@ class AssetController extends Controller
                 'reason' => 'Penerimaan aset',
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ])->save();
             $this->createBooks($asset, $data, $tenantId);
             $this->saveAttributes($asset, $data, $tenantId);
 
@@ -126,7 +137,7 @@ class AssetController extends Controller
     {
         $this->requirePermission($request, 'mutate');
         $tenantId = $this->tenantId($request);
-        $asset = app(OrganizationScope::class)->assetQuery(Asset::query()->where('tenant_id', $tenantId), $request)->findOrFail($id);
+        $asset = app(OrganizationScope::class)->assetQuery(Asset::query(), $request)->findOrFail($id);
         abort_if(in_array($asset->lifecycle_state, ['decommissioned', 'disposed'], true), 409, 'Aset yang tidak aktif atau sudah dilepas tidak dapat dimutasi.');
         $data = $request->validate([
             'effective_on' => ['required', 'date'],
@@ -136,22 +147,22 @@ class AssetController extends Controller
             'asset_location_id' => ['nullable', 'ulid', Rule::exists('aset_m_lokasi_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
         ]);
         app(OrganizationScope::class)->require($request, $asset->legal_entity_id, $data['usage_org_unit_id']);
-        $this->assertDepreciationReady($asset, $tenantId, (string) $data['effective_on']);
+        $this->assertDepreciationReady($asset, (string) $data['effective_on']);
         DB::transaction(function () use ($asset, $tenantId, $data): void {
-            DB::table('aset_tr_penempatan_aset')->insert([
+            (new AssetPlacement)->forceFill([
                 'id' => (string) Str::ulid(), 'tenant_id' => $tenantId, 'asset_id' => $asset->id,
                 'usage_org_unit_id' => $data['usage_org_unit_id'],
                 'custodian_user_id' => $data['custodian_user_id'] ?? null,
                 'asset_location_id' => $data['asset_location_id'] ?? null,
                 'effective_on' => $data['effective_on'], 'reason' => $data['reason'], 'created_at' => now(), 'updated_at' => now(),
-            ]);
+            ])->save();
             // Mutasi ikut memperbarui dimensi keuangan: memindahkan aset ke lokasi yang
             // dipetakan ke unit lain berarti pembebanannya juga pindah.
             $locationId = $data['asset_location_id'] ?? $asset->asset_location_id;
             $asset->update([
                 'asset_location_id' => $locationId,
                 'responsible_org_unit_id' => $data['usage_org_unit_id'],
-                'financial_dimension_org_unit_id' => $this->locationDimension($tenantId, $locationId) ?? $data['usage_org_unit_id'],
+                'financial_dimension_org_unit_id' => $this->locationDimension($locationId) ?? $data['usage_org_unit_id'],
                 'lifecycle_state' => 'in_use',
             ]);
         });
@@ -162,12 +173,11 @@ class AssetController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $this->requirePermission($request, 'read');
-        $tenantId = $this->tenantId($request);
-        $asset = app(OrganizationScope::class)->assetQuery(Asset::query()->where('tenant_id', $tenantId), $request)->findOrFail($id);
+        $asset = app(OrganizationScope::class)->assetQuery(Asset::query(), $request)->findOrFail($id);
 
         return response()->json(['data' => [
             ...$this->present($asset),
-            'atribut' => $this->attributesOf($tenantId, $asset->id),
+            'atribut' => $this->attributesOf($asset->id),
         ]]);
     }
 
@@ -184,7 +194,7 @@ class AssetController extends Controller
     {
         $this->requirePermission($request, 'update');
         $tenantId = $this->tenantId($request);
-        $asset = app(OrganizationScope::class)->assetQuery(Asset::query()->where('tenant_id', $tenantId), $request)->findOrFail($id);
+        $asset = app(OrganizationScope::class)->assetQuery(Asset::query(), $request)->findOrFail($id);
         abort_if(
             in_array($asset->lifecycle_state, ['disposed'], true),
             409,
@@ -214,9 +224,11 @@ class AssetController extends Controller
             'Aset tidak dapat menjadi induk dirinya sendiri.'
         );
 
-        $periods = DB::table('aset_tr_penyusutan_aset as period')
-            ->join('aset_tr_buku_aset as book', 'book.id', '=', 'period.asset_book_id')
-            ->where(['period.tenant_id' => $tenantId, 'book.asset_id' => $asset->id])
+        $periods = DepreciationPeriod::query()
+            ->join('aset_tr_buku_aset as book', function ($join): void {
+                $join->on('book.id', '=', 'aset_tr_penyusutan_aset.asset_book_id')->on('book.tenant_id', '=', 'aset_tr_penyusutan_aset.tenant_id');
+            })
+            ->where('book.asset_id', $asset->id)
             ->exists();
         $touchesValue = array_key_exists('acquisition_value', $data) || array_key_exists('residual_value', $data);
         abort_if(
@@ -230,7 +242,7 @@ class AssetController extends Controller
             // register aset lebih dulu agar penggantian baris atribut tidak saling
             // menyelip di antara delete dan insert.
             $lockedAsset = Asset::query()
-                ->where(['tenant_id' => $tenantId, 'id' => $asset->id])
+                ->where('id', $asset->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
@@ -242,7 +254,6 @@ class AssetController extends Controller
 
             if (array_intersect(array_keys($data), ['jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id']) !== []) {
                 $this->assertModelCombination(
-                    $tenantId,
                     array_key_exists('jenis_aset_id', $data) ? $data['jenis_aset_id'] : $lockedAsset->jenis_aset_id,
                     array_key_exists('pabrikan_aset_id', $data) ? $data['pabrikan_aset_id'] : $lockedAsset->pabrikan_aset_id,
                     array_key_exists('model_aset_id', $data) ? $data['model_aset_id'] : $lockedAsset->model_aset_id,
@@ -255,7 +266,7 @@ class AssetController extends Controller
             ])));
 
             if ($touchesValue) {
-                $this->applyValueChange($lockedAsset, $data, $tenantId);
+                $this->applyValueChange($lockedAsset, $data);
             }
             // Tanggal mulai digunakan hanya boleh menggeser buku yang belum menyusut.
             // Buku yang sudah berjalan memakai tanggal itu sebagai dasar periode yang
@@ -266,7 +277,7 @@ class AssetController extends Controller
             // Mengganti jenis aset mengganti definisi atributnya, jadi nilainya wajib
             // dikirim ulang: nilai lama milik jenis lama tidak dapat dipercaya lagi.
             if (array_key_exists('atribut', $data) || array_key_exists('jenis_aset_id', $data)) {
-                DB::table('aset_tr_aset_atribut')->where(['tenant_id' => $tenantId, 'asset_id' => $lockedAsset->id])->delete();
+                AssetAttribute::query()->where('asset_id', $lockedAsset->id)->delete();
                 $this->saveAttributes($lockedAsset, ['jenis_aset_id' => $lockedAsset->jenis_aset_id, 'atribut' => $data['atribut'] ?? []], $tenantId);
             }
 
@@ -277,17 +288,17 @@ class AssetController extends Controller
 
         return response()->json(['data' => [
             ...$this->present($asset),
-            'atribut' => $this->attributesOf($tenantId, $asset->id),
+            'atribut' => $this->attributesOf($asset->id),
         ]]);
     }
 
     public function history(Request $request, string $id): JsonResponse
     {
         $this->requirePermission($request, 'read');
-        $asset = app(OrganizationScope::class)->assetQuery(Asset::query()->where('tenant_id', $this->tenantId($request)), $request)->findOrFail($id);
-        $placements = DB::table('aset_tr_penempatan_aset')
-            ->where(['tenant_id' => $this->tenantId($request), 'asset_id' => $asset->id])
-            ->orderBy('effective_on')->orderBy('created_at')->get();
+        $asset = app(OrganizationScope::class)->assetQuery(Asset::query(), $request)->findOrFail($id);
+        $placements = AssetPlacement::query()
+            ->where('asset_id', $asset->id)
+            ->orderBy('effective_on')->orderBy('created_at')->toBase()->get();
 
         return response()->json(['data' => ['asset' => $this->present($asset), 'placements' => $placements]]);
     }
@@ -334,7 +345,6 @@ class AssetController extends Controller
      * yang dikaitkan. Pabrikan model selalu harus sama dengan pabrikan pada aset.
      */
     private function assertModelCombination(
-        string $tenantId,
         ?string $jenisAsetId,
         ?string $pabrikanAsetId,
         ?string $modelAsetId,
@@ -343,9 +353,12 @@ class AssetController extends Controller
             return;
         }
 
-        $model = DB::table('aset_m_model_aset')
-            ->where(['tenant_id' => $tenantId, 'id' => $modelAsetId])
-            ->whereNull('deleted_at')
+        // `toBase()` menjalankan query lewat model — global scope tenant dan soft delete
+        // sudah tersisip di dalamnya — tetapi memulangkan baris apa adanya, bukan model,
+        // sehingga nilai yang dibaca tetap sama persis seperti saat query masih mentah.
+        $model = ModelAset::query()
+            ->where('id', $modelAsetId)
+            ->toBase()
             ->first(['pabrikan_aset_id', 'jenis_aset_id', 'aktif']);
 
         if (! $model) {
@@ -368,9 +381,8 @@ class AssetController extends Controller
             return;
         }
 
-        $hasConfiguredModels = DB::table('aset_m_model_aset')
-            ->where(['tenant_id' => $tenantId, 'jenis_aset_id' => $jenisAsetId, 'aktif' => true])
-            ->whereNull('deleted_at')
+        $hasConfiguredModels = ModelAset::query()
+            ->where(['jenis_aset_id' => $jenisAsetId, 'aktif' => true])
             ->exists();
 
         if ($hasConfiguredModels && $model->jenis_aset_id !== $jenisAsetId) {
@@ -413,12 +425,12 @@ class AssetController extends Controller
             return;
         }
 
-        DB::table('aset_tr_aset_atribut')->insert(array_map(
-            fn (array $row): array => [...$row, 'asset_id' => $asset->id],
-            $rows,
-        ));
-        DB::table('aset_m_tipe_atribut')
-            ->where('tenant_id', $tenantId)
+        foreach ($rows as $row) {
+            (new AssetAttribute)->forceFill([...$row, 'asset_id' => $asset->id])->save();
+        }
+        // `withTrashed()`: tipe atribut yang sudah diarsipkan pun tetap dikunci tipenya,
+        // karena nilai yang baru saja tersimpan tetap merujuk padanya.
+        TipeAtribut::withTrashed()
             ->whereIn('id', collect($rows)->pluck('tipe_atribut_id')->unique()->all())
             ->update(['data_type_locked' => true, 'updated_at' => now()]);
     }
@@ -432,16 +444,18 @@ class AssetController extends Controller
      *
      * @return list<array<string, mixed>>
      */
-    private function attributesOf(string $tenantId, string $assetId): array
+    private function attributesOf(string $assetId): array
     {
-        return DB::table('aset_tr_aset_atribut as nilai')
+        $baris = AssetAttribute::query()
             ->join('aset_m_tipe_atribut as tipe', function ($join): void {
-                $join->on('tipe.id', '=', 'nilai.tipe_atribut_id')->on('tipe.tenant_id', '=', 'nilai.tenant_id');
+                $join->on('tipe.id', '=', 'aset_tr_aset_atribut.tipe_atribut_id')->on('tipe.tenant_id', '=', 'aset_tr_aset_atribut.tenant_id');
             })
-            ->where(['nilai.tenant_id' => $tenantId, 'nilai.asset_id' => $assetId])
+            ->where('aset_tr_aset_atribut.asset_id', $assetId)
             ->orderBy('tipe.nama')
+            ->toBase()
             ->get(['tipe.id as tipe_atribut_id', 'tipe.kode', 'tipe.nama', 'tipe.data_type', 'tipe.satuan',
-                'nilai.nilai_text', 'nilai.nilai_number', 'nilai.nilai_boolean', 'nilai.nilai_date', 'nilai.tipe_atribut_nilai_id'])
+                'aset_tr_aset_atribut.nilai_text', 'aset_tr_aset_atribut.nilai_number', 'aset_tr_aset_atribut.nilai_boolean',
+                'aset_tr_aset_atribut.nilai_date', 'aset_tr_aset_atribut.tipe_atribut_nilai_id'])
             ->map(fn (object $row): array => [
                 'tipe_atribut_id' => $row->tipe_atribut_id,
                 'kode' => $row->kode,
@@ -457,6 +471,10 @@ class AssetController extends Controller
                 },
             ])
             ->all();
+
+        // `array_values` bukan hiasan: kuncinya harus berurut supaya jawaban JSON tetap
+        // sebuah array, bukan objek berkunci angka.
+        return array_values($baris);
     }
 
     /**
@@ -467,7 +485,7 @@ class AssetController extends Controller
      *
      * @param  array<string, mixed>  $data
      */
-    private function applyValueChange(Asset $asset, array $data, string $tenantId): void
+    private function applyValueChange(Asset $asset, array $data): void
     {
         $changes = ['updated_at' => now()];
         if (array_key_exists('acquisition_value', $data)) {
@@ -477,7 +495,7 @@ class AssetController extends Controller
         if (array_key_exists('residual_value', $data)) {
             $changes['residual_value'] = $data['residual_value'] ?? 0;
         }
-        DB::table('aset_tr_buku_aset')->where(['tenant_id' => $tenantId, 'asset_id' => $asset->id])->update($changes);
+        AssetBook::query()->where('asset_id', $asset->id)->update($changes);
     }
 
     /**
@@ -488,12 +506,12 @@ class AssetController extends Controller
     {
         $calculator = app(DepreciationCalculator::class);
         $placedInService = (string) ($asset->placed_in_service_on ?? $asset->acquired_on);
-        $books = DB::table('aset_tr_buku_aset')
-            ->where(['tenant_id' => $tenantId, 'asset_id' => $asset->id])
-            ->get(['id', 'convention', 'depreciation_profile_id']);
+        $books = AssetBook::query()
+            ->where('asset_id', $asset->id)
+            ->toBase()->get(['id', 'convention', 'depreciation_profile_id']);
 
         foreach ($books as $book) {
-            DB::table('aset_tr_buku_aset')->where('id', $book->id)->update([
+            AssetBook::query()->where('id', $book->id)->update([
                 'depreciation_start_on' => $calculator->startDate(
                     $placedInService,
                     $book->convention,
@@ -517,32 +535,34 @@ class AssetController extends Controller
      */
     private function createBooks(Asset $asset, array $data, string $tenantId): void
     {
-        $threshold = DB::table('aset_m_group_aset')
-            ->where(['tenant_id' => $tenantId, 'id' => $data['group_aset_id']])
-            ->value('capitalization_threshold');
+        // `withTrashed()` di sini dan pada `groupDefaults()` mempertahankan perilaku lama:
+        // group yang sudah diarsipkan tetap terbaca, karena aset yang sedang diterima
+        // memang sudah lolos validasi yang menuntut group masih hidup.
+        $threshold = GroupAset::withTrashed()
+            ->where('id', $data['group_aset_id'])
+            ->toBase()->value('capitalization_threshold');
         // Perolehan di bawah ambang kapitalisasi tetap dicatat sebagai aset, tetapi
         // bukunya tidak menyusut. Ini perilaku yang sama dengan F&O.
         $capitalized = $threshold === null || (float) $data['acquisition_value'] >= (float) $threshold;
 
-        $rows = DB::table('aset_m_group_buku_penyusutan as matrix')
+        $rows = GroupBukuPenyusutan::query()
             ->join('aset_m_buku_penyusutan as buku', function ($join): void {
-                $join->on('buku.id', '=', 'matrix.buku_id')->on('buku.tenant_id', '=', 'matrix.tenant_id');
+                $join->on('buku.id', '=', 'aset_m_group_buku_penyusutan.buku_id')->on('buku.tenant_id', '=', 'aset_m_group_buku_penyusutan.tenant_id');
             })
-            ->where(['matrix.tenant_id' => $tenantId, 'matrix.group_aset_id' => $data['group_aset_id']])
-            ->whereNull('matrix.deleted_at')
+            ->where('aset_m_group_buku_penyusutan.group_aset_id', $data['group_aset_id'])
             ->whereNull('buku.deleted_at')
             ->where('buku.aktif', true)
             ->select(
-                'matrix.buku_id',
-                'matrix.useful_life_periods',
-                'matrix.convention',
-                'matrix.depreciate',
-                DB::raw('coalesce(matrix.round_off_depreciation, buku.round_off_depreciation) as round_off_depreciation'),
-                DB::raw('coalesce(matrix.depreciation_profile_id, buku.depreciation_profile_id) as depreciation_profile_id'),
-                DB::raw('coalesce(matrix.alternative_profile_id, buku.alternative_profile_id) as alternative_profile_id'),
+                'aset_m_group_buku_penyusutan.buku_id',
+                'aset_m_group_buku_penyusutan.useful_life_periods',
+                'aset_m_group_buku_penyusutan.convention',
+                'aset_m_group_buku_penyusutan.depreciate',
+                DB::raw('coalesce(aset_m_group_buku_penyusutan.round_off_depreciation, buku.round_off_depreciation) as round_off_depreciation'),
+                DB::raw('coalesce(aset_m_group_buku_penyusutan.depreciation_profile_id, buku.depreciation_profile_id) as depreciation_profile_id'),
+                DB::raw('coalesce(aset_m_group_buku_penyusutan.alternative_profile_id, buku.alternative_profile_id) as alternative_profile_id'),
                 'buku.kode as buku_code',
             )
-            ->get();
+            ->toBase()->get();
 
         $calculator = app(DepreciationCalculator::class);
         // F&O menghitung penyusutan dari tanggal aset mulai digunakan, bukan tanggal
@@ -560,14 +580,13 @@ class AssetController extends Controller
             // sama-sama memaksa tenant mengarang profil yang tidak pernah dipakai.
             $depreciates = $capitalized && (bool) $row->depreciate;
             $profile = $depreciates ? $this->requireComputableProfile(
-                $tenantId,
                 $row->depreciation_profile_id,
                 $row->useful_life_periods,
                 $row->convention,
                 checkEffectiveDate: false,
             ) : null;
             if ($depreciates && $row->alternative_profile_id) {
-                $this->requireComputableProfile($tenantId, $row->alternative_profile_id, null, null, checkEffectiveDate: false);
+                $this->requireComputableProfile($row->alternative_profile_id, null, null, checkEffectiveDate: false);
             }
             $usefulLife = $row->useful_life_periods ?? $profile?->useful_life_periods;
             $convention = $row->convention ?? $profile?->convention;
@@ -614,9 +633,9 @@ class AssetController extends Controller
         if (! $profileId || ! in_array($convention, $yearBoundConventions, true)) {
             return null;
         }
-        $yearBasis = DB::table('aset_m_profil_penyusutan')
-            ->where(['tenant_id' => $tenantId, 'id' => $profileId])
-            ->value('year_basis');
+        $yearBasis = ProfilPenyusutan::withTrashed()
+            ->where('id', $profileId)
+            ->toBase()->value('year_basis');
         if ($yearBasis !== 'fiscal') {
             return null;
         }
@@ -635,11 +654,11 @@ class AssetController extends Controller
      * harus sudah berasal dari matriks dan setiap buku yang dihitung harus memiliki
      * profil aktif serta rentang berlaku yang mencakup tanggal penempatan.
      */
-    private function assertDepreciationReady(Asset $asset, string $tenantId, string $effectiveOn): void
+    private function assertDepreciationReady(Asset $asset, string $effectiveOn): void
     {
-        $books = DB::table('aset_tr_buku_aset')
-            ->where(['tenant_id' => $tenantId, 'asset_id' => $asset->id, 'status' => 'active'])
-            ->get([
+        $books = AssetBook::query()
+            ->where(['asset_id' => $asset->id, 'status' => 'active'])
+            ->toBase()->get([
                 'buku_id', 'depreciation_profile_id', 'alternative_profile_id',
                 'useful_life_periods', 'convention', 'depreciate',
             ]);
@@ -662,7 +681,6 @@ class AssetController extends Controller
                 continue;
             }
             $this->requireComputableProfile(
-                $tenantId,
                 $book->depreciation_profile_id,
                 $book->useful_life_periods,
                 $book->convention,
@@ -671,7 +689,6 @@ class AssetController extends Controller
             );
             if ($book->alternative_profile_id) {
                 $this->requireComputableProfile(
-                    $tenantId,
                     $book->alternative_profile_id,
                     null,
                     null,
@@ -687,23 +704,21 @@ class AssetController extends Controller
      * melindungi data legacy yang dibuat sebelum matriks menjadi sumber konfigurasi.
      */
     private function requireComputableProfile(
-        string $tenantId,
         ?string $profileId,
         mixed $usefulLifeOverride,
         ?string $conventionOverride,
         bool $checkEffectiveDate,
         ?string $effectiveOn = null,
-    ): object {
+    ): stdClass {
         if (! $profileId) {
             throw ValidationException::withMessages([
                 'group_aset_id' => 'Buku penyusutan belum memiliki profil utama yang efektif. Pilih profil pada matriks group x book atau pada Buku penyusutan.',
             ]);
         }
 
-        $profile = DB::table('aset_m_profil_penyusutan')
-            ->where(['tenant_id' => $tenantId, 'id' => $profileId, 'aktif' => true])
-            ->whereNull('deleted_at')
-            ->first([
+        $profile = ProfilPenyusutan::query()
+            ->where(['id' => $profileId, 'aktif' => true])
+            ->toBase()->first([
                 'id', 'method', 'frequency', 'convention', 'useful_life_periods', 'rate_percent',
                 'manual_schedule', 'effective_from', 'effective_to',
             ]);
@@ -768,28 +783,32 @@ class AssetController extends Controller
      * dipetakan ke unit organisasi mengembalikan null, dan aset tetap memakai unit
      * penggunanya sendiri.
      */
-    private function locationDimension(string $tenantId, ?string $locationId): ?string
+    private function locationDimension(?string $locationId): ?string
     {
         if (! $locationId) {
             return null;
         }
 
-        return DB::table('aset_m_lokasi_aset')
-            ->where(['tenant_id' => $tenantId, 'id' => $locationId])
-            ->value('org_unit_id');
+        // `withTrashed()`: lokasi yang sudah diarsipkan tetap membawa pemetaan dimensinya,
+        // sama seperti sebelum query ini melewati model.
+        return LokasiAset::withTrashed()
+            ->where('id', $locationId)
+            ->toBase()->value('org_unit_id');
     }
 
     /**
      * Group ditunjuk langsung oleh aset, jadi default penyusutan dibaca dengan satu
      * lookup. Sebelumnya nilai ini diraih dengan menyusuri jenis -> kategori -> group,
      * yang membuat rantai klasifikasi wajib ada semata-mata sebagai jalur lookup.
+     *
+     * Hasilnya baris mentah `toBase()` — sebuah `stdClass`, bukan model.
      */
-    private function groupDefaults(string $tenantId, string $groupAsetId): ?object
+    private function groupDefaults(string $groupAsetId): ?stdClass
     {
-        return DB::table('aset_m_group_aset')
-            ->where(['tenant_id' => $tenantId, 'id' => $groupAsetId])
+        return GroupAset::withTrashed()
+            ->where('id', $groupAsetId)
             ->select('kelompok_harta_fiskal_id', 'asset_location_id')
-            ->first();
+            ->toBase()->first();
     }
 
     /** @return array<string, mixed> */

@@ -22,9 +22,9 @@ use Tests\TestCase;
  * Yang diuji di sini bukan tampilan, melainkan empat sambungan yang masing-masing bisa
  * putus tanpa satu pun error:
  *
- * 1. **Tautan menu.** Menu module dan menu app container disaring izin dengan kode yang
- *    sama; yang berbeda hanya tujuannya. Sebuah module yang tetap mendapat tautan bergaya
- *    iframe (`/apps/<id>?view=…`) akan tampil normal di sidebar dan baru gagal saat diklik.
+ * 1. **Tautan menu.** Tautan entri menu disusun satu tempat, dan bentuknya
+ *    `/<id module>/<id entri>`. Sebuah module yang mendapat tautan bergaya lama
+ *    (`/apps/<id>?view=…`) akan tampil normal di sidebar dan baru gagal saat diklik.
  * 2. **Rute yang dituju ada.** Tautan itu disusun dengan aturan `/<id module>/<id entri>`,
  *    jadi id entri pada manifest dan jalur pada berkas rute module harus sejalan. Keduanya
  *    dimiliki orang yang berbeda dan tidak ada yang mengikatnya selain test ini.
@@ -32,9 +32,9 @@ use Tests\TestCase;
  *    module. Kalau ia dibagikan di tempat yang salah — misalnya dari `HandleInertiaRequests`,
  *    yang menyusun prop bersama **sebelum** middleware rute berjalan — halamannya tetap
  *    terbuka, hanya tanpa menu.
- * 4. **Halaman yang dirender halaman module, bukan halaman iframe.** Satu-satunya `iframe`
- *    di shell ada pada `pages/apps/host.tsx`. Selama halaman module berkomponen
- *    `contoh-a::Daftar`, berkas itu tidak pernah ikut dirender.
+ * 4. **Tidak ada iframe di jalur halaman module.** Jalur hosting container sudah dibuang,
+ *    jadi tidak ada lagi halaman shell yang memuat `iframe`; pemeriksaan di bawah menjaga
+ *    agar ia tidak kembali lewat pintu belakang.
  */
 class HalamanModuleShellTest extends TestCase
 {
@@ -184,25 +184,25 @@ class HalamanModuleShellTest extends TestCase
     {
         $akar = dirname(__DIR__, 3);
 
-        $this->assertStringNotContainsString(
-            '<iframe',
-            (string) file_get_contents($akar.'/resources/js/pages/modules/host.tsx'),
-        );
-        $this->assertStringNotContainsString(
-            '<iframe',
-            (string) file_get_contents(dirname($akar, 2).'/modules/apperp/contoh-a/ui/Pages/Daftar.tsx'),
-        );
+        // Kendali positifnya dulu berkas halaman iframe yang lama: ia memang memuat kata itu,
+        // jadi ia membuktikan pembacaannya sampai. Berkas itu dibuang bersama jalur hosting
+        // container, jadi kendalinya sekarang ada pada berkas yang diperiksa itu sendiri —
+        // masing-masing wajib memuat penanda yang pasti ada. Tanpa itu, "tidak ada iframe di
+        // berkas yang tidak terbaca" lolos sebagai bukti, padahal ia bukan bukti apa pun.
+        foreach ([
+            $akar.'/resources/js/lib/halaman-module.tsx' => 'export',
+            dirname($akar, 2).'/modules/apperp/contoh-a/ui/Pages/Daftar.tsx' => 'export default',
+        ] as $berkas => $penanda) {
+            $isi = (string) file_get_contents($berkas);
 
-        // Penutup untuk pemeriksanya sendiri. Dua pernyataan di atas akan tetap hijau kalau
-        // berkasnya hilang, berpindah, atau dibaca kosong — dan "tidak ada iframe di berkas
-        // yang tidak terbaca" bukan bukti apa pun. Halaman iframe yang lama masih ada di
-        // repo dan memang memuat kata itu, jadi ia dipakai sebagai kendali positif.
-        $this->assertStringContainsString(
-            '<iframe',
-            (string) file_get_contents($akar.'/resources/js/pages/apps/host.tsx'),
-            'Halaman iframe lama tidak lagi memuat elemen `iframe`; pemeriksaan di atas '
-            .'kehilangan kendali positifnya dan berhenti membuktikan apa pun.',
-        );
+            $this->assertStringContainsString(
+                $penanda,
+                $isi,
+                "Berkas {$berkas} tidak memuat `{$penanda}`; ia hilang, berpindah, atau terbaca "
+                .'kosong, dan pemeriksaan iframe di bawahnya berhenti membuktikan apa pun.',
+            );
+            $this->assertStringNotContainsString('<iframe', $isi);
+        }
     }
 
     /**

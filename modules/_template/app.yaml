@@ -1,0 +1,77 @@
+# Manifest cetakan module.
+#
+# Id-nya `change-me`, dan itu bukan sekadar tanda "belum diisi": `ModuleRegistry` menolak
+# manifest ber-id `change-me`, jadi cetakan yang tanpa sengaja tersalin ke
+# `modules/<penerbit>/<module>/` tetap tidak akan pernah dimuat, dipasang, atau menerima data
+# tenant. Perintah `module:make` mengganti seluruh penanda di bawah ini; jangan menyalin
+# folder ini dengan tangan.
+#
+# Penanda yang diganti perintah itu, masing-masing punya bentuknya sendiri:
+#   penerbit-contoh  -> id penerbit          (apperp)
+#   PenerbitContoh   -> penerbit, StudlyCase (Apperp)
+#   change-me        -> id module            (kelola-contoh)
+#   ChangeMe         -> module, StudlyCase   (KelolaContoh)
+#   Change Me        -> nama tampilan        (Kelola Contoh)
+#   change_me_       -> awalan tabel         (contoh_)
+id: change-me
+name: Change Me
+description: Cetakan module. Ganti seluruh isi berkas ini dengan identitas module yang sebenarnya.
+publisher: penerbit-contoh
+version: 0.1.0
+
+# `business-app` adalah module yang boleh sampai ke pelanggan. Yang hanya ada sebagai bahan
+# uji di repo ini memakai `internal-fixture`, dan pembangun bundle edisi menolaknya.
+kind: business-app
+
+requires:
+  core: ^0.1
+
+# Peta id module ke rentang versi, bukan daftar. Module tanpa dependency memakai `{}`;
+# daftar kosong `[]` terbaca sebagai peta kosong dan membuat prasyaratnya tidak dijaga
+# siapa pun.
+dependsOn: {}
+
+# Awalan tabel dipilih sekali dan tidak berubah setelah module pertama kali dipasang.
+# Ia wajib terdaftar di tabel pemetaan pada modules/README.md; `module:make` yang menuliskannya.
+table_prefix: change_me_
+
+# Menu module. `id` sebuah entri sidebar adalah juga jalur rutenya: Core menyusun tautan
+# `/change-me/<id entri>`, jadi routes/web.php wajib punya rute dengan jalur itu. Item menu
+# hanya boleh memakai permission `read` milik module sendiri.
+ui:
+  navigation:
+    rail:
+      - id: master
+        label: Master data
+    sidebar:
+      master:
+        - id: daftar-contoh
+          label: Daftar contoh
+          permission: change-me.contoh.read
+
+# Empat lapis keamanan, dan keempatnya wajib tersambung utuh: entry point dilindungi
+# permission, permission masuk privilege, privilege masuk duty, dan duty itulah yang disusun
+# admin tenant menjadi security role. Rantai yang putus berarti izin yang tidak pernah bisa
+# diberikan kepada siapa pun, dan itu baru terlihat sebagai layar kosong tanpa pesan galat.
+#
+# Seluruh kode wajib berawalan id module; Control Plane menolak registrasi yang tidak.
+security:
+  entry_points:
+    - code: change-me.contoh.form
+      name: Layar daftar contoh
+      type: ui
+  permissions:
+    - code: change-me.contoh.read
+      entry_point: change-me.contoh.form
+      access_level: read
+      name: Melihat daftar contoh
+  privileges:
+    - code: change-me.contoh.maintain
+      name: Merawat data contoh
+      permissions:
+        - change-me.contoh.read
+  duties:
+    - code: change-me.contoh.manage
+      name: Mengelola data contoh
+      privileges:
+        - change-me.contoh.maintain

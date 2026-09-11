@@ -29,24 +29,10 @@ export type ShellNotification = {
     level: NotificationLevel;
     title: string;
     body?: string;
-    /** Tujuan di Shell, misalnya `/apps/management-aset?view=laporan`. */
+    /** Tujuan di Shell, misalnya `/management-aset/entitas-aset`. */
     href?: string;
     createdAt: string;
     readAt: string | null;
-};
-
-/** Bentuk yang dikirim app lewat `postMessage`; Shell yang melengkapi sisanya. */
-export type AppNotificationMessage = {
-    type: 'coreerp.notification';
-    appId: string;
-    notification: {
-        id: string;
-        level?: NotificationLevel;
-        title: string;
-        body?: string;
-        /** Id item navigasi app yang dituju, seperti pada `app.yaml`. */
-        view?: string;
-    };
 };
 
 const MAX_ITEMS = 50;
@@ -183,39 +169,4 @@ export function removeNotification(id: string): void {
 
 export function clearNotifications(): void {
     write([]);
-}
-
-/** Validasi bentuk pesan dari iframe app. Sumber dan origin diperiksa pemanggil. */
-export function isAppNotificationMessage(
-    data: unknown,
-): data is AppNotificationMessage {
-    if (typeof data !== 'object' || data === null) {
-        return false;
-    }
-
-    const message = data as Partial<AppNotificationMessage>;
-    const notification = message.notification;
-
-    return (
-        message.type === 'coreerp.notification' &&
-        typeof message.appId === 'string' &&
-        typeof notification === 'object' &&
-        notification !== null &&
-        typeof notification.id === 'string' &&
-        notification.id.length > 0 &&
-        notification.id.length <= 120 &&
-        typeof notification.title === 'string' &&
-        notification.title.length > 0 &&
-        notification.title.length <= 200 &&
-        (notification.body === undefined ||
-            (typeof notification.body === 'string' &&
-                notification.body.length <= 1000)) &&
-        (notification.view === undefined ||
-            (typeof notification.view === 'string' &&
-                /^[a-z0-9-]{1,60}$/.test(notification.view))) &&
-        (notification.level === undefined ||
-            ['info', 'success', 'warning', 'error'].includes(
-                notification.level,
-            ))
-    );
 }

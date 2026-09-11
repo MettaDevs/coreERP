@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
@@ -202,7 +203,10 @@ class DepreciationBookTest extends TestCase
         ], fn ($value) => $value !== null));
     }
 
-    /** @param list<array<string, mixed>> $rows */
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return TestResponse<Response>
+     */
     private function matrix(string $groupId, array $rows): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))

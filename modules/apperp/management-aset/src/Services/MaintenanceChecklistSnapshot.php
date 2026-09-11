@@ -2,88 +2,95 @@
 
 namespace Modules\Apperp\ManagementAset\Services;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
+use Modules\Apperp\ManagementAset\Models\master\Trade;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetChecklist;
+use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetDetail;
 
+/**
+ * Menyalin prosedur pemeriksaan menjadi snapshot milik satu baris pekerjaan.
+ *
+ * Tenant tidak lagi diminta sebagai argumen: setiap model di sini tersaring tenant aktif
+ * lewat `MilikTenant`, dan tenant yang dikirim terpisah dari konteks permintaan justru
+ * membuka celah menyalin prosedur milik tenant lain.
+ */
 final class MaintenanceChecklistSnapshot
 {
     /**
      * Mengambil default paling spesifik yang cocok dengan pekerjaan lalu menyalin template
      * menjadi snapshot checklist. Template tidak pernah dirujuk langsung oleh hasil kerja.
      */
-    public function applyDefault(string $tenantId, object $job): int
+    public function applyDefault(PemeliharaanAsetDetail $job): int
     {
-        $templateId = $this->defaultTemplateId($tenantId, $job);
+        $templateId = $this->defaultTemplateId($job);
         if ($templateId === null) {
             return 0;
         }
 
-        return $this->copyTemplate($tenantId, (string) $job->id, $templateId);
+        return $this->copyTemplate((string) $job->id, $templateId);
     }
 
-    public function copyTemplate(string $tenantId, string $jobId, string $templateId): int
+    public function copyTemplate(string $jobId, string $templateId): int
     {
-        $lines = $this->expandTemplate($tenantId, $templateId);
+        $lines = $this->expandTemplate($templateId);
         if ($lines === []) {
             return 0;
         }
 
-        $rows = collect($lines)->values()->map(fn (array $line, int $index): array => [
-            'id' => (string) Str::ulid(),
-            'tenant_id' => $tenantId,
-            'pemeliharaan_aset_detail_id' => $jobId,
-            'line_number' => $index + 1,
-            'nama' => $line['nama'],
-            'instruksi' => $line['instruksi'],
-            'tipe' => $line['tipe'],
-            'satuan' => $line['satuan'],
-            'min_value' => $line['min_value'],
-            'max_value' => $line['max_value'],
-            'wajib' => $line['wajib'],
-            'sumber' => 'template',
-            'sumber_id' => $line['sumber_id'],
-            'nilai' => null,
-            'result_code' => null,
-            'tidak_berlaku' => false,
-            'diperiksa' => false,
-            'diperiksa_oleh_user_id' => null,
-            'diperiksa_pada' => null,
-            'catatan_teknisi' => null,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ])->all();
-
-        DB::table('aset_tr_pemeliharaan_aset_checklist')
-            ->where(['tenant_id' => $tenantId, 'pemeliharaan_aset_detail_id' => $jobId])
+        PemeliharaanAsetChecklist::query()
+            ->where('pemeliharaan_aset_detail_id', $jobId)
             ->delete();
-        DB::table('aset_tr_pemeliharaan_aset_checklist')->insert($rows);
 
-        return count($rows);
+        foreach ($lines as $index => $line) {
+            PemeliharaanAsetChecklist::create([
+                'pemeliharaan_aset_detail_id' => $jobId,
+                'line_number' => $index + 1,
+                'nama' => $line['nama'],
+                'instruksi' => $line['instruksi'],
+                'tipe' => $line['tipe'],
+                'satuan' => $line['satuan'],
+                'min_value' => $line['min_value'],
+                'max_value' => $line['max_value'],
+                'wajib' => $line['wajib'],
+                'sumber' => 'template',
+                'sumber_id' => $line['sumber_id'],
+                'nilai' => null,
+                'result_code' => null,
+                'tidak_berlaku' => false,
+                'diperiksa' => false,
+                'diperiksa_oleh_user_id' => null,
+                'diperiksa_pada' => null,
+                'catatan_teknisi' => null,
+            ]);
+        }
+
+        return count($lines);
     }
 
-    private function defaultTemplateId(string $tenantId, object $job): ?string
+    private function defaultTemplateId(PemeliharaanAsetDetail $job): ?string
     {
-        $asset = DB::table('aset_tr_penerimaan_aset')->where([
-            'tenant_id' => $tenantId,
-            'id' => $job->asset_id,
-        ])->first(['jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'asset_location_id']);
+        $asset = Asset::query()
+            ->where('id', $job->asset_id)
+            ->toBase()
+            ->first(['jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'asset_location_id']);
 
         if (! $asset) {
             return null;
         }
 
         $tradeName = $job->trade_id
-            ? DB::table('aset_m_trade')->where(['tenant_id' => $tenantId, 'id' => $job->trade_id])->value('nama')
+            ? Trade::query()->where('id', $job->trade_id)->value('nama')
             : null;
 
-        $defaults = DB::table('aset_m_maintenance_job_type_default')
+        $defaults = MaintenanceJobTypeDefault::query()
             ->where([
-                'tenant_id' => $tenantId,
                 'maintenance_job_type_id' => $job->maintenance_job_type_id,
                 'aktif' => true,
             ])
-            ->whereNull('deleted_at')
             ->whereNotNull('checklist_template_id')
+            ->toBase()
             ->get();
 
         $matches = $defaults->filter(function (object $default) use ($asset, $job, $tradeName): bool {
@@ -119,8 +126,11 @@ final class MaintenanceChecklistSnapshot
         return $configured === null || $configured === $actual;
     }
 
-    /** @return list<array<string, mixed>> */
-    private function expandTemplate(string $tenantId, string $templateId, array $visited = []): array
+    /**
+     * @param  list<string>  $visited
+     * @return list<array<string, mixed>>
+     */
+    private function expandTemplate(string $templateId, array $visited = []): array
     {
         if (in_array($templateId, $visited, true)) {
             return [];
@@ -128,14 +138,15 @@ final class MaintenanceChecklistSnapshot
         $visited[] = $templateId;
         $result = [];
 
-        $lines = DB::table('aset_m_maintenance_checklist_template_line')
-            ->where(['tenant_id' => $tenantId, 'template_id' => $templateId])
+        $lines = MaintenanceChecklistTemplateLine::query()
+            ->where('template_id', $templateId)
             ->orderBy('line_number')
+            ->toBase()
             ->get();
 
         foreach ($lines as $line) {
             if ($line->type === 'template' && $line->nested_template_id !== null) {
-                $result = [...$result, ...$this->expandTemplate($tenantId, $line->nested_template_id, $visited)];
+                $result = [...$result, ...$this->expandTemplate($line->nested_template_id, $visited)];
 
                 continue;
             }

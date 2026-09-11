@@ -2,11 +2,14 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterLinkController;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
+use Modules\Apperp\ManagementAset\Models\master\GroupAset;
+use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 
 /**
@@ -16,6 +19,8 @@ use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
  * masa manfaat dan konvensi apa. Nilainya menjadi default
  * yang disalin ke buku aset saat aset diterima, bukan acuan hidup: mengubah matriks
  * tidak menulis ulang aset yang sudah berjalan.
+ *
+ * @extends MasterLinkController<GroupBukuPenyusutan>
  */
 class GroupBukuPenyusutanController extends MasterLinkController
 {
@@ -24,9 +29,9 @@ class GroupBukuPenyusutanController extends MasterLinkController
         return 'group-aset';
     }
 
-    protected function ownerTable(): string
+    protected function ownerModel(): string
     {
-        return 'aset_m_group_aset';
+        return GroupAset::class;
     }
 
     protected function ownerColumn(): string
@@ -34,9 +39,9 @@ class GroupBukuPenyusutanController extends MasterLinkController
         return 'group_aset_id';
     }
 
-    protected function table(): string
+    protected function query(bool $termasukArsip = false): Builder
     {
-        return 'aset_m_group_buku_penyusutan';
+        return $termasukArsip ? GroupBukuPenyusutan::withTrashed() : GroupBukuPenyusutan::query();
     }
 
     protected function rowRules(string $tenantId): array
@@ -71,10 +76,8 @@ class GroupBukuPenyusutanController extends MasterLinkController
             fn (array $row): ?string => $row['buku_id'] ?? null,
             $rows,
         )));
-        $books = DB::table('aset_m_buku_penyusutan')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('id', $bookIds)
-            ->whereNull('deleted_at')
+        $books = BukuPenyusutan::query()
+            ->whereKey($bookIds)
             ->get(['id', 'depreciation_profile_id', 'alternative_profile_id'])
             ->keyBy('id');
 
@@ -87,16 +90,14 @@ class GroupBukuPenyusutanController extends MasterLinkController
             }
             $book = $books->get($row['buku_id'] ?? '');
             foreach (['depreciation_profile_id', 'alternative_profile_id'] as $field) {
-                if (! empty($book?->{$field})) {
+                if (! empty($book->{$field})) {
                     $profileIds[] = $book->{$field};
                 }
             }
         }
-        $profiles = DB::table('aset_m_profil_penyusutan')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('id', array_values(array_unique($profileIds)))
+        $profiles = ProfilPenyusutan::query()
+            ->whereKey(array_values(array_unique($profileIds)))
             ->where('aktif', true)
-            ->whereNull('deleted_at')
             ->get([
                 'id', 'method', 'frequency', 'convention', 'useful_life_periods', 'rate_percent',
                 'effective_from', 'effective_to',
@@ -162,8 +163,13 @@ class GroupBukuPenyusutanController extends MasterLinkController
         ];
     }
 
-    /** @param array<string, object> $profiles @param array<string, string> $errors */
-    private function profile($profiles, ?string $id, array &$errors, string $key): ?object
+    /**
+     * Profil yang dipakai satu baris, sekaligus tempat seluruh pemeriksaannya.
+     *
+     * @param  Collection<int|string, ProfilPenyusutan>  $profiles  dikunci id profil
+     * @param  array<string, string>  $errors
+     */
+    private function profile(Collection $profiles, ?string $id, array &$errors, string $key): ?ProfilPenyusutan
     {
         if (! $id) {
             return null;

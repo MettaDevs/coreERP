@@ -5,7 +5,6 @@ namespace App\Actions\Onboarding;
 use App\Actions\Modules\InstallModule;
 use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Actions\ReferenceData\ProvisionDefaultUnitsOfMeasure;
-use App\Jobs\DeployAppPlacement;
 use App\Models\AppDataPolicy;
 use App\Models\Client;
 use App\Models\Role;
@@ -15,7 +14,9 @@ use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\AppDependencyGraph;
+use App\Support\Modules\Contracts\TenantDisiapkan;
 use App\Support\Modules\ModuleRegistry;
+use App\Support\Modules\PengirimEventModul;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -55,8 +56,9 @@ class RegisterBusiness
             // Tenant provisioning adalah fakta lintas app. Payload starter sengaja
             // kosong: setiap app memilih template versinya sendiri dari konfigurasi,
             // sedangkan Core hanya meneruskan tenant context yang tepercaya.
+            $idEvent = (string) Str::ulid();
             DB::table('outbox_events')->insert([
-                'id' => (string) Str::ulid(),
+                'id' => $idEvent,
                 'tenant_id' => $tenant->id,
                 'type' => 'core.tenant.provisioned.v1',
                 'correlation_id' => $tenant->id,
@@ -127,39 +129,44 @@ class RegisterBusiness
                 ]);
             }
 
-            DB::afterCommit(function () use ($appIds, $placement, $tenant): void {
+            DB::afterCommit(function () use ($appIds, $idEvent, $tenant): void {
                 $registry = app(ModuleRegistry::class);
 
                 foreach ($appIds as $appId) {
-                    // Dua jalur, dipilih dari satu pertanyaan: apakah id ini ada sebagai
-                    // folder di modules/. Bila ya, tidak ada container yang perlu
-                    // ditempatkan — memasangnya berarti menjalankan migration, mencatat
-                    // pemasangan, dan mengisi data awal, semuanya di proses ini juga.
+                    // Satu jalur: sebuah app dipasang bila id-nya ada sebagai folder di
+                    // modules/. Memasangnya berarti menjalankan migration, mencatat
+                    // pemasangan, dan mengisi data awal — semuanya di proses ini juga.
                     //
-                    // Jalur container dipertahankan selama masih ada app yang belum
-                    // dipindah. Ia dibuang pada fase 7, bukan sekarang.
-                    if ($registry->cari($appId) !== null) {
-                        app(InstallModule::class)->handle($appId, $tenant->id);
-
+                    // Sebuah app yang berhak tetapi tidak ada sebagai module dilewati tanpa
+                    // suara, dan itu memang bentuk yang benar sekarang: entitlement-nya
+                    // tercatat, tetapi tidak ada apa pun yang bisa dipasang untuknya sampai
+                    // module-nya benar-benar ada di edisi ini. Ia tidak akan muncul di
+                    // peluncur, karena peluncur membaca catatan pemasangan.
+                    if ($registry->cari($appId) === null) {
                         continue;
                     }
 
-                    $ready = DB::table('app_placements')
-                        ->where('app_id', $appId)
-                        ->where('placement', $placement)
-                        ->where('artifact_status', 'placed')
-                        ->where('migration_status', 'succeeded')
-                        ->where('runtime_status', 'ready')
-                        ->whereNotNull('ready_at')
-                        ->exists();
-                    if ($ready) {
-                        continue;
-                    }
+                    app(InstallModule::class)->handle($appId, $tenant->id);
 
-                    DeployAppPlacement::dispatch($appId, $placement);
+                    // Dipancarkan **per module yang benar-benar terpasang**, bukan sekali
+                    // untuk seluruh tenant, dan bedanya menentukan apakah ia benar.
+                    //
+                    // Sebuah tenant boleh berhak atas app yang tidak ada di edisi ini. Bila
+                    // eventnya dipancarkan sekali dengan seluruh daftar app, listener module
+                    // yang **tidak** terpasang ikut menjawabnya dan menyemai data ke tabel
+                    // yang migrationnya belum pernah dijalankan untuk tenant itu.
+                    //
+                    // Letaknya sesudah `InstallModule` karena di sanalah migration, catatan
+                    // pemasangan, dan urutan nomor module dibuat — dan penyediaan data awal
+                    // membutuhkan ketiganya.
+                    app(PengirimEventModul::class)->kirim(
+                        new TenantDisiapkan($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
+                        (string) $tenant->id,
+                    );
                 }
 
                 app(EnsureNumberSequenceDrafts::class)->forReadyTenant($tenant->id);
+
             });
 
             return $user;

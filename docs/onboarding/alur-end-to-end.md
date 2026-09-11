@@ -6,7 +6,7 @@ Skenarionya: seseorang mendaftarkan bisnis baru dan memilih beberapa app. Titik 
 
 > Berkas: `apps/control-plane/app/Actions/Onboarding/RegisterBusiness.php`
 
-Seluruh alur di bawah berjalan dalam **satu transaksi database**. Efek samping yang menyentuh dunia luar sengaja ditunda sampai transaksi selesai — alasannya di [langkah 9](#_9-setelah-commit-baru-menyentuh-dunia-luar).
+Seluruh alur di bawah berjalan dalam **satu transaksi database**. Efek samping yang menulis di luar transaksi itu sengaja ditunda sampai transaksi selesai — alasannya di [langkah 9](#_9-setelah-commit-baru-memasang-module).
 
 ## 1. Validasi pilihan app terhadap katalog
 
@@ -101,68 +101,57 @@ Semua `null` artinya owner melihat seluruh tenant. Nanti admin bisa mempersempit
 | --- | --- |
 | Catalogued | ✅ divalidasi di langkah 1 |
 | Entitled | ✅ dibuat di langkah 5 |
-| Placed + migrated | ❌ belum |
-| Ready | ❌ belum |
+| Installed | ❌ belum |
 
-Tenant sudah punya user, hak, role, dan scope — tapi **belum ada app yang benar-benar jalan**. Kalau UI menampilkan "terpasang" pada titik ini, itu bohong.
+Tenant sudah punya user, hak, role, dan scope — tapi **belum ada module yang terpasang**. Kalau UI menampilkan "terpasang" pada titik ini, itu bohong.
 
-## 9. Setelah commit, baru menyentuh dunia luar {#_9-setelah-commit-baru-menyentuh-dunia-luar}
+## 9. Setelah commit, baru memasang module {#_9-setelah-commit-baru-memasang-module}
 
 ```php
-DB::afterCommit(function () use ($appIds, $placement, $tenant): void {
-    foreach ($appIds as $appId) {
-        $ready = DB::table('app_placements')
-            ->where('app_id', $appId)
-            ->where('placement', $placement)
-            ->where('artifact_status', 'placed')
-            ->where('migration_status', 'succeeded')
-            ->where('runtime_status', 'ready')
-            ->whereNotNull('ready_at')
-            ->exists();
+DB::afterCommit(function () use ($appIds, $idEvent, $tenant): void {
+    $registry = app(ModuleRegistry::class);
 
-        if ($ready) {
+    foreach ($appIds as $appId) {
+        if ($registry->cari($appId) === null) {
             continue;
         }
 
-        DeployAppPlacement::dispatch($appId, $placement);
+        app(InstallModule::class)->handle($appId, $tenant->id);
+
+        app(PengirimEventModul::class)->kirim(
+            new TenantDisiapkan($idEvent, (string) $tenant->id, (string) $tenant->id, null, ['app_ids' => [$appId]]),
+            (string) $tenant->id,
+        );
     }
 
     app(EnsureNumberSequenceDrafts::class)->forReadyTenant($tenant->id);
 });
 ```
 
-Dua hal yang layak diperhatikan:
+Tiga hal yang layak diperhatikan:
 
-**`afterCommit`, bukan di dalam transaksi.** Kalau job dilempar sebelum commit, worker bisa mulai jalan sebelum datanya ada di database. Job-nya sendiri juga dideklarasikan `ShouldQueueAfterCommit` — sabuk pengaman ganda.
+**`afterCommit`, bukan di dalam transaksi.** Migration module dan penyemaian data awal berjalan di sini; menjalankannya sebelum commit berarti menulis untuk tenant yang belum ada di database.
 
-**Registry yang ditanya, bukan entitlement.** Kalau app sudah `ready` pada placement itu (misalnya tenant lain sudah memakainya di `pooled`), tidak ada deploy ulang. Kebenaran ketiga dan keempat datang dari sini, bukan dari langkah 5.
+**Registry runtime yang ditanya, bukan entitlement.** Id yang tidak ada sebagai folder di `modules/` dilewati tanpa suara: entitlement-nya tercatat, tetapi tidak ada yang bisa dipasang untuknya, dan ia tidak muncul di peluncur.
 
-## 10. Worker menyelesaikan sisanya
+**Event `TenantDisiapkan` dipancarkan per module yang benar-benar terpasang**, bukan sekali dengan seluruh daftar app. Sekali dengan seluruh daftar akan membuat listener module yang tidak terpasang ikut menjawab dan menyemai data ke tabel yang migration-nya belum pernah dijalankan untuk tenant itu.
 
-`DeployAppPlacement` berjalan di queue dengan `tries = 3`, backoff `30/120/300` detik, dan `ShouldBeUnique` per pasangan app+placement. Ia menolak dua hal secara eksplisit:
-
-```php
-if ($existing->release_version !== $app->version) {
-    throw new RuntimeException('App upgrade requires the backup and compatibility workflow.');
-}
-if ($existing->profile !== $profile) {
-    throw new RuntimeException('An app placement cannot change deployment profile in place.');
-}
-```
-
-Upgrade bukan efek samping onboarding — ia punya alur sendiri dengan compatibility matrix, backup, dan rollback. Ganti profile juga tidak bisa dilakukan di tempat. Keduanya dijelaskan di [Release dan on-prem](/dev/03-release-and-on-prem).
+Sampai 10 September 2026 di sini ada langkah kesepuluh: sebuah job `DeployAppPlacement` yang menarik
+image app, menjalankan migration di container lain, dan menaikkan `runtime_status` menjadi `ready`.
+Job itu dibuang bersama jalur hosting container — tidak ada lagi app yang ditempatkan sebagai
+container, jadi tidak ada lagi runtime kedua yang perlu dinyatakan sehat.
 
 ## Yang bisa kamu bawa dari alur ini
 
 1. Fakta lifecycle tidak disimpulkan dari fakta sebelumnya — masing-masing dibaca dari sumbernya.
-2. Efek samping ke dunia luar ditunda sampai transaksi commit.
-3. Core mengatur policy dan koordinasi; Core **tidak** menulis database app.
+2. Efek samping yang menulis data ditunda sampai transaksi commit.
+3. Core mengatur policy dan koordinasi; Core **tidak** menulis data app. Itu tetap berlaku setelah module pindah ke runtime Core: satu database yang sama bukan izin untuk saling menulis.
 4. Duty dan data policy datang dari manifest app, bukan dari kode Core.
-5. Operasi berisiko (upgrade, ganti profile) menolak jalan diam-diam.
+5. Upgrade bukan efek samping onboarding. Ia punya alurnya sendiri dengan compatibility matrix, backup, dan rollback; lihat [Release dan on-prem](/dev/03-release-and-on-prem).
 
 ## Lihat juga
 
-- [Empat kebenaran lifecycle](/onboarding/empat-kebenaran) — aturan di balik langkah 8 dan 9
+- [Tiga kebenaran lifecycle](/onboarding/tiga-kebenaran) — aturan di balik langkah 8 dan 9
 - [Identity dan access](/dev/09-identity-and-access) — role, duty, workforce, dan onboarding
 - [Tenant dan hierarki organisasi](/dev/01a-tenant-and-org-hierarchy) — kenapa tenant dan organization dipisah
 - [Number sequence](/dev/14-number-sequences) — apa yang dikerjakan `EnsureNumberSequenceDrafts`

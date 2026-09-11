@@ -1,0 +1,57 @@
+<?php
+
+namespace Modules\Apperp\ManagementAset\Models\master;
+
+use App\Support\Modules\Contracts\MilikTenant;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
+
+/**
+ * Penempelan tipe atribut pada jenis aset; aset mewarisi atribut dari jenisnya.
+ *
+ * Bukan master penuh: tanpa kode dan tanpa nama. `wajib` di sini berarti aset dari jenis
+ * tersebut harus mengisi atribut itu, bukan bahwa penempelannya sendiri wajib ada.
+ *
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $jenis_aset_id
+ * @property string $tipe_atribut_id
+ * @property bool $wajib
+ * @property int $urutan
+ * @property ?Carbon $created_at
+ * @property ?Carbon $updated_at
+ * @property ?Carbon $deleted_at
+ */
+class JenisAsetAtribut extends Model
+{
+    use HasUlids;
+    use MilikTenant;
+    use SoftDeletes;
+
+    protected $table = 'aset_m_jenis_aset_atribut';
+
+    protected $fillable = ['tenant_id', 'jenis_aset_id', 'tipe_atribut_id', 'wajib', 'urutan'];
+
+    protected function casts(): array
+    {
+        return [
+            'wajib' => 'boolean',
+            'urutan' => 'integer',
+        ];
+    }
+
+    /** @return BelongsTo<JenisAset, $this> */
+    public function jenisAset(): BelongsTo
+    {
+        return $this->belongsTo(JenisAset::class, 'jenis_aset_id');
+    }
+
+    /** @return BelongsTo<TipeAtribut, $this> */
+    public function tipeAtribut(): BelongsTo
+    {
+        return $this->belongsTo(TipeAtribut::class, 'tipe_atribut_id');
+    }
+}

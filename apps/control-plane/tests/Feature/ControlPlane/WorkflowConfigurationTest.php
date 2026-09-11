@@ -34,12 +34,12 @@ class WorkflowConfigurationTest extends TestCase
         $this->seed(AppCatalogSeeder::class);
         $this->owner = app(RegisterBusiness::class)->handle([
             'name' => 'Owner', 'business_name' => 'Tenant test',
-            'app_ids' => ['management-aset'], 'email' => 'owner@workflow.test', 'password' => 'password',
+            'app_ids' => ['app-uji'], 'email' => 'owner@workflow.test', 'password' => 'password',
         ]);
         $this->workflowTypeId = (string) Str::ulid();
         DB::table('workflow_types')->insert([
-            'id' => $this->workflowTypeId, 'app_id' => 'management-aset',
-            'code' => 'management-aset.pemusnahan-aset-verification',
+            'id' => $this->workflowTypeId, 'app_id' => 'app-uji',
+            'code' => 'app-uji.verifikasi-pemusnahan',
             'name' => 'Verifikasi usulan pemusnahan aset',
             'decision_context_schema' => json_encode(['required' => ['document_id', 'asset_id']], JSON_THROW_ON_ERROR),
             'created_at' => now(), 'updated_at' => now(),
@@ -308,16 +308,22 @@ class WorkflowConfigurationTest extends TestCase
             'occurred_at' => now(), 'created_at' => now(), 'updated_at' => now(),
         ]);
         config()->set('coreerp.app_context_signing_key', 'workflow-test-key');
+        // `procurement`, bukan `human-resources`. Yang diuji di sini penerima yang **tidak**
+        // dimuat runtime ini, dan human-resources berhenti memenuhi syarat itu pada F7-01 —
+        // sejak ia menjadi module, penjaga di atas justru menahan pengirimannya dan test ini
+        // gagal dengan "An expected request was not recorded". Procurement adalah app terakhir
+        // yang masih berjalan sebagai container; ketika ia menyusul pindah, test ini kehilangan
+        // subjeknya dan harus dibuang bersama jalur HTTP-nya.
         config()->set('coreerp.event_endpoints', [[
             'type' => 'core.workflow.decision.v2',
-            'url' => 'https://hr.test/events',
-            'module' => 'human-resources',
+            'url' => 'https://procurement.test/events',
+            'module' => 'procurement',
         ]]);
-        Http::fake(['https://hr.test/events' => Http::response(['data' => ['accepted' => true]])]);
+        Http::fake(['https://procurement.test/events' => Http::response(['data' => ['accepted' => true]])]);
 
         Artisan::call('workflow-events:publish');
 
-        Http::assertSent(fn ($request): bool => $request->url() === 'https://hr.test/events');
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://procurement.test/events');
         $this->assertNotNull(DB::table('outbox_events')->where('id', $eventId)->value('published_at'));
     }
 

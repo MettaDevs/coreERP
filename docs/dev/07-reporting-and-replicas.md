@@ -1,5 +1,12 @@
 # Reporting, read replica, dan event projection
 
+> **Bacaan halaman ini untuk module.** Contoh di bawah memakai satu database per app karena itu
+> bentuk yang membuat masalahnya paling jelas. Untuk module yang berjalan di runtime Core, batas
+> yang sama berlaku pada kumpulan tabel berawalan, bukan pada database terpisah: laporan gabungan
+> tetap dibangun dari projection event, bukan dari join langsung ke tabel module lain. Yang hilang
+> hanyalah lag replikasi antar database; ownership dan larangan join lintas module tidak hilang.
+> Lihat [grand design](01-grand-design.md).
+
 ## Tiga sumber baca yang berbeda
 
 Event broker dan database replica saling melengkapi; keduanya tidak menyelesaikan masalah yang sama.

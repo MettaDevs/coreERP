@@ -45,17 +45,18 @@ Sebagian dokumen ditulis sebelum istilahnya diseragamkan, dan mengganti nama tab
 | --- | --- |
 | **Catalogued** | Produknya dikenal platform. |
 | **Entitled** | Tenant berhak memakainya. Belum berarti terpasang. |
-| **Placed** | Artifact sudah ditempatkan pada suatu placement. |
-| **Migrated** | Migration app berhasil dijalankan. |
-| **Ready** | Runtime sehat menurut health check nyata. |
+| **Installed** | Migration module berhasil dijalankan untuk tenant itu, dan barisnya tercatat di `core_module_installations`. |
 
-Keempatnya adalah fakta terpisah. Lihat [Empat kebenaran lifecycle](/onboarding/empat-kebenaran).
+Ketiganya adalah fakta terpisah. Lihat [Tiga kebenaran lifecycle](/onboarding/tiga-kebenaran).
+
+**Placed**, **migrated**, dan **ready** adalah istilah jalur hosting container, yang dibuang pada
+10 September 2026. Ketiganya tidak dipakai lagi.
 
 ## Deployment
 
 | Istilah | Arti di CoreERP |
 | --- | --- |
-| **Control plane** | Layanan global vendor untuk mengelola tenant, lisensi, placement, operasi, dan billing **SaaS**. |
+| **Control plane** | Layanan global vendor untuk mengelola tenant, lisensi, deployment, operasi, dan billing **SaaS**. |
 | **Application plane** | API/UI/database yang menjalankan fungsi ERP untuk tenant. |
 | **Pool / pooled** | Tenant berbagi deployment dan database module, dipisahkan oleh `tenant_id`. |
 | **Silo / isolated** | Resource suatu module ditempatkan khusus untuk satu tenant. |

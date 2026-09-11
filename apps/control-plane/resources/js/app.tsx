@@ -5,7 +5,8 @@ import type { ComponentType } from 'react';
 import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
-import halamanModule from '@/pages/modules/host';
+import halamanModule from '@/lib/halaman-module';
+import { pasangPelaporanKesalahan } from '@/lib/pelaporan-kesalahan';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -56,6 +57,17 @@ function halamanModuleUntuk(
 
     return halamanModule(nama, halamanModul[jalur]);
 }
+
+/**
+ * Dipasang sebelum aplikasi dibuat, bukan sesudah.
+ *
+ * Kesalahan yang paling ingin dilihat justru yang terjadi saat memasang: bundel yang gagal
+ * diunduh, halaman yang tidak ditemukan pemilih di bawah. Memasang penangkapnya setelah
+ * `createInertiaApp` berarti persis kesalahan itu yang lolos.
+ *
+ * Tanpa `VITE_OTEL_ENDPOINT` saat membangun, pemanggilan ini tidak melakukan apa pun.
+ */
+pasangPelaporanKesalahan();
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

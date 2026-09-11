@@ -5,10 +5,24 @@ Halaman ini untuk developer. Isinya apa yang bisa dan **tidak bisa** dilihat tia
 ## Feature test
 
 ```bash
-cd api && php artisan test
+cd apps/control-plane && php artisan test
 ```
 
-Berjalan satu permintaan pada satu proses terhadap SQLite.
+Satu perintah menjalankan test Core **dan** seluruh module. Suite `Module` pada
+`apps/control-plane/phpunit.xml` menyapu `modules/*/*/tests`; tidak ada perintah kedua untuk modul
+ini, dan tidak ada `artisan` di dalam folder modul untuk menjalankannya sendiri.
+
+::: tip Yang berubah dan kenapa itu penting
+Modul dulu punya suite sendiri di atas SQLite. Suite itu **tidak pernah membuktikan apa pun tentang
+penguncian baris**: pada SQLite, `lockForUpdate`, `sharedLock`, dan `FOR UPDATE SKIP LOCKED`
+dikompilasi menjadi string kosong. Sekarang test modul berjalan pada koneksi PostgreSQL yang sama
+dengan test Core.
+
+Satu hal yang **tidak pernah bisa diuji sebelumnya** kini bisa: bahwa daftar tidak memuat baris
+tenant lain. Dulu tiap tenant punya databasenya sendiri, jadi kebocoran semacam itu tidak punya
+tempat untuk terjadi di dalam test — dan karena itu tidak punya tempat untuk dibuktikan tidak
+terjadi.
+:::
 
 ### Di mana menambah test
 
@@ -28,18 +42,37 @@ Berjalan satu permintaan pada satu proses terhadap SQLite.
 | `MaintenanceSetupTest` | Setup maintenance dan penautannya |
 | `WorkOrderTest`, `WorkOrderExecutionTest` | Dokumen work order dan pengisian checklist |
 | `IndonesiaStarterProvisioningTest` | Penyiapan tenant, termasuk pengulangannya |
-| `NumberSequenceFailureTest` | Perilaku saat Core menolak atau tidak bisa dihubungi |
+| `NumberSequenceFailureTest` | Perilaku saat penerbitan nomor ditolak |
+| `PenyediaLaporanTest` | Definisi, layout bawaan, dan dataset laporan lewat kontrak |
+| `PerkakasModuleTest` | Perkakas yang dipakai bersama test lain |
 
-`InteractsWithCoreErpContext` adalah trait yang menyusun token konteks palsu untuk test. Pakai itu, jangan membuat token sendiri — kalau bentuk token berubah, satu tempat yang perlu disesuaikan.
+`tests/Concerns/BerinteraksiDenganKonteksCore` menyusun konteks modul untuk test. Pakai itu, jangan
+menyusun konteks sendiri — kalau bentuknya berubah, satu tempat yang perlu disesuaikan.
+
+Test lama yang mencetak JWT sendiri dan menandatanganinya dengan kunci yang ia pasang sendiri sudah
+dibuang. Jalur itu tidak ada lagi, dan test yang menguji jalur yang tidak ada adalah test yang hijau
+tanpa membuktikan apa pun.
 
 ### Yang dijaganya
 
 - Induk lintas tenant tertolak.
+- Daftar tidak pernah memuat baris tenant lain.
+- Menyimpan atas nama tenant lain dibatalkan sisi tulis `MilikTenant`.
 - Hak satu master tidak merembet ke master lain.
 - Induk yang masih beranak tidak bisa diarsipkan.
 - `kode` selalu berasal dari Core.
 - Transisi status work order mengikuti grafiknya.
 - Penyiapan data awal idempoten.
+
+### Penjaga batas berjalan di perintah yang sama
+
+`apps/control-plane/tests/Feature/Boundary/` memindai seluruh isi `modules/` dan menolak: tabel
+tanpa awalan modul, tabel milik modul lain yang disentuh, model tenant tanpa `MilikTenant`,
+namespace yang menyeberang, kerangka aplikasi Laravel di dalam folder modul, rute modul tanpa
+middleware konteks, dan manifest yang susunannya tidak sah.
+
+Ia bukan test milik modul ini, tetapi ia yang menangkap pelanggaran modul ini. Kalau salah satunya
+merah setelah perubahan Anda, itu bukan test yang perlu dilonggarkan.
 
 ## Yang tidak bisa dilihat feature test
 
@@ -55,23 +88,34 @@ Feature test **secara struktural** tidak bisa melihat:
 
 Bukan karena testnya kurang lengkap, melainkan karena ia menjalankan satu permintaan pada satu waktu. Menambah test feature tidak akan pernah menutup celah ini.
 
-Contoh nyata: endpoint penautan maintenance menghapus lalu menyisipkan ulang tanpa mengunci baris pemiliknya. Dua penulis bisa menghasilkan gabungan dua daftar. Seluruh 181 test tetap hijau.
+Contoh nyata: endpoint penautan maintenance menghapus lalu menyisipkan ulang tanpa mengunci baris pemiliknya. Dua penulis bisa menghasilkan gabungan dua daftar. Seluruh suite tetap hijau.
 
 ## Load test
 
-```bash
-cd loadtest
-node mint-tenants.mjs
-docker run … grafana/k6:0.55.0 run /scripts/master-data.js
-```
+Skenario dan oracle SQL-nya ada di `modules/apperp/management-aset/loadtest/`, karena permukaan
+yang diuji milik modul ini. **Stack-nya bukan milik modul**: sejak 10 September 2026 hanya ada satu,
+`apps/control-plane/loadtest/`, yang menjalankan runtime Core sungguhan dengan empat instance di
+belakang nginx. Cara menjalankannya, hasil terukurnya, dan batas kejujurannya ada di `README.md`
+folder itu.
 
-Menjalankan API sungguhan di belakang load balancer, dengan PostgreSQL asli dan stub Core yang mencatat setiap nomor yang diterbitkan.
+| Skrip | Yang diuji | Status |
+| --- | --- | --- |
+| `master-data.js` | CRUD master, idempotency, batas tenant, eskalasi hak | diukur ulang pada runtime baru |
+| `maintenance.js` | Setup maintenance, dan balapan penggantian kaitan | diukur ulang pada runtime baru |
+| `depreciation.js` | Proposal dan finalisasi penyusutan beserta pengulangannya | **belum dipindah**; berhenti dengan galat bila dijalankan |
+| `work-order.js` | Dokumen work order di bawah beban | **belum dipindah**; berhenti dengan galat bila dijalankan |
 
-| Skrip | Yang diuji |
-| --- | --- |
-| `master-data.js` | CRUD master, idempotency, batas tenant, eskalasi hak |
-| `depreciation.js` | Proposal dan finalisasi penyusutan beserta pengulangannya |
-| `maintenance.js` | Setup maintenance, dan balapan penggantian kaitan |
+Tidak ada lagi tiruan Core. Nomor diterbitkan proses yang sama lewat `PenerbitNomor`, jadi oracle
+nomor dibaca dari tabel terbitan Core: tiap `kode` yang tersimpan modul harus punya satu baris di
+`number_sequence_issues` pada tenant dan reference yang benar.
+
+::: warning Dua skenario belum diukur ulang
+`depreciation.js` dan `work-order.js` masih memakai harness lama — berkas fixture berisi token
+konteks dan header `Authorization: Bearer`, dua hal yang tidak ada lagi. Keduanya sengaja dibiarkan
+gagal keras, bukan diperbaiki setengah jalan, supaya tidak ada skenario yang hijau tanpa menjalankan
+apa pun. Permukaan penyusutan dan work order karena itu **belum terverifikasi di bawah beban** pada
+runtime satu proses.
+:::
 
 ### Profil
 
@@ -110,12 +154,30 @@ Diperiksa dengan SQL langsung ke database setelah run, **bukan** lewat API. API 
 
 ## Hasil yang sudah tercatat
 
-Modul ini sudah melewati gate concurrency: 1000 pengguna serentak pada 128 tenant, empat instance API, PostgreSQL asli. Nol pelanggaran lintas tenant, nol nomor ganda dari 4.342 nomor terbit, nol eskalasi hak.
+Diukur ulang **10 September 2026** pada runtime satu proses, empat instance Core di belakang nginx,
+PostgreSQL asli, tanpa tiruan Core.
 
-Temuan pentingnya bukan angka throughput, melainkan **apa yang jenuh lebih dulu**: penanganan koneksi database, bukan kode modul. Tanpa koneksi persisten, PostgreSQL menghabiskan 5,5 core hanya untuk membuat proses baru tiap permintaan. Karena itu ada `DB_PERSISTENT` di `api/config/database.php`, default mati, dinyalakan pada deployment dengan worker tetap.
+- Penjenuhan: 1000 pengguna serentak pada 128 tenant, 90 detik. Nol pelanggaran kebenaran, nol 5xx
+  aplikasi, 225 probe lintas tenant semua ditolak, 73 probe eskalasi hak semua 403.
+- Perlombaan tautan: 32 pengguna dipusatkan pada 4 tenant, 90 detik. Nol himpunan gabungan dari
+  3.920 pembacaan balik.
+- Oracle SQL: 12 pemeriksaan sisi Core dan 26 pemeriksaan sisi modul, seluruhnya nol. 63.861 nomor
+  terbit, 63.861 unik.
+
+Oracle-nya dibuktikan bisa merah lebih dulu — probe diarahkan ke record milik sendiri, penulis
+balapan mengirim gabungan kedua himpunan, satu baris cacat disuntik ke database lalu dihapus — dan
+angka merahnya ada di README stack.
+
+Temuan pentingnya bukan angka throughput, melainkan **apa yang jenuh lebih dulu**, dan jawabannya
+berubah: sekarang CPU PHP, bukan PostgreSQL. Dengan PgBouncer session pooling, 1000 pengguna
+serentak hanya memakai 39 koneksi database dan PostgreSQL tinggal 11-65% satu core, sementara
+keempat instance API menghabiskan hampir seluruh 12 vCPU mesin. Salah satu sebabnya dapat
+diperbaiki di lapis deployment: `php artisan config:cache` gagal pada Core, sehingga setiap
+permintaan membayar bootstrap Laravel penuh.
 
 ## Halaman terkait
 
 - [Load dan concurrency testing](/dev/20-load-and-concurrency-testing) — gate platform
 - [Database dan migration](/apps/management-aset/arsitektur/database) — batasan yang diandalkan pengujian
-- `loadtest/README.md` di repo app — cara menjalankan dan batas kejujuran hasilnya
+- [Definition of done](/onboarding/definition-of-done) — penjaga batas dan gate load test sebagai syarat selesai
+- `apps/control-plane/loadtest/README.md` — stack gabungan: cara menjalankan, hasil terukur, dan batas kejujurannya

@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Actions\Provider\RegisterAppCatalog;
 use App\Http\Requests\Provider\AppCatalogRequest;
+use App\Support\Modules\ModuleManifest;
+use App\Support\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -12,52 +14,119 @@ use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Mendaftarkan katalog app dari file manifest `app.yaml`.
+ * Mendaftarkan katalog app dari `app.yaml` module yang ada di dalam repo.
  *
  * Manifest adalah sumber kebenaran katalog. Command ini memakai aturan validasi,
  * normalisasi payload, dan action yang sama dengan endpoint provider
  * (`POST /api/v1/provider/apps`) supaya jalur CLI dan jalur API tidak bisa
  * saling menyimpang.
+ *
+ * **Kenapa tidak lagi menerima jalur berkas.** Dulu manifest tinggal di repo lain, jadi
+ * satu-satunya cara menunjuknya adalah jalur yang diketik pemakai. Sekarang module ada di
+ * dalam repo dan `ModuleRegistry` sudah menemukannya dengan memindai folder
+ * `modules/<penerbit>/<module>/app.yaml`.
+ * Jalur yang diketik pemakai berarti dua sumber kebenaran yang bisa berselisih: yang
+ * didaftarkan ke katalog bisa berbeda dari yang dimuat runtime, dan tidak ada yang akan
+ * menyadarinya. Registry yang sama dipakai keduanya.
+ *
+ * **Kenapa `semua()`, bukan `semuaTermasukYangSedangDipindah()`.** Katalog adalah daftar yang
+ * boleh dipasang untuk tenant. Module yang sedang dipindah masuk belum boleh dipasang —
+ * kodenya boleh dimuat supaya testnya berjalan, tetapi datanya belum tentu tersaring
+ * `tenant_id`. Mendaftarkannya ke katalog berarti membuka pemasangannya.
+ *
+ * **Aman diulang.** Pembaruan on-premise dijalankan admin pelanggan, yang tidak punya cara
+ * mengetahui apakah sebuah perintah sudah pernah jalan. Menjalankan perintah ini dua kali
+ * harus menghasilkan keadaan yang sama persis dengan sekali.
  */
 class RegisterAppManifestCommand extends Command
 {
     protected $signature = 'app:register-manifest
-        {path : Path ke file app.yaml}
-        {--name= : Nama produk; menimpa `name` di manifest}
-        {--description= : Deskripsi produk; menimpa `description` di manifest}
-        {--repository-url= : URL repository (https://)}
-        {--contract-url= : URL contract yang dipublish (https://)}
+        {module? : ID module yang didaftarkan; kosong berarti semua module yang dilayani}
         {--dry-run : Tampilkan hasil pemetaan tanpa menulis ke database}';
 
-    protected $description = 'Daftarkan app ke katalog control-plane dari manifest app.yaml';
+    protected $description = 'Daftarkan module yang ada di repo ke katalog control-plane dari app.yaml-nya';
 
-    public function handle(RegisterAppCatalog $registrar): int
+    public function handle(ModuleRegistry $registry, RegisterAppCatalog $registrar): int
     {
-        $path = $this->argument('path');
+        $module = $this->modulYangDidaftarkan($registry);
 
-        if (! is_file($path)) {
-            $this->components->error("Manifest tidak ditemukan: {$path}");
-
+        if ($module === null) {
             return self::FAILURE;
         }
 
+        if ($module === []) {
+            $this->components->info('Tidak ada module yang perlu didaftarkan.');
+
+            return self::SUCCESS;
+        }
+
+        foreach ($module as $satu) {
+            if ($this->daftarkan($satu, $registrar) === self::FAILURE) {
+                return self::FAILURE;
+            }
+        }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Module yang akan didaftarkan, atau null bila argumennya menunjuk module yang tidak
+     * dilayani.
+     *
+     * @return list<ModuleManifest>|null
+     */
+    private function modulYangDidaftarkan(ModuleRegistry $registry): ?array
+    {
+        // Module contoh dilewati. Ia hidup di repo sebagai bahan uji penjaga batas, bukan
+        // sebagai produk, dan katalog adalah daftar yang dilihat serta dipasang pelanggan.
+        $dilayani = array_values(array_filter(
+            $registry->semua(),
+            static fn (ModuleManifest $m): bool => ! $m->bahanUjiInternal(),
+        ));
+
+        $id = $this->argument('module');
+
+        if (! is_string($id) || $id === '') {
+            return $dilayani;
+        }
+
+        $dipilih = array_values(array_filter($dilayani, static fn (ModuleManifest $m): bool => $m->id === $id));
+
+        if ($dipilih === []) {
+            $this->components->error(sprintf(
+                'Module "%s" tidak ada di repo atau belum boleh dilayani. Yang bisa didaftarkan: %s.',
+                $id,
+                $dilayani === [] ? 'tidak ada' : implode(', ', array_map(static fn (ModuleManifest $m): string => $m->id, $dilayani)),
+            ));
+
+            return null;
+        }
+
+        return $dipilih;
+    }
+
+    private function daftarkan(ModuleManifest $module, RegisterAppCatalog $registrar): int
+    {
+        $berkas = $module->folder.'/app.yaml';
+
         try {
-            $manifest = Yaml::parseFile($path);
+            /** @var mixed $manifest */
+            $manifest = Yaml::parseFile($berkas);
         } catch (ParseException $exception) {
-            $this->components->error('Manifest bukan YAML yang valid: '.$exception->getMessage());
+            $this->components->error("Manifest {$berkas} bukan YAML yang valid: ".$exception->getMessage());
 
             return self::FAILURE;
         }
 
         if (! is_array($manifest)) {
-            $this->components->error('Manifest harus berupa map di level teratas.');
+            $this->components->error("Manifest {$berkas} harus berupa map di level teratas.");
 
             return self::FAILURE;
         }
 
-        // Ditolak, bukan diabaikan diam-diam: penulis app yang masih menuliskan
+        // Ditolak, bukan diabaikan diam-diam: penulis module yang masih menuliskan
         // `ui.entry` perlu tahu bahwa nilainya tidak lagi dipakai, agar tidak
-        // mengira app-nya disajikan pada path yang ia tentukan sendiri.
+        // mengira module-nya disajikan pada path yang ia tentukan sendiri.
         if (isset($manifest['ui']['entry'])) {
             $this->components->error(
                 'Manifest tidak boleh lagi mendeklarasikan `ui.entry`. Path konten UI '
@@ -71,7 +140,7 @@ class RegisterAppManifestCommand extends Command
         $validator = $this->validatorFor($request);
 
         if ($validator->fails()) {
-            $this->components->error('Manifest ditolak validasi katalog:');
+            $this->components->error("Manifest {$berkas} ditolak validasi katalog:");
             $this->components->bulletList($validator->errors()->all());
 
             return self::FAILURE;
@@ -111,7 +180,7 @@ class RegisterAppManifestCommand extends Command
      *
      * Manifest tidak mendeklarasikan nama produk yang layak tampil, sedangkan
      * halaman pendaftaran menampilkannya; karena itu nama diturunkan dari ID
-     * app bila manifest maupun opsi tidak menyediakannya.
+     * app bila manifest tidak menyediakannya.
      *
      * @param  array<mixed>  $manifest
      * @return array<string, mixed>
@@ -122,20 +191,21 @@ class RegisterAppManifestCommand extends Command
 
         return [
             'id' => $id,
-            'name' => $this->stringOption('name') ?? $this->asString($manifest['name'] ?? null) ?: Str::headline($id),
-            'description' => $this->stringOption('description') ?? ($manifest['description'] ?? null),
+            'name' => $this->asString($manifest['name'] ?? null) ?: Str::headline($id),
+            'description' => $manifest['description'] ?? null,
             'version' => $this->asString($manifest['version'] ?? null),
-            // Manifest module tidak punya blok `database`. Yang tidak disebutkan dikirim
-            // sebagai null, bukan string kosong: string kosong tetap gagal pada pola nama
-            // database dan akan menolak module dengan pesan yang menyesatkan.
-            'database_name' => $this->asString($manifest['database']['logical_name'] ?? null) ?: null,
+            // Selalu null. Yang didaftarkan command ini hanya module, dan module berjalan di
+            // dalam runtime Core memakai database Core. Manifest aset masih membawa
+            // `database.logical_name` dari masa ia sebuah container; menyalinnya ke katalog
+            // berarti mencatat nama database yang tidak ada dan tidak pernah dibuat siapa pun.
+            'database_name' => null,
             // Manifest hanya menyatakan bahwa app punya UI, bukan di path mana ia
             // disajikan. Path itu milik platform karena ia bergantung pada
             // placement, yang berbeda antar deployment dari release yang sama.
             'has_ui' => isset($manifest['ui']) && is_array($manifest['ui']),
             'navigation' => $manifest['ui']['navigation'] ?? null,
-            'repository_url' => $this->stringOption('repository-url') ?? ($manifest['repository_url'] ?? null),
-            'contract_url' => $this->stringOption('contract-url') ?? ($manifest['contract_url'] ?? null),
+            'repository_url' => $manifest['repository_url'] ?? null,
+            'contract_url' => $manifest['contract_url'] ?? null,
             'dependsOn' => $manifest['dependsOn'] ?? [],
             'security' => $manifest['security'] ?? [],
             'number_sequences' => $manifest['number_sequences'] ?? [],
@@ -189,14 +259,6 @@ class RegisterAppManifestCommand extends Command
         $this->components->twoColumnDetail('<fg=gray>Jenis workflow</>', (string) count($request->workflowTypesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Policy data</>', (string) count($request->dataPoliciesPayload()));
         $this->components->twoColumnDetail('<fg=gray>Laporan</>', (string) count($request->reportsPayload()));
-    }
-
-    /** Opsi CLI yang kosong dianggap tidak diisi sehingga manifest tetap dipakai. */
-    private function stringOption(string $key): ?string
-    {
-        $value = $this->option($key);
-
-        return is_string($value) && $value !== '' ? $value : null;
     }
 
     private function asString(mixed $value): string
