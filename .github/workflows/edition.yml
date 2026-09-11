@@ -30,6 +30,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
+    # Alasannya ditulis lengkap di alur tests.
+    #
+    # `PASANG_OTEL: '0'` melewatkan kompilasi ekstensi `opentelemetry` saat membangun image.
+    # Alur ini membangun dua image pada setiap PR hanya untuk membuktikan pemangkasan module
+    # bekerja, lalu membuangnya. Konsekuensinya disadari dan diterima: image yang diverifikasi
+    # di sini bukan image yang dikirim ke pelanggan. Yang dikirim dibangun `release.yml`, dan
+    # alur itu sengaja tidak menyetel variabel ini.
+    env:
+      OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
+      PASANG_OTEL: '0'
+
     services:
       postgres:
         image: postgres:16-alpine
@@ -69,7 +80,7 @@ jobs:
           coverage: none
 
       - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-opentelemetry
         working-directory: apps/control-plane
 
       - name: Copy Environment File

@@ -30,6 +30,11 @@
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
         "laravel/wayfinder": "^0.1.14",
+        "open-telemetry/exporter-otlp": "^1.4",
+        "open-telemetry/opentelemetry-auto-laravel": "^1.9",
+        "open-telemetry/opentelemetry-auto-psr3": "^0.3.0",
+        "open-telemetry/sdk": "^1.15",
+        "php-http/guzzle7-adapter": "^1.1",
         "phpoffice/phpspreadsheet": "4.0",
         "phpoffice/phpword": "1.3",
         "symfony/yaml": "^8.1"
@@ -133,7 +138,8 @@
         "sort-packages": true,
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "tbachert/spi": true
         }
     },
     "minimum-stability": "stable",

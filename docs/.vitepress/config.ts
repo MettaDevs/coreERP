@@ -210,6 +210,7 @@ export default withMermaid({
           collapsed: true,
           items: [
             { text: 'Standar penjaga dan pengujian', link: '/dev/25-standar-penjaga-dan-pengujian' },
+            { text: 'Pelaporan kesalahan', link: '/dev/28-pelaporan-kesalahan' },
             { text: 'Load dan concurrency testing', link: '/dev/20-load-and-concurrency-testing' },
           ],
         },

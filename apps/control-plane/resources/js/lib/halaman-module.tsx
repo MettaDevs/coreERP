@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense } from 'react';
 import type { ComponentType, ReactNode } from 'react';
+import { laporkanKesalahan } from '@/lib/pelaporan-kesalahan';
 
 /**
  * Satu-satunya halaman Inertia untuk semua module.
@@ -97,6 +98,13 @@ class BatasKesalahan extends Component<PropsBatas, StateBatas> {
             `Halaman module ${this.props.nama} gagal dimuat.`,
             kesalahan,
         );
+
+        // Konsol itu milik peramban pengguna, jadi ia tidak sampai ke siapa pun. Ini
+        // satu-satunya penangkap yang tahu *module* mana yang gagal — di penangkap global
+        // kesalahan yang sama hanya berupa berkas potongan tanpa nama.
+        laporkanKesalahan(kesalahan, 'batas-module', {
+            'coreerp.halaman_module': this.props.nama,
+        });
     }
 
     render() {

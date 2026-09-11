@@ -34,7 +34,28 @@
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
-        @fonts
+        {{--
+            Tidak ada `@fonts` di sini, dan itu pasangan dari tidak adanya blok `fonts`
+            pada `vite.config.ts` — keduanya harus dicabut bersamaan.
+
+            Direktif itu tidak membaca konfigurasi Vite melainkan sebuah manifest di
+            `public/fonts-manifest.dev.json`, yang **ditulis** plugin saat font disetel
+            dan **tidak pernah dihapusnya** ketika setelan itu dicabut. Berkasnya
+            untracked, jadi ia tertinggal di mesin siapa pun yang pernah menjalankan
+            server pengembangan sebelum `bunny('Instrument Sans')` dibuang, dan tetap
+            dibaca di sana selamanya.
+
+            Akibatnya setiap halaman memancarkan enam `<link rel="preload">` beserta
+            `@font-face` untuk Instrument Sans — font yang tidak dipakai tema — menuju
+            `/__laravel_vite_plugin__/fonts/<hash>.woff2` pada server pengembangan yang
+            tidak lagi melayani rute itu. Tema memakai Poppins dan Geist dari
+            `@fontsource`, jadi tampilannya tidak pernah berubah; yang muncul hanya enam
+            baris merah di konsol setiap kali halaman dibuka, dan konsol yang selalu
+            merah adalah konsol yang berhenti dibaca orang.
+
+            Kalau kelak font memang mau diurus plugin, pasang kembali keduanya sekaligus:
+            blok `fonts` di `vite.config.ts` dan direktif ini.
+        --}}
 
         @php
             /*
