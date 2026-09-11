@@ -7,6 +7,8 @@ use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\Observabilitas\PelaporKesalahan;
 use App\Support\ParameterWorkflow;
+use App\Support\Pusat\JaringSambunganKeluar;
+use App\Support\Pusat\LingkunganAktif;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -47,6 +49,16 @@ class AppServiceProvider extends ServiceProvider
         // Alasan yang sama untuk parameter workflow: jawabannya tidak berubah di tengah satu
         // permintaan, dan sebuah workflow bercabang akan menanyakannya berkali-kali.
         $this->app->scoped(ParameterWorkflow::class);
+
+        /*
+         * Scoped, dan itu yang membuat `lupakan()` pada kelas itu jarang diperlukan.
+         *
+         * Jawabannya ditanyakan ulang oleh setiap titik yang menjaga sambungan keluar, dan
+         * setiap pertanyaan berarti satu query kalau instansnya baru tiap kali. Scoped juga
+         * yang menjaga ingatannya tidak menyeberang: pekerja antrean yang memungut job
+         * berikutnya mendapat ikatan yang bersih, persis seperti permintaan HTTP berikutnya.
+         */
+        $this->app->scoped(LingkunganAktif::class);
     }
 
     /**
@@ -65,6 +77,11 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureDefaults();
         $this->hentikanPenerusanLogKeOtel();
+
+        // Dipasang tanpa syarat, termasuk on-prem dan di dalam test. Yang menentukan apakah ia
+        // menolak sesuatu adalah baris `environments`, bukan pemasangannya — dan selama satu
+        // tenant hanya punya produksi, ia tidak pernah menolak apa pun.
+        JaringSambunganKeluar::pasang();
 
         Gate::define(
             'manage-access',

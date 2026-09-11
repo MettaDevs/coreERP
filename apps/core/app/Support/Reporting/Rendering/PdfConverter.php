@@ -11,6 +11,27 @@ use Illuminate\Support\Facades\Http;
  * Service itu stateless: menerima satu berkas, mengembalikan PDF, tidak menyimpan apa pun
  * dan tidak mengenal tenant. Karena itu ia boleh dipakai bersama oleh semua app dan
  * semua tenant pada satu deployment, dan pada on-prem cukup satu container tambahan.
+ *
+ * ## Kenapa di sini TIDAK ada penjagaan sambungan keluar, dan jangan ditambahkan
+ *
+ * Ketika sebuah produksi disalin menjadi sandbox, salinannya dilucuti sambungan keluarnya:
+ * penerbit event berhenti mengirim, laporan ke Discord ditekan, dan sisanya ditolak jaring
+ * global. Titik ini sengaja berada di luar daftar itu, dan `JaringSambunganKeluar` malah
+ * mengecualikan alamatnya dengan sengaja.
+ *
+ * Alasannya ada pada kalimat pertama docblock ini. Yang dilucuti dari sebuah salinan adalah
+ * kemampuannya menghubungi **pihak yang sebenarnya** — pelanggan yang menerima email, sistem
+ * yang menerima webhook, penyedia pembayaran. Gotenberg bukan salah satunya: ia berada di
+ * dalam deployment yang sama, tidak tahu apa-apa tentang tenant, dan tidak menyimpan sebaris
+ * pun dari dokumen yang lewat. Memblokirnya tidak melindungi seorang pelanggan pun.
+ *
+ * Yang dirusaknya justru nyata: pencetakan mati di **setiap** sandbox dan setiap demo — dan
+ * mencetak adalah hal pertama yang orang coba ketika ia diperlihatkan produk ini. Fitur yang
+ * hanya bisa dicoba di produksi persis kebalikan dari alasan sandbox dibangun.
+ *
+ * Jadi kalau suatu saat seseorang membaca daftar pelucutan lalu merasa titik ini "terlewat":
+ * ia tidak terlewat. Kalimat ini yang menahannya, dan ada test yang membuktikan perender
+ * tetap berhasil di lingkungan yang sambungan keluarnya sudah dimatikan.
  */
 final class PdfConverter
 {

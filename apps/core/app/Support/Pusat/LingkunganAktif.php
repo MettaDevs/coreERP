@@ -34,9 +34,15 @@ use Throwable;
  *
  * - Ia hanya menjangkau panggilan yang lewat facade `Http`. cURL mentah, client Guzzle yang
  *   dibangun sendiri oleh sebuah SDK, dan `file_get_contents('http://...')` lewat begitu saja.
- * - `Http::withoutGlobalConfiguration()` — API publik yang tidak terdokumentasi — mematikan
- *   seluruh global middleware selama closure berjalan. Satu paket pihak ketiga dapat melenyapkan
- *   gate ini dari dalam proses yang sama, tanpa jejak.
+ * - Daftar global middleware diserahkan lewat konstruktor `PendingRequest`, jadi `new
+ *   PendingRequest` tanpa factory lahir tanpa satu pun dari daftar itu. Begitu pula `Http::swap()`,
+ *   yang mengganti factory-nya sekalian. Keduanya API publik, dan keduanya dapat dipakai satu paket
+ *   pihak ketiga dari dalam proses yang sama tanpa meninggalkan jejak.
+ *
+ * (Versi terdahulu docblock ini menyebut `Http::withoutGlobalConfiguration()` sebagai jalan
+ * pintasnya. Method itu tidak ada — diperiksa pada `Factory.php` dan `PendingRequest.php` Laravel
+ * 13.19. Kesimpulannya tidak berubah, tetapi sebuah lubang yang ditulis dari ingatan dan bukan dari
+ * kodenya tidak layak dipercaya orang berikutnya.)
  *
  * Batas yang sesungguhnya adalah **isolasi jaringan container** (`internal: true`): ia mengikat
  * apa pun yang keluar dari proses PHP, termasuk kode yang tidak kita kendalikan. Kelas ini
@@ -100,7 +106,10 @@ class LingkunganAktif
      */
     public function bolehKeluar(): bool
     {
-        return $this->sekarang()?->outbound_allowed ?? true;
+        // `->`, bukan `?->`. Di sebelah kiri `??` keduanya berperilaku sama — pembacaan properti
+        // pada null menghasilkan null, bukan galat — dan analisa statis menolak yang kedua sebagai
+        // penjagaan yang tidak menjaga apa pun.
+        return $this->sekarang()->outbound_allowed ?? true;
     }
 
     /**
