@@ -7,8 +7,36 @@ use Laravel\Fortify\Features;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * Suite ini tidak boleh menyentuh schema kerja.
+     *
+     * `RefreshDatabase` menjalankan `migrate:fresh`, yang **membuang seluruh tabel** pada schema
+     * yang sedang aktif. Selama koneksinya `pgsql_test` dengan `search_path` tersendiri, itu tidak
+     * berbahaya. Begitu sebuah test — atau sebuah perintah yang dipanggil test — berpindah ke
+     * koneksi bawaan, perintah yang sama menghapus database kerja pengembang tanpa satu pun
+     * peringatan: yang terlihat hanyalah suite yang hijau, lalu stack lokal yang tiba-tiba kosong.
+     *
+     * Sudah terjadi sekali pada 12 September 2026, dan yang hilang adalah tenant beserta akun
+     * operator di database dev. Pemeriksaan ini berdiri sebelum satu baris test pun berjalan karena
+     * kerusakannya tidak dapat dibatalkan — mencetaknya sesudah tidak menolong siapa pun.
+     */
     protected function setUp(): void
     {
+        // Dibaca dari env, bukan dari `config()`. Aplikasinya belum berdiri di titik ini — dan ia
+        // memang tidak boleh berdiri lebih dulu, karena `RefreshDatabase` menumpang
+        // `parent::setUp()` di bawah dan sudah menjalankan `migrate:fresh` sebelum baris pertama
+        // test manapun sempat memeriksa apa pun.
+        $koneksi = (string) (getenv('DB_CONNECTION') ?: ($_ENV['DB_CONNECTION'] ?? ''));
+        $jalur = (string) (getenv('DB_TEST_SCHEMA') ?: ($_ENV['DB_TEST_SCHEMA'] ?? 'coreerp_test'));
+
+        if (! str_starts_with($koneksi, 'pgsql_test') || $jalur === 'public') {
+            $this->fail(
+                'Suite ini menunjuk koneksi "'.$koneksi.'" dengan search_path "'.$jalur.'". '
+                .'Test hanya boleh berjalan di schema test — `migrate:fresh` pada schema kerja '
+                .'menghapus database pengembang, dan tidak ada yang mengembalikannya.'
+            );
+        }
+
         parent::setUp();
 
         // Fixture katalog untuk test. Bentuknya sengaja memakai empat lapis
