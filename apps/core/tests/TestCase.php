@@ -10,30 +10,36 @@ abstract class TestCase extends BaseTestCase
     /**
      * Suite ini tidak boleh menyentuh schema kerja.
      *
-     * `RefreshDatabase` menjalankan `migrate:fresh`, yang **membuang seluruh tabel** pada schema
-     * yang sedang aktif. Selama koneksinya `pgsql_test` dengan `search_path` tersendiri, itu tidak
-     * berbahaya. Begitu sebuah test — atau sebuah perintah yang dipanggil test — berpindah ke
-     * koneksi bawaan, perintah yang sama menghapus database kerja pengembang tanpa satu pun
-     * peringatan: yang terlihat hanyalah suite yang hijau, lalu stack lokal yang tiba-tiba kosong.
+     * Trait penyiap database milik Laravel mengosongkan schema yang sedang aktif sebelum tiap test
+     * — `RefreshDatabase` lewat `migrate:fresh`, `DatabaseTruncation` lewat TRUNCATE. Selama
+     * koneksinya `pgsql_test` dengan `search_path` tersendiri, itu tidak berbahaya. Begitu sebuah
+     * test berpindah ke koneksi bawaan, mekanisme yang sama mengosongkan database kerja pengembang
+     * tanpa satu pun peringatan: yang terlihat hanyalah suite yang hijau, lalu stack lokal yang
+     * tiba-tiba kosong.
      *
      * Sudah terjadi sekali pada 12 September 2026, dan yang hilang adalah tenant beserta akun
-     * operator di database dev. Pemeriksaan ini berdiri sebelum satu baris test pun berjalan karena
-     * kerusakannya tidak dapat dibatalkan — mencetaknya sesudah tidak menolong siapa pun.
+     * operator di database dev. Jejaknya TRUNCATE, bukan drop: `pg_stat_user_tables` mencatat
+     * `n_tup_del = 0` dengan `n_live_tup = 0`, seluruh 116 tabel masih berdiri, dan tabel
+     * `migrations` justru selamat — persis yang dikecualikan `DatabaseTruncation`.
+     *
+     * Karena itu yang diperiksa di sini alamatnya, bukan mekanismenya. Pemeriksaannya berdiri
+     * sebelum satu baris test pun berjalan, karena kerusakannya tidak dapat dibatalkan —
+     * mencetaknya sesudah tidak menolong siapa pun.
      */
     protected function setUp(): void
     {
         // Dibaca dari env, bukan dari `config()`. Aplikasinya belum berdiri di titik ini — dan ia
         // memang tidak boleh berdiri lebih dulu, karena `RefreshDatabase` menumpang
-        // `parent::setUp()` di bawah dan sudah menjalankan `migrate:fresh` sebelum baris pertama
-        // test manapun sempat memeriksa apa pun.
+        // `parent::setUp()` di bawah dan sudah mengosongkan schema-nya sebelum baris pertama test
+        // manapun sempat memeriksa apa pun.
         $koneksi = (string) (getenv('DB_CONNECTION') ?: ($_ENV['DB_CONNECTION'] ?? ''));
         $jalur = (string) (getenv('DB_TEST_SCHEMA') ?: ($_ENV['DB_TEST_SCHEMA'] ?? 'coreerp_test'));
 
         if (! str_starts_with($koneksi, 'pgsql_test') || $jalur === 'public') {
             $this->fail(
                 'Suite ini menunjuk koneksi "'.$koneksi.'" dengan search_path "'.$jalur.'". '
-                .'Test hanya boleh berjalan di schema test — `migrate:fresh` pada schema kerja '
-                .'menghapus database pengembang, dan tidak ada yang mengembalikannya.'
+                .'Test hanya boleh berjalan di schema test — trait penyiap database mengosongkan '
+                .'schema yang ditunjuknya, dan tidak ada yang mengembalikan isinya.'
             );
         }
 
