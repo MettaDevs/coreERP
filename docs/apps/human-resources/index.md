@@ -75,7 +75,7 @@ Sudah ada: workforce dasar dan integrasi akses berbasis posisi.
 | --- | --- | --- |
 | Manifest dan kontrak | ✅ Ada | `app.yaml`, `contracts/openapi.yaml`, `contracts/asyncapi.yaml` |
 | Masuk stack lokal | ✅ Ada | Ditemukan dengan memindai `modules/`; tidak ada service Compose yang perlu didaftarkan |
-| Penjaga batas | ✅ Hijau | `apps/control-plane/tests/Feature/Boundary/` |
+| Penjaga batas | ✅ Hijau | `apps/core/tests/Feature/Boundary/` |
 | Batas tenant terbukti | ✅ Ada | `tests/Feature/PenyaringanTenantTest.php` |
 | **Gate concurrency** | ❌ **Belum** | Tidak ada folder `loadtest/` |
 | Halaman fitur di `docs/apps/` | ⚠️ Minimal | Baru halaman ini |

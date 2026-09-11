@@ -1,7 +1,7 @@
 # Uji beban Management Aset
 
 Folder ini berisi **skenario dan oracle** milik modul. Ia tidak lagi berisi stack: sejak F7-03
-hanya ada satu, di `apps/control-plane/loadtest/`, dan ia menjalankan runtime Core yang sungguhan
+hanya ada satu, di `apps/core/loadtest/`, dan ia menjalankan runtime Core yang sungguhan
 dengan empat instance di belakang nginx.
 
 Cara menjalankan, hasil terukur, dan batas kejujurannya ada di `README.md` folder itu. Yang
@@ -31,7 +31,7 @@ mengikat tiap baris ke terbitannya.
 **Tidak ada lagi token konteks.** Rute modul berada di belakang `['web', 'auth']` dengan awalan
 `/api/modules/management-aset/v1/`; identitasnya sesi Core, lengkap dengan cookie dan CSRF. Karena
 itu `mint-tenants.mjs` dan `k6/tenants.json` dihapus, dan tenant disiapkan lewat alur pendaftaran
-usaha yang sungguhan di dalam `setup()` — lihat `apps/control-plane/loadtest/k6/lib.js`.
+usaha yang sungguhan di dalam `setup()` — lihat `apps/core/loadtest/k6/lib.js`.
 
 **Nama tabel berawalan `aset_`.** Modul berbagi database Core dan dipisahkan awalan tabel, bukan
 database sendiri. Query oracle yang masih menyebut `m_group_aset` tidak error — ia hanya tidak
@@ -39,7 +39,7 @@ menemukan tabel, dan gate-nya lolos secara palsu. Itu sebabnya seluruh `verify.s
 
 ## Menjalankan skenario modul
 
-Dari `apps/control-plane/loadtest/`, dengan stack sudah menyala:
+Dari `apps/core/loadtest/`, dengan stack sudah menyala:
 
 ```powershell
 $core = "$PWD\k6"

@@ -18,7 +18,7 @@
 //                       melihatnya: ia menjalankan satu permintaan pada satu proses.
 //
 // Sejak F7-03 identitas datang dari sesi Core, bukan token konteks, dan stack-nya
-// `apps/control-plane/loadtest/`. Karena satu sesi milik satu pengguna, VU dipetakan tetap ke
+// `apps/core/loadtest/`. Karena satu sesi milik satu pengguna, VU dipetakan tetap ke
 // arenanya: VU genap menulis himpunan A, VU ganjil menulis himpunan B, keduanya pada tenant
 // dan job type yang sama.
 

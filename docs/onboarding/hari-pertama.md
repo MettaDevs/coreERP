@@ -44,7 +44,7 @@ sedang kamu buka.
 ## Peta repo CoreERP
 
 ```text
-apps/control-plane/    Laravel. Identity, tenant, entitlement, katalog app, pemasangan module. Sekaligus shell UI yang merender halaman module.
+apps/core/    Laravel. Identity, tenant, entitlement, katalog app, pemasangan module. Sekaligus shell UI yang merender halaman module.
 apps/provider-console/ Konsol vendor.
 packages/ui/           SDK UI bersama (@apperp/ui).
 modules/               Module bisnis, satu folder per module di bawah <penerbit>/. Baca modules/README.md dulu.
@@ -54,7 +54,7 @@ deploy/                Manifest deployment dan contoh konfigurasi.
 docs/                  Dokumentasi ini.
 ```
 
-Perintah Composer dan NPM untuk Core dijalankan dari `apps/control-plane`, bukan dari root repo.
+Perintah Composer dan NPM untuk Core dijalankan dari `apps/core`, bukan dari root repo.
 Perintah itu ikut menjangkau `modules/`: `composer lint:check` menjalankan Pint pada keduanya, dan
 `php artisan test` menjalankan suite Core beserta suite `Module` yang menyapu `modules/*/*/tests`.
 

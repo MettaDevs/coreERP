@@ -140,7 +140,7 @@ Beberapa aturan yang mengikuti dari pengalaman menjalankannya:
 
 ## Implementasi rujukan
 
-`apps/control-plane/loadtest/` adalah stack-nya, dan sejak 10 September 2026 hanya ada satu: Compose dengan empat instance runtime Core di belakang nginx, PgBouncer, PostgreSQL, `prepare.sh` yang menjalankan urutan bootstrap yang sama dengan stack pengembangan, dan `verify.sql` sebagai oracle sisi Core. `README.md` di dalam folder itu mencatat hasil terukur, perintah persis yang menghasilkannya, dan batas kejujurannya.
+`apps/core/loadtest/` adalah stack-nya, dan sejak 10 September 2026 hanya ada satu: Compose dengan empat instance runtime Core di belakang nginx, PgBouncer, PostgreSQL, `prepare.sh` yang menjalankan urutan bootstrap yang sama dengan stack pengembangan, dan `verify.sql` sebagai oracle sisi Core. `README.md` di dalam folder itu mencatat hasil terukur, perintah persis yang menghasilkannya, dan batas kejujurannya.
 
 Skenario dan oracle milik module tinggal di folder module — `modules/apperp/management-aset/loadtest/` — karena permukaan yang diuji memang miliknya, dan keduanya berjalan di atas stack di atas lewat `k6/lib.js` yang sama.
 

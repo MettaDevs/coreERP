@@ -154,7 +154,7 @@ Module tidak punya alamat: Core memanggilnya di dalam proses yang sama. Tidak ad
 1. **Permission.** Laporan menyebut permission data app yang wajib dipegang pengguna; Core memeriksanya saat tombol ditekan, app memeriksanya lagi saat dataset diminta.
 2. **Data policy.** Dataset memakai scope organisasi yang sama dengan endpoint detail; jalur dataset tidak punya jalan pintas.
 3. **Kontrak.** `PenyediaLaporanModul` terdaftar saat boot, dan ada test yang membuktikan ketiga methodnya menjawab dari jalur yang sungguhan.
-4. **Load.** Endpoint permintaan ekspor Core dan endpoint dataset app masuk skenario load test; `apps/control-plane/loadtest/k6/reporting-e2e.js` menjalankan alur penuh pada stack lokal.
+4. **Load.** Endpoint permintaan ekspor Core dan endpoint dataset app masuk skenario load test; `apps/core/loadtest/k6/reporting-e2e.js` menjalankan alur penuh pada stack lokal.
 5. **Dokumentasi.** Halaman fitur di `docs/apps/<app>/` menyebut kode laporan, placeholder, dan permission-nya.
 
 ## Lihat juga

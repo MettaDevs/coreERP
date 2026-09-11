@@ -49,7 +49,7 @@ dalam iframe pada path `/apps-content/<placement>/<app-id>/`.
 Yang menggantikannya adalah folder module di `modules/<penerbit>/<module>/`, dijelaskan pada sisa
 halaman ini.
 
-Repository CoreERP ini menampung `apps/control-plane`, `apps/provider-console`, dan seluruh module
+Repository CoreERP ini menampung `apps/core`, `apps/provider-console`, dan seluruh module
 di bawah `modules/`. Surface Web Shell — launcher dan kerangka layar module — hidup di dalam UI
 Control Plane, bukan folder tersendiri.
 
@@ -203,7 +203,7 @@ Setiap app memiliki owner yang bertanggung jawab atas code review, contract, dat
 
 **Module** memakai database tenant yang sama dengan Core. Pemisahnya adalah **awalan nama tabel**
 yang diturunkan dari nama folder module, misalnya `aset_` dan `hr_`. Awalan itu didaftarkan pada
-katalog dan diperiksa penjaga batas di `apps/control-plane/tests/Feature/Boundary/`: tabel tanpa
+katalog dan diperiksa penjaga batas di `apps/core/tests/Feature/Boundary/`: tabel tanpa
 awalan yang benar, dan tabel milik module lain yang disentuh, ditolak sebelum pull request digabung.
 
 Addon pihak ketiga yang berjalan di luar runtime ini memakai database sendiri dengan pola

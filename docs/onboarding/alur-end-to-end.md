@@ -4,7 +4,7 @@ Satu alur yang ditelusuri sampai ke kode. Kalau kamu paham yang satu ini, sebagi
 
 Skenarionya: seseorang mendaftarkan bisnis baru dan memilih beberapa app. Titik masuknya `RegisterBusiness`.
 
-> Berkas: `apps/control-plane/app/Actions/Onboarding/RegisterBusiness.php`
+> Berkas: `apps/core/app/Actions/Onboarding/RegisterBusiness.php`
 
 Seluruh alur di bawah berjalan dalam **satu transaksi database**. Efek samping yang menulis di luar transaksi itu sengaja ditunda sampai transaksi selesai — alasannya di [langkah 9](#_9-setelah-commit-baru-memasang-module).
 

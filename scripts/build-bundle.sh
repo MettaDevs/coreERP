@@ -155,7 +155,7 @@ bash "$akar/scripts/build-edition.sh" "$edisi" "$image"
 # yang dibeli pelanggan; dependency, module penghubung, dan penolakan bahan uji seluruhnya
 # ditambahkan `edition:resolve`. Manifest rilis harus menyebut apa yang benar-benar ada di dalam
 # image, bukan apa yang diminta.
-if ! daftar_module="$(cd "$akar/apps/control-plane" && php artisan edition:resolve "$edisi" --daftar 2>&1)"; then
+if ! daftar_module="$(cd "$akar/apps/core" && php artisan edition:resolve "$edisi" --daftar 2>&1)"; then
     printf '%s\n' "$daftar_module" >&2
     gagal "Daftar module edisi \"$edisi\" gagal dihitung."
 fi

@@ -6,7 +6,7 @@ declare(strict_types=1);
 /**
  * Membuang module yang tidak dibeli sebuah edisi dari pohon bangunan image.
  *
- * Dipanggil dari `apps/control-plane/Dockerfile`, bukan dari mesin pengembang. Ia mengubah
+ * Dipanggil dari `apps/core/Dockerfile`, bukan dari mesin pengembang. Ia mengubah
  * berkas di tempat; menjalankannya di repo sungguhan akan memangkas repo itu sendiri.
  *
  * ## Kenapa dua tahap
@@ -158,7 +158,7 @@ function ulangi(string $akar, array $dibeli): int
  */
 function pangkasComposer(string $akar, array $dibuang): void
 {
-    $app = $akar.'/apps/control-plane';
+    $app = $akar.'/apps/core';
     $berkasJson = $app.'/composer.json';
     $berkasLock = $app.'/composer.lock';
 
@@ -284,7 +284,7 @@ function simpanHasilPangkasan(string $akar): void
     buatFolder(simpanan());
 
     foreach (['composer.json', 'composer.lock'] as $berkas) {
-        salin($akar.'/apps/control-plane/'.$berkas, simpanan().'/'.$berkas);
+        salin($akar.'/apps/core/'.$berkas, simpanan().'/'.$berkas);
     }
 }
 
@@ -300,7 +300,7 @@ function pulihkanHasilPangkasan(string $akar): void
             ));
         }
 
-        salin($sumber, $akar.'/apps/control-plane/'.$berkas);
+        salin($sumber, $akar.'/apps/core/'.$berkas);
     }
 
     pesan('composer.json dan composer.lock hasil pangkasan dipasang kembali.');
@@ -372,7 +372,7 @@ function buangFolderModule(string $akar, array $dibuang): void
 function buangKeluaranWayfinder(string $akar): void
 {
     foreach (['actions', 'routes', 'wayfinder'] as $folder) {
-        $jalur = $akar.'/apps/control-plane/resources/js/'.$folder;
+        $jalur = $akar.'/apps/core/resources/js/'.$folder;
 
         if (is_dir($jalur)) {
             hapus($jalur);

@@ -3,7 +3,7 @@
 # module dibentuk ulang, jadi build gagal pada baris COPY pertama.
 #
 # Ia tetap ada karena `loadtest/docker-compose.yml` masih menunjuk ke sini. Folder itu
-# dibekukan sampai F7-03, yang menggabungkannya dengan `apps/control-plane/loadtest/`;
+# dibekukan sampai F7-03, yang menggabungkannya dengan `apps/core/loadtest/`;
 # berkas ini ikut hilang pada task yang sama, bukan sebelumnya.
 
 FROM composer:2 AS vendor

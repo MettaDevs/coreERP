@@ -24,7 +24,7 @@ korelasi : jejak 4bf92f3577b34da6 · alur 01K3…
 ────────────────────────────────────────────────────────────
 Illuminate\Database\QueryException
 SQLSTATE[22001]: String data, right truncated …
-/repo/apps/control-plane/app/Http/Controllers/…:118
+/repo/apps/core/app/Http/Controllers/…:118
 ────────────────────────────────────────────────────────────
 pgsql · core_erp @ core-db:5432 (write) · SQLSTATE 22001
 value too long for type character varying(8)

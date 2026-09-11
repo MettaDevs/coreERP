@@ -107,15 +107,15 @@ Yang dipertukarkan hanya kode kebijakan dan daftar hak.
 
 Batas itu tidak berubah karena keduanya kini satu proses dan satu database. Yang berubah adalah
 siapa yang menegakkannya: dulu database terpisah, sekarang penjaga batas di
-`apps/control-plane/tests/Feature/Boundary/`.
+`apps/core/tests/Feature/Boundary/`.
 
 ## Di mana kodenya
 
 | Berkas | Isinya |
 | --- | --- |
 | `modules/apperp/management-aset/src/Support/OrganizationScope.php` | Penyaringan dan pemeriksaan hak |
-| `apps/control-plane/app/Support/Modules/Contracts/KonteksTenant.php`, `KonteksPermintaan.php` | Pintu tempat modul membaca konteksnya |
-| `apps/control-plane/app/Support/Modules/TenantScope.php` | Penegakan `MilikTenant` pada sisi baca dan sisi tulis |
+| `apps/core/app/Support/Modules/Contracts/KonteksTenant.php`, `KonteksPermintaan.php` | Pintu tempat modul membaca konteksnya |
+| `apps/core/app/Support/Modules/TenantScope.php` | Penegakan `MilikTenant` pada sisi baca dan sisi tulis |
 | [Rancangan scope data aset](/apps/management-aset/arsitektur/rancangan-scope-data-aset) | Rancangan pemisahan data per organisasi |
 
 ## Halaman terkait

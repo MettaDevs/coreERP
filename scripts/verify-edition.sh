@@ -66,7 +66,7 @@ gagal() {
 # Dihitung di sini, di luar image, dan sengaja begitu: kalau daftarnya dibaca dari dalam image,
 # image yang bocor akan menghitung dirinya sendiri sebagai benar.
 
-dibeli="$(cd "$akar_repo/apps/control-plane" && php artisan edition:resolve "$edisi" --daftar)"
+dibeli="$(cd "$akar_repo/apps/core" && php artisan edition:resolve "$edisi" --daftar)"
 
 semua_modul=""
 for folder in "$akar_repo"/modules/*/*/; do
@@ -213,9 +213,9 @@ fi
 
 for modul in $tidak_dibeli; do
     for bentuk in "$modul::" "/$modul/"; do
-        if docker run --rm --entrypoint sh "$image" -c "grep -rlF '$bentuk' /repo/apps/control-plane/public/build 2>/dev/null | head -5" | grep -q .; then
+        if docker run --rm --entrypoint sh "$image" -c "grep -rlF '$bentuk' /repo/apps/core/public/build 2>/dev/null | head -5" | grep -q .; then
             echo >&2
-            docker run --rm --entrypoint sh "$image" -c "grep -rlF '$bentuk' /repo/apps/control-plane/public/build 2>/dev/null | head -20" >&2 || true
+            docker run --rm --entrypoint sh "$image" -c "grep -rlF '$bentuk' /repo/apps/core/public/build 2>/dev/null | head -20" >&2 || true
             gagal "bundel JavaScript pada image edisi \"$edisi\" memuat \"$bentuk\", milik modul \"$modul\" yang tidak dibeli"
         fi
     done

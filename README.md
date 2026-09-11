@@ -45,6 +45,6 @@ Mulai dari [desain kanonik](docs/dev/README.md), lalu gunakan dokumen sesuai pek
 - [API dan integration bridge](docs/dev/04-api-and-integration.md)
 - [Target worktree](docs/dev/06-worktree-target.md)
 
-Laravel Control Plane saat ini berada di `apps/control-plane`; jalankan perintah Composer atau NPM dari direktori tersebut.
+Laravel Control Plane saat ini berada di `apps/core`; jalankan perintah Composer atau NPM dari direktori tersebut.
 
 Flow signup bisnis, invite code, role assignment, dan identity monitor dijelaskan di [Identity and Access](docs/dev/09-identity-and-access.md).

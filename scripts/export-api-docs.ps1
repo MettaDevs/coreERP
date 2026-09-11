@@ -1,8 +1,8 @@
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$controlPlane = Join-Path $repoRoot 'apps\control-plane'
-$moduleContracts = Join-Path $controlPlane 'contracts\modules'
+$core = Join-Path $repoRoot 'apps\core'
+$moduleContracts = Join-Path $core 'contracts\modules'
 
-Push-Location $controlPlane
+Push-Location $core
 try {
     php artisan scramble:export --path=contracts\openapi.json
 }

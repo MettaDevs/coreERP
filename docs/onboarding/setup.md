@@ -18,7 +18,7 @@ Node dan akun registry npm **tidak** diperlukan. Stack membangun SDK UI di dalam
 Nama repository **tidak selalu sama** dengan nama folder yang dibutuhkan build. `git clone` biasa dapat menghasilkan folder yang tidak ditemukan Compose. Selalu sebutkan nama foldernya secara eksplisit.
 :::
 
-`compose.yaml` melakukan build dari relative path `../CoreERP/apps/control-plane`. Kalau nama foldernya meleset satu huruf, build gagal.
+`compose.yaml` melakukan build dari relative path `../CoreERP/apps/core`. Kalau nama foldernya meleset satu huruf, build gagal.
 
 ```bash
 git clone <url-repo-core> CoreERP
@@ -106,7 +106,7 @@ memisahkan datanya adalah awalan nama tabel.
 
 ## Perintah verifikasi
 
-Dijalankan dari `apps/control-plane`:
+Dijalankan dari `apps/core`:
 
 ```bash
 composer lint:check

@@ -46,10 +46,10 @@ jobs:
 
     defaults:
       run:
-        working-directory: apps/control-plane
+        working-directory: apps/core
     strategy:
       matrix:
-        # 8.4 adalah versi yang dijalankan image produksi (apps/control-plane/Dockerfile),
+        # 8.4 adalah versi yang dijalankan image produksi (apps/core/Dockerfile),
         # jadi ia selalu dijalankan.
         #
         # 8.5 hanya dijalankan pada cabang utama dan sekali seminggu. Menjalankannya pada
@@ -62,7 +62,7 @@ jobs:
     # Suite ini menuntut PostgreSQL sungguhan, bukan SQLite: setiap klausa kunci yang
     # dipakai penerbitan nomor (lockForUpdate, FOR UPDATE SKIP LOCKED) berubah menjadi
     # string kosong di SQLite, sehingga test tidak membuktikan apa pun. Alasannya
-    # ditulis juga di apps/control-plane/phpunit.xml.
+    # ditulis juga di apps/core/phpunit.xml.
     #
     # Database test tidak perlu tahan mati listrik. Ia dibuat, dipakai beberapa menit, lalu
     # dibuang bersama runnernya — jadi seluruh jaminan durabilitas PostgreSQL di sini dibayar
@@ -153,7 +153,7 @@ jobs:
       # `--ignore-platform-req=ext-opentelemetry` menjawab separuh masalah yang berbeda dari
       # env di atas: dua paket `open-telemetry/*` mendeklarasikan ekstensi itu sebagai
       # platform requirement keras, dan penyelesai dependency menolak jauh sebelum satu baris
-      # kode pun dijalankan. Bentuk ini menyamai tahap vendor pada `apps/control-plane/Dockerfile`,
+      # kode pun dijalankan. Bentuk ini menyamai tahap vendor pada `apps/core/Dockerfile`,
       # supaya masalah yang sama tidak ditangani dengan dua mekanisme berbeda.
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-opentelemetry
@@ -179,7 +179,7 @@ jobs:
 
       # Koneksi test menunjuk schema tersendiri lewat search_path, dan PostgreSQL tidak
       # membuat schema itu sendiri. Di mesin pengembang langkah ini dilakukan tangan
-      # sekali, sesuai catatan pada apps/control-plane/.env.example.
+      # sekali, sesuai catatan pada apps/core/.env.example.
       #
       # Langkah ini dipertahankan walau alur di bawah berjalan paralel dan tidak memakainya:
       # mode serial masih membutuhkannya, dan itulah yang dijalankan siapa pun yang menyetel

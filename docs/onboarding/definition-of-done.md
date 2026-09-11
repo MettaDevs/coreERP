@@ -19,7 +19,7 @@ Kalimat terakhir itu inti seluruh aturan. Kalau kode "sudah dipasang" tidak bisa
 - [ ] Perubahan user yang tidak terkait tidak ikut terbawa
 - [ ] Hanya scope yang berubah yang diverifikasi
 
-Keempat perintah itu dijalankan dari `apps/control-plane` dan **ikut menjangkau `modules/`**.
+Keempat perintah itu dijalankan dari `apps/core` dan **ikut menjangkau `modules/`**.
 Mengubah module tanpa menjalankannya berarti CI yang menemukan masalahnya, bukan kamu.
 
 ### 2. Perubahan UI
@@ -44,7 +44,7 @@ Kalau kamu mengubah navigasi atau security di `app.yaml`, tambahan:
 
 Semua di atas, plus **penjaga batas** dan **gate load test**. Module tidak selesai hanya karena feature test lulus.
 
-Penjaga batasnya hidup sebagai test biasa di `apps/control-plane/tests/Feature/Boundary/` dan ikut
+Penjaga batasnya hidup sebagai test biasa di `apps/core/tests/Feature/Boundary/` dan ikut
 `php artisan test`. Ia memindai seluruh isi `modules/`, jadi module baru langsung masuk cakupannya
 tanpa satu pun berkas yang perlu didaftarkan. Yang ditolaknya: tabel tanpa awalan module, tabel
 milik module lain yang disentuh, model tenant tanpa `MilikTenant`, namespace yang menyeberang,

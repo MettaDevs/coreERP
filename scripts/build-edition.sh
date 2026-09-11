@@ -70,7 +70,7 @@ done
 # edisi Core saja. Keluarannya ditangkap, bukan dibiarkan mengalir, supaya bisa diperiksa
 # bentuknya sebelum dipakai; kalau perintahnya gagal, pesannya dicetak ulang apa adanya karena
 # di sanalah sebab kegagalannya dijelaskan.
-if ! keluaran="$(cd "$akar/apps/control-plane" && php artisan edition:resolve "$edisi" --daftar 2>&1)"; then
+if ! keluaran="$(cd "$akar/apps/core" && php artisan edition:resolve "$edisi" --daftar 2>&1)"; then
     printf '%s\n' "$keluaran" >&2
     gagal "Daftar module edisi \"$edisi\" gagal dihitung."
 fi
@@ -112,14 +112,14 @@ fi
 printf 'Tag image: %s\n\n' "$tag"
 
 # Konteks pembangunan adalah akar repo, bukan folder app. Alasannya ada di komentar paling atas
-# `apps/control-plane/Dockerfile`.
+# `apps/core/Dockerfile`.
 #
 # `PASANG_OTEL` diteruskan apa adanya dari lingkungan dan bawaannya `1`, jadi siapa pun yang
 # menjalankan skrip ini dengan tangan — termasuk pelanggan yang membangun dari sumber —
 # mendapat image utuh tanpa perlu tahu variabel ini ada. Yang menyetelnya ke `0` hanya alur
 # `edition.yml`, yang membangun untuk memverifikasi lalu membuang hasilnya.
 docker build \
-    --file "$akar/apps/control-plane/Dockerfile" \
+    --file "$akar/apps/core/Dockerfile" \
     --build-arg "MODUL=$daftar" \
     --build-arg "PASANG_OTEL=${PASANG_OTEL:-1}" \
     --tag "$tag" \

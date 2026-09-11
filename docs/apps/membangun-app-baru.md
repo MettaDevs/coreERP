@@ -117,7 +117,7 @@ Prosedur dan template: `.agents/skills/module-discovery/SKILL.md`. Aturan: [Gate
 Folder module dibuat dari cetakan `modules/_template/`, lewat perintahnya:
 
 ```powershell
-cd apps/control-plane
+cd apps/core
 php artisan module:make kelola-contoh --nama="Kelola Contoh" --awalan=kelola_
 ```
 
@@ -245,7 +245,7 @@ operasional membawa `org_unit_id` bila memang relevan.
 **Tidak ada foreign key, Eloquent relation, atau query ke tabel milik module lain.** Kalau kamu
 butuh data module lain, jawabannya tahap 4, bukan tahap ini. Yang menolak di sini bukan database —
 `DB::table()` akan berhasil menjangkaunya — melainkan penjaga batas di
-`apps/control-plane/tests/Feature/Boundary/`. Itulah sebabnya query mentah pada tabel module
+`apps/core/tests/Feature/Boundary/`. Itulah sebabnya query mentah pada tabel module
 dilarang: ia melewati lapisan model, dan lapisan model itulah yang menegakkan penyaringan tenant.
 
 Struktur klasifikasi milik domain module sendiri **boleh** memakai `parent_id` permanen — larangan `parent_id` hanya berlaku untuk identitas organization Core.
@@ -319,7 +319,7 @@ merendernya seperti halaman Inertia biasa:
 return Inertia::render('management-aset::Daftar', ['barang' => $barang]);
 ```
 
-Penerbit tidak ikut disebut; pemilih halaman pada `apps/control-plane/resources/js/app.tsx`
+Penerbit tidak ikut disebut; pemilih halaman pada `apps/core/resources/js/app.tsx`
 mencocokkan akhiran jalurnya, dan id module sudah unik di seluruh runtime.
 
 Tiga hal yang mengikat:
@@ -350,7 +350,7 @@ Teks untuk pengguna bisnis memakai bahasa sehari-hari. Istilah internal — `ent
 
 Komponen memakai SDK `@apperp/ui`. `Select` atau combobox di dalam `Sheet`, dialog, atau popover wajib menerima ref overlay lewat `portalContainer`; kalau tidak, menunya terbuka di bawah overlay dan tidak bisa dipilih.
 
-Berkas `ui/` diperiksa Prettier lewat `npm run format:check` di `apps/control-plane`. ESLint belum
+Berkas `ui/` diperiksa Prettier lewat `npm run format:check` di `apps/core`. ESLint belum
 mencakup folder ini, jadi untuk sementara ia hanya dijaga Prettier dan `tsc`.
 
 ::: tip Gate keluar

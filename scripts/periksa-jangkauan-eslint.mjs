@@ -1,7 +1,7 @@
 // Membuktikan bahwa ESLint benar-benar melihat berkas di luar Core.
 //
 // Ini bukan pemeriksaan gaya. Ia menjaga satu jenis kegagalan yang tidak pernah berbunyi:
-// sampai 10 September 2026 `eslint.config.js` berada di `apps/control-plane/`, dan ESLint 9
+// sampai 10 September 2026 `eslint.config.js` berada di `apps/core/`, dan ESLint 9
 // menetapkan base path dari letak berkas konfigurasinya. Akibatnya `eslint .` dari folder itu
 // memeriksa **nol** berkas di bawah `modules/` — lalu keluar dengan kode 0.
 //

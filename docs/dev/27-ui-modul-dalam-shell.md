@@ -13,11 +13,11 @@ Sampai 10 September 2026 dua bentuk hidup berdampingan, dan hampir semua kesalah
 | Salinan React | satu, milik shell | dua, satu di shell dan satu di dalam bingkai |
 | Token konteks | tidak ada | ada, beserta muat ulang berkalanya |
 
-Yang **tidak** berubah oleh pembuangan itu: menu tetap datang dari blok `ui.navigation` pada manifest lewat `App\Support\LaunchableAppCatalog`, tetap disaring permission, dan `/apps/<id>` tetap menjadi tautan peluncur produk. Rute `apps/{app}` di `apps/control-plane/routes/web.php` sekarang hanya mengalihkan ke entri menu pertama yang boleh dilihat pengguna. Satu tautan peluncur yang tetap benar lebih murah daripada peluncur yang harus tahu entri menu mana yang pertama boleh dilihat tiap pengguna.
+Yang **tidak** berubah oleh pembuangan itu: menu tetap datang dari blok `ui.navigation` pada manifest lewat `App\Support\LaunchableAppCatalog`, tetap disaring permission, dan `/apps/<id>` tetap menjadi tautan peluncur produk. Rute `apps/{app}` di `apps/core/routes/web.php` sekarang hanya mengalihkan ke entri menu pertama yang boleh dilihat pengguna. Satu tautan peluncur yang tetap benar lebih murah daripada peluncur yang harus tahu entri menu mana yang pertama boleh dilihat tiap pengguna.
 
 ## Nama halaman dan satu tuan rumah Inertia
 
-Controller module memanggil `Inertia::render` dengan nama berformat `Modul::Halaman`, misalnya `management-aset::Modul`. Pemilih halaman di `apps/control-plane/resources/js/app.tsx` mengenali tanda `::`, mencari berkasnya di antara halaman module, lalu **membungkusnya** dengan tuan rumah di `apps/control-plane/resources/js/lib/halaman-module.tsx`. Jadi satu komponen itulah satu-satunya halaman Inertia yang benar-benar dirender untuk seluruh module.
+Controller module memanggil `Inertia::render` dengan nama berformat `Modul::Halaman`, misalnya `management-aset::Modul`. Pemilih halaman di `apps/core/resources/js/app.tsx` mengenali tanda `::`, mencari berkasnya di antara halaman module, lalu **membungkusnya** dengan tuan rumah di `apps/core/resources/js/lib/halaman-module.tsx`. Jadi satu komponen itulah satu-satunya halaman Inertia yang benar-benar dirender untuk seluruh module.
 
 Penerbit sengaja tidak ikut disebut pada nama halaman. Id module unik di seluruh runtime, jadi menuliskan penerbitnya pada setiap `Inertia::render` hanya menambah satu hal lagi yang bisa salah ketik tanpa menambah ketepatan.
 
@@ -32,7 +32,7 @@ Berkas tuan rumah itu tinggal di `lib/`, bukan di `pages/`. Pola glob halaman sh
 
 ## Tautan menu adalah aturan tetap, bukan kolom manifest
 
-Tautan entri menu module adalah `/<id module>/<id entri menu>`, disusun `LaunchableAppCatalog::tautanMenu()` dari manifest. Sebuah kolom manifest kedua yang berisi jalur pernah dipertimbangkan dan ditolak: kolom seperti itu akan menyimpang dari berkas rute module cepat atau lambat, dan penyimpangannya tidak terlihat sampai ada yang mengklik menunya. Dengan aturan tetap, berkas rute module adalah satu-satunya sumber kebenaran, dan `apps/control-plane/tests/Feature/Modules/HalamanModuleShellTest.php` membuktikan setiap tautan menu mendarat pada rute yang terdaftar.
+Tautan entri menu module adalah `/<id module>/<id entri menu>`, disusun `LaunchableAppCatalog::tautanMenu()` dari manifest. Sebuah kolom manifest kedua yang berisi jalur pernah dipertimbangkan dan ditolak: kolom seperti itu akan menyimpang dari berkas rute module cepat atau lambat, dan penyimpangannya tidak terlihat sampai ada yang mengklik menunya. Dengan aturan tetap, berkas rute module adalah satu-satunya sumber kebenaran, dan `apps/core/tests/Feature/Modules/HalamanModuleShellTest.php` membuktikan setiap tautan menu mendarat pada rute yang terdaftar.
 
 ## Rute layar dimiliki module, bukan Core
 
@@ -53,7 +53,7 @@ Route::middleware(['web', 'auth', 'konteks-module:management-aset'])
 
 `where('sisa', '.*')` bukan soal gaya. Tanpanya Laravel berhenti pada garis miring pertama, dan alamat seperti `/management-aset/pemeliharaan-aset/<id>/ubah` tidak pernah sampai ke controller. Ruas sesudah id menu inilah yang dulu ditulis sesudah tanda pagar oleh perutean hash di dalam iframe; sekarang ia alamat biasa, sehingga tombol kembali peramban, muat ulang, dan tautan yang disalin semuanya mendarat di record yang sama.
 
-`konteks-module` — alias middleware yang didaftarkan `apps/control-plane/bootstrap/app.php` untuk `App\Http\Middleware\ResolveModuleContext` — menerima id module sebagai parameter, jadi ia dipasang di grup rute module dan bukan sebagai middleware global: izin bersifat per app, dan middleware global tidak tahu ia sedang melayani module yang mana.
+`konteks-module` — alias middleware yang didaftarkan `apps/core/bootstrap/app.php` untuk `App\Http\Middleware\ResolveModuleContext` — menerima id module sebagai parameter, jadi ia dipasang di grup rute module dan bukan sebagai middleware global: izin bersifat per app, dan middleware global tidak tahu ia sedang melayani module yang mana.
 
 ## Manifest adalah satu-satunya daftar id menu
 
@@ -72,7 +72,7 @@ Kode di dalam `modules/<penerbit>/<module>/ui` hanya boleh menyebut `@apperp/ui`
 
 Bahayanya justru karena melanggarnya berhasil: impor `@/lib/...` dari folder module akan dibangun tanpa keluhan — keduanya satu build — dan tidak ada satu pun pemeriksaan otomatis yang berubah merah saat itu terjadi. Build hijau di sini bukan bukti; batas ini dijaga saat menulis dan saat mereview, bukan oleh alat.
 
-Karena itu jalan ke shell adalah event peramban. Layar module melempar `CustomEvent('coreerp:print')` pada `window`; komponen shell `apps/control-plane/resources/js/components/jembatan-cetak-module.tsx`, yang dipasang pada `app-layout.tsx`, menampungnya dan meneruskannya ke dialog cetak. Isi `detail` datang dari kode module dan ikut berubah tanpa perubahan di sisi shell, jadi **pemeriksa bentuk pesan** di `apps/control-plane/resources/js/lib/print-requests.ts` tetap dipakai apa adanya: ia yang menahan bentuk yang menyimpang supaya tidak sampai ke dialog cetak sebagai parameter yang setengah benar. Penanda jenis disisipkan sisi shell, bukan dituntut dari module — sebuah event bernama `coreerp:print` sudah menyebutkan jenisnya pada namanya.
+Karena itu jalan ke shell adalah event peramban. Layar module melempar `CustomEvent('coreerp:print')` pada `window`; komponen shell `apps/core/resources/js/components/jembatan-cetak-module.tsx`, yang dipasang pada `app-layout.tsx`, menampungnya dan meneruskannya ke dialog cetak. Isi `detail` datang dari kode module dan ikut berubah tanpa perubahan di sisi shell, jadi **pemeriksa bentuk pesan** di `apps/core/resources/js/lib/print-requests.ts` tetap dipakai apa adanya: ia yang menahan bentuk yang menyimpang supaya tidak sampai ke dialog cetak sebagai parameter yang setengah benar. Penanda jenis disisipkan sisi shell, bukan dituntut dari module — sebuah event bernama `coreerp:print` sudah menyebutkan jenisnya pada namanya.
 
 ## Panggilan API dari layar module
 
@@ -86,24 +86,24 @@ Layar module memanggil endpoint module-nya dengan sesi Core, bukan token pembawa
 
 Halaman module **tidak** punya token konteks dan **tidak** punya muat ulang berkala. Keduanya milik jalur app berkontainer, yang dibuang pada 10 September 2026 bersama halaman tuan rumah beriframe-nya: muat ulang berkala di sana ada semata-mata untuk menyegarkan token berumur pendek sebelum kedaluwarsa. Halaman module tidak punya token yang perlu disegarkan, jadi menambahkan pemuatan ulang berkala padanya hanya menambah lalu lintas tanpa satu pun masalah yang diselesaikan.
 
-Kriteria yang berlaku adalah "tidak ada elemen `iframe` pada halaman **module**", dan `apps/control-plane/tests/Feature/Modules/LayarManagementAsetTest.php` membuktikannya pada modul produk yang sungguhan, bukan pada module contoh. Kendali positif pemeriksaan itu dulu berkas halaman iframe yang lama; setelah berkas itu dibuang, kendalinya berpindah ke penanda yang wajib ada pada berkas yang diperiksa sendiri.
+Kriteria yang berlaku adalah "tidak ada elemen `iframe` pada halaman **module**", dan `apps/core/tests/Feature/Modules/LayarManagementAsetTest.php` membuktikannya pada modul produk yang sungguhan, bukan pada module contoh. Kendali positif pemeriksaan itu dulu berkas halaman iframe yang lama; setelah berkas itu dibuang, kendalinya berpindah ke penanda yang wajib ada pada berkas yang diperiksa sendiri.
 
 ## Ukuran bundel: dipecah per entri menu, satu React
 
-Halaman module dipecah per entri menu — di `modules/apperp/management-aset/ui/App.tsx` tiap layar diimpor lewat `lazy()` — sehingga tenant yang membuka satu layar tidak ikut mengunduh kode layar lain. Ukurannya jangan disalin ke halaman ini: angka bundel berubah setiap kali layar berubah, dan angka yang disalin akan basi tanpa berbunyi. Cara mengukurnya bisa diulang siapa pun — bangun dengan halaman module, bangun sekali lagi tanpanya, lalu selisihkan seluruh isi `apps/control-plane/public/build/assets`.
+Halaman module dipecah per entri menu — di `modules/apperp/management-aset/ui/App.tsx` tiap layar diimpor lewat `lazy()` — sehingga tenant yang membuka satu layar tidak ikut mengunduh kode layar lain. Ukurannya jangan disalin ke halaman ini: angka bundel berubah setiap kali layar berubah, dan angka yang disalin akan basi tanpa berbunyi. Cara mengukurnya bisa diulang siapa pun — bangun dengan halaman module, bangun sekali lagi tanpanya, lalu selisihkan seluruh isi `apps/core/public/build/assets`.
 
-React hanya boleh termuat sekali, dan itu dijaga alat, bukan ingatan. `npm run bundle:check` menjalankan `apps/control-plane/scripts/periksa-bundel.mjs` atas hasil build, dan langkah yang sama berjalan di `.github/workflows/tests.yml` tepat sesudah pembangunan aset. Dua salinan React membuat build tetap hijau dan halaman tetap tampil, lalu setiap hook melempar "Invalid hook call" hanya pada komponen yang kebetulan melintasi batas salinan — kegagalan yang muncul jauh dari sebabnya.
+React hanya boleh termuat sekali, dan itu dijaga alat, bukan ingatan. `npm run bundle:check` menjalankan `apps/core/scripts/periksa-bundel.mjs` atas hasil build, dan langkah yang sama berjalan di `.github/workflows/tests.yml` tepat sesudah pembangunan aset. Dua salinan React membuat build tetap hijau dan halaman tetap tampil, lalu setiap hook melempar "Invalid hook call" hanya pada komponen yang kebetulan melintasi batas salinan — kegagalan yang muncul jauh dari sebabnya.
 
 Cara pemeriksa itu bekerja layak diketahui sebelum ada yang menyederhanakannya:
 
 - Ia membaca **isi** potongan, bukan namanya. Nama potongan disusun alat pembangun dan berubah kapan saja. Yang dicari adalah penanda implementasi React di dalam isinya; di antara potongan pembawa penanda itu, tepat satu yang tidak mengimpor potongan React lain — itulah salinan React yang sesungguhnya.
 - Ia **gagal juga bila penandanya tidak ditemukan sama sekali**, dan bila folder hasil build kosong. Pemeriksa yang tidak menemukan apa pun tidak boleh dianggap hijau; penanda React sudah pernah berganti nama antar versi mayor, dan pemeriksa yang hanya mengenal satu bentuk akan diam pada versi berikutnya.
 
-Satu salinan React sendiri dijaga `resolve.dedupe` pada `apps/control-plane/vite.config.ts`, bukan alias. Alias akan melewati peta `exports` paket dan menuntut jalur `dist/` ditulis tangan.
+Satu salinan React sendiri dijaga `resolve.dedupe` pada `apps/core/vite.config.ts`, bukan alias. Alias akan melewati peta `exports` paket dan menuntut jalur `dist/` ditulis tangan.
 
 ## Pemindaian Tailwind dan pengemasan `@apperp/ui`
 
-Sumber pemindaian Tailwind untuk UI module ditulis sebagai **satu pola** di `apps/control-plane/resources/css/app.css`:
+Sumber pemindaian Tailwind untuk UI module ditulis sebagai **satu pola** di `apps/core/resources/css/app.css`:
 
 ```css
 @source '../../../../modules/*/*/ui';
@@ -111,7 +111,7 @@ Sumber pemindaian Tailwind untuk UI module ditulis sebagai **satu pola** di `app
 
 Bukan satu baris per module. Daftar yang harus ditambah setiap kali module baru mendarat adalah daftar yang akan terlupa, dan lupanya tidak berbunyi: CSS tetap hijau dan hanya kelas milik layar module itu yang hilang.
 
-`@apperp/ui` berhenti didistribusikan sebagai berkas `.tgz` yang disalin ke tiap repo. Ia kini paket di dalam repo — `packages/ui`, terdaftar sebagai workspace pada `package.json` akar dan disebut `apps/control-plane/package.json` — yang diimpor langsung. Ketidakcocokan versi antara paket yang dibangun dan paket yang disalin, kegagalan yang dulu terlihat sebagai berkas `.tgz` bernomor lama tergeletak di samping paket versi yang lebih baru, tidak bisa terjadi lagi karena hanya ada satu salinan sumbernya.
+`@apperp/ui` berhenti didistribusikan sebagai berkas `.tgz` yang disalin ke tiap repo. Ia kini paket di dalam repo — `packages/ui`, terdaftar sebagai workspace pada `package.json` akar dan disebut `apps/core/package.json` — yang diimpor langsung. Ketidakcocokan versi antara paket yang dibangun dan paket yang disalin, kegagalan yang dulu terlihat sebagai berkas `.tgz` bernomor lama tergeletak di samping paket versi yang lebih baru, tidak bisa terjadi lagi karena hanya ada satu salinan sumbernya.
 
 Akar repo menjadi akar workspace npm, dan itu yang membuat pencarian `node_modules` dari berkas di `modules/<penerbit>/<module>/ui` berakhir di tempat yang benar. Izin membaca folder di luar akar proyek shell diberikan `server.fs.allow` pada `vite.config.ts`; tanpa itu server pengembangan menolak menyajikan berkasnya dengan 403 sementara `npm run build` tetap berhasil — kegagalan yang hanya muncul di satu dari dua jalur adalah yang paling lama dicari.
 
@@ -119,23 +119,23 @@ Akar repo menjadi akar workspace npm, dan itu yang membuat pencarian `node_modul
 
 | Berkas | Isinya |
 | --- | --- |
-| `apps/control-plane/resources/js/app.tsx` | Pemilih halaman: mengenali nama `Modul::Halaman` dan memindai folder UI module |
-| `apps/control-plane/resources/js/lib/halaman-module.tsx` | Tuan rumah module: pembatas penangguhan, pembatas kesalahan, simpanan komponen malas |
-| `apps/control-plane/app/Support/LaunchableAppCatalog.php` | Menu dari manifest, penyaringan permission, aturan tautan `/<id module>/<id entri menu>` |
-| `apps/control-plane/routes/web.php` | Rute `apps/{app}`: peluncur produk untuk kedua bentuk |
-| `apps/control-plane/app/Http/Middleware/ResolveModuleContext.php` | Konteks module per permintaan, dipasang lewat alias `konteks-module` |
-| `apps/control-plane/resources/js/components/jembatan-cetak-module.tsx` | Penampung `CustomEvent('coreerp:print')` dari layar module |
-| `apps/control-plane/scripts/periksa-bundel.mjs` | Pemeriksa React tunggal, dijalankan `npm run bundle:check` |
-| `apps/control-plane/vite.config.ts` | `resolve.dedupe`, alias `@modules`, `server.fs.allow` |
-| `apps/control-plane/resources/css/app.css` | Sumber pemindaian Tailwind, termasuk pola satu baris untuk seluruh module |
+| `apps/core/resources/js/app.tsx` | Pemilih halaman: mengenali nama `Modul::Halaman` dan memindai folder UI module |
+| `apps/core/resources/js/lib/halaman-module.tsx` | Tuan rumah module: pembatas penangguhan, pembatas kesalahan, simpanan komponen malas |
+| `apps/core/app/Support/LaunchableAppCatalog.php` | Menu dari manifest, penyaringan permission, aturan tautan `/<id module>/<id entri menu>` |
+| `apps/core/routes/web.php` | Rute `apps/{app}`: peluncur produk untuk kedua bentuk |
+| `apps/core/app/Http/Middleware/ResolveModuleContext.php` | Konteks module per permintaan, dipasang lewat alias `konteks-module` |
+| `apps/core/resources/js/components/jembatan-cetak-module.tsx` | Penampung `CustomEvent('coreerp:print')` dari layar module |
+| `apps/core/scripts/periksa-bundel.mjs` | Pemeriksa React tunggal, dijalankan `npm run bundle:check` |
+| `apps/core/vite.config.ts` | `resolve.dedupe`, alias `@modules`, `server.fs.allow` |
+| `apps/core/resources/css/app.css` | Sumber pemindaian Tailwind, termasuk pola satu baris untuk seluruh module |
 | `modules/apperp/management-aset/routes/web.php` | Contoh rute layar module beserta alasan tiap bagiannya |
 | `modules/apperp/management-aset/src/Http/Controllers/HalamanModulController.php` | Pembacaan id menu dan permission dari manifest, 404 dan 403 |
 | `modules/apperp/management-aset/ui/Pages/Modul.tsx` | Titik masuk potongan UI module |
 | `modules/apperp/management-aset/ui/api.ts` | Panggilan API dengan sesi dan CSRF |
-| `apps/control-plane/tests/Feature/Modules/HalamanModuleShellTest.php` | Tautan menu mendarat pada rute yang terdaftar |
-| `apps/control-plane/tests/Feature/Modules/LayarManagementAsetTest.php` | Layar modul produk: rute, ruas alamat, 404, 403, sidebar, tanpa `iframe` |
+| `apps/core/tests/Feature/Modules/HalamanModuleShellTest.php` | Tautan menu mendarat pada rute yang terdaftar |
+| `apps/core/tests/Feature/Modules/LayarManagementAsetTest.php` | Layar modul produk: rute, ruas alamat, 404, 403, sidebar, tanpa `iframe` |
 
-Perintah yang berlaku untuk berkas di folder UI module, dijalankan dari `apps/control-plane`: `npm run lint:check`, `npm run types:check`, `npm run format:check`, `npm run build`, dan `npm run bundle:check` sesudah build.
+Perintah yang berlaku untuk berkas di folder UI module, dijalankan dari `apps/core`: `npm run lint:check`, `npm run types:check`, `npm run format:check`, `npm run build`, dan `npm run bundle:check` sesudah build.
 
 ## Lihat juga
 

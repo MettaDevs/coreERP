@@ -38,7 +38,7 @@ request lewat `edition.yml`.
 **Pemeriksa susunan repo app yang lama** (`app-erp-ci-workflows`, action
 `validate-app-repository`) tidak dipanggil satu pun alur di repo ini. Aturannya yang masih
 berlaku — manifest sah, rantai keamanan lengkap, awalan tabel terdaftar — dipasang ulang sebagai
-penjaga batas di `apps/control-plane/tests/Feature/Boundary/`, tempat ia benar-benar dijalankan
+penjaga batas di `apps/core/tests/Feature/Boundary/`, tempat ia benar-benar dijalankan
 tiap pull request. Syarat lamanya tentang Dockerfile per app, potongan compose, dan skrip
 migrasi per app sudah tidak berlaku sama sekali.
 
@@ -59,12 +59,12 @@ ditambahkan. Yang ditulis adalah cara membacanya:
 
 1. Telusuri tiap langkah di `.github/workflows/lint.yml` dan `.github/workflows/tests.yml`
    berurutan. Nama langkah menyebut alatnya, perintahnya menyebut skrip yang dipanggil.
-2. Buka perintah itu di `apps/control-plane/composer.json` atau `apps/control-plane/package.json`.
+2. Buka perintah itu di `apps/core/composer.json` atau `apps/core/package.json`.
    Sebuah pemeriksa menjangkau module bila jalur `../../modules` muncul pada perintahnya sendiri
-   atau pada berkas setelannya — `paths` dan `scanDirectories` di `apps/control-plane/phpstan.neon`,
-   `include` di `apps/control-plane/tsconfig.json`.
+   atau pada berkas setelannya — `paths` dan `scanDirectories` di `apps/core/phpstan.neon`,
+   `include` di `apps/core/tsconfig.json`.
 3. Jalankan seluruhnya di mesin sendiri pada pohon hasil penggabungan sebelum mendorong.
-   `composer ci:check` di `apps/control-plane` menjalankan gaya PHP, gaya dan format frontend,
+   `composer ci:check` di `apps/core` menjalankan gaya PHP, gaya dan format frontend,
    analisa tipe, dan test dalam satu perintah. Yang tidak ikut di dalamnya — salinan skill,
    cakupan kontrak internal, dan pemeriksa bundel — dijalankan seperti yang tertulis di kedua
    berkas alur itu.
@@ -79,7 +79,7 @@ sementara keberadaannya tetap terbaca seolah ada yang dijaga.
 **Jangkauan ESLint dijaga, karena ia pernah hilang tanpa berbunyi.** `eslint.config.js` hidup di
 **akar repo**, dan perintah lint menargetkan akar repo. Keduanya bukan selera: ESLint 9 menetapkan
 base path dari letak berkas konfigurasinya, dan sampai 10 September 2026 berkas itu ada di
-`apps/control-plane/` — sehingga `eslint .` memeriksa **nol** berkas di bawah `modules/` dan
+`apps/core/` — sehingga `eslint .` memeriksa **nol** berkas di bawah `modules/` dan
 `packages/`, lalu keluar dengan kode 0.
 
 Bukan menolak, bukan memperingatkan; hanya diam. Puluhan berkas UI module karena itu tidak pernah
@@ -98,11 +98,11 @@ tidak menemukan pelanggaran.** Lihat [standar penjaga dan pengujian](25-standar-
 
 ### Baseline analisa tipe hanya boleh menyusut
 
-`apps/control-plane/phpstan-baseline.neon` membekukan temuan yang sudah ada sejak sebelum
+`apps/core/phpstan-baseline.neon` membekukan temuan yang sudah ada sejak sebelum
 analisanya dijalankan sungguhan. Tanpa pembekuan itu langkah `Run Type Analysis` tidak pernah
 hijau, dan langkah yang tidak pernah hijau tidak memeriksa apa pun karena tidak ada lagi yang
 membaca hasilnya. Yang dibeli pembekuan itu satu hal: kode baru diperiksa penuh pada level yang
-tertulis di `apps/control-plane/phpstan.neon` sejak hari pertama.
+tertulis di `apps/core/phpstan.neon` sejak hari pertama.
 
 Karena itu berkas tersebut **hanya boleh menyusut**. Menambah baris ke dalamnya berarti
 menyembunyikan temuan baru di balik izin yang diberikan untuk kode lama, dan itu ditolak saat
@@ -167,11 +167,11 @@ Pertimbangan kuota di balik pilihan itu ditulis di kepala kedua berkas alur.
 dimatikan. Penanda itu berada di tengah blok impor, dan `import/order` menata ulang impor
 melewatinya: penandanya berpindah, isinya berubah, lalu penghapusan fitur membuang baris yang
 salah tanpa ada yang berbunyi. Karena itu aturan `import/order` dimatikan pada berkas-berkas
-tersebut di `apps/control-plane/eslint.config.js`, dan urutan impornya dijaga tangan sampai
+tersebut di `apps/core/eslint.config.js`, dan urutan impornya dijaga tangan sampai
 penandanya tidak lagi dipakai. Daftar berkasnya ada di berkas konfigurasi itu, bukan di sini.
 
 Yang membuat penanda itu bergerak adalah `composer update`: ia memicu `install:features` lewat
-`post-update-cmd` di `apps/control-plane/composer.json` dan mengubah berkas di luar perubahan
+`post-update-cmd` di `apps/core/composer.json` dan mengubah berkas di luar perubahan
 yang sedang dikerjakan. Jangan menjalankan `composer update` di repo ini tanpa memeriksa berkas
 apa saja yang ikut berubah.
 
