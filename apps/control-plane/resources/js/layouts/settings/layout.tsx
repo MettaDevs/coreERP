@@ -22,6 +22,11 @@ const sidebarNavItems: NavItem[] = [
         icon: null,
     },
     {
+        title: 'Buku alamat global',
+        href: '/settings/global-address-book',
+        icon: null,
+    },
+    {
         title: 'Identity & access',
         href: '/settings/access',
         icon: null,

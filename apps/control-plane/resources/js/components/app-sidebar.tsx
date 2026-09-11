@@ -2,9 +2,11 @@ import { Sidebar } from '@apperp/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Briefcase,
     Building2,
     CalendarDays,
     Clock,
+    Contact,
     Database,
     FileOutput,
     FileText,
@@ -12,6 +14,8 @@ import {
     LayoutDashboard,
     Hash,
     Map,
+    MapPin,
+    PhoneCall,
     Ruler,
     Package,
     Palette,
@@ -19,7 +23,7 @@ import {
     UserRound,
     Users,
 } from 'lucide-react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -74,6 +78,33 @@ function TruncatedLabel({ children }: { children: string }) {
 export function AppSidebar() {
     const { url, props } = usePage();
     const path = url.split('?')[0];
+    const [realtimeSection, setRealtimeSection] = useState<string | null>(null);
+    const [prevUrl, setPrevUrl] = useState(url);
+
+    if (prevUrl !== url) {
+        setPrevUrl(url);
+        setRealtimeSection(null);
+    }
+
+    useEffect(() => {
+        const handleSectionChange = (event: Event) => {
+            const customEvent = event as CustomEvent<{ section: string }>;
+
+            if (customEvent.detail?.section) {
+                setRealtimeSection(customEvent.detail.section);
+            }
+        };
+
+        window.addEventListener('coreerp:section-change', handleSectionChange);
+
+        return () => {
+            window.removeEventListener(
+                'coreerp:section-change',
+                handleSectionChange,
+            );
+        };
+    }, []);
+
     const coreItems: PrimaryNavigationItem[] = [
         {
             label: 'Dashboard',
@@ -136,6 +167,38 @@ export function AppSidebar() {
                               label: 'Organisasi',
                               icon: Building2,
                               href: '/settings/organization',
+                          },
+                      ],
+                  },
+                  {
+                      label: 'Buku alamat',
+                      icon: Contact,
+                      href: '/settings/global-address-book',
+                      children: [
+                          {
+                              label: 'General',
+                              icon: UserRound,
+                              href: '/settings/global-address-book?section=general',
+                          },
+                          {
+                              label: 'Addresses',
+                              icon: MapPin,
+                              href: '/settings/global-address-book?section=addresses',
+                          },
+                          {
+                              label: 'Relationships',
+                              icon: Users,
+                              href: '/settings/global-address-book?section=relationships',
+                          },
+                          {
+                              label: 'Contact Information',
+                              icon: PhoneCall,
+                              href: '/settings/global-address-book?section=contacts',
+                          },
+                          {
+                              label: 'Roles',
+                              icon: Briefcase,
+                              href: '/settings/global-address-book?section=roles',
                           },
                       ],
                   },
@@ -290,11 +353,24 @@ export function AppSidebar() {
                     : path === child.href.split('?')[0],
             ),
         ) ?? primaryItems[0];
-    const isChildActive = (item: NavigationItem) =>
-        url === item.href ||
-        (item.href === '/settings/access?section=members' &&
-            path === '/settings/access' &&
-            !url.includes('?section='));
+    const isChildActive = (item: NavigationItem) => {
+        if (realtimeSection && path === '/settings/global-address-book') {
+            return (
+                item.href ===
+                `/settings/global-address-book?section=${realtimeSection}`
+            );
+        }
+
+        return (
+            url === item.href ||
+            (item.href === '/settings/global-address-book?section=general' &&
+                path === '/settings/global-address-book' &&
+                !url.includes('?section=')) ||
+            (item.href === '/settings/access?section=members' &&
+                path === '/settings/access' &&
+                !url.includes('?section='))
+        );
+    };
 
     return (
         <Sidebar
