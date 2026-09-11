@@ -3,6 +3,15 @@
 return [
     // Canonical official apps. Entitlements and module installations reference these IDs.
     'database' => 'core_erp',
+    /*
+     * Nama koneksi untuk tabel sisi pusat — identitas, pelanggan, daftar tenant, registry
+     * environment, akses operator. Kosong berarti "ikut koneksi bawaan", dan itulah bawaannya.
+     *
+     * On-prem kosong selamanya: di sana tidak ada sisi pusat yang terpisah, dan Core memang harus
+     * sanggup menjadi keseluruhannya. Yang membacanya trait App\Support\Pusat\MilikPusat.
+     */
+    'control_connection' => env('COREERP_CONTROL_CONNECTION'),
+
     // `deployment` dibuang pada 11 September 2026 bersama satu-satunya pembacanya: pendaftaran
     // usaha kini menulis baris `environments`, bukan `tenant_deployments`. Sebelumnya `pull_images`
     // dan `release_root` dibuang dengan alasan yang sama. Tempat kerja sebuah tenant sekarang fakta

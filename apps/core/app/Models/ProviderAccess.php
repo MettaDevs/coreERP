@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Support\Pusat\MilikPusat;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /** @property int $user_id @property string $role */
 class ProviderAccess extends Model
 {
+    use MilikPusat;
+
     protected $table = 'provider_access';
 
     protected $primaryKey = 'user_id';
