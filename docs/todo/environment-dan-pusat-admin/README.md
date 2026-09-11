@@ -409,7 +409,34 @@ Menghapus tenant ketika provision gagal melanggar larangan hapus fisik repo ini,
 percobaan ulang: pengulangan yang menyala saat kompensasi sedang berjalan akan kehilangan baris yang
 baru saja dibuatnya. Perbaikan **maju** yang aman diulang adalah satu-satunya bentuk yang sejalan
 dengan aturan yang sudah ada.
+
+**Dan ada pembenaran yang lebih kuat daripada aturan repo.** Alasan sebenarnya bukan "kami melarang
+hapus fisik" melainkan **tidak ada keadaan baik untuk dikembalikan**: sebelum provision, environment
+itu belum pernah benar-benar ada. Bandingkan dengan update, yang punya keadaan baik — dan di sana
+Business Central memang memakai pemulihan mundur, *"restores the environment to its state immediately
+before the update started"*, yang dapat memakan lebih dari sejam. Jadi yang menentukan bukan
+silo-lawan-pool, melainkan ada atau tidaknya keadaan sebelumnya yang masih sah.
 :::
+
+### Nama polanya, supaya ia dapat ditunjuk
+
+Azure memberi kosakata yang membuat alur di atas berhenti menjadi selera:
+
+- Langkah 2 — `CREATE DATABASE`, yang wajib di luar transaksi — adalah **pivot transaction**:
+  *"Pivot transactions serve as the point of no return in the saga."*
+- Langkah 3 sampai 7 adalah **retryable transactions**: *"Retryable transactions follow the pivot
+  transaction"*, dan masing-masing idempoten supaya alurnya tetap mencapai keadaan akhirnya.
+- Peringatan yang menopang larangan di atas: *"Compensating transactions might not always succeed,
+  which can leave the system in an inconsistent state."*
+
+Karena perintah kita dijalankan **ulang seutuhnya** dan bukan dilanjutkan dari langkah tertentu,
+nama yang lebih tepat lagi datang dari Kubernetes: **reconciliation loop**, yang setiap putarannya
+*"tries to move the current cluster state closer to the desired state."*
+
+Azure juga menyebut tiga respons kegagalan yang sah **per langkah**, bukan satu untuk seluruh alur:
+ulangi langkah yang gagal; lanjut ke langkah berikutnya bila langkah itu memang boleh gagal; atau
+tinggalkan alurnya dan picu pemulihan manual. Ditambah satu pertanyaan yang belum pernah kita
+jawab — *"Also consider the user experience for each failure scenario."*
 
 ## Migration yang menyebar ke banyak environment
 
@@ -439,6 +466,37 @@ Dua jalan keluarnya, dan yang pertama direkomendasikan untuk tahun pertama:
 2. **Lepaskan gerbangnya.** Migrasikan environment di latar, dan sajikan halaman pemeliharaan bagi
    yang tertinggal. Bergulir, bukan serentak — tetapi kode baru berjalan di atas skema lama selama
    satu jendela, yang menghormati satu versi di dalam kode sambil melanggarnya dalam praktik.
+
+**Ada jalan ketiga yang tidak terpikir saat ini ditulis, dan ia punya nama:** *deployment rings*.
+Azure menyebutnya apa adanya — *"Deployment rings enable you to progressively roll out updates across
+a set of tenants"* — dengan cincin canary, early adopter, lalu semua pengguna. Gerbangnya tetap ada,
+tetapi **per cincin**, bukan per armada, sehingga rilis tidak pernah menunggu dua ratus environment
+sekaligus. Halaman yang sama menopang penolakan kita atas model Business Central: *"Be careful about
+enabling tenants to initiate their own updates."*
+
+Dan mekanismenya, dari vendor yang benar-benar menjalankannya. Business Central tidak pernah
+memigrasikan semua sebelum melayani: jendela update **per environment** (minimum enam jam, bawaan
+20:00–06:00 waktu setempat), batas waktu keras — *"Updates that fail to complete before the end of
+the update window are canceled"* — lalu **dijadwalkan ulang otomatis tujuh hari kemudian** beserta
+pemberitahuannya, dan mode pemeliharaan per environment, bukan global.
+
+Polanya karena itu bukan "lepaskan gerbangnya" melainkan **jendela per environment + pembatalan
+otomatis + penjadwalan ulang + pemberitahuan**. Opsi 1 tetap perlu, tetapi tidak cukup sendirian:
+tanpa batas waktu per environment, satu environment besar tetap menahan rilis.
+:::
+
+::: tip Template database memangkas langkah migrationnya sama sekali
+Azure SQL menjalankan fan-out migration lewat **job agent tersendiri** — *"The job agent database
+holds job definitions, job status, and history"* — jadi status penyebarannya hidup di luar registry
+environment, bukan sebagai kolom di dalamnya seperti rancangan kita.
+
+Job yang sama merawat sebuah **template database**: *"Elastic Jobs can also be used to maintain a
+template database used to create new tenants."* Environment baru lahir dari template yang sudah
+mutakhir — `CREATE DATABASE ... TEMPLATE` di PostgreSQL — bukan dari memutar ulang seluruh riwayat
+migration. Itu memotong langkah 3 `environment:provision` menjadi hampir nol, dan menghapus satu
+kelas bug sekaligus: environment baru yang lahir dengan skema tertinggal.
+
+Belum dikerjakan, dan sengaja dicatat sebagai perbaikan, bukan syarat.
 :::
 
 ## Operasi Copy, beserta pelucutannya
@@ -573,6 +631,32 @@ Satu constraint di sini menggantikan kunci yang tidak kita punya: **partial uniq
 mengizinkan tepat satu operasi berjalan per environment.** Tanpa Redis, itu kunci termurah yang
 tersedia — dan ia sekaligus memenuhi anjuran Microsoft untuk membatasi refresh satu pada satu waktu.
 
+::: danger Kunci tanpa masa berlaku adalah kunci yang macet permanen
+Dua keputusan halaman ini bertabrakan, dan tabrakannya baru kelihatan setelah dicari sumbernya.
+
+Indeks di atas mengizinkan tepat satu operasi berjalan, sementara satu-satunya strategi pemulihan
+yang halaman ini izinkan adalah **menjalankan ulang perintahnya**. Kalau prosesnya mati di tengah —
+container dibunuh, deploy berjalan, OOM — barisnya tetap berstatus berjalan **selamanya**, dan
+indeks itu menolak percobaan ulang yang merupakan satu-satunya jalan keluarnya. Tidak ada kolom
+kedaluwarsa, tidak ada heartbeat, tidak ada aturan siapa boleh merebutnya, dan tidak ada tombol
+batal bagi operator.
+
+Jalur merah yang sudah ditulis menguji "salinan kedua yang berjalan bersamaan ditolak". Ia tidak
+menguji "operasi yang prosesnya dibunuh dapat diambil alih" — dan justru itu yang akan terjadi
+lebih dulu.
+
+Vendor lain memberi setiap operasi panjang sebuah tenggat **dan** sebuah jalan keluar manual.
+Business Central membatalkan update yang lewat jendelanya lalu menjadwalkannya ulang tujuh hari
+kemudian, dan menyediakan tombol Cancel update justru untuk operasi yang sedang berjalan. Azure
+menyebut *"Abandon the workflow and trigger a manual recovery process"* sebagai salah satu dari tiga
+respons kegagalan yang sah.
+
+**Yang wajib ikut sebelum operasi panjang pertama mendarat:** kolom masa berlaku pada
+`environment_operations`, aturan perebutan operasi yang masa berlakunya habis, aksi batal untuk
+operator, dan satu baris jalur merah — *operasi yang prosesnya dibunuh di tengah dapat diambil alih
+percobaan berikutnya.*
+:::
+
 ::: tip `tenant_deployments` tidak perlu dibongkar
 Temuan `LIFE-15` menyatakan `unique('tenant_id')` pada tabel itu mengunci satu environment per tenant,
 dan bahwa lima query kesiapan menyambung lewatnya sehingga retrofitnya mahal. **Itu benar saat ditulis
@@ -668,9 +752,18 @@ daripada sebuah label di domain. Bertingkat dicatat sebagai jalur naik, bukan di
 Satu server PostgreSQL untuk semuanya, **sekarang**, dengan tiga penjaga yang membuat pilihan murah
 tetap aman:
 
-1. satu salinan pada satu waktu — sudah ditegakkan indeks pada `environment_operations`;
+1. satu salinan pada satu waktu **per environment** — ditegakkan indeks pada
+   `environment_operations`;
 2. penolakan bila sisa disk di bawah ambang;
 3. jendela di luar jam sibuk untuk salinan besar.
+
+::: warning Yang pertama tidak membatasi beban server
+Versi terdahulu halaman ini menulis "satu salinan pada satu waktu" seolah ia penjaga beban.
+Indeksnya **per environment**, jadi dua ratus environment dapat menyalin bersamaan tanpa satu pun
+ditolak. Yang benar-benar membatasi beban satu server hanyalah penjaga kedua dan ketiga — dan
+keduanya belum ada. Kalau beban server memang harus dijaga, ia menuntut penjaga keempat yang
+menghitung operasi berjalan di seluruh registry, bukan per barisnya.
+:::
 
 Microsoft menaruh sandbox pada tier yang lebih rendah justru karena alasan ini, dan mengatakannya
 terang-terangan: menyalin di jam sibuk memengaruhi sistem produksi. Ambang pemisahan ditulis sebagai
@@ -1028,8 +1121,20 @@ Dibaca dari sumbernya pada 11 September 2026.
 **Bentuk multi-tenant dan batas plane**
 
 - [Tenancy models for a multitenant solution — Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/tenancy-models) — *horizontally partitioned deployments*
-- [Control plane vs. application plane — AWS](https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html) — control plane bukan multi-tenant, dan provisioning ditaruh di application plane
-- [Manage tenants across multiple SaaS products on a single control plane — AWS](https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/manage-tenants-across-multiple-saas-products-on-a-single-control-plane.html) — beserta keterbatasannya yang ditulis apa adanya
+- [Control plane vs. application plane — AWS](https://docs.aws.amazon.com/whitepapers/latest/saas-architecture-fundamentals/control-plane-vs.-application-plane.html) — control plane bukan multi-tenant, dan provisioning ditaruh di application plane. **Halaman ini kini berlabel arsip** (*"This whitepaper is for historical reference only"*), jadi ia tidak boleh berdiri sendirian; dua sumber di bawah yang menggantikannya
+- [Tenant Onboarding Best Practices in SaaS with the AWS Well-Architected SaaS Lens](https://aws.amazon.com/blogs/apn/tenant-onboarding-best-practices-in-saas-with-the-aws-well-architected-saas-lens/) — orkestratornya justru di control plane, *"responsible for orchestrating and applying the policies, strategies, and workflow"*. Jadi "pusat admin memerintah, Core mengerjakan" memang bentuk yang dianjurkan, bukan kompromi kita sendiri
+- [SaaS Builder Toolkit for AWS](https://github.com/awslabs/sbt-aws/blob/main/docs/public/README.md) — **kontrak pesan antar-plane yang eksplisit**: control plane menerbitkan `onboardingRequest` beserta status awal, application plane menerbitkan balik `provisionSuccess` atau `provisionFailure`. Status dimiliki control plane; hasil **dilaporkan sebagai event**, bukan dipolling — arah yang belum ada di rancangan kita
+- [Manage tenants across multiple SaaS products on a single control plane — AWS](https://docs.aws.amazon.com/prescriptive-guidance/latest/patterns/manage-tenants-across-multiple-saas-products-on-a-single-control-plane.html) — beserta keterbatasannya yang ditulis apa adanya; ia juga menuntut kanal terpisah untuk status, galat, dan percobaan ulang
+- [Considerations for multitenant control planes — Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/control-planes) — tiga respons kegagalan yang sah, per langkah
+- [Saga design pattern — Azure](https://learn.microsoft.com/en-us/azure/architecture/patterns/saga) — *pivot transaction* dan *retryable transaction*, beserta keterbatasan compensating transaction
+- [Kubernetes Controllers](https://kubernetes.io/docs/concepts/architecture/controller/) — *reconciliation loop*, nama yang paling tepat untuk perintah yang dijalankan ulang seutuhnya
+
+**Penyebaran skema dan ambang skalanya**
+
+- [Considerations for updating a multitenant solution — Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/updates) — *deployment rings*, dan peringatan agar tenant tidak memulai updatenya sendiri
+- [Manage schema in a single-tenant app — Azure SQL](https://learn.microsoft.com/en-us/azure/azure-sql/database/saas-tenancy-schema-management) — job agent tersendiri, dan **template database** untuk melahirkan tenant baru
+- [Managing updates in the admin center — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/tenant-admin-center-update-management) — jendela per environment, pembatalan otomatis, penjadwalan ulang, dan tombol batal bagi operator
+- [Designing your Postgres database for multi-tenancy — Crunchy Data](https://www.crunchydata.com/blog/designing-your-postgres-database-for-multi-tenancy) — ambangnya dengan angka: *"Managing 5 databases is fine, managing 10 you're probably okay, but if you anticipate 50 customers or more steer clear"*. Angka 50 di halaman ini ternyata cocok dengan yang ditulis vendor Postgres secara mandiri
 
 **Sertifikat**
 
