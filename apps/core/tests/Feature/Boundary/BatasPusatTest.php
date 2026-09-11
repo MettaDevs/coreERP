@@ -7,12 +7,14 @@ namespace Tests\Feature\Boundary;
 use App\Models\Client;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
+use App\Models\Organization;
 use App\Models\ProviderAccess;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\Pusat\MilikPusat;
 use Illuminate\Database\Eloquent\Model;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -49,7 +51,7 @@ class BatasPusatTest extends TestCase
     /**
      * @param  class-string<Model>  $kelas
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('modelSisiPusat')]
+    #[DataProvider('modelSisiPusat')]
     public function test_model_sisi_pusat_memakai_penandanya(string $kelas, string $tabel): void
     {
         $this->assertContains(
@@ -90,7 +92,7 @@ class BatasPusatTest extends TestCase
         // mencari dirinya di database yang salah.
         $this->assertSame(
             config('database.default'),
-            \App\Models\Organization::query()->getConnection()->getName(),
+            Organization::query()->getConnection()->getName(),
         );
     }
 }
