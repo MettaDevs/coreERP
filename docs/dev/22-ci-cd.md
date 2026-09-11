@@ -196,6 +196,14 @@ yang lahir besok tertangkap tanpa ada yang perlu mendaftarkannya. Ia juga menola
 `/repo/apps` ternyata kosong, karena pemindai yang tidak menemukan subjek tidak dapat dibedakan
 dari pemindai yang tidak menemukan pelanggaran.
 
+Satu pengecualian tercatat di `.dockerignore`, dan ia sengaja sempit: **manifest npm** milik
+`apps/pusat-admin` ikut ke konteks pembangunan, isi foldernya tidak. Sebabnya mekanis — folder itu
+disebut `workspaces` pada `package.json` akar, dan `npm ci` di tahap `assets` berhenti sebelum satu
+paket pun terpasang bila sebuah workspace yang disebut di sana tidak ada. Nol baris kode konsol ikut
+masuk, dan tahap akhir tetap hanya menyalin `apps/core`, jadi jalur pertama di atas tetap yang
+menagihnya. Kalau kelak ada berkas kedua yang ingin dikecualikan, pertanyaannya bukan "apakah berkas
+ini aman" melainkan "kenapa image pelanggan membutuhkan sesuatu dari perkakas vendor".
+
 Bukti-bisa-merahnya terpisah dari milik ketiga jalur lain. `--anggap-tidak-dibeli` hanya
 menggeser daftar modul, jadi pemeriksaan aplikasi dapat rusak total tanpa satu pun langkah CI
 berubah warna; karena itu ia punya modenya sendiri, `--buktikan-aplikasi-bisa-merah`, yang

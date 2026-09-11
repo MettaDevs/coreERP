@@ -782,10 +782,32 @@ Begitu langkah 2 selesai, arahnya membalik dan pemindahannya jadi mekanis.
 
 ### Ongkos langkah 2, diukur bukan ditaksir
 
-**28 foreign key menunjuk `tenants`. 10 menunjuk `users`.** PostgreSQL tidak mengenal foreign key
-lintas database, jadi memisahkan penyimpanannya berarti membuang ketiga puluh delapan constraint
-itu dan menggantinya dengan id opaque — dan setiap `cascadeOnDelete` yang ikut hilang harus lahir
-kembali sebagai logika aplikasi yang seseorang harus ingat menulisnya.
+Angka ini dibaca dari `pg_constraint` pada skema yang sedang berlaku, 12 September 2026, bukan
+ditaksir dari berkas migration. Dari **159** foreign key seluruh skema Core:
+
+| Arah | Jumlah |
+| --- | --- |
+| pusat → pusat | 9 |
+| environment → environment | 117 |
+| **environment → pusat** | **33** |
+| pusat → environment | 0 |
+
+Yang 33 itulah ongkosnya, dan rinciannya: `tenants` 25, `users` 4, `tenant_memberships` 3,
+`environments` 1. PostgreSQL tidak mengenal foreign key lintas database, jadi memisahkan
+penyimpanannya berarti membuang ketiga puluh tiga constraint itu dan menggantinya dengan id opaque
+— dan setiap `cascadeOnDelete` yang ikut hilang harus lahir kembali sebagai logika aplikasi yang
+seseorang harus ingat menulisnya.
+
+Dua hal yang hanya kelihatan setelah diukur, dan keduanya mengubah taksiran:
+
+- **`tenant_memberships` juga ditunjuk dari sisi environment** (3 foreign key: `role_assignments`
+  dan `sod_conflicts` dua kali). Ia tidak pernah disebut sebagai ongkos sebelumnya.
+- **`environment_members` belum punya model Eloquent** — `RegisterBusiness` menulisnya lewat
+  `DB::table` — sehingga tidak ada tempat memasang penandanya dan ia terhitung di sisi yang salah.
+  Begitu ia punya model bertanda, dua angka di atas turun.
+
+Versi terdahulu halaman ini menulis "28 menunjuk `tenants`, 10 menunjuk `users`". Angka itu tidak
+dapat direproduksi dari sumber mana pun dan ditinggalkan; yang di atas berasal dari database.
 
 Itu bukan satu migration. Itu merancang ulang integritas referensial seluruh skema, dan karena itu
 ia berdiri sebagai irisannya sendiri.
@@ -796,8 +818,11 @@ Selama batasnya belum jadi batas fisik, satu aturan menahan ongkosnya agar tidak
 **tidak boleh ada foreign key maupun join baru yang menyeberang batas.** Tabel sisi environment
 tidak menunjuk tabel sisi pusat, dan sebaliknya.
 
-Ia murah dijaga — satu pemindai migration — dan tanpanya angka 38 di atas akan bertambah diam-diam
-setiap kali seseorang menambah tabel.
+Ia sudah dijaga mesin: `apps/core/tests/Feature/Boundary/FkMenyeberangBatasTest.php` membaca
+`pg_constraint`, menurunkan daftar tabel sisi pusat dari model yang memakai `MilikPusat` alih-alih
+menyalinnya, dan menolak setiap pertambahan terhadap angka di atas. Ia juga menolak **penyusutan**
+yang tidak disertai penurunan angkanya, supaya ruang yang sudah dibebaskan tidak terisi lagi
+diam-diam.
 
 ### Yang tidak berubah setelah pemisahan
 
@@ -845,14 +870,56 @@ mencakup `docs/` wajib diperiksa matanya, bukan hanya build-nya: tautan tetap hi
 `npm run docs:build` tetap hijau.
 :::
 
-### `[ ]` Irisan 1 — registry, tanpa database kedua
+### `[x]` Irisan 1 — registry, tanpa database kedua
 
 Tiga tabel baru. `RegisterBusiness` menulis baris `environments` alih-alih `tenant_deployments`.
 Koneksi `control` diperkenalkan tetapi masih menunjuk database yang sama. Bendera sambungan keluar
-beserta titik-titik cekiknya. `apps/pusat-admin` berdiri dengan satu layar daftar, dan pemeriksa
-kebocoran edisi diperluas menolak jejaknya.
+beserta titik-titik cekiknya. `apps/pusat-admin` berdiri dengan layar daftar, rincian, dan
+pembuatan; pemeriksa kebocoran edisi diperluas menolak jejaknya.
 
 **Nol perubahan perilaku bagi setiap pelanggan yang ada, on-prem termasuk.**
+
+*Terbukti oleh:* registry + penanda batas (16 test), penjaga foreign key lintas batas (6 test),
+pelucutan sambungan keluar beserta pasangan hijaunya (8 test), konsol operator (9 test), dan image
+edisi yang tetap menolak setiap folder aplikasi selain `core`.
+
+::: tip Dua hal yang baru kelihatan saat dikerjakan
+**Menangkap `23505` di dalam transaksi tidak memulihkan transaksinya.** PostgreSQL membatalkan
+seluruh blok begitu satu pernyataan gagal; percobaan berikutnya ditolak `25P02` — gagal karena
+percobaan sebelumnya, bukan karena datanya. Pola sisip-lalu-tangkap yang dianjurkan halaman ini
+karena itu wajib membungkus tiap percobaan dalam transaksi bersarang, yang diterjemahkan Laravel
+menjadi SAVEPOINT. Yang menemukannya test, bukan review.
+
+**`Http::withoutGlobalConfiguration()` tidak ada.** Versi terdahulu halaman dan kode ini
+menyebutnya sebagai cara melewati jaring `Http` global. Diperiksa pada `Factory.php` dan
+`PendingRequest.php` Laravel 13.19: method itu tidak pernah ada. Lubangnya tetap nyata, hanya
+bentuknya lain — `new PendingRequest` tanpa factory tidak menerima daftar global middleware, dan
+`Http::swap()` mengganti factory-nya sekalian.
+:::
+
+#### Mencobanya di mesin sendiri
+
+Konsol berjalan sebagai aplikasi Laravel kedua di porta 8001, membaca database yang sama dengan
+Core. Ia **tidak** punya migration sendiri, jadi skemanya harus sudah dibangun Core lebih dulu.
+
+```bash
+cd apps/pusat-admin
+composer install
+php artisan key:generate
+npm run build --workspace @coreerp/pusat-admin
+php artisan serve --port=8001
+```
+
+Berkas `.env`-nya menyalin `DB_*` milik Core; kalau keduanya berbeda, konsol membaca database yang
+salah dan daftarnya kosong tanpa satu pun pesan.
+
+Masuk memakai akun Core yang memegang `provider_access.role = 'provider_admin'` —
+`ProviderAdminSeeder` di Core yang membuatnya. Akun tanpa peran itu mendapat 404, bukan 403: alamat
+ini tidak perlu diketahui pengguna biasa.
+
+Yang dapat dilakukan hari ini: melihat seluruh lingkungan, membuka rincian beserta riwayat
+operasinya, dan membuat lingkungan baru untuk sebuah tenant. Yang **belum**: memasukinya. Lingkungan
+baru lahir berstatus `provisioning` dan hanya `active` yang dapat dirutekan — itu Irisan 2.
 
 ### `[ ]` Irisan 2 — environment demo
 
