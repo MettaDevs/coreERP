@@ -46,7 +46,7 @@ Ia dibaca dari `api/` dan menjalankan `php artisan route:list --json` di sana. S
 masuk ke dalam runtime Core, `api/` tidak lagi memuat `artisan`, jadi skripnya berhenti
 sebelum membandingkan satu rute pun. Ditambah lagi, tidak ada alur CI yang pernah
 memanggilnya: langkah `Check internal API contract coverage` pada
-`.github/workflows/lint.yml` berjalan dengan `working-directory: apps/control-plane`, jadi
+`.github/workflows/lint.yml` berjalan dengan `working-directory: apps/core`, jadi
 yang dijalankan adalah pemeriksa milik Core atas `contracts/openapi-internal.yaml` Core.
 
 Yang menggantikannya adalah batas permukaannya sendiri: rute `/api/v1/...` module hanya

@@ -1,3 +1,3 @@
 # Hasil run bersifat lokal dan berukuran besar; yang disimpan di repo adalah angkanya,
-# di README stack pada `apps/control-plane/loadtest/`.
+# di README stack pada `apps/core/loadtest/`.
 results/

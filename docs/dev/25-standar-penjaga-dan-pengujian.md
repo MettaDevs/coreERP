@@ -2,7 +2,7 @@
 
 Halaman ini mengumpulkan aturan yang mengatur **penjaga** — test dan pemeriksaan otomatis yang menegakkan sebuah batas arsitektur, bukan yang menguji satu fitur. Semuanya lahir dari kegagalan yang benar-benar terjadi di repository ini selama modul dipindahkan ke satu runtime, dan hampir semuanya lahir dari bentuk kegagalan yang sama: sebuah pemeriksa melaporkan hijau padahal tidak memeriksa apa pun.
 
-Penjaga yang berlaku hari ini ada di `apps/control-plane/tests/Feature/Boundary/`. Halaman ini menjelaskan aturan yang harus dipenuhi penjaga baru sebelum ia boleh dipercaya, dan kenapa aturannya begitu.
+Penjaga yang berlaku hari ini ada di `apps/core/tests/Feature/Boundary/`. Halaman ini menjelaskan aturan yang harus dipenuhi penjaga baru sebelum ia boleh dipercaya, dan kenapa aturannya begitu.
 
 ## Penjaga dulu, pemindahan kemudian
 
@@ -33,7 +33,7 @@ Karena itu setiap penjaga harus pernah dilihat merah, dan pesan merahnya disimpa
 Dua cara membuktikannya, keduanya dipakai di repository ini:
 
 - **Percobaan sekali jalan.** Rusakkan sesuatu dengan sengaja, catat pesannya, kembalikan. Dipakai untuk penjaga yang subjeknya modul sungguhan.
-- **Test pendamping yang permanen.** Penjaga membaca daftar pelanggaran; test kedua memberi daftar itu subjek buatan dan menuntutnya merah. `ModulTanpaAnalisaTipeTest::test_tenggat_yang_lewat_terdeteksi` di `apps/control-plane/tests/Feature/Boundary/ModulTanpaAnalisaTipeTest.php` adalah bentuknya — tanpa test itu, fungsi pemeriksanya bisa saja selalu memulangkan daftar kosong.
+- **Test pendamping yang permanen.** Penjaga membaca daftar pelanggaran; test kedua memberi daftar itu subjek buatan dan menuntutnya merah. `ModulTanpaAnalisaTipeTest::test_tenggat_yang_lewat_terdeteksi` di `apps/core/tests/Feature/Boundary/ModulTanpaAnalisaTipeTest.php` adalah bentuknya — tanpa test itu, fungsi pemeriksanya bisa saja selalu memulangkan daftar kosong.
 
 Bentuk kedua lebih baik bila memungkinkan, karena percobaan sekali jalan hanya membuktikan penjaga bisa gagal **pada hari itu**.
 
@@ -45,7 +45,7 @@ Rute modul dilindungi dua lapis: middleware konteks menolak pengguna tanpa izin,
 
 Yang benar-benar bisa gagal adalah test yang memasang penutup **tidak ikut menjaga** di belakang middleware: sebuah closure yang selalu menjawab 200. Kalau middleware-nya lenyap, jawabannya 200 dan testnya merah.
 
-Bentuknya ada di `apps/control-plane/tests/Feature/Boundary/ModuleRequestContextTest.php` pada `test_middleware_menolak_sebelum_controller_module_sempat_berjalan`, yang berdiri tepat di sebelah test rute modul biasa dengan komentar yang menjelaskan kenapa keduanya diperlukan.
+Bentuknya ada di `apps/core/tests/Feature/Boundary/ModuleRequestContextTest.php` pada `test_middleware_menolak_sebelum_controller_module_sempat_berjalan`, yang berdiri tepat di sebelah test rute modul biasa dengan komentar yang menjelaskan kenapa keduanya diperlukan.
 
 Dua lapis memang disengaja. Yang tidak boleh adalah lapis pertama yang hilangnya tidak terlihat sampai ada satu modul yang lupa memeriksa di controllernya.
 
@@ -57,7 +57,7 @@ Bentuk terburuknya: sebuah test siklus hidup aset memalsukan Core dua kali — i
 
 Sejak Core dan modul berjalan dalam satu runtime, aturannya: **jangan memalsukan Core.** Tempuh jalur sungguhan, dan buat kalimat "tanpa satu pun permintaan HTTP" bisa gagal dengan `Http::preventStrayRequests()`.
 
-`apps/control-plane/tests/Feature/Boundary/NoInternalHttpTest.php` menunjukkan bahwa satu lapis saja tidak cukup, dan alasannya layak dibaca sebelum menulis test serupa:
+`apps/core/tests/Feature/Boundary/NoInternalHttpTest.php` menunjukkan bahwa satu lapis saja tidak cukup, dan alasannya layak dibaca sebelum menulis test serupa:
 
 - `Http::fake()` telanjang memulangkan 200 kosong, yang justru membuat lompatan yang tersisa terlihat berhasil. Penangannya harus **melempar**.
 - `Http::preventStrayRequests()` menangkap permintaan yang lolos dari pemalsuan itu.
@@ -74,9 +74,9 @@ Migration module "contoh-a" membuat tabel yang bukan miliknya: contoh_b_m_curian
 Awalan yang sah: "contoh_a_".
 ```
 
-Nama yang salah dan bentuk yang sah, keduanya di baris yang sama. Penjaga namespace di `apps/control-plane/tests/Feature/Boundary/ModuleNamespaceBoundaryTest.php` mengikuti bentuk yang sama: ia menyebut berkas yang melanggar, namespace yang disebutnya, lalu apa yang sebenarnya boleh disebut modul — kelas Core, kerangka kerja, dan kelasnya sendiri.
+Nama yang salah dan bentuk yang sah, keduanya di baris yang sama. Penjaga namespace di `apps/core/tests/Feature/Boundary/ModuleNamespaceBoundaryTest.php` mengikuti bentuk yang sama: ia menyebut berkas yang melanggar, namespace yang disebutnya, lalu apa yang sebenarnya boleh disebut modul — kelas Core, kerangka kerja, dan kelasnya sendiri.
 
-Penjaga yang daftarnya boleh berisi pengecualian menambahkan satu hal lagi: pengecualian ditulis di berkas test itu sendiri, beserta alasan dan task yang membereskannya, supaya "sengaja belum" bisa dibedakan dari "terlupakan". `apps/control-plane/tests/Feature/Boundary/RuteModuleTerlindungiTest.php` menyimpan daftarnya sebagai konstanta dengan komentar itu.
+Penjaga yang daftarnya boleh berisi pengecualian menambahkan satu hal lagi: pengecualian ditulis di berkas test itu sendiri, beserta alasan dan task yang membereskannya, supaya "sengaja belum" bisa dibedakan dari "terlupakan". `apps/core/tests/Feature/Boundary/RuteModuleTerlindungiTest.php` menyimpan daftarnya sebagai konstanta dengan komentar itu.
 
 ## Penjaga namespace membaca berkas, bukan menganalisa tipe
 
@@ -84,11 +84,11 @@ Aturan PHPStan untuk batas namespace sempat ditulis lebih dulu di sini, lalu dib
 
 Penjaga batas namespace karena itu memindai teks berkas. Ini bukan kompromi kualitas — untuk pertanyaan "apakah berkas ini menyebut nama itu", pembacaan berkas justru yang lengkap.
 
-PHPStan tetap dipakai, untuk pertanyaan lain: kebenaran tipe. Setelannya ada di `apps/control-plane/phpstan.neon`.
+PHPStan tetap dipakai, untuk pertanyaan lain: kebenaran tipe. Setelannya ada di `apps/core/phpstan.neon`.
 
 ## Daftar pengecualian yang boleh kosong tetap harus membuktikan aturannya
 
-`App\Support\Modules\ModulTanpaAnalisaTipe` di `apps/control-plane/app/Support/Modules/ModulTanpaAnalisaTipe.php` mendaftar modul yang belum ikut analisa tipe. Daftar itu sekarang kosong, dan itu hasil yang diinginkan.
+`App\Support\Modules\ModulTanpaAnalisaTipe` di `apps/core/app/Support/Modules/ModulTanpaAnalisaTipe.php` mendaftar modul yang belum ikut analisa tipe. Daftar itu sekarang kosong, dan itu hasil yang diinginkan.
 
 Daftar kosong membuat setiap pemeriksaan yang membacanya hijau **tanpa subjek**. Penjaga tanpa subjek tidak boleh dianggap hijau: ia tidak membuktikan aturannya berlaku, ia hanya membuktikan tidak ada yang diperiksa. Karena itu syarat "alasan menyebut angka terukur" dan "tenggat ditulis `YYYY-MM-DD`" dibuktikan pada entri buatan di dalam test, lewat penyedia data yang memberi entri cacat dan menuntut pemeriksanya merah.
 
@@ -108,10 +108,10 @@ Polanya sudah ada di beberapa tempat dan tinggal diikuti:
 
 | Berkas | Yang dibuat di folder sementara |
 | --- | --- |
-| `apps/control-plane/tests/Feature/Boundary/PemindaiModul.php` | Modul palsu untuk penjaga batas |
-| `apps/control-plane/tests/Feature/Boundary/ModulSedangDipindahTest.php` | Sepasang modul yang identik sampai ke barisnya, beda hanya nama folder |
-| `apps/control-plane/tests/Feature/Boundary/SusunanManifestModulTest.php` | Manifest palsu yang membuktikan aturannya bisa merah |
-| `apps/control-plane/tests/Feature/ControlPlane/EditionResolverTest.php` | Folder modul yang dibaca resolver edisi |
+| `apps/core/tests/Feature/Boundary/PemindaiModul.php` | Modul palsu untuk penjaga batas |
+| `apps/core/tests/Feature/Boundary/ModulSedangDipindahTest.php` | Sepasang modul yang identik sampai ke barisnya, beda hanya nama folder |
+| `apps/core/tests/Feature/Boundary/SusunanManifestModulTest.php` | Manifest palsu yang membuktikan aturannya bisa merah |
+| `apps/core/tests/Feature/ControlPlane/EditionResolverTest.php` | Folder modul yang dibaca resolver edisi |
 
 ## Setiap tabel yang diisi migrasi terdaftar sebagai pengecualian pemangkasan
 
@@ -119,7 +119,7 @@ Polanya sudah ada di beberapa tempat dan tinggal diikuti:
 
 Aturannya: **setiap tabel yang diisi migrasi harus terdaftar sebagai pengecualian pemangkasan.** Tidak ada yang memulihkan isinya di antara test, jadi memangkasnya merusak suite lain yang berjalan sesudahnya — dan kerusakannya muncul di tempat yang salah.
 
-Daftarnya ada di `apps/control-plane/tests/Feature/ControlPlane/NumberSequenceConcurrencyTest.php` pada `$exceptTables`, beserta perintah untuk memeriksanya ulang:
+Daftarnya ada di `apps/core/tests/Feature/ControlPlane/NumberSequenceConcurrencyTest.php` pada `$exceptTables`, beserta perintah untuk memeriksanya ulang:
 
 ```bash
 grep -rho "DB::table('[a-z_]*')->insert" database/migrations/ | sort -u
@@ -129,11 +129,11 @@ Modul yang masuk pada fase berikutnya akan membawa tabel referensinya sendiri, j
 
 ## Fixture test Core tidak meminjam id produk sungguhan
 
-Fixture katalog di `apps/control-plane/tests/TestCase.php` dulu memakai id modul aset yang sungguhan. Ia bukan salinan buruk dari modul itu; ia bahan uji rantai izin milik Core yang kebetulan meminjam idnya. Selama modul itu belum dilayani runtime, pinjaman itu tidak berakibat apa-apa. Begitu modulnya dilayani, satu id menunjuk dua hal, dan pendaftaran bisnis memilih yang salah.
+Fixture katalog di `apps/core/tests/TestCase.php` dulu memakai id modul aset yang sungguhan. Ia bukan salinan buruk dari modul itu; ia bahan uji rantai izin milik Core yang kebetulan meminjam idnya. Selama modul itu belum dilayani runtime, pinjaman itu tidak berakibat apa-apa. Begitu modulnya dilayani, satu id menunjuk dua hal, dan pendaftaran bisnis memilih yang salah.
 
 Perbaikannya satu baris makna: fixture memakai id `app-uji`, yang tidak akan pernah menjadi folder di `modules/`. **Dua sumber kebenaran untuk satu katalog adalah dua sumber yang akan menyimpang** — pertanyaannya kapan, bukan apakah.
 
-Sisi lain aturan yang sama: fixture katalog yang memang harus mewakili modul sungguhan mendaftarkan manifest modul itu apa adanya, lewat perintah `app:register-manifest` di `apps/control-plane/app/Console/Commands/RegisterAppManifestCommand.php` — perintah yang sama dengan yang dijalankan admin on-prem. Daftar kecil yang ditulis tangan di dalam test adalah sumber kebenaran kedua, dan itu yang menyimpang.
+Sisi lain aturan yang sama: fixture katalog yang memang harus mewakili modul sungguhan mendaftarkan manifest modul itu apa adanya, lewat perintah `app:register-manifest` di `apps/core/app/Console/Commands/RegisterAppManifestCommand.php` — perintah yang sama dengan yang dijalankan admin on-prem. Daftar kecil yang ditulis tangan di dalam test adalah sumber kebenaran kedua, dan itu yang menyimpang.
 
 ## Menjalankan suitenya
 
@@ -145,12 +145,12 @@ Tiga jebakan lingkungan yang pesannya tidak pernah menyebut sebabnya. Ketiganya 
 
 | Perintah | Batas |
 | --- | --- |
-| `composer types:check` | `--memory-limit=1G`, sudah ter-commit di `apps/control-plane/composer.json` |
+| `composer types:check` | `--memory-limit=1G`, sudah ter-commit di `apps/core/composer.json` |
 | Suite penuh dalam satu proses secara lokal | `php -d memory_limit=1G vendor/bin/phpunit` |
 
 Angka lama PHPStan cukup hanya selama modul dikecualikan dari analisa; begitu seluruh isi `modules/` beserta grafik tipe Eloquent ikut masuk, analisanya berhenti dengan pesan yang tidak menyebut modul sama sekali. Untuk PHPUnit, `memory_limit` bawaan CLI berakhir `Fatal error: Premature end of PHP process` pada test yang tidak ada hubungannya dengan sebabnya — pesannya menyebut test berikutnya. CI tidak terkena karena `setup-php` melepas batasnya dan run-nya paralel, jadi jebakan ini hanya menggigit secara lokal.
 
-**Angka PHPStan hanya sah diukur sesudah simpanannya dibatalkan.** Simpanan hasil analisa menyembunyikan temuan: sebuah berkas pernah dilaporkan dengan temuan yang merujuk keadaan yang sudah tidak ada di disk, dan begitu simpanannya dibatalkan, temuan yang sebenarnya muncul. Setiap angka yang ditulis ke `apps/control-plane/phpstan-baseline.neon` atau ke catatan pekerjaan diukur sesudah `phpstan clear-result-cache`.
+**Angka PHPStan hanya sah diukur sesudah simpanannya dibatalkan.** Simpanan hasil analisa menyembunyikan temuan: sebuah berkas pernah dilaporkan dengan temuan yang merujuk keadaan yang sudah tidak ada di disk, dan begitu simpanannya dibatalkan, temuan yang sebenarnya muncul. Setiap angka yang ditulis ke `apps/core/phpstan-baseline.neon` atau ke catatan pekerjaan diukur sesudah `phpstan clear-result-cache`.
 
 Ada satu lapis lagi yang lebih jahat: **mengubah berkas aturan PHPStan buatan sendiri tidak membatalkan simpanan itu.** Selama menulis penjaga namespace, aturannya sudah berjalan sejak awal, tetapi setiap perubahan kodenya disajikan hasil lama dengan nol temuan — terbaca persis seperti "aturannya tidak jalan". Memanggil `clear-result-cache` saja tidak cukup:
 

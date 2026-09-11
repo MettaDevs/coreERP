@@ -10,7 +10,7 @@ Modul memakai database tenant yang sama dengan Core. Yang memisahkan datanya ada
 menyaring kejadian ganda.
 
 Konsekuensinya perlu disadari sejak awal: `DB::table('tabel_modul_lain')` **akan berhasil**. Yang
-menolaknya bukan database, melainkan penjaga batas di `apps/control-plane/tests/Feature/Boundary/`
+menolaknya bukan database, melainkan penjaga batas di `apps/core/tests/Feature/Boundary/`
 yang memindai seluruh isi `modules/`. Itu sebabnya query mentah pada tabel modul dilarang: ia juga
 melewati lapisan model, dan lapisan model itulah yang menegakkan penyaringan tenant.
 

@@ -1,6 +1,6 @@
 """Validate app.yaml against the Control Plane catalog contract.
 
-Mirrors apps/control-plane/app/Http/Requests/Provider/AppCatalogRequest.php, including the
+Mirrors apps/core/app/Http/Requests/Provider/AppCatalogRequest.php, including the
 four Dynamics 365 layers (entry point -> permission -> privilege -> duty) and the rule that
 privilege codes must never collide with permission codes. Manifest keys mirror the endpoint payload
 exactly (snake_case), so CI forwards them without renaming.

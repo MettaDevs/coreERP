@@ -1,6 +1,6 @@
 // Konfigurasi ESLint untuk **seluruh repo**, dan karena itu ia hidup di akar.
 //
-// Sampai 10 September 2026 berkas ini ada di `apps/control-plane/`, dan akibatnya tidak terlihat
+// Sampai 10 September 2026 berkas ini ada di `apps/core/`, dan akibatnya tidak terlihat
 // sebagai kegagalan: ESLint 9 menetapkan base path dari letak berkas konfigurasinya, sehingga
 // `eslint .` dari folder itu memeriksa **nol** berkas di bawah `modules/` — dan melaporkan sukses.
 // Bukan menolak, bukan memperingatkan; hanya diam. Puluhan berkas UI module karena itu tidak pernah
@@ -68,7 +68,7 @@ export default [
             'import/resolver': {
                 typescript: {
                     alwaysTryTypes: true,
-                    project: './apps/control-plane/tsconfig.json',
+                    project: './apps/core/tsconfig.json',
                 },
                 node: true,
             },
@@ -121,12 +121,12 @@ export default [
         // fitur diam-diam membuang baris yang salah. Urutan impor pada berkas ini dijaga
         // tangan sampai penandanya tidak lagi dipakai.
         files: [
-            'apps/control-plane/resources/js/pages/auth/confirm-password.tsx',
-            'apps/control-plane/resources/js/pages/auth/login.tsx',
-            'apps/control-plane/resources/js/pages/settings/profile.tsx',
-            'apps/control-plane/resources/js/pages/settings/security.tsx',
-            'apps/control-plane/resources/js/pages/welcome.tsx',
-            'apps/control-plane/resources/js/types/auth.ts',
+            'apps/core/resources/js/pages/auth/confirm-password.tsx',
+            'apps/core/resources/js/pages/auth/login.tsx',
+            'apps/core/resources/js/pages/settings/profile.tsx',
+            'apps/core/resources/js/pages/settings/security.tsx',
+            'apps/core/resources/js/pages/welcome.tsx',
+            'apps/core/resources/js/types/auth.ts',
         ],
         rules: {
             'import/order': 'off',
@@ -149,7 +149,7 @@ export default [
         // kawan-kawannya disediakan runtime itu, jadi tanpa deklarasi ini setiap
         // pembacaan variabel lingkungan dilaporkan sebagai variabel tak dikenal.
         files: [
-            'apps/control-plane/loadtest/k6/**/*.js',
+            'apps/core/loadtest/k6/**/*.js',
             'modules/*/*/loadtest/k6/**/*.js',
         ],
         languageOptions: {
@@ -164,14 +164,14 @@ export default [
         ignores: [
             '**/vendor/**',
             '**/node_modules/**',
-            'apps/control-plane/public/**',
-            'apps/control-plane/bootstrap/ssr/**',
-            'apps/control-plane/tailwind.config.js',
-            'apps/control-plane/vite.config.ts',
+            'apps/core/public/**',
+            'apps/core/bootstrap/ssr/**',
+            'apps/core/tailwind.config.js',
+            'apps/core/vite.config.ts',
             // Dibangkitkan wayfinder; menata ulangnya hanya membuat diff yang tidak dibaca siapa pun.
-            'apps/control-plane/resources/js/actions/**',
-            'apps/control-plane/resources/js/routes/**',
-            'apps/control-plane/resources/js/wayfinder/**',
+            'apps/core/resources/js/actions/**',
+            'apps/core/resources/js/routes/**',
+            'apps/core/resources/js/wayfinder/**',
             // Keluaran build, bukan kode sumber. Tanpa baris ini dua bundel terminifikasi
             // menyumbang lebih dari sebelas ribu temuan dan menenggelamkan yang sungguhan.
             '**/dist/**',

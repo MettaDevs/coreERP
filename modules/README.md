@@ -53,7 +53,7 @@ Controller module merendernya seperti halaman Inertia biasa, dengan nama berbent
 return Inertia::render('contoh-a::Daftar', ['barang' => $barang]);
 ```
 
-Penerbit tidak ikut disebut; pemilih halaman pada `apps/control-plane/resources/js/app.tsx` mencocokkan
+Penerbit tidak ikut disebut; pemilih halaman pada `apps/core/resources/js/app.tsx` mencocokkan
 akhiran jalurnya, dan id module sudah unik di seluruh runtime.
 
 Tiga hal yang mengikat:
@@ -64,10 +64,10 @@ Tiga hal yang mengikat:
 - **Id entri menu pada `app.yaml` adalah jalur rutenya.** Core menyusun tautan sidebar dengan aturan
   `/<id module>/<id entri menu>`, jadi berkas rute module wajib punya rute dengan jalur itu.
 - **Halaman module dimuat malas.** Tuan rumahnya di
-  `apps/control-plane/resources/js/pages/modules/host.tsx` memasang pembatas penangguhan dan pembatas
+  `apps/core/resources/js/pages/modules/host.tsx` memasang pembatas penangguhan dan pembatas
   kesalahan; jangan menghapus salah satunya.
 
-Berkas `ui/` diperiksa Prettier lewat `npm run format:check` di `apps/control-plane`, dengan
+Berkas `ui/` diperiksa Prettier lewat `npm run format:check` di `apps/core`, dengan
 `--config .prettierrc` yang ditulis eksplisit: Prettier mencari konfigurasi dengan menaiki folder dari
 berkas yang diperiksa, dan di atas `modules/` tidak ada satu pun. ESLint **belum** mencakup folder ini —
 ia menolak berkas di luar folder konfigurasinya — jadi berkas `ui/` untuk sementara hanya dijaga
@@ -90,7 +90,7 @@ mengganti nama tabel di setiap instalasi pelanggan. Awalan baru dicatat di tabel
 yang membuat module-nya, supaya tabrakan ketahuan saat peninjauan, bukan saat migrasi jalan.
 
 Tabel ini memuat module yang **ada hari ini**, tidak lebih dan tidak kurang, dan itu dijaga
-`SusunanManifestModulTest` di `apps/control-plane/tests/Feature/Boundary/`. Baris yang kurang membuat
+`SusunanManifestModulTest` di `apps/core/tests/Feature/Boundary/`. Baris yang kurang membuat
 awalan yang sudah dipakai tampak masih bebas; baris untuk module yang belum ada membuat awalan yang
 masih bebas tampak sudah terpakai. Keduanya menyesatkan orang berikutnya, dan sebelum penjaga itu ada,
 tidak ada satu pun test yang gagal karenanya.

@@ -138,12 +138,12 @@ services:
       # Layout unggahan dan hasil ekspor laporan ditulis worker lalu disajikan web, jadi keduanya
       # harus melihat storage yang sama. Tanpa volume bersama, unduhan menjawab 410 untuk berkas
       # yang sebenarnya ada — hanya ada di container yang salah.
-      - core-storage:/repo/apps/control-plane/storage/app
+      - core-storage:/repo/apps/core/storage/app
       # Tanpa volume ini, log hidup di lapisan tulis container dan lenyap pada setiap upgrade.
       # Di mesin pelanggan itu berarti satu-satunya catatan tentang kegagalan kemarin hilang
       # tepat pada saat seseorang datang untuk membacanya. Nama berkas dibedakan per peran
       # (lihat `config/logging.php`), jadi ketiga container aman berbagi satu volume.
-      - core-logs:/repo/apps/control-plane/storage/logs
+      - core-logs:/repo/apps/core/storage/logs
     ports:
       - '${CORE_APP_PORT:-8000}:80'
     healthcheck:
@@ -170,8 +170,8 @@ services:
       - default
       - renderer
     volumes:
-      - core-storage:/repo/apps/control-plane/storage/app
-      - core-logs:/repo/apps/control-plane/storage/logs
+      - core-storage:/repo/apps/core/storage/app
+      - core-logs:/repo/apps/core/storage/logs
 
   # Tepat satu replika. Tanpa penjadwal, `number-sequences:recover` tidak pernah berjalan dan
   # reservasi nomor berkelanjutan yang kedaluwarsa tidak pernah dilepas.
@@ -191,7 +191,7 @@ services:
       # membuang trace request web.
       OTEL_SERVICE_NAME: coreerp-scheduler
     volumes:
-      - core-logs:/repo/apps/control-plane/storage/logs
+      - core-logs:/repo/apps/core/storage/logs
 
   # Stateless, tidak mengenal tenant, dan **tidak punya jalan keluar** — lihat network `renderer`
   # di bawah. Ia hanya mengubah dokumen yang sudah diisi menjadi PDF.

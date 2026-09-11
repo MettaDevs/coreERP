@@ -2,7 +2,7 @@
 
 Ketemu berkas tapi tidak tahu aturannya, atau baca dokumen tapi tidak tahu kodenya di mana. Tabel ini jembatannya.
 
-Semua path relatif terhadap `apps/control-plane` kecuali disebutkan lain.
+Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 
 ## Berdasarkan area
 
@@ -82,8 +82,8 @@ Semua path relatif terhadap `apps/control-plane` kecuali disebutkan lain.
 | --- | --- |
 | `resources/js/pages/`, `components/`, `layouts/` | `.agents/skills/coreerp-ui/SKILL.md`, `.agents/skills/coreerp-page-standard/SKILL.md` |
 | `packages/ui/` (root repo) | SDK UI bersama `@apperp/ui` |
-| `apps/control-plane/resources/js/components/product-launcher.tsx` | Launcher aplikasi di header shell |
-| `apps/control-plane/resources/js/lib/halaman-module.tsx` | Tuan rumah halaman module; halaman module ikut build shell |
+| `apps/core/resources/js/components/product-launcher.tsx` | Launcher aplikasi di header shell |
+| `apps/core/resources/js/lib/halaman-module.tsx` | Tuan rumah halaman module; halaman module ikut build shell |
 | `apps/provider-console/` (root repo) | Konsol vendor |
 
 ## Berdasarkan pertanyaan

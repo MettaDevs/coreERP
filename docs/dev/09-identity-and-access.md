@@ -284,7 +284,7 @@ Owner dan admin tenant dapat mengatur Number Sequence melalui permission platfor
 
 ## Product launcher
 
-Core selalu tersedia sebagai control-plane shell. Produk bisnis hanya tampil sebagai siap digunakan bila:
+Core selalu tersedia sebagai shell Core. Produk bisnis hanya tampil sebagai siap digunakan bila:
 
 - tenant mempunyai entitlement aktif;
 - installation/deployment registry menyatakan placement/release `ready`;
@@ -316,7 +316,7 @@ Provider admin bukan tenant membership. Akses support lintas tenant hanya boleh 
 
 ## Setup lokal
 
-Setup Laravel saat ini tetap dijalankan dari `apps/control-plane`:
+Setup Laravel saat ini tetap dijalankan dari `apps/core`:
 
 ```powershell
 php artisan core:configure-local

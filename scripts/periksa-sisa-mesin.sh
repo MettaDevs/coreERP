@@ -31,7 +31,7 @@
 set -euo pipefail
 
 akar="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-app="$akar/apps/control-plane"
+app="$akar/apps/core"
 
 PENANDA='SISA-MESIN-PEMBANGUN-PENANDA'
 
@@ -89,7 +89,7 @@ periksa() {
     hasil="$(printf '%s\n' "$daftar" | docker run --rm -i --entrypoint sh "$image" -c '
         while IFS= read -r relatif; do
             [ -n "$relatif" ] || continue
-            if [ -e "/repo/apps/control-plane/$relatif" ]; then
+            if [ -e "/repo/apps/core/$relatif" ]; then
                 echo "ADA $relatif"
             else
                 echo "TIDAK $relatif"
@@ -143,8 +143,8 @@ buktikan_merah() {
 
     printf '%s\n' \
         'FROM alpine' \
-        'COPY apps/control-plane/storage /repo/apps/control-plane/storage' \
-        'COPY apps/control-plane/resources /repo/apps/control-plane/resources' \
+        'COPY apps/core/storage /repo/apps/core/storage' \
+        'COPY apps/core/resources /repo/apps/core/resources' \
         > "$sementara/Merah.Dockerfile"
     : > "$sementara/Merah.Dockerfile.dockerignore"
 

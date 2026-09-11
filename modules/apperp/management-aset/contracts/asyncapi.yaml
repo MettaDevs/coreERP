@@ -4,7 +4,7 @@ info:
   version: 0.3.0
   description: |
     Event yang **diterima** app ini. Sisi penerbitnya dikontrakkan pada
-    `CoreERP/apps/control-plane/contracts/asyncapi.yaml`; kedua file wajib
+    `CoreERP/apps/core/contracts/asyncapi.yaml`; kedua file wajib
     berubah bersama-sama.
 
     Sejak `v2`, `correlation_id` wajib dan berisi id dokumen dekomisioning yang

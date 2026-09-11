@@ -3,7 +3,7 @@
     "name": "coreerp",
     "private": true,
     "workspaces": [
-        "apps/control-plane",
+        "apps/core",
         "packages/ui"
     ]
 }

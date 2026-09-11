@@ -35,7 +35,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const akar = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const jalurBaseline = 'apps/control-plane/phpstan-baseline.neon';
+const jalurBaseline = 'apps/core/phpstan-baseline.neon';
 const pembanding = process.argv[2] ?? 'origin/main';
 
 function gagal(...baris) {

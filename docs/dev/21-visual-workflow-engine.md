@@ -201,13 +201,13 @@ sakelar.
 
 | Berkas | Isinya |
 | --- | --- |
-| `apps/control-plane/app/Http/Controllers/Workflow/WorkflowConfigurationController.php` | Manajemen konfigurasi dan editor graf workflow |
-| `apps/control-plane/app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php` | Endpoint internal `/internal/v1/workflows/instances` |
-| `apps/control-plane/app/Http/Controllers/Workflow/WorkflowInboxController.php` | Pengelolaan work items dan inbox persetujuan |
-| `apps/control-plane/resources/js/pages/settings/workflows.tsx` | Layar daftar konfigurasi workflow per tipe |
-| `apps/control-plane/resources/js/pages/settings/workflow-editor.tsx` | Editor kanvas visual untuk menyusun step dan rule kondisi |
-| `apps/control-plane/resources/js/pages/workflow-inbox.tsx` | Layar antrian inbox persetujuan terpusat |
-| `apps/control-plane/contracts/asyncapi.yaml` | Kontrak event `core.workflow.decision.v2` |
+| `apps/core/app/Http/Controllers/Workflow/WorkflowConfigurationController.php` | Manajemen konfigurasi dan editor graf workflow |
+| `apps/core/app/Http/Controllers/Workflow/InternalWorkflowInstanceController.php` | Endpoint internal `/internal/v1/workflows/instances` |
+| `apps/core/app/Http/Controllers/Workflow/WorkflowInboxController.php` | Pengelolaan work items dan inbox persetujuan |
+| `apps/core/resources/js/pages/settings/workflows.tsx` | Layar daftar konfigurasi workflow per tipe |
+| `apps/core/resources/js/pages/settings/workflow-editor.tsx` | Editor kanvas visual untuk menyusun step dan rule kondisi |
+| `apps/core/resources/js/pages/workflow-inbox.tsx` | Layar antrian inbox persetujuan terpusat |
+| `apps/core/contracts/asyncapi.yaml` | Kontrak event `core.workflow.decision.v2` |
 
 ---
 

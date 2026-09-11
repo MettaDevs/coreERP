@@ -20,7 +20,7 @@ bukan ke berkas YAML:
 
 - Keputusan workflow dan penerimaan event sudah menjadi event Laravel in-process (F3-09;
   penyediaan tenant menyusul di F3-11). Sisi penerbit tetap dikontrakkan pada
-  `apps/control-plane/contracts/asyncapi.yaml`, dan **itulah** salinan yang berwenang.
+  `apps/core/contracts/asyncapi.yaml`, dan **itulah** salinan yang berwenang.
 - Laporan dibaca Core lewat `App\Support\Modules\Contracts\PenyediaLaporanModul`, bukan
   lewat `internal/v1/laporan/...` (F3-12).
 
@@ -31,7 +31,7 @@ keduanya cukup sendiri-sendiri:
 
 1. **Tidak ada alur CI yang memanggilnya.** `.github/workflows/lint.yml` memang menjalankan
    `python3 contracts/check-contract-coverage.py`, tetapi langkah itu memakai
-   `working-directory: apps/control-plane` — yang dijalankan adalah salinan milik Core, yang
+   `working-directory: apps/core` — yang dijalankan adalah salinan milik Core, yang
    membandingkan `routes/api.php` Core dengan `contracts/openapi-internal.yaml` Core. Salinan
    milik module tidak pernah tersentuh. Standar repo ini menyebutnya apa adanya: pemeriksa
    yang tidak dipanggil pipeline mana pun adalah berkas, bukan gerbang.

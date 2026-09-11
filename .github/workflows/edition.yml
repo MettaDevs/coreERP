@@ -81,20 +81,20 @@ jobs:
 
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-opentelemetry
-        working-directory: apps/control-plane
+        working-directory: apps/core
 
       - name: Copy Environment File
         run: cp .env.example .env
-        working-directory: apps/control-plane
+        working-directory: apps/core
 
       - name: Generate Application Key
         run: php artisan key:generate
-        working-directory: apps/control-plane
+        working-directory: apps/core
 
       # Dipakai `verify-edition.sh` saat menjalankan migration dari dalam image.
       - name: Baca Application Key
         run: |
-          echo "APP_KEY=$(grep '^APP_KEY=' apps/control-plane/.env | cut -d= -f2-)" >> "$GITHUB_ENV"
+          echo "APP_KEY=$(grep '^APP_KEY=' apps/core/.env | cut -d= -f2-)" >> "$GITHUB_ENV"
 
       # Ditanam sebelum kedua image dibangun, dan diperiksa sesudahnya. Runner melakukan checkout
       # bersih, jadi sisa mesin pembangun tidak pernah ada di sini dengan sendirinya — sebuah

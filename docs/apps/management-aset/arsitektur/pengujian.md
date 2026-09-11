@@ -5,11 +5,11 @@ Halaman ini untuk developer. Isinya apa yang bisa dan **tidak bisa** dilihat tia
 ## Feature test
 
 ```bash
-cd apps/control-plane && php artisan test
+cd apps/core && php artisan test
 ```
 
 Satu perintah menjalankan test Core **dan** seluruh module. Suite `Module` pada
-`apps/control-plane/phpunit.xml` menyapu `modules/*/*/tests`; tidak ada perintah kedua untuk modul
+`apps/core/phpunit.xml` menyapu `modules/*/*/tests`; tidak ada perintah kedua untuk modul
 ini, dan tidak ada `artisan` di dalam folder modul untuk menjalankannya sendiri.
 
 ::: tip Yang berubah dan kenapa itu penting
@@ -66,7 +66,7 @@ tanpa membuktikan apa pun.
 
 ### Penjaga batas berjalan di perintah yang sama
 
-`apps/control-plane/tests/Feature/Boundary/` memindai seluruh isi `modules/` dan menolak: tabel
+`apps/core/tests/Feature/Boundary/` memindai seluruh isi `modules/` dan menolak: tabel
 tanpa awalan modul, tabel milik modul lain yang disentuh, model tenant tanpa `MilikTenant`,
 namespace yang menyeberang, kerangka aplikasi Laravel di dalam folder modul, rute modul tanpa
 middleware konteks, dan manifest yang susunannya tidak sah.
@@ -94,7 +94,7 @@ Contoh nyata: endpoint penautan maintenance menghapus lalu menyisipkan ulang tan
 
 Skenario dan oracle SQL-nya ada di `modules/apperp/management-aset/loadtest/`, karena permukaan
 yang diuji milik modul ini. **Stack-nya bukan milik modul**: sejak 10 September 2026 hanya ada satu,
-`apps/control-plane/loadtest/`, yang menjalankan runtime Core sungguhan dengan empat instance di
+`apps/core/loadtest/`, yang menjalankan runtime Core sungguhan dengan empat instance di
 belakang nginx. Cara menjalankannya, hasil terukurnya, dan batas kejujurannya ada di `README.md`
 folder itu.
 
@@ -180,4 +180,4 @@ permintaan membayar bootstrap Laravel penuh.
 - [Load dan concurrency testing](/dev/20-load-and-concurrency-testing) — gate platform
 - [Database dan migration](/apps/management-aset/arsitektur/database) — batasan yang diandalkan pengujian
 - [Definition of done](/onboarding/definition-of-done) — penjaga batas dan gate load test sebagai syarat selesai
-- `apps/control-plane/loadtest/README.md` — stack gabungan: cara menjalankan, hasil terukur, dan batas kejujurannya
+- `apps/core/loadtest/README.md` — stack gabungan: cara menjalankan, hasil terukur, dan batas kejujurannya

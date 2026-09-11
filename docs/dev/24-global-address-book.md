@@ -10,7 +10,7 @@ Legal entity dan operating unit ikut menjadi party karena keduanya punya nama da
 
 ## Yang disimpan
 
-Skema lengkapnya ada di `apps/control-plane/database/migrations/2026_07_27_020000_create_party_and_address_book_tables.php`; daftar negara ISO 3166-1 diisi `2026_09_05_140000_seed_country_regions.php` sebagai migrasi, bukan seeder, karena tanpa isinya tidak ada alamat yang dapat disimpan.
+Skema lengkapnya ada di `apps/core/database/migrations/2026_07_27_020000_create_party_and_address_book_tables.php`; daftar negara ISO 3166-1 diisi `2026_09_05_140000_seed_country_regions.php` sebagai migrasi, bukan seeder, karena tanpa isinya tidak ada alamat yang dapat disimpan.
 
 | Tabel | Isi | Aturan yang dijaga database |
 | --- | --- | --- |
@@ -48,12 +48,12 @@ Party untuk pelanggan, pemasok, dan pegawai belum punya API. Saat app pertama me
 
 | Berkas | Isi |
 | --- | --- |
-| `apps/control-plane/app/Models/{Party,PartyLocation,PostalAddress,ElectronicAddress,OrganizationParty,CountryRegion}.php` | Model buku alamat |
-| `apps/control-plane/app/Support/AddressBook/OrganizationAddressBook.php` | Tautan organisasi ke party, aturan satu utama, ringkasan untuk kop |
-| `apps/control-plane/app/Support/AddressBook/PostalAddressFormatter.php` | Bentuk tercetak alamat |
-| `apps/control-plane/app/Http/Controllers/GlobalAddressBook/` | Endpoint alamat dan kontak organisasi |
-| `apps/control-plane/resources/js/components/organization/address-book-section.tsx` | Dua bagian pada kartu organisasi |
-| `apps/control-plane/tests/Feature/ControlPlane/OrganizationAddressBookTest.php` | Utama otomatis dan berpindah, satu utama per jenis, kop membaca buku alamat, hak akses |
+| `apps/core/app/Models/{Party,PartyLocation,PostalAddress,ElectronicAddress,OrganizationParty,CountryRegion}.php` | Model buku alamat |
+| `apps/core/app/Support/AddressBook/OrganizationAddressBook.php` | Tautan organisasi ke party, aturan satu utama, ringkasan untuk kop |
+| `apps/core/app/Support/AddressBook/PostalAddressFormatter.php` | Bentuk tercetak alamat |
+| `apps/core/app/Http/Controllers/GlobalAddressBook/` | Endpoint alamat dan kontak organisasi |
+| `apps/core/resources/js/components/organization/address-book-section.tsx` | Dua bagian pada kartu organisasi |
+| `apps/core/tests/Feature/ControlPlane/OrganizationAddressBookTest.php` | Utama otomatis dan berpindah, satu utama per jenis, kop membaca buku alamat, hak akses |
 
 ## Halaman terkait
 

@@ -107,7 +107,7 @@ Test feature menjaga hal yang tidak boleh regresi: induk lintas tenant tertolak,
 | --- | --- | --- |
 | Gate penemuan | ✅ Lewat | Modul terdaftar di katalog dengan manifest lengkap |
 | Migration PostgreSQL | ✅ Ada | `php artisan module:migrate management-aset` |
-| Penjaga batas | ✅ Hijau | `apps/control-plane/tests/Feature/Boundary/`, ikut tiap `php artisan test` |
+| Penjaga batas | ✅ Hijau | `apps/core/tests/Feature/Boundary/`, ikut tiap `php artisan test` |
 | Test feature | ✅ Ada | `tests/Feature/`, berjalan pada PostgreSQL bersama test Core |
 | **Gate concurrency** | ✅ Lewat | 1000 VU pada 128 tenant, empat instance runtime Core di belakang nginx, PostgreSQL asli — diukur ulang 10 September 2026 pada runtime satu proses |
 | Scope organisasi | ⏳ Belum | Baru menerapkan batas tenant dan permission; scope organisasi menunggu contract Core |

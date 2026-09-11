@@ -21,15 +21,15 @@ utuh.
 
 Yang dibuang:
 
-- `apps/control-plane/app/Support/AppContentPath.php` dan `AppContextToken.php`
-- `apps/control-plane/app/Console/Commands/RenderAppProxyConfigCommand.php` dan
+- `apps/core/app/Support/AppContentPath.php` dan `AppContextToken.php`
+- `apps/core/app/Console/Commands/RenderAppProxyConfigCommand.php` dan
   `BootstrapLocalAppRuntimeCommand.php`
-- `apps/control-plane/app/Jobs/DeployAppPlacement.php`
-- `apps/control-plane/app/Support/Reporting/AppReportClient.php` beserta cabang HTTP pada
+- `apps/core/app/Jobs/DeployAppPlacement.php`
+- `apps/core/app/Support/Reporting/AppReportClient.php` beserta cabang HTTP pada
   `SumberLaporan` — tidak ada lagi app di luar proses yang menyiapkan dataset laporan
 - pendaftaran rilis penyedia: `AppReleaseController`, `AppReleaseRequest`, model `AppRelease`,
   rutenya, dan entri OpenAPI-nya
-- `apps/control-plane/resources/js/pages/apps/host.tsx` beserta pemeriksa pesan iframe pada
+- `apps/core/resources/js/pages/apps/host.tsx` beserta pemeriksa pesan iframe pada
   `resources/js/lib/notifications.ts`
 - `deploy/apps-content-proxy.md`
 - pemanggilan `app:render-proxy-config` pada `docker/entrypoint.sh`, dan dua modul Apache
@@ -135,7 +135,7 @@ dikerjakan. Yang sudah selesai adalah pembuangan jalur container yang disebut ba
 
 **ESLint tidak menjangkau `modules/` maupun `packages/`.** Dan bentuknya lebih buruk daripada
 "menolak": ia memeriksa **nol** berkas di sana lalu keluar dengan kode 0. ESLint 9 menetapkan base
-path dari letak berkas konfigurasi, dan konfigurasinya ada di `apps/control-plane/`. Puluhan berkas
+path dari letak berkas konfigurasi, dan konfigurasinya ada di `apps/core/`. Puluhan berkas
 UI module karena itu tidak pernah diperiksa aturan hook React maupun urutan impor sejak module
 pertama mendarat, sementara alur CI melaporkan linter hijau di setiap pull request.
 
@@ -195,7 +195,7 @@ akan mencoba menarik image per app yang tidak dibangun lagi.
 
 ## 8. Kontrak OpenAPI internal tidak diregenerasi siapa pun
 
-`apps/control-plane/contracts/openapi.json` adalah salinan yang dibuat sekali dan tidak ada langkah
+`apps/core/contracts/openapi.json` adalah salinan yang dibuat sekali dan tidak ada langkah
 CI yang meregenerasinya maupun memeriksa apakah ia masih cocok dengan rute yang benar-benar ada.
 Ia akan basi tanpa ada satu pun pemeriksaan yang gagal.
 

@@ -10,7 +10,7 @@ artifacts
 # pengembang hanya menaruh versi basi di lapisan yang lebih awal.
 packages/ui/dist
 **/.env
-apps/control-plane/public/build
+apps/core/public/build
 # Seluruh isi `storage/` milik mesin pembangun, bukan milik rilis. Yang dikirim hanya rangka
 # foldernya, lewat berkas `.gitignore` yang dikecualikan di baris berikutnya.
 #
@@ -19,6 +19,6 @@ apps/control-plane/public/build
 # pertama; dan view Blade terkompilasi dipilih berdasarkan waktu ubah, sehingga satu view basi
 # dari mesin pengembang dapat menggantikan template yang sebenarnya dikirim tanpa satu pun pesan
 # galat. `scripts/periksa-sisa-mesin.sh` yang menjaga baris-baris ini.
-apps/control-plane/storage/**
-!apps/control-plane/storage/**/.gitignore
-apps/control-plane/bootstrap/cache/*.php
+apps/core/storage/**
+!apps/core/storage/**/.gitignore
+apps/core/bootstrap/cache/*.php

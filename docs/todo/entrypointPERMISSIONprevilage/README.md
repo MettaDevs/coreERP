@@ -12,7 +12,7 @@ Diverifikasi langsung ke kode, bukan dari status yang tertulis.
 
 | Item | Yang dikerjakan | Bukti di kode |
 | --- | --- | --- |
-| EP-01 | Detail akses saat admin memilih duty: tiap duty dapat dibuka sampai privilege dan permission efektifnya, lengkap dengan access level dan entry point | `apps/control-plane/resources/js/pages/settings/access.tsx` |
+| EP-01 | Detail akses saat admin memilih duty: tiap duty dapat dibuka sampai privilege dan permission efektifnya, lengkap dengan access level dan entry point | `apps/core/resources/js/pages/settings/access.tsx` |
 | EP-02 | Layar audit "mengapa orang ini bisa melakukan tindakan ini?" — telusuran read-only per anggota dari role sampai entry point, diikuti batas datanya | `access.tsx`, bagian assignment per anggota |
 | EP-03 | Ringkasan tindakan efektif per entry point pada daftar security role, misalnya `Register aset: lihat, tambah, ubah` | `access.tsx`, agregasi permission per entry point |
 | EP-04 | Validasi manifest menolak: kode privilege sama dengan kode permission, permission tanpa entry point terdaftar, privilege memakai permission app lain, dan duty memakai privilege app lain. Menu sidebar juga dibatasi permission `read` milik app yang sama | `app/Http/Requests/Provider/AppCatalogRequest.php` |

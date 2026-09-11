@@ -15,7 +15,7 @@ membacanya sebagai arah untuk pekerjaan baru.
 
 | Lokasi | Keadaan |
 | --- | --- |
-| `apps/control-plane/` | Laravel, Inertia, Fortify; organization, access, entitlement, placement, worker, dan **runtime yang menjalankan seluruh module** ada di sini. Ia tidak memiliki domain bisnis sendiri. |
+| `apps/core/` | Laravel, Inertia, Fortify; organization, access, entitlement, placement, worker, dan **runtime yang menjalankan seluruh module** ada di sini. Ia tidak memiliki domain bisnis sendiri. |
 | `apps/provider-console/` | Ada di repository ini; hanya memakai Control Plane API untuk operasi provider. |
 | Web Shell | Tidak punya folder sendiri. Launcher dan halaman tuan rumah hidup di UI Control Plane (`resources/js/components/product-launcher.tsx`, `resources/js/lib/halaman-module.tsx`, `resources/js/pages/apps/host.tsx`). |
 | `modules/` | Module bisnis, satu folder per module. Berjalan di runtime Core, memakai database tenant yang sama, dipisahkan awalan tabel. |
@@ -29,7 +29,7 @@ Control Plane sekarang memiliki organization directory (`organizations`, `legal_
 ```text
 CoreERP/                            # repository platform yang sekarang ini
 ├── apps/
-│   ├── control-plane/              # tenant, identity, entitlement, placement, installer, runtime module
+│   ├── core/                      # tenant, identity, entitlement, placement, installer, runtime module
 │   ├── provider-console/           # operasi provider, memakai Control Plane API
 │   └── web-shell/                  # host UI tenant dan launcher (belum ada, lihat tabel di atas)
 ├── modules/<penerbit>/<module>/    # module bisnis, berjalan di runtime Core
@@ -51,7 +51,7 @@ database.
 
 1. **Tetapkan contract dan template app:** gunakan struktur pada [standar app](02-module-standard.md), format manifest, aturan versi API/event, serta pipeline CI dasar. Belum perlu membuat package bersama.
 2. **Selesaikan platform minimum:** pisahkan Provider Console dan Web Shell dalam repository platform. Web Shell hanya perlu login/konteks kerja, launcher dari installation registry `ready`, dan kemampuan memuat satu UI app. Provider Console hanya perlu katalog, release, placement, dan status operasi yang benar.
-3. **Buat satu app pilot langsung pada repository sendiri:** app pilot harus memiliki Laravel API, UI, migration, OpenAPI/AsyncAPI, deploy, serta CI sendiri. Jangan membuat domain baru di `apps/control-plane`.
+3. **Buat satu app pilot langsung pada repository sendiri:** app pilot harus memiliki Laravel API, UI, migration, OpenAPI/AsyncAPI, deploy, serta CI sendiri. Jangan membuat domain baru di `apps/core`.
 4. **Buktikan release end-to-end:** CI menerbitkan API/UI/manifest; installer menjalankan migration; registry mencatat `ready`; Web Shell dapat membuka UI app. Hak produk tanpa placement `ready` tidak boleh membuat app tampil sebagai terpasang.
 5. **Skalakan ke app kedua:** baru setelah langkah 4 stabil. Jika ada kebutuhan kode lintas repository yang benar-benar sama, publish package kecil yang berversi dan memiliki owner.
 6. **Bridge atau reporting:** dibuat hanya saat ada use case lintas app nyata; komunikasi memakai REST/OpenAPI atau event/AsyncAPI, bukan query database.

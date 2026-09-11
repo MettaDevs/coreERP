@@ -21,7 +21,7 @@ pertama menghasilkan penanda yang terlewat; yang kedua ikut membawa keputusan do
 itu beserta awalan tabelnya.
 
 ```powershell
-cd apps/control-plane
+cd apps/core
 php artisan module:make kelola-contoh --nama="Kelola Contoh" --awalan=kelola_
 ```
 

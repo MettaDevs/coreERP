@@ -54,7 +54,7 @@ repo yang sama dengan kodenya, karena kalau tidak, memperbaruinya butuh dua pull
 Tiga hal yang tidak bisa ditawar:
 
 **Satu module tidak menyentuh data module lain.** Yang menolak adalah penjaga batas di
-`apps/control-plane/tests/Feature/Boundary/` dan analisa statis. Satu database yang sama bukan izin
+`apps/core/tests/Feature/Boundary/` dan analisa statis. Satu database yang sama bukan izin
 untuk melakukan `join` ke tabel modul sebelah.
 
 **Data tenant memakai konteks tepercaya dari Core.** Jangan menerima `tenant_id` atau scope organisasi bebas dari browser. Module membacanya lewat kontrak `KonteksTenant` dan `KonteksPermintaan`.

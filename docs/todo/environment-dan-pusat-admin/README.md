@@ -141,7 +141,7 @@ ini akui sendiri.
 Pekerjaan ini menyingkap cacat yang sudah ada sebelum ia dimulai, dan cacat itu harus dibereskan lebih
 dulu karena semua yang lain berdiri di atasnya.
 
-**`apps/control-plane` bukan control plane.** Ia application plane — runtime Core, layanan platform,
+**`apps/core` bukan control plane.** Ia application plane — runtime Core, layanan platform,
 dan UI yang dipakai pelanggan. Seluruh dokumen dan seluruh berkas compose sudah memanggilnya Core:
 `core-app`, `core-db`, `core-worker`, "image edisi Core", "runtime Core". Hanya nama foldernya yang
 menyimpang, dan selama ia menyimpang, kata "control plane" tidak dapat dipakai untuk benda yang
@@ -163,7 +163,7 @@ kebocoran edisi hanya melihat folder `modules/`.
 | Penghuni | pelanggan | vendor |
 | Ikut bundle on-prem | **Ya** | **Tidak pernah** |
 
-`apps/control-plane` → `apps/core` adalah **rename**, bukan penulisan ulang: ia menyelaraskan nama
+`apps/core` → `apps/core` adalah **rename**, bukan penulisan ulang: ia menyelaraskan nama
 folder dengan nama yang sudah dipakai di mana-mana.
 
 Bukan dua repo. [Grand design](../../dev/01-grand-design.md) mengunci satu repo dengan satu cabang
@@ -763,7 +763,7 @@ resolver koneksi dinamis persis bentuk yang dikeluhkan analisa statis.
 
 Lima, dan masing-masing berguna serta dapat dibuktikan sendiri. Urutannya bukan selera.
 
-### `[ ]` Irisan 0 — rename `apps/control-plane` menjadi `apps/core`
+### `[ ]` Irisan 0 — rename `apps/core` menjadi `apps/core`
 
 Mekanis, nol perubahan perilaku, tetapi **lebar**: ia menyentuh Dockerfile, berkas compose edisi,
 seluruh workflow CI, `start.ps1` di repo `erp-dev` beserta jalur sumbernya, repo penyebaran, dan

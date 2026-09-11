@@ -5,7 +5,7 @@ Halaman ini untuk developer. Isinya semua hal yang **tidak** dibuat sendiri oleh
 Aturan dasarnya satu: **modul tidak pernah menyentuh tabel milik Core atau modul lain.** Modul dan
 Core memakai database tenant yang sama, jadi yang menolak di sini bukan database — `DB::table()`
 akan berhasil menjangkaunya. Yang menolak adalah penjaga batas di
-`apps/control-plane/tests/Feature/Boundary/`, dan itu tetap batas.
+`apps/core/tests/Feature/Boundary/`, dan itu tetap batas.
 
 Pintunya satu: antarmuka di `App\Support\Modules\Contracts`. Itu **satu-satunya** namespace Core yang
 boleh disebut modul ini.
