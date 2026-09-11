@@ -42,6 +42,162 @@ penjaga batas di `apps/control-plane/tests/Feature/Boundary/`, tempat ia benar-b
 tiap pull request. Syarat lamanya tentang Dockerfile per app, potongan compose, dan skrip
 migrasi per app sudah tidak berlaku sama sekali.
 
+## Aturan yang ditegakkan pemeriksa hari ini
+
+Keempat alur di atas menjalankan aturan; bagian ini menjelaskan aturannya beserta alasannya,
+supaya sebuah langkah yang tampak sewenang-wenang tidak dibuang orang berikutnya.
+
+### Pemeriksa yang menjangkau `modules/` didaftar, bukan ditunggu
+
+Pertanyaan yang harus diajukan sebelum sebuah module baru mendarat adalah **"apa saja di Core
+yang memindai `modules/`"** — bukan "apa yang rusak". Keduanya berakhir pada daftar yang sama,
+tetapi yang kedua menyusunnya satu per satu lewat putaran CI merah, dan tiap putaran memakan
+waktu tunggu yang sebenarnya tidak perlu dibayar. Daftarnya bisa dibaca; ia tidak perlu ditunggu.
+
+Daftar itu sengaja tidak ditulis di sini, karena ia akan basi pada pemeriksa berikutnya yang
+ditambahkan. Yang ditulis adalah cara membacanya:
+
+1. Telusuri tiap langkah di `.github/workflows/lint.yml` dan `.github/workflows/tests.yml`
+   berurutan. Nama langkah menyebut alatnya, perintahnya menyebut skrip yang dipanggil.
+2. Buka perintah itu di `apps/control-plane/composer.json` atau `apps/control-plane/package.json`.
+   Sebuah pemeriksa menjangkau module bila jalur `../../modules` muncul pada perintahnya sendiri
+   atau pada berkas setelannya — `paths` dan `scanDirectories` di `apps/control-plane/phpstan.neon`,
+   `include` di `apps/control-plane/tsconfig.json`.
+3. Jalankan seluruhnya di mesin sendiri pada pohon hasil penggabungan sebelum mendorong.
+   `composer ci:check` di `apps/control-plane` menjalankan gaya PHP, gaya dan format frontend,
+   analisa tipe, dan test dalam satu perintah. Yang tidak ikut di dalamnya — salinan skill,
+   cakupan kontrak internal, dan pemeriksa bundel — dijalankan seperti yang tertulis di kedua
+   berkas alur itu.
+
+Satu pemeriksaan lokal atas seluruh alur lebih murah daripada tiga putaran CI, dan ia menemukan
+hal yang sama.
+
+**Semua langkah alur wajib.** Tidak ada satu pun `continue-on-error` di alur mana pun, dan
+tidak boleh ditambahkan. Langkah yang boleh merah tanpa menggagalkan alur tidak menjaga apa pun,
+sementara keberadaannya tetap terbaca seolah ada yang dijaga.
+
+**Jangkauan ESLint dijaga, karena ia pernah hilang tanpa berbunyi.** `eslint.config.js` hidup di
+**akar repo**, dan perintah lint menargetkan akar repo. Keduanya bukan selera: ESLint 9 menetapkan
+base path dari letak berkas konfigurasinya, dan sampai 10 September 2026 berkas itu ada di
+`apps/control-plane/` — sehingga `eslint .` memeriksa **nol** berkas di bawah `modules/` dan
+`packages/`, lalu keluar dengan kode 0.
+
+Bukan menolak, bukan memperingatkan; hanya diam. Puluhan berkas UI module karena itu tidak pernah
+diperiksa aturan hook React maupun urutan impor sejak module pertama mendarat, sementara alur ini
+melaporkan linter hijau di setiap pull request. Begitu jangkauannya dibuka, ratusan temuan mekanis
+muncul sekaligus.
+
+Yang menjaganya sekarang `scripts/periksa-jangkauan-eslint.mjs`, dipanggil dari `lint:check`
+sesudah ESLint sendiri: ia menolak bila tidak satu pun berkas yang diperiksa berada di bawah
+`modules/` atau `packages/`. Ia juga menolak bila kedua folder itu kosong — daftar tanpa subjek
+membuat pemeriksanya hijau tanpa membuktikan apa pun.
+
+Pelajarannya lebih umum daripada ESLint, dan ia berlaku untuk setiap pemeriksa yang menyaring
+berkas: **sebuah pemeriksa yang tidak menemukan subjek tidak dapat dibedakan dari pemeriksa yang
+tidak menemukan pelanggaran.** Lihat [standar penjaga dan pengujian](25-standar-penjaga-dan-pengujian.md).
+
+### Baseline analisa tipe hanya boleh menyusut
+
+`apps/control-plane/phpstan-baseline.neon` membekukan temuan yang sudah ada sejak sebelum
+analisanya dijalankan sungguhan. Tanpa pembekuan itu langkah `Run Type Analysis` tidak pernah
+hijau, dan langkah yang tidak pernah hijau tidak memeriksa apa pun karena tidak ada lagi yang
+membaca hasilnya. Yang dibeli pembekuan itu satu hal: kode baru diperiksa penuh pada level yang
+tertulis di `apps/control-plane/phpstan.neon` sejak hari pertama.
+
+Karena itu berkas tersebut **hanya boleh menyusut**. Menambah baris ke dalamnya berarti
+menyembunyikan temuan baru di balik izin yang diberikan untuk kode lama, dan itu ditolak saat
+peninjauan. Cara menyusutkannya: perbaiki temuannya, lalu jalankan `composer types:check` —
+baris yang sudah tidak terpakai akan dilaporkan.
+
+Tidak ada mesin yang menahan pertumbuhannya. Pull request yang menambah baris ke berkas itu
+tetap hijau, jadi yang menahannya adalah peninjau yang membaca diff.
+
+Sejak 10 September 2026 aturan itu punya mesin: `scripts/periksa-baseline-phpstan.mjs`, dijalankan
+langkah **Periksa baseline analisa tipe tidak bertambah** pada `lint.yml`.
+
+Yang dibandingkan **per entri**, bukan totalnya. Rancangan pertamanya membandingkan total dan
+terbukti tidak menjaga apa pun: pada cabang yang membuang tujuh belas bungkaman, menambahkan tiga
+bungkaman baru masih terbaca "menyusut" dan lolos. Aturan yang berlaku sekarang lebih sempit dan
+lebih jujur — **tidak boleh ada bungkaman baru**, termasuk menaikkan `count:` pada entri yang sudah
+ada. Membuang entri tetap bebas.
+
+Kedua bentuk kegagalan itu dibuktikan merah sebelum langkahnya dipasang.
+
+### Dua folder skill wajib identik
+
+`.agents/skills` dan `.claude/skills` dibaca alat yang berbeda dan berisi salinan yang sama.
+Keduanya sudah pernah menyimpang diam-diam, dan penyimpangannya dua arah: masing-masing folder
+membawa aturan yang tidak dimiliki salinannya, sehingga menimpa satu folder dengan yang lain
+akan membuang aturan yang sah. Tidak ada test yang gagal karena sebuah aturan hilang di salinan
+yang kebetulan tidak sedang dibaca.
+
+`.github/scripts/check-skill-copies.py` membandingkan setiap skill yang ada di kedua folder dan
+gagal bila isinya berbeda; ia berjalan pada langkah `Check skill copies are in sync` di
+`.github/workflows/lint.yml`. Skill yang hanya ada di satu folder dibiarkan — yang berjanji sama
+hanyalah nama yang ada di keduanya. Sebuah penyimpangan yang sengaja dibuat harus membuat alur
+merah; bila tidak, yang rusak adalah pemeriksanya.
+
+### Cabang utama dikunci, dan sampai mana penguncian itu berlaku
+
+Perubahan masuk lewat pull request, dan sebuah pull request tidak digabungkan sebelum alurnya
+hijau. Aturan inilah yang membuat kalimat "selesai bila test lulus" punya arti di seluruh
+dokumen ini. Sebelumnya alur yang merah diabaikan berbulan-bulan, dan itu wajar: ketika setiap
+pull request merah, warna merah tidak membedakan apa pun.
+
+Jumlah persetujuan yang diwajibkan disetel **nol**, bukan satu. Timnya satu engineer dengan tiga
+magang, dan penulis tidak boleh menyetujui pull request-nya sendiri — mewajibkan satu persetujuan
+berarti pull request pemimpin tim tidak pernah bisa digabungkan. Yang ditegakkan mesin adalah
+pemeriksaan otomatis; peninjauan manusia untuk pull request magang tetap dilakukan, tetapi
+ditegakkan orang.
+
+Konsekuensinya harus dinyatakan terang-terangan supaya tidak ada yang salah mengira:
+**perlindungan cabang tidak tersedia pada paket GitHub yang dipakai repo ini, sehingga setiap
+pemeriksaan pada dokumen ini bisa dilewati dengan satu klik gabungkan.** Menaikkan paket dan
+memasang penambal sama-sama sudah ditimbang dan ditolak. Yang berbeda dari keadaan sebelumnya
+hanya satu hal, tapi bukan hal kecil: alurnya sekarang benar-benar hijau, jadi merahnya berarti
+sesuatu.
+
+Ada celah kedua yang mengikuti dari bentuk pemicunya: `lint.yml` dan `tests.yml` hanya dipicu
+`pull_request`, jadi push langsung ke `main` tanpa pull request tidak diperiksa sama sekali.
+Pertimbangan kuota di balik pilihan itu ditulis di kepala kedua berkas alur.
+
+### `import/order` dimatikan pada berkas ber-penanda `@chisel-*`
+
+`laravel/chisel` menghapus kode di antara sepasang penanda `@chisel-*` ketika sebuah fitur
+dimatikan. Penanda itu berada di tengah blok impor, dan `import/order` menata ulang impor
+melewatinya: penandanya berpindah, isinya berubah, lalu penghapusan fitur membuang baris yang
+salah tanpa ada yang berbunyi. Karena itu aturan `import/order` dimatikan pada berkas-berkas
+tersebut di `apps/control-plane/eslint.config.js`, dan urutan impornya dijaga tangan sampai
+penandanya tidak lagi dipakai. Daftar berkasnya ada di berkas konfigurasi itu, bukan di sini.
+
+Yang membuat penanda itu bergerak adalah `composer update`: ia memicu `install:features` lewat
+`post-update-cmd` di `apps/control-plane/composer.json` dan mengubah berkas di luar perubahan
+yang sedang dikerjakan. Jangan menjalankan `composer update` di repo ini tanpa memeriksa berkas
+apa saja yang ikut berubah.
+
+### Pemangkasan per edisi dibuat skrip, dan CI yang membuktikannya
+
+Klaim produknya berbunyi "modul yang tidak dibeli **tidak ada** di server pelanggan", bukan
+"modulnya dimatikan". Klaim sekuat itu hanya sah bila mesin membuktikannya pada image yang
+benar-benar dikirim; tanpa itu ia cuma janji.
+
+Karena itu pemangkasannya dibuat skrip, bukan dikerjakan tangan per pelanggan.
+`scripts/edisi-pangkas.php` membuang module yang tidak dibeli dari pohon bangunan di dalam
+Dockerfile, `scripts/build-edition.sh` membangun satu image per edisi, dan
+`scripts/verify-edition.sh` memeriksa tiga jalur kebocoran yang masing-masing bisa bocor
+sendiri-sendiri: berkas dan nama namespace di dalam image, tabel yang terbentuk ketika migration
+dijalankan ke database kosong, dan bundel JavaScript. Satu saja bocor, alurnya gagal.
+
+Daftar edisi dibaca dari folder `editions/`, tidak ditulis di dalam alur. Sebuah edisi baru yang
+tidak ikut terbangun adalah kegagalan yang tidak berbunyi — pelanggannya baru tahu saat
+memutakhirkan. Langkah `Kumpulkan daftar edisi` di `.github/workflows/release.yml` yang
+membacanya, dan ia gagal bila folder itu kosong.
+
+Yang belum ada, dan disebut supaya tidak dikira ada: pemangkasan source per edisi hanya hidup di
+dalam pembangunan image. Tidak ada keluaran ekspor source per edisi yang berdiri sendiri di luar
+image, dan `scripts/edisi-pangkas.php` mengubah berkas di tempat — menjalankannya di repo
+sungguhan akan memangkas repo itu sendiri.
+
 ## Keputusan
 
 > Mulai dari sini sampai akhir halaman, "repository app" berarti repo `app-erp-*` yang masih

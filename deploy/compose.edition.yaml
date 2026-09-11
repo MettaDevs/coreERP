@@ -1,0 +1,225 @@
+name: coreerp
+
+# Berkas compose yang **ikut di dalam bundle**, bukan yang ditarik dari repo lain.
+#
+# Perbedaannya dengan compose di repo penyebaran bukan bentuk layanannya — keduanya sama — melainkan
+# dari mana image-nya datang. Di sana image dibangun di server pelanggan lewat git dan `docker
+# build`; di sini seluruh image sudah dimuat dari `images.tar.gz` oleh `update.sh` sebelum satu
+# container pun dinyalakan.
+#
+# Dua image di bawah ditulis **harfiah**, bukan lewat variabel, dan itu disengaja: `build-bundle.sh`
+# membacanya dari berkas ini untuk menentukan apa saja yang harus ikut disimpan ke dalam bundle.
+# Menggantinya menjadi variabel membuat keduanya lolos dari pembacaan itu, dan bundle-nya akan
+# terlihat lengkap sampai ia dicoba di mesin tanpa internet.
+#
+# `docs` sengaja tidak ada di sini. Ia satu image lagi yang harus ikut menyeberang, dan dokumentasi
+# bukan bagian yang membuat aplikasi berjalan; pelanggan yang memintanya mendapat bundle terpisah.
+
+x-edition-environment: &edition-environment
+  APP_ENV: ${APP_ENV:-production}
+  APP_DEBUG: ${APP_DEBUG:-false}
+  APP_URL: ${APP_URL}
+  APP_KEY: ${CORE_APP_KEY}
+  DB_CONNECTION: pgsql
+  DB_HOST: core-db
+  DB_PORT: 5432
+  DB_DATABASE: core_erp
+  DB_USERNAME: core_erp
+  DB_PASSWORD: ${CORE_DB_PASSWORD}
+  SESSION_DRIVER: database
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  COREERP_DEPLOYMENT_PROFILE: ${COREERP_DEPLOYMENT_PROFILE:-on-prem}
+  COREERP_DEPLOYMENT_PLACEMENT: ${COREERP_DEPLOYMENT_PLACEMENT:-on-prem-primary}
+  COREERP_PROVIDER_EMAIL: ${COREERP_PROVIDER_EMAIL}
+  COREERP_PROVIDER_PASSWORD: ${COREERP_PROVIDER_PASSWORD}
+  COREERP_TRUSTED_PROXIES: ${COREERP_TRUSTED_PROXIES:-}
+  # Engine PDF milik platform. Tanpa layanan ini ekspor laporan gagal — dan gagalnya baru terlihat
+  # saat pengguna menekan cetak, bukan saat pemasangan.
+  COREERP_RENDERER_URL: http://core-renderer:3000
+  # Laporan kesalahan ke Discord. Kosong berarti mati, dan itu bawaan yang benar untuk
+  # on-prem: channelnya milik pelanggan, bukan milik kita. Lihat .env.example.
+  COREERP_SIGNOZ_URL: ${COREERP_SIGNOZ_URL:-}
+  COREERP_DISCORD_WEBHOOK_URL: ${COREERP_DISCORD_WEBHOOK_URL:-}
+  COREERP_DISCORD_MENTION: ${COREERP_DISCORD_MENTION:-}
+  COREERP_DISCORD_JEDA_DETIK: ${COREERP_DISCORD_JEDA_DETIK:-60}
+  # Penerima event di **luar** proses ini. Module di dalam image tidak lewat sini; mereka menerima
+  # event sebagai pemanggilan fungsi. Biarkan `[]` kecuali ada sistem luar yang berlangganan.
+  COREERP_EVENT_ENDPOINTS: ${COREERP_EVENT_ENDPOINTS:-[]}
+  # Trace OpenTelemetry. Variabel ini **harus** ada di sini, bukan di `.env` Laravel: SDK-nya
+  # menyalakan diri saat autoload Composer, sebelum Laravel membaca `.env` sama sekali.
+  #
+  # Mati secara bawaan, dan itu disengaja. Bundle ini dipasang di mesin pelanggan yang sering
+  # tidak punya jalan keluar ke internet; kalau ekspor menyala sementara alamat kolektornya tak
+  # terjangkau, setiap request membayar waktu tunggu koneksi TCP sebelum proses PHP-nya berakhir.
+  # Menyalakannya cukup satu baris di `.env` pemasangan: OTEL_PHP_AUTOLOAD_ENABLED=true.
+  OTEL_PHP_AUTOLOAD_ENABLED: ${OTEL_PHP_AUTOLOAD_ENABLED:-false}
+  # Bukan variabel yang boleh ditimpa dari luar: nilainya dibedakan per peran di blok layanan
+  # masing-masing, dan satu nilai dari host akan menggabungkan ketiganya kembali jadi satu nama.
+  OTEL_SERVICE_NAME: coreerp-control-plane
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${OTEL_DEPLOYMENT_ENVIRONMENT:-on-prem}
+  OTEL_TRACES_EXPORTER: ${OTEL_TRACES_EXPORTER:-otlp}
+  OTEL_METRICS_EXPORTER: none
+  # Laporan kesalahan internal ikut dikirim sebagai log terstruktur, supaya ia bisa dicari dan
+  # disambungkan ke jejak permintaannya. Nilainya `otlp`, bukan `none`, karena saklar
+  # sebenarnya ada satu tingkat di atas: `OTEL_PHP_AUTOLOAD_ENABLED` di atas tetap `false`
+  # secara bawaan, jadi pemasangan yang tidak punya jalan keluar tidak mengirim apa pun dan
+  # tidak membayar waktu tunggu apa pun. Yang menyalakan telemetri menyalakannya sekali, dan
+  # mendapat laporan kesalahan sekaligus — bukan menemukan belakangan bahwa ada saklar kedua
+  # yang lupa dinyalakan.
+  #
+  # Berkas log di mesin ditulis tanpa bergantung pada nilai ini sama sekali.
+  OTEL_LOGS_EXPORTER: ${OTEL_LOGS_EXPORTER:-otlp}
+  # Auto-instrumentation PSR-3 dimatikan; `laravel` tetap hidup karena ia yang menghasilkan
+  # trace. Keduanya meneruskan panggilan `Log::` menjadi catatan OTLP, jadi membiarkan keduanya
+  # hidup berarti setiap baris log terkirim dua kali. Di mesin pelanggan dengan sambungan
+  # terbatas, membayar dua kali untuk isi yang sama bukan pilihan yang netral.
+  OTEL_PHP_DISABLED_INSTRUMENTATIONS: ${OTEL_PHP_DISABLED_INSTRUMENTATIONS:-psr3}
+  OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://103.122.2.94:4318}
+  OTEL_PROPAGATORS: ${OTEL_PROPAGATORS:-baggage,tracecontext}
+  OTEL_PHP_LOG_DESTINATION: ${OTEL_PHP_LOG_DESTINATION:-none}
+
+services:
+  core-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: core_erp
+      POSTGRES_USER: core_erp
+      POSTGRES_PASSWORD: ${CORE_DB_PASSWORD}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U core_erp -d core_erp']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - core-db-data:/var/lib/postgresql/data
+
+  # Sekali jalan, dan aman diulang. Pembaruan on-prem dijalankan admin pelanggan yang tidak punya
+  # cara mengetahui apakah sebuah perintah sudah pernah jalan, jadi menjalankannya dua kali harus
+  # menghasilkan keadaan yang sama persis dengan sekali.
+  #
+  # `app:register-manifest` tanpa argumen mendaftarkan **seluruh module yang ada di dalam image
+  # ini**, jadi berkas compose tidak perlu tahu edisi mana yang sedang dipasang. Tabel milik module
+  # sendiri dibuat saat module dipasang untuk sebuah tenant, lewat jalur pendaftaran usaha.
+  core-migrate:
+    image: ${EDITION_IMAGE}
+    restart: 'no'
+    depends_on:
+      core-db:
+        condition: service_healthy
+    environment:
+      <<: *edition-environment
+      # Migrasi bukan lalu lintas yang perlu dilihat sebagai trace, dan ia berjalan justru pada
+      # saat kolektor belum tentu sudah siap. Dimatikan di sini saja, bukan di anchor.
+      OTEL_PHP_AUTOLOAD_ENABLED: 'false'
+    entrypoint: ['sh', '-c']
+    command:
+      - >-
+        php artisan migrate --force --no-interaction &&
+        php artisan db:seed --force --no-interaction &&
+        php artisan app:register-manifest --no-interaction
+
+  core-app:
+    image: ${EDITION_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      core-db:
+        condition: service_healthy
+      core-migrate:
+        condition: service_completed_successfully
+    environment: *edition-environment
+    networks:
+      - default
+      - renderer
+    volumes:
+      # Layout unggahan dan hasil ekspor laporan ditulis worker lalu disajikan web, jadi keduanya
+      # harus melihat storage yang sama. Tanpa volume bersama, unduhan menjawab 410 untuk berkas
+      # yang sebenarnya ada — hanya ada di container yang salah.
+      - core-storage:/repo/apps/control-plane/storage/app
+      # Tanpa volume ini, log hidup di lapisan tulis container dan lenyap pada setiap upgrade.
+      # Di mesin pelanggan itu berarti satu-satunya catatan tentang kegagalan kemarin hilang
+      # tepat pada saat seseorang datang untuk membacanya. Nama berkas dibedakan per peran
+      # (lihat `config/logging.php`), jadi ketiga container aman berbagi satu volume.
+      - core-logs:/repo/apps/control-plane/storage/logs
+    ports:
+      - '${CORE_APP_PORT:-8000}:80'
+    healthcheck:
+      test: ['CMD', 'php', '-r', "exit(@file_get_contents('http://127.0.0.1/up') === false);"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  core-worker:
+    image: ${EDITION_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      core-db:
+        condition: service_healthy
+      core-migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *edition-environment
+      CONTAINER_ROLE: worker
+      # Ketiga container menjalankan image yang sama; tanpa nama per peran, span request web,
+      # job, dan tick penjadwal menumpuk pada satu layanan dan tidak bisa dipisahkan lagi.
+      OTEL_SERVICE_NAME: coreerp-worker
+    networks:
+      - default
+      - renderer
+    volumes:
+      - core-storage:/repo/apps/control-plane/storage/app
+      - core-logs:/repo/apps/control-plane/storage/logs
+
+  # Tepat satu replika. Tanpa penjadwal, `number-sequences:recover` tidak pernah berjalan dan
+  # reservasi nomor berkelanjutan yang kedaluwarsa tidak pernah dilepas.
+  core-scheduler:
+    image: ${EDITION_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      core-db:
+        condition: service_healthy
+      core-migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *edition-environment
+      CONTAINER_ROLE: scheduler
+      # `schedule:work` bangun tiap menit dan menghasilkan span tiap kali, sebagian besar tanpa
+      # pekerjaan. Nama tersendiri membuat kebisingan itu dapat disaring di kolektor tanpa ikut
+      # membuang trace request web.
+      OTEL_SERVICE_NAME: coreerp-scheduler
+    volumes:
+      - core-logs:/repo/apps/control-plane/storage/logs
+
+  # Stateless, tidak mengenal tenant, dan **tidak punya jalan keluar** — lihat network `renderer`
+  # di bawah. Ia hanya mengubah dokumen yang sudah diisi menjadi PDF.
+  core-renderer:
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --api-timeout=120s
+      - --libreoffice-restart-after=50
+      - --chromium-disable-routes=true
+    networks:
+      - renderer
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+networks:
+  default:
+  # Tanpa jalan keluar: container di sini hanya dapat dihubungi container lain pada network yang
+  # sama. Perender menerima dokumen milik pelanggan, jadi ia tidak boleh dapat menghubungi apa pun
+  # di luar.
+  renderer:
+    internal: true
+
+volumes:
+  core-db-data:
+  core-storage:
+  core-logs:

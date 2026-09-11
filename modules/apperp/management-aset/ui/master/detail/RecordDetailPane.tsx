@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import type { FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import {
     CollapsibleSection,
@@ -9,21 +10,24 @@ import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import DynamicField from '../DynamicField';
+import type { FieldValue } from '../fields';
+import { isVisible, payloadValue, valueFrom } from '../fields';
 import GroupBookMatrix from '../GroupBookMatrix';
 import JenisAsetAtribut from '../JenisAsetAtribut';
-import { FieldValue, isVisible, payloadValue, valueFrom } from '../fields';
-import { MasterConfig, MasterRecord, Permission, permission } from '../masters';
-import PabrikanAsetCounters from './PabrikanAsetCounters';
-import PabrikanModels from './PabrikanModels';
-import { PabrikanAsetDetail } from './pabrikanAsetDetail';
+import type { MasterConfig, MasterRecord, Permission } from '../masters';
+import { permission } from '../masters';
 import JenisAsetCounters from './JenisAsetCounters';
-import JenisAsetModels from './JenisAsetModels';
+import type { JenisAsetDetail } from './jenisAsetDetail';
 import JenisAsetMaintenanceJobTypes from './JenisAsetMaintenanceJobTypes';
-import MaintenanceJobTypeDetails from './MaintenanceJobTypeDetails';
-import MaintenanceChecklistVariableValues from './MaintenanceChecklistVariableValues';
+import JenisAsetModels from './JenisAsetModels';
 import MaintenanceChecklistTemplateLines from './MaintenanceChecklistTemplateLines';
-import { JenisAsetDetail } from './jenisAsetDetail';
-import { DetailSection, sectionsFor, summaryFor } from './sections';
+import MaintenanceChecklistVariableValues from './MaintenanceChecklistVariableValues';
+import MaintenanceJobTypeDetails from './MaintenanceJobTypeDetails';
+import PabrikanAsetCounters from './PabrikanAsetCounters';
+import type { PabrikanAsetDetail } from './pabrikanAsetDetail';
+import PabrikanModels from './PabrikanModels';
+import type { DetailSection } from './sections';
+import { sectionsFor, summaryFor } from './sections';
 
 export type DetailMode = 'view' | 'edit' | 'create';
 
@@ -75,86 +79,130 @@ export default function RecordDetailPane({
     const [error, setError] = useState('');
     const creationKey = useRef(newIdempotencyKey());
     const formRef = useRef<HTMLFormElement>(null);
-    const [pendingFocus, setPendingFocus] = useState<string | null>(null);
-    const [jenisAsetDetail, setJenisAsetDetail] =
-        useState<JenisAsetDetail | null>(null);
-    const [jenisAsetDetailLoading, setJenisAsetDetailLoading] = useState(false);
-    const [jenisAsetDetailError, setJenisAsetDetailError] = useState('');
-    const [pabrikanAsetDetail, setPabrikanAsetDetail] =
-        useState<PabrikanAsetDetail | null>(null);
-    const [pabrikanAsetDetailLoading, setPabrikanAsetDetailLoading] =
-        useState(false);
-    const [pabrikanAsetDetailError, setPabrikanAsetDetailError] = useState('');
+    /**
+     * Field yang menunggu fokus setelah perisai sunting hilang. Disimpan pada ref, bukan
+     * state, karena tidak ikut menentukan tampilan apa pun: ia hanya dibaca sekali oleh
+     * effect di bawah begitu `readOnly` berubah, lalu dikosongkan lagi.
+     */
+    const pendingFocusRef = useRef<string | null>(null);
     const [pabrikanAsetDetailVersion, setPabrikanAsetDetailVersion] =
         useState(0);
 
+    /**
+     * Detail tambahan disimpan berpasangan dengan kunci yang menghasilkannya, lalu
+     * keadaan memuat dan pesan kesalahannya dihitung saat render. Dengan begitu ganti
+     * record langsung menampilkan keadaan memuat pada render pertama: tidak ada effect
+     * yang perlu mengosongkan isi lama lebih dulu, dan tidak ada satu frame pun yang
+     * memperlihatkan detail milik record sebelumnya.
+     */
+    const jenisAsetKunci =
+        config.resource === 'jenis-aset' && record?.id ? record.id : null;
+    const [jenisAsetMuatan, setJenisAsetMuatan] = useState<{
+        kunci: string;
+        detail: JenisAsetDetail | null;
+        error: string;
+    } | null>(null);
+    const jenisAsetTermuat =
+        jenisAsetKunci !== null && jenisAsetMuatan?.kunci === jenisAsetKunci
+            ? jenisAsetMuatan
+            : null;
+    const jenisAsetDetail = jenisAsetTermuat?.detail ?? null;
+    const jenisAsetDetailError = jenisAsetTermuat?.error ?? '';
+    const jenisAsetDetailLoading =
+        jenisAsetKunci !== null && jenisAsetTermuat === null;
+
+    // Nomor versi ikut masuk kunci: memintanya naik berarti detail pabrikan dianggap
+    // belum termuat lagi, persis seperti saat record-nya baru dibuka.
+    const pabrikanAsetKunci =
+        config.resource === 'pabrikan-aset' && record?.id
+            ? `${record.id}|${pabrikanAsetDetailVersion}`
+            : null;
+    const [pabrikanAsetMuatan, setPabrikanAsetMuatan] = useState<{
+        kunci: string;
+        detail: PabrikanAsetDetail | null;
+        error: string;
+    } | null>(null);
+    const pabrikanAsetTermuat =
+        pabrikanAsetKunci !== null &&
+        pabrikanAsetMuatan?.kunci === pabrikanAsetKunci
+            ? pabrikanAsetMuatan
+            : null;
+    const pabrikanAsetDetail = pabrikanAsetTermuat?.detail ?? null;
+    const pabrikanAsetDetailError = pabrikanAsetTermuat?.error ?? '';
+    const pabrikanAsetDetailLoading =
+        pabrikanAsetKunci !== null && pabrikanAsetTermuat === null;
+
     useEffect(() => {
-        if (config.resource !== 'jenis-aset' || !record?.id) {
-            setJenisAsetDetail(null);
-            setJenisAsetDetailLoading(false);
-            setJenisAsetDetailError('');
+        if (jenisAsetKunci === null) {
             return;
         }
 
         let cancelled = false;
-        setJenisAsetDetail(null);
-        setJenisAsetDetailLoading(true);
-        setJenisAsetDetailError('');
-        api<{ data: JenisAsetDetail }>(`/jenis-aset/${record.id}/detail`)
+        api<{ data: JenisAsetDetail }>(`/jenis-aset/${jenisAsetKunci}/detail`)
             .then((result) => {
-                if (!cancelled) setJenisAsetDetail(result.data);
+                if (!cancelled) {
+                    setJenisAsetMuatan({
+                        kunci: jenisAsetKunci,
+                        detail: result.data,
+                        error: '',
+                    });
+                }
             })
             .catch((caught) => {
-                if (!cancelled)
-                    setJenisAsetDetailError(
-                        errorMessage(
+                if (!cancelled) {
+                    setJenisAsetMuatan({
+                        kunci: jenisAsetKunci,
+                        detail: null,
+                        error: errorMessage(
                             caught,
                             'Detail jenis aset belum dapat dimuat.',
                         ),
-                    );
-            })
-            .finally(() => {
-                if (!cancelled) setJenisAsetDetailLoading(false);
+                    });
+                }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [config.resource, record?.id]);
+    }, [jenisAsetKunci]);
+
+    const pabrikanAsetId = record?.id;
 
     useEffect(() => {
-        if (config.resource !== 'pabrikan-aset' || !record?.id) {
-            setPabrikanAsetDetail(null);
-            setPabrikanAsetDetailLoading(false);
-            setPabrikanAsetDetailError('');
+        if (pabrikanAsetKunci === null || !pabrikanAsetId) {
             return;
         }
 
         let cancelled = false;
-        setPabrikanAsetDetail(null);
-        setPabrikanAsetDetailLoading(true);
-        setPabrikanAsetDetailError('');
-        api<{ data: PabrikanAsetDetail }>(`/pabrikan-aset/${record.id}/detail`)
+        api<{ data: PabrikanAsetDetail }>(
+            `/pabrikan-aset/${pabrikanAsetId}/detail`,
+        )
             .then((result) => {
-                if (!cancelled) setPabrikanAsetDetail(result.data);
+                if (!cancelled) {
+                    setPabrikanAsetMuatan({
+                        kunci: pabrikanAsetKunci,
+                        detail: result.data,
+                        error: '',
+                    });
+                }
             })
             .catch((caught) => {
-                if (!cancelled)
-                    setPabrikanAsetDetailError(
-                        errorMessage(
+                if (!cancelled) {
+                    setPabrikanAsetMuatan({
+                        kunci: pabrikanAsetKunci,
+                        detail: null,
+                        error: errorMessage(
                             caught,
                             'Detail pabrikan belum dapat dimuat.',
                         ),
-                    );
-            })
-            .finally(() => {
-                if (!cancelled) setPabrikanAsetDetailLoading(false);
+                    });
+                }
             });
 
         return () => {
             cancelled = true;
         };
-    }, [config.resource, pabrikanAsetDetailVersion, record?.id]);
+    }, [pabrikanAsetId, pabrikanAsetKunci]);
 
     function markDirty() {
         onDirtyChange(true);
@@ -162,8 +210,11 @@ export default function RecordDetailPane({
 
     /** Pindah ke mode sunting karena pengguna menyentuh satu field, lalu fokus ke situ. */
     function enterEdit(name: string) {
-        if (!readOnly || !canEdit) return;
-        setPendingFocus(name);
+        if (!readOnly || !canEdit) {
+            return;
+        }
+
+        pendingFocusRef.current = name;
         onRequestEdit();
     }
 
@@ -173,33 +224,42 @@ export default function RecordDetailPane({
      * begitu perisainya hilang, fokus dipindahkan ke kontrol aslinya.
      */
     useEffect(() => {
-        if (readOnly || !pendingFocus) return;
+        const menunggu = pendingFocusRef.current;
+
+        if (readOnly || !menunggu) {
+            return;
+        }
+
+        pendingFocusRef.current = null;
         const scope = formRef.current?.querySelector(
-            `[data-field-name="${CSS.escape(pendingFocus)}"]`,
+            `[data-field-name="${CSS.escape(menunggu)}"]`,
         );
         scope
             ?.querySelector<HTMLElement>(
                 'input:not([type="hidden"]), textarea, button',
             )
             ?.focus();
-        setPendingFocus(null);
-    }, [readOnly, pendingFocus]);
+    }, [readOnly]);
 
     async function submit(event: FormEvent) {
         event.preventDefault();
         onSavingChange(true);
         setError('');
+
         try {
             const payload: Record<string, unknown> = { nama };
+
             for (const field of allFields) {
                 // Field yang sedang tersembunyi tidak dikirim, supaya mengganti satu pilihan
                 // tidak diam-diam menyimpan nilai milik pilihan sebelumnya.
-                if (isVisible(field, values))
+                if (isVisible(field, values)) {
                     payload[field.name] = payloadValue(
                         field,
                         values[field.name],
                     );
+                }
             }
+
             const saved = await api<{ data: MasterRecord }>(
                 `/${config.resource}${record ? `/${record.id}` : ''}`,
                 {
@@ -270,6 +330,10 @@ export default function RecordDetailPane({
         if (section.manufacturerModels) {
             return record ? (
                 <PabrikanModels
+                    // Ganti record berarti panel ini dipasang ulang, sehingga nomor
+                    // halaman dan daftar modelnya mulai dari keadaan bersih tanpa
+                    // effect yang menyetel ulang state.
+                    key={record.id}
                     manufacturer={record}
                     canReadModels={permissions.includes(
                         permission('model-aset', 'read'),
@@ -350,6 +414,9 @@ export default function RecordDetailPane({
         if (section.maintenanceJobType) {
             return record ? (
                 <MaintenanceJobTypeDetails
+                    // Dipasang ulang setiap ganti record: varian dan daftar jenis aset
+                    // dimuat dari keadaan bersih, tanpa sisa pesan dari record lama.
+                    key={record.id}
                     jobTypeId={record.id}
                     canEdit={!readOnly && canEdit}
                 />
@@ -390,6 +457,9 @@ export default function RecordDetailPane({
         if (section.maintenanceJobTypes) {
             return record ? (
                 <JenisAsetMaintenanceJobTypes
+                    // Dipasang ulang setiap ganti record supaya penanda "tersimpan" dan
+                    // pilihan dari record sebelumnya tidak ikut terbawa.
+                    key={record.id}
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
                 />

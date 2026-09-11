@@ -53,9 +53,15 @@ const PERIODS_PER_YEAR: Record<string, number> = {
 function serviceLifeHint(periods: string, frequency: unknown): string | null {
     const count = Number(periods);
     const perYear = PERIODS_PER_YEAR[String(frequency)];
-    if (!Number.isFinite(count) || count <= 0) return null;
-    if (!perYear)
+
+    if (!Number.isFinite(count) || count <= 0) {
+        return null;
+    }
+
+    if (!perYear) {
         return 'Setara berapa tahun baru terlihat setelah profil dipilih.';
+    }
+
     const years = count / perYear;
 
     return `Setara ${years.toFixed(2).replace(/\.00$/, '')} tahun.`;
@@ -102,7 +108,10 @@ export default function GroupBookMatrix({
             ),
         ])
             .then(([bookList, matrix]) => {
-                if (cancelled) return;
+                if (cancelled) {
+                    return;
+                }
+
                 setBooks(bookList.data);
                 setRows(
                     matrix.data.map((row) => ({
@@ -129,14 +138,16 @@ export default function GroupBookMatrix({
                 );
             })
             .catch((caught) => {
-                if (!cancelled)
+                if (!cancelled) {
                     setError(
                         errorMessage(
                             caught,
                             'Matriks buku penyusutan belum dapat dimuat.',
                         ),
                     );
+                }
             });
+
         return () => {
             cancelled = true;
         };
@@ -144,6 +155,7 @@ export default function GroupBookMatrix({
 
     const label = (id: string) => {
         const book = books.find((item) => item.id === id);
+
         return book ? `${book.kode} — ${book.nama}` : '';
     };
     const unused = books.filter(
@@ -160,6 +172,7 @@ export default function GroupBookMatrix({
         setSaving(true);
         setError('');
         setSaved(false);
+
         try {
             // Kiriman memuat daftar penuh; baris yang dihapus dari layar ikut diarsipkan.
             await api(`/group-aset/${groupId}/buku-penyusutan`, {
@@ -410,7 +423,10 @@ export default function GroupBookMatrix({
                                     `${candidate.kode} — ${candidate.nama}` ===
                                     item,
                             );
-                            if (book) setRows([...rows, emptyRow(book.id)]);
+
+                            if (book) {
+                                setRows([...rows, emptyRow(book.id)]);
+                            }
                         }}
                     />
                 </div>

@@ -228,95 +228,6 @@
                 }
             }
         },
-        "/provider/apps/{app}/releases": {
-            "post": {
-                "operationId": "provider.app-releases.store",
-                "tags": [
-                    "AppRelease"
-                ],
-                "parameters": [
-                    {
-                        "name": "app",
-                        "in": "path",
-                        "required": true,
-                        "description": "The app ID",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/AppReleaseRequest"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object",
-                                            "properties": {
-                                                "id": {
-                                                    "type": "string"
-                                                },
-                                                "app_id": {
-                                                    "type": "string"
-                                                },
-                                                "version": {
-                                                    "type": "string"
-                                                },
-                                                "status": {
-                                                    "type": "string"
-                                                },
-                                                "manifest_sha256": {
-                                                    "type": "string"
-                                                },
-                                                "edition_image": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "required": [
-                                                "id",
-                                                "app_id",
-                                                "version",
-                                                "status",
-                                                "manifest_sha256",
-                                                "edition_image"
-                                            ]
-                                        }
-                                    },
-                                    "required": [
-                                        "data"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "$ref": "#/components/responses/ModelNotFoundException"
-                    },
-                    "401": {
-                        "$ref": "#/components/responses/AuthenticationException"
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
-                    },
-                    "403": {
-                        "$ref": "#/components/responses/AuthorizationException"
-                    }
-                }
-            }
-        },
         "/provider/apps/{app}/service-credentials": {
             "post": {
                 "operationId": "provider.app-service-credentials.store",
@@ -2780,7 +2691,7 @@
                     },
                     "has_ui": {
                         "type": "boolean",
-                        "description": "App menyatakan punya UI. Path konten diturunkan platform dari app dan placement; app tidak mendaftarkannya."
+                        "description": "App menyatakan punya UI. Jalur halamannya diturunkan platform dari id module dan id entri menu; app tidak mendaftarkannya."
                     },
                     "navigation": {
                         "type": "object",
@@ -3136,69 +3047,6 @@
                     "number_sequences"
                 ],
                 "title": "AppCatalogRequest"
-            },
-            "AppReleaseRequest": {
-                "type": "object",
-                "properties": {
-                    "version": {
-                        "type": "string",
-                        "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$",
-                        "maxLength": 40
-                    },
-                    "manifest_sha256": {
-                        "type": "string",
-                        "pattern": "^[a-f0-9]{64}$",
-                        "minLength": 64,
-                        "maxLength": 64
-                    },
-                    "edition_image": {
-                        "type": "string",
-                        "pattern": "^.+@sha256:[a-f0-9]{64}$",
-                        "maxLength": 500
-                    },
-                    "bundle_path": {
-                        "type": "string",
-                        "pattern": "#^(?!.*\\.\\.)[A-Za-z0-9_./-]+$#",
-                        "maxLength": 255
-                    },
-                    "compose_file": {
-                        "type": "string",
-                        "pattern": "#^(?!.*\\.\\.)[A-Za-z0-9_./-]+\\.ya?ml$#",
-                        "maxLength": 120
-                    },
-                    "compose_project": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9][a-z0-9-]*$",
-                        "maxLength": 120
-                    },
-                    "api_service": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9][a-z0-9-]*$",
-                        "maxLength": 120,
-                        "nullable": true
-                    },
-                    "ui_service": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9][a-z0-9-]*$",
-                        "maxLength": 120,
-                        "nullable": true
-                    },
-                    "database_service": {
-                        "type": "string",
-                        "pattern": "^[a-z0-9][a-z0-9-]*$",
-                        "maxLength": 120,
-                        "nullable": true
-                    }
-                },
-                "required": [
-                    "version",
-                    "manifest_sha256",
-                    "edition_image",
-                    "bundle_path",
-                    "compose_file",
-                    "compose_project"
-                ],
-                "title": "AppReleaseRequest"
             },
             "BusinessRegistrationRequest": {
                 "type": "object",

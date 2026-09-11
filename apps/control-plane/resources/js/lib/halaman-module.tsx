@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense } from 'react';
 import type { ComponentType, ReactNode } from 'react';
+import { laporkanKesalahan } from '@/lib/pelaporan-kesalahan';
 
 /**
  * Satu-satunya halaman Inertia untuk semua module.
@@ -24,10 +25,10 @@ import type { ComponentType, ReactNode } from 'react';
  * `INEFFECTIVE_DYNAMIC_IMPORT`. Peringatan yang selalu muncul adalah peringatan yang berhenti
  * dibaca orang.
  *
- * Ini yang menggantikan `pages/apps/host.tsx`. Perbedaan yang paling penting bukan soal
- * gaya: iframe memuat aplikasi React kedua beserta salinan React dan `@apperp/ui`-nya
- * sendiri, sedangkan yang di sini berbagi satu React, satu tema, dan satu riwayat
- * peramban dengan shell.
+ * Ini yang menggantikan halaman tuan rumah beriframe yang dulu memuat UI app. Perbedaan yang
+ * paling penting bukan soal gaya: iframe memuat aplikasi React kedua beserta salinan React dan
+ * `@apperp/ui`-nya sendiri, sedangkan yang di sini berbagi satu React, satu tema, dan satu
+ * riwayat peramban dengan shell.
  */
 
 type PropsHalaman = Record<string, unknown>;
@@ -97,6 +98,13 @@ class BatasKesalahan extends Component<PropsBatas, StateBatas> {
             `Halaman module ${this.props.nama} gagal dimuat.`,
             kesalahan,
         );
+
+        // Konsol itu milik peramban pengguna, jadi ia tidak sampai ke siapa pun. Ini
+        // satu-satunya penangkap yang tahu *module* mana yang gagal — di penangkap global
+        // kesalahan yang sama hanya berupa berkas potongan tanpa nama.
+        laporkanKesalahan(kesalahan, 'batas-module', {
+            'coreerp.halaman_module': this.props.nama,
+        });
     }
 
     render() {

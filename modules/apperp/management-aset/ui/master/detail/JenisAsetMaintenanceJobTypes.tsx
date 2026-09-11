@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import { TransferList, type TransferListItem } from '@apperp/ui/transfer-list';
+import { TransferList } from '@apperp/ui/transfer-list';
+import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../../api';
 
 type Choice = { id: string; kode: string; nama: string };
@@ -25,33 +26,54 @@ export default function JenisAsetMaintenanceJobTypes({
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
 
-    async function load() {
-        setLoading(true);
-        setError('');
-        try {
-            const result = await api<{
-                data: { remaining: Choice[]; selected: Choice[] };
-            }>(`/jenis-aset/${jenisAsetId}/maintenance-job-types`);
-            setRemaining(result.data.remaining.map(itemOf));
-            setSelected(result.data.selected.map(itemOf));
-        } catch (caught) {
-            setError(
-                errorMessage(
-                    caught,
-                    'Daftar jenis pekerjaan maintenance belum dapat dimuat.',
-                ),
-            );
-        } finally {
-            setLoading(false);
-        }
-    }
+    // Pengambilan data lahir di dalam effect: state baru disetel setelah jawaban server
+    // tiba, bukan pada commit render yang sama. Tidak ada `setLoading(true)` di awal —
+    // penandanya sudah bernilai benar sejak state pertama, dan RecordDetailPane memasang
+    // `key` sehingga ganti jenis aset memasang ulang panel ini dari keadaan bersih.
     useEffect(() => {
-        void load();
+        let dilepas = false;
+
+        const muat = async () => {
+            try {
+                const result = await api<{
+                    data: { remaining: Choice[]; selected: Choice[] };
+                }>(`/jenis-aset/${jenisAsetId}/maintenance-job-types`);
+
+                if (dilepas) {
+                    return;
+                }
+
+                setRemaining(result.data.remaining.map(itemOf));
+                setSelected(result.data.selected.map(itemOf));
+            } catch (caught) {
+                if (dilepas) {
+                    return;
+                }
+
+                setError(
+                    errorMessage(
+                        caught,
+                        'Daftar jenis pekerjaan maintenance belum dapat dimuat.',
+                    ),
+                );
+            } finally {
+                if (!dilepas) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        void muat();
+
+        return () => {
+            dilepas = true;
+        };
     }, [jenisAsetId]);
 
     async function save() {
         setSaving(true);
         setError('');
+
         try {
             await api(`/jenis-aset/${jenisAsetId}/maintenance-job-types`, {
                 method: 'PUT',
@@ -72,14 +94,19 @@ export default function JenisAsetMaintenanceJobTypes({
         }
     }
 
-    if (loading)
+    if (loading) {
         return (
             <p className="text-muted-foreground text-sm">
                 Memuat jenis pekerjaan maintenance…
             </p>
         );
-    if (error) return <p className="text-destructive text-sm">{error}</p>;
-    if (!canEdit && selected.length === 0)
+    }
+
+    if (error) {
+        return <p className="text-destructive text-sm">{error}</p>;
+    }
+
+    if (!canEdit && selected.length === 0) {
         return (
             <Empty>
                 <EmptyDescription>
@@ -87,6 +114,7 @@ export default function JenisAsetMaintenanceJobTypes({
                 </EmptyDescription>
             </Empty>
         );
+    }
 
     return (
         <div className="space-y-4">

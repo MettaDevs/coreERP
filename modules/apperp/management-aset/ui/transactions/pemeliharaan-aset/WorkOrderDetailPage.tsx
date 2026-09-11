@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Printer } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
-import { DataTable, type DataTableColumn } from '@apperp/ui/data-table';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
@@ -14,20 +17,20 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
-import { Printer } from 'lucide-react';
-import { toast } from 'sonner';
-import { api, errorMessage, newIdempotencyKey } from '../../api';
 import EditShield from '../../_shared/EditShield';
+import { api, errorMessage, newIdempotencyKey } from '../../api';
 import { requestPrint } from '../../print';
-import {
+import type {
     ChecklistRow,
     Context,
     EditableWorkOrder,
     JobLine,
     Option,
+    WorkOrder,
+} from './workOrder';
+import {
     StatusBadge,
     TRANSISI,
-    WorkOrder,
     bukaDaftar,
     bukaWorkOrder,
     bukaWorkOrderUbah,
@@ -40,6 +43,9 @@ import {
 } from './workOrder';
 
 type Mode = 'view' | 'edit' | 'create';
+
+/** Dipakai bersama saat varian jenis pekerjaan belum termuat, agar identitasnya tetap. */
+const TANPA_VARIAN: Option[] = [];
 
 function JobRow({
     job,
@@ -72,19 +78,41 @@ function JobRow({
     onChange: (change: Partial<JobLine>) => void;
     onRemove: () => void;
 }) {
-    const [variants, setVariants] = useState<Option[]>([]);
+    // Varian dicatat bersama jenis pekerjaan yang memintanya; selama jenisnya belum
+    // cocok, pilihannya kosong. Dihitung saat render, jadi ganti jenis pekerjaan tidak
+    // pernah menyisakan satu frame berisi varian milik jenis sebelumnya.
+    const [variantsMuatan, setVariantsMuatan] = useState<{
+        jobTypeId: string;
+        items: Option[];
+    } | null>(null);
+    const jobTypeId = job.maintenance_job_type_id;
+    const variants =
+        jobTypeId && variantsMuatan?.jobTypeId === jobTypeId
+            ? variantsMuatan.items
+            : TANPA_VARIAN;
 
     useEffect(() => {
-        if (!job.maintenance_job_type_id) {
-            setVariants([]);
+        if (!jobTypeId) {
             return;
         }
-        api<{ data: Option[] }>(
-            `/maintenance-job-types/${job.maintenance_job_type_id}/variants`,
-        )
-            .then((result) => setVariants(result.data))
-            .catch(() => setVariants([]));
-    }, [job.maintenance_job_type_id]);
+
+        let dibatalkan = false;
+        api<{ data: Option[] }>(`/maintenance-job-types/${jobTypeId}/variants`)
+            .then((result) => {
+                if (!dibatalkan) {
+                    setVariantsMuatan({ jobTypeId, items: result.data });
+                }
+            })
+            .catch(() => {
+                if (!dibatalkan) {
+                    setVariantsMuatan({ jobTypeId, items: [] });
+                }
+            });
+
+        return () => {
+            dibatalkan = true;
+        };
+    }, [jobTypeId]);
 
     const pilih = (options: Option[], id: string) =>
         options.find((option) => option.id === id);
@@ -512,7 +540,13 @@ export default function WorkOrderDetailPage({
     mode: Mode;
     checklistJobId?: string;
 }) {
-    const can = izin(permissions);
+    const can = useMemo(() => izin(permissions), [permissions]);
+    /**
+     * Referensi hanya diperlukan bila pengguna memang dapat menyusun work order.
+     * Dipadatkan menjadi satu boolean supaya effect pemuatnya bergantung pada nilai yang
+     * stabil, bukan pada daftar izin yang dirangkai ulang setiap render.
+     */
+    const bolehSusun = can('create') || can('update') || can('execute');
     const [record, setRecord] = useState<EditableWorkOrder | undefined>(
         mode === 'create' ? emptyWorkOrder() : undefined,
     );
@@ -526,11 +560,20 @@ export default function WorkOrderDetailPage({
     const [faultCauses, setFaultCauses] = useState<Option[]>([]);
     const [repairActions, setRepairActions] = useState<Option[]>([]);
     const [assetSearch, setAssetSearch] = useState('');
-    const [checklist, setChecklist] = useState<ChecklistRow[] | undefined>();
+    // Checklist dicatat bersama job yang alamatnya membukanya. Menutup checklist berarti
+    // `checklistJobId` hilang dari alamat, dan isinya ikut hilang saat render itu juga —
+    // tanpa effect yang perlu mengosongkannya lebih dulu.
+    const [checklistMuatan, setChecklistMuatan] = useState<{
+        jobId: string;
+        rows: ChecklistRow[];
+    } | null>(null);
     const [saving, setSaving] = useState(false);
 
     const loadJobTypesForAsset = useCallback(async (assetId: string) => {
-        if (!assetId) return;
+        if (!assetId) {
+            return;
+        }
+
         try {
             const result = await api<{ data: Option[] }>(
                 `/pemeliharaan-aset/referensi/job-types?asset_id=${encodeURIComponent(assetId)}`,
@@ -544,11 +587,32 @@ export default function WorkOrderDetailPage({
         }
     }, []);
 
-    const load = useCallback(
-        async (id: string) => {
+    // Effect di bawah adalah satu-satunya pembaca work order dari server. Setelah pindah
+    // status atau simpan hasil pekerjaan, pembacaan ulang dinyatakan dengan menaikkan
+    // penanda ini — bukan dengan memanggil pemuatnya dari luar.
+    const [versiMuat, setVersiMuat] = useState(0);
+    const muatUlang = () => setVersiMuat((versi) => versi + 1);
+
+    // `mode` ikut jadi pemicu supaya kembali ke mode baca berarti membaca ulang dari
+    // server. Itulah yang membuang suntingan yang batal: tidak ada salinan lama yang
+    // masih menempel saat pengguna membuka work order yang sama lagi.
+    // Tanpa `workOrderId` tidak ada yang perlu dibaca: record kosongnya sudah lahir dari
+    // penginisialisasi `useState` di atas, dan WorkOrderPage memberi cabang "baru" `key`
+    // tersendiri sehingga tidak mungkin berganti menjadi rincian tanpa dipasang ulang.
+    useEffect(() => {
+        if (!workOrderId) {
+            return;
+        }
+
+        let dibatalkan = false;
+
+        // Pembacaan lahir di dalam effect: state baru disetel setelah jawaban server
+        // tiba, bukan pada commit render yang sama, dan jawaban yang telat datang setelah
+        // layar ditutup dibuang lewat `dibatalkan`.
+        const muat = async () => {
             try {
                 const result = await api<{ data: WorkOrder }>(
-                    `/pemeliharaan-aset/${id}`,
+                    `/pemeliharaan-aset/${workOrderId}`,
                 );
                 const details = (result.data.details ?? []).map(
                     (job, index) => ({
@@ -574,6 +638,11 @@ export default function WorkOrderDetailPage({
                 await Promise.all(
                     details.map((job) => loadJobTypesForAsset(job.asset_id)),
                 );
+
+                if (dibatalkan) {
+                    return;
+                }
+
                 setRecord({
                     ...result.data,
                     tingkat_layanan_id: result.data.tingkat_layanan_id ?? '',
@@ -582,28 +651,28 @@ export default function WorkOrderDetailPage({
                     details,
                 });
             } catch (caught) {
+                if (dibatalkan) {
+                    return;
+                }
+
                 toast.error(
                     errorMessage(caught, 'Work order belum dapat dibuka.'),
                 );
             }
-        },
-        [loadJobTypesForAsset],
-    );
+        };
 
-    // `mode` ikut jadi pemicu supaya kembali ke mode baca berarti membaca ulang dari
-    // server. Itulah yang membuang suntingan yang batal: tidak ada salinan lama yang
-    // masih menempel saat pengguna membuka work order yang sama lagi.
+        void muat();
+
+        return () => {
+            dibatalkan = true;
+        };
+    }, [loadJobTypesForAsset, mode, versiMuat, workOrderId]);
+
     useEffect(() => {
-        if (!workOrderId) {
-            setRecord(emptyWorkOrder());
+        if (!bolehSusun) {
             return;
         }
-        void load(workOrderId);
-    }, [load, mode, workOrderId]);
 
-    // Referensi hanya dimuat bila pengguna memang dapat menyusun work order.
-    useEffect(() => {
-        if (!can('create') && !can('update') && !can('execute')) return;
         const muat = (
             path: string,
             set: (options: Option[]) => void,
@@ -641,21 +710,26 @@ export default function WorkOrderDetailPage({
         // penyaringan dilakukan di sini. Mengirim `q` ke server hanya akan diabaikan diam-diam
         // dan membuat kotak pencarian terlihat bekerja padahal tidak.
         void muat('/aset', setAssets, 'Aset belum dapat dimuat.');
-    }, [permissions.join(',')]);
+    }, [bolehSusun]);
 
     // Checklist yang terbuka ikut alamat: menutupnya berarti kembali ke alamat rincian,
     // sehingga tombol kembali peramban tidak membuka ulang checklist yang sudah ditutup.
     useEffect(() => {
         if (!workOrderId || !checklistJobId) {
-            setChecklist(undefined);
             return;
         }
+
         let dibatalkan = false;
         api<{ data: ChecklistRow[] }>(
             `/pemeliharaan-aset/${workOrderId}/jobs/${checklistJobId}/checklist`,
         )
             .then((result) => {
-                if (!dibatalkan) setChecklist(result.data);
+                if (!dibatalkan) {
+                    setChecklistMuatan({
+                        jobId: checklistJobId,
+                        rows: result.data,
+                    });
+                }
             })
             .catch((caught) =>
                 toast.error(
@@ -668,6 +742,11 @@ export default function WorkOrderDetailPage({
         };
     }, [workOrderId, checklistJobId]);
 
+    const checklist =
+        checklistJobId && checklistMuatan?.jobId === checklistJobId
+            ? checklistMuatan.rows
+            : undefined;
+
     const assetQuery = assetSearch.trim().toLowerCase();
     const assetTersaring =
         assetQuery === ''
@@ -679,12 +758,19 @@ export default function WorkOrderDetailPage({
               );
 
     const pindahStatus = async (ke: string, label: string) => {
-        if (!record?.id || !record.kode) return;
+        if (!record?.id || !record.kode) {
+            return;
+        }
+
         const alasan =
             ke === 'dibatalkan'
                 ? window.prompt(`Alasan membatalkan ${record.kode}?`)
                 : null;
-        if (ke === 'dibatalkan' && !alasan?.trim()) return;
+
+        if (ke === 'dibatalkan' && !alasan?.trim()) {
+            return;
+        }
+
         try {
             await api(`/pemeliharaan-aset/${record.id}/status`, {
                 method: 'POST',
@@ -694,7 +780,7 @@ export default function WorkOrderDetailPage({
                     alasan,
                 }),
             });
-            await load(record.id);
+            muatUlang();
             toast.success(`${record.kode} — ${label.toLowerCase()} berhasil.`);
         } catch (caught) {
             toast.error(
@@ -707,8 +793,12 @@ export default function WorkOrderDetailPage({
     };
 
     const simpanChecklist = async () => {
-        if (!checklist || !workOrderId || !checklistJobId) return;
+        if (!checklist || !workOrderId || !checklistJobId) {
+            return;
+        }
+
         setSaving(true);
+
         try {
             await api(
                 `/pemeliharaan-aset/${workOrderId}/jobs/${checklistJobId}/checklist`,
@@ -736,8 +826,12 @@ export default function WorkOrderDetailPage({
     };
 
     const simpanPelaksanaan = async (job: JobLine) => {
-        if (!record?.id || !job.id) return;
+        if (!record?.id || !job.id) {
+            return;
+        }
+
         setSaving(true);
+
         try {
             await api(
                 `/pemeliharaan-aset/${record.id}/jobs/${job.id}/execution`,
@@ -756,7 +850,7 @@ export default function WorkOrderDetailPage({
                 },
             );
             toast.success('Hasil pekerjaan tersimpan.');
-            await load(record.id);
+            muatUlang();
         } catch (caught) {
             toast.error(
                 errorMessage(caught, 'Hasil pekerjaan belum dapat disimpan.'),
@@ -774,11 +868,13 @@ export default function WorkOrderDetailPage({
 
             return;
         }
+
         if (!record.tipe_work_order_id) {
             toast.error('Pilih tipe work order lebih dahulu.');
 
             return;
         }
+
         if (
             !record.details.every(
                 (job) => job.asset_id && job.maintenance_job_type_id,
@@ -867,7 +963,10 @@ export default function WorkOrderDetailPage({
     const canEditExecution =
         can('execute') && (status === 'dikerjakan' || status === 'selesai');
     const mintaSunting = () => {
-        if (!dapatDisunting || editing || !record.id) return;
+        if (!dapatDisunting || editing || !record.id) {
+            return;
+        }
+
         bukaWorkOrderUbah(record.id);
     };
 
@@ -963,6 +1062,7 @@ export default function WorkOrderDetailPage({
                 const selected = faultCauses.find(
                     (option) => option.id === job.sebab_kerusakan_id,
                 );
+
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
                         <Select
@@ -1020,6 +1120,7 @@ export default function WorkOrderDetailPage({
                 const selected = repairActions.find(
                     (option) => option.id === job.tindakan_perbaikan_id,
                 );
+
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
                         <Select
@@ -1404,11 +1505,12 @@ export default function WorkOrderDetailPage({
                                     },
                                 ]}
                                 onRowAction={(action, job) => {
-                                    if (action === 'checklist' && record.id)
+                                    if (action === 'checklist' && record.id) {
                                         bukaChecklistJob(
                                             record.id,
                                             String(job.id),
                                         );
+                                    }
                                 }}
                             />
                         ) : (
@@ -1431,10 +1533,12 @@ export default function WorkOrderDetailPage({
                                         if (
                                             'asset_id' in change &&
                                             change.asset_id
-                                        )
+                                        ) {
                                             void loadJobTypesForAsset(
                                                 change.asset_id,
                                             );
+                                        }
+
                                         setRecord({
                                             ...record,
                                             details: record.details.map(
@@ -1469,14 +1573,22 @@ export default function WorkOrderDetailPage({
                         editable={status === 'dikerjakan'}
                         saving={saving}
                         onClose={() => {
-                            if (workOrderId) bukaWorkOrder(workOrderId);
+                            if (workOrderId) {
+                                bukaWorkOrder(workOrderId);
+                            }
                         }}
                         onSave={() => void simpanChecklist()}
                         onChange={(id, change) =>
-                            setChecklist((current) =>
-                                current?.map((row) =>
-                                    row.id === id ? { ...row, ...change } : row,
-                                ),
+                            setChecklistMuatan(
+                                (current) =>
+                                    current && {
+                                        ...current,
+                                        rows: current.rows.map((row) =>
+                                            row.id === id
+                                                ? { ...row, ...change }
+                                                : row,
+                                        ),
+                                    },
                             )
                         }
                     />

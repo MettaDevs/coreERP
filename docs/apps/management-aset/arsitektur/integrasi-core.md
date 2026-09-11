@@ -13,7 +13,7 @@ boleh disebut modul ini.
 ::: tip Yang berubah, dan kenapa halaman ini ditulis ulang
 Empat klien HTTP — nomor, kalender fiskal, satuan, workflow — sudah tidak ada. Begitu pula token
 konteks, tanda tangan HMAC pada event, dan `services.coreerp`. Semuanya jadi pemanggilan fungsi di
-dalam proses yang sama. Alasannya ada di [keputusan satu runtime](/todo/satu-runtime/00-keputusan).
+dalam proses yang sama. Alasannya ada di [grand design](/dev/01-grand-design).
 :::
 
 ## Yang diminta modul ke Core

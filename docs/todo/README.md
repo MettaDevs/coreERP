@@ -21,6 +21,10 @@ setelah pemeriksaan langsung ke dokumentasi Microsoft, karena audit hanya
 menyebut konsolidasi sebagai app yang terblokir, bukan sebagai kemampuan yang
 harus melekat pada legal entity.
 
+Folder ini memuat lebih dari satu berkas kerja. Bagian di bawah memetakan audit
+terhadap Dynamics 365; folder lain di sebelahnya berdiri sendiri, masing-masing
+dengan halamannya sendiri di sidebar.
+
 ## Peta dokumen
 
 | Dokumen | Isi | Temuan |
@@ -63,10 +67,15 @@ juga berlaku.
 ## Yang tidak dianggap gap
 
 Keputusan arsitektur berikut sengaja tidak dilaporkan sebagai kekurangan:
-satu repository per app; tanpa query lintas database app; tenant sebagai batas
-kontrak dan bukan root organization; parent-child hidup pada node hierarchy
-berversi dan bukan pada identitas organisasi; serta empat kebenaran lifecycle
-yang terpisah.
+tenant sebagai batas kontrak dan bukan root organization; parent-child hidup
+pada node hierarchy berversi dan bukan pada identitas organisasi; serta empat
+kebenaran lifecycle yang terpisah.
+
+Dua butir yang dulu ada di daftar ini — satu repository per app, dan tidak ada
+query lintas database app — sudah tidak menggambarkan keadaan sekarang. Module
+hidup di dalam repo Core dan memakai database tenant yang sama; yang memisahkan
+mereka adalah awalan nama tabel beserta penjaganya. Lihat
+[standar module](../dev/02-module-standard.md).
 
 ## Aturan pengerjaan
 

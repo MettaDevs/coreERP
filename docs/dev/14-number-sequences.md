@@ -2,12 +2,12 @@
 
 Number Sequence adalah layanan Control Plane untuk menerbitkan kode bisnis yang dapat dipakai app mana pun. Ia bukan tabel bersama: app meminta nomor lewat pintu resmi dan tidak pernah membaca atau menulis tabel sequence Core secara langsung.
 
-Ada dua pintu, dan yang menentukan bukan selera melainkan tempat app itu berjalan:
+Ada dua pintu, dan yang menentukan bukan selera melainkan tempat pemanggilnya berjalan:
 
 | Pemanggil | Pintu |
 | --- | --- |
 | Module di runtime Core | Kontrak `App\Support\Modules\Contracts\PenerbitNomor` — pemanggilan fungsi biasa |
-| App berkontainer | API internal `POST /api/internal/v1/number-sequences/...` dengan token layanan |
+| Addon pihak ketiga di luar runtime | API internal `POST /api/internal/v1/number-sequences/...` dengan token layanan |
 
 ## Pemilik kebenaran
 
@@ -169,11 +169,13 @@ Core tetap memeriksa entitlement dan readiness app untuk tenant tersebut pada se
 
 ## Rekonsiliasi
 
-Bagian ini berlaku untuk app berkontainer. Core dan app semacam itu memiliki database terpisah, sehingga commit transaksi app dan confirm ke Core bukan satu transaksi database. Untuk continuous, app wajib menyimpan transaksi bisnis dan outbox `confirm` atau `cancel` dalam satu transaksi database app. Worker app mengirim outbox tersebut ulang sampai Core menjawab; endpoint Core idempotent.
+Bagian ini berlaku untuk pemanggil di luar runtime ini. Core dan pemanggil semacam itu memiliki database terpisah, sehingga commit transaksinya dan confirm ke Core bukan satu transaksi database. Untuk continuous, ia wajib menyimpan transaksi bisnis dan outbox `confirm` atau `cancel` dalam satu transaksi database miliknya. Worker-nya mengirim outbox tersebut ulang sampai Core menjawab; endpoint Core idempotent.
+
+Untuk module, keadaan itu tidak ada: penerbitan nomor dan transaksi bisnisnya berada di satu database dan satu transaksi.
 
 `php artisan number-sequences:recover` mencari reservation continuous yang melewati masa tunggu lalu mengubahnya menjadi `reconciliation_pending`. Job ini **tidak** mengembalikan nomor ke pool. Reservation `reconciliation_pending` masih boleh dikonfirmasi oleh outbox terlambat, atau dibatalkan bila app membuktikan transaksi tidak pernah tersimpan. Core tidak boleh mendaur ulangnya hanya berdasarkan TTL, karena TTL habis bukan bukti transaksi gagal.
 
-Setiap kali job berjalan ia mencatat `number-sequence.recover.completed` berisi jumlah yang ditandai dan **backlog rekonsiliasi** saat itu. Backlog yang naik terus berarti ada app yang tidak pernah menyelesaikan outbox-nya, dan nomor pool tertahan. Jadikan angka itu alert.
+Setiap kali job berjalan ia mencatat `number-sequence.recover.completed` berisi jumlah yang ditandai dan **backlog rekonsiliasi** saat itu. Backlog yang naik terus berarti ada pemanggil luar yang tidak pernah menyelesaikan outbox-nya, dan nomor pool tertahan. Jadikan angka itu alert.
 
 ## Scale-out dan high availability
 
@@ -207,6 +209,22 @@ Aturan operasional:
 
 Uji failover sebelum produksi: setelah primary dipromosikan, retry request dengan `idempotency_key` yang sama harus mengembalikan nomor atau reservation yang sama, bukan nomor baru.
 
+## Kegagalan menjawab 422, bukan 503
+
+Ketika penerbitan nomor masih berupa panggilan HTTP dari app ke Core, sebuah kegagalan bisa berarti
+"Core tidak terjangkau", dan 503 adalah jawaban yang jujur. Untuk module di dalam runtime, keadaan
+itu tidak ada lagi: Core adalah pemanggilan fungsi di proses yang sama, dan kalau ia tidak ada, tidak
+akan ada permintaan HTTP yang sampai untuk dijawab.
+
+Karena itu kegagalan penerbitan menjawab **422**. Kode kesalahan jaringan pada jalur ini bukan
+sekadar berhenti dipakai — ia dibuat **tidak bisa ditulis lagi**, supaya jawaban yang mustahil tidak
+bisa lahir kembali dari kode yang disalin.
+
+Penerbitan boleh dipanggil dari dalam transaksi pemanggilnya, dan tidak wajib berada di dalamnya:
+transaksinya menjadi savepoint. Yang mengikat adalah hasilnya — nomor, dokumen, dan pengajuan
+workflow berada dalam satu transaksi, sehingga transaksi yang gagal mengembalikan nilai berikutnya
+seperti semula dan tidak meninggalkan satu pun baris penerbitan.
+
 ## Pengujian
 
 Test suite berjalan di **PostgreSQL sungguhan**, pada schema terpisah (`DB_TEST_SCHEMA`, default `coreerp_test`). Ini bukan preferensi gaya. Pada SQLite, `lockForUpdate`, `sharedLock`, dan `FOR UPDATE SKIP LOCKED` semuanya dikompilasi menjadi string kosong, sehingga suite SQLite tidak membuktikan satu pun jaminan konkurensi yang menjadi dasar desain ini. Pemindahan ke PostgreSQL langsung menemukan satu bug produksi: kolom `status` selebar 20 karakter tidak muat menampung `reconciliation_pending` (23 karakter), jadi seluruh jalur recovery gagal di produksi sementara test SQLite lulus.
@@ -223,6 +241,13 @@ psql -d core_erp -c "CREATE SCHEMA IF NOT EXISTS coreerp_test;"
 - instance kedua benar-benar diblokir pada row lock counter;
 - unique index idempotency menolak nomor kedua untuk satu key;
 - blok preallocation tidak pernah mengulang nomor.
+
+### Bahan uji dibaca dari manifest, bukan disalin ke test
+
+Daftar reference nomor milik sebuah module beserta awalannya dibaca dari `app.yaml` module itu, tidak
+ditulis ulang di dalam berkas test. Daftar kedua akan menyimpang dari yang pertama, dan yang
+menyimpang lebih berbahaya daripada yang tidak ada. Membacanya dari manifest juga membuat assertion
+sekaligus membuktikan bahwa reference yang benar memang dipakai.
 
 ## Load test
 
@@ -304,17 +329,17 @@ Layanan ini mengasumsikan pemanggilnya bisa salah, termasuk salah yang merusak. 
 | Nomor melampaui lebar segmen | Ditolak, bukan melebar diam-diam |
 | Membuka halaman pengaturan berulang kali | Konstan per tenant, tidak menyentuh tenant lain |
 
-## Aturan implementasi app
+## Aturan implementasi module
 
-1. Nyatakan reference dan allowed scope di manifest app.
-2. Minta nomor hanya lewat pintu resminya — kontrak `PenerbitNomor` untuk module, API internal untuk app berkontainer. Jangan query tabel sequence Core.
-3. Gunakan idempotency key yang **stabil** dari transaksi app. Key yang dibuat ulang tiap percobaan membatalkan seluruh manfaat idempotency dan membakar satu nomor per retry.
+1. Nyatakan reference dan allowed scope di manifest module.
+2. Minta nomor hanya lewat pintu resminya — kontrak `PenerbitNomor`. Jangan query tabel sequence Core.
+3. Gunakan idempotency key yang **stabil** dari transaksi module. Key yang dibuat ulang tiap percobaan membatalkan seluruh manfaat idempotency dan membakar satu nomor per retry.
 4. Jangan menyimpulkan reservation kedaluwarsa berarti transaksi gagal. Hanya cancel bila transaksi memang tidak tersimpan.
-5. Jangan mengaktifkan atau mengubah format dari kode app; itu keputusan owner/admin tenant.
+5. Jangan mengaktifkan atau mengubah format dari kode module; itu keputusan owner/admin tenant.
 
-Dua aturan tambahan **hanya** untuk app berkontainer:
+Dua aturan tambahan **hanya** untuk pemanggil di luar runtime ini:
 
-6. Untuk continuous, simpan transaksi bisnis dan catatan outbox confirm/cancel dalam satu transaksi database app; worker mengirimnya sampai sukses.
+6. Untuk continuous, simpan transaksi bisnis dan catatan outbox confirm/cancel dalam satu transaksi database miliknya; worker mengirimnya sampai sukses.
 7. Set timeout eksplisit pada HTTP client ke Core.
 
 ## Lihat juga

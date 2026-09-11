@@ -4,7 +4,7 @@
 Halaman ini ditulis ketika target platform adalah **satu repository per app bisnis**. Target itu
 sudah dibalik: module bisnis kini hidup di dalam repo CoreERP pada `modules/<penerbit>/<module>/`
 dan berjalan di runtime Core. Alasan dan bukti pembalikannya ada di
-[keputusan satu runtime](../todo/satu-runtime/00-keputusan.md).
+[grand design](01-grand-design.md).
 
 Isinya tidak dibuang karena app yang belum dipindah masih menjalankan bentuk yang digambarkan di
 sini, dan aturan ownership serta batas release di bawah tetap berlaku untuknya. Yang salah adalah
@@ -82,7 +82,7 @@ Control Plane mengoordinasi katalog, entitlement, placement, dan status runtime.
 ## Lihat juga
 
 - [Standar module](02-module-standard.md) — isi wajib satu module, dan isi wajib satu repository app
-- [Release dan on-prem](03-release-and-on-prem.md) — image edisi untuk module, bundle untuk app berkontainer
+- [Release dan on-prem](03-release-and-on-prem.md) — image edisi dan bundle on-prem
 - [Development stack lokal](11-local-docker-development.md) — bentuk stack yang benar-benar dijalankan hari ini
-- [Menerbitkan release app](13-publishing-an-app-release.md) — CI per repository app
-- [Keputusan satu runtime](../todo/satu-runtime/00-keputusan.md) — kenapa arah halaman ini dibalik
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — CI per repository app
+- [Grand design](01-grand-design.md) — kenapa arah halaman ini dibalik

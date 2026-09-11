@@ -45,9 +45,10 @@ class AppCatalogRequest extends FormRequest
                 'max:120',
                 'regex:/^[a-z][a-z0-9_]*$/',
             ],
-            // Path konten UI ditentukan platform dari (app_id, placement), bukan
-            // didaftarkan app. Menerima nilai dari app akan membuat dua placement
-            // dari app yang sama berebut path yang sama.
+            // Jalur halaman UI ditentukan platform dari id module dan id entri menu, bukan
+            // didaftarkan app. Aturannya tetap ada meski kolomnya sudah tidak dipakai: sebuah
+            // manifest lama yang masih menyebutkannya harus ditolak dengan sebabnya, bukan
+            // diterima lalu diabaikan diam-diam.
             'ui_entry' => ['prohibited'],
             'has_ui' => ['nullable', 'boolean'],
             'navigation' => ['nullable', 'array'],

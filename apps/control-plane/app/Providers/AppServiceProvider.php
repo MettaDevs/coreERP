@@ -5,11 +5,13 @@ namespace App\Providers;
 use App\Models\User;
 use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
+use App\Support\Observabilitas\PelaporKesalahan;
 use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -52,7 +54,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Prevent touch() utime warning from crashing Blade view rendering on containerized environments
+        set_error_handler(function ($severity, $message) {
+            if (str_contains($message, 'touch(): Utime failed')) {
+                return true;
+            }
+
+            return false;
+        }, E_WARNING);
+
         $this->configureDefaults();
+        $this->hentikanPenerusanLogKeOtel();
 
         Gate::define(
             'manage-access',
@@ -114,5 +126,35 @@ class AppServiceProvider extends ServiceProvider
                 ? $password->uncompromised()
                 : $password;
         });
+    }
+
+    /**
+     * Menghentikan `opentelemetry-auto-laravel` meneruskan setiap panggilan `Log::` ke OTLP.
+     *
+     * Paket itu memasang `LogWatcher`, yang mendengarkan `MessageLogged` dan mengubah setiap
+     * catatan log menjadi satu catatan OTLP. Akibatnya satu kesalahan tiba di SigNoz sebagai
+     * **dua** catatan: log exception bawaan Laravel, dan laporan yang dikirim
+     * {@see PelaporKesalahan} dengan sengaja.
+     *
+     * Yang dipertahankan adalah yang kedua, dan itu bukan sekadar soal jumlah. Laporan terkurasi
+     * membawa tenant, module, pengguna, batas organisasi, SQL yang gagal, dan `trace_id` sebagai
+     * atribut yang bisa disaring; salinan dari `LogWatcher` membawa empat atribut dan tidak satu
+     * pun di antaranya bisa dipakai menyaring. Menyimpan keduanya berarti membayar dua kali
+     * untuk satu kejadian, dan yang lebih miskin justru yang muncul lebih dulu saat dicari.
+     *
+     * Panggilan `Log::` biasa tetap berjalan seperti sedia kala dan tetap masuk `laravel.log`.
+     * Yang hilang hanya penerusannya ke SigNoz — dan sampai basis kode ini benar-benar menulis
+     * log terstruktur di jalur permintaan (lihat `LIFE-14`), yang diteruskan itu hampir tidak
+     * ada isinya.
+     *
+     * Mengembalikannya cukup dengan menghapus pemanggilan metode ini.
+     */
+    private function hentikanPenerusanLogKeOtel(): void
+    {
+        // Tidak ada pendengar `MessageLogged` lain di basis kode ini — sudah diperiksa — jadi
+        // melupakan seluruh pendengarnya setara dengan melepas satu pendengar milik paket itu.
+        // Kalau suatu saat CoreERP menambah pendengarnya sendiri, baris ini harus berubah
+        // menjadi pelepasan yang lebih tepat sasaran.
+        Event::forget(MessageLogged::class);
     }
 }

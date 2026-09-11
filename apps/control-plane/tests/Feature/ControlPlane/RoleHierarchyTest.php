@@ -7,7 +7,6 @@ use App\Models\CoreApp;
 use App\Models\Role;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\AppContextToken;
 use App\Support\LaunchableAppCatalog;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -203,30 +202,20 @@ class RoleHierarchyTest extends TestCase
         $this->assertDatabaseMissing('security_role_children', ['child_role_id' => $foreignId]);
     }
 
-    public function test_inherited_permissions_reach_the_app_through_the_context_token(): void
+    public function test_inherited_permissions_reach_the_module_through_the_catalog(): void
     {
-        config()->set('coreerp.app_context_signing_key', str_repeat('k', 48));
-
         $child = $this->createRole('Pengelola group aset', [self::GROUP]);
         $parent = $this->createRole('Manajer aset', [self::ENTITAS], [$child->id]);
         $this->assignToOwner($parent);
 
         $membership = $this->subject->activeMembership()->refresh();
-        $catalog = app(LaunchableAppCatalog::class);
-        $token = app(AppContextToken::class)->issue(
-            $membership,
-            'app-uji',
-            $catalog->permissionsFor($membership, 'app-uji'),
-            null,
-            null,
-        );
 
-        // App membaca hak dari payload token ini; hak warisan harus sudah ada di
-        // dalamnya, karena app tidak mengetahui hierarchy role sama sekali.
-        $payload = json_decode(base64_decode(strtr(explode('.', $token)[1], '-_', '+/')), true);
+        // Module membaca hak dari daftar yang disusun katalog ini; hak warisan harus sudah
+        // ada di dalamnya, karena module tidak mengetahui hierarchy role sama sekali.
+        $permissions = app(LaunchableAppCatalog::class)->permissionsFor($membership, 'app-uji');
 
-        $this->assertContains('app-uji.group.archive', $payload['permissions']);
-        $this->assertContains('app-uji.entitas.read', $payload['permissions']);
+        $this->assertContains('app-uji.group.archive', $permissions);
+        $this->assertContains('app-uji.entitas.read', $permissions);
     }
 
     public function test_clearing_children_removes_the_inherited_access(): void

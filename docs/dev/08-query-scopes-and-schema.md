@@ -21,8 +21,7 @@ control_plane_db
 ├── tenants
 ├── tenant_app_entitlements
 ├── tenant_deployments
-├── app_placements
-└── app_installations
+└── core_module_installations
 
 organization_db
 ├── organizations
@@ -253,6 +252,40 @@ Ini adalah query reporting eventually consistent, bukan query operasional lintas
 4. Resolve claim data policy yang relevan dengan resource/proses, termasuk hierarchy version yang sudah efektif.
 5. Terapkan `tenant_id` lalu predicate `legal_entity_id`/`org_unit_id` milik policy itu pada setiap query dan command module.
 6. Gunakan local hierarchy projection atau daftar unit hasil claim bila descendants diperlukan. Workspace hanya boleh memberi filter awal; ia bukan claim otorisasi.
+
+## Konteks permintaan dihitung sekali, dan dibuang di batas permintaan
+
+`CurrentWorkspace` dan resolver kebijakan data diikat dengan cakupan **per permintaan**, bukan sebagai
+singleton. Perbedaannya bukan gaya: proses pekerja hidup lama dan menangani banyak permintaan, dan
+sebuah singleton akan membawa keanggotaan pengguna sebelumnya ke permintaan berikutnya. Berpindah
+tenant juga membuang ingatannya, karena konteks yang bertahan setelah perpindahan adalah konteks yang
+salah.
+
+Memoisasi itu yang membuat jumlah query per permintaan berhenti tumbuh sebanding jumlah pemeriksaan
+izin. Yang menjaganya adalah test yang **menghitung query, bukan milidetik** — milidetik berubah
+mengikuti mesin yang menjalankannya dan akan mulai gagal karena hal yang tidak ada hubungannya
+dengan kode.
+
+Satu jebakan yang mudah terlewat saat menulis test semacam itu: ia harus **meniru batas permintaan**.
+Tanpa membuang instance bercakupan di antara dua permintaan tiruan, permintaan kedua memakai konteks
+yang sudah dihangatkan permintaan pertama, dan angkanya terlihat jauh lebih baik daripada
+kenyataannya.
+
+## Indeks unik pada kode bisnis wajib parsial
+
+Karena tidak ada baris yang dihapus fisik, keunikan yang meliputi seluruh tabel akan menghitung baris
+yang sudah diarsipkan. Kode yang sudah "dihapus" pengguna tetap menempati namanya, dan pengguna tidak
+bisa memakai ulang kode itu tanpa penjelasan yang masuk akal.
+
+Karena itu keunikan pada kode bisnis dinyatakan sebagai **indeks parsial** yang hanya mencakup baris
+hidup. Ada satu detail PostgreSQL yang membuat perubahan ini lebih berbelit daripada dugaan: keunikan
+yang lahir dari pembangun skema Laravel adalah sebuah *constraint*, bukan indeks, dan constraint tidak
+boleh punya klausa `WHERE`. Membuangnya menuntut `ALTER TABLE ... DROP CONSTRAINT`, dan penggantinya
+**wajib** berupa indeks.
+
+Pemeriksaannya dijalankan **pada database** — membaca katalog indeks dan constraint — bukan dengan
+mencari teks di berkas migration. Migration yang membuat constraint bisa saja sudah diganti migration
+lain di kemudian hari, dan yang menentukan adalah apa yang benar-benar ada di database pelanggan.
 
 ## Keadaan worktree saat ini
 

@@ -46,11 +46,15 @@ export default function MutationPage() {
     }, []);
     async function save(form: HTMLFormElement) {
         const data = new FormData(form);
+
         if (!assetId) {
             setError('Pilih aset yang dimutasi terlebih dahulu.');
+
             return;
         }
+
         setSaving(true);
+
         try {
             await api('/aset/' + assetId + '/penempatan', {
                 method: 'POST',
@@ -75,6 +79,7 @@ export default function MutationPage() {
             setSaving(false);
         }
     }
+
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
             <CardHeader className="border-b px-5 py-3">

@@ -58,12 +58,6 @@ class CoreApp extends Model
         return $this->hasMany(SecurityDuty::class, 'app_id');
     }
 
-    /** @return HasMany<AppRelease, $this> */
-    public function releases(): HasMany
-    {
-        return $this->hasMany(AppRelease::class, 'app_id');
-    }
-
     /** @return BelongsToMany<CoreApp, $this> */
     public function dependencies(): BelongsToMany
     {

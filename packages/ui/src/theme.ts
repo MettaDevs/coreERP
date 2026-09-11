@@ -4,7 +4,9 @@ export type CoreErpTheme = {
 };
 
 export function applyCoreErpTheme(theme?: CoreErpTheme): void {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined') {
+return;
+}
 
     const appearance = theme?.appearance ?? 'light';
     const font = theme?.font ?? 'poppins';

@@ -1,5 +1,5 @@
 import { Input } from '@apperp/ui/input';
-import { JenisAsetDetail } from './jenisAsetDetail';
+import type { JenisAsetDetail } from './jenisAsetDetail';
 
 /**
  * Kotak yang belum punya tabel maupun relasi ke jenis aset. Masing-masing sudah memiliki

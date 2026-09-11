@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\AppServiceCredential;
+use App\Models\ModuleInstallation;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -67,17 +68,25 @@ class AuthenticateAppService
             ->first(fn (AppServiceCredential $candidate): bool => Hash::check($token, (string) $candidate->secret_hash));
     }
 
+    /**
+     * Kesiapan sekarang berarti satu hal: tenant berhak atas app ini **dan** app-nya tercatat
+     * terpasang sebagai module untuk tenant itu.
+     *
+     * Penentu sebelumnya — artifact ditempatkan, migration berhasil, runtime dinyatakan siap —
+     * milik jalur hosting container, dan ia ikut dibuang bersama jalur itu. Mempertahankannya
+     * berarti menolak setiap pemanggil, karena tidak ada lagi yang menulis `app_placements`.
+     */
     private function isReadyForTenant(string $appId, string $tenantId): bool
     {
         return DB::table('tenant_app_entitlements as entitlements')
-            ->join('tenant_deployments as deployments', 'deployments.tenant_id', '=', 'entitlements.tenant_id')
-            ->join('app_placements as placements', 'placements.placement', '=', 'deployments.placement')
+            ->join('core_module_installations as installations', function ($join) use ($appId): void {
+                $join->on('installations.tenant_id', '=', 'entitlements.tenant_id')
+                    ->where('installations.module_id', '=', $appId)
+                    ->where('installations.status', '=', ModuleInstallation::STATUS_INSTALLED);
+            })
             ->where('entitlements.tenant_id', $tenantId)->where('entitlements.app_id', $appId)
             ->where('entitlements.status', 'active')->where('entitlements.starts_at', '<=', now())
             ->where(fn ($query) => $query->whereNull('entitlements.ends_at')->orWhere('entitlements.ends_at', '>', now()))
-            ->where('deployments.status', 'active')->where('placements.app_id', $appId)
-            ->whereColumn('placements.profile', 'deployments.profile')
-            ->where('placements.artifact_status', 'placed')->where('placements.migration_status', 'succeeded')
-            ->where('placements.runtime_status', 'ready')->whereNotNull('placements.ready_at')->exists();
+            ->exists();
     }
 }

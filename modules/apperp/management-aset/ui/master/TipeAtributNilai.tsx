@@ -29,22 +29,25 @@ export default function TipeAtributNilai({
             `/tipe-atribut/${tipeAtributId}/nilai`,
         )
             .then((result) => {
-                if (!cancelled)
+                if (!cancelled) {
                     setRows(
                         result.data.map((row) => ({
                             nilai: String(row.nilai ?? ''),
                         })),
                     );
+                }
             })
             .catch((caught) => {
-                if (!cancelled)
+                if (!cancelled) {
                     setError(
                         errorMessage(
                             caught,
                             'Pilihan nilai belum dapat dimuat.',
                         ),
                     );
+                }
             });
+
         return () => {
             cancelled = true;
         };
@@ -54,6 +57,7 @@ export default function TipeAtributNilai({
         setSaving(true);
         setError('');
         setSaved(false);
+
         try {
             // Urutan layar menjadi urutan tampil; kirimannya daftar penuh, jadi baris yang
             // dihapus dari layar ikut diarsipkan server.

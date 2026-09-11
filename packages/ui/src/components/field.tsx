@@ -1,7 +1,7 @@
-import { useMemo } from "react"
 import { cva } from "class-variance-authority"
 import type { VariantProps } from "class-variance-authority"
 import { CircleAlert } from "lucide-react"
+import { useMemo } from "react"
 
 import { cn } from "../utils"
 import { Label } from "./label"

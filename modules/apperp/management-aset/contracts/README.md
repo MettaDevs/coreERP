@@ -53,6 +53,7 @@ YAML yang tidak dibaca siapa-siapa.
 | `asyncapi.yaml` | Bentuk amplop event yang diterima module; **salinan berwenangnya ada di Core**, dan bila keduanya berbeda, Core yang benar |
 
 Karena tidak ada lagi yang memeriksanya, berkas di sini **bisa basi tanpa ada yang gagal**.
-Perlakukan sebagai catatan, bukan sebagai janji. Nasib akhirnya — termasuk apakah
-`asyncapi.yaml` masih perlu ada dalam bentuk salinan — dievaluasi ulang pada F7-06
-("Bersihkan sisa") di `docs/todo/satu-runtime/01-prd.md`.
+Perlakukan sebagai catatan, bukan sebagai janji. Aturannya ada di
+[API, event, dan integrasi module](../../../../docs/dev/04-api-and-integration.md): untuk module di
+dalam runtime, berkas di sini adalah dokumentasi, dan permukaan yang benar-benar melewati batas
+berpindah menjadi kontrak PHP di dalam proses.

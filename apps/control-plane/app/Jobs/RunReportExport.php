@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Models\TenantMembership;
-use App\Support\Reporting\AppReportClient;
 use App\Support\Reporting\ExportStatus;
 use App\Support\Reporting\LayoutStore;
 use App\Support\Reporting\PrintIdentityStore;
@@ -66,10 +65,7 @@ final class RunReportExport implements ShouldQueue
             }
             $parameters = json_decode($export->parameters, true, flags: JSON_THROW_ON_ERROR) ?: [];
 
-            $data = AppReportClient::guard(
-                fn () => $client->dataset($report, $membership, $export->legal_entity_id, $export->org_unit_id, $parameters),
-                $report,
-            );
+            $data = $client->dataset($report, $membership, $export->legal_entity_id, $export->org_unit_id, $parameters);
             $limit = (int) config('reporting.max_rows');
             if ($data->rowCount() > $limit) {
                 throw new RenderException("Data terlalu besar untuk satu ekspor ({$data->rowCount()} baris; batas {$limit}). Persempit filternya.");
@@ -81,10 +77,7 @@ final class RunReportExport implements ShouldQueue
             $data = $data->withIdentity($identity['fields'], $identity['images']);
             $this->update(['progress' => 40, 'row_count' => $data->rowCount()]);
 
-            $layout = AppReportClient::guard(
-                fn () => $layouts->resolve($report, $this->tenantId, $export->legal_entity_id, $export->layout_ref, $membership, $export->org_unit_id),
-                $report,
-            );
+            $layout = $layouts->resolve($report, $this->tenantId, $export->legal_entity_id, $export->layout_ref, $membership, $export->org_unit_id);
             $rendered = $pipeline->render($layout, $data, $export->format);
             $this->update(['progress' => 85]);
 

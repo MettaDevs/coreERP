@@ -152,10 +152,10 @@ class LayarManagementAsetTest extends TestCase
     /**
      * Kriteria keluar fase 4, diperiksa pada berkas yang benar-benar dirender.
      *
-     * Pemeriksaan berkas dibuat bisa gagal lebih dulu: halaman iframe lama masih ada di repo
-     * dan masih memuat elemen itu, jadi kalau pembacaannya salah alamat — berkas hilang,
-     * berpindah, atau terbaca kosong — pemeriksaan kedua yang menandainya. "Tidak ada iframe
-     * di berkas yang tidak terbaca" bukan bukti apa pun.
+     * Pemeriksaan berkas dibuat bisa gagal lebih dulu: berkas yang diperiksa wajib memuat
+     * penanda yang pasti ada padanya, jadi berkas yang hilang, berpindah, atau terbaca kosong
+     * menandai dirinya sendiri. "Tidak ada iframe di berkas yang tidak terbaca" bukan bukti
+     * apa pun.
      */
     public function test_layar_module_tidak_memakai_iframe(): void
     {
@@ -168,13 +168,15 @@ class LayarManagementAsetTest extends TestCase
             'modul gagal dimuat di peramban sementara seluruh test HTTP di atas tetap hijau.',
         ]));
 
-        $this->assertStringNotContainsString('<iframe', (string) file_get_contents($halamanModul));
+        $isi = (string) file_get_contents($halamanModul);
 
         $this->assertStringContainsString(
-            '<iframe',
-            (string) file_get_contents($akar.'/resources/js/pages/apps/host.tsx'),
-            'Halaman iframe lama tidak lagi memuat elemen `iframe`; pemeriksaan di atas berhenti membuktikan apa pun.',
+            'export default',
+            $isi,
+            'Halaman modul tidak memuat `export default`; ia terbaca kosong atau bukan halaman '
+            .'React, dan pemeriksaan iframe di bawahnya berhenti membuktikan apa pun.',
         );
+        $this->assertStringNotContainsString('<iframe', $isi);
     }
 
     /**

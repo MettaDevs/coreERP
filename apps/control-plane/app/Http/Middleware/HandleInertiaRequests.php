@@ -94,6 +94,8 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'status' => fn (): ?string => $request->session()->get('status'),
                 'error' => fn (): ?string => $request->session()->get('error'),
+                'saved_id' => fn (): ?string => $request->session()->get('saved_id'),
+                'saved_section' => fn (): ?string => $request->session()->get('saved_section'),
             ],
         ];
     }

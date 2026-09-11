@@ -1,4 +1,6 @@
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -26,7 +28,6 @@ import {
 } from '@apperp/ui/sheet';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
-import { toast } from 'sonner';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Permission = string;
@@ -211,28 +212,69 @@ export default function PlanningPage({
     const [saving, setSaving] = useState(false);
     const sheetContentRef = useRef<HTMLDivElement>(null);
 
-    const load = async () => {
-        try {
-            const result = await api<{ data: Plan[] }>('/perencanaan-aset');
-            setPlans(result.data);
-        } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Rencana aset belum dapat dimuat.'),
-            );
-        }
-    };
+    // Effect adalah satu-satunya pemilik pengambilan daftar rencana. Pemuatan ulang
+    // setelah simpan atau arsip dinyatakan dengan menaikkan penanda ini.
+    const [versiMuat, setVersiMuat] = useState(0);
+    const muatUlang = () => setVersiMuat((versi) => versi + 1);
+
+    /**
+     * Pilihan jenis aset dan satuan hanya diperlukan oleh form. Disimpan sebagai satu
+     * boolean supaya effect di bawah bergantung pada nilai yang stabil, bukan pada
+     * daftar izin yang dirangkai ulang setiap render.
+     */
+    const bolehSunting = useMemo(
+        () =>
+            permissions.includes('management-aset.perencanaan-aset.create') ||
+            permissions.includes('management-aset.perencanaan-aset.update'),
+        [permissions],
+    );
 
     useEffect(() => {
-        void load();
-    }, []);
+        let dilepas = false;
+
+        // Pengambilan data lahir di dalam effect: state baru disetel setelah jawaban
+        // server tiba, bukan pada commit render yang sama, dan jawaban yang telat
+        // datang setelah layar ditutup dibuang lewat `dilepas`.
+        const muat = async () => {
+            try {
+                const result = await api<{ data: Plan[] }>('/perencanaan-aset');
+
+                if (dilepas) {
+                    return;
+                }
+
+                setPlans(result.data);
+            } catch (caught) {
+                if (dilepas) {
+                    return;
+                }
+
+                toast.error(
+                    errorMessage(caught, 'Rencana aset belum dapat dimuat.'),
+                );
+            }
+        };
+
+        void muat();
+
+        return () => {
+            dilepas = true;
+        };
+    }, [versiMuat]);
     useEffect(() => {
-        if (!can('create') && !can('update')) return;
+        if (!bolehSunting) {
+            return;
+        }
+
         api<{ data: AssetType[] }>('/reference-data/units-of-measure')
             .then((result) => setUnits(result.data))
             .catch(() => toast.error('Satuan belum dapat dimuat.'));
-    }, [permissions.join(',')]);
+    }, [bolehSunting]);
     useEffect(() => {
-        if (!can('create') && !can('update')) return;
+        if (!bolehSunting) {
+            return;
+        }
+
         const timer = window.setTimeout(() => {
             api<{ data: AssetType[] }>(
                 `/jenis-aset?per_page=20&aktif=true&q=${encodeURIComponent(typeSearch)}`,
@@ -240,8 +282,9 @@ export default function PlanningPage({
                 .then((result) => setTypes(result.data))
                 .catch(() => toast.error('Jenis aset belum dapat dimuat.'));
         }, 250);
+
         return () => window.clearTimeout(timer);
-    }, [permissions.join(','), typeSearch]);
+    }, [bolehSunting, typeSearch]);
 
     const openEdit = async (id: string) => {
         try {
@@ -264,13 +307,16 @@ export default function PlanningPage({
     };
 
     const archive = async (plan: Plan) => {
-        if (!window.confirm(`Arsipkan rencana ${plan.kode}?`)) return;
+        if (!window.confirm(`Arsipkan rencana ${plan.kode}?`)) {
+            return;
+        }
+
         try {
             await api(`/perencanaan-aset/${plan.id}`, {
                 method: 'DELETE',
                 body: JSON.stringify({ version: plan.version }),
             });
-            await load();
+            muatUlang();
         } catch (caught) {
             toast.error(
                 errorMessage(caught, 'Rencana aset belum dapat diarsipkan.'),
@@ -295,8 +341,10 @@ export default function PlanningPage({
             toast.error(
                 'Pilih entitas legal dan unit kerja aktif sebelum membuat rencana.',
             );
+
             return;
         }
+
         if (
             !editing.details.every(
                 (detail) =>
@@ -308,6 +356,7 @@ export default function PlanningPage({
             toast.error(
                 'Pilih jenis aset, satuan, dan isi spesifikasi pada setiap rincian.',
             );
+
             return;
         }
 
@@ -340,8 +389,9 @@ export default function PlanningPage({
                     body: JSON.stringify(body),
                 });
             }
+
             setEditing(undefined);
-            await load();
+            muatUlang();
             toast.success('Rencana aset disimpan.');
         } catch (caught) {
             toast.error(

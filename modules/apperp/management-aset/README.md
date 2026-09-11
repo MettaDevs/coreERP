@@ -193,13 +193,13 @@ Rencana membawa entitas legal dan unit kerja dari konteks CoreERP yang aktif, no
 
 ## Setup
 
-1. Daftarkan `app.yaml` melalui alur publish app CoreERP sampai installation registry menyatakan release `ready`. Registrasi katalog perlu dikirim ulang setiap kali daftar permission, duty, atau reference nomor bertambah.
-2. Buat service credential untuk `management-aset`, lalu isi `COREERP_SERVICE_TOKEN` pada API.
-3. Pakai nilai `COREERP_APP_CONTEXT_SIGNING_KEY` yang sama pada Core dan API Aset.
-4. Setelah placement app berstatus **ready**, Control Plane otomatis mematerialisasi seluruh reference pada **Nomor dokumen** dengan scope dari manifest. Verifikasi daftar dan preview di halaman tersebut; seed tenant baru baru menerbitkan nomor setelah tahap ini siap.
-5. Jalankan migration API dan build UI. UI menerima token konteks dari Web Shell melalui `postMessage` dan tidak menerima `tenant_id` dari browser.
+1. Daftarkan `app.yaml` ke katalog dengan `php artisan app:register-manifest management-aset`. Registrasi perlu dikirim ulang setiap kali daftar permission, duty, atau reference nomor bertambah.
+2. Pasang module untuk tenant dengan `php artisan module:install management-aset <tenant>` — atau biarkan pendaftaran usaha melakukannya. Di sanalah migration module dijalankan dan catatan pemasangannya dibuat.
+3. Setelah module tercatat **terpasang**, Control Plane mematerialisasi seluruh reference pada **Nomor dokumen** dengan scope dari manifest. Verifikasi daftar dan preview di halaman tersebut; seed tenant baru baru menerbitkan nomor setelah tahap ini siap.
 
-Manifest masih berversi `0.1.0`. Menaikkan versi release belum dapat dilakukan lewat endpoint registrasi (lihat `docs/dev/13-publishing-an-app-release.md`): versi release harus sama dengan versi katalog dan upgrade memerlukan compatibility matrix, backup, serta rollback terverifikasi. Selama app masih berada pada release pengembangan, jalankan migration baru pada placement pengembangan dan jangan memperlakukannya sebagai upgrade produksi.
+Halaman module ikut build shell Core dan menerima konteks tenant dari request Core yang sama; ia tidak menerima `tenant_id` dari browser dan tidak memakai token konteks.
+
+Manifest masih berversi `0.1.0`. Upgrade memerlukan compatibility matrix, backup, serta rollback terverifikasi (lihat `docs/dev/13-publishing-an-app-release.md`). Selama module berada pada release pengembangan, jalankan migration baru dengan `module:migrate` dan jangan memperlakukannya sebagai upgrade produksi.
 
 API health tersedia pada `GET /api/v1/health`. Contract lengkap berada di `contracts/openapi.yaml`, yang merupakan bundle hasil generate dari `contracts/src/`. Sunting sumbernya di `contracts/src/`, lalu jalankan `python contracts/bundle.py`; `--check` memverifikasi bundle masih sinkron.
 

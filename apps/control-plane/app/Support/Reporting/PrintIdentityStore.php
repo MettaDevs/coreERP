@@ -82,7 +82,7 @@ final class PrintIdentityStore
      * sementara; pemanggil menghapusnya setelah render.
      *
      * @param  array<string, mixed>|null  $identity
-     * @return array{fields: array<string, string|null>, images: array<string, string>}
+     * @return array{fields: array<string, string|null>, images: array<string, array{path: string, width_mm: int}>}
      */
     public function placeholders(?array $identity): array
     {

@@ -24,6 +24,108 @@ App yang masih berupa container tetap memakai jalur di bawah: image API dan UI s
 sendiri, dan bundle yang menyusunnya. Jalur itu tidak dihapus selama masih ada app yang
 menjalankannya.
 
+### Satu repo, satu `main`, rilis lewat edisi
+
+Seluruh Core dan seluruh module hidup di satu repo dengan satu cabang utama. Yang membedakan satu
+pelanggan dari pelanggan lain bukan cabang, melainkan **manifest edisi**.
+
+Pemeliharaan versi lama memakai cabang tersendiri per edisi, dan **paling banyak dua edisi ke
+belakang**. Hotfix untuk pelanggan yang belum naik versi dibuat dari cabang pemeliharaannya, bukan
+dari `main` — mengambilnya dari `main` berarti mengirim perubahan yang belum pernah diuji bersama
+versi yang sedang berjalan di sana. Batas dua edisi bukan angka teknis; ia batas berapa banyak versi
+yang benar-benar sanggup dijaga tim sebesar ini.
+
+### Apa yang ditulis manifest, dan apa yang dihitung mesin
+
+Manifest edisi menyebut pelanggan, profil penempatan, nomor rilis, dan **daftar module yang dibeli**.
+Yang sengaja **tidak** ditulis di sana: dependency, module penghubung, dan penolakan module bahan
+uji. Ketiganya dihitung `edition:resolve`, karena daftar yang ditulis tangan akan ketinggalan pada
+hari sebuah module menambah dependency baru — dan ketinggalannya baru terasa sebagai layar yang
+kosong di tempat pelanggan.
+
+Sumber kebenaran dependency adalah `depends_on` pada `app.yaml` tiap module, bukan tabel di database.
+Alasannya sederhana dan mengikat: image edisi dibangun di CI, tempat tidak ada database mana pun.
+
+Dua bentuk masukan ditolak, bukan disaring diam-diam: id module yang tidak ada di repo, dan module
+bertanda `kind: internal-fixture`. Yang kedua penting — sebuah menu bernama "Contoh A" di layar
+pelanggan adalah kegagalan yang tidak boleh mungkin terjadi, jadi ia harus gagal saat membangun,
+bukan hilang tanpa suara.
+
+Module penghubung dikenali dari `kind: link`. Ia ikut **hanya** bila seluruh sisinya terpilih, dan ia
+**tidak pernah** menarik sisinya ikut masuk. Aturan itu berlaku juga untuk penghubung berlapis:
+penghubung yang menarik sisinya akan diam-diam mengirim module yang tidak dibeli.
+
+### Bagaimana image edisi dibangun
+
+Pembangunannya menerima daftar module dan mengenal tiga bentuk nilai: semua module, kosong yang
+berarti Core saja, dan daftar eksplisit. Pemangkasan `composer.json` beserta lockfile-nya terjadi
+**sebelum** pemasangan dependency, lewat penghapusan paket tanpa memasang ulang — bukan lewat
+pembaruan lockfile, yang akan ikut menaikkan versi paket lain tanpa diminta. Tahap akhir menyalin
+dari tahap yang sudah dipangkas, bukan dari konteks pembangunan, supaya module yang dipangkas tidak
+masuk lewat pintu belakang.
+
+Image runtime tidak boleh memuat Dockerfile maupun suite test. Keduanya menyebut namespace module
+secara harfiah, jadi keduanya adalah calon kebocoran yang akan lolos setiap pemeriksaan yang hanya
+melihat folder `modules/`.
+
+Isi `storage/` juga tidak ikut. Yang dikirim hanya rangka foldernya; berkas di dalamnya milik mesin
+pembangun, dan Docker menyalin isi image ke named volume yang masih kosong — sehingga berkas mesin
+pengembang berakhir di storage pelanggan pada boot pertama.
+
+### Apa yang diperiksa sebelum sebuah edisi boleh terbit
+
+Pemeriksaan kebocoran dijalankan pada image yang benar-benar dikirim, dan daftar module yang
+dipakainya dihitung **di luar** image — image yang bocor tidak boleh menilai dirinya sendiri. Yang
+diperiksa lebih dari satu jalur, karena satu module meninggalkan jejak di tempat yang berbeda dan
+ketiganya bisa bocor sendiri-sendiri: berkas dan nama namespace di dalam image, tabel yang terbentuk
+ketika migration dijalankan ke database kosong, dan bundel JavaScript.
+
+Dua rincian yang menentukan apakah pemeriksanya berguna:
+
+- Pemeriksaan tabel menjalankan migration tiap module **dari dalam image** lebih dulu. Tanpa itu, ia
+  memeriksa database yang tidak pernah menerima satu pun tabel dan melaporkan bersih.
+- Bundel dicari lewat bentuk yang khas — nama module diikuti pemisah — bukan lewat id telanjang. Id
+  telanjang cocok dengan potongan kata yang kebetulan sama dan membanjiri hasilnya.
+
+Pembuktian bahwa pemeriksanya **bisa merah** adalah langkah CI permanen, bukan catatan manual sekali
+jalan: sebuah module yang memang dibeli diperlakukan seolah tidak dibeli, dan alurnya gagal bila
+pemeriksanya tetap hijau.
+
+Urutannya mengikat: bangun, periksa kebocoran, **baru** dorong. Satu image dibangun per **rilis**,
+bukan satu image lengkap yang dipangkas per pelanggan — lapisan yang dibuang dari image lengkap tetap
+ikut terkirim di dalam riwayat lapisannya.
+
+Awalan versi yang bergerak seperti `latest` dilarang untuk penempatan, dan penjaganya berjalan
+**sebelum** apa pun didorong.
+
+### Pembaruan on-prem berbentuk satu perintah, dan aman diulang
+
+Tidak ada saluran pembaruan otomatis, dan tidak direncanakan ada. **Pembaruan bersifat tarik, bukan
+dorong**: server pelanggan tidak dibuka dari luar, dan admin di tempat pelangganlah yang
+menjalankannya.
+
+Karena admin itu tidak punya cara mengetahui apakah sebuah perintah sudah pernah jalan, **setiap
+perintah pembaruan wajib aman diulang** — dijalankan dua kali harus memberi hasil yang sama persis
+dengan sekali. Ini bukan anjuran gaya; ia yang membuat pembaruan bisa dilanjutkan setelah gagal di
+tengah tanpa memulai dari awal.
+
+Dua akibat langsung:
+
+- **Migration yang sudah pernah dijalankan tidak disunting.** Perubahan skema datang lewat migration
+  baru. Menyunting yang lama membuat dua server pelanggan berakhir dengan skema berbeda dari
+  riwayat yang sama.
+- **Fitur berparameter tidak boleh menuntut migration per parameter.** Simpan baris per kode dengan
+  registry, sehingga parameter baru berarti satu entri registry dan satu titik penegakan — nol
+  migration. Setiap migration harus berhasil di server setiap pelanggan, dan itu ongkos yang tidak
+  sebanding untuk sebuah sakelar.
+
+### Bentuk on-prem dan SaaS harus tetap sama
+
+Penempatan gabungan dan penempatan terpisah memakai **skema yang persis sama**. Perbedaannya hanya
+berapa banyak tenant yang tinggal di satu database, bukan bentuk tabelnya. Begitu keduanya boleh
+berbeda, setiap migration harus dipikirkan dua kali dan setiap laporan bug harus menyebut profilnya
+lebih dulu.
+
 ## Install bukan sekadar `composer install`
 
 Installer membaca app manifest. Pada SaaS ia memperoleh placement dari control plane; pada on-prem perpetual ia memakai manifest dan lisensi yang tersedia lokal. Ia selalu menjalankan langkah idempotent berikut:
@@ -31,50 +133,26 @@ Installer membaca app manifest. Pada SaaS ia memperoleh placement dari control p
 ```text
 validate license/signature/version/dependency
 -> choose deployment target
--> pull API and UI artifact
--> create or resolve app database
--> backup and run migration
--> register API/UI/event subscription
+-> pull image edisi Core
+-> create or resolve tenant database
+-> backup and run module migration
+-> register manifest and event subscription
 -> health check
--> bind entitled tenant to ready placement
+-> record module installation for entitled tenant
 ```
 
 ### Perbedaan per profile
 
 | Langkah | Pooled cloud | Isolated cloud | On-prem perpetual |
 | --- | --- | --- | --- |
-| Artifact | Sudah dideploy global per release | Pull/deploy per tenant placement | Operator memperoleh bundle image/manifest bertanda tangan untuk edition customer lalu memuatnya secara lokal |
-| Database | Resolve `app_pool_db` | Create/resolve `app_tenant_db` | Create volume/database app di Compose |
+| Artifact | Image edisi Core sudah dideploy global | Image edisi Core per placement tenant | Operator memperoleh bundle image/manifest bertanda tangan untuk edition customer lalu memuatnya secara lokal |
+| Database | Resolve database tenant yang sudah ada | Create/resolve database khusus tenant | Create volume/database Core di Compose |
 | Enable | Entitlement per tenant | Entitlement + endpoint placement | Lisensi perpetual dan manifest instalasi lokal; tidak ada heartbeat vendor |
-| UI | Container UI per placement, di belakang path `/apps-content/<placement>/<app-id>/` | Sama, dengan placement khusus tenant | Static UI container pada server customer, path yang sama |
+| UI | Ikut build shell Core; tidak ada artifact UI tersendiri | Sama | Sama |
 
-Untuk module, tiga baris pertama menyusut: artifact-nya adalah image Core edisi itu, databasenya
-adalah database tenant yang sudah ada, dan yang dijalankan hanyalah `module:migrate` beserta
-registrasi manifest. Baris UI gugur sama sekali — halaman module ikut build shell.
-
-### Config reverse proxy adalah artifact rilis
-
-Bagian ini berlaku untuk app berkontainer; module tidak punya container UI untuk di-proxy.
-
-Path konten UI diturunkan dari `(app_id, placement)` dan tidak pernah disimpan.
-Yang perlu disiapkan operator hanyalah reverse proxy yang menerjemahkan path itu ke
-container UI milik placement bersangkutan — dan config-nya **dirender dari registry
-placement, bukan ditulis tangan**:
-
-```bash
-php artisan app:render-proxy-config --target=nginx --output=/etc/nginx/conf.d/coreerp-apps-content.conf
-```
-
-Command melaporkan setiap placement yang dilewati beserta alasannya, sehingga config
-yang belum lengkap tidak terbaca seolah sudah lengkap. Detail dan jebakan trailing
-slash ada pada berkas `deploy/apps-content-proxy.md`.
-
-Batasnya perlu diketahui sebelum jumlah tenant bertambah: config ini statis, jadi
-setiap provisioning menuntut render ulang dan reload proxy pada semua replica. Cukup
-untuk puluhan placement. Karena path sudah di-key placement, penggantian ke resolusi
-dinamis — `resolver` nginx dengan `proxy_pass` bervariabel, ingress controller dengan
-aturan per-placement, atau service router yang membaca `app_placements` — tidak
-menuntut perubahan skema maupun migrasi data.
+Baris artifact dan database menyusut untuk module: artifact-nya adalah image Core edisi itu,
+databasenya adalah database tenant yang sudah ada, dan yang dijalankan hanyalah `module:migrate`
+beserta registrasi manifest.
 
 ## Workflow tim dan release self-hosted
 
@@ -185,52 +263,43 @@ apps:
 
 Jika versi tersebut kompatibel, CI membuat **signed add-on bundle** yang memuat Backoffice, migration, manifest/lisensi baru, dan hanya dependency upgrade yang diwajibkan oleh compatibility matrix. POS dan Booking yang telah ada tidak dibangun atau dikirim ulang. Bila tidak ada kombinasi yang kompatibel, Release Manager menolak penerbitan bundle dan menuntut upgrade prerequisite yang eksplisit.
 
-Di server PT.LeakStudio, operator menjalankan installer add-on. Installer memverifikasi bundle, membuat `backoffice_db`, menjalankan migration, memuat image Backoffice, mendaftarkan API/UI/event subscription, melakukan bootstrap data melalui API/event contract pemilik data, lalu health check. Ia dilarang membaca `pos_db` atau `booking_db` secara langsung.
+Di server PT.LeakStudio, operator menjalankan installer add-on. Installer memverifikasi bundle, memuat image edisi baru yang sudah memuat module Backoffice, menjalankan `module:migrate` untuk module itu, mendaftarkan manifest dan event subscription, melakukan bootstrap data lewat kontrak pemilik datanya, lalu health check. Module Backoffice dilarang membaca tabel milik POS atau Booking secara langsung.
 
 ## Compose edition on-prem
 
 Edition manifest menjelaskan dengan tepat apa yang boleh hadir pada server customer.
 
-Untuk **module**, "hadir" berarti berkasnya ikut di dalam image Core edisi itu; ia tidak menambah
-satu pun service Compose, database, atau volume. Server pelanggan yang hanya membeli module
-menjalankan container Core saja beserta database, worker, scheduler, dan renderer-nya.
+"Hadir" berarti berkas module itu ikut di dalam image Core edisi tersebut; ia tidak menambah satu
+pun service Compose, database, atau volume. Karena itu bentuk Compose-nya tidak lagi tumbuh
+mengikuti jumlah produk yang dibeli: berapa pun module yang dibeli customer, service-nya sama.
 
-Contoh di bawah adalah bentuk untuk **app berkontainer** — customer membeli Core, POS, Booking, dan bridge:
+Sampai 10 September 2026 halaman ini memuat contoh kedua dengan enam service tambahan per app —
+API, UI, dan database masing-masing. Contoh itu dibuang bersama jalur hosting container: tidak ada
+lagi app yang dibangun sebagai image tersendiri, jadi bentuk itu tidak pernah muncul lagi pada
+server pelanggan mana pun.
 
 ```yaml
 services:
   gateway:
     image: coreerp/gateway:1.0.0
   core-api:
-    image: coreerp/core-api:1.0.0
+    image: coreerp/core-edition-leakstudio:1.0.0
+  core-worker:
+    image: coreerp/core-edition-leakstudio:1.0.0
+  core-scheduler:
+    image: coreerp/core-edition-leakstudio:1.0.0
   core-db:
     image: postgres:17
-  # Engine render PDF milik platform; stateless, dipakai semua app. Lihat 23-document-rendering.md.
+  # Engine render PDF milik platform; stateless, dipakai semua module. Lihat 23-document-rendering.md.
   core-renderer:
     image: gotenberg/gotenberg:8
-  pos-api:
-    image: coreerp/pos-api:1.0.0
-  pos-ui:
-    image: coreerp/pos-ui:1.0.0
-  pos-db:
-    image: postgres:17
-  booking-api:
-    image: coreerp/booking-api:1.0.0
-  booking-ui:
-    image: coreerp/booking-ui:1.0.0
-  booking-db:
-    image: postgres:17
-  pos-booking-bridge:
-    image: coreerp/pos-booking-bridge:1.0.0
-  bridge-db:
-    image: postgres:17
 ```
 
-Jika customer tidak membeli Booking, seluruh `booking-*` dan `pos-booking-bridge` tidak muncul pada manifest, inventaris bundle, Compose file, image cache, atau database server. Dalam production cloud, `pos-db` dapat berarti database logis pada cluster managed; Compose menunjukkan boundary yang mudah dipahami pada server customer.
+Jika customer tidak membeli Booking, berkas module Booking tidak ikut ke dalam image edisi itu, tidak muncul pada manifest maupun inventaris bundle, dan tabelnya tidak pernah dibuat pada database server. Yang menegakkan batas komersialnya adalah ketiadaan berkas, bukan sebuah sakelar.
 
-`core-renderer` adalah engine render dokumen milik Core: ia hanya mengubah berkas Office yang sudah diisi Core menjadi PDF, tidak menyimpan data, dan selalu ikut bundle. Ekspor laporan semua app dikerjakan `core-worker`; jumlah replica-nya adalah angka di compose customer, dan web serta worker Core berbagi volume storage.
+`core-renderer` adalah engine render dokumen milik Core: ia hanya mengubah berkas Office yang sudah diisi Core menjadi PDF, tidak menyimpan data, dan selalu ikut bundle. Ekspor laporan semua module dikerjakan `core-worker`; jumlah replica-nya adalah angka di compose customer, dan web serta worker Core berbagi volume storage.
 
-`core-api` menyimpan identitas administrator lokal, manifest app aktif, riwayat instalasi, dan lisensi perpetual yang telah diverifikasi. `core-db` adalah database milik platform core; ia bukan database POS atau Booking. Control plane vendor **tidak** dijalankan pada server customer, juga tidak dibutuhkan agar deployment berfungsi. Images dapat dimuat dari bundle release (misalnya `docker load`) sehingga server runtime tidak perlu memiliki akses registry vendor.
+`core-api` menyimpan identitas administrator lokal, manifest module aktif, riwayat pemasangan, dan lisensi perpetual yang telah diverifikasi. `core-db` adalah database platform beserta seluruh module yang dibeli, dipisahkan oleh awalan nama tabel per module. Control plane vendor **tidak** dijalankan pada server customer, juga tidak dibutuhkan agar deployment berfungsi. Images dapat dimuat dari bundle release (misalnya `docker load`) sehingga server runtime tidak perlu memiliki akses registry vendor.
 
 Jika customer secara eksplisit membeli managed support, Compose dapat menambahkan `support-connector` terpisah. Connector hanya membuat koneksi outbound mTLS dan mengirim allow-list health/version minimum; detail batas data dan aksesnya ada di [01-grand-design.md](01-grand-design.md#konektor-support-bukan-bagian-default-on-prem).
 
@@ -250,10 +319,24 @@ Rollback image hanya boleh dilakukan bila migration kompatibel mundur. Jika tida
 disable entitlement -> hide UI / reject API -> drain workers
 -> block new events -> validate dependents -> export/archive data
 -> deregister routes/subscriptions -> remove placement/artifact
--> optional explicit purge database
 ```
 
+Urutan itu **berhenti di situ**. Tidak ada langkah yang menghapus data, dan tidak ada opsi untuk
+menambahkannya. Baris terakhir dokumen ini dulu berbunyi `optional explicit purge database`, dan itu
+menjanjikan tombol yang memang tidak ada — [standar module](02-module-standard.md#mencabut-modul-tidak-menyentuh-data)
+melarangnya, penjaganya menolak perintah pencabutan yang punya opsi bernama `purge`, `delete`,
+`drop`, atau `hapus`, dan retensi rekam medis menuntut data bertahan jauh lebih lama daripada masa
+langganan. Memasang ulang app atau module yang sama pada tenant yang sama mengembalikan datanya
+seperti sedia kala.
+
+Kalau data memang harus benar-benar pergi — pelanggan berhenti dan memintanya — jalannya bukan
+perintah pencabutan, melainkan serah terima atau ekspor lengkap yang ditulis di kontrak sebelum
+pelanggan pergi.
+
 Uninstall harus ditolak jika app lain masih declared dependency atau memiliki integration mapping aktif. Salesforce menerapkan prinsip serupa: package tidak dapat dilepas ketika komponen lain masih mereferensikannya. [Salesforce package uninstall](https://help.salesforce.com/s/articleView?id=000392277&language=en_US&type=1)
+
+Untuk module, penolakan itu diperiksa **terhadap tenant, bukan terhadap katalog**: pencabutan ditolak
+bila module masih menjadi dependency module lain yang terpasang pada tenant yang sama.
 
 ## License dan source protection
 
@@ -265,7 +348,7 @@ Uninstall harus ditolak jika app lain masih declared dependency atau memiliki in
 ## Lihat juga
 
 - [Standar module](02-module-standard.md) — definisi release unit yang dirilis di sini
-- [Menerbitkan release app](13-publishing-an-app-release.md) — kontrak CI untuk katalog dan release
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — kontrak CI untuk katalog dan release
 - [Development stack lokal](11-local-docker-development.md) — versi lokal dari mekanisme yang sama
 - [Gate fondasi Core](10-core-foundation-gates.md) — syarat sebelum deployment production aktif
-- [Empat kebenaran lifecycle](../onboarding/empat-kebenaran.md) — kenapa "terpasang" bukan satu status
+- [Tiga kebenaran lifecycle](../onboarding/tiga-kebenaran.md) — kenapa "terpasang" bukan satu status

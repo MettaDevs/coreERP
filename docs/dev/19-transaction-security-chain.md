@@ -158,7 +158,7 @@ Empat item pertama wajib. Sisanya diputuskan sadar — termasuk keputusan "tidak
 
 - [Standar module](02-module-standard.md) — bentuk manifest dan aturan kode empat lapis
 - [Identity dan access](09-identity-and-access.md) — model akses lengkap, hierarchy role, SoD, workforce
-- [Menerbitkan release app](13-publishing-an-app-release.md) — payload registrasi dan aturan prune
+- [Mendaftarkan katalog produk](13-publishing-an-app-release.md) — payload registrasi dan aturan prune
 - [Gate penemuan dan keputusan](18-module-discovery-and-decision-gate.md) — keputusan sebelum transaksi dibuat
 - [Query scope dan schema](08-query-scopes-and-schema.md) — scope organisasi pada level data
 - [Membangun app baru](../apps/membangun-app-baru.md) — posisi rantai ini dalam jalur membangun app

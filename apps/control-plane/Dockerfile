@@ -50,8 +50,10 @@ COPY modules ./modules
 # beserta cara `composer.lock` disegarkan ada di `scripts/edisi-pangkas.php`.
 RUN php scripts/edisi-pangkas.php pasang --modul="$MODUL"
 WORKDIR /repo/apps/control-plane
-# ext-gd hanya ada pada image runtime di bawah; image composer tidak membawanya.
-RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --ignore-platform-req=ext-gd
+# ext-gd dan ext-opentelemetry hanya ada pada image runtime di bawah; image composer tidak
+# membawa keduanya. Tahap ini cuma mengunduh berkas vendor — `--no-scripts` membuatnya tidak
+# pernah menjalankan kode yang butuh ekstensi itu, jadi melewati pemeriksaannya aman di sini.
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts --ignore-platform-req=ext-gd --ignore-platform-req=ext-opentelemetry
 WORKDIR /repo
 COPY . .
 # `COPY . .` di atas menaruh kembali `composer.json`, `composer.lock`, dan seluruh folder module
@@ -105,10 +107,35 @@ RUN npm run build
 
 FROM php:8.4-apache
 # gd dibutuhkan PhpSpreadsheet (layout Excel laporan); zip oleh PhpWord dan PhpSpreadsheet.
+#
+# `opentelemetry` tidak dibundel PHP, jadi ia dikompilasi lewat `pecl` di lapisan yang sama —
+# bukan lapisan sendiri, karena lapisan runtime inilah yang dikirim ke pelanggan. Alat
+# kompilasinya sengaja tidak ikut dipasang di sini: image `php` resmi sudah membawa $PHPIZE_DEPS
+# secara permanen, dan itu pula yang dipakai `docker-php-ext-install` di baris atas. Membuangnya
+# sesudah `pecl` selesai karena itu bukan penghematan yang gratis — ia mencabut perkakas milik
+# image dasar dan mematikan setiap `docker-php-ext-install` yang ditambahkan sesudah baris ini.
+# Yang memang sisa hanyalah sumber dan hasil build `pecl` di /tmp/pear, dan itu dibuang.
+#
+# Versinya dipin, seperti `composer.lock` dan `npm ci` memin milik mereka. `pecl install`
+# tanpa versi menarik rilis terbaru pada saat build, jadi image yang dibangun bulan depan
+# dari commit yang sama bisa berbeda isinya — kegagalan yang tidak punya commit untuk
+# disalahkan, dan muncul pertama kali di mesin pelanggan.
+#
+# `PASANG_OTEL=0` melewatkan kompilasinya. Ini dipakai alur `edition.yml`, yang membangun
+# image hanya untuk memverifikasi pemangkasan module pada setiap PR dan tidak pernah
+# mengirimkannya. Alur `release.yml` — yang membangun image yang benar-benar dikirim —
+# memakai nilai bawaan, jadi artefak produksi selalu membawa ekstensinya. Perlu disadari
+# konsekuensinya: image yang diuji saat PR karena itu bukan image yang dikirim.
+ARG PASANG_OTEL=1
 RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev unzip \
     && docker-php-ext-configure gd --with-jpeg \
     && docker-php-ext-install bcmath gd intl pdo_pgsql pgsql zip \
-    && a2enmod rewrite proxy proxy_http \
+    && if [ "$PASANG_OTEL" = "1" ]; then \
+        pecl install opentelemetry-1.2.1 \
+        && docker-php-ext-enable opentelemetry; \
+    fi \
+    && rm -rf /tmp/pear \
+    && a2enmod rewrite \
     && sed -ri 's!/var/www/html!/var/www/repo/apps/control-plane/public!g' /etc/apache2/sites-available/000-default.conf \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /repo
