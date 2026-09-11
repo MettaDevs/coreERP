@@ -1027,15 +1027,37 @@ Masuk memakai akun Core yang memegang `provider_access.role = 'provider_admin'` 
 `ProviderAdminSeeder` di Core yang membuatnya. Akun tanpa peran itu mendapat 404, bukan 403: alamat
 ini tidak perlu diketahui pengguna biasa.
 
-Yang dapat dilakukan hari ini: melihat seluruh lingkungan, membuka rincian beserta riwayat
-operasinya, dan membuat lingkungan baru untuk sebuah tenant. Yang **belum**: memasukinya. Lingkungan
-baru lahir berstatus `provisioning` dan hanya `active` yang dapat dirutekan — itu Irisan 2.
+Lingkungan baru lahir berstatus `provisioning` dan belum punya database sendiri. Menyiapkannya satu
+perintah, dijalankan dari Core:
 
-### `[ ]` Irisan 2 — environment demo
+```bash
+cd apps/core
+php artisan environment:siapkan <id lingkungan>
+```
 
-`environment:provision`, pembuatan database, middleware pemilih environment beserta penjaganya,
-scheduler yang memutari seluruh environment, dan pengalih serta spanduk di sisi pelanggan. Demo saja;
-belum ada salin.
+Id-nya ditampilkan halaman rincian apa adanya, beserta perintah lengkapnya, supaya ia dapat disalin
+tanpa menebak. Sesudahnya lingkungan itu punya databasenya sendiri, seluruh skema Core di dalamnya,
+dan statusnya `active`.
+
+Terukur di mesin pengembang, 12 September 2026: satu lingkungan demo, **116 tabel, 78 migration**,
+di bawah sepuluh detik.
+
+Yang **belum**: memasukinya. Database-nya ada dan terisi skema, tetapi belum ada middleware yang
+merutekan sebuah permintaan ke sana — itu sisa Irisan 2.
+
+### `[~]` Irisan 2 — environment demo
+
+**Sudah:** `environment:siapkan` — pembuatan database, migration ke dalamnya, sidik skema, dan
+masa berlaku operasi yang membuat penyiapan mati dapat diambil alih.
+
+**Belum:** middleware pemilih environment beserta penjaga koneksinya, scheduler yang memutari
+seluruh environment, serta pengalih dan spanduk di sisi pelanggan.
+
+Bagiannya yang sudah mendarat sengaja **lebih sempit** daripada tujuh langkah
+`environment:provision` di atas: pendaftaran manifest, entitlement, role Owner, dan pemasangan
+module tidak ditarik ke sana. Halaman ini sendiri mencatat bahwa langkah kelima **gagal pada
+percobaan kedua** sebelum dua perbaikan kecilnya dikerjakan; menariknya masuk sekarang akan merusak
+persis sifat aman-diulang yang testnya buktikan.
 
 ### `[ ]` Irisan 3 — Copy
 
