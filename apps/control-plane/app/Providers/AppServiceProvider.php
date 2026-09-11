@@ -54,6 +54,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Prevent touch() utime warning from crashing Blade view rendering on containerized environments
+        set_error_handler(function ($severity, $message) {
+            if (str_contains($message, 'touch(): Utime failed')) {
+                return true;
+            }
+
+            return false;
+        }, E_WARNING);
+
         $this->configureDefaults();
         $this->hentikanPenerusanLogKeOtel();
 

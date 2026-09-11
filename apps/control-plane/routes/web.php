@@ -18,6 +18,7 @@ use App\Http\Controllers\Organization\WorkspaceContextController;
 use App\Http\Controllers\Provider\AppCatalogController;
 use App\Http\Controllers\Provider\AppServiceCredentialController;
 use App\Http\Controllers\Provider\IdentityMonitorController;
+use App\Http\Controllers\ReferenceData\AddressHierarchy\AddressSetupController;
 use App\Http\Controllers\ReferenceData\UnitOfMeasureController;
 use App\Http\Controllers\Reporting\ReportController;
 use App\Http\Controllers\Reporting\ReportExportController;
@@ -128,6 +129,55 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/number-sequences', [NumberSequenceController::class, 'index'])->name('number-sequences.index');
     Route::patch('settings/number-sequences/{sequence}', [NumberSequenceController::class, 'update'])->name('number-sequences.update');
     Route::get('settings/fiscal-calendars', [FiscalCalendarController::class, 'index'])->name('fiscal-calendars.index');
+    Route::get('settings/address-setup', [AddressSetupController::class, 'index'])->name('address-setup.index');
+    Route::get('settings/address setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
+    Route::get('settings/address_setup', fn (Request $r) => redirect('/settings/address-setup?'.http_build_query($r->query())));
+    // Countries
+    Route::post('settings/address-setup/countries', [AddressSetupController::class, 'storeCountry'])->name('address-setup.countries.store');
+    Route::delete('settings/address-setup/countries/{code}', [AddressSetupController::class, 'destroyCountry'])->name('address-setup.countries.destroy');
+    // Provinces
+    Route::post('settings/address-setup/provinces', [AddressSetupController::class, 'storeProvince'])->name('address-setup.provinces.store');
+    Route::delete('settings/address-setup/provinces/{province}', [AddressSetupController::class, 'destroyProvince'])->name('address-setup.provinces.destroy');
+    // Regencies
+    Route::post('settings/address-setup/regencies', [AddressSetupController::class, 'storeRegency'])->name('address-setup.regencies.store');
+    Route::delete('settings/address-setup/regencies/{regency}', [AddressSetupController::class, 'destroyRegency'])->name('address-setup.regencies.destroy');
+    // Districts
+    Route::post('settings/address-setup/districts', [AddressSetupController::class, 'storeDistrict'])->name('address-setup.districts.store');
+    Route::delete('settings/address-setup/districts/{district}', [AddressSetupController::class, 'destroyDistrict'])->name('address-setup.districts.destroy');
+    // Villages
+    Route::post('settings/address-setup/villages', [AddressSetupController::class, 'storeVillage'])->name('address-setup.villages.store');
+    Route::delete('settings/address-setup/villages/{village}', [AddressSetupController::class, 'destroyVillage'])->name('address-setup.villages.destroy');
+    // Streets (RT/RW)
+    Route::post('settings/address-setup/streets', [AddressSetupController::class, 'storeStreet'])->name('address-setup.streets.store');
+    Route::delete('settings/address-setup/streets/{street}', [AddressSetupController::class, 'destroyStreet'])->name('address-setup.streets.destroy');
+    // Buildings (Gedung/Unit/Lantai)
+    Route::post('settings/address-setup/buildings', [AddressSetupController::class, 'storeBuilding'])->name('address-setup.buildings.store');
+    Route::delete('settings/address-setup/buildings/{building}', [AddressSetupController::class, 'destroyBuilding'])->name('address-setup.buildings.destroy');
+    // Postal Codes
+    Route::post('settings/address-setup/postal-codes', [AddressSetupController::class, 'storePostalCode'])->name('address-setup.postal-codes.store');
+    Route::delete('settings/address-setup/postal-codes/{postalCode}', [AddressSetupController::class, 'destroyPostalCode'])->name('address-setup.postal-codes.destroy');
+    // Group of houses
+    Route::post('settings/address-setup/group-of-houses', [AddressSetupController::class, 'storeGroupOfHouses'])->name('address-setup.group-of-houses.store');
+    Route::delete('settings/address-setup/group-of-houses/{groupOfHouse}', [AddressSetupController::class, 'destroyGroupOfHouses'])->name('address-setup.group-of-houses.destroy');
+    // Land plots
+    Route::post('settings/address-setup/land-plots', [AddressSetupController::class, 'storeLandPlot'])->name('address-setup.land-plots.store');
+    Route::delete('settings/address-setup/land-plots/{landPlot}', [AddressSetupController::class, 'destroyLandPlot'])->name('address-setup.land-plots.destroy');
+    // Parameters
+    Route::post('settings/address-setup/parameters', [AddressSetupController::class, 'storeParameters'])->name('address-setup.parameters.store');
+    // Hierarchy Lookups (Bottom-Up and Top-Down)
+    Route::get('settings/address-setup/lookup/bottom-up', [AddressSetupController::class, 'lookupBottomUp'])->name('address-setup.lookup.bottom-up');
+    Route::get('settings/address-setup/lookup/top-down', [AddressSetupController::class, 'lookupTopDown'])->name('address-setup.lookup.top-down');
+    Route::get('settings/address-setup/timezone/resolve', [AddressSetupController::class, 'resolveTimezone'])->name('address-setup.timezone.resolve');
+    Route::get('settings/address-setup/divisions', [AddressSetupController::class, 'getDivisions'])->name('address-setup.divisions');
+    Route::get('settings/address-setup/villages-paginated', [AddressSetupController::class, 'getVillagesPaginated'])->name('address-setup.villages.paginated');
+    // External Codes & Translations
+    Route::get('settings/address-setup/external-codes', [AddressSetupController::class, 'getExternalCodes'])->name('address-setup.external-codes.index');
+    Route::post('settings/address-setup/external-codes', [AddressSetupController::class, 'storeExternalCode'])->name('address-setup.external-codes.store');
+    Route::delete('settings/address-setup/external-codes/{id}', [AddressSetupController::class, 'destroyExternalCode'])->name('address-setup.external-codes.destroy');
+    Route::get('settings/address-setup/translations', [AddressSetupController::class, 'getTranslations'])->name('address-setup.translations.index');
+    Route::post('settings/address-setup/translations', [AddressSetupController::class, 'storeTranslation'])->name('address-setup.translations.store');
+    Route::delete('settings/address-setup/translations/{id}', [AddressSetupController::class, 'destroyTranslation'])->name('address-setup.translations.destroy');
+
     // Laporan cetak/ekspor untuk semua app; lihat docs/dev/23-document-rendering.md.
     Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index');
     Route::get('reports/exports', [ReportExportController::class, 'page'])->name('report-exports.index');
