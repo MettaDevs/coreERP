@@ -3,14 +3,10 @@
 return [
     // Canonical official apps. Entitlements and module installations reference these IDs.
     'database' => 'core_erp',
-    // Profile dan placement satu deployment. Keduanya dicatat pada `tenant_deployments` saat
-    // usaha mendaftar, dan dibaca jalur urutan nomor. `pull_images` dan `release_root` dibuang
-    // pada 10 September 2026 bersama job penempatan container yang menjadi satu-satunya
-    // pembacanya.
-    'deployment' => [
-        'profile' => env('COREERP_DEPLOYMENT_PROFILE', 'pooled'),
-        'placement' => env('COREERP_DEPLOYMENT_PLACEMENT', 'pooled-primary'),
-    ],
+    // `deployment` dibuang pada 11 September 2026 bersama satu-satunya pembacanya: pendaftaran
+    // usaha kini menulis baris `environments`, bukan `tenant_deployments`. Sebelumnya `pull_images`
+    // dan `release_root` dibuang dengan alasan yang sama. Tempat kerja sebuah tenant sekarang fakta
+    // di database, bukan setelan proses — lihat `docs/todo/environment-dan-pusat-admin`.
     'provider' => [
         'email' => env('COREERP_PROVIDER_EMAIL', 'provider@coreerp.local'),
         'password' => env('COREERP_PROVIDER_PASSWORD'),

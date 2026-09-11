@@ -52,7 +52,13 @@ class BusinessOnboardingTest extends TestCase
         $this->assertDatabaseCount('organizations', 0);
         $this->assertDatabaseHas('tenant_memberships', ['system_role' => 'owner', 'status' => 'active']);
         $this->assertDatabaseCount('tenant_app_entitlements', 1);
-        $this->assertDatabaseCount('tenant_deployments', 1);
+        $this->assertDatabaseCount('environments', 1);
+        $this->assertDatabaseHas('environments', [
+            'tenant_id' => $tenantId,
+            'kind' => 'production',
+            'outbound_allowed' => true,
+        ]);
+        $this->assertDatabaseHas('environment_members', ['status' => 'active']);
         $this->assertDatabaseHas('outbox_events', [
             'tenant_id' => $tenantId,
             'type' => 'core.tenant.provisioned.v1',

@@ -7,6 +7,7 @@ use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Actions\ReferenceData\ProvisionDefaultUnitsOfMeasure;
 use App\Models\AppDataPolicy;
 use App\Models\Client;
+use App\Models\Environment;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\SecurityDuty;
@@ -20,7 +21,6 @@ use App\Support\Modules\PengirimEventModul;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use LogicException;
 
 class RegisterBusiness
 {
@@ -68,28 +68,32 @@ class RegisterBusiness
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            $profile = (string) config('coreerp.deployment.profile');
-            $placement = (string) config('coreerp.deployment.placement');
-            if (! in_array($profile, ['pooled', 'isolated'], true) || ! preg_match('/^[a-z0-9][a-z0-9-]{0,119}$/', $placement)) {
-                throw new LogicException('CoreERP deployment profile or placement is invalid.');
-            }
-            if ($profile === 'isolated') {
-                $placement .= '-'.Str::lower($tenant->id);
-            }
-            DB::table('tenant_deployments')->insert([
-                'id' => (string) Str::ulid(),
+            // Tempat kerja pertama tenant ini, dan satu-satunya yang boleh berjenis `production`.
+            // `database_name` kosong berarti ia ikut database koneksi bawaan — keadaan pooled dan
+            // on-prem, dan di sana ia permanen.
+            $environment = Environment::create([
                 'tenant_id' => $tenant->id,
-                'profile' => $profile,
-                'placement' => $placement,
+                'kind' => 'production',
+                'name' => 'Production',
+                'slug' => $slug,
+                'database_name' => null,
                 'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
+                'outbound_allowed' => true,
             ]);
             $membership = TenantMembership::create([
                 'tenant_id' => $tenant->id,
                 'user_id' => $user->id,
                 'system_role' => 'owner',
                 'status' => 'active',
+            ]);
+            // Indeks navigasi: ia menentukan environment mana yang muncul di pengalih, bukan apa
+            // yang boleh dikerjakan di dalamnya. Hak tetap berasal dari membership di atas.
+            DB::table('environment_members')->insert([
+                'environment_id' => $environment->id,
+                'user_id' => $user->id,
+                'status' => 'active',
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             foreach ($appIds as $appId) {
