@@ -465,6 +465,9 @@ class AppCatalogRequest extends FormRequest
         ])->all());
     }
 
+    /**
+     * @return list<array{code: string, name: string, scope: string, decision_context_schema: array<string, mixed>}>
+     */
     public function workflowTypesPayload(): array
     {
         return array_values($this->collect('workflow_types')->map(fn (array $type): array => [
