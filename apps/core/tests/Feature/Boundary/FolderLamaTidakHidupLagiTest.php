@@ -5,94 +5,116 @@ declare(strict_types=1);
 namespace Tests\Feature\Boundary;
 
 use FilesystemIterator;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
 /**
- * Tidak boleh ada berkas yang hidup lagi di folder yang sudah dipindah.
+ * Kode Core tidak boleh mendarat di folder aplikasi lain.
  *
- * Penjaga ini lahir dari satu pemindahan — `apps/control-plane` menjadi `apps/core` — tetapi
- * yang dijaganya bukan pemindahan itu. Ia menjaga bentuk kegagalannya, dan bentuk itu berulang
- * pada setiap pemindahan berikutnya. Karena itu daftarnya ada di `folderYangSudahDipindah()`:
- * pemindahan berikutnya cukup menambah satu baris di sana.
+ * Penjaga ini lahir dari satu pemindahan — `apps/control-plane` menjadi `apps/core` — dan bentuk
+ * yang dijaganya ini: kegagalannya **tidak menghasilkan konflik**. Git hanya melaporkan konflik
+ * untuk berkas yang diubah di dua sisi; berkas yang **ditambahkan** tidak pernah bertabrakan
+ * dengan folder yang dihapus. Sebuah cabang yang dibuat sebelum pemindahan, lalu di-merge
+ * sesudahnya, menaruh berkas barunya di path lama — dan merge-nya hijau, tanpa satu pun
+ * peringatan.
  *
- * Penjaga ini ada karena kegagalannya **tidak menghasilkan konflik**. Git hanya melaporkan
- * konflik untuk berkas yang diubah di dua sisi; berkas yang **ditambahkan** tidak pernah
- * bertabrakan dengan folder yang dihapus. Jadi sebuah cabang yang dibuat sebelum pemindahan,
- * lalu di-merge sesudahnya, akan menaruh berkas barunya di path lama — folder yang sudah tidak
- * ada — dan merge-nya hijau, tanpa satu pun peringatan.
- *
- * Akibatnya repo diam-diam punya dua folder aplikasi: satu yang dijalankan semua orang, dan
- * satu lagi yang tidak pernah dimuat autoloader, tidak pernah ikut image edisi, dan tidak
- * pernah dijalankan test mana pun. Kode di dalamnya terlihat ada, terbaca di editor, dan tidak
+ * Akibatnya repo diam-diam punya kode yang tidak pernah dimuat autoloader, tidak pernah ikut image
+ * edisi, dan tidak pernah dijalankan test mana pun. Ia terlihat ada, terbaca di editor, dan tidak
  * pernah berjalan.
  *
- * Tidak ada pemeriksaan lain yang menangkapnya: PHPStan hanya menganalisa jalur yang terdaftar,
- * penjaga namespace hanya membaca berkas yang memang dipindainya, dan pemeriksa kebocoran edisi
- * menghitung folder aplikasi **di dalam image**, bukan di dalam repo — folder lama yang hidup
- * lagi tidak pernah tersalin ke sana, jadi justru tidak pernah terlihat olehnya.
+ * ## Kenapa bentuknya berubah pada 12 September 2026
  *
- * **Yang diperiksa isinya, bukan keberadaan foldernya.** Windows menolak menghapus direktori
- * yang masih dipegang proses lain — editor atau kolam PHP yang menunjuk ke sana — sehingga
- * kerangka kosong bisa tertinggal di mesin pengembang berjam-jam setelah isinya pindah. Kerangka
- * kosong itu tidak berbahaya; berkas di dalamnya yang berbahaya. Menjaga yang kedua membuat
- * penjaga ini berarti tanpa menjadi merah palsu.
+ * Versi pertama penjaga ini menuntut folder `apps/control-plane` **kosong**, karena isinya sudah
+ * pindah ke `apps/core`. Nama itu kemudian **dipakai ulang** — konsol operator vendor menempatinya,
+ * dan kali ini namanya memang benar: isinya control plane sungguhan, bukan runtime Core yang salah
+ * nama.
+ *
+ * Sejak saat itu tuntutan "folder ini harus kosong" menjadi merah selamanya tanpa ada yang salah.
+ * Membuangnya begitu saja akan melepas risikonya sekaligus; yang dilakukan di sini adalah
+ * **mempersempit** tuntutannya menjadi yang masih benar: folder itu boleh berisi kode konsol, dan
+ * tidak boleh berisi kode Core.
+ *
+ * Yang membedakan keduanya namespace — konsol memakai `ControlPlane\`, Core memakai `App\` — dan
+ * itu tanda yang tidak dapat dipalsukan tanpa sengaja: berkas Core yang mendarat di sana akan
+ * membawa `namespace App;` apa adanya.
+ *
+ * Mekanisme lama tidak dihapus dari ingatan: pemindahan folder berikutnya yang **tidak** dipakai
+ * ulang namanya cukup menirukan versi pertama penjaga ini dari riwayat git — menuntut foldernya
+ * kosong, dan menyebutkan ke mana isinya pindah.
  */
 class FolderLamaTidakHidupLagiTest extends TestCase
 {
-    /**
-     * Folder yang sudah dipindah, beserta tempat isinya sekarang.
-     *
-     * Pasangan kedua bukan hiasan: pesan galat yang hanya berkata "folder ini tidak boleh berisi
-     * apa pun" memaksa pembacanya menebak ke mana isinya harus dipindahkan, dan tebakan itu
-     * berakhir dengan berkas yang dihapus alih-alih dipindah.
-     *
-     * @return array<string, array{string, string}>
-     */
-    public static function folderYangSudahDipindah(): array
-    {
-        return [
-            'apps/control-plane' => ['apps/control-plane', 'apps/core'],
-        ];
-    }
+    /** Folder aplikasi lain di repo ini, beserta namespace yang sah di dalamnya. */
+    private const KONSOL = 'apps/control-plane';
 
-    #[DataProvider('folderYangSudahDipindah')]
-    public function test_tidak_ada_berkas_yang_hidup_lagi(string $lama, string $baru): void
+    public function test_berkas_milik_core_tidak_mendarat_di_konsol(): void
     {
         // tests/Feature/Boundary -> tests -> core -> apps -> akar repo
-        $folder = dirname(__DIR__, 5).'/'.$lama;
+        $folder = dirname(__DIR__, 5).'/'.self::KONSOL;
 
-        if (! is_dir($folder)) {
-            $this->addToAssertionCount(1);
+        $this->assertDirectoryExists(
+            $folder,
+            'Folder konsol tidak ada. Penjaga ini tidak dapat membuktikan apa pun tanpa subjek — '
+            .'kalau konsolnya memang dipindah lagi, perbarui penjaga ini bersamaan.'
+        );
 
-            return;
+        $tersangka = [];
+        $diperiksa = 0;
+
+        foreach ($this->berkasPhp($folder) as $jalur) {
+            $diperiksa++;
+            $isi = (string) file_get_contents($jalur);
+
+            // Dicocokkan pada deklarasi namespace-nya, bukan pada kemunculan kata `App` di mana
+            // pun: konsol memang menyebut kelas Core di dalam komentar dan pesan galat, dan
+            // pencocokan yang lebih longgar akan merah karena prosa.
+            if (preg_match('/^\s*namespace\s+App\s*[;\\\\]/m', $isi) === 1) {
+                $tersangka[] = substr($jalur, strlen($folder) + 1);
+            }
         }
 
-        $berkas = [];
+        $this->assertGreaterThan(
+            10,
+            $diperiksa,
+            'Hanya '.$diperiksa.' berkas PHP yang terbaca di konsol. Pemindaian ini hampir pasti '
+            .'salah alamat, dan pemeriksa yang tidak menemukan subjek tidak dapat dibedakan dari '
+            .'pemeriksa yang tidak menemukan pelanggaran.'
+        );
+
+        $this->assertSame([], $tersangka, implode("\n", [
+            'Ada berkas bernamespace `App\\` di dalam `'.self::KONSOL.'`, folder milik konsol operator.',
+            '',
+            'Ini hampir pasti bukan disengaja: sebuah cabang yang dibuat sebelum `apps/control-plane`',
+            'menjadi `apps/core` di-merge tanpa konflik, dan berkas Core-nya mendarat di path lama —',
+            'yang kini ditempati aplikasi lain. Ia tidak dimuat autoloader mana pun, tidak ikut image',
+            'edisi, dan tidak pernah dijalankan test mana pun.',
+            '',
+            'Yang harus dilakukan: pindahkan tiap berkas ke path yang setara di bawah `apps/core/`.',
+            'Jangan menghapus begitu saja — isinya kode yang seseorang tulis dan kira sudah berjalan.',
+        ]));
+    }
+
+    /** @return iterable<string> */
+    private function berkasPhp(string $folder): iterable
+    {
         $isi = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($folder, FilesystemIterator::SKIP_DOTS),
             RecursiveIteratorIterator::LEAVES_ONLY
         );
 
         foreach ($isi as $entri) {
-            $berkas[] = substr($entri->getPathname(), strlen($folder) + 1);
-            if (count($berkas) >= 10) {
-                break;
+            $jalur = str_replace('\\', '/', $entri->getPathname());
+
+            // `vendor/` dan `node_modules/` memang penuh namespace orang lain, dan `storage/`
+            // memuat view Blade terkompilasi yang menyalin jalur berkas aslinya.
+            if (str_contains($jalur, '/vendor/') || str_contains($jalur, '/node_modules/') || str_contains($jalur, '/storage/')) {
+                continue;
+            }
+
+            if (str_ends_with($jalur, '.php')) {
+                yield $jalur;
             }
         }
-
-        $this->assertSame([], $berkas, implode("\n", [
-            sprintf('Ada berkas yang hidup lagi di `%s`, folder yang sudah dipindah ke `%s`.', $lama, $baru),
-            '',
-            'Ini hampir pasti bukan disengaja: sebuah cabang yang dibuat sebelum pemindahan di-merge',
-            'tanpa konflik, dan berkas barunya mendarat di path lama. Ia tidak dimuat autoloader, tidak',
-            'ikut image edisi, dan tidak pernah dijalankan test mana pun.',
-            '',
-            sprintf('Yang harus dilakukan: pindahkan tiap berkas ke path yang setara di bawah `%s/`, lalu', $baru),
-            'hapus foldernya. Jangan menghapus begitu saja — isinya kode yang seseorang tulis dan kira',
-            'sudah berjalan.',
-        ]));
     }
 }

@@ -178,6 +178,11 @@ class EnvironmentRegistryTest extends TestCase
             'operation' => $jenis,
             'status' => 'running',
             'started_at' => now(),
+            // Wajib sejak constraint `environment_operations_berjalan_bertenggat`: operasi berjalan
+            // harus membawa tenggatnya. Kunci yang dipegang selamanya bukan kunci melainkan
+            // kebuntuan — proses yang mati keras akan menolak percobaan ulang yang merupakan
+            // satu-satunya pemulihan yang desain ini izinkan.
+            'lease_until' => now()->addMinutes(30),
         ]);
 
         return $id;
