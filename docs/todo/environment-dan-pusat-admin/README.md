@@ -500,6 +500,124 @@ datanya sendiri. Satu keputusan ini yang menyelamatkan jalur edisi on-prem **dan
 yang sudah ada; perilaku multi-database diuji suite kecil tersendiri yang benar-benar membuat dan
 membuang database.
 
+### Entitlement milik tenant, pemasangan milik lingkungan
+
+Tabel di atas sudah menempatkan "catatan pemasangan module" di sisi environment sejak halaman ini
+ditulis. Kodenya tidak mengikutinya, dan selisih itu baru terlihat ketika pemilik produk bertanya
+apakah membuat lingkungan sudah membuat database dan menjalankan seeder. Jawabannya waktu itu:
+databasenya ya, seedernya tidak — `environment:siapkan` hanya menjalankan migration Core.
+
+Akibatnya sebuah demo lahir dengan skema Core lengkap dan **nol tabel module**. Bukan kosong,
+hilang. Dan karena pemasangan module tercatat per tenant, sebuah tenant dengan produksi dan demo
+hanya punya satu baris untuk pertanyaan yang punya dua jawaban — termasuk `seeded_at`, kolom yang
+seluruh alasan keberadaannya mencegah data awal terisi dua kali. Lingkungan kedua akan dilewati
+seedernya karena lingkungan pertama sudah menandainya.
+
+#### Dua tingkat, dan Microsoft memisahkannya juga
+
+| | Milik | Menjawab |
+| --- | --- | --- |
+| Entitlement | Tenant | App apa yang **boleh** ada |
+| Pemasangan | Lingkungan | App apa yang **benar-benar** ada, di tempat kerja yang mana |
+
+Business Central menyebutnya langsung: *"These apps are unique per environment"*, dan *"A Business
+Central environment is built as a collection of apps"* — sementara lisensinya justru di tenant:
+*"Each Microsoft Entra tenant that buys a Business Central online license automatically gets some
+environments."*
+
+Power Platform memberi nama pada tingkat pertengahannya, `applicationPackages`: daftar app yang
+boleh dipasang, dihitung dari entitlement tenant, tetapi ditanyakan **per environment** —
+*"we retrieve the list of Applications you can install to a specific environment"*. Statusnya pun
+dieja terpisah: `Enabled` berarti *"ready to be installed in your environments"*, `Configured`
+berarti ia sudah dipasang di salah satunya.
+
+#### Keputusan: lingkungan mewarisi entitlement tenantnya, tanpa kecuali
+
+Microsoft membolehkan dua environment dalam satu tenant punya daftar terpasang yang berbeda. **Kita
+tidak.** Tidak ada isian app pada layar pembuatan lingkungan, dan tidak ada entitlement per
+lingkungan. Yang dibeli tenant, itu yang dipasang di setiap tempat kerjanya.
+
+Alasannya bukan bahwa Microsoft salah, melainkan bahwa perbedaannya belum membeli apa pun pada skala
+5-10 prospek per minggu — sementara ongkosnya nyata: satu daftar lagi yang bisa menyimpang dari
+tenantnya, dan satu layar lagi yang harus menjelaskan kenapa demo pelanggan tidak memuat produk yang
+ia beli.
+
+Yang **tidak** boleh ikut disederhanakan adalah catatannya. Pemasangan tetap fakta per lingkungan
+meski daftarnya selalu sama, karena migrationnya memang berjalan atau tidak berjalan di database
+yang berbeda.
+
+#### Kenapa tanpa kolom `environment_id`
+
+`core_module_installations` tidak diberi kolom baru. Ia justru **tinggal di database lingkungan itu
+sendiri**, berdampingan dengan riwayat migration yang ia gambarkan. Tiga alasan, dan yang kedua yang
+menentukan:
+
+1. `environment:salin` menyalin database secara fisik, jadi catatan pemasangan ikut apa adanya tanpa
+   satu baris kode pun — dan perintah itu memang **sudah** membandingkan jumlahnya sesudah restore.
+   Rancangan ini sudah dianut Copy sebelum ditulis di sini.
+2. `seeded_at` dan riwayat migration harus sepakat. Bila catatannya di database pusat sementara
+   tabelnya di database lingkungan, sebuah restore dari cadangan yang lebih tua membuat keduanya
+   berselisih diam-diam: catatannya bilang sudah disemai, tabelnya kosong, dan seed tidak pernah
+   berjalan lagi. Satu database membuat keduanya berhasil atau gagal bersama.
+3. Kolom baru pada kunci gabungan berarti delapan tempat yang hari ini bertanya `(tenant, module)`
+   harus ikut menyebut lingkungan — delapan kesempatan melewatkan satu, dan yang terlewat tidak
+   berbunyi: ia menampilkan menu module yang tabelnya tidak ada.
+
+#### Yang berubah
+
+- **`KoneksiLingkungan`** — satu tempat yang menjawab "database mana", menggantikan salinan ketiga
+  dari `konfigurasiDasar`/`siapkanKoneksi`. Ia memindahkan `database.default` untuk selama satu
+  blok, dan **sekaligus memasang `coreerp.control_connection`** ke koneksi semula. Yang kedua itu
+  yang menahan `users`, `tenants`, `clients`, dan registry `environments` tetap di pusat selama blok
+  berjalan — tanpa itu, seeder module yang membaca `Tenant` akan mencarinya di database sandbox.
+  Ini pemakaian sungguhan pertama trait `MilikPusat`; sebelumnya ia memang tidak melakukan apa-apa.
+- **`InstallModule`** menerima lingkungan, dan seluruh badannya berjalan di dalam blok itu. Menyebut
+  lingkungan **opsional**; kosong berarti lingkungan produksi tenant itu — yang `database_name`-nya
+  hari ini kosong, yaitu database bawaan. Jalur tanpa penyebutan karena itu berjalan persis seperti
+  sebelumnya, dan pendaftaran mandiri tidak berubah satu query pun.
+- **`PasangModulYangDibeli`** — membaca entitlement yang berlaku sekarang, menyaringnya ke module
+  yang benar-benar ada di edisi ini, lalu memasangnya dalam urutan topologis dari
+  `AppDependencyGraph`. Tanpa urutan itu, daftar yang sama kadang berhasil dan kadang gagal
+  tergantung urutan barisnya tertulis di database.
+- **`environment:siapkan`** memperoleh dua langkah: `catat-database` sebelum module dipasang — karena
+  pemasangan menanyakan `database_name` untuk tahu ke mana ia menulis — lalu `pasang-module`.
+  Statusnya naik ke `active` **sesudah** keduanya. Kegagalan memasang satu module tidak ditelan:
+  lingkungan setengah terisi harus menjadi tempat yang tidak dapat dimasuki.
+- **`module:install`, `module:disable`, `module:uninstall`** memperoleh `--lingkungan=`. Id yang
+  disebut tetapi tidak ada dijawab galat, bukan diam-diam jatuh ke produksi.
+- **`environment_operations.requested_by`** akhirnya terisi untuk penyiapan dari layar. Sebelumnya
+  kolom "Oleh" berbunyi "Sistem" — jawaban yang benar untuk penjadwal, dan jawaban yang salah untuk
+  tombol yang baru saja ditekan manusia.
+
+#### Dua cacat yang hanya muncul saat dijalankan, bukan saat diuji
+
+Keduanya berbentuk sama dengan cacat header token yang melahirkan `KontrakPerintahKeCoreTest`:
+**test yang subjeknya dipilih penulisnya akan setuju dengan asumsi penulisnya.**
+
+1. **Demo yang belum punya database meminjam pemasangan milik produksi.** Keduanya berbagi database
+   bawaan dan penyaringnya hanya `tenant_id`, sehingga layar rincian menampilkan "Human Resources —
+   Terpasang" tepat di bawah kalimat yang menyatakan lingkungan itu belum memuat apa pun. Aturannya
+   sekarang eksplisit: `database_name` kosong berarti database bawaan **hanya** untuk lingkungan
+   produksi; yang lain berarti belum punya database sama sekali.
+2. **Atribusi operator hilang di perbatasan tipe.** `Artisan::call()` meneruskan `int` apa adanya
+   lewat `ArrayInput`, sementara perintahnya hanya menerima `string` — jadi penyiapan lewat tombol
+   berhasil sepenuhnya sambil mencatat "Sistem". Testnya ikut setuju karena ia memanggil dengan
+   `(string) $id`. Yang menemukannya satu panggilan `curl` sungguhan; testnya kini memakai bentuk
+   yang benar-benar dikirim pemanggilnya.
+
+#### Tombolnya, dan alasan lama yang sudah tidak berlaku
+
+Layar rincian lingkungan dulu hanya **menampilkan** perintah `environment:siapkan` untuk disalin ke
+terminal. Alasannya ditulis apa adanya di sana: arah konsol ke Core belum punya jalur autentikasi.
+Alasan itu gugur ketika `HanyaPusatAdmin` lahir bersama pembuatan pelanggan — token yang sama persis
+kini menjaga `POST /api/internal/v1/environments/{id}/siapkan`.
+
+Sinkron, bukan lewat antrean, dan itu keputusan bukan kemalasan: pekerja antrean yang mati di tengah
+meninggalkan lingkungan `degraded` yang tidak dilihat siapa pun sampai ada yang membuka layarnya;
+permintaan HTTP yang mati di tengah meninggalkan keadaan yang sama, tetapi orangnya sedang menatap
+layar ketika itu terjadi. Yang membuatnya sah adalah dua sifat yang sudah ada — kunci operasi punya
+masa berlaku, dan perintahnya aman diulang.
+
 ## Cara sebuah permintaan memilih databasenya
 
 Middleware pemilih environment berjalan **sesudah** `auth` dan **sebelum** middleware Inertia.
@@ -1323,17 +1441,21 @@ merutekan sebuah permintaan ke sana — itu sisa Irisan 2.
 
 ### `[~]` Irisan 2 — environment demo
 
-**Sudah:** `environment:siapkan` — pembuatan database, migration ke dalamnya, sidik skema, dan
-masa berlaku operasi yang membuat penyiapan mati dapat diambil alih.
+**Sudah:** `environment:siapkan` — pembuatan database, migration ke dalamnya, sidik skema, masa
+berlaku operasi yang membuat penyiapan mati dapat diambil alih, dan **pemasangan module yang dibeli
+tenantnya** beserta data awalnya.
 
 **Belum:** middleware pemilih environment beserta penjaga koneksinya, scheduler yang memutari
 seluruh environment, serta pengalih dan spanduk di sisi pelanggan.
 
-Bagiannya yang sudah mendarat sengaja **lebih sempit** daripada tujuh langkah
-`environment:provision` di atas: pendaftaran manifest, entitlement, role Owner, dan pemasangan
-module tidak ditarik ke sana. Halaman ini sendiri mencatat bahwa langkah kelima **gagal pada
-percobaan kedua** sebelum dua perbaikan kecilnya dikerjakan; menariknya masuk sekarang akan merusak
-persis sifat aman-diulang yang testnya buktikan.
+Yang terakhir dari daftar "sudah" itu baru mendarat sesudah pertanyaan pemilik produk, dan alasan ia
+sempat tertinggal layak dicatat: bagian irisan ini sengaja ditarik **lebih sempit** daripada tujuh
+langkah `environment:provision` — pendaftaran manifest, entitlement, dan role Owner memang tidak
+ditarik ke sana, karena semuanya milik kelahiran tenant dan bukan milik kelahiran tempat kerjanya.
+Pemasangan module ikut tertinggal bersama mereka, padahal ia justru satu-satunya dari daftar itu yang
+**per lingkungan**. Menyempitkan scope memotong sesuatu yang seharusnya ikut, dan tidak ada satu pun
+test yang berbunyi — karena seluruh test pemasangan module berjalan di database bawaan, satu-satunya
+tempat yang memang sudah terisi.
 
 ### `[x]` Irisan 2b — `apps/pusat-admin` menjadi `apps/control-plane`
 
@@ -1468,11 +1590,17 @@ sungguhan. Jalur merah ketiga yang halaman ini wajibkan terbukti: alur yang sama
 **Belum:** template demo lewat `CREATE DATABASE ... TEMPLATE`, deklarasi pelucutan per module,
 penyebaran migration beserta sidik skemanya, pemeriksaan kuota, dan jendela di luar jam sibuk.
 
-Satu kembaran yang sengaja dibiarkan dan dicatat di sini supaya tidak terlupa: `buatDatabase`,
-`siapkanKoneksi`, dan `konfigurasiDasar` ada di `SiapkanLingkungan` maupun `SalinLingkungan`.
-Bentuknya sudah menyimpang — tanda tangannya berbeda — jadi penyatuannya refactor tersendiri dengan
-risiko nyata di dua perintah yang berat testnya. Yang berbahaya sudah disatukan: protokol kunci
-operasi, lewat trait `MemegangOperasiLingkungan`.
+Kembaran `buatDatabase`/`siapkanKoneksi`/`konfigurasiDasar` **sebagian sudah hilang**, dan bukan
+karena refactor yang diniatkan: pemasangan module membutuhkan jawaban "database mana" sebagai pemanggil
+ketiga, dan salinan ketiga adalah salinan yang pasti menyimpang. `SiapkanLingkungan` sekarang
+memanggil `KoneksiLingkungan`.
+
+`SalinLingkungan` dan `environment:hapus-permanen` masih memegang salinannya sendiri, dan itu
+dibiarkan dengan sadar: keduanya memakai koneksi pemelihara untuk pernyataan yang berbeda
+(`pg_dump`, `DROP DATABASE`), tanda tangannya sudah menyimpang, dan menyatukannya sekarang berarti
+menyentuh dua perintah yang paling berat testnya demi nol perubahan perilaku. Yang berbahaya sudah
+disatukan dua kali sekarang: protokol kunci operasi lewat `MemegangOperasiLingkungan`, dan pemilihan
+database lewat `KoneksiLingkungan`.
 
 ::: danger Jangan mulai dari Copy
 `Copy` adalah fitur yang terlihat dan alasan orang meminta pekerjaan ini. Tetapi salinan ke dalam
@@ -1517,9 +1645,21 @@ penjaganya sendiri harus dibuktikan dapat merah, bukan dipercaya karena ia hijau
 
 ## Keadaan pada 12 September 2026
 
-Irisan 0 sampai 2b sudah mendarat: rename `apps/core`, registry environment, konsol operator,
-`environment:siapkan`, dan rename `apps/control-plane`. Sebuah lingkungan demo sudah pernah dibuat
-dari layar lalu disiapkan sampai punya databasenya sendiri — terukur 116 tabel, 78 migration.
+Irisan 0 sampai 6 sudah mendarat kecuali yang ditandai `[~]`: rename `apps/core`, registry
+environment, konsol operator, `environment:siapkan`, rename `apps/control-plane`, operator
+melahirkan tenant, alamat dan routing, konversi demo menjadi produksi, serta Copy beserta daur
+hidupnya. Sebuah lingkungan demo sudah pernah dibuat dari layar lalu disiapkan sampai punya
+databasenya sendiri — terukur 116 tabel, 78 migration.
+
+**Pemasangan module ikut turun ke lingkungan pada tanggal yang sama.** Sampai sore itu
+`environment:siapkan` hanya menjalankan migration Core, sehingga tiap demo lahir tanpa satu pun tabel
+module — dan tidak ada test yang berbunyi, karena semuanya berjalan di database bawaan. Yang
+menemukannya sebuah pertanyaan, bukan sebuah alat. Rinciannya di
+[Entitlement milik tenant, pemasangan milik lingkungan](#entitlement-milik-tenant-pemasangan-milik-lingkungan).
+
+Layar rincian lingkungan juga berhenti meminta orang membuka terminal: `environment:siapkan` kini
+punya tombolnya sendiri, lewat `POST /api/internal/v1/environments/{id}/siapkan` dengan token yang
+sama seperti pembuatan pelanggan.
 
 **Halaman ini ditulis ulang pada tanggal ini**, bukan ditambal, karena scope-nya terbukti terlalu
 kecil: ia merancang daftar environment sementara pekerjaan sebenarnya dimulai dari melahirkan
