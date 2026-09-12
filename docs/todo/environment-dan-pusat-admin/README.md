@@ -78,7 +78,7 @@ belum ada", melainkan "pemanggilnya dihitung dan jumlahnya nol".
 | --- | --- |
 | **Operator membuat tenant** | **Nol jalur.** `Tenant::create` hanya punya satu pemanggil di seluruh `apps/core`: `RegisterBusiness`. Dua perintah beban uji menyisipkan baris `tenants` mentah, tetapi tanpa user, membership, role, maupun environment — hasilnya tenant yang tidak bisa dimasuki siapa pun |
 | **Operator membuat admin pertama** | **Mustahil, dan dikunci tiga tempat.** Undangan dilarang memberi owner (`CreateInvitation`: *"Invitations cannot grant owner access"*); layar akses dilarang memindahkannya (`UpdateMembership`); dan `system_role='owner'` hanya pernah ditulis di `RegisterBusiness` |
-| **Satu orang di banyak tenant** | **Diblokir.** `RedeemInvitation` menolak email yang sudah punya akun, dan `JoinInvitationRequest` memaksa `unique:users,email`. Jadi tidak ada jalur menambahkan orang yang sudah punya akun ke tenant kedua |
+| **Satu orang di banyak tenant** | **Sudah ada** sejak 13 September 2026, lewat jalur kedua: orang yang **sudah masuk** menukar kodenya, dan yang dikirim hanya kodenya. Penolakan email-sudah-terdaftar pada jalur tamu sengaja **tetap berdiri** — mencabutnya membuka pengambilalihan akun |
 | **Undangan yang benar-benar terkirim** | **Tidak ada email sama sekali di repo.** Folder `app/Mail` dan `app/Notifications` tidak ada; nol hit untuk `Mailable`, `Mail::`, `->notify(`. Admin menyalin kodenya lalu mengirim sendiri |
 | **Undangan yang aman** | Kodenya **tidak ditujukan ke siapa pun** (tidak ada kolom email), **tidak pernah kedaluwarsa** (`expires_at` ditulis `null` harfiah), dan **dapat dipakai berkali-kali tanpa batas** |
 | **Ubah app setelah tenant lahir** | **Tidak ada.** `entitlements()->create` hanya satu pemanggil. Pelanggan yang ingin menambah app harus disunting langsung di database |
@@ -215,8 +215,22 @@ Satu akun, satu email, banyak keanggotaan. Konsultan, akuntan, dan operator vend
 membutuhkannya, dan pengalihnya **sudah ada** di navbar Core (`workspace-switcher`, tiga tingkat:
 tenant → legal entity → unit kerja).
 
-**Ini menabrak sesuatu yang harus dicabut:** `RedeemInvitation` menolak email yang sudah punya akun.
-Selama penolakan itu berdiri, satu orang di tenant kedua mustahil lewat jalur mana pun.
+**Ini menabrak sesuatu — dan cara mengatasinya bukan yang pertama terpikir.** `RedeemInvitation`
+menolak email yang sudah punya akun, dan selama penolakan itu berdiri sendirian, satu orang di
+tenant kedua mustahil lewat jalur mana pun.
+
+Tetapi **mencabut penolakan itu adalah lubang pengambilalihan akun.** Kode undangan dirancang untuk
+dibagikan — ia bukan bukti identitas. Tanpa penolakan itu, siapa pun yang memegang satu kode dapat
+mengetik email orang lain beserta kata sandi pilihannya sendiri, dan keluar sebagai pemilik akun itu.
+
+Yang dikerjakan karena itu **menambah jalur, bukan mencabut penjaga**: orang yang sudah masuk
+menukar kodenya tanpa mengirim nama, email, maupun kata sandi — identitasnya sudah dibuktikan oleh
+sesinya, dan undangan hanya menambah tempat ia boleh bekerja. Rutenya keluar dari grup `guest`,
+karena selama ia dijaga begitu orang yang sudah punya akun bahkan tidak dapat mencapainya.
+
+Selesai 13 September 2026. Keanggotaan yang sudah aktif ditolak tanpa melahirkan baris kedua, dan
+keanggotaan yang pernah dicabut dihidupkan kembali — mengundang ulang orang yang pernah keluar
+adalah alasan undangan itu ada.
 
 Risikonya ditulis apa adanya: satu akun yang bocor menjangkau banyak pelanggan sekaligus. Itu
 ongkos yang diterima sadar, dan ia yang membuat SSO per tenant menjadi penting kelak.
@@ -1766,8 +1780,8 @@ satu jalur yang dipakai dua pintu** — bukan disalin.
 Tiga hal yang ikut karena alur ini menabraknya:
 
 - kata sandi sementara beserta penanda wajib-ganti pada masuk pertama;
-- penolakan email-sudah-terdaftar pada `RedeemInvitation` **dicabut**, kalau tidak "satu orang
-  banyak tenant" mustahil lewat jalur mana pun;
+- "satu orang banyak tenant" dibuka lewat **jalur kedua** pada `RedeemInvitation` — bukan dengan
+  mencabut penolakan email-sudah-terdaftar, yang justru membuka pengambilalihan akun;
 - jalur menambah dan mencabut entitlement sesudah tenant lahir — hari ini tidak ada sama sekali.
 
 *Terbukti oleh:* satu panggilan sungguhan antara dua aplikasi, bukan tiruan. Operator membuat
