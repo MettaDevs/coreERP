@@ -102,6 +102,20 @@ services:
   # `app:register-manifest` tanpa argumen mendaftarkan **seluruh module yang ada di dalam image
   # ini**, jadi berkas compose tidak perlu tahu edisi mana yang sedang dipasang. Tabel milik module
   # sendiri dibuat saat module dipasang untuk sebuah tenant, lewat jalur pendaftaran usaha.
+  # `environment:upgrade` berjalan sebagai langkah terakhir layanan ini, dan letaknya menentukan.
+  #
+  # Ketiga layanan lain menunggu `core-migrate` selesai, jadi menaruh pembaruan armada di sini
+  # berarti **tiap rilis tertahan sampai seluruh lingkungan selesai dimigrasi** — sebelum satu
+  # permintaan pun dilayani. Itu diterima dengan sadar untuk tahun pertama: pada 5-10 prospek per
+  # minggu, angkanya belasan lingkungan dan jendelanya hitungan menit.
+  #
+  # Yang membuatnya tidak diterima lagi: dua ratus lingkungan, yang berarti jendela pemeliharaan
+  # berpuluh menit bagi semua pelanggan sekaligus pada setiap rilis. Jalan keluarnya sudah
+  # dirancang — jendela per lingkungan beserta pembatalan otomatisnya, dan deployment rings — dan
+  # rinciannya di `docs/todo/environment-dan-pusat-admin/README.md`.
+  #
+  # Sampai hari itu, pembaruan dari layar konsol memakai antrean dan tidak menahan apa pun; yang di
+  # sini khusus untuk rilis, di mana menahan justru yang benar.
   core-migrate:
     image: ${EDITION_IMAGE}
     restart: 'no'
@@ -118,7 +132,8 @@ services:
       - >-
         php artisan migrate --force --no-interaction &&
         php artisan db:seed --force --no-interaction &&
-        php artisan app:register-manifest --no-interaction
+        php artisan app:register-manifest --no-interaction &&
+        php artisan environment:upgrade --no-interaction
 
   core-app:
     image: ${EDITION_IMAGE}

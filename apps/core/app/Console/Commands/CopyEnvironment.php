@@ -1038,7 +1038,29 @@ final class CopyEnvironment extends Command
             ));
         }
 
-        $row = $target->table('migrations')->orderByDesc('id')->first();
+        /*
+         * Diurutkan menurut **nama berkasnya**, bukan menurut `id`.
+         *
+         * `id` adalah urutan penerapan, dan urutan penerapan tidak sama dengan urutan nama begitu
+         * dua migration ditambahkan tidak berurutan — yang terjadi tiap kali dua orang bekerja
+         * paralel dan salah satunya memberi timestamp yang lebih awal. Pada database kerja repo ini
+         * `..._130000_add_satu_salinan...` benar-benar diterapkan **sesudah**
+         * `..._140000_add_purged_at...`.
+         *
+         * Akibatnya sidik dari `id` tidak dapat dibandingkan dengan sidik image, yang diturunkan
+         * dari daftar berkas terurut nama. Dan cacatnya tidak berbunyi: ia melaporkan **setiap**
+         * lingkungan tertinggal, selamanya — jadi operator menekan "Perbarui semua", pekerjaannya
+         * berjalan, dan angkanya tidak pernah bergerak.
+         *
+         * Ditemukan dengan membaca jawaban endpointnya pada data sungguhan, bukan oleh test: test
+         * menerapkan migrationnya berurutan, jadi kedua urutan itu selalu sepakat di sana.
+         *
+         * Yang masih tidak tertangkap sidik ini: migration yang **bolong di tengah**. Nama
+         * terbesarnya sama, jadi ia terbaca mutakhir. Itu diterima karena `migrate` pada pembaruan
+         * berikutnya tetap menerapkan yang bolong — yang salah cuma labelnya, dan cuma sampai
+         * pembaruan berikutnya berjalan.
+         */
+        $row = $target->table('migrations')->orderByDesc('migration')->first();
 
         if (! is_object($row) || ! property_exists($row, 'migration')) {
             throw new RuntimeException('Salinan tidak punya satu baris pun riwayat migration.');

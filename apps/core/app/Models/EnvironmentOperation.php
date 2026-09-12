@@ -24,6 +24,9 @@ use Illuminate\Support\Carbon;
  * @property string $status
  * @property ?string $step
  * @property ?string $failure_message
+ * @property ?int $requested_by
+ * @property Carbon $started_at
+ * @property ?Carbon $finished_at
  * @property ?Carbon $lease_until
  */
 class EnvironmentOperation extends Model
@@ -62,5 +65,19 @@ class EnvironmentOperation extends Model
     public function environment(): BelongsTo
     {
         return $this->belongsTo(Environment::class);
+    }
+
+    /**
+     * Siapa yang meminta operasi ini, bila memang ada manusia di baliknya.
+     *
+     * Kosong berarti penjadwal, dan layar riwayat menuliskannya "Sistem". Membedakan keduanya
+     * adalah seluruh guna kolomnya — riwayat yang menamai penjadwal dan manusia dengan kata yang
+     * sama menghapus satu-satunya keterangan yang membedakan keduanya.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function requester(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'requested_by');
     }
 }

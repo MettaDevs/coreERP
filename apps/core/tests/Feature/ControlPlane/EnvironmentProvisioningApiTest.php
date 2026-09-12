@@ -141,7 +141,27 @@ final class EnvironmentProvisioningApiTest extends TestCase
             ->assertStatus(409);
     }
 
-    /** Pasangan hijaunya: operator yang sungguhan memang sampai ke kolom riwayat. */
+    /**
+     * Pasangan hijaunya: operator yang sungguhan memang sampai ke kolom riwayat.
+     *
+     * Dijalankan lewat `environment:upgrade`, bukan `environment:provision`, dan bedanya bukan
+     * selera. Keduanya menempuh protokol kunci yang sama — `HoldsEnvironmentOperation`, tempat
+     * `requested_by` diisi — tetapi yang kedua **membuat database sungguhan**, dan versi pertama
+     * test ini membayarnya hanya untuk membaca satu kolom.
+     *
+     * Ongkosnya bukan cuma waktu. Pembersihannya (`DROP DATABASE ... WITH (FORCE)`) gagal dengan
+     * *"permission denied to terminate process"* ketika beberapa kelas test berjalan dalam satu
+     * proses: sebuah backend masih menempel pada database itu, dan peran aplikasi tidak boleh
+     * membunuh backend milik peran lain. Test ini karena itu **hijau sendirian dan merah
+     * bersama-sama** — bentuk kegagalan yang paling mahal dicari.
+     *
+     * `environment:upgrade` atas lingkungan yang tinggal di database pusat tidak membuat apa pun,
+     * jadi tidak ada yang perlu dibersihkan sama sekali.
+     *
+     * `int`, bukan `(string)`: itu bentuk yang benar-benar dikirim `Artisan::call()` dari controller
+     * internal, dan versi pertama pembacanya hanya menerima string — sehingga pekerjaannya berhasil
+     * sepenuhnya sambil mencatat "Sistem". Test yang memanggil dengan `(string)` ikut setuju.
+     */
     public function test_a_requester_that_exists_is_recorded_on_its_operation(): void
     {
         $operator = User::create([
@@ -150,62 +170,31 @@ final class EnvironmentProvisioningApiTest extends TestCase
             'password' => bcrypt('rahasia'),
         ]);
 
-        // Bukan lewat HTTP: yang diuji di sini penyambungannya sampai ke baris operasi, dan
-        // menjalankan seluruh penyiapan sungguhan hanya untuk membaca satu kolom berarti membayar
-        // satu database baru per assertion.
-        $environment = $this->environment('provisioning');
+        // `production`: satu-satunya jenis yang memang wajar tinggal di database pusat, dan
+        // karena itu satu-satunya yang dapat diperbarui tanpa membuat database apa pun.
+        $environment = $this->environment('active', 'production');
 
-        // `int`, bukan `(string)`. Itu bentuk yang benar-benar dikirim `Artisan::call()` dari
-        // controller internal, dan versi pertama perintah ini hanya menerima string — sehingga
-        // penyiapan lewat tombol berhasil sepenuhnya sambil mencatat "Sistem". Test yang memanggil
-        // dengan `(string)` ikut setuju dengan cacatnya.
-        $this->artisan('environment:provision', [
+        $this->artisan('environment:upgrade', [
             'environment' => $environment->id,
             '--requested-by' => $operator->id,
-        ])->run();
+        ])->assertExitCode(0);
 
-        $operation = EnvironmentOperation::query()->where('environment_id', $environment->id)->firstOrFail();
+        $operation = EnvironmentOperation::query()->where('environment_id', $environment->id)->sole();
 
         $this->assertSame($operator->id, $operation->requested_by);
-
-        $this->dropDatabase($environment);
     }
 
-    private function environment(string $status): Environment
+    private function environment(string $status, string $kind = 'demo'): Environment
     {
         return Environment::create([
             'tenant_id' => $this->tenant->id,
-            'kind' => 'demo',
+            'kind' => $kind,
             'name' => 'Peragaan',
             'slug' => 'peragaan-'.substr(md5(uniqid('', true)), 0, 8),
             'database_name' => null,
             'status' => $status,
-            'expires_at' => now()->addDays(30),
-            'outbound_allowed' => false,
+            'expires_at' => $kind === 'demo' ? now()->addDays(30) : null,
+            'outbound_allowed' => $kind === 'production',
         ]);
-    }
-
-    /**
-     * Membuang database yang benar-benar dibuat test di atas.
-     *
-     * PDO terpisah karena `DROP DATABASE` dilarang di dalam transaksi, dan `RefreshDatabase`
-     * memegang satu. `WITH (FORCE)` memutus sesi yang masih menempel; tanpa itu satu koneksi yang
-     * lupa ditutup cukup untuk meninggalkan database yatim di mesin siapa pun yang menjalankannya.
-     */
-    private function dropDatabase(Environment $environment): void
-    {
-        $name = $environment->refresh()->database_name;
-
-        if (! is_string($name) || $name === '') {
-            return;
-        }
-
-        DB::purge('environment_provisioning');
-        DB::purge('environment_'.$environment->id);
-
-        config(['database.connections.test_purge' => config('database.connections.'.config('database.default'))]);
-        DB::purge('test_purge');
-        DB::connection('test_purge')->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $name));
-        DB::purge('test_purge');
     }
 }

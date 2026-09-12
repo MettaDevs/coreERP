@@ -57,26 +57,46 @@ trait HoldsEnvironmentOperation
     abstract protected function operationLeaseMinutes(): int;
 
     /**
+     * Siapa yang meminta operasi ini, bila memang ada manusia di baliknya.
+     *
+     * Null untuk perintah yang dijalankan penjadwal atau diketik langsung di terminal — kolom
+     * "Oleh" pada layar riwayat berbunyi "Sistem", dan memang begitulah keadaannya. Menampilkan
+     * "Sistem" untuk tombol yang baru saja ditekan manusia adalah riwayat yang berbohong justru
+     * pada kolom yang ada untuk menjawabnya.
+     *
+     * Perintah yang menyediakan `--requested-by` memperolehnya dari sana tanpa menulis apa pun;
+     * yang tidak menyediakannya tetap null. `hasOption()` diperiksa lebih dulu karena
+     * `getOption()` atas opsi yang tidak dideklarasikan **melempar**, dan melemparnya akan
+     * menjatuhkan operasi yang sebenarnya tidak butuh nama siapa pun.
+     *
+     * `$this->input->getOption()`, bukan `$this->option()`. Keduanya membaca nilai yang sama,
+     * tetapi PHPDoc Laravel menyatakan yang kedua mengembalikan `string|array|bool|null` padahal
+     * `ArrayInput` menyimpan apa pun yang diberikan pemanggilnya apa adanya. Cacatnya sudah nyata
+     * sekali: penyiapan dari tombol berhasil sepenuhnya sambil mencatat "Sistem", dan testnya ikut
+     * setuju karena ia memanggil dengan `(string) $id`. Satu panggilan `curl` yang menemukannya.
+     */
+    protected function requestedBy(): ?int
+    {
+        if (! $this->input->hasOption('requested-by')) {
+            return null;
+        }
+
+        $id = $this->input->getOption('requested-by');
+
+        if (is_int($id)) {
+            return $id;
+        }
+
+        return is_string($id) && $id !== '' && ctype_digit($id) ? (int) $id : null;
+    }
+
+    /**
      * Membuka satu baris operasi, atau menolak karena sudah ada yang berjalan.
      *
      * Tidak ada pemeriksaan "apakah ada yang berjalan" di depannya, dan itu disengaja: pemeriksaan
      * semacam itu hanya memindahkan balapan satu baris ke atas tanpa menutupnya. Barisnya
      * disisipkan apa adanya, dan bentrokan yang muncul diterjemahkan.
      */
-    /**
-     * Siapa yang meminta operasi ini, bila memang ada manusia di baliknya.
-     *
-     * Null bawaannya, dan itu jawaban yang benar untuk perintah yang dijalankan penjadwal atau
-     * diketik langsung di terminal — kolom "Oleh" pada layar riwayat berbunyi "Sistem", dan memang
-     * begitulah keadaannya. Yang menimpanya hanya perintah yang benar-benar dipanggil atas nama
-     * seseorang; menampilkan "Sistem" untuk tombol yang baru saja ditekan manusia adalah riwayat
-     * yang berbohong justru pada kolom yang ada untuk itu.
-     */
-    protected function requestedBy(): ?int
-    {
-        return null;
-    }
-
     protected function openOperation(Environment $environment, string $kind, bool $takeOver = true): ?EnvironmentOperation
     {
         $koneksi = DB::connection((new EnvironmentOperation)->getConnectionName());

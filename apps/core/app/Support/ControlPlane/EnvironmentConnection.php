@@ -216,11 +216,33 @@ class EnvironmentConnection
         return $snapshot;
     }
 
-    /** @param  array<string, mixed>  $snapshot */
+    /**
+     * Memulangkan config, lalu **menutup PDO ke database lingkungan itu**.
+     *
+     * Penutupannya bukan kerapian. Proses yang berumur panjang — pekerja antrean, dan perintah yang
+     * memutari armada — menyentuh satu database lingkungan demi satu, dan tiap koneksi yang tidak
+     * ditutup menetap sebagai backend menganggur di PostgreSQL sampai prosesnya mati. Pada dua ratus
+     * lingkungan itu dua ratus koneksi menganggur dari satu pekerja.
+     *
+     * Ia juga menghalangi hal yang lebih langsung: `DROP DATABASE` menolak selama ada yang menempel,
+     * dan `WITH (FORCE)` hanya boleh membunuh backend milik peran yang sama. Terlihat pertama kali
+     * bukan sebagai kebocoran melainkan sebagai suite test yang menggantung — satu pekerja yang
+     * masih hidup memegang database yang sedang coba dibuang test lain.
+     *
+     * @param  array<string, mixed>  $snapshot
+     */
     private function leave(array $snapshot): void
     {
-        if ($snapshot !== []) {
-            config($snapshot);
+        if ($snapshot === []) {
+            return;
+        }
+
+        $target = config('database.default');
+
+        config($snapshot);
+
+        if (is_string($target) && str_starts_with($target, 'environment_')) {
+            DB::purge($target);
         }
     }
 

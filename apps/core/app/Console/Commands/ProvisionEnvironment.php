@@ -95,35 +95,6 @@ final class ProvisionEnvironment extends Command
         return 30;
     }
 
-    /**
-     * Dua bentuk diterima, dan itu bukan kelonggaran melainkan perbaikan cacat.
-     *
-     * Versi pertama hanya menerima string, karena begitulah bentuknya ketika opsi ini diketik di
-     * terminal. Tetapi pemanggil yang sebenarnya `Artisan::call()` dari controller internal, dan ia
-     * meneruskan **int** apa adanya lewat `ArrayInput`. Akibatnya penyiapan dari tombol tetap
-     * berhasil sepenuhnya sementara kolom "Oleh" pada riwayat berbunyi "Sistem" — kegagalan yang
-     * tidak berbunyi di mana pun.
-     *
-     * Testnya ikut setuju dengan asumsi yang salah itu, karena ia memanggil perintahnya dengan
-     * `(string) $id`. Yang menemukannya satu panggilan HTTP sungguhan.
-     */
-    protected function requestedBy(): ?int
-    {
-        // `$this->input->getOption()`, bukan `$this->option()`. Keduanya membaca nilai yang sama,
-        // tetapi PHPDoc Laravel menyatakan yang kedua mengembalikan `string|array|bool|null` —
-        // padahal `ArrayInput` menyimpan apa pun yang diberikan pemanggilnya apa adanya. Memakai
-        // yang pertama membuat pemeriksaan `int` di bawah menjadi pemeriksaan yang jujur, bukan
-        // cabang yang menurut analisa statis tidak pernah tercapai padahal ia justru satu-satunya
-        // yang tercapai di jalur sungguhan.
-        $id = $this->input->getOption('requested-by');
-
-        if (is_int($id)) {
-            return $id;
-        }
-
-        return is_string($id) && $id !== '' && ctype_digit($id) ? (int) $id : null;
-    }
-
     public function handle(): int
     {
         $id = (string) $this->argument('environment');
@@ -321,7 +292,10 @@ final class ProvisionEnvironment extends Command
      */
     private function schemaFingerprint(): string
     {
-        $row = DB::connection(self::CONNECTION)->table('migrations')->orderByDesc('id')->first();
+        // Urut nama berkas, bukan urut `id`. Alasannya di `CopyEnvironment::schemaFingerprint()`:
+        // urutan penerapan tidak sama dengan urutan nama, dan sidik dari `id` melaporkan setiap
+        // lingkungan tertinggal selamanya.
+        $row = DB::connection(self::CONNECTION)->table('migrations')->orderByDesc('migration')->first();
 
         if (! is_object($row) || ! property_exists($row, 'migration')) {
             throw new RuntimeException('Migration berjalan tanpa meninggalkan satu baris pun riwayat.');

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Http\Controllers\Internal\FiscalCalendarDirectoryController;
+use App\Http\Controllers\Internal\FleetController;
 use App\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Http\Controllers\Internal\MemberDirectoryController;
 use App\Http\Controllers\Internal\OrganizationDirectoryController;
@@ -43,4 +44,7 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
 Route::prefix('internal/v1')->middleware(['throttle:30,1', 'control-plane'])->group(function (): void {
     Route::post('tenants', [TenantProvisioningController::class, 'store']);
     Route::post('environments/{environment}/provision', [EnvironmentProvisioningController::class, 'store']);
+    Route::get('fleet', [FleetController::class, 'index']);
+    Route::post('environments/upgrade', [FleetController::class, 'upgrade']);
+    Route::post('environments/{environment}/upgrade', [FleetController::class, 'upgrade']);
 });
