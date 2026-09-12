@@ -23,7 +23,7 @@
 # Karena tidak bergantung pada `$tidak_dibeli`, ia tetap berarti pada edisi yang membeli semua
 # modul, ketika ketiga jalur di bawahnya tidak punya apa pun untuk dicari.
 #
-# Ia ditulis sebagai daftar-boleh, bukan daftar-larang atas nama `pusat-admin`: aplikasi kelima
+# Ia ditulis sebagai daftar-boleh, bukan daftar-larang atas nama `control-plane`: aplikasi kelima
 # yang ditambahkan seseorang tahun depan tertangkap tanpa ada yang perlu ingat mendaftarkannya.
 #
 # Pemakaian:
@@ -37,7 +37,7 @@
 # `--anggap-tidak-dibeli` memperlakukan sebuah modul yang **memang dibeli** seolah tidak dibeli,
 # sehingga ketiga jalur modul harus merah. `--buktikan-aplikasi-bisa-merah` membangun dua image
 # sekali pakai berisi dua baris — satu hanya berisi `apps/core`, satu lagi ditambah
-# `apps/pusat-admin` — lalu menuntut jalur pertama hijau pada yang pertama dan merah pada yang
+# `apps/control-plane` — lalu menuntut jalur pertama hijau pada yang pertama dan merah pada yang
 # kedua. Image edisi tidak dibangun ulang untuk itu.
 
 set -euo pipefail
@@ -136,7 +136,7 @@ periksa_aplikasi() {
 # Jalur merahnya dibuat dengan image sekali pakai berisi dua baris, pola yang sama dipakai
 # `scripts/periksa-sisa-mesin.sh buktikan-merah`. Dua sasaran dibangun dari satu berkas, dan yang
 # kedua menumpuk di atas yang pertama sehingga lapisannya dipakai ulang: satu image bersih yang
-# hanya berisi `apps/core`, satu lagi ditambah `apps/pusat-admin`.
+# hanya berisi `apps/core`, satu lagi ditambah `apps/control-plane`.
 #
 # Keduanya diperiksa, bukan hanya yang bocor. Pemeriksa yang selalu merah sama tidak berartinya
 # dengan pemeriksa yang selalu hijau — bedanya ia tidak bertahan lama, karena orang pertama yang
@@ -151,7 +151,7 @@ buktikan_aplikasi_bisa_merah() {
         'FROM alpine AS bersih' \
         'RUN mkdir -p /repo/apps/core' \
         'FROM bersih AS bocor' \
-        'RUN mkdir -p /repo/apps/pusat-admin && echo "{}" > /repo/apps/pusat-admin/composer.json' \
+        'RUN mkdir -p /repo/apps/control-plane && echo "{}" > /repo/apps/control-plane/composer.json' \
         > "$sementara/Merah.Dockerfile"
 
     local bersih='coreerp-aplikasi:uji-bersih'
@@ -177,11 +177,11 @@ buktikan_aplikasi_bisa_merah() {
     fi
 
     if [ "$kode_bocor" -eq 0 ]; then
-        gagal 'pemeriksa aplikasi hijau pada image yang memuat `apps/pusat-admin`. Ia tidak memeriksa apa pun.'
+        gagal 'pemeriksa aplikasi hijau pada image yang memuat `apps/control-plane`. Ia tidak memeriksa apa pun.'
     fi
 
     printf '%s\n' "$keluaran_bocor"
-    printf 'Pemeriksa aplikasi hijau pada image bersih, lalu gagal dengan kode keluar %d pada image yang memuat `apps/pusat-admin`.\n' "$kode_bocor"
+    printf 'Pemeriksa aplikasi hijau pada image bersih, lalu gagal dengan kode keluar %d pada image yang memuat `apps/control-plane`.\n' "$kode_bocor"
 }
 
 if [ "${1:-}" = '--buktikan-aplikasi-bisa-merah' ]; then
