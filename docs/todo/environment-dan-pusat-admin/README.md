@@ -1310,7 +1310,7 @@ module tidak ditarik ke sana. Halaman ini sendiri mencatat bahwa langkah kelima 
 percobaan kedua** sebelum dua perbaikan kecilnya dikerjakan; menariknya masuk sekarang akan merusak
 persis sifat aman-diulang yang testnya buktikan.
 
-### `[x]` Irisan 2b — `apps/control-plane` menjadi `apps/control-plane`
+### `[x]` Irisan 2b — `apps/pusat-admin` menjadi `apps/control-plane`
 
 Mekanis, nol perubahan perilaku. Nama lama adalah nama **produk yang dibaca operator di layar**;
 nama folder harus mengikuti arsitekturnya. Judul di layar tetap "Pusat Admin".
@@ -1318,7 +1318,18 @@ nama folder harus mengikuti arsitekturnya. Judul di layar tetap "Pusat Admin".
 Dikerjakan sekarang karena hari ini baru satu aplikasi yang menyebutnya, dan tiap minggu ia
 bertambah mahal.
 
-### `[ ]` Irisan 3 — operator melahirkan tenant
+::: danger Pelajaran yang sama, dua kali
+Judul irisan ini sempat berbunyi "rename `apps/control-plane` menjadi `apps/control-plane`" —
+kalimat yang tidak berarti apa-apa, dan **persis kesalahan yang sudah tercatat di irisan 0 halaman
+ini**. Skrip pengganti massal menyentuh halaman ini sendiri, dan tautannya tetap hidup sehingga
+`npm run docs:build` tetap hijau.
+
+Tercatatnya sebuah pelajaran tidak menghentikannya terulang; yang menghentikannya adalah pemeriksa
+yang berjalan. Penggantian massal yang mencakup `docs/` harus **membaca kembali berkas yang
+disentuhnya**, bukan mengandalkan build.
+:::
+
+### `[x]` Irisan 3 — operator melahirkan tenant
 
 **Ini inti pekerjaan barunya, dan yang paling dibutuhkan.** Satu layar: nama badan hukum → email
 admin → app yang dibeli → jenis lingkungan pertama.
@@ -1333,21 +1344,100 @@ Tiga hal yang ikut karena alur ini menabraknya:
   banyak tenant" mustahil lewat jalur mana pun;
 - jalur menambah dan mencabut entitlement sesudah tenant lahir — hari ini tidak ada sama sekali.
 
-### `[ ]` Irisan 4 — alamat dan routing
+*Terbukti oleh:* satu panggilan sungguhan antara dua aplikasi, bukan tiruan. Operator membuat
+pelanggan dari layar konsol → konsol memanggil `POST /api/internal/v1/tenants` → Core melahirkan
+tenant, client, user, keanggotaan owner, role Owner, entitlement, dan environment produksi → kata
+sandi sementara muncul sekali di layar → pelanggan masuk memakainya → Core **memaksanya** ke layar
+ganti kata sandi.
 
-Wildcard TLS, middleware yang menentukan tenant **dan** environment dari host, penjaga koneksi, dan
-tempat setelan penyedia identitas per tenant. Menuntut nameserver sudah pindah ke Cloudflare.
+::: warning Satu bug yang hanya dapat ditemukan panggilan sungguhan
+Sisi Core memeriksa `Authorization: Bearer`; sisi konsol mengirim `X-Control-Plane-Token`. **Kedua
+suite hijau** — masing-masing memalsukan lawan bicaranya, dan tiruan selalu setuju dengan yang
+menirukannya. Di dunia nyata setiap panggilan dijawab 401.
 
-### `[ ]` Irisan 5 — konversi demo menjadi produksi
+Penjaganya sekarang membaca `contracts/openapi-internal.yaml` milik Core, berkas yang sama yang
+ditagih CI terhadap rute Core yang sebenarnya. Rantainya lengkap: rute dijaga cocok dengan kontrak,
+panggilan konsol dijaga cocok dengan kontrak, dan tidak ada sisi yang boleh berubah sendirian.
+
+Yang **masih** tidak dibuktikan siapa pun: bahwa Core benar-benar berjalan di alamat yang disetel
+konsol. Itu hanya dapat dibuktikan di lingkungan yang kedua aplikasinya hidup.
+:::
+
+### `[x]` Irisan 4 — alamat dan routing
+
+Middleware yang menentukan tenant **dan** environment dari host, spanduk di Shell pelanggan, dan
+tempat setelan penyedia identitas per tenant.
+
+Bentuk alamatnya: produksi `<tenant>.contoh.co.id`, selain itu
+`<tenant>--<lingkungan>.<jenis>.contoh.co.id`. **Pemisahnya dua tanda hubung**, dan itu bukan
+selera — lihat peringatan di bawah.
+
+Ia **tidak pernah menyala** tanpa `COREERP_DOMAIN_DASAR`. Bukan gagal; tidak menyala. On-prem,
+lingkungan lokal, dan seluruh suite yang ada berjalan persis seperti sebelumnya.
+
+**Belum:** middleware ini belum memindahkan koneksi database. Itu menuntut penjaga koneksi beserta
+jalur gagal-tertutupnya, dan permintaan yang dirutekan ke database yang salah jauh lebih berbahaya
+daripada yang tidak dirutekan sama sekali. Wildcard TLS-nya juga belum dipasang — ia menunggu
+nameserver pindah ke Cloudflare.
+
+*Terbukti oleh:* lima kasus alamat diperiksa pada server yang benar-benar berjalan — lingkungan sah
+200, bentuk ambigu 404, label karangan 404, jenis yang salah 404, label konsol 200 — dan spanduknya
+terbukti muncul di dasbor pelanggan lewat alamat demo.
+
+::: danger Dua cacat yang testnya justru membenarkan
+**Pemisah satu tanda hubung ambigu.** Alasan yang ditulis halaman ini sendiri — "slug tenant tidak
+pernah memuat tanda hubung" — salah: `uniqueSlug()` meng-slugify nama badan hukum, jadi "PT Sinar
+Abadi" menjadi `pt-sinar-abadi`. Slug lingkungan juga sering bertanda hubung. `pt-sinar-abadi` +
+`peragaan` karena itu tidak dapat dibedakan dari `pt` + `sinar-abadi-peragaan`.
+
+Testnya memakai `ivs` — slug tanpa tanda hubung — sehingga ia **membenarkan asumsinya sendiri**.
+Yang menangkapnya satu `curl` ke alamat pelanggan yang benar-benar ada.
+
+**Alamat karangan melayani aplikasi pangkal.** Host berbentuk alamat lingkungan yang tidak terurai
+sebelumnya lewat begitu saja. Dengan DNS wildcard itu berarti aplikasi ini dapat disajikan dari
+alamat mana saja yang dikarang orang.
+
+Pelajaran yang sama dua kali dalam satu hari: **test yang subjeknya dipilih sendiri akan setuju
+dengan asumsi penulisnya.** Yang membantahnya hanya data sungguhan.
+:::
+
+### `[x]` Irisan 5 — konversi demo menjadi produksi
 
 Operasi eksplisit yang dijalankan operator dan tercatat di `environment_operations` — bukan dipicu
 peristiwa login seperti Business Central.
 
-### `[ ]` Irisan 6 — template, Copy, dan lifecycle
+*Terbukti oleh:* 13 test, 64 assertion, dengan empat mutasi yang dijalankan untuk membuktikan
+testnya tidak hijau karena buta.
 
-Template demo lewat `CREATE DATABASE ... TEMPLATE`, `environment:copy` beserta pelucutannya, jenis
-`sandbox`, sapuan kedaluwarsa, hapus lunak, pemulihan, penghapusan permanen, dan penyebaran
-migration beserta sidik skemanya.
+::: warning Bahaya yang ditemukan saat mengerjakannya
+Lingkungan demo lahir dengan sambungan keluar mati, jadi `outbox_events`-nya menumpuk. Penerbitnya
+memilih baris dengan `published_at IS NULL` **tanpa batas umur sama sekali** — sehingga
+`outbox_events` milik demo bukan riwayat melainkan **antrean**. Begitu benderanya menyala,
+berbulan-bulan keputusan yang dibuat prospek selagi mencoba-coba menjadi layak kirim ke endpoint
+sungguhan, dalam hitungan menit, tanpa ada yang menekan tombol.
+
+Karena itu konversi **melucuti antreannya lebih dulu, baru menyalakan benderanya**, dan urutan itu
+mengikat: jalur pelucutan hanya berjalan selagi sambungan keluar masih dilarang.
+:::
+
+### `[~]` Irisan 6 — template, Copy, dan lifecycle
+
+**Sudah:** sapuan kedaluwarsa, hapus lunak, pemulihan, dan penghapusan permanen —
+`environment:sapu-kedaluwarsa`, `environment:pulihkan`, `environment:hapus-permanen`, dua di
+antaranya dijadwalkan. 19 test, 124 assertion.
+
+Tiga hal yang bentuknya ditentukan constraint, bukan sekadar mengikutinya:
+
+- pemulihan **wajib memberi masa berlaku baru**, karena demo tanpa tanggal berakhir ditolak database
+  — baris yang pulih dengan tanggal di masa lalu akan disapu lagi malam berikutnya;
+- riwayat operasi **tidak pernah dihapus**; yang dibuang databasenya, barisnya tinggal sebagai nisan
+  bertanda `purged_at`. `restrictOnDelete` tidak diakali — ia yang menentukan bentuknya;
+- status pemulihan **dibaca dari riwayat**, bukan ditebak `active`: sapuan tidak menyaring status,
+  jadi demo `degraded` ikut tersapu, dan memulihkannya sebagai aktif berarti mengangkat lingkungan
+  tanpa database menjadi tempat yang boleh dirutekan.
+
+**Belum:** template demo lewat `CREATE DATABASE ... TEMPLATE`, `environment:copy` beserta
+pelucutannya, dan penyebaran migration beserta sidik skemanya.
 
 ::: danger Jangan mulai dari Copy
 `Copy` adalah fitur yang terlihat dan alasan orang meminta pekerjaan ini. Tetapi salinan ke dalam
