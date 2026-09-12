@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use ControlPlane\Http\Controllers\Keluar;
-use ControlPlane\Http\Controllers\Lingkungan\Daftar;
-use ControlPlane\Http\Controllers\Lingkungan\Rincian;
-use ControlPlane\Http\Controllers\Lingkungan\Simpan;
+use ControlPlane\Http\Controllers\Lingkungan\Daftar as DaftarLingkungan;
+use ControlPlane\Http\Controllers\Lingkungan\Rincian as RincianLingkungan;
+use ControlPlane\Http\Controllers\Lingkungan\Simpan as SimpanLingkungan;
 use ControlPlane\Http\Controllers\Masuk;
+use ControlPlane\Http\Controllers\Pelanggan\Daftar as DaftarPelanggan;
+use ControlPlane\Http\Controllers\Pelanggan\Simpan as SimpanPelanggan;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/lingkungan');
@@ -27,7 +29,10 @@ Route::post('/logout', Keluar::class)->middleware('auth');
  * menampilkan data yang sama dijaga gate.
  */
 Route::middleware(['auth', 'operator'])->group(function (): void {
-    Route::get('/lingkungan', Daftar::class)->name('lingkungan.daftar');
-    Route::post('/lingkungan', Simpan::class)->name('lingkungan.simpan');
-    Route::get('/lingkungan/{lingkungan}', Rincian::class)->name('lingkungan.rincian');
+    Route::get('/pelanggan', DaftarPelanggan::class)->name('pelanggan.daftar');
+    Route::post('/pelanggan', SimpanPelanggan::class)->name('pelanggan.simpan');
+
+    Route::get('/lingkungan', DaftarLingkungan::class)->name('lingkungan.daftar');
+    Route::post('/lingkungan', SimpanLingkungan::class)->name('lingkungan.simpan');
+    Route::get('/lingkungan/{lingkungan}', RincianLingkungan::class)->name('lingkungan.rincian');
 });

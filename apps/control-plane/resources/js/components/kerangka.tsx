@@ -7,11 +7,20 @@ type Bersama = {
     pesan: string | null;
 };
 
+const menu = [
+    { alamat: '/pelanggan', judul: 'Pelanggan' },
+    { alamat: '/lingkungan', judul: 'Lingkungan' },
+];
+
 /**
  * Bingkai setiap layar operator.
  *
- * Sengaja satu berkas dan tanpa sidebar. Konsol ini punya tiga layar; navigasi yang dapat runtuh,
- * mengingat keadaannya, dan ikut diuji adalah ongkos yang belum dibeli apa pun.
+ * Sengaja satu berkas dan tanpa sidebar. Konsol ini punya beberapa layar saja; navigasi yang dapat
+ * runtuh, mengingat keadaannya, dan ikut diuji adalah ongkos yang belum dibeli apa pun.
+ *
+ * Dua tautan di bilah atas berurutan seperti alur kerjanya, bukan seperti abjad: pelanggan lahir
+ * lebih dulu, lingkungannya menyusul. Layar Lingkungan tidak dapat berbuat apa-apa untuk
+ * perusahaan yang belum menjadi pelanggan.
  */
 export default function Kerangka({
     judul,
@@ -24,15 +33,38 @@ export default function Kerangka({
     aksi?: ReactNode;
     children: ReactNode;
 }) {
-    const { operator, pesan } = usePage<Bersama>().props;
+    const halaman = usePage<Bersama>();
+    const { operator, pesan } = halaman.props;
 
     return (
         <div className="text-foreground min-h-screen bg-[hsl(210_30%_96%)]">
             <header className="bg-background border-b">
                 <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
-                    <Link href="/lingkungan" className="text-sm font-semibold">
-                        Pusat Admin
-                    </Link>
+                    <div className="flex items-center gap-6">
+                        <Link
+                            href="/lingkungan"
+                            className="text-sm font-semibold"
+                        >
+                            Pusat Admin
+                        </Link>
+                        {operator && (
+                            <nav className="flex items-center gap-4 text-sm">
+                                {menu.map((butir) => (
+                                    <Link
+                                        key={butir.alamat}
+                                        href={butir.alamat}
+                                        className={
+                                            halaman.url.startsWith(butir.alamat)
+                                                ? 'text-foreground font-medium'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                        }
+                                    >
+                                        {butir.judul}
+                                    </Link>
+                                ))}
+                            </nav>
+                        )}
+                    </div>
                     {operator && (
                         <div className="text-muted-foreground flex items-center gap-3 text-sm">
                             <span>{operator.nama}</span>
