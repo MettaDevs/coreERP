@@ -6,6 +6,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\HanyaPusatAdmin;
 use App\Http\Middleware\LampirkanKonteksJejak;
 use App\Http\Middleware\ResolveModuleContext;
+use App\Http\Middleware\TetapkanLingkungan;
 use App\Http\Middleware\WajibGantiSandi;
 use App\Support\Observabilitas\JejakAktif;
 use App\Support\Observabilitas\PelaporKesalahan;
@@ -45,6 +46,19 @@ return Application::configure(basePath: dirname(__DIR__))
         // tenant (ditulis `AuthenticateAppService`), dan justru panggilan antar-layanan itu
         // yang paling sulit ditelusuri tanpa atribut tenant pada span-nya.
         $middleware->append(LampirkanKonteksJejak::class);
+
+        /*
+         * Global, dan ia berdiri paling awal dengan sengaja.
+         *
+         * Lingkungan ditentukan dari **alamat**, bukan dari sesi, jadi jawabannya sudah ada sebelum
+         * `auth` berjalan — dan itu justru yang dibutuhkan: untuk mengarahkan orang ke penyedia
+         * identitas yang benar kelak, sistem harus tahu tenant mana ini sebelum orangnya mengetik
+         * apa pun.
+         *
+         * Ia tidak pernah menyala pada penempatan yang tidak menyetel `COREERP_DOMAIN_DASAR` —
+         * on-prem, lingkungan lokal, dan seluruh test suite yang ada. Bukan gagal; tidak menyala.
+         */
+        $middleware->append(TetapkanLingkungan::class);
 
         $middleware->web(append: [
             HandleAppearance::class,

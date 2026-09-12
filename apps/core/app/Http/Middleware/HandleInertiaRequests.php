@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\CoreApp;
+use App\Models\Environment;
 use App\Models\TenantMembership;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
@@ -50,6 +51,16 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            /*
+             * Lingkungan yang sedang dilayani, dan HANYA ketika ia bukan produksi.
+             *
+             * Null adalah keadaan biasa, bukan kekurangan: produksi, on-prem, dan setiap
+             * penempatan satu-alamat tidak punya apa pun untuk diumumkan. Yang perlu diumumkan
+             * justru kebalikannya — pengguna yang tidak tahu ia sedang di sandbox akan
+             * memperlakukan angka sandbox sebagai angka sungguhan, lalu mengambil keputusan di
+             * atasnya.
+             */
+            'lingkungan' => $this->lingkunganTampil($request),
             'auth' => [
                 'user' => $user,
                 'membership' => $membership ? [
@@ -151,5 +162,25 @@ class HandleInertiaRequests extends Middleware
                 'name' => $app->name,
                 'description' => $app->description ?? '',
             ])->all();
+    }
+
+    /**
+     * Keterangan lingkungan untuk spanduk, atau null bila memang tidak ada yang perlu diumumkan.
+     *
+     * Dibaca dari atribut permintaan yang ditulis `TetapkanLingkungan`, bukan dengan query sendiri:
+     * dua tempat yang menjawab "lingkungan mana ini" adalah dua tempat yang dapat menjawab berbeda,
+     * dan yang berbeda di sini berbentuk spanduk yang menyebut tempat yang salah.
+     *
+     * @return array{jenis: string, nama: string}|null
+     */
+    private function lingkunganTampil(Request $request): ?array
+    {
+        $lingkungan = $request->attributes->get('coreerp.environment');
+
+        if (! $lingkungan instanceof Environment || $lingkungan->produksi()) {
+            return null;
+        }
+
+        return ['jenis' => $lingkungan->kind, 'nama' => $lingkungan->name];
     }
 }

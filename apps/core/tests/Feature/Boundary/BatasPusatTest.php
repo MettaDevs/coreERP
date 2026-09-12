@@ -10,6 +10,7 @@ use App\Models\EnvironmentOperation;
 use App\Models\Organization;
 use App\Models\ProviderAccess;
 use App\Models\Tenant;
+use App\Models\TenantIdentityProvider;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\Pusat\MilikPusat;
@@ -45,6 +46,7 @@ class BatasPusatTest extends TestCase
             [ProviderAccess::class, 'provider_access'],
             [Environment::class, 'environments'],
             [EnvironmentOperation::class, 'environment_operations'],
+            [TenantIdentityProvider::class, 'tenant_identity_providers'],
         ];
     }
 

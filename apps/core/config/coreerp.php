@@ -12,6 +12,28 @@ return [
      */
     'control_connection' => env('COREERP_CONTROL_CONNECTION'),
 
+    /*
+     * Domain dasar yang di bawahnya tiap lingkungan memperoleh alamatnya sendiri.
+     *
+     *   production : <tenant>.contoh.co.id
+     *   selain itu : <tenant>-<lingkungan>.<jenis>.contoh.co.id
+     *
+     * **Kosong berarti satu alamat untuk semua, dan itu bawaannya.** On-prem melayani satu
+     * pelanggan dari satu alamat selamanya, dan lingkungan pengembangan sebelum DNS disiapkan juga
+     * begitu. Selama ia kosong, `TetapkanLingkungan` tidak pernah menyala — bukan gagal, tidak
+     * menyala — dan seluruh perilaku hari ini utuh.
+     *
+     * Untuk mencobanya di mesin sendiri, isi `localhost`: peramban modern menyelesaikan setiap
+     * `*.localhost` ke mesin sendiri, jadi `pelanggan-uji.demo.localhost:8000` bekerja tanpa
+     * menyentuh DNS sama sekali.
+     *
+     * Di server, bentuk ini menuntut satu sertifikat berisi empat nama — `*.contoh.co.id`,
+     * `*.demo.contoh.co.id`, `*.sandbox.contoh.co.id`, dan `contoh.co.id` sendiri, karena wildcard
+     * tidak mencakup domain induknya. Alasan lengkapnya di
+     * `docs/todo/environment-dan-pusat-admin/README.md`.
+     */
+    'domain_dasar' => env('COREERP_DOMAIN_DASAR'),
+
     // `deployment` dibuang pada 11 September 2026 bersama satu-satunya pembacanya: pendaftaran
     // usaha kini menulis baris `environments`, bukan `tenant_deployments`. Sebelumnya `pull_images`
     // dan `release_root` dibuang dengan alasan yang sama. Tempat kerja sebuah tenant sekarang fakta
