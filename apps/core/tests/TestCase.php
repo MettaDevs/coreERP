@@ -54,21 +54,6 @@ abstract class TestCase extends BaseTestCase
             );
         }
 
-        // Akarnya, dan ia tidak bergantung pada schema sama sekali: selama database test dan
-        // database kerja adalah database yang sama, tiap jalur baru yang kebetulan menunjuk
-        // `public` akan mengosongkan data kerja. Dua penjagaan sebelumnya menambal jalur; yang ini
-        // menutup kelasnya.
-        $databaseKerja = $baca('DB_DATABASE');
-        $databaseUji = $baca('DB_TEST_DATABASE');
-
-        if ($databaseKerja !== '' && $databaseUji === $databaseKerja) {
-            $this->fail(
-                'DB_TEST_DATABASE sama dengan DB_DATABASE ("'.$databaseKerja.'"). Test akan '
-                .'mengosongkan database yang sedang dipakai bekerja. Buat database terpisah: '
-                .'`createdb '.$databaseKerja.'_test`, lalu setel DB_TEST_DATABASE ke sana.'
-            );
-        }
-
         // Mode paralel tanpa token adalah keadaan yang tidak pernah dimaksudkan siapa pun, dan ia
         // persis yang mengosongkan database dev dua kali. Ditolak terpisah supaya pesannya menyebut
         // sebabnya, bukan sekadar nama schema yang kebetulan sudah benar.
@@ -204,6 +189,41 @@ abstract class TestCase extends BaseTestCase
                 ],
             ],
         ]]);
+    }
+
+    /**
+     * Akarnya, dan ia tidak bergantung pada schema sama sekali.
+     *
+     * Selama database test dan database kerja adalah database yang sama, tiap jalur baru yang
+     * kebetulan menunjuk `public` akan mengosongkan data kerja. Dua penjagaan di `setUp()` menambal
+     * jalur; yang ini menutup kelasnya.
+     *
+     * **Kenapa di sini dan bukan di `setUp()`.** Percobaan pertama menaruhnya di sana dan membaca
+     * `getenv()`. Itu tidak pernah bisa menyala: `.env` baru dimuat ketika aplikasinya berdiri, dan
+     * aplikasinya berdiri **di dalam** `parent::setUp()` — jadi kedua nilainya selalu kosong dan
+     * pemeriksaannya selalu dilewati. Penjaga yang tidak dapat merah lebih buruk daripada tidak
+     * ada, karena ia mengakhiri pencarian.
+     *
+     * `setUpTraits()` adalah titik yang benar: ia dipanggil **sesudah** aplikasinya berdiri,
+     * sehingga `config()` sudah menjawab yang sebenarnya, dan **sebelum** `RefreshDatabase` maupun
+     * `DatabaseTruncation` menyentuh satu baris pun — keduanya justru dipasang oleh method ini.
+     */
+    protected function setUpTraits(): array
+    {
+        $bawaan = (string) config('database.default');
+        $databaseUji = (string) config('database.connections.'.$bawaan.'.database');
+        $databaseKerja = (string) config('database.connections.pgsql.database');
+
+        if ($databaseKerja !== '' && $databaseUji === $databaseKerja) {
+            $this->fail(
+                'Koneksi test menunjuk database "'.$databaseUji.'", yang sama dengan database kerja. '
+                .'Test akan mengosongkan database yang sedang dipakai bekerja — sudah terjadi tiga '
+                .'kali. Buat database terpisah (`createdb '.$databaseKerja.'_test`) lalu setel '
+                .'DB_TEST_DATABASE ke sana.'
+            );
+        }
+
+        return parent::setUpTraits();
     }
 
     /**

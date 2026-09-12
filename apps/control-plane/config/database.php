@@ -9,7 +9,22 @@
  * kode di sini.
  */
 return [
-    'default' => 'pgsql',
+    /*
+     * Dibaca dari env, dan itu bukan kelengkapan melainkan perbaikan cacat.
+     *
+     * Nilainya sempat dipaku `'pgsql'`. Akibatnya `DB_CONNECTION=pgsql_test` pada `phpunit.xml`
+     * **diabaikan sepenuhnya**, dan seluruh suite konsol ini — yang membangun ulang skema Core
+     * lewat `migrate:fresh` — berjalan di atas database kerja pengembang. Ia tetap hijau, karena
+     * skemanya memang terbentuk; yang hilang hanya isinya.
+     *
+     * Penjaga di `Tests\TestCase::setUpTraits()` yang menemukannya, pada hari ia dipindah ke titik
+     * yang dapat membaca `config()` yang sebenarnya. Sebelum itu ia membaca `getenv('DB_CONNECTION')`
+     * — yang memang berisi `pgsql_test`, persis nilai yang tidak pernah dipakai siapa pun.
+     *
+     * Pelajarannya: memeriksa **niat** (apa yang disetel) berbeda dari memeriksa **akibat** (apa
+     * yang benar-benar dipakai), dan hanya yang kedua yang menjaga apa pun.
+     */
+    'default' => env('DB_CONNECTION', 'pgsql'),
 
     'connections' => [
         'pgsql' => [

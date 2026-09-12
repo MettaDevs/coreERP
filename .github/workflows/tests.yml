@@ -76,7 +76,7 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: core_erp
+          POSTGRES_DB: core_erp_test
           POSTGRES_USER: core_erp
           POSTGRES_PASSWORD: core_erp
           PGDATA: /var/lib/postgresql/data/pgdata
@@ -89,10 +89,20 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+    # `core_erp_test`, dan ia SENGAJA berbeda dari `DB_DATABASE` di `.env.example`.
+    #
+    # Database kerja dan database test yang bernama sama sudah mengosongkan database pengembang tiga
+    # kali dalam dua hari — trait penyiap database mengosongkan apa pun yang ditunjuk koneksinya, dan
+    # `DatabaseTruncation` mengecualikan tabel `migrations` sehingga yang tertinggal adalah skema
+    # utuh berisi nol baris: suite hijau, exit code nol, lalu stack lokal kosong.
+    #
+    # `Tests\TestCase::setUpTraits()` menolak jalan ketika keduanya sama. Runner CI memang tidak
+    # punya data kerja untuk hilang, tetapi nama yang berbeda di sini menjaga satu hal lain: alur ini
+    # tetap menjadi contoh yang benar bagi siapa pun yang menyalinnya ke mesin sendiri.
     env:
       DB_TEST_HOST: 127.0.0.1
       DB_TEST_PORT: 5432
-      DB_TEST_DATABASE: core_erp
+      DB_TEST_DATABASE: core_erp_test
       DB_TEST_USERNAME: core_erp
       DB_TEST_PASSWORD: core_erp
       DB_TEST_SCHEMA: coreerp_test
@@ -242,7 +252,7 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: core_erp
+          POSTGRES_DB: core_erp_test
           POSTGRES_USER: core_erp
           POSTGRES_PASSWORD: core_erp
           PGDATA: /var/lib/postgresql/data/pgdata
@@ -258,7 +268,7 @@ jobs:
     env:
       DB_TEST_HOST: 127.0.0.1
       DB_TEST_PORT: 5432
-      DB_TEST_DATABASE: core_erp
+      DB_TEST_DATABASE: core_erp_test
       DB_TEST_USERNAME: core_erp
       DB_TEST_PASSWORD: core_erp
       DB_TEST_SCHEMA: coreerp_test
@@ -285,7 +295,7 @@ jobs:
       - name: Create Test Schema
         env:
           PGPASSWORD: core_erp
-        run: psql -h 127.0.0.1 -p 5432 -U core_erp -d core_erp -c "CREATE SCHEMA IF NOT EXISTS coreerp_test;"
+        run: psql -h 127.0.0.1 -p 5432 -U core_erp -d core_erp_test -c "CREATE SCHEMA IF NOT EXISTS coreerp_test;"
 
       # Tanpa `--parallel`: suitenya sepuluh test, dan tiap pekerja paralel membayar satu
       # pembangunan skema Core penuh lebih dulu. Paralelisasi di sini menambah waktu, bukan

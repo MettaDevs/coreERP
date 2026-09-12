@@ -39,21 +39,6 @@ abstract class TestCase extends BaseTestCase
         $koneksi = $baca('DB_CONNECTION');
         $jalur = $baca('DB_TEST_SCHEMA') ?: 'coreerp_test';
 
-        // Akarnya, dan ia tidak bergantung pada schema sama sekali: selama database test dan
-        // database kerja adalah database yang sama, tiap jalur yang kebetulan menunjuk `public`
-        // akan mengosongkan data kerja. Suite ini membangun ulang seluruh skema Core, jadi ia
-        // justru yang paling merusak kalau salah alamat.
-        $databaseKerja = $baca('DB_DATABASE');
-        $databaseUji = $baca('DB_TEST_DATABASE');
-
-        if ($databaseKerja !== '' && $databaseUji === $databaseKerja) {
-            $this->fail(
-                'DB_TEST_DATABASE sama dengan DB_DATABASE ("'.$databaseKerja.'"). Suite ini '
-                .'menjalankan migrate:fresh, jadi ia akan membuang seluruh tabel database yang '
-                .'sedang dipakai bekerja. Buat database terpisah lalu setel DB_TEST_DATABASE.'
-            );
-        }
-
         if ($koneksi !== 'pgsql_test' || $jalur === 'public') {
             $this->fail(
                 'Suite ini menunjuk koneksi "'.$koneksi.'" dengan schema "'.$jalur.'". '
@@ -73,5 +58,37 @@ abstract class TestCase extends BaseTestCase
          * bukan oleh suite ini.
          */
         $this->withoutVite();
+    }
+
+    /**
+     * Database test tidak boleh sama dengan database kerja.
+     *
+     * Diperiksa di `setUpTraits()` dan bukan di `setUp()`, karena `.env` baru dimuat ketika
+     * aplikasinya berdiri — dan aplikasinya berdiri **di dalam** `parent::setUp()`. Percobaan
+     * pertama membaca `getenv()` di sana, dan kedua nilainya selalu kosong: penjaganya tidak pernah
+     * dapat menyala. Penjaga yang tidak dapat merah lebih buruk daripada tidak ada, karena ia
+     * mengakhiri pencarian.
+     *
+     * `setUpTraits()` dipanggil sesudah `config()` menjawab yang sebenarnya, dan sebelum trait
+     * penyiap database menyentuh satu baris pun — keduanya justru dipasang oleh method ini.
+     *
+     * Suite ini membangun ulang seluruh skema Core lewat `migrate:fresh`, jadi ia yang paling
+     * merusak kalau salah alamat.
+     */
+    protected function setUpTraits(): array
+    {
+        $bawaan = (string) config('database.default');
+        $databaseUji = (string) config('database.connections.'.$bawaan.'.database');
+        $databaseKerja = (string) config('database.connections.pgsql.database');
+
+        if ($databaseKerja !== '' && $databaseUji === $databaseKerja) {
+            $this->fail(
+                'Koneksi test menunjuk database "'.$databaseUji.'", yang sama dengan database kerja. '
+                .'Suite ini menjalankan migrate:fresh, jadi ia akan membuang seluruh tabel database '
+                .'yang sedang dipakai bekerja. Buat database terpisah lalu setel DB_TEST_DATABASE.'
+            );
+        }
+
+        return parent::setUpTraits();
     }
 }
