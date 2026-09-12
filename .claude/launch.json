@@ -11,7 +11,7 @@
     {
       "name": "pusat-admin",
       "runtimeExecutable": "php",
-      "runtimeArgs": ["artisan", "serve", "--port=8001"],
+      "runtimeArgs": ["-S", "127.0.0.1:8001", "-t", "public", "server.php"],
       "cwd": "apps/pusat-admin",
       "port": 8001
     }
