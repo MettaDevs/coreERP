@@ -73,13 +73,20 @@ class FkMenyeberangBatasTest extends TestCase
      *   environment. Begitu ia punya model bertanda, baris ini hilang dengan sendirinya dan
      *   angkanya wajib diturunkan.
      *
+     * `users` turun dari 4 menjadi 3 pada tanggal yang sama, dan itu persis mekanisme yang
+     * diramalkan catatan di atas. `passkeys` memperoleh model bertanda — `App\Models\Passkey`,
+     * yang ada supaya relasi `User::passkeys()` tidak jatuh ke database lingkungan begitu
+     * `ResolveEnvironment` menggeser koneksinya. Dengan itu ia berhenti terhitung sisi environment,
+     * dan foreign keynya ke `users` berhenti menyeberang batas. Penjaga ini yang
+     * memberitahukannya, bukan sebaliknya.
+     *
      * @var array<string, int>
      */
     private const ANGGARAN = [
         'environments' => 1,
         'tenant_memberships' => 3,
         'tenants' => 25,
-        'users' => 4,
+        'users' => 3,
     ];
 
     public function test_tidak_ada_fk_dari_sisi_pusat_ke_sisi_environment(): void

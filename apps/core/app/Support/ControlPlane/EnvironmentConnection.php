@@ -43,7 +43,17 @@ use RuntimeException;
  * bawaan. Kelas ini dipanggil kode yang **sudah memegang** barisnya, jadi tidak ada yang perlu
  * ditebak. Lihat App\Http\Middleware\ResolveEnvironment.
  */
-final class EnvironmentConnection
+/*
+ * Sengaja **tidak** `final`, dan alasannya satu: middleware menerimanya lewat konstruktor, jadi
+ * satu-satunya cara membuktikan keduanya benar-benar tersambung adalah menggantinya dengan
+ * pengganti yang mencatat panggilannya. Tanpa itu, memutus panggilan di middleware meninggalkan
+ * suite yang seluruhnya hijau dan setiap permintaan dilayani database pusat.
+ *
+ * Percobaan pertama memang `final`, dan test penggantinya gagal sebagai **proses PHP yang mati
+ * tanpa pesan** — bukan sebagai "tidak boleh mewarisi kelas final". Yang terlihat cuma suite yang
+ * menggantung sampai tenggatnya habis.
+ */
+class EnvironmentConnection
 {
     /**
      * Koneksi kedua ke database pusat, dipakai hanya untuk pernyataan tingkat kluster.
@@ -152,19 +162,7 @@ final class EnvironmentConnection
      */
     public function runWithin(Environment $environment, Closure $callback): mixed
     {
-        $controlPlane = $this->controlPlane();
-        $target = $this->for($environment);
-
-        if ($target === $controlPlane) {
-            return $callback();
-        }
-
-        $previousControl = config('coreerp.control_connection');
-
-        config([
-            'database.default' => $target,
-            'coreerp.control_connection' => $controlPlane,
-        ]);
+        $snapshot = $this->enter($environment);
 
         try {
             return $callback();
@@ -172,11 +170,102 @@ final class EnvironmentConnection
             // `finally`, dan tanpa satu pun cabang di dalamnya. Blok ini yang menentukan apakah
             // sebuah kegagalan di tengah pemasangan module berakhir sebagai kegagalan biasa atau
             // sebagai proses yang sisa hidupnya menulis ke database yang salah.
-            config([
-                'database.default' => $controlPlane,
-                'coreerp.control_connection' => $previousControl,
-            ]);
+            $this->leave($snapshot);
         }
+    }
+
+    /**
+     * Menggeser koneksi bawaan ke database lingkungan ini **untuk sisa permintaan**, tanpa dipulihkan.
+     *
+     * Bedanya dari {@see self::runWithin()} hanya itu: yang ini tidak punya blok penutup, karena
+     * yang menutupnya adalah berakhirnya permintaan itu sendiri. Dipakai middleware; jangan dipakai
+     * di dalam proses yang melayani lebih dari satu lingkungan berurutan — pekerja antrean dan
+     * perintah yang memutari armada wajib memakai `runWithin`, yang memulihkan.
+     */
+    public function useForRequest(Environment $environment): void
+    {
+        $this->enter($environment);
+    }
+
+    /**
+     * Memasang pakuannya, dan memulangkan nilai sebelumnya supaya dapat dipulihkan.
+     *
+     * Kosong berarti tidak ada yang digeser — lingkungan yang memang tinggal di database bawaan
+     * dilewati tanpa menyentuh config sama sekali. Itu jalur yang dilalui seluruh perilaku hari ini.
+     *
+     * @return array<string, mixed>
+     */
+    private function enter(Environment $environment): array
+    {
+        $controlPlane = $this->controlPlane();
+        $target = $this->for($environment);
+
+        if ($target === $controlPlane) {
+            return [];
+        }
+
+        $pins = $this->pins($target, $controlPlane);
+        $snapshot = [];
+
+        foreach (array_keys($pins) as $key) {
+            $snapshot[$key] = config($key);
+        }
+
+        config($pins);
+
+        return $snapshot;
+    }
+
+    /** @param  array<string, mixed>  $snapshot */
+    private function leave(array $snapshot): void
+    {
+        if ($snapshot !== []) {
+            config($snapshot);
+        }
+    }
+
+    /**
+     * Apa yang pindah, dan apa yang justru harus **tidak** pindah.
+     *
+     * Menggeser `database.default` memindahkan semua yang tidak menyebut koneksinya sendiri, dan
+     * itu memang gunanya. Yang tidak boleh ikut adalah tabel sisi pusat — dan daftarnya lebih
+     * panjang daripada daftar model bertrait `OwnedByControlPlane`, karena empat di antaranya tidak
+     * punya model sama sekali: sesi, cache, antrean, dan token reset sandi dibaca Laravel lewat
+     * kunci config, bukan lewat Eloquent.
+     *
+     * Dipaku lewat config, bukan lewat urutan middleware. Urutan mengandalkan sesuatu berjalan
+     * lebih dulu — dan siapa pun yang menyusun ulang middleware kelak tidak akan tahu bahwa
+     * urutannya menopang pemilihan database. Pakuan mengandalkan nilai yang memang disetel, dan
+     * ia terbaca di tempat yang sama dengan yang digesernya.
+     *
+     * Satu yang tidak perlu dipaku dan sengaja tidak ada di sini: `queue.failed.database`. Ia
+     * menyebut `env('DB_CONNECTION')` apa adanya, jadi ia sudah menunjuk koneksi pusat sejak awal.
+     *
+     * @return array<string, mixed>
+     */
+    private function pins(string $target, string $controlPlane): array
+    {
+        return [
+            'database.default' => $target,
+            'coreerp.control_connection' => $controlPlane,
+
+            // Tanpa ini, setiap permintaan ke alamat lingkungan memulai sesi baru di database
+            // lingkungan — dan login tidak pernah bertahan satu klik pun.
+            'session.connection' => $controlPlane,
+
+            // Pembatas laju login hidup di cache. Tanpa ini ia menghitung per lingkungan, sehingga
+            // percobaan sandi dapat dikalikan sebanyak lingkungan yang dimiliki tenant.
+            'cache.stores.database.connection' => $controlPlane,
+            'cache.stores.database.lock_connection' => $controlPlane,
+
+            // Job yang dilahirkan di dalam lingkungan akan menunggu di tabel `jobs` milik database
+            // lingkungan itu — tabel yang tidak dibaca pekerja mana pun.
+            'queue.connections.database.connection' => $controlPlane,
+
+            // Tautan reset sandi dibuat di satu database dan dicari di database lain. Gagalnya
+            // berbunyi "token tidak sah", yang menuduh tautannya padahal yang salah tempatnya.
+            'auth.passwords.users.connection' => $controlPlane,
+        ];
     }
 
     /** @return array<string, mixed> */

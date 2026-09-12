@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\Passkey;
 use App\Models\User;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\OutboundGuard;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Passkeys\Passkeys;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -74,6 +76,15 @@ class AppServiceProvider extends ServiceProvider
 
             return false;
         }, E_WARNING);
+
+        /*
+         * Passkey dibaca dari database pusat, bukan dari database lingkungan.
+         *
+         * Dipasang di sini karena satu-satunya pintunya milik paket, dan alasan lengkapnya beserta
+         * kenapa menandai `User` saja tidak cukup ada di {@see Passkey}. Tanpa baris ini, pelanggan
+         * yang masuk dengan passkey dari alamat lingkungannya tidak menemukan passkey miliknya.
+         */
+        Passkeys::usePasskeyModel(Passkey::class);
 
         $this->configureDefaults();
         $this->hentikanPenerusanLogKeOtel();

@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\Environment;
-use App\Support\ControlPlane\EnvironmentAddress;
 use App\Support\ControlPlane\ActiveEnvironment;
+use App\Support\ControlPlane\EnvironmentAddress;
+use App\Support\ControlPlane\EnvironmentConnection;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -41,16 +42,35 @@ use Symfony\Component\HttpFoundation\Response;
  * **404, bukan 403.** Keberadaan sebuah lingkungan adalah informasi: `pelanggan-a.demo.contoh.co.id`
  * yang menjawab 403 memberi tahu penanya bahwa pelanggan A memang punya demo.
  *
- * ## Yang BELUM dikerjakan di sini, dan ditulis supaya tidak dikira sudah
+ * ## Ia sekarang memindahkan koneksi databasenya
  *
- * Middleware ini **belum memindahkan koneksi database**. Ia mengikat identitas lingkungannya
- * sehingga bendera sambungan keluar, spanduk, dan kelak pemilih koneksi punya satu sumber yang
- * sama. Pemindahan koneksinya menuntut `PenjagaKoneksi` beserta jalur gagal-tertutupnya, dan itu
- * pekerjaan tersendiri: sebuah permintaan yang dirutekan ke database yang salah jauh lebih
- * berbahaya daripada permintaan yang tidak dirutekan sama sekali.
+ * Sampai 12 September 2026 middleware ini hanya mengikat identitas lingkungannya, dan docblock ini
+ * menyebutnya apa adanya sebagai pekerjaan yang belum selesai. Sekarang ia memanggil
+ * {@see EnvironmentConnection::useForRequest()}, yang menggeser koneksi bawaan **dan** memaku sisi
+ * pusat — sesi, cache, antrean, dan token reset sandi — tetap di tempatnya. Daftar pakuannya beserta
+ * akibat melupakan masing-masingnya ada di kelas itu.
+ *
+ * Ia berjalan sebagai middleware **global**, jadi ia mendahului `StartSession`. Itu bukan
+ * kebetulan yang menguntungkan melainkan syarat: penangan sesi dibangun saat sesi pertama kali
+ * diminta, dan ia membaca `session.connection` pada saat itu. Digeser sesudahnya berarti pakuannya
+ * tidak berlaku.
+ *
+ * ## Yang BELUM dikerjakan, dan ditulis supaya tidak dikira sudah
+ *
+ * Lapis gagal-tertutup pertama — koneksi bawaan yang menunjuk database tidak ada, sehingga jalur
+ * yang lupa menggeser meledak sendiri — **belum dapat dipasang**. Ia menuntut database pusat
+ * benar-benar terpisah, sedangkan hari ini seluruh tabel berbagi satu database dan
+ * `coreerp.control_connection` kosong sampai middleware ini mengisinya. Jadi pakuan sisi pusatnya
+ * nyata; yang belum nyata hanyalah ledakan otomatis bagi yang lupa.
+ *
+ * Job antrean juga belum membawa id lingkungannya. Selama hanya lingkungan produksi yang dirutekan
+ * — dan produksi tinggal di database bawaan — tidak ada job yang salah alamat. Itu berhenti benar
+ * pada hari sebuah demo benar-benar dimasuki orang.
  */
 class ResolveEnvironment
 {
+    public function __construct(private readonly EnvironmentConnection $connections) {}
+
     public function handle(Request $request, Closure $next): Response
     {
         $address = EnvironmentAddress::fromHost($request->getHost());
@@ -77,15 +97,33 @@ class ResolveEnvironment
             ->whereNull('deleted_at')
             ->first();
 
-        // Hanya `active` yang boleh dirutekan. Lingkungan yang sedang disiapkan, sedang disalin,
-        // atau bermasalah adalah lingkungan yang **tidak dapat dimasuki** — bukan lingkungan yang
-        // dimasuki lalu ternyata setengah jadi.
-        if (! $environment instanceof Environment || $environment->status !== 'active') {
+        if (! $environment instanceof Environment) {
             abort(404);
+        }
+
+        /*
+         * Hanya `active` yang boleh dirutekan. Lingkungan yang sedang disiapkan, sedang disalin,
+         * sedang diperbarui, atau bermasalah adalah lingkungan yang **tidak dapat dimasuki** —
+         * bukan lingkungan yang dimasuki lalu ternyata setengah jadi.
+         *
+         * Tetapi kodenya dibedakan, karena 404 dan 503 menjawab pertanyaan yang berbeda. 404
+         * berarti "tidak ada", dan itu benar untuk lingkungan yang belum pernah berdiri —
+         * keberadaan sebuah demo adalah informasi yang tidak perlu dibocorkan kepada penanya.
+         * 503 berarti "ada, sedang tidak melayani", dan itu benar untuk lingkungan yang hidup
+         * kemarin: pemiliknya sudah tahu ia ada, jadi menyembunyikannya tidak melindungi apa pun
+         * dan membuat gangguan terbaca seperti salah ketik alamat.
+         *
+         * Pembedanya `schema_migrated_at` — terisi berarti lingkungan itu pernah benar-benar
+         * punya skema, dan karena itu pernah dapat dimasuki.
+         */
+        if ($environment->status !== 'active') {
+            abort($environment->schema_migrated_at !== null ? 503 : 404);
         }
 
         $request->attributes->set('coreerp.environment', $environment);
         app()->instance(ActiveEnvironment::KEY, $environment->id);
+
+        $this->connections->useForRequest($environment);
 
         return $next($request);
     }
