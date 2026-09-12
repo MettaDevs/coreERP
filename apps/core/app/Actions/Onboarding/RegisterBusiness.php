@@ -157,7 +157,7 @@ class RegisterBusiness
                 ]);
             }
 
-            DB::afterCommit(function () use ($appIds, $idEvent, $tenant): void {
+            DB::afterCommit(function () use ($appIds, $idEvent, $tenant, $environment): void {
                 $registry = app(ModuleRegistry::class);
 
                 foreach ($appIds as $appId) {
@@ -174,7 +174,12 @@ class RegisterBusiness
                         continue;
                     }
 
-                    app(InstallModule::class)->handle($appId, $tenant->id);
+                    // Lingkungannya disebut, bukan dibiarkan ditebak. Produksi hari ini
+                    // `database_name`-nya kosong — yaitu database bawaan — jadi jalur ini
+                    // berjalan persis seperti sebelumnya. Yang berubah kelak, ketika produksi
+                    // punya databasenya sendiri, adalah tempat migrationnya berjalan; dan itu
+                    // berubah tanpa menyentuh baris ini lagi.
+                    app(InstallModule::class)->handle($appId, $tenant->id, $environment);
 
                     // Dipancarkan **per module yang benar-benar terpasang**, bukan sekali
                     // untuk seluruh tenant, dan bedanya menentukan apakah ia benar.

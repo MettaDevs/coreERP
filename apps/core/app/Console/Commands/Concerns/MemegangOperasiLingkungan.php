@@ -63,6 +63,20 @@ trait MemegangOperasiLingkungan
      * semacam itu hanya memindahkan balapan satu baris ke atas tanpa menutupnya. Barisnya
      * disisipkan apa adanya, dan bentrokan yang muncul diterjemahkan.
      */
+    /**
+     * Siapa yang meminta operasi ini, bila memang ada manusia di baliknya.
+     *
+     * Null bawaannya, dan itu jawaban yang benar untuk perintah yang dijalankan penjadwal atau
+     * diketik langsung di terminal — kolom "Oleh" pada layar riwayat berbunyi "Sistem", dan memang
+     * begitulah keadaannya. Yang menimpanya hanya perintah yang benar-benar dipanggil atas nama
+     * seseorang; menampilkan "Sistem" untuk tombol yang baru saja ditekan manusia adalah riwayat
+     * yang berbohong justru pada kolom yang ada untuk itu.
+     */
+    protected function dimintaOleh(): ?int
+    {
+        return null;
+    }
+
     protected function bukaOperasi(Environment $lingkungan, string $jenis, bool $ambilAlih = true): ?EnvironmentOperation
     {
         $koneksi = DB::connection((new EnvironmentOperation)->getConnectionName());
@@ -78,6 +92,7 @@ trait MemegangOperasiLingkungan
                 'step' => 'mulai',
                 'started_at' => now(),
                 'lease_until' => now()->addMinutes($this->tenggatOperasiMenit()),
+                'requested_by' => $this->dimintaOleh(),
             ]));
         } catch (QueryException $bentrok) {
             if (! str_contains($bentrok->getMessage(), 'environment_operations_satu_berjalan')) {

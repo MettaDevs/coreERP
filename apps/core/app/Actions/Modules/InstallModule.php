@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Actions\Modules;
 
 use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
+use App\Models\Environment;
 use App\Models\ModuleInstallation;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleMigrator;
 use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\ModuleSeeder;
+use App\Support\Pusat\KoneksiLingkungan;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -25,6 +27,29 @@ use RuntimeException;
  * terpasang tanpa menyentuh data dan tanpa mengisi ulang data awal, sehingga perintah ini
  * aman dijalankan dua kali — sifat yang dibutuhkan admin pelanggan yang menjalankan
  * pembaruan on-prem dengan tangan.
+ *
+ * ## Yang dipasang bukan tenant, melainkan lingkungannya
+ *
+ * Entitlement milik tenant: ia yang menentukan module apa yang **boleh** ada. Pemasangan milik
+ * lingkungan: ia yang menentukan module apa yang **benar-benar** ada di satu tempat kerja. Sebuah
+ * tenant dengan produksi dan demo punya dua database, dan pertanyaan "HR terpasang?" punya dua
+ * jawaban yang berbeda di sana — karena migrationnya memang berjalan atau tidak berjalan di dua
+ * tempat terpisah.
+ *
+ * Karena itu `core_module_installations` tidak diberi kolom `environment_id`. Ia justru **tinggal
+ * di database lingkungan itu sendiri**, berdampingan dengan riwayat migration yang ia gambarkan.
+ * Dua alasan, dan yang kedua yang menentukan:
+ *
+ * 1. `environment:copy` menyalin database secara fisik, sehingga catatan pemasangan ikut apa adanya
+ *    tanpa satu baris kode pun — dan ia memang sudah memeriksa jumlahnya sesudah restore.
+ * 2. `seeded_at` dan riwayat migration harus sepakat. Kalau catatannya di database pusat sementara
+ *    tabelnya di database lingkungan, sebuah restore dari cadangan yang lebih tua membuat keduanya
+ *    berselisih diam-diam: catatannya bilang sudah disemai, tabelnya kosong, dan seed tidak pernah
+ *    berjalan lagi. Satu database membuat keduanya berhasil atau gagal bersama.
+ *
+ * Menyebut lingkungan itu **opsional**, dan kosong berarti lingkungan produksi tenant ini. Produksi
+ * hari ini `database_name`-nya kosong — yaitu database bawaan — sehingga jalur tanpa penyebutan
+ * berjalan persis seperti sebelum pemisahan ini ada.
  */
 final class InstallModule
 {
@@ -33,9 +58,35 @@ final class InstallModule
         private readonly ModuleMigrator $migrator,
         private readonly ModuleSeeder $seeder,
         private readonly EnsureNumberSequenceDrafts $urutanNomor,
+        private readonly KoneksiLingkungan $koneksi,
     ) {}
 
-    public function handle(string $moduleId, string $tenantId): ModuleInstallation
+    public function handle(string $moduleId, string $tenantId, ?Environment $lingkungan = null): ModuleInstallation
+    {
+        $tujuan = $lingkungan ?? $this->produksi($tenantId);
+
+        if (! $tujuan instanceof Environment) {
+            // Tenant tanpa satu pun baris registry. Itu keadaan pemasangan lama yang belum
+            // di-backfill, dan jawabannya database bawaan — sama seperti sebelum lingkungan ada.
+            return $this->pasang($moduleId, $tenantId);
+        }
+
+        return $this->koneksi->jalankanDi(
+            $tujuan,
+            fn (): ModuleInstallation => $this->pasang($moduleId, $tenantId),
+        );
+    }
+
+    private function produksi(string $tenantId): ?Environment
+    {
+        return Environment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('kind', 'production')
+            ->whereNull('deleted_at')
+            ->first();
+    }
+
+    private function pasang(string $moduleId, string $tenantId): ModuleInstallation
     {
         $module = $this->registry->cari($moduleId);
 

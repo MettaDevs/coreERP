@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use App\Models\Tenant;
+use App\Support\Pusat\KoneksiLingkungan;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
@@ -345,6 +346,165 @@ class SiapkanLingkunganTest extends TestCase
             'status' => 'running',
             'step' => 'mulai',
             'started_at' => now(),
+        ]);
+    }
+
+    // ---------------------------------------------------------------- module ikut terpasang
+
+    /**
+     * Yang dijaga di sini adalah cacat yang tidak ditemukan satu pun test sebelumnya.
+     *
+     * Sampai langkah `pasang-module` ada, `environment:siapkan` hanya menjalankan migration Core.
+     * Sebuah demo karena itu lahir dengan skema Core lengkap dan **nol tabel module** — dan seluruh
+     * test pemasangan module tetap hijau, karena semuanya berjalan di database bawaan, satu-satunya
+     * tempat yang memang sudah terisi.
+     *
+     * Dua assertion terakhir yang membuat test ini berarti, dan keduanya tentang tempat: tabel
+     * modulenya ada di database lingkungan, dan catatan pemasangannya **tidak** ada di database
+     * pusat. Tanpa yang kedua, pemasangan yang salah alamat tetap lolos.
+     */
+    public function test_penyiapan_memasang_module_yang_dibeli_ke_database_lingkungannya(): void
+    {
+        $this->daftarkanApp('contoh-a');
+        $this->beri('contoh-a');
+
+        $lingkungan = $this->buatLingkungan('provisioning');
+        $nama = SiapkanLingkungan::namaDatabase($lingkungan);
+
+        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+            ->assertExitCode(Command::SUCCESS);
+
+        $sasaran = $this->koneksiKe($nama);
+
+        $this->assertTrue(
+            $sasaran->getSchemaBuilder()->hasTable('contoh_a_m_barang'),
+            'Migration module harus berjalan ke database lingkungan, bukan hanya migration Core.',
+        );
+
+        $pemasangan = $sasaran->table('core_module_installations')
+            ->where('tenant_id', $this->tenant->id)
+            ->where('module_id', 'contoh-a')
+            ->first();
+
+        $this->assertNotNull($pemasangan, 'Catatan pemasangan hidup di database lingkungan itu sendiri.');
+        $this->assertSame('installed', $pemasangan->status);
+        $this->assertNotNull($pemasangan->seeded_at, 'Data awal module harus benar-benar diisi, bukan dilewati.');
+
+        $this->assertGreaterThan(
+            0,
+            $sasaran->table('contoh_a_m_barang')->where('tenant_id', $this->tenant->id)->count(),
+            'Seeder module menulis ke database lingkungan.',
+        );
+
+        // Sisi pusat tidak boleh ikut ketularan. Kalau salah satu dari keduanya muncul di sini,
+        // pemasangannya berjalan ke database yang salah — dan itu persis keadaan sebelum perbaikan.
+        $this->assertFalse(
+            DB::connection()->getSchemaBuilder()->hasTable('contoh_a_m_barang'),
+            'Tabel module tidak boleh lahir di database pusat.',
+        );
+        $this->assertDatabaseMissing('core_module_installations', [
+            'tenant_id' => $this->tenant->id,
+            'module_id' => 'contoh-a',
+        ]);
+    }
+
+    /**
+     * Entitlement yang menentukan, bukan katalog dan bukan isi folder `modules/`.
+     *
+     * Tanpa syarat ini, tiap pelanggan memperoleh setiap module yang pernah ditulis siapa pun —
+     * termasuk yang tidak ia bayar, di lingkungan yang justru paling sering diperlihatkan kepada
+     * orang luar.
+     */
+    public function test_module_yang_tidak_dibeli_tidak_ikut_terpasang(): void
+    {
+        $this->daftarkanApp('contoh-a');
+        $this->daftarkanApp('contoh-b');
+        $this->beri('contoh-a');
+
+        $lingkungan = $this->buatLingkungan('provisioning');
+
+        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+            ->assertExitCode(Command::SUCCESS);
+
+        $sasaran = $this->koneksiKe(SiapkanLingkungan::namaDatabase($lingkungan));
+
+        $this->assertTrue($sasaran->getSchemaBuilder()->hasTable('contoh_a_m_barang'));
+        $this->assertFalse(
+            $sasaran->getSchemaBuilder()->hasTable('contoh_b_m_rak'),
+            'Module yang entitlement-nya tidak ada tidak boleh ikut terpasang.',
+        );
+    }
+
+    /**
+     * Menggeser koneksi bawaan tidak boleh ikut menyeret sisi pusat.
+     *
+     * Ini bagian yang paling mudah luput dan paling sulit dibaca ketika ia salah. Seeder module
+     * yang membaca `Tenant` di tengah pemasangan akan mencarinya di database sandbox, tidak
+     * menemukannya, lalu gagal dengan pesan yang tidak menyebut sebabnya sama sekali.
+     *
+     * Yang menahannya `coreerp.control_connection`, dipasang selama blok berjalan. Assertion
+     * ketiga yang membuat dua sebelumnya berarti: tabel `tenants` di database lingkungan memang
+     * kosong, jadi baris yang terbaca tadi pasti datang dari pusat.
+     */
+    public function test_sisi_pusat_tetap_di_pusat_selagi_koneksi_digeser(): void
+    {
+        $lingkungan = $this->buatLingkungan('provisioning');
+
+        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+            ->assertExitCode(Command::SUCCESS);
+
+        $lingkungan->refresh();
+        $pusat = (string) config('database.default');
+
+        app(KoneksiLingkungan::class)->jalankanDi($lingkungan, function () use ($pusat): void {
+            $digeser = (string) config('database.default');
+
+            $this->assertNotSame($pusat, $digeser, 'Koneksi bawaan harus benar-benar bergeser.');
+            $this->assertNotNull(
+                Tenant::query()->find($this->tenant->id),
+                'Model bertanda MilikPusat harus tetap terbaca dari database pusat.',
+            );
+            $this->assertSame(
+                0,
+                DB::connection($digeser)->table('tenants')->count(),
+                'Tabel tenants di database lingkungan memang kosong — itu yang membuat assertion di atas berarti.',
+            );
+        });
+
+        $this->assertSame(
+            $pusat,
+            (string) config('database.default'),
+            'Koneksi bawaan harus kembali sesudah blok selesai.',
+        );
+    }
+
+    /** Baris katalog `apps` untuk sebuah module yang memang ada di folder `modules/`. */
+    private function daftarkanApp(string $id): void
+    {
+        DB::table('apps')->updateOrInsert(
+            ['id' => $id],
+            [
+                'name' => 'Module '.$id,
+                'version' => '1.0.0',
+                'status' => 'available',
+                'database_name' => str_replace('-', '_', $id),
+                'updated_at' => now(),
+                'created_at' => now(),
+            ],
+        );
+    }
+
+    /** Entitlement yang berlaku sekarang untuk tenant uji. */
+    private function beri(string $appId): void
+    {
+        DB::table('tenant_app_entitlements')->insert([
+            'tenant_id' => $this->tenant->id,
+            'app_id' => $appId,
+            'status' => 'active',
+            'starts_at' => now()->subDay(),
+            'ends_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 }

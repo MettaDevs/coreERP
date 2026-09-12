@@ -731,6 +731,121 @@ paths:
               schema: { $ref: '#/components/schemas/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /environments/{lingkungan}/siapkan:
+    post:
+      tags: [Pusat admin]
+      operationId: internal.environments.siapkan
+      summary: Siapkan database sebuah lingkungan, lalu pasang module yang dibeli tenantnya
+      description: |
+        **Pemanggilnya pusat admin, bukan app module** — penjaganya token bersama yang sama
+        dengan `/tenants`.
+
+        Di belakangnya berjalan `environment:siapkan`, dan urutannya menentukan: database
+        dibuat, seluruh migration Core dijalankan ke dalamnya, `database_name` dicatat,
+        **lalu** tiap module yang dibeli tenantnya dipasang beserta data awalnya. Statusnya
+        naik ke `active` sesudah semuanya — lingkungan yang setengah terisi harus menjadi
+        tempat yang tidak dapat dimasuki, bukan tempat yang dimasuki lalu ternyata separuh.
+
+        **Sinkron, dan itu keputusan.** Ia menjalankan migration sungguhan dan dapat memakan
+        puluhan detik; pemanggil wajib memberi tenggat yang jauh lebih longgar daripada
+        endpoint lain di berkas ini. Sambungan yang putus tidak membatalkan apa pun di sisi
+        Core — perintahnya berjalan sampai selesai.
+
+        **Aman diulang.** Nama database dihitung dari baris yang sama, "database sudah ada"
+        diperlakukan berhasil, dan migration yang sudah teraplikasi dilewati sendiri. Panggilan
+        kedua yang datang selagi yang pertama masih berjalan ditolak oleh kunci operasinya,
+        bukan dilayani sebagai penyiapan kedua di atas yang pertama.
+
+        Balasannya tanpa envelope `data`, dengan alasan yang sama seperti `/tenants`.
+      security:
+        - controlPlaneToken: []
+      parameters:
+        - name: lingkungan
+          in: path
+          required: true
+          schema: { type: string, format: ulid }
+          description: Id baris `environments` yang disiapkan.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                diminta_oleh:
+                  type: integer
+                  description: |
+                    Id user yang menekan tombolnya. Tercatat pada `environment_operations` supaya
+                    kolom "Oleh" di layar riwayat menyebut orangnya. Dihilangkan bila id-nya tidak
+                    ada sebagai user di sini — kolomnya berkunci asing, dan id yang tidak ada akan
+                    menjatuhkan penyiapannya demi sebuah nama. Kosong berarti riwayatnya berbunyi
+                    "Sistem", persis seperti perintah yang diketik di terminal.
+      responses:
+        '200':
+          description: Lingkungan disiapkan dan aktif.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, database, modul]
+                properties:
+                  status:
+                    type: string
+                    description: Status barisnya sesudah penyiapan; `active` bila berhasil.
+                  database:
+                    type: string
+                    nullable: true
+                    description: Nama database yang kini dipakai lingkungan ini.
+                  modul:
+                    type: array
+                    description: |
+                      Dibaca dari database lingkungan itu, bukan disimpulkan dari entitlement
+                      tenantnya. Kosong bila tenantnya tidak membeli satu pun module yang ada
+                      di edisi ini — atau bila daftarnya tidak terbaca, yang sengaja tidak
+                      menggagalkan penyiapan yang sudah berhasil.
+                    items:
+                      type: object
+                      required: [id, versi, status, disemai]
+                      properties:
+                        id: { type: string }
+                        versi: { type: string }
+                        status:
+                          type: string
+                          enum: [installed, disabled, uninstalled]
+                        disemai:
+                          type: boolean
+                          description: Data awal module ini sudah pernah diisi.
+                  catatan:
+                    type: string
+                    description: Keluaran mentah perintahnya, untuk ditempel ke laporan.
+        '401':
+          description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Lingkungan itu tidak ada di registry, atau sudah dihapus lunak.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            Statusnya bukan `provisioning` maupun `degraded`. Menyiapkan ulang lingkungan yang
+            sudah hidup akan menimpa isinya, jadi ia ditolak — dan ini keadaan yang dapat
+            berubah sendiri sebelum orangnya menekan tombol, bukan permintaan yang salah bentuk.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: |
+            Penyiapannya berjalan dan gagal. Lingkungannya turun ke `degraded`, dan `message`
+            memuat alasan yang tercatat di `environment_operations` — bukan keluaran perintahnya,
+            karena yang tercatat itulah yang masih dapat dibaca besok.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
 components:
   securitySchemes:
     controlPlaneToken:

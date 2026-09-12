@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Actions\Modules\PasangModulYangDibeli;
 use App\Console\Commands\Concerns\MemegangOperasiLingkungan;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
+use App\Support\Pusat\KoneksiLingkungan;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use PDOException;
@@ -50,23 +52,13 @@ final class SiapkanLingkungan extends Command
 {
     use MemegangOperasiLingkungan;
 
-    protected $signature = 'environment:siapkan {environment : Id baris environments yang disiapkan}';
+    protected $signature = 'environment:siapkan {environment : Id baris environments yang disiapkan}'
+        .' {--diminta-oleh= : Id user yang meminta; dipakai konsol operator supaya riwayatnya bernama}';
 
     protected $description = 'Buatkan database sebuah environment, jalankan migration Core ke dalamnya, lalu aktifkan';
 
     /** Koneksi sementara ke database environment yang sedang disiapkan. */
     private const KONEKSI = 'lingkungan_disiapkan';
-
-    /**
-     * Koneksi kedua ke database pusat, dipakai hanya untuk `CREATE DATABASE`.
-     *
-     * PostgreSQL menolak `CREATE DATABASE` di dalam blok transaksi, dan koneksi bawaan sangat
-     * mungkin sedang berada di dalam satu — di suite test ia selalu begitu. PDO terpisah adalah
-     * satu-satunya cara berada di luarnya tanpa menyentuh transaksi milik orang lain. Ia hanya
-     * pernah membaca `pg_database` dan membuat database baru; tidak satu pun tabel repo ini
-     * disentuh lewat sini.
-     */
-    private const KONEKSI_PEMELIHARA = 'lingkungan_pemelihara';
 
     /**
      * Status yang boleh disiapkan.
@@ -76,6 +68,13 @@ final class SiapkanLingkungan extends Command
      * cukup untuk sampai ke sana.
      */
     private const STATUS_BOLEH = ['provisioning', 'degraded'];
+
+    public function __construct(
+        private readonly PasangModulYangDibeli $modul,
+        private readonly KoneksiLingkungan $koneksi,
+    ) {
+        parent::__construct();
+    }
 
     /**
      * Berapa lama sebuah operasi boleh memegang kuncinya sebelum boleh direbut.
@@ -94,6 +93,35 @@ final class SiapkanLingkungan extends Command
     protected function tenggatOperasiMenit(): int
     {
         return 30;
+    }
+
+    /**
+     * Dua bentuk diterima, dan itu bukan kelonggaran melainkan perbaikan cacat.
+     *
+     * Versi pertama hanya menerima string, karena begitulah bentuknya ketika opsi ini diketik di
+     * terminal. Tetapi pemanggil yang sebenarnya `Artisan::call()` dari controller internal, dan ia
+     * meneruskan **int** apa adanya lewat `ArrayInput`. Akibatnya penyiapan dari tombol tetap
+     * berhasil sepenuhnya sementara kolom "Oleh" pada riwayat berbunyi "Sistem" — kegagalan yang
+     * tidak berbunyi di mana pun.
+     *
+     * Testnya ikut setuju dengan asumsi yang salah itu, karena ia memanggil perintahnya dengan
+     * `(string) $id`. Yang menemukannya satu panggilan HTTP sungguhan.
+     */
+    protected function dimintaOleh(): ?int
+    {
+        // `$this->input->getOption()`, bukan `$this->option()`. Keduanya membaca nilai yang sama,
+        // tetapi PHPDoc Laravel menyatakan yang kedua mengembalikan `string|array|bool|null` —
+        // padahal `ArrayInput` menyimpan apa pun yang diberikan pemanggilnya apa adanya. Memakai
+        // yang pertama membuat pemeriksaan `int` di bawah menjadi pemeriksaan yang jujur, bukan
+        // cabang yang menurut analisa statis tidak pernah tercapai padahal ia justru satu-satunya
+        // yang tercapai di jalur sungguhan.
+        $id = $this->input->getOption('diminta-oleh');
+
+        if (is_int($id)) {
+            return $id;
+        }
+
+        return is_string($id) && $id !== '' && ctype_digit($id) ? (int) $id : null;
     }
 
     public function handle(): int
@@ -147,20 +175,37 @@ final class SiapkanLingkungan extends Command
             $langkah = 'sidik-skema';
             $sidik = $this->sidikSkema();
 
-            $langkah = 'aktifkan';
+            /*
+             * Databasenya dicatat **sebelum** module dipasang, dan statusnya belum dinaikkan.
+             *
+             * Urutan ini yang membuat langkah berikutnya mungkin sama sekali: pemasangan module
+             * menanyakan `database_name` untuk tahu ke mana ia harus menulis, dan baris yang belum
+             * mencatatnya akan mengirim seluruh migration module ke database pusat. Statusnya tetap
+             * `provisioning` sampai isinya lengkap — lingkungan yang setengah terisi harus menjadi
+             * tempat yang tidak dapat dimasuki, bukan tempat yang dimasuki lalu ternyata separuh.
+             */
+            $langkah = 'catat-database';
             $lingkungan->update([
                 'database_name' => $nama,
                 'schema_migrated_at' => now(),
                 'schema_fingerprint' => $sidik,
-                'status' => 'active',
             ]);
+
+            $langkah = 'pasang-module';
+            $modul = $this->modul->untuk($lingkungan);
+            $this->line($modul === []
+                ? '  tidak ada module yang dibeli tenant ini; hanya skema Core yang dipasang.'
+                : sprintf('  module terpasang: %s.', implode(', ', $modul)));
+
+            $langkah = 'aktifkan';
+            $lingkungan->update(['status' => 'active']);
 
             $operasi->update([
                 'status' => 'succeeded',
                 'step' => $langkah,
                 'finished_at' => now(),
                 'lease_until' => null,
-                'detail' => ['database' => $nama, 'sidik' => $sidik],
+                'detail' => ['database' => $nama, 'sidik' => $sidik, 'module' => $modul],
             ]);
 
             $this->info(sprintf('Environment "%s" aktif di database "%s" (sidik %s).', $lingkungan->slug, $nama, $sidik));
@@ -216,7 +261,7 @@ final class SiapkanLingkungan extends Command
             throw new RuntimeException(sprintf('Nama database "%s" tidak berbentuk identifier yang aman.', $nama));
         }
 
-        $dasar = $this->konfigurasiDasar();
+        $dasar = $this->koneksi->konfigurasiDasar();
 
         // Penjaga terakhir sebelum sesuatu yang tidak bisa dibatalkan. Kalau perhitungan nama
         // pernah menghasilkan nama database pusat, langkah berikutnya akan menjalankan seluruh
@@ -225,11 +270,10 @@ final class SiapkanLingkungan extends Command
             throw new RuntimeException('Nama database environment sama dengan database pusat; penyiapan dihentikan.');
         }
 
-        config(['database.connections.'.self::KONEKSI_PEMELIHARA => $dasar]);
-        DB::purge(self::KONEKSI_PEMELIHARA);
+        $pemelihara = $this->koneksi->pemelihara();
 
         try {
-            $koneksi = DB::connection(self::KONEKSI_PEMELIHARA);
+            $koneksi = DB::connection($pemelihara);
 
             if ($koneksi->selectOne('select 1 from pg_database where datname = ?', [$nama]) !== null) {
                 return false;
@@ -252,30 +296,21 @@ final class SiapkanLingkungan extends Command
 
             throw $e;
         } finally {
-            DB::purge(self::KONEKSI_PEMELIHARA);
+            DB::purge($pemelihara);
         }
     }
 
     /**
      * Mendaftarkan koneksi ke database yang baru, lalu mendirikan schema yang ditunjuk search_path.
      *
-     * Konfigurasinya disalin dari koneksi bawaan supaya host, kredensial, dan search_path tidak
-     * pernah menyimpang darinya. `url` dikosongkan karena Laravel mendahulukannya di atas `database`
-     * bila ia terisi — dan bila itu terjadi, seluruh migration di bawah ini akan berjalan ke
-     * database pusat.
+     * Isinya pindah ke {@see KoneksiLingkungan} ketika pemasangan module ikut membutuhkannya.
+     * Salinan ketiga dari logika yang sama adalah salinan yang akan menyimpang, dan yang menyimpang
+     * di sini adalah jawaban atas pertanyaan "database mana".
      */
     private function siapkanKoneksi(string $nama): void
     {
-        $konfigurasi = $this->konfigurasiDasar();
-        $konfigurasi['database'] = $nama;
-        $konfigurasi['url'] = null;
-
-        config(['database.connections.'.self::KONEKSI => $konfigurasi]);
-        DB::purge(self::KONEKSI);
-
-        foreach ($this->skemaDari($konfigurasi) as $skema) {
-            DB::connection(self::KONEKSI)->statement(sprintf('CREATE SCHEMA IF NOT EXISTS "%s"', $skema));
-        }
+        $this->koneksi->daftarkan(self::KONEKSI, $nama);
+        $this->koneksi->dirikanSkema(self::KONEKSI);
     }
 
     /**
@@ -307,49 +342,6 @@ final class SiapkanLingkungan extends Command
         $this->tutupOperasiSebagaiGagal($operasi, $langkah, $e);
 
         $lingkungan->update(['status' => 'degraded']);
-    }
-
-    /** @return array<string, mixed> */
-    private function konfigurasiDasar(): array
-    {
-        $bawaan = (string) config('database.default');
-        $konfigurasi = config('database.connections.'.$bawaan);
-
-        if (! is_array($konfigurasi)) {
-            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $bawaan));
-        }
-
-        /** @var array<string, mixed> $konfigurasi */
-        return $konfigurasi;
-    }
-
-    /**
-     * Schema yang harus ada di database baru supaya search_path koneksinya menunjuk sesuatu.
-     *
-     * `public` dilewati: ia sudah ada di tiap database baru, dan `CREATE SCHEMA` atasnya menuntut
-     * hak yang belum tentu dimiliki peran aplikasi.
-     *
-     * @param  array<string, mixed>  $konfigurasi
-     * @return list<string>
-     */
-    private function skemaDari(array $konfigurasi): array
-    {
-        $search = $konfigurasi['search_path'] ?? 'public';
-        $daftar = is_array($search) ? $search : explode(',', (string) $search);
-
-        $hasil = [];
-
-        foreach ($daftar as $skema) {
-            $bersih = trim((string) $skema, " \t\"'");
-
-            if ($bersih === '' || $bersih === 'public' || preg_match('/^[a-z][a-z0-9_]*$/', $bersih) !== 1) {
-                continue;
-            }
-
-            $hasil[] = $bersih;
-        }
-
-        return $hasil;
     }
 
     /** Mengubah sepotong slug menjadi bagian identifier yang sah, tanpa membuatnya unik. */

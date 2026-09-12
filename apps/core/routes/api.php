@@ -5,6 +5,7 @@ use App\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Http\Controllers\Internal\MemberDirectoryController;
 use App\Http\Controllers\Internal\OrganizationDirectoryController;
 use App\Http\Controllers\Internal\PembuatanTenantController;
+use App\Http\Controllers\Internal\PenyiapanLingkunganController;
 use App\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Http\Controllers\NumberSequence\InternalNumberSequenceController;
 use App\Http\Controllers\Workflow\InternalWorkflowInstanceController;
@@ -41,4 +42,5 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
  */
 Route::prefix('internal/v1')->middleware(['throttle:30,1', 'pusat-admin'])->group(function (): void {
     Route::post('tenants', [PembuatanTenantController::class, 'store']);
+    Route::post('environments/{lingkungan}/siapkan', [PenyiapanLingkunganController::class, 'store']);
 });
