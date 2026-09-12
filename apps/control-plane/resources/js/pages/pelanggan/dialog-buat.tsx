@@ -110,7 +110,7 @@ export default function DialogBuat({
 
                     <div className="space-y-4 py-4">
                         {galatLain.length > 0 && (
-                            <div className="border-destructive/40 text-destructive rounded-md border bg-red-50 px-4 py-3 text-sm">
+                            <div className="border-destructive/40 text-destructive rounded-md border bg-red-50 px-4 py-3 text-sm dark:bg-red-950/40 dark:text-red-200">
                                 {galatLain.map((pesan) => (
                                     <p key={pesan}>{pesan}</p>
                                 ))}

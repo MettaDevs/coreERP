@@ -22,6 +22,12 @@ export const namaStatus: Record<string, string> = {
     soft_deleted: 'Dihapus',
 };
 
+export const namaStatusModul: Record<string, string> = {
+    installed: 'Terpasang',
+    disabled: 'Dimatikan',
+    uninstalled: 'Dicopot',
+};
+
 export const namaOperasi: Record<string, string> = {
     provision: 'Penyiapan',
     copy: 'Penyalinan',

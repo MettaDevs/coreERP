@@ -49,7 +49,7 @@ export default function KartuKredensial({
     }
 
     return (
-        <section className="rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950">
+        <section className="rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-50">
             <h2 className="text-base font-semibold">
                 Akun admin untuk {kredensial.nama} sudah dibuat
             </h2>
@@ -64,7 +64,7 @@ export default function KartuKredensial({
             </p>
 
             <dl className="mt-4 space-y-2">
-                <div className="bg-background flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 px-4 py-3">
+                <div className="bg-background flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 px-4 py-3 dark:border-amber-900/60">
                     <div className="min-w-0">
                         <dt className="text-muted-foreground text-xs">
                             Email admin
@@ -83,7 +83,7 @@ export default function KartuKredensial({
                     </Button>
                 </div>
 
-                <div className="bg-background flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 px-4 py-3">
+                <div className="bg-background flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 px-4 py-3 dark:border-amber-900/60">
                     <div className="min-w-0">
                         <dt className="text-muted-foreground text-xs">
                             Kata sandi sementara

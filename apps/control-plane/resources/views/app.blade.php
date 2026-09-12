@@ -6,14 +6,36 @@
         <meta name="robots" content="noindex, nofollow">
 
         {{--
-            Tidak ada pemilih tema gelap/terang di sini, tidak seperti Core.
+            Tema dibaca dan diterapkan di sini, sebelum badan halaman tergambar.
 
-            Konsol ini dipakai segelintir operator, dan setiap sakelar tampilan menuntut
-            penyimpanan preferensi, satu skrip sebelum render supaya layarnya tidak berkedip,
-            dan satu hal lagi yang bisa berbeda antara dua aplikasi. Tema terang saja dulu;
-            menambahkannya kelak jauh lebih murah daripada mencabutnya.
+            Sumbernya `localStorage`, bukan cookie seperti di Core. Core membacanya di PHP karena ia
+            merender di sisi server; konsol ini tidak — `inertia({ ssr: false })` — jadi cookie
+            hanya akan menambah satu hal yang harus dikecualikan dari enkripsi cookie Laravel
+            sebelum PHP dapat membacanya sama sekali.
+
+            Skripnya wajib berdiri di `<head>` dan wajib sinkron. Menaruhnya di berkas masuk berarti
+            halaman tergambar terang lebih dulu lalu menggelap sesudah bundel tiba, dan kedipan
+            putih itulah yang membuat sakelar tema terasa rusak.
         --}}
-        <style>html { background-color: hsl(210 30% 96%); }</style>
+        <script>
+            (function () {
+                try {
+                    var pilihan = localStorage.getItem('tampilan');
+                    var gelap = pilihan === 'gelap'
+                        || (pilihan !== 'terang'
+                            && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+                    document.documentElement.classList.toggle('dark', gelap);
+                    document.documentElement.style.colorScheme = gelap ? 'dark' : 'light';
+                } catch (e) {
+                    // Peramban yang memblokir penyimpanan situs tetap mendapat tema terang.
+                }
+            })();
+        </script>
+        <style>
+            html { background-color: hsl(210 30% 96%); }
+            html.dark { background-color: oklch(0.145 0 0); }
+        </style>
 
         @vite(['resources/css/app.css', 'resources/js/app.tsx'])
         <x-inertia::head>

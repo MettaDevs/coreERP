@@ -202,10 +202,10 @@ export default function DialogBuat({
                             </p>
                             <p className="text-muted-foreground text-xs">
                                 Yang tercatat di sini baru registry-nya.
-                                Databasenya disiapkan satu perintah sesudahnya,
-                                dan perintahnya muncul di halaman rincian —
-                                sampai itu selesai, lingkungannya tidak dapat
-                                dibuka siapa pun.
+                                Databasenya disiapkan satu langkah sesudahnya,
+                                lewat tombol di halaman rincian — sampai itu
+                                selesai, lingkungannya tidak dapat dibuka siapa
+                                pun.
                             </p>
                         </dl>
                     </div>

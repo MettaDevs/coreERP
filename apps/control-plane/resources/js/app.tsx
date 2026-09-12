@@ -1,6 +1,7 @@
 import { createInertiaApp } from '@inertiajs/react';
 import type { ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
+import { pasangTema } from '@/hooks/tema';
 
 type ModulHalaman = { default: ComponentType<Record<string, unknown>> };
 
@@ -12,6 +13,8 @@ type ModulHalaman = { default: ComponentType<Record<string, unknown>> };
  * seluruh halaman hilang sekaligus tanpa satu pun pesan saat membangun.
  */
 const halaman = import.meta.glob<ModulHalaman>('./pages/**/*.tsx');
+
+pasangTema();
 
 void createInertiaApp({
     title: (judul) => (judul ? `${judul} · Pusat Admin` : 'Pusat Admin'),

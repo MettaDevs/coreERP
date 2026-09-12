@@ -16,7 +16,7 @@ export default function Login() {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-[hsl(210_30%_96%)] px-6">
+        <div className="bg-muted/30 text-foreground flex min-h-screen items-center justify-center px-6">
             <Head title="Masuk" />
             <form
                 onSubmit={kirim}
