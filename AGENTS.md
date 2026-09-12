@@ -1,5 +1,6 @@
 # CoreERP
 
+- **Belum ada satu pun pelanggan di aplikasi ini.** Per 13 September 2026, nol pelanggan sungguhan, nol lingkungan produksi yang dipakai orang luar. Setiap tenant, lingkungan, dan baris data yang ada hari ini adalah data percobaan. Jangan menulis kalimat, keputusan, atau peringatan yang berasumsi ada pelanggan yang sedang memakai sistem ini — dan jangan menahan perubahan yang berisiko demi data yang sebenarnya boleh dibuang. Baris ini berlaku sampai pemilik produk menghapusnya sendiri; jangan hapus atas inisiatif sendiri meskipun terlihat sudah tidak berlaku.
 - Desain kanonik ada di `docs/dev/README.md` dan di Dynamic 365 https://learn.microsoft.com/en-us/dynamics365/. Buka hanya dokumen yang relevan dengan tugas; dokumen konsep lama bersifat historis.
 - Jaga perubahan dan dependency tetap minimal. Jangan membuat abstraksi atau compatibility layer spekulatif kalau ada yang bingung langsung tanyakan saya, stop berfikir sampainkonteks jelas. /
 - Untuk perubahan source atau audit keterbacaan, gunakan skill `code-formatting`: pakai formatter yang sudah ada, pisahkan perubahan format dari perubahan perilaku, dan jangan menambah atau mengubah kebijakan formatter tanpa persetujuan eksplisit.
