@@ -17,6 +17,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -38,6 +39,7 @@ use Tests\TestCase;
  * PostgreSQL yang benar-benar dibuat lebih dulu, sehingga "tidak jadi dibuang" adalah fakta yang
  * dibaca dari `pg_database` — bukan dari ketiadaan sesuatu yang memang tidak pernah ada.
  */
+#[Group('serial')]
 class EnvironmentLifecycleTest extends TestCase
 {
     use RefreshDatabase;

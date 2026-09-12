@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -33,6 +34,7 @@ use Tests\TestCase;
  * satu pernyataan — dan yang kedua membuktikan `environments_sumber_hanya_sandbox` tidak pernah
  * dapat menggigit jalur ini. Tanpa keduanya, komentar panjang di perintahnya hanya klaim.
  */
+#[Group('serial')]
 class ConvertEnvironmentTest extends TestCase
 {
     use RefreshDatabase;
@@ -479,7 +481,7 @@ class ConvertEnvironmentTest extends TestCase
     }
 
     /** @return list<string> */
-    private function testDatabase(): array
+    private function test_database(): array
     {
         $rows = $this->maintenance()->select(
             'select datname from pg_database where datname like ? order by datname',

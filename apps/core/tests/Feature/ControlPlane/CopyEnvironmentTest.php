@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -43,6 +44,7 @@ use Tests\TestCase;
  * Seluruh database yang dibuat di sini bernama `env_ujisalin_...`. Awalan itu ada supaya sisa yang
  * lolos dari pembersihan langsung terbaca sebagai sampah test, bukan milik seseorang.
  */
+#[Group('serial')]
 class CopyEnvironmentTest extends TestCase
 {
     use RefreshDatabase;
@@ -590,7 +592,7 @@ class CopyEnvironmentTest extends TestCase
     }
 
     /** @return list<string> */
-    private function testDatabase(): array
+    private function test_database(): array
     {
         $rows = $this->maintenance()->select(
             'select datname from pg_database where datname like ? order by datname',

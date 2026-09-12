@@ -14,6 +14,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 /**
@@ -27,6 +28,7 @@ use Tests\TestCase;
  * Seluruh database yang dibuat di sini bernama `env_ujisiapkan_...`. Awalan itu ada supaya sisa
  * yang lolos dari pembersihan langsung terbaca sebagai sampah test, bukan milik seseorang.
  */
+#[Group('serial')]
 class ProvisionEnvironmentTest extends TestCase
 {
     use RefreshDatabase;
@@ -247,7 +249,7 @@ class ProvisionEnvironmentTest extends TestCase
     }
 
     /** @return list<string> */
-    private function testDatabase(): array
+    private function test_database(): array
     {
         $rows = $this->maintenance()->select(
             'select datname from pg_database where datname like ? order by datname',
