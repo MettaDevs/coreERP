@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * Satu tempat kerja milik sebuah tenant.
@@ -28,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property ?string $database_name
  * @property string $status
  * @property bool $outbound_allowed
+ * @property ?Carbon $purged_at
  */
 class Environment extends Model
 {
@@ -51,7 +53,7 @@ class Environment extends Model
     ];
 
     /*
-     * `deleted_at` dan `purge_after` sengaja TIDAK dapat diisi massal.
+     * `deleted_at`, `purge_after`, dan `purged_at` sengaja TIDAK dapat diisi massal.
      *
      * Keduanya terikat satu sama lain dan pada `status` oleh constraint database: menghapus lunak
      * wajib menulis ketiganya sekaligus, dan menulis salah satunya saja ditolak PostgreSQL. Trait
@@ -69,6 +71,7 @@ class Environment extends Model
             'schema_migrated_at' => 'datetime',
             'deleted_at' => 'datetime',
             'purge_after' => 'datetime',
+            'purged_at' => 'datetime',
         ];
     }
 
