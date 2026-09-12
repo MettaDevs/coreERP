@@ -34,8 +34,25 @@ abstract class TestCase extends BaseTestCase
          * `parent::setUp()` karena di situlah pengosongannya berjalan, dan kerusakannya tidak
          * dapat dibatalkan.
          */
-        $koneksi = (string) (getenv('DB_CONNECTION') ?: ($_ENV['DB_CONNECTION'] ?? ''));
-        $jalur = (string) (getenv('DB_TEST_SCHEMA') ?: ($_ENV['DB_TEST_SCHEMA'] ?? 'coreerp_test'));
+        $baca = static fn (string $kunci): string => (string) (getenv($kunci) ?: ($_ENV[$kunci] ?? ''));
+
+        $koneksi = $baca('DB_CONNECTION');
+        $jalur = $baca('DB_TEST_SCHEMA') ?: 'coreerp_test';
+
+        // Akarnya, dan ia tidak bergantung pada schema sama sekali: selama database test dan
+        // database kerja adalah database yang sama, tiap jalur yang kebetulan menunjuk `public`
+        // akan mengosongkan data kerja. Suite ini membangun ulang seluruh skema Core, jadi ia
+        // justru yang paling merusak kalau salah alamat.
+        $databaseKerja = $baca('DB_DATABASE');
+        $databaseUji = $baca('DB_TEST_DATABASE');
+
+        if ($databaseKerja !== '' && $databaseUji === $databaseKerja) {
+            $this->fail(
+                'DB_TEST_DATABASE sama dengan DB_DATABASE ("'.$databaseKerja.'"). Suite ini '
+                .'menjalankan migrate:fresh, jadi ia akan membuang seluruh tabel database yang '
+                .'sedang dipakai bekerja. Buat database terpisah lalu setel DB_TEST_DATABASE.'
+            );
+        }
 
         if ($koneksi !== 'pgsql_test' || $jalur === 'public') {
             $this->fail(

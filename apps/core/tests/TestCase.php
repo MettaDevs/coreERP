@@ -54,6 +54,21 @@ abstract class TestCase extends BaseTestCase
             );
         }
 
+        // Akarnya, dan ia tidak bergantung pada schema sama sekali: selama database test dan
+        // database kerja adalah database yang sama, tiap jalur baru yang kebetulan menunjuk
+        // `public` akan mengosongkan data kerja. Dua penjagaan sebelumnya menambal jalur; yang ini
+        // menutup kelasnya.
+        $databaseKerja = $baca('DB_DATABASE');
+        $databaseUji = $baca('DB_TEST_DATABASE');
+
+        if ($databaseKerja !== '' && $databaseUji === $databaseKerja) {
+            $this->fail(
+                'DB_TEST_DATABASE sama dengan DB_DATABASE ("'.$databaseKerja.'"). Test akan '
+                .'mengosongkan database yang sedang dipakai bekerja. Buat database terpisah: '
+                .'`createdb '.$databaseKerja.'_test`, lalu setel DB_TEST_DATABASE ke sana.'
+            );
+        }
+
         // Mode paralel tanpa token adalah keadaan yang tidak pernah dimaksudkan siapa pun, dan ia
         // persis yang mengosongkan database dev dua kali. Ditolak terpisah supaya pesannya menyebut
         // sebabnya, bukan sekadar nama schema yang kebetulan sudah benar.
