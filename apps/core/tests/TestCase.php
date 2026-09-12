@@ -17,14 +17,21 @@ abstract class TestCase extends BaseTestCase
      * tanpa satu pun peringatan: yang terlihat hanyalah suite yang hijau, lalu stack lokal yang
      * tiba-tiba kosong.
      *
-     * Sudah terjadi sekali pada 12 September 2026, dan yang hilang adalah tenant beserta akun
-     * operator di database dev. Jejaknya TRUNCATE, bukan drop: `pg_stat_user_tables` mencatat
-     * `n_tup_del = 0` dengan `n_live_tup = 0`, seluruh 116 tabel masih berdiri, dan tabel
-     * `migrations` justru selamat — persis yang dikecualikan `DatabaseTruncation`.
+     * Sudah terjadi **dua kali**, 11 dan 12 September 2026, dan yang hilang adalah tenant, akun
+     * operator, beserta seluruh katalog app di database dev. Jejaknya TRUNCATE bukan drop:
+     * `pg_stat_user_tables` mencatat `n_tup_del = 0` dengan `n_live_tup = 0`, seluruh 116 tabel
+     * masih berdiri, dan tabel `migrations` justru selamat — persis yang dikecualikan
+     * `DatabaseTruncation`.
      *
-     * Karena itu yang diperiksa di sini alamatnya, bukan mekanismenya. Pemeriksaannya berdiri
-     * sebelum satu baris test pun berjalan, karena kerusakannya tidak dapat dibatalkan —
-     * mencetaknya sesudah tidak menolong siapa pun.
+     * Penyebabnya ditelusuri dan terbukti, bukan ditebak: dengan `LARAVEL_PARALLEL_TESTING`
+     * menyala tetapi `TEST_TOKEN` kosong, koneksi test resolve ke database `core_erp` dengan
+     * `search_path` `public` — yaitu tempat kerja pengembang sendiri. Sakelar yang tertinggal di
+     * lingkungan shell sudah cukup. `config/database.php` kini menutupnya di sumbernya; pemeriksaan
+     * di sini lapis keduanya, dan ia yang memberi pesan terbaca.
+     *
+     * Karena itu yang diperiksa alamatnya, bukan mekanismenya. Ia berdiri sebelum satu baris test
+     * pun berjalan, karena kerusakannya tidak dapat dibatalkan — mencetaknya sesudah tidak
+     * menolong siapa pun.
      */
     protected function setUp(): void
     {
@@ -32,14 +39,30 @@ abstract class TestCase extends BaseTestCase
         // memang tidak boleh berdiri lebih dulu, karena `RefreshDatabase` menumpang
         // `parent::setUp()` di bawah dan sudah mengosongkan schema-nya sebelum baris pertama test
         // manapun sempat memeriksa apa pun.
-        $koneksi = (string) (getenv('DB_CONNECTION') ?: ($_ENV['DB_CONNECTION'] ?? ''));
-        $jalur = (string) (getenv('DB_TEST_SCHEMA') ?: ($_ENV['DB_TEST_SCHEMA'] ?? 'coreerp_test'));
+        $baca = static fn (string $kunci): string => (string) (getenv($kunci) ?: ($_ENV[$kunci] ?? ''));
+
+        $koneksi = $baca('DB_CONNECTION');
+        $jalur = $baca('DB_TEST_SCHEMA') ?: 'coreerp_test';
+        $paralel = $baca('LARAVEL_PARALLEL_TESTING');
+        $token = $baca('TEST_TOKEN');
 
         if (! str_starts_with($koneksi, 'pgsql_test') || $jalur === 'public') {
             $this->fail(
                 'Suite ini menunjuk koneksi "'.$koneksi.'" dengan search_path "'.$jalur.'". '
                 .'Test hanya boleh berjalan di schema test — trait penyiap database mengosongkan '
                 .'schema yang ditunjuknya, dan tidak ada yang mengembalikan isinya.'
+            );
+        }
+
+        // Mode paralel tanpa token adalah keadaan yang tidak pernah dimaksudkan siapa pun, dan ia
+        // persis yang mengosongkan database dev dua kali. Ditolak terpisah supaya pesannya menyebut
+        // sebabnya, bukan sekadar nama schema yang kebetulan sudah benar.
+        if ($paralel !== '' && $token === '') {
+            $this->fail(
+                'LARAVEL_PARALLEL_TESTING menyala tetapi TEST_TOKEN kosong. Di keadaan itu koneksi '
+                .'test jatuh ke database kerja pengembang, dan trait penyiap database akan '
+                .'mengosongkannya. Cabut sakelar itu dari lingkungan shell, atau jalankan lewat '
+                .'`php artisan test --parallel` yang mengisi tokennya sendiri.'
             );
         }
 
