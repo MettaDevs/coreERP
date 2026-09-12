@@ -36,6 +36,18 @@
       ],
       "cwd": "apps/control-plane",
       "port": 8001
+    },
+    {
+      "name": "core-worker",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "artisan",
+        "queue:work",
+        "--tries=1",
+        "--timeout=900"
+      ],
+      "cwd": "apps/core",
+      "port": 8002
     }
   ]
 }
