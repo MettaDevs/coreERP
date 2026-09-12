@@ -197,7 +197,7 @@ yang lahir besok tertangkap tanpa ada yang perlu mendaftarkannya. Ia juga menola
 dari pemindai yang tidak menemukan pelanggaran.
 
 Satu pengecualian tercatat di `.dockerignore`, dan ia sengaja sempit: **manifest npm** milik
-`apps/pusat-admin` ikut ke konteks pembangunan, isi foldernya tidak. Sebabnya mekanis — folder itu
+`apps/control-plane` ikut ke konteks pembangunan, isi foldernya tidak. Sebabnya mekanis — folder itu
 disebut `workspaces` pada `package.json` akar, dan `npm ci` di tahap `assets` berhenti sebelum satu
 paket pun terpasang bila sebuah workspace yang disebut di sana tidak ada. Nol baris kode konsol ikut
 masuk, dan tahap akhir tetap hanya menyalin `apps/core`, jadi jalur pertama di atas tetap yang

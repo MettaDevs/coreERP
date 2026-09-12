@@ -1,7 +1,24 @@
-# Environment dan pusat admin
+# Control plane: pelanggan, environment, dan cara keduanya lahir
 
 Halaman ini rencana kerja, bukan desain kanonik. Ia menunggu review; bila disetujui, isinya naik ke
 `docs/dev/` sebagai halaman desain tersendiri — dan itulah yang menutup instruksi `LIFE-15`.
+
+## Pertanyaan yang harus dijawab halaman ini
+
+> *Sebuah perusahaan tertarik dengan sistem kita. Apa yang harus saya lakukan sekarang?*
+
+Itu pertanyaan pemilik produk, dan ia yang menentukan seluruh bentuk halaman ini. Jawabannya —
+beserta alasannya di [bagian tersendiri](#dari-tertarik-sampai-jadi-pelanggan) — adalah:
+
+**Buatkan tenant untuk perusahaan itu, berisi satu environment demo berbatas waktu.** Jangan
+menumpangkan demonya ke tenant milik kita sendiri.
+
+Versi pertama halaman ini menjawab pertanyaan yang salah. Ia merancang **daftar environment** untuk
+tenant yang sudah ada, padahal pekerjaannya dimulai satu langkah sebelumnya: tenant itu sendiri
+harus dilahirkan, beserta admin pertamanya. Hari ini tenant **hanya bisa lahir dari pendaftaran
+mandiri** — tidak ada satu pun jalur bagi operator. Konsol yang dibangun di atas rancangan lama
+karena itu hanya dapat melayani pelanggan yang kebetulan sudah mendaftar sendiri, kebalikan dari
+alur jualan yang sebenarnya.
 
 ## Kenapa ini ada
 
@@ -52,16 +69,208 @@ Kata **demo** tidak muncul satu kali pun di seluruh `docs/`. Halaman ini yang pe
 | Bundle on-prem beserta pemasangan dan jalur mundurnya | Ada, sudah dijalankan | [bundle on-prem](../bundle-on-prem/README.md) |
 | Identitas operator vendor | Ada, tetapi hanya dua izin | tabel `provider_access` |
 
-## Yang belum ada
+## Yang belum ada, diukur bukan ditaksir
 
-- Registry environment. `tenants` tidak punya kolom jenis maupun lingkungan.
-- Jalur operator untuk membuat apa pun. Tenant hanya lahir dari **pendaftaran mandiri**; tidak ada
-  satu pun layar atau endpoint yang membuat, menangguhkan, atau mengatur tenant.
-- Menyalin sebuah environment, mengosongkannya, memulihkannya, atau menetapkan masa berlakunya.
-- Mode pemeliharaan.
-- Data contoh. Repo hanya punya seeder bahan uji dan satu factory.
-- Batas antara alat vendor dan aplikasi pelanggan — lihat bagian berikutnya, dan ini yang paling
-  mendesak dari seluruh daftar ini.
+Dibaca dari kode pada 12 September 2026. Tiap baris punya bukti negatifnya — bukan "sepertinya
+belum ada", melainkan "pemanggilnya dihitung dan jumlahnya nol".
+
+| Kemampuan | Keadaan |
+| --- | --- |
+| **Operator membuat tenant** | **Nol jalur.** `Tenant::create` hanya punya satu pemanggil di seluruh `apps/core`: `RegisterBusiness`. Dua perintah beban uji menyisipkan baris `tenants` mentah, tetapi tanpa user, membership, role, maupun environment — hasilnya tenant yang tidak bisa dimasuki siapa pun |
+| **Operator membuat admin pertama** | **Mustahil, dan dikunci tiga tempat.** Undangan dilarang memberi owner (`CreateInvitation`: *"Invitations cannot grant owner access"*); layar akses dilarang memindahkannya (`UpdateMembership`); dan `system_role='owner'` hanya pernah ditulis di `RegisterBusiness` |
+| **Satu orang di banyak tenant** | **Diblokir.** `RedeemInvitation` menolak email yang sudah punya akun, dan `JoinInvitationRequest` memaksa `unique:users,email`. Jadi tidak ada jalur menambahkan orang yang sudah punya akun ke tenant kedua |
+| **Undangan yang benar-benar terkirim** | **Tidak ada email sama sekali di repo.** Folder `app/Mail` dan `app/Notifications` tidak ada; nol hit untuk `Mailable`, `Mail::`, `->notify(`. Admin menyalin kodenya lalu mengirim sendiri |
+| **Undangan yang aman** | Kodenya **tidak ditujukan ke siapa pun** (tidak ada kolom email), **tidak pernah kedaluwarsa** (`expires_at` ditulis `null` harfiah), dan **dapat dipakai berkali-kali tanpa batas** |
+| **Ubah app setelah tenant lahir** | **Tidak ada.** `entitlements()->create` hanya satu pemanggil. Pelanggan yang ingin menambah app harus disunting langsung di database |
+| **Registry environment** | Sudah ada sejak irisan pertama; sebelumnya `tenants` tidak punya kolom jenis maupun lingkungan |
+| **`environment_members`** | **Ditulis, tidak pernah dibaca.** Satu-satunya penulis `RegisterBusiness`; nol pembaca di seluruh repo |
+| **Scope tenant pada model inti Core** | **Tidak ada global scope.** Sisi module dijaga keras — query tanpa tenant aktif melempar. Sisi Core menyaring `where('tenant_id', ...)` manual per controller: lupa berarti **bocor diam-diam**, bukan 500, dan tidak ada test yang menangkapnya |
+| **SSO** | **Tidak ada.** Nol Socialite, nol SAML, nol OIDC, nol Entra. Yang terpasang Fortify + passkey/WebAuthn — itu *passwordless*, bukan *single sign-on*. Audit repo sendiri menamainya `SEC-14` |
+| **Alamat per tenant** | **Tidak ada.** Nol `Route::domain` di seluruh repo. Satu alamat, satu halaman login, satu sesi |
+| Menyalin environment, mengosongkan, memulihkan, masa berlaku | Belum ada |
+| Mode pemeliharaan | Belum ada |
+| Data contoh | Belum ada. Repo hanya punya seeder bahan uji dan satu factory |
+
+Dua baris yang paling menentukan pekerjaan ini: **operator tidak dapat melahirkan apa pun**, dan
+**model inti Core bocor diam-diam kalau sebuah controller lupa menyaring**. Yang kedua jadi tajam
+begitu orang luar — calon pelanggan yang belum membeli apa pun — masuk ke sistem yang sama.
+
+## Dari tertarik sampai jadi pelanggan
+
+### Kata yang menentukan segalanya
+
+> **Tenant** adalah batas identitas satu pelanggan.
+> **Environment** adalah tempat kerja di dalam batas itu.
+
+Calon pelanggan **sudah** pelanggan yang berbeda — ia hanya belum membayar. "Belum membayar" adalah
+status **entitlement**, bukan alasan menaruhnya di dalam batas identitas orang lain.
+
+### Kenapa demo tidak boleh menumpang tenant kita
+
+Alasan yang paling mengikat bukan kerapian melainkan identitas: kalau demo hidup di tenant kita,
+admin calon pelanggan itu harus menjadi **anggota tenant kita**. Ia masuk ke daftar keanggotaan
+perusahaan kita sendiri — dan sebagaimana tercatat di atas, model inti Core belum punya global
+scope, sehingga satu controller yang lupa menyaring sudah cukup untuk memperlihatkan data kita
+kepada orang yang belum membeli apa pun.
+
+Microsoft menjawabnya dengan kalimat harfiah:
+
+> *"If the prospect is convinced and decides to buy Business Central, you can then either let them
+> keep the environment that they're currently using, or create a new production environment for
+> them. **If the tenant is yours rather than the prospect's, then a new tenant is provided to
+> them.**"*
+
+Baca kalimat terakhirnya: demo yang ditaruh di tenant vendor **tetap dibuang** saat deal jadi.
+Dan lisensi partner sandbox mereka melarangnya terang-terangan — *"You aren't allowed to use this
+license for customers (in a customer tenant), nor for production use."*
+
+| | Demo di tenant kita | Demo di tenant mereka |
+| --- | --- | --- |
+| Saat jadi beli | Tenant baru; data trial tidak terbawa; akun admin dibuat ulang | Tambah environment produksi di tenant yang sama — identitas, keanggotaan, entitlement lanjut |
+| Saat tidak jadi | Sisa keanggotaan orang luar di tenant kita, selamanya | Hapus lunak tenantnya, bersih |
+| Kuota dan tagihan | Tidak terhitung per pelanggan | Natural per tenant |
+| Kalau scoping bocor | Data kita terlihat orang luar | Hanya data mereka sendiri |
+
+### Alurnya
+
+```mermaid
+flowchart LR
+    A["Perusahaan tertarik"] --> B["Operator melahirkan tenant<br/>+ admin pertama"]
+    B --> C["Environment demo<br/>berbatas waktu"]
+    C --> D{"Jadi beli?"}
+    D -- Ya --> E["Demo dikonversi<br/>menjadi produksi"]
+    D -- Tidak --> F["Demo kedaluwarsa,<br/>tenant dihapus lunak"]
+```
+
+### Konversi, bukan environment kedua
+
+Ketika prospek jadi membeli, environment demonya **dikonversi di tempat** — bukan diganti
+environment baru yang kosong.
+
+Power Platform melakukannya persis begitu:
+
+> *"You can convert a trial environment to a production environment by switching it to consume from
+> paid capacity, preventing it from being disabled or deleted."*
+
+Syaratnya kapasitas diperiksa lebih dulu, dan operasinya memakan waktu. Business Central justru
+tidak punya konversi tipe environment sama sekali — yang berubah di sana langganannya.
+
+**Kita mengikuti Power Platform**, dan alasannya bukan kemiripan: **data yang diisi prospek selama
+demo adalah alasan terkuat ia jadi membeli.** Membuangnya lalu menyuruhnya mengetik ulang adalah
+cara termurah kehilangan pelanggan yang sudah hampir menandatangani.
+
+Satu jebakan yang layak dicatat dari Business Central, karena bentuknya mudah terulang: di sana
+akhir masa trial dipicu **peristiwa identitas** — siapa yang pertama kali masuk setelah lisensi
+dipasang — dan bukan aksi admin. *"If an administrator is the first person to sign in after the
+license was applied... then the trial will continue until it expires."* Pemicu yang bergantung pada
+urutan login adalah pemicu yang akan salah, dan konversi kita tidak boleh berbentuk begitu: ia
+operasi eksplisit yang dijalankan operator, tercatat di `environment_operations`.
+
+### Template demo — menyiapkan sekali, memakai berulang
+
+Menyiapkan satu demo yang matang — data contoh bagus, setelan rapi — lalu memakainya berulang per
+prospek **bukan** "demo di tenant vendor". Itu **template**, dan ia sumber kebingungan yang wajar
+karena hasilnya terlihat mirip.
+
+Bedanya: template tidak pernah dimasuki pelanggan mana pun. Ia cetakan, bukan tempat kerja.
+
+Azure SQL memakai pola yang sama untuk melahirkan tenant baru — *"Elastic Jobs can also be used to
+maintain a template database used to create new tenants"* — dan di PostgreSQL ia hampir gratis:
+`CREATE DATABASE ... TEMPLATE` menyalin seluruh isinya tanpa memutar ulang satu migration pun.
+
+Business Central menyediakan jalur ketiga yang **tidak** kita ambil: partner menyiapkan demo di
+tenantnya sendiri lalu **memindahkan environment itu** ke tenant pelanggan. Protokolnya tetap layak
+dicontoh karena ketiganya menutup lubang nyata, dan ketiganya akan kita pakai pada operasi panjang
+mana pun:
+
+| Yang dicontoh | Lubang yang ditutupnya |
+| --- | --- |
+| **Serah terima dua sisi** — sumber mengajukan, tujuan menerima | Pemindahan sepihak tidak pernah punya saksi |
+| **Jendela penerimaan yang kedaluwarsa** (8 jam di sana) | Permintaan yang menggantung selamanya menumpuk tanpa ada yang menutupnya |
+| **Kuota diperiksa saat eksekusi, bukan saat diterima** | *"Accepting a transfer doesn't reserve the quota, and the transfer fails if quota is no longer available"* |
+
+Dan satu garis yang harus kita putuskan sekarang, bukan nanti: di sana **data environment ikut
+pindah utuh, identitas tidak** — *"these users aren't migrated to the new Microsoft Entra tenant.
+You have to recreate the users on the target tenant."* Selama `tenant_id` dan `environment_id`
+belum menjadi dua sumbu yang terpisah, memindahkan environment lintas tenant berarti menulis ulang
+setiap baris.
+
+## Identitas: siapa yang masuk, dan lewat mana
+
+Lima keputusan, semuanya diambil pemilik produk pada 12 September 2026.
+
+### Admin pertama dibuatkan operator
+
+Operator mengisi nama dan email saat melahirkan tenant. Sistem membuat akunnya dengan **kata sandi
+sementara**, dan masuk pertama **wajib menggantinya**.
+
+Yang dibeli: kecepatan. Akses dapat diberikan di tengah pertemuan, tanpa menunggu email.
+Yang dibayar: kata sandi sempat melewati tangan operator, dan itu tercatat sebagai akses vendor ke
+akun pelanggan. Alternatifnya — undangan lewat email — ditolak karena **repo ini tidak punya satu
+pun jalur email**, sehingga ia bukan pilihan yang tersedia hari ini.
+
+### Satu orang boleh berada di banyak tenant
+
+Satu akun, satu email, banyak keanggotaan. Konsultan, akuntan, dan operator vendor sendiri
+membutuhkannya, dan pengalihnya **sudah ada** di navbar Core (`workspace-switcher`, tiga tingkat:
+tenant → legal entity → unit kerja).
+
+**Ini menabrak sesuatu yang harus dicabut:** `RedeemInvitation` menolak email yang sudah punya akun.
+Selama penolakan itu berdiri, satu orang di tenant kedua mustahil lewat jalur mana pun.
+
+Risikonya ditulis apa adanya: satu akun yang bocor menjangkau banyak pelanggan sekaligus. Itu
+ongkos yang diterima sadar, dan ia yang membuat SSO per tenant menjadi penting kelak.
+
+### Alamat bertingkat
+
+`<tenant>.<jenis>.contoh.co.id`, dengan produksi tanpa label jenis: `<tenant>.contoh.co.id`.
+
+Jenisnya terbaca dari bilah alamat, dan cookie terpisah antar jenis secara alami — sandbox tidak
+dapat membaca sesi produksi karena peramban sendiri yang memisahkannya.
+
+### SSO disiapkan untuk dua mode sekaligus
+
+Tabel setelan penyedia identitas **per tenant**, dengan tiga keadaan:
+
+1. ikut penyedia bersama milik kita;
+2. pakai penyedia sendiri — OIDC lebih dulu, SAML kemudian;
+3. kata sandi lokal saja.
+
+Keduanya sangat mungkin terjadi: pelanggan kecil akan memakai yang pertama, pelanggan korporat akan
+menuntut yang kedua karena mereka mau mencabut akses karyawan dari direktori mereka sendiri.
+
+**Yang dibangun sekarang hanya tempatnya, bukan integrasinya.** Yang penting dua hal: jalur masuk
+tidak boleh dirancang dengan asumsi hanya ada kata sandi, dan **domain harus sudah dapat menentukan
+tenant sebelum orangnya mengetik apa pun** — karena itulah yang memungkinkan mengarahkan orang ke
+penyedia identitas yang benar.
+
+::: warning SSO belum ada di repo ini
+Nol Socialite, nol SAML, nol OIDC. Yang terpasang Fortify + passkey/WebAuthn — *passwordless*,
+bukan *single sign-on*. Pemilik produk menyatakan bentuknya sudah berdiri di server dan akan dibawa
+masuk kelak; sampai itu terjadi, **tidak ada satu baris pun di repo yang boleh berasumsi ia ada**.
+:::
+
+### Operator vendor boleh masuk, tanpa jejak — untuk sekarang
+
+Keputusan sadar, beserta akibatnya yang ditulis di sini supaya tidak mengejutkan siapa pun: pada
+hari pertama ada keluhan *"siapa yang mengubah data saya"*, tidak ada yang bisa menjawab.
+
+Microsoft menempuh jalan berlawanan dan patut dicatat sebagai arah, bukan sebagai celaan: akses
+partner di sana **berbatas waktu, paling lama dua tahun**, permintaannya kedaluwarsa dalam 90 hari,
+dan pelanggan dapat mencabutnya sepihak dari panel mereka sendiri. Jejak audit adalah hal yang
+harus ada **sejak hari pertama** atau tidak pernah — menambahkannya kelak berarti seluruh periode
+sebelumnya tetap gelap.
+
+### Pendaftaran mandiri tetap hidup
+
+Dua pintu berdampingan, dan ini diminta eksplisit. Microsoft pun punya keduanya: *self-service
+sign-up* melahirkan tenant **tanpa admin sama sekali** — *"An unmanaged tenant is a tenant that has
+no Global Administrator"* — lalu sebuah proses pengambilalihan mengubahnya menjadi tenant terkelola.
+
+Yang **tidak** boleh: dua salinan alur pembuatan tenant. `RegisterBusiness` diangkat menjadi satu
+aksi yang dipakai kedua pintu, dan yang berbeda hanya asal kata sandinya serta siapa yang tercatat
+sebagai pembuat. Dua salinan adalah dua tempat yang akan menyimpang, dan yang menyimpang di sini
+adalah rantai izin.
 
 ## Bagaimana Microsoft melakukannya
 
@@ -156,7 +365,7 @@ kebocoran edisi hanya melihat folder `modules/`.
 
 ### Keputusan: satu repo, dua aplikasi
 
-| | `apps/core/` | `apps/pusat-admin/` |
+| | `apps/core/` | `apps/control-plane/` |
 | --- | --- | --- |
 | Isi | runtime Core dan seluruh module bisnis | registry environment, orkestrasi, log operasi, konsol operator |
 | Plane | application | control |
@@ -174,7 +383,7 @@ sendiri — untuk masalah yang tidak diselesaikannya.
 ```mermaid
 flowchart TB
     subgraph vendor["Milik vendor — tidak pernah dikirim ke pelanggan"]
-        PA["apps/pusat-admin"]
+        PA["apps/control-plane"]
         DBP[("database pusat")]
     end
     subgraph pelanggan["Dikirim ke pelanggan — SaaS maupun on-prem"]
@@ -730,22 +939,54 @@ pastikan setiap rute baru berada di dalam grup yang dijaga.
 Pola yang diinginkan mengikuti Dynamics: `<pelanggan>-<lingkungan>.<jenis>.<domain>`, misalnya
 `ivs-uat.sandbox.contoh.co.id`.
 
-Ia menabrak satu aturan TLS yang menentukan bentuk domainnya, dan lebih baik diketahui sekarang
-daripada saat sertifikatnya ditolak peramban: **sebuah wildcard hanya mencakup satu label.**
-`*.contoh.co.id` **tidak** mencakup `ivs-uat.sandbox.contoh.co.id`; yang mencakupnya adalah
-`*.sandbox.contoh.co.id`, satu wildcard per jenis.
+Ia menabrak dua aturan TLS yang menentukan bentuk domainnya, dan keduanya lebih baik diketahui
+sekarang daripada saat sertifikatnya ditolak peramban:
 
-Dan Let's Encrypt hanya menerbitkan wildcard lewat **DNS-01** — *"Wildcard issuance must use the DNS-01
-challenge"* — yang menuntut akses API ke penyedia DNS. HTTP-01 tidak bisa, dan tidak ada jalan
-memutarnya.
+1. **Sebuah wildcard hanya mencakup satu label.** `*.contoh.co.id` **tidak** mencakup
+   `ivs-uat.sandbox.contoh.co.id` — RFC 6125 §6.4.3: *"the client SHOULD NOT compare against
+   anything but the left-most label."*
+2. **Wildcard juga tidak mencakup domain induknya sendiri.** `*.contoh.co.id` bukan
+   `contoh.co.id`, jadi apex harus ikut disebut.
 
-| Bentuk | Sertifikat | Ongkos |
+Dan Let's Encrypt hanya menerbitkan wildcard lewat **DNS-01** — *"Wildcard issuance must use the
+DNS-01 challenge"* — yang menuntut TXT record ditulis **mesin** tiap perpanjangan. HTTP-01 tidak
+bisa, dan tidak ada jalan memutarnya.
+
+### Keputusan, dan ia tidak dibuka lagi
+
+**Nameserver ke Cloudflare. Satu sertifikat berisi empat nama, DNS-01, dijalankan Traefik, record
+DNS-only bukan proxied.**
+
+| | |
+| --- | --- |
+| Nama dalam satu sertifikat | `*.contoh.co.id`, `*.demo.contoh.co.id`, `*.sandbox.contoh.co.id`, dan `contoh.co.id` |
+| Kenapa satu sertifikat | Batasnya 100 nama per sertifikat — satu penerbitan cukup, bukan tiga |
+| Kenapa DNS-only | Supaya sertifikat yang kita terbitkan itulah yang dilihat peramban |
+| Token API | Dibatasi satu zona, izin `Zone:DNS:Edit` saja |
+
+**Kenapa wildcard dan bukan sertifikat per tenant — dan alasannya bukan batas laju.** Pada skala
+5–10 prospek per minggu, batas 50 sertifikat per registered domain tidak akan pernah tersentuh.
+Alasannya operasional:
+
+| | Per tenant | Wildcard |
 | --- | --- | --- |
-| Satu tingkat: `ivs-uat.contoh.co.id` | Satu wildcard untuk semuanya | Paling murah; jenis environment tidak terbaca dari domainnya |
-| Bertingkat seperti Microsoft | Satu wildcard per jenis | Jenis terbaca dari bilah alamat; setiap jenis baru menuntut sertifikat baru |
+| Tenant baru lahir | Terbit sertifikat saat permintaan pertama, ada jeda | **Nol pekerjaan** |
+| Subdomain acak dihantam orang | Memancing penerbitan; butuh daftar-yang-diizinkan | Tidak relevan |
+| Demo massal saat pameran | 50 per minggu jadi plafon nyata | Tidak terbatas |
 
-Rekomendasi: **satu tingkat lebih dulu**, dan jenisnya dinyatakan spanduk — yang memang lebih terbaca
-daripada sebuah label di domain. Bertingkat dicatat sebagai jalur naik, bukan dibuang.
+Penyedia DNS lama — Niagahoster, DomaiNesia, Rumahweb — **tidak satu pun** punya dokumentasi API
+DNS resmi, dan tidak satu pun ada di daftar penyedia yang didukung acme.sh maupun lego; dicek per
+nama. Karena itu pemindahan nameserver bukan preferensi melainkan syarat.
+
+Jalur cadangan yang sempat dirancang lalu **dibuang** karena Cloudflare diterima: delegasi
+`_acme-challenge` lewat CNAME ke `acme-dns`, yang didokumentasikan Let's Encrypt sendiri — *"you
+can use CNAME records or NS records to delegate answering the challenge to other DNS zones."* Ia
+dicatat di sini kalau-kalau syarat Cloudflare kelak tidak dapat dipenuhi.
+
+::: warning Yang menggigit saat menyetel, bukan saat berjalan
+**Lima penerbitan per set nama identik per tujuh hari.** Lima kali salah setel berarti terkunci
+seminggu. Pakai staging environment Let's Encrypt sampai setelannya benar-benar jalan.
+:::
 
 ## Tempat database
 
@@ -880,7 +1121,7 @@ Bagian ini lahir dari pertanyaan yang berulang tiga kali dalam satu hari — "pi
 | --- | --- | --- |
 | 1. Batas | Penanda `MilikPusat` pada tabel sisi pusat; nama koneksi jadi setelan | Sudah, di Irisan 1 |
 | 2. Database | Tabel sisi pusat pindah ke database sendiri | Saat environment kedua lahir dan butuh penyimpanan terpisah |
-| 3. Repo | `apps/pusat-admin` pindah keluar | **Saat control plane memiliki skemanya sendiri** — yaitu sesudah langkah 2 |
+| 3. Repo | `apps/control-plane` pindah keluar | **Saat control plane memiliki skemanya sendiri** — yaitu sesudah langkah 2 |
 
 ### Kenapa repo tidak dipisah sekarang
 
@@ -984,7 +1225,7 @@ mencakup `docs/` wajib diperiksa matanya, bukan hanya build-nya: tautan tetap hi
 
 Tiga tabel baru. `RegisterBusiness` menulis baris `environments` alih-alih `tenant_deployments`.
 Koneksi `control` diperkenalkan tetapi masih menunjuk database yang sama. Bendera sambungan keluar
-beserta titik-titik cekiknya. `apps/pusat-admin` berdiri dengan layar daftar, rincian, dan
+beserta titik-titik cekiknya. `apps/control-plane` berdiri dengan layar daftar, rincian, dan
 pembuatan; pemeriksa kebocoran edisi diperluas menolak jejaknya.
 
 **Nol perubahan perilaku bagi setiap pelanggan yang ada, on-prem termasuk.**
@@ -1013,10 +1254,10 @@ Konsol berjalan sebagai aplikasi Laravel kedua di porta 8001, membaca database y
 Core. Ia **tidak** punya migration sendiri, jadi skemanya harus sudah dibangun Core lebih dulu.
 
 ```bash
-cd apps/pusat-admin
+cd apps/control-plane
 composer install
 php artisan key:generate
-npm run build --workspace @coreerp/pusat-admin
+npm run build --workspace @coreerp/control-plane
 php -S 127.0.0.1:8001 -t public server.php
 ```
 
@@ -1069,19 +1310,52 @@ module tidak ditarik ke sana. Halaman ini sendiri mencatat bahwa langkah kelima 
 percobaan kedua** sebelum dua perbaikan kecilnya dikerjakan; menariknya masuk sekarang akan merusak
 persis sifat aman-diulang yang testnya buktikan.
 
-### `[ ]` Irisan 3 — Copy
+### `[x]` Irisan 2b — `apps/control-plane` menjadi `apps/control-plane`
 
-Klien PostgreSQL di dalam image, `environment:copy`, pelucutan di dalam database, dan jenis `sandbox`.
+Mekanis, nol perubahan perilaku. Nama lama adalah nama **produk yang dibaca operator di layar**;
+nama folder harus mengikuti arsitekturnya. Judul di layar tetap "Pusat Admin".
 
-### `[ ]` Irisan 4 — lifecycle
+Dikerjakan sekarang karena hari ini baru satu aplikasi yang menyebutnya, dan tiap minggu ia
+bertambah mahal.
 
-Sapuan kedaluwarsa, hapus lunak, pemulihan, penghapusan permanen, dan penyebaran migration beserta
-sidik skemanya.
+### `[ ]` Irisan 3 — operator melahirkan tenant
 
-::: danger Jangan mulai dari irisan 3
+**Ini inti pekerjaan barunya, dan yang paling dibutuhkan.** Satu layar: nama badan hukum → email
+admin → app yang dibeli → jenis lingkungan pertama.
+
+Yang harus dibuatnya sudah punya bentuknya di `RegisterBusiness`, dan aksi itu **diangkat menjadi
+satu jalur yang dipakai dua pintu** — bukan disalin.
+
+Tiga hal yang ikut karena alur ini menabraknya:
+
+- kata sandi sementara beserta penanda wajib-ganti pada masuk pertama;
+- penolakan email-sudah-terdaftar pada `RedeemInvitation` **dicabut**, kalau tidak "satu orang
+  banyak tenant" mustahil lewat jalur mana pun;
+- jalur menambah dan mencabut entitlement sesudah tenant lahir — hari ini tidak ada sama sekali.
+
+### `[ ]` Irisan 4 — alamat dan routing
+
+Wildcard TLS, middleware yang menentukan tenant **dan** environment dari host, penjaga koneksi, dan
+tempat setelan penyedia identitas per tenant. Menuntut nameserver sudah pindah ke Cloudflare.
+
+### `[ ]` Irisan 5 — konversi demo menjadi produksi
+
+Operasi eksplisit yang dijalankan operator dan tercatat di `environment_operations` — bukan dipicu
+peristiwa login seperti Business Central.
+
+### `[ ]` Irisan 6 — template, Copy, dan lifecycle
+
+Template demo lewat `CREATE DATABASE ... TEMPLATE`, `environment:copy` beserta pelucutannya, jenis
+`sandbox`, sapuan kedaluwarsa, hapus lunak, pemulihan, penghapusan permanen, dan penyebaran
+migration beserta sidik skemanya.
+
+::: danger Jangan mulai dari Copy
 `Copy` adalah fitur yang terlihat dan alasan orang meminta pekerjaan ini. Tetapi salinan ke dalam
 runtime yang belum dapat merutekan ke database kedua dan belum dapat menyebarkan schedulernya adalah
 salinan yang tidak dapat dipakai siapa pun.
+
+Dan lebih mendasar lagi: menyalin environment milik pelanggan yang **belum pernah bisa dilahirkan
+operator** adalah menyelesaikan langkah keempat sebelum langkah pertama ada.
 :::
 
 ## Selesai bila
@@ -1116,20 +1390,27 @@ menjalankannya, bukan dengan membaca kodenya:
 Yang terakhir mengikuti pola yang sudah dipakai [bundle on-prem](../bundle-on-prem/README.md):
 penjaganya sendiri harus dibuktikan dapat merah, bukan dipercaya karena ia hijau.
 
-## Keadaan pada 11 September 2026
+## Keadaan pada 12 September 2026
 
-Belum ada satu baris kode pun. Halaman ini ditulis lebih dulu, sesuai instruksi penutup temuan
-`LIFE-15` dan sesuai aturan folder ini: tidak ada yang dimulai sebelum direview dan disetujui.
+Irisan 0 sampai 2b sudah mendarat: rename `apps/core`, registry environment, konsol operator,
+`environment:siapkan`, dan rename `apps/control-plane`. Sebuah lingkungan demo sudah pernah dibuat
+dari layar lalu disiapkan sampai punya databasenya sendiri — terukur 116 tabel, 78 migration.
 
-Yang sudah dikerjakan bersama halaman ini: pembacaan langsung ke dokumentasi Microsoft, Azure, dan
-AWS; pemeriksaan bahwa `tenant_deployments` memang tidak lagi punya pembaca; dan pemeriksaan bahwa
-repo ini tidak memanggil `Mail::` di mana pun — yang mengubah isi daftar pelucutannya.
+**Halaman ini ditulis ulang pada tanggal ini**, bukan ditambal, karena scope-nya terbukti terlalu
+kecil: ia merancang daftar environment sementara pekerjaan sebenarnya dimulai dari melahirkan
+tenant beserta admin pertamanya.
 
-Tiga hal yang **belum** diperiksa dan pantas diketahui sebelum pengerjaan dimulai:
+Yang dikerjakan bersama penulisan ulangnya: pembacaan langsung ke dokumentasi Microsoft, Azure, dan
+AWS; pengukuran langsung ke kode untuk seluruh baris di [Yang belum ada](#yang-belum-ada-diukur-bukan-ditaksir);
+dan pemeriksaan bahwa repo ini tidak memanggil `Mail::` maupun memuat satu paket SSO pun.
 
-- apakah domain dan akses API DNS-nya sudah dimiliki;
+Empat hal yang **belum** diperiksa dan pantas diketahui sebelum irisan berikutnya dimulai:
+
+- apakah nameserver sudah dipindah ke Cloudflare, dan tokennya sudah dibuat;
 - berapa besar database produksi terbesar hari ini, yang menentukan apakah satu server masih cukup;
-- ketidakcocokan versi PostgreSQL antara berkas compose dan halaman release.
+- ketidakcocokan versi PostgreSQL antara berkas compose dan halaman release;
+- bentuk SSO yang sudah berdiri di server, dan apakah ia OIDC, SAML, atau sesuatu yang lain —
+  jawabannya menentukan mana dari dua mode di atas yang lebih dulu dibangun.
 
 ## Sumber
 
@@ -1168,9 +1449,28 @@ Dibaca dari sumbernya pada 11 September 2026.
 - [Managing updates in the admin center — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/tenant-admin-center-update-management) — jendela per environment, pembatalan otomatis, penjadwalan ulang, dan tombol batal bagi operator
 - [Designing your Postgres database for multi-tenancy — Crunchy Data](https://www.crunchydata.com/blog/designing-your-postgres-database-for-multi-tenancy) — ambangnya dengan angka: *"Managing 5 databases is fine, managing 10 you're probably okay, but if you anticipate 50 customers or more steer clear"*. Angka 50 di halaman ini ternyata cocok dengan yang ditulis vendor Postgres secara mandiri
 
+**Calon pelanggan menjadi pelanggan**
+
+- [Managing Production and Sandbox Environments — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/tenant-admin-center-environments) — kalimat yang menjawab pertanyaan pembuka halaman ini: *"If the tenant is yours rather than the prospect's, then a new tenant is provided to them"*
+- [Production and Sandbox Environments — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/environment-types) — larangan memakai lisensi partner sandbox untuk pelanggan
+- [About trial environments — Power Platform](https://learn.microsoft.com/en-us/power-platform/admin/trial-environments) — konversi trial menjadi produksi **di tempat**, beserta syarat kapasitas dan operasi yang tidak didukung selama trial
+- [Trials and subscriptions — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/trials-subscriptions) — akhir trial dipicu peristiwa identitas, bukan aksi admin; dan rantai perpanjangan sampai 90 hari
+- [Transfer Environments — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/tenant-admin-center-environments-move) — serah terima dua sisi, jendela penerimaan yang kedaluwarsa, kuota diperiksa saat eksekusi, dan **data ikut sementara identitas tidak**
+- [GDAP introduction](https://learn.microsoft.com/en-us/partner-center/customers/gdap-introduction) dan [GDAP FAQ](https://learn.microsoft.com/en-us/partner-center/customers/gdap-faq) — akses partner ke tenant pelanggan berbatas waktu, paling lama dua tahun, dan dapat dicabut pelanggan sepihak
+
+**Identitas dan tenant baru**
+
+- [Quickstart: create a new tenant — Microsoft Entra](https://learn.microsoft.com/en-us/entra/fundamentals/create-new-tenant) — pembuat tenant otomatis menjadi Global Administrator
+- [Self-service sign up for email-verified users](https://learn.microsoft.com/en-us/entra/identity/users/directory-self-service-signup) — tenant yang lahir **tanpa admin sama sekali**
+- [Admin takeover of an unmanaged directory](https://learn.microsoft.com/en-us/entra/identity/users/domains-admin-takeover) — dua varian pengambilalihan, dan DNS sebagai bukti kepemilikan
+
 **Sertifikat**
 
 - [Let's Encrypt FAQ](https://letsencrypt.org/docs/faq/) — wildcard hanya lewat DNS-01
+- [Challenge types — Let's Encrypt](https://letsencrypt.org/docs/challenge-types/) — HTTP-01 tidak dapat menerbitkan wildcard, dan delegasi tantangan lewat CNAME atau NS
+- [Rate limits — Let's Encrypt](https://letsencrypt.org/docs/rate-limits/) — 50 sertifikat per registered domain per 7 hari, 100 nama per sertifikat, dan **5 per set nama identik** yang menggigit saat menyetel
+- [RFC 6125 §6.4.3](https://www.rfc-editor.org/rfc/rfc6125.html) — wildcard hanya mencakup label paling kiri
+- [acme-dns](https://github.com/joohoi/acme-dns) — jalur cadangan bila penyedia DNS tidak punya API; dicatat meski tidak dipakai
 
 **Sistem yang pernah membongkar dirinya**
 
