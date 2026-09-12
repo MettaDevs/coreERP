@@ -1,0 +1,100 @@
+# Traefik: penutup TLS untuk seluruh alamat lingkungan.
+#
+# ## Kenapa DNS-01, bukan HTTP-01
+#
+# Karena yang dibutuhkan sertifikat wildcard, dan Let's Encrypt hanya menerbitkan wildcard lewat
+# DNS-01. Satu akibat sampingannya sangat berguna bagi kita: tantangannya berupa record TXT, bukan
+# permintaan HTTP masuk — jadi mesin yang berada di balik NAT, termasuk laptop pengembang, dapat
+# memperoleh sertifikat tanpa membuka satu port pun. Itu yang membuat percobaan lokal ini mungkin.
+#
+# ## Empat nama dalam satu sertifikat
+#
+# Sebuah wildcard hanya mencakup SATU label, dan ia tidak mencakup domain induknya sendiri
+# (RFC 6125 §6.4.3). Jadi `*.erp.grenery.xyz` tidak mencakup `erp.grenery.xyz` maupun
+# `pelanggan.demo.erp.grenery.xyz`. Keempatnya karena itu disebut satu per satu di `dynamic/`.
+#
+# Universal SSL gratis Cloudflare tidak dapat menggantikannya: ia hanya mencakup apex dan wildcard
+# satu tingkat. Alamat demo kita ada di tingkat kedua. Itu sebabnya record DNS-nya wajib DNS-only
+# (abu-abu), bukan proxied — supaya sertifikat yang diterbitkan di sinilah yang dilihat peramban.
+#
+# ## Menjalankannya
+#
+#   docker compose --env-file "$HOME/.coreerp/traefik.env" -f deploy/traefik/compose.yaml up
+#
+# `--env-file` dipakai, bukan `env_file:` di dalam service, karena nilai yang sama dibutuhkan di
+# DUA tempat: sebagai variabel substitusi untuk `command:` di bawah, dan sebagai variabel lingkungan
+# di dalam container untuk penyedia DNS-nya. Satu berkas, satu mekanisme.
+#
+# Berkasnya sengaja berada DI LUAR repo. `.gitignore` memang menutup `.env` di kedalaman mana pun,
+# tetapi nama lain seperti `traefik.env` tidak tertangkap pola itu — dan token yang ter-push tidak
+# dapat ditarik kembali.
+
+name: coreerp-traefik
+
+services:
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+
+    environment:
+      # Dibaca penyedia DNS Traefik. `:?` membuat token yang belum diisi berhenti di sini dengan
+      # kalimat yang menyebut sebabnya — bukan berjalan lalu gagal di tengah tantangan ACME dengan
+      # galat yang tidak menyebut apa pun.
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN belum diisi di berkas env}
+
+    command:
+      - --log.level=INFO
+      - --accesslog=true
+      - --api.dashboard=false
+
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+
+      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL:?ACME_EMAIL belum diisi di berkas env}
+      - --certificatesresolvers.cloudflare.acme.storage=/acme/acme.json
+      # Staging adalah BAWAANNYA, dan itu disengaja.
+      #
+      # Let's Encrypt produksi membatasi 5 penerbitan per 7 hari untuk set nama yang identik. Lima
+      # kali salah setel berarti terkunci seminggu — dan setelan pertama hampir tidak pernah benar.
+      # Staging menerbitkan sertifikat yang tidak dipercaya peramban (peringatan merah, klik lanjut)
+      # dengan jatah yang praktis tak terbatas.
+      #
+      # Pindah ke produksi dengan menyetel ACME_CA_SERVER ke
+      # https://acme-v02.api.letsencrypt.org/directory — SESUDAH seluruhnya terbukti jalan, dan
+      # sesudah `docker volume rm coreerp-traefik_acme` supaya ia tidak memakai akun staging.
+      - --certificatesresolvers.cloudflare.acme.caserver=${ACME_CA_SERVER:-https://acme-staging-v02.api.letsencrypt.org/directory}
+      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      # Ditanya langsung ke resolver publik, bukan ke resolver sistem.
+      #
+      # Lego memeriksa sendiri bahwa record TXT-nya sudah terlihat sebelum memberi tahu Let's
+      # Encrypt. Resolver kantor atau ISP yang menyimpan jawaban negatif akan membuat pemeriksaan
+      # itu gagal berulang kali padahal recordnya sudah ada — gejalanya "timeout" yang menuduh
+      # Cloudflare atas kesalahan yang terjadi di jaringan sendiri.
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+
+    ports:
+      # Porta 80 hanya melayani pengalihan ke HTTPS; tantangan DNS-01 tidak menyentuhnya sama
+      # sekali. Karena itu ia boleh digeser ketika sesuatu yang lain — nginx lokal, IIS — sudah
+      # memegangnya, dan percobaannya tetap sah. Di server biarkan 80.
+      - "${TRAEFIK_HTTP_PORT:-80}:80"
+      - "${TRAEFIK_HTTPS_PORT:-443}:443"
+
+    volumes:
+      - ./dynamic:/etc/traefik/dynamic:ro
+      # Volume bernama, bukan bind mount, dan alasannya khusus Windows: Traefik menolak `acme.json`
+      # yang izinnya lebih longgar dari 0600, sementara bind mount Windows selalu melaporkan 0777.
+      # Di dalam volume, izinnya milik Linux dan Traefik puas.
+      - acme:/acme
+
+    extra_hosts:
+      # Diperlukan di Linux; di Docker Desktop ia sudah ada, dan menyebutnya lagi tidak merusak.
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  acme:

@@ -16,7 +16,7 @@
       "runtimeExecutable": "php",
       "runtimeArgs": [
         "-S",
-        "127.0.0.1:8000",
+        "0.0.0.0:8000",
         "-t",
         "public",
         "server.php"
@@ -29,7 +29,7 @@
       "runtimeExecutable": "php",
       "runtimeArgs": [
         "-S",
-        "127.0.0.1:8001",
+        "0.0.0.0:8001",
         "-t",
         "public",
         "server.php"
