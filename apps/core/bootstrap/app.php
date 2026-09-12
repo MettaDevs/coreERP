@@ -7,6 +7,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LampirkanKonteksJejak;
 use App\Http\Middleware\ResolveEnvironment;
 use App\Http\Middleware\ResolveModuleContext;
+use App\Http\Middleware\ResolvePasskeyOrigin;
 use App\Http\Middleware\WajibGantiSandi;
 use App\Support\Observabilitas\JejakAktif;
 use App\Support\Observabilitas\PelaporKesalahan;
@@ -59,6 +60,13 @@ return Application::configure(basePath: dirname(__DIR__))
          * on-prem, lingkungan lokal, dan seluruh test suite yang ada. Bukan gagal; tidak menyala.
          */
         $middleware->append(ResolveEnvironment::class);
+
+        /*
+         * Sesudahnya, dan urutannya tidak penting — keduanya membaca alamat yang sama dan tidak
+         * saling membutuhkan. Yang penting keduanya berdiri sebelum rute Fortify berjalan, karena
+         * upacara WebAuthn membaca config-nya saat rute itu dieksekusi.
+         */
+        $middleware->append(ResolvePasskeyOrigin::class);
 
         $middleware->web(append: [
             HandleAppearance::class,
