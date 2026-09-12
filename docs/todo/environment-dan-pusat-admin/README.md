@@ -1017,8 +1017,18 @@ cd apps/pusat-admin
 composer install
 php artisan key:generate
 npm run build --workspace @coreerp/pusat-admin
-php artisan serve --port=8001
+php -S 127.0.0.1:8001 -t public server.php
 ```
+
+::: warning Bukan `php artisan serve`, dan `-t public` tidak boleh dilepas
+`php artisan serve` menyalakan `php -S` sebagai proses anak, dan Windows dapat menolaknya dengan
+*"CreateProcess failed: The requested operation requires elevation"* — pesan yang tidak menyebut
+Laravel maupun portanya.
+
+`-t public` menentukan tempat berkas statis dicari. Tanpanya halaman tetap terkirim — router yang
+menanganinya — tetapi seluruh CSS dan JavaScript dijawab 404, dan yang terlihat adalah **halaman
+kosong dengan judul yang benar**, tanpa satu pun galat di sisi server.
+:::
 
 Berkas `.env`-nya menyalin `DB_*` milik Core; kalau keduanya berbeda, konsol membaca database yang
 salah dan daftarnya kosong tanpa satu pun pesan.
