@@ -171,22 +171,41 @@ export default function DialogBuat({
                                     {produksi ? 'Ya' : 'Tidak'}
                                 </dd>
                             </div>
+                            {/*
+                                Dua baris ini sempat berbunyi "Database sendiri: Belum" dan "Dapat
+                                dimasuki: Belum", dan itu menyesatkan: keduanya berdiri sejajar
+                                dengan "Kirim keluar", yang memang sebuah pilihan. "Belum" karena
+                                itu terbaca seperti kotak yang lupa dicentang, padahal ia langkah
+                                berikutnya yang pasti terjadi. Yang dibetulkan bukan datanya
+                                melainkan kata kerjanya — ini rencana, bukan setelan.
+                            */}
                             <div className="flex justify-between gap-4">
                                 <dt className="text-muted-foreground">
-                                    Database sendiri
+                                    Database
                                 </dt>
-                                <dd className="font-medium">Belum</dd>
+                                <dd className="font-medium">
+                                    Dibuatkan sendiri, di langkah berikutnya
+                                </dd>
                             </div>
                             <div className="flex justify-between gap-4">
                                 <dt className="text-muted-foreground">
-                                    Dapat dimasuki
+                                    Setelah dibuat
                                 </dt>
-                                <dd className="font-medium">Belum</dd>
+                                <dd className="font-medium">
+                                    Belum dapat dimasuki
+                                </dd>
                             </div>
                             <p className="text-muted-foreground pt-2 text-xs">
                                 {produksi
                                     ? 'Produksi boleh menghubungi dunia luar: email, webhook, dan pengiriman otomatis berjalan seperti biasa.'
                                     : 'Di luar produksi, webhook dan pengiriman otomatis dimatikan. Itu satu-satunya alasan lingkungan terpisah ada — supaya salinan tidak menghubungi pelanggan sungguhan.'}
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                                Yang tercatat di sini baru registry-nya.
+                                Databasenya disiapkan satu perintah sesudahnya,
+                                dan perintahnya muncul di halaman rincian —
+                                sampai itu selesai, lingkungannya tidak dapat
+                                dibuka siapa pun.
                             </p>
                         </dl>
                     </div>
