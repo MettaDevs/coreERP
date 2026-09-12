@@ -734,9 +734,34 @@ pembekuan; itu sandiwara yang mengganggu pelanggan tanpa menambah jaminan.
 | --- | --- | --- |
 | `outbox_events` yang belum terbit | Publisher akan **mengirim ulang event produksi dari sandbox** ke endpoint sungguhan. Ini bahaya paling konkret yang benar-benar ada di repo hari ini | Ditandai sudah terbit |
 | Ekspor laporan yang masih antre | Berjalan lagi dan menulis ke storage | Ditandai gagal, dengan alasan berbahasa Indonesia |
-| Reservasi nomor yang menggantung | Perintah pemulihan akan mengaduknya | Dilepas |
+| Reservasi nomor yang menggantung | Perintah pemulihan akan mengaduknya | Dilepas, **beserta kolam yang memegang nomornya** — tanpa itu nomornya hilang selamanya dan urutan berkelanjutan berhenti |
 | Catatan pemasangan module | **Tidak disentuh** — sandbox tanpa module terpasang bukan salinan | — |
-| Job antrean dan kredensial layanan | Tidak ikut tersalin sama sekali; keduanya di sisi pusat | Gratis |
+| Job antrean | Instruksi yang belum dijalankan, bukan catatan siapa pun. Ia akan berjalan di sandbox seolah ia produksi | Dihapus |
+| Kredensial layanan | Sandbox lahir memegang **token produksi yang masih berlaku** | Dihapus. Akibatnya sandbox tiba tanpa satu pun token, dan penerbitan ulangnya pekerjaan control plane |
+| **Tabel `environments` sendiri** | Lihat peringatan di bawah — ini yang membatalkan seluruh baris di atasnya | Barisnya **diturunkan** menjadi sandbox, bukan dihapus |
+
+::: danger Satu tabel yang membatalkan seluruh pelucutan lain
+`environments` ikut tersalin, dan di dalam salinannya tertulis `kind='production'` dengan
+`outbound_allowed=true`. `LingkunganAktif` membaca tabel itu dari **koneksi bawaan** — jadi begitu
+middleware pemilih environment menjadikan database sandbox sebagai koneksi bawaan, yaitu persis
+tujuannya, sandbox membaca registry miliknya sendiri, menyimpulkan ia produksi, lalu membuka
+seluruh sambungan keluarnya.
+
+Barisnya **diturunkan**, tidak dihapus. Dihapus, `LingkunganAktif` tidak menemukan apa pun — dan
+aturan tertulisnya sendiri, *"tidak tahu berarti boleh"*, justru membuka sambungan keluarnya.
+:::
+
+::: warning Baris yang sebelumnya tertulis "gratis" ternyata tidak
+Versi terdahulu tabel ini menulis job antrean dan kredensial layanan **tidak ikut tersalin sama
+sekali, karena keduanya di sisi pusat**. Itu tidak benar hari ini: `coreerp.control_connection`
+kosong, jadi `MilikPusat` tidak memindahkan apa pun dan `jobs`, `sessions`, `users`,
+`app_service_credentials`, bahkan `tenants` dan `environments` semuanya hidup di database
+environment dan ikut tersalin utuh.
+
+Ini bentuk kekeliruan yang pantas diingat: **penanda yang belum aktif terbaca seolah sudah
+menjaga.** `MilikPusat` memang sudah terpasang di ketujuh model itu, dan justru karena terpasang,
+mudah dikira sudah memindahkan sesuatu.
+:::
 
 **Deklarasi per module** — membunuh yang tidak dapat diungkapkan sebagai baris, **termasuk yang belum
 ada saat halaman ini ditulis.**
@@ -1420,7 +1445,7 @@ Karena itu konversi **melucuti antreannya lebih dulu, baru menyalakan benderanya
 mengikat: jalur pelucutan hanya berjalan selagi sambungan keluar masih dilarang.
 :::
 
-### `[~]` Irisan 6 — template, Copy, dan lifecycle
+### `[~]` Irisan 6 — Copy dan lifecycle sudah; template belum
 
 **Sudah:** sapuan kedaluwarsa, hapus lunak, pemulihan, dan penghapusan permanen —
 `environment:sapu-kedaluwarsa`, `environment:pulihkan`, `environment:hapus-permanen`, dua di
@@ -1436,8 +1461,18 @@ Tiga hal yang bentuknya ditentukan constraint, bukan sekadar mengikutinya:
   jadi demo `degraded` ikut tersapu, dan memulihkannya sebagai aktif berarti mengangkat lingkungan
   tanpa database menjadi tempat yang boleh dirutekan.
 
-**Belum:** template demo lewat `CREATE DATABASE ... TEMPLATE`, `environment:copy` beserta
-pelucutannya, dan penyebaran migration beserta sidik skemanya.
+**Sudah juga:** `environment:salin` beserta pelucutannya — 11 test, 74 assertion, dengan `pg_dump`
+sungguhan. Jalur merah ketiga yang halaman ini wajibkan terbukti: alur yang sama pada produksi
+**masih mengirim**.
+
+**Belum:** template demo lewat `CREATE DATABASE ... TEMPLATE`, deklarasi pelucutan per module,
+penyebaran migration beserta sidik skemanya, pemeriksaan kuota, dan jendela di luar jam sibuk.
+
+Satu kembaran yang sengaja dibiarkan dan dicatat di sini supaya tidak terlupa: `buatDatabase`,
+`siapkanKoneksi`, dan `konfigurasiDasar` ada di `SiapkanLingkungan` maupun `SalinLingkungan`.
+Bentuknya sudah menyimpang — tanda tangannya berbeda — jadi penyatuannya refactor tersendiri dengan
+risiko nyata di dua perintah yang berat testnya. Yang berbahaya sudah disatukan: protokol kunci
+operasi, lewat trait `MemegangOperasiLingkungan`.
 
 ::: danger Jangan mulai dari Copy
 `Copy` adalah fitur yang terlihat dan alasan orang meminta pekerjaan ini. Tetapi salinan ke dalam
