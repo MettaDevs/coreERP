@@ -74,6 +74,8 @@ abstract class TestCase extends BaseTestCase
      *
      * Suite ini membangun ulang seluruh skema Core lewat `migrate:fresh`, jadi ia yang paling
      * merusak kalau salah alamat.
+     *
+     * @return array<string, string> Trait yang dipakai kelas test ini, seperti yang dipulangkan Laravel.
      */
     protected function setUpTraits(): array
     {

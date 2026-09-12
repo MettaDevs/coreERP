@@ -45,4 +45,18 @@ return [
      */
     'tenggat' => (int) env('COREERP_TIMEOUT', 30),
 
+    /*
+     * Batas menunggu khusus penyiapan lingkungan, dalam detik.
+     *
+     * Angkanya sepuluh kali lipat yang di atas, dan bukan karena berjaga-jaga. Menyiapkan
+     * lingkungan membuat databasenya lebih dulu, menjalankan seluruh migration Core ke
+     * dalamnya, lalu memasang tiap module yang dibeli tenantnya — masing-masing dengan
+     * migration dan data awalnya sendiri. Yang di atas mengukur satu migration ke database
+     * yang sudah ada; yang ini mengukur database yang belum ada sama sekali.
+     *
+     * Terputus di sini tidak membatalkan apa pun di sisi Core — perintahnya berjalan sampai
+     * selesai dan memang aman diulang. Yang rusak hanya kepercayaan operator pada layarnya.
+     */
+    'tenggat_siapkan' => (int) env('COREERP_TIMEOUT_SIAPKAN', 300),
+
 ];

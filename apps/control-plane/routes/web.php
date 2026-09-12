@@ -5,6 +5,7 @@ declare(strict_types=1);
 use ControlPlane\Http\Controllers\Keluar;
 use ControlPlane\Http\Controllers\Lingkungan\Daftar as DaftarLingkungan;
 use ControlPlane\Http\Controllers\Lingkungan\Rincian as RincianLingkungan;
+use ControlPlane\Http\Controllers\Lingkungan\Siapkan as SiapkanLingkungan;
 use ControlPlane\Http\Controllers\Lingkungan\Simpan as SimpanLingkungan;
 use ControlPlane\Http\Controllers\Masuk;
 use ControlPlane\Http\Controllers\Pelanggan\Daftar as DaftarPelanggan;
@@ -35,4 +36,5 @@ Route::middleware(['auth', 'operator'])->group(function (): void {
     Route::get('/lingkungan', DaftarLingkungan::class)->name('lingkungan.daftar');
     Route::post('/lingkungan', SimpanLingkungan::class)->name('lingkungan.simpan');
     Route::get('/lingkungan/{lingkungan}', RincianLingkungan::class)->name('lingkungan.rincian');
+    Route::post('/lingkungan/{lingkungan}/siapkan', SiapkanLingkungan::class)->name('lingkungan.siapkan');
 });

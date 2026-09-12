@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ControlPlane\Http\Controllers\Lingkungan;
 
 use ControlPlane\Http\Controllers\Controller;
+use ControlPlane\Lingkungan\ModulTerpasang;
 use ControlPlane\Models\Lingkungan;
 use ControlPlane\Models\OperasiLingkungan;
 use Inertia\Inertia;
@@ -18,7 +19,7 @@ use Inertia\Response as HalamanInertia;
  */
 class Rincian extends Controller
 {
-    public function __invoke(string $lingkungan): HalamanInertia
+    public function __invoke(string $lingkungan, ModulTerpasang $modul): HalamanInertia
     {
         $baris = Lingkungan::query()
             ->with('tenant:id,name,slug')
@@ -50,6 +51,15 @@ class Rincian extends Controller
                 'dibuat' => $baris->created_at?->toDateTimeString(),
             ],
             'riwayat' => $riwayat,
+            // Dibaca dari database lingkungan itu, bukan disimpulkan dari entitlement tenantnya.
+            // Entitlement menjawab apa yang boleh ada; hanya tabel di dalam databasenya yang
+            // menjawab apa yang benar-benar ada — dan selisih keduanya persis yang dicari operator
+            // ketika ia bertanya kenapa sebuah demo terasa kosong.
+            'modul' => $modul($baris),
+            // Sama persis dengan daftar status yang diterima `environment:siapkan`. Ditulis di sini
+            // supaya tombolnya tidak pernah muncul untuk keadaan yang akan ditolak Core — tombol
+            // yang selalu terlihat lalu selalu gagal melatih orang mengabaikan pesannya.
+            'bisaDisiapkan' => in_array($baris->status, ['provisioning', 'degraded'], true),
         ]);
     }
 }

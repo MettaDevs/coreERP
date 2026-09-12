@@ -7,7 +7,7 @@ namespace ControlPlane\Tests\Feature;
 use ControlPlane\Tests\TestCase;
 
 /**
- * Konsol dan Core sepakat soal bentuk panggilannya — dibaca dari kontrak, bukan dari ingatan.
+ * Konsol dan Core sepakat soal bentuk setiap perintahnya — dibaca dari kontrak, bukan dari ingatan.
  *
  * ## Kenapa test ini ada
  *
@@ -33,7 +33,7 @@ use ControlPlane\Tests\TestCase;
  * bahwa Core benar-benar berjalan di alamat yang disetel konsol. Itu hanya dapat dibuktikan satu
  * panggilan sungguhan di lingkungan yang kedua aplikasinya hidup.
  */
-class KontrakPembuatanTenantTest extends TestCase
+class KontrakPerintahKeCoreTest extends TestCase
 {
     /** @var array<string, mixed> */
     private array $kontrak;
@@ -74,6 +74,16 @@ class KontrakPembuatanTenantTest extends TestCase
         );
     }
 
+    public function test_alamat_penyiapan_lingkungan_ada_di_kontrak(): void
+    {
+        $this->assertContains(
+            '/environments/{lingkungan}/siapkan',
+            $this->kontrak['paths'],
+            'Kontrak Core tidak memuat rute penyiapan lingkungan. Tombol "Siapkan" memanggil alamat '
+            .'yang tidak dijanjikan siapa pun.'
+        );
+    }
+
     public function test_konsol_mengirim_token_dengan_cara_yang_diminta_kontrak(): void
     {
         // `http` + `bearer` berarti `Authorization: Bearer <token>`. Konsol memakai
@@ -95,6 +105,33 @@ class KontrakPembuatanTenantTest extends TestCase
             'X-Control-Plane-Token',
             $sumber,
             'Konsol masih mengirim header kustom. Core membacanya lewat `bearerToken()`.'
+        );
+    }
+
+    /**
+     * Aturan yang sama berlaku untuk pemanggil kedua, dan pemeriksaannya diulang dengan sengaja.
+     *
+     * Cacat yang melahirkan berkas ini adalah cacat **per pemanggil**, bukan per aplikasi: satu
+     * berkas yang benar tidak membuat berkas berikutnya ikut benar. Pemanggil ketiga kelak harus
+     * menambah blok seperti ini juga, dan itu memang ongkos yang diinginkan.
+     */
+    public function test_pemanggil_penyiapan_juga_memakai_bearer(): void
+    {
+        $sumber = (string) file_get_contents(__DIR__.'/../../app/Lingkungan/SiapkanLewatCore.php');
+
+        $this->assertStringContainsString(
+            'Http::withToken(',
+            $sumber,
+            'Kontrak menuntut token dikirim sebagai `Authorization: Bearer`, tetapi pemanggil '
+            .'penyiapan tidak memakai `Http::withToken()`.'
+        );
+
+        // Tenggatnya sendiri, bukan `core.tenggat`. Penyiapan menjalankan migration tiap module;
+        // tiga puluh detik yang cukup untuk melahirkan tenant akan memutusnya di tengah jalan.
+        $this->assertStringContainsString(
+            "config('core.tenggat_siapkan')",
+            $sumber,
+            'Penyiapan memakai tenggat pembuatan tenant. Keduanya mengukur pekerjaan yang berbeda.'
         );
     }
 
