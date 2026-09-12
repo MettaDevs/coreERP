@@ -59,4 +59,12 @@ return [
      */
     'provision_timeout' => (int) env('COREERP_PROVISION_TIMEOUT', 300),
 
+    /*
+     * Proxy yang boleh dipercaya header `X-Forwarded-*`-nya. Kosong berarti tidak satu pun.
+     *
+     * Dibaca `AppServiceProvider`, bukan `bootstrap/app.php` — alasannya tertulis di sana, dan ia
+     * bukan selera: closure middleware berjalan sebelum berkas env dimuat.
+     */
+    'trusted_proxies' => env('COREERP_TRUSTED_PROXIES'),
+
 ];

@@ -126,4 +126,12 @@ return [
         'value_stream' => 'Value stream',
         'retail_channel' => 'Retail channel',
     ],
+    /*
+     * Proxy yang boleh dipercaya header `X-Forwarded-*`-nya. Kosong berarti tidak satu pun.
+     *
+     * Dibaca `AppServiceProvider`, bukan `bootstrap/app.php` — alasannya tertulis di sana, dan ia
+     * bukan selera: closure middleware berjalan sebelum berkas env dimuat.
+     */
+    'trusted_proxies' => env('COREERP_TRUSTED_PROXIES'),
+
 ];

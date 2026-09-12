@@ -13,6 +13,7 @@ use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Date;
@@ -68,6 +69,27 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        /*
+         * Proxy tepercaya disetel DI SINI, bukan di `bootstrap/app.php`.
+         *
+         * Closure `withMiddleware()` dijalankan `afterResolving(HttpKernel::class)`, dan kernel
+         * di-resolve SEBELUM `LoadEnvironmentVariables` berjalan. Akibatnya `env()` di dalam closure
+         * itu selalu memulangkan null, dan pemanggilan `trustProxies()` di sana tidak pernah
+         * melakukan apa pun. Ia terbaca benar dan terbukti mati.
+         *
+         * Gejalanya hanya muncul di belakang proxy: Laravel membaca alamat dari koneksi ke proxy —
+         * yang memang `http` — lalu menerbitkan setiap pengalihan sebagai `http://`. Peramban
+         * dilempar ke porta 80, dan yang terlihat bukan "salah setel proxy" melainkan galat milik
+         * apa pun yang kebetulan mendengar di sana.
+         *
+         * Ditemukan dengan membukanya lewat Traefik, bukan oleh test.
+         */
+        $proxies = config('coreerp.trusted_proxies');
+
+        if (is_string($proxies) && $proxies !== '') {
+            TrustProxies::at($proxies === '*' ? '*' : array_map(trim(...), explode(',', $proxies)));
+        }
+
         // Prevent touch() utime warning from crashing Blade view rendering on containerized environments
         set_error_handler(function ($severity, $message) {
             if (str_contains($message, 'touch(): Utime failed')) {

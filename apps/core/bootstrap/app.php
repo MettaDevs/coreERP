@@ -25,11 +25,6 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $trustedProxies = env('COREERP_TRUSTED_PROXIES');
-        if (is_string($trustedProxies) && $trustedProxies !== '') {
-            $middleware->trustProxies(at: $trustedProxies);
-        }
-
         // Nama alias-nya didaftarkan di sini bersama alias lain; yang *memasangnya* adalah
         // penyedia layanan tiap module, per grup rute, karena middleware ini butuh id module
         // sebagai parameter dan tidak ada gunanya dipasang global.
