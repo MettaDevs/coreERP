@@ -65,7 +65,7 @@ export default function OperatorMenu() {
                                 <span className="truncate text-sm font-medium">
                                     {operator.name}
                                 </span>
-                                <span className="text-muted-foreground truncate text-xs">
+                                <span className="truncate text-xs text-muted-foreground">
                                     {operator.email}
                                 </span>
                             </span>
@@ -86,12 +86,12 @@ export default function OperatorMenu() {
                             <span className="block truncate text-sm font-medium">
                                 {operator.name}
                             </span>
-                            <span className="text-muted-foreground block truncate text-xs">
+                            <span className="block truncate text-xs text-muted-foreground">
                                 {operator.email}
                             </span>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
+                        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
                             Tampilan
                         </DropdownMenuLabel>
                         <DropdownMenuRadioGroup

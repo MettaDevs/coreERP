@@ -29,13 +29,13 @@ export default function AppSidebar() {
     return (
         <Sidebar
             collapsible="offcanvas"
-            className="border-sidebar-border border-r"
+            className="border-r border-sidebar-border"
         >
             <SidebarHeader className="gap-0 px-3 py-4">
                 <Link href="/lingkungan" className="text-sm font-semibold">
                     Pusat Admin
                 </Link>
-                <span className="text-sidebar-foreground/70 text-xs">
+                <span className="text-xs text-sidebar-foreground/70">
                     Konsol operator
                 </span>
             </SidebarHeader>

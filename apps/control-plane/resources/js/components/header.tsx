@@ -34,13 +34,13 @@ export default function Header({
         <header
             className={
                 scrolled
-                    ? 'bg-background sticky top-0 z-20 h-14 shrink-0 rounded-none border-b shadow-sm transition-[border-radius,box-shadow] duration-200'
-                    : 'bg-background sticky top-0 z-20 h-14 shrink-0 rounded-t-2xl border-b transition-[border-radius,box-shadow] duration-200'
+                    ? 'sticky top-0 z-20 h-14 shrink-0 rounded-none border-b bg-background shadow-sm transition-[border-radius,box-shadow] duration-200'
+                    : 'sticky top-0 z-20 h-14 shrink-0 rounded-t-2xl border-b bg-background transition-[border-radius,box-shadow] duration-200'
             }
         >
             <div className="flex h-full items-center gap-3 px-5">
                 <SidebarTrigger className="shrink-0" />
-                <div className="bg-border hidden h-6 w-px sm:block" />
+                <div className="hidden h-6 w-px bg-border sm:block" />
                 <Breadcrumb>
                     <BreadcrumbList>
                         {section && section.title !== title && (

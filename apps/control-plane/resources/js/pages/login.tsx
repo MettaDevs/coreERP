@@ -16,15 +16,15 @@ export default function Login() {
     }
 
     return (
-        <div className="bg-muted/30 text-foreground flex min-h-screen items-center justify-center px-6">
+        <div className="flex min-h-screen items-center justify-center bg-muted/30 px-6 text-foreground">
             <Head title="Masuk" />
             <form
                 onSubmit={submit}
-                className="bg-background w-full max-w-sm space-y-5 rounded-lg border p-8 shadow-sm"
+                className="w-full max-w-sm space-y-5 rounded-lg border bg-background p-8 shadow-sm"
             >
                 <div>
                     <h1 className="text-xl font-semibold">Pusat Admin</h1>
-                    <p className="text-muted-foreground mt-1 text-sm">
+                    <p className="mt-1 text-sm text-muted-foreground">
                         Konsol operator. Masuk dengan akun Core Anda.
                     </p>
                 </div>
@@ -39,7 +39,7 @@ export default function Login() {
                         onChange={(e) => setData('email', e.target.value)}
                     />
                     {errors.email && (
-                        <p className="text-destructive text-sm">
+                        <p className="text-sm text-destructive">
                             {errors.email}
                         </p>
                     )}

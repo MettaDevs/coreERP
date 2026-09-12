@@ -41,7 +41,7 @@ export default function Index({
         >
             <Head title="Lingkungan" />
 
-            <div className="bg-background overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-lg border bg-background">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -59,7 +59,7 @@ export default function Index({
                             <TableRow>
                                 <TableCell
                                     colSpan={7}
-                                    className="text-muted-foreground py-10 text-center text-sm"
+                                    className="py-10 text-center text-sm text-muted-foreground"
                                 >
                                     Belum ada lingkungan yang tercatat.
                                 </TableCell>
@@ -69,7 +69,7 @@ export default function Index({
                             <TableRow key={row.id}>
                                 <TableCell className="font-medium">
                                     {row.name}
-                                    <span className="text-muted-foreground ms-2 text-xs">
+                                    <span className="ms-2 text-xs text-muted-foreground">
                                         {row.slug}
                                     </span>
                                 </TableCell>
@@ -83,7 +83,7 @@ export default function Index({
                                 <TableCell className="font-mono text-xs">
                                     {row.database}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
+                                <TableCell className="text-sm text-muted-foreground">
                                     {row.expiresAt ?? 'Tidak berakhir'}
                                 </TableCell>
                                 <TableCell className="text-end">

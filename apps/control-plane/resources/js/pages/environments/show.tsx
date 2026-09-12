@@ -51,7 +51,7 @@ type Module = {
 function Row({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="flex flex-wrap justify-between gap-4 border-b py-2.5 last:border-b-0">
-            <dt className="text-muted-foreground text-sm">{label}</dt>
+            <dt className="text-sm text-muted-foreground">{label}</dt>
             <dd className="text-sm font-medium">{children}</dd>
         </div>
     );
@@ -114,7 +114,7 @@ export default function Show({
             {provisionError && (
                 <div
                     role="alert"
-                    className="border-destructive/40 text-destructive rounded-md border bg-red-50 px-4 py-3 text-sm break-words whitespace-pre-line dark:bg-red-950/40 dark:text-red-200"
+                    className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm break-words whitespace-pre-line text-destructive dark:bg-red-950/40 dark:text-red-200"
                 >
                     {provisionError}
                 </div>
@@ -163,7 +163,7 @@ export default function Show({
             )}
 
             <div className="grid gap-6 lg:grid-cols-2">
-                <section className="bg-background rounded-lg border p-5">
+                <section className="rounded-lg border bg-background p-5">
                     <h2 className="mb-2 text-sm font-semibold">Keterangan</h2>
                     <dl>
                         <Row label="Jenis">
@@ -205,7 +205,7 @@ export default function Show({
                     </dl>
                 </section>
 
-                <section className="bg-background rounded-lg border p-5">
+                <section className="rounded-lg border bg-background p-5">
                     <h2 className="mb-2 text-sm font-semibold">
                         Operasi terakhir
                     </h2>
@@ -229,7 +229,7 @@ export default function Show({
                             )}
                         </dl>
                     ) : (
-                        <p className="text-muted-foreground text-sm">
+                        <p className="text-sm text-muted-foreground">
                             Belum ada operasi yang tercatat.
                         </p>
                     )}
@@ -239,13 +239,13 @@ export default function Show({
             <section className="space-y-3">
                 <h2 className="text-sm font-semibold">Module terpasang</h2>
                 {modules.length === 0 ? (
-                    <div className="text-muted-foreground bg-background rounded-lg border border-dashed px-4 py-8 text-center text-sm">
+                    <div className="rounded-lg border border-dashed bg-background px-4 py-8 text-center text-sm text-muted-foreground">
                         {environment.ownDatabase
                             ? 'Lingkungan ini sudah punya database sendiri, tetapi belum satu pun module dipasang di dalamnya. Yang ada di sana baru tabel milik Core; pemakainya akan masuk ke tempat kerja yang kosong.'
                             : 'Belum ada database yang dapat memuat module. Siapkan databasenya lebih dulu.'}
                     </div>
                 ) : (
-                    <div className="bg-background overflow-x-auto rounded-lg border">
+                    <div className="overflow-x-auto rounded-lg border bg-background">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -284,7 +284,7 @@ export default function Show({
                         </Table>
                     </div>
                 )}
-                <p className="text-muted-foreground text-xs">
+                <p className="text-xs text-muted-foreground">
                     Yang terdaftar di sini adalah module di dalam database
                     lingkungan ini, bukan yang dibeli tenantnya. Keduanya dapat
                     berbeda: pembelian tercatat pada tenant, pemasangan terjadi
@@ -295,7 +295,7 @@ export default function Show({
 
             <section className="space-y-3">
                 <h2 className="text-sm font-semibold">Riwayat lengkap</h2>
-                <div className="bg-background overflow-x-auto rounded-lg border">
+                <div className="overflow-x-auto rounded-lg border bg-background">
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -312,7 +312,7 @@ export default function Show({
                                 <TableRow>
                                     <TableCell
                                         colSpan={6}
-                                        className="text-muted-foreground py-8 text-center text-sm"
+                                        className="py-8 text-center text-sm text-muted-foreground"
                                     >
                                         Belum ada riwayat.
                                     </TableCell>

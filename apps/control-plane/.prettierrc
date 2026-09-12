@@ -12,5 +12,6 @@
         "cn",
         "cva"
     ],
-    "tabWidth": 4
+    "tabWidth": 4,
+    "tailwindStylesheet": "resources/css/app.css"
 }

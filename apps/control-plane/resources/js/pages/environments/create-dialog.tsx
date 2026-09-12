@@ -87,7 +87,7 @@ export default function CreateDialog({
                                 ))}
                             </NativeSelect>
                             {errors.kind && (
-                                <p className="text-destructive text-sm">
+                                <p className="text-sm text-destructive">
                                     {errors.kind}
                                 </p>
                             )}
@@ -109,7 +109,7 @@ export default function CreateDialog({
                                 ))}
                             </NativeSelect>
                             {errors.tenant_id && (
-                                <p className="text-destructive text-sm">
+                                <p className="text-sm text-destructive">
                                     {errors.tenant_id}
                                 </p>
                             )}
@@ -126,7 +126,7 @@ export default function CreateDialog({
                                 placeholder="Uji coba penagihan"
                             />
                             {errors.name && (
-                                <p className="text-destructive text-sm">
+                                <p className="text-sm text-destructive">
                                     {errors.name}
                                 </p>
                             )}
@@ -145,20 +145,20 @@ export default function CreateDialog({
                                         setData('expires_at', e.target.value)
                                     }
                                 />
-                                <p className="text-muted-foreground text-xs">
+                                <p className="text-xs text-muted-foreground">
                                     Demo wajib punya tanggal berakhir. Tanpa itu
                                     ia tinggal selamanya, dan tidak ada yang
                                     menyadarinya sampai disknya penuh.
                                 </p>
                                 {errors.expires_at && (
-                                    <p className="text-destructive text-sm">
+                                    <p className="text-sm text-destructive">
                                         {errors.expires_at}
                                     </p>
                                 )}
                             </div>
                         )}
 
-                        <dl className="bg-muted/40 space-y-1.5 rounded-md border p-4 text-sm">
+                        <dl className="space-y-1.5 rounded-md border bg-muted/40 p-4 text-sm">
                             <div className="flex justify-between gap-4">
                                 <dt className="text-muted-foreground">
                                     Kirim keluar
@@ -197,12 +197,12 @@ export default function CreateDialog({
                                     Belum dapat dimasuki
                                 </dd>
                             </div>
-                            <p className="text-muted-foreground pt-2 text-xs">
+                            <p className="pt-2 text-xs text-muted-foreground">
                                 {production
                                     ? 'Produksi boleh menghubungi dunia luar: email, webhook, dan pengiriman otomatis berjalan seperti biasa.'
                                     : 'Di luar produksi, webhook dan pengiriman otomatis dimatikan. Itu satu-satunya alasan lingkungan terpisah ada — supaya salinan tidak menghubungi pelanggan sungguhan.'}
                             </p>
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-xs text-muted-foreground">
                                 Yang tercatat di sini baru registry-nya.
                                 Databasenya disiapkan satu langkah sesudahnya,
                                 lewat tombol di halaman rincian — sampai itu

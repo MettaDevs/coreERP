@@ -43,7 +43,7 @@ export default function Index({
             */}
             {credentials && <CredentialsCard credentials={credentials} />}
 
-            <div className="bg-background overflow-x-auto rounded-lg border">
+            <div className="overflow-x-auto rounded-lg border bg-background">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -57,7 +57,7 @@ export default function Index({
                             <TableRow>
                                 <TableCell
                                     colSpan={3}
-                                    className="text-muted-foreground py-10 text-center text-sm"
+                                    className="py-10 text-center text-sm text-muted-foreground"
                                 >
                                     Belum ada pelanggan. Sampai ada, layar
                                     Lingkungan tidak punya siapa pun untuk
@@ -69,20 +69,20 @@ export default function Index({
                             <TableRow key={row.id}>
                                 <TableCell className="font-medium">
                                     {row.name}
-                                    <span className="text-muted-foreground ms-2 font-mono text-xs">
+                                    <span className="ms-2 font-mono text-xs text-muted-foreground">
                                         {row.id}
                                     </span>
                                 </TableCell>
                                 <TableCell>
                                     {row.environments === 0 ? (
-                                        <span className="text-muted-foreground text-sm">
+                                        <span className="text-sm text-muted-foreground">
                                             Belum ada
                                         </span>
                                     ) : (
                                         row.environments
                                     )}
                                 </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
+                                <TableCell className="text-sm text-muted-foreground">
                                     {row.createdAt ?? 'Tidak tercatat'}
                                 </TableCell>
                             </TableRow>

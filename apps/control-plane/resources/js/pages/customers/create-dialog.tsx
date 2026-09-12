@@ -105,7 +105,7 @@ export default function CreateDialog({
 
                     <div className="space-y-4 py-4">
                         {otherErrors.length > 0 && (
-                            <div className="border-destructive/40 text-destructive rounded-md border bg-red-50 px-4 py-3 text-sm dark:bg-red-950/40 dark:text-red-200">
+                            <div className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm text-destructive dark:bg-red-950/40 dark:text-red-200">
                                 {otherErrors.map((message) => (
                                     <p key={message}>{message}</p>
                                 ))}
@@ -122,13 +122,13 @@ export default function CreateDialog({
                                 }
                                 placeholder="PT Sumber Sehat Nusantara"
                             />
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-xs text-muted-foreground">
                                 Nama resmi seperti tertulis di aktanya, bukan
                                 nama panggilan. Ia yang muncul di dokumen yang
                                 dicetak pelanggan.
                             </p>
                             {errors.legal_name && (
-                                <p className="text-destructive text-sm">
+                                <p className="text-sm text-destructive">
                                     {errors.legal_name}
                                 </p>
                             )}
@@ -145,7 +145,7 @@ export default function CreateDialog({
                                 placeholder="Siti Rahmawati"
                             />
                             {errors.admin_name && (
-                                <p className="text-destructive text-sm">
+                                <p className="text-sm text-destructive">
                                     {errors.admin_name}
                                 </p>
                             )}
@@ -162,14 +162,14 @@ export default function CreateDialog({
                                 }
                                 placeholder="siti@sumbersehat.co.id"
                             />
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-xs text-muted-foreground">
                                 Tidak ada surat yang dikirim ke alamat ini —
                                 repo ini belum punya jalur email sama sekali. Ia
                                 dipakai untuk masuk, dan kata sandinya
                                 disampaikan operator.
                             </p>
                             {errors.admin_email && (
-                                <p className="text-destructive text-sm">
+                                <p className="text-sm text-destructive">
                                     {errors.admin_email}
                                 </p>
                             )}
@@ -178,7 +178,7 @@ export default function CreateDialog({
                         <div className="space-y-2">
                             <Label>App yang dibeli</Label>
                             {app.length === 0 ? (
-                                <p className="text-muted-foreground rounded-md border border-dashed px-4 py-3 text-sm">
+                                <p className="rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground">
                                     Katalog app kosong. Daftarkan manifest app
                                     di Core lebih dulu — tanpa satu pun app,
                                     pelanggan lahir ke peluncur yang kosong.
@@ -207,7 +207,7 @@ export default function CreateDialog({
                                                 className="font-normal"
                                             >
                                                 {item.name}
-                                                <span className="text-muted-foreground ms-2 font-mono text-xs">
+                                                <span className="ms-2 font-mono text-xs text-muted-foreground">
                                                     {item.id}
                                                 </span>
                                             </Label>
@@ -215,13 +215,13 @@ export default function CreateDialog({
                                     ))}
                                 </div>
                             )}
-                            <p className="text-muted-foreground text-xs">
+                            <p className="text-xs text-muted-foreground">
                                 Prerequisite ditambahkan Core sendiri, jadi
                                 memilih satu app sudah cukup untuk membawa serta
                                 yang dibutuhkannya.
                             </p>
                             {errors.app_ids && (
-                                <p className="text-destructive text-sm">
+                                <p className="text-sm text-destructive">
                                     {errors.app_ids}
                                 </p>
                             )}

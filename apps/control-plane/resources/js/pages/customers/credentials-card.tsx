@@ -64,9 +64,9 @@ export default function CredentialsCard({
             </p>
 
             <dl className="mt-4 space-y-2">
-                <div className="bg-background flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 px-4 py-3 dark:border-amber-900/60">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background px-4 py-3 dark:border-amber-900/60">
                     <div className="min-w-0">
-                        <dt className="text-muted-foreground text-xs">
+                        <dt className="text-xs text-muted-foreground">
                             Email admin
                         </dt>
                         <dd className="truncate font-mono text-sm">
@@ -83,9 +83,9 @@ export default function CredentialsCard({
                     </Button>
                 </div>
 
-                <div className="bg-background flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 px-4 py-3 dark:border-amber-900/60">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background px-4 py-3 dark:border-amber-900/60">
                     <div className="min-w-0">
-                        <dt className="text-muted-foreground text-xs">
+                        <dt className="text-xs text-muted-foreground">
                             Kata sandi sementara
                         </dt>
                         <dd className="truncate font-mono text-lg font-semibold tracking-wide">
@@ -114,7 +114,7 @@ export default function CredentialsCard({
                 </p>
             )}
 
-            <p className="text-muted-foreground mt-3 text-xs">
+            <p className="mt-3 text-xs text-muted-foreground">
                 Tenant {credentials.tenant}. Minta pelanggan menggantinya pada
                 masuk pertama.
             </p>
