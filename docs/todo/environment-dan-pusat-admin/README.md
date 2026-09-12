@@ -1000,29 +1000,55 @@ nama field-nya sendiri — `versionDetails.version`, "Latest Available Version",
 `errorMessage`, `createdBy` — dan Elastic Jobs memberi padanan barisnya: `start_time`, `end_time`,
 `last_message`, `current_attempts`.
 
-### Bentuk layarnya
+### Bentuk layarnya — sudah berdiri
 
-Satu halaman, `/pembaruan`.
+Satu halaman, `/pembaruan`, di konsol operator. Sumbernya `GET /api/internal/v1/fleet` milik Core,
+satu panggilan untuk seluruh armada.
 
 Kepala halaman menyebut **versi platform** — sidik skema milik image yang sedang berjalan — beserta
-hitungan: berapa mutakhir, berapa tertinggal, berapa bermasalah. Satu tombol: **Perbarui semua yang
-tertinggal**.
+empat hitungan: mutakhir, tertinggal, bermasalah, belum terbaca. Satu tombol: **Perbarui semua yang
+tertinggal**, yang mati sendiri ketika tidak ada yang tertinggal.
 
 Tabelnya satu baris per lingkungan:
 
 | Kolom | Isinya |
 | --- | --- |
-| Pelanggan / Lingkungan | Nama badan hukum dan nama tempat kerjanya |
+| Lingkungan | Nama tempat kerjanya beserta slug-nya |
+| Pelanggan | Nama badan hukum |
 | Jenis | Produksi, Demo, Sandbox |
-| Versi | Sidik skema lingkungan itu, dipendekkan |
-| Keadaan | Mutakhir · Tertinggal · Sedang diperbarui · Gagal · Belum punya database |
-| Operasi terakhir | Hasil, langkah terakhir, dan alasan bila gagal |
-| Waktu | Mulai dan selesai |
-| Oleh | Operator yang memicunya, atau Sistem |
-| Aksi | Perbarui — hanya untuk yang tertinggal atau gagal |
+| Keadaan | Mutakhir · Tertinggal · Bermasalah · Belum terbaca |
+| Sidik skema | "Sama dengan image", atau sidiknya utuh bila ia berbeda |
+| Operasi terakhir | Hasil, langkah terakhir, waktu, siapa yang memicunya, dan alasan bila gagal |
+| Aksi | Perbarui — hanya untuk yang tertinggal atau bermasalah |
 
-"Keadaan" yang dibaca operator, bukan sidiknya. Sidik skema adalah nama berkas migration sepanjang
-lima puluh karakter; ia jawaban yang benar untuk mesin dan jawaban yang tidak terbaca untuk manusia.
+Tiga hal berbeda dari rencana di atas, dan ketiganya lahir dari menjalankannya:
+
+**Sidiknya tidak "dipendekkan" — ia disembunyikan ketika sama.** Rencananya memotong sidik menjadi
+beberapa karakter. Itu justru merusak satu-satunya alasan kolom itu ada: bagian yang membedakan dua
+nama berkas migration ada di **ekornya**, jadi potongan berujung elipsis membuat dua baris yang
+berbeda terbaca sama persis. Yang dilakukan sekarang kebalikannya — baris yang sidiknya sama dengan
+image berbunyi "Sama dengan image", dan hanya yang berbeda yang menampilkan namanya utuh. Angka yang
+memaksanya: kolom sidik penuh meluberkan tabel 231 piksel pada jendela 965 piksel, dan yang terdorong
+keluar layar adalah kolom aksi beserta tombolnya.
+
+**Waktu dan "Oleh" tidak berkolom sendiri.** Keduanya menjelaskan operasi terakhir, jadi keduanya
+tinggal di dalam selnya. Dua kolom tambahan yang isinya kosong pada baris yang belum pernah punya
+operasi hanya melebarkan tabel untuk ruang putih.
+
+**"Sedang dikerjakan" bukan salah satu dari empat keadaan.** Ia muncul di kolom aksi, menggantikan
+tombolnya. Alasannya sama dengan alasan tombolnya tidak muncul di baris yang mutakhir: menekan
+"Perbarui" pada lingkungan yang sedang dikerjakan akan ditolak kunci operasi, dan penolakan itu
+terbaca operator sebagai kegagalan pembaruannya.
+
+Halaman ini **memuat ulang dirinya tiap delapan detik selama masih ada operasi yang berjalan**, dan
+diam sepenuhnya ketika tidak ada. Syaratnya keadaan yang berakhir sendiri, jadi tidak ada jadwal
+yang harus dimatikan siapa pun.
+
+Satu lubang ditutup di sisi Core ketika tombolnya menjadi nyata: `POST /environments/upgrade`
+sekarang **melewati lingkungan yang operasi terakhirnya masih berjalan**, dan `force` pun tidak
+menembusnya. Tanpa itu, operator yang menekan tombolnya dua kali — keadaan yang paling wajar, karena
+angkanya belum bergerak — mengantrekan job kedua yang pasti ditolak kunci operasi, gagal, dan diulang
+tiga kali.
 
 ### Yang sengaja TIDAK ditiru, dan kenapa
 

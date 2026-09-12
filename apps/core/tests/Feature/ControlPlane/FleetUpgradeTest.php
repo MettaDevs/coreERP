@@ -217,6 +217,50 @@ final class FleetUpgradeTest extends TestCase
         Queue::assertNothingPushed();
     }
 
+    /**
+     * Lingkungan yang sedang dikerjakan tidak diantrekan lagi, dan `force` pun tidak menembusnya.
+     *
+     * Kunci operasi mengizinkan tepat satu operasi berjalan per lingkungan, jadi job kedua atas
+     * lingkungan yang sama akan ditolak, dilempar, dan diulang tiga kali sebelum menyerah — tiga
+     * baris `failed_jobs` untuk keadaan yang sebenarnya sehat.
+     *
+     * Ini keadaan yang paling wajar di layar Pembaruan, bukan keadaan pinggiran: operator menekan
+     * "Perbarui semua yang tertinggal", melihat angkanya belum bergerak, lalu menekannya lagi.
+     */
+    public function test_an_environment_already_being_worked_on_is_not_queued_again(): void
+    {
+        Queue::fake();
+
+        $busy = $this->environment('demo', 'sedangjalan');
+        $busy->forceFill([
+            'database_name' => 'env_uji_sedangjalan_0000000000',
+            'schema_fingerprint' => '2000_01_01_000000_zaman_batu',
+        ])->save();
+
+        EnvironmentOperation::create([
+            'environment_id' => $busy->id,
+            'operation' => 'migrate',
+            'status' => 'running',
+            'step' => 'migration-core',
+            'started_at' => now(),
+            'lease_until' => now()->addMinutes(30),
+        ]);
+
+        $this->withToken(self::TOKEN)
+            ->postJson('/api/internal/v1/environments/upgrade')
+            ->assertStatus(202)
+            ->assertJsonPath('queued_count', 0);
+
+        // `force` ada untuk migration yang isinya berubah tanpa berganti nama — bukan untuk
+        // menabrak pekerjaan yang sedang berjalan.
+        $this->withToken(self::TOKEN)
+            ->postJson('/api/internal/v1/environments/'.$busy->id.'/upgrade', ['force' => true])
+            ->assertStatus(202)
+            ->assertJsonPath('queued_count', 0);
+
+        Queue::assertNothingPushed();
+    }
+
     public function test_an_environment_that_does_not_exist_answers_404(): void
     {
         Queue::fake();

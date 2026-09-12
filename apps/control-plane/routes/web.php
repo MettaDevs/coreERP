@@ -10,6 +10,8 @@ use ControlPlane\Http\Controllers\Environments\Show as EnvironmentShow;
 use ControlPlane\Http\Controllers\Environments\Store as EnvironmentStore;
 use ControlPlane\Http\Controllers\Login;
 use ControlPlane\Http\Controllers\Logout;
+use ControlPlane\Http\Controllers\Updates\Index as UpdateIndex;
+use ControlPlane\Http\Controllers\Updates\Upgrade as UpdateUpgrade;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/lingkungan');
@@ -37,4 +39,13 @@ Route::middleware(['auth', 'operator'])->group(function (): void {
     Route::post('/lingkungan', EnvironmentStore::class)->name('environments.store');
     Route::get('/lingkungan/{lingkungan}', EnvironmentShow::class)->name('environments.show');
     Route::post('/lingkungan/{lingkungan}/siapkan', EnvironmentProvision::class)->name('environments.provision');
+
+    /*
+     * Satu controller melayani kedua tombol, karena yang membedakannya hanya ada atau tidaknya satu
+     * id di alamatnya. Alamatnya tetap berbahasa Indonesia seperti seluruh konsol ini — yang
+     * berbahasa Inggris nama berkas dan methodnya, bukan yang dibaca operator di bilah alamat.
+     */
+    Route::get('/pembaruan', UpdateIndex::class)->name('updates.index');
+    Route::post('/pembaruan', UpdateUpgrade::class)->name('updates.upgrade');
+    Route::post('/pembaruan/{lingkungan}', UpdateUpgrade::class)->name('updates.upgrade-one');
 });

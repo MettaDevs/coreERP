@@ -118,9 +118,27 @@ final class FleetController extends Controller
                 continue;
             }
 
+            $operation = $latest[$environment->id] ?? null;
+
+            /*
+             * Yang sedang dikerjakan dilewati, dan `force` pun tidak menembusnya.
+             *
+             * Kunci operasi `environment_operations_satu_berjalan` mengizinkan tepat satu operasi
+             * berjalan per lingkungan, jadi job kedua atas lingkungan yang sama akan ditolak,
+             * dilempar, dan diulang tiga kali sebelum menyerah — tiga baris `failed_jobs` untuk
+             * keadaan yang sebenarnya sehat.
+             *
+             * Ini bukan kemungkinan teoretis melainkan keadaan yang paling wajar di layar
+             * Pembaruan: operator menekan "Perbarui semua yang tertinggal", melihat angkanya belum
+             * bergerak, lalu menekannya lagi.
+             */
+            if ($operation !== null && $operation->status === 'running') {
+                continue;
+            }
+
             $own = is_string($environment->database_name) && $environment->database_name !== '';
             $fingerprint = $own ? $environment->schema_fingerprint : $central;
-            $state = $this->stateOf($environment, $fingerprint, $platform, $latest[$environment->id] ?? null);
+            $state = $this->stateOf($environment, $fingerprint, $platform, $operation);
 
             if (! $force && $state === 'current') {
                 continue;

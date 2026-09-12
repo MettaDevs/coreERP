@@ -47,6 +47,21 @@ export const resultLabels: Record<string, string> = {
     failed: 'Gagal',
 };
 
+/**
+ * Keadaan sebuah lingkungan terhadap versi image yang sedang berjalan.
+ *
+ * `unknown` sengaja tidak diterjemahkan menjadi "Tidak diketahui". Ia mencakup dua keadaan yang
+ * keduanya bukan kegagalan dan bukan ketertinggalan — sedang dikerjakan, dan belum pernah punya
+ * skema sama sekali — dan "Tidak diketahui" membaca keduanya sebagai kerusakan. "Belum terbaca"
+ * menyebut apa adanya: layarnya belum dapat menyimpulkan, bukan sesuatunya rusak.
+ */
+export const fleetStateLabels: Record<string, string> = {
+    current: 'Mutakhir',
+    behind: 'Tertinggal',
+    failed: 'Bermasalah',
+    unknown: 'Belum terbaca',
+};
+
 export function labelFor(labels: Record<string, string>, key: string): string {
     return labels[key] ?? key;
 }

@@ -135,6 +135,73 @@ class CoreCommandContractTest extends TestCase
         );
     }
 
+    public function test_the_fleet_addresses_are_in_the_contract(): void
+    {
+        $this->assertContains(
+            '/fleet',
+            $this->contract['paths'],
+            'Kontrak Core tidak memuat rute keadaan armada. Layar Pembaruan membaca alamat yang '
+            .'tidak dijanjikan siapa pun.'
+        );
+
+        $this->assertContains(
+            '/environments/upgrade',
+            $this->contract['paths'],
+            'Kontrak Core tidak memuat rute pembaruan armada. Tombol "Perbarui semua yang '
+            .'tertinggal" memanggil alamat yang tidak dijanjikan siapa pun.'
+        );
+
+        $this->assertContains(
+            '/environments/{environment}/upgrade',
+            $this->contract['paths'],
+            'Kontrak Core tidak memuat rute pembaruan satu lingkungan.'
+        );
+    }
+
+    /**
+     * Pemanggil ketiga dan keempat, dan pemeriksaannya diulang lagi dengan sengaja.
+     *
+     * Alasannya sama dengan yang di atas: cacat yang melahirkan berkas ini adalah cacat **per
+     * pemanggil**. Satu berkas yang benar tidak membuat berkas berikutnya ikut benar, dan yang
+     * paling mungkin salah justru pemanggil yang ditulis paling belakangan — ketika polanya sudah
+     * terasa jelas sehingga tidak ada yang memeriksanya lagi.
+     */
+    public function test_the_fleet_callers_also_use_bearer(): void
+    {
+        foreach (['FleetFromCore', 'QueueUpgradeViaCore'] as $caller) {
+            $source = (string) file_get_contents(__DIR__.'/../../app/Environments/'.$caller.'.php');
+
+            $this->assertStringContainsString(
+                'Http::withToken(',
+                $source,
+                'Kontrak menuntut token dikirim sebagai `Authorization: Bearer`, tetapi '
+                .$caller.' tidak memakai `Http::withToken()`.'
+            );
+
+            $this->assertStringNotContainsString(
+                'X-Control-Plane-Token',
+                $source,
+                $caller.' masih mengirim header kustom. Core membacanya lewat `bearerToken()`.'
+            );
+        }
+    }
+
+    /**
+     * Mengantrekan bukan mengerjakan, dan tenggatnya harus menyebutkan yang mana.
+     *
+     * Core memulangkan 202 begitu job-nya masuk antrean, jadi panggilan ini selesai dalam hitungan
+     * milidetik berapa pun jumlah lingkungannya. Memberinya tenggat penyiapan tidak membuat satu
+     * pun pembaruan lebih mungkin berhasil — ia hanya membuat konsol menggantung lima menit ketika
+     * Core mati.
+     */
+    public function test_queueing_an_upgrade_waits_for_acceptance_not_for_the_work(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../app/Environments/QueueUpgradeViaCore.php');
+
+        $this->assertStringContainsString("config('core.timeout')", $source);
+        $this->assertStringNotContainsString("config('core.provision_timeout')", $source);
+    }
+
     /**
      * @return array{paths: list<string>, lines: list<string>}
      */
