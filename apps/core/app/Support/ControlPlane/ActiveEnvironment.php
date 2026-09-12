@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Pusat;
+namespace App\Support\ControlPlane;
 
 use App\Models\Environment;
 use App\Support\Modules\TenantScope;
@@ -71,27 +71,27 @@ use Throwable;
  * sudah salah — kadang database itu sendiri. Penentu yang melempar di sana akan menelan laporan
  * yang seharusnya terkirim, lalu menggantinya dengan laporan tentang dirinya sendiri.
  */
-class LingkunganAktif
+class ActiveEnvironment
 {
     /** Kunci container untuk id environment yang sedang dikerjakan. */
-    public const KUNCI = 'coreerp.environment.id';
+    public const KEY = 'coreerp.environment.id';
 
     private ?Environment $memo = null;
 
-    private bool $sudahDicari = false;
+    private bool $resolved = false;
 
     public function __construct(private Container $container) {}
 
-    public function sekarang(): ?Environment
+    public function current(): ?Environment
     {
-        if ($this->sudahDicari) {
+        if ($this->resolved) {
             return $this->memo;
         }
 
-        $this->sudahDicari = true;
+        $this->resolved = true;
 
         try {
-            $this->memo = $this->cari();
+            $this->memo = $this->resolve();
         } catch (Throwable) {
             $this->memo = null;
         }
@@ -104,12 +104,12 @@ class LingkunganAktif
      *
      * Tidak pernah melempar. Tidak tahu berarti boleh — alasannya ada di docblock kelas.
      */
-    public function bolehKeluar(): bool
+    public function outboundAllowed(): bool
     {
         // `->`, bukan `?->`. Di sebelah kiri `??` keduanya berperilaku sama — pembacaan properti
         // pada null menghasilkan null, bukan galat — dan analisa statis menolak yang kedua sebagai
         // penjagaan yang tidak menjaga apa pun.
-        return $this->sekarang()->outbound_allowed ?? true;
+        return $this->current()->outbound_allowed ?? true;
     }
 
     /**
@@ -118,11 +118,11 @@ class LingkunganAktif
      * Pesan yang hanya berbunyi "ditolak" memaksa orang membaca kode untuk tahu sebabnya. Yang ini
      * menyebut environment-nya, sehingga jelas bahwa yang salah bukan kodenya melainkan tempatnya.
      */
-    public function alasanPenolakan(): string
+    public function refusalReason(): string
     {
-        $lingkungan = $this->sekarang();
+        $environment = $this->current();
 
-        if ($lingkungan === null) {
+        if ($environment === null) {
             return 'Sambungan keluar ditolak.';
         }
 
@@ -130,8 +130,8 @@ class LingkunganAktif
             'Sambungan keluar ditolak: lingkungan "%s" berjenis %s, bukan produksi. '
             .'Email, pengiriman otomatis ke sistem lain, dan laporan terjadwal sengaja dimatikan di sana '
             .'supaya salinan data tidak menghubungi pihak yang sebenarnya.',
-            $lingkungan->name,
-            $lingkungan->kind,
+            $environment->name,
+            $environment->kind,
         );
     }
 
@@ -144,13 +144,13 @@ class LingkunganAktif
     public function lupakan(): void
     {
         $this->memo = null;
-        $this->sudahDicari = false;
+        $this->resolved = false;
     }
 
-    private function cari(): ?Environment
+    private function resolve(): ?Environment
     {
-        if ($this->container->bound(self::KUNCI)) {
-            $id = $this->container->get(self::KUNCI);
+        if ($this->container->bound(self::KEY)) {
+            $id = $this->container->get(self::KEY);
 
             return is_string($id) ? Environment::query()->find($id) : null;
         }

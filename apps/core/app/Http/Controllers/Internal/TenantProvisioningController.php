@@ -6,10 +6,10 @@ namespace App\Http\Controllers\Internal;
 
 use App\Actions\Onboarding\RegisterBusiness;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Internal\PembuatanTenantRequest;
+use App\Http\Requests\Internal\TenantProvisioningRequest;
 use App\Models\Environment;
 use App\Models\TenantMembership;
-use App\Support\Pusat\SandiSementara;
+use App\Support\ControlPlane\TemporaryPassword;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -25,29 +25,29 @@ use Illuminate\Http\JsonResponse;
  * Itu bentuk yang diminta PRD dan alasannya keras: dua salinan alur pembuatan tenant adalah dua
  * tempat yang akan menyimpang, dan yang menyimpang di sini rantai izin.
  */
-final class PembuatanTenantController extends Controller
+final class TenantProvisioningController extends Controller
 {
-    public function store(PembuatanTenantRequest $permintaan, RegisterBusiness $daftarkanUsaha): JsonResponse
+    public function store(TenantProvisioningRequest $request, RegisterBusiness $registerBusiness): JsonResponse
     {
-        $sandiSementara = SandiSementara::buat();
+        $temporaryPassword = TemporaryPassword::generate();
 
-        $pemilik = $daftarkanUsaha->handle([
-            'name' => $permintaan->string('nama_admin')->toString(),
-            'email' => $permintaan->string('email_admin')->toString(),
-            'password' => $sandiSementara,
-            'business_name' => $permintaan->string('nama_badan_hukum')->toString(),
-            'app_ids' => $permintaan->appIds(),
+        $owner = $registerBusiness->handle([
+            'name' => $request->string('admin_name')->toString(),
+            'email' => $request->string('admin_email')->toString(),
+            'password' => $temporaryPassword,
+            'business_name' => $request->string('legal_name')->toString(),
+            'app_ids' => $request->appIds(),
             'must_change_password' => true,
         ]);
 
-        $keanggotaan = TenantMembership::query()
-            ->where('user_id', $pemilik->id)
+        $membership = TenantMembership::query()
+            ->where('user_id', $owner->id)
             ->where('system_role', 'owner')
             ->latest('created_at')
             ->firstOrFail();
 
-        $produksi = Environment::query()
-            ->where('tenant_id', $keanggotaan->tenant_id)
+        $production = Environment::query()
+            ->where('tenant_id', $membership->tenant_id)
             ->where('kind', 'production')
             ->firstOrFail();
 
@@ -56,10 +56,10 @@ final class PembuatanTenantController extends Controller
         // mana pun — jadi operator yang kehilangan balasan ini harus menempuh jalur lupa sandi,
         // bukan meminta seseorang membacakannya dari database.
         return response()->json([
-            'tenant_id' => $keanggotaan->tenant_id,
-            'environment_id' => $produksi->id,
-            'email' => $pemilik->email,
-            'kata_sandi_sementara' => $sandiSementara,
+            'tenant_id' => $membership->tenant_id,
+            'environment_id' => $production->id,
+            'email' => $owner->email,
+            'temporary_password' => $temporaryPassword,
         ], 201);
     }
 }

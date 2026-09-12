@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Concerns\MemegangOperasiLingkungan;
+use App\Console\Commands\Concerns\HoldsEnvironmentOperation;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use Carbon\CarbonInterface;
@@ -23,7 +23,7 @@ use Throwable;
  *
  * ## Tiga kolom dilepas sekaligus, karena memang tidak dapat dilepas satu-satu
  *
- * Bentuknya cermin dari `environment:sapu-kedaluwarsa`, dan constraint yang sama yang
+ * Bentuknya cermin dari `environment:sweep-expired`, dan constraint yang sama yang
  * menentukannya: `environments_hapus_berpasangan` mengikat `deleted_at` dengan `purge_after`, dan
  * `environments_status_hapus_sejalan` mengikat keduanya dengan `status`. Mengosongkan `deleted_at`
  * saja ditolak pada pernyataan pertama.
@@ -48,7 +48,7 @@ use Throwable;
  * Dan ketika riwayat itu tidak ada — lingkungan yang dihapus lunak sebelum perintah ini lahir,
  * atau lewat jalur yang tidak mencatat apa pun — jawabannya `degraded`. Itu bukan hukuman melainkan
  * keadaan yang paling jujur untuk "isinya ada, tetapi tidak ada yang tahu ia sehat": ia tidak dapat
- * dirutekan, dan `environment:siapkan` menerimanya apa adanya sehingga jalan keluarnya satu
+ * dirutekan, dan `environment:provision` menerimanya apa adanya sehingga jalan keluarnya satu
  * perintah. Menebak `active` menukar kejujuran itu dengan kegagalan yang muncul di tempat yang
  * jauh lebih mahal.
  *
@@ -63,7 +63,7 @@ use Throwable;
  * demo tanpa tanggal berakhir persis bug yang membuat disk penuh tanpa disadari siapa pun.
  *
  * Jadi memulihkan sebuah demo berarti memutuskan sampai kapan ia hidup. Perintah ini memutuskannya
- * terang-terangan, mencatatnya di riwayat, dan menerima `--hari` bagi operator yang tahu angka yang
+ * terang-terangan, mencatatnya di riwayat, dan menerima `--days` bagi operator yang tahu angka yang
  * lebih tepat.
  *
  * ## Yang ditolak, dan kenapa penolakannya bukan kehati-hatian berlebih
@@ -76,13 +76,13 @@ use Throwable;
  *   adalah lingkungan yang tampak pulih lalu hilang isinya beberapa menit kemudian. Penolakan yang
  *   terbaca jauh lebih baik daripada pemulihan yang mungkin.
  */
-final class PulihkanLingkungan extends Command
+final class RestoreEnvironment extends Command
 {
-    use MemegangOperasiLingkungan;
+    use HoldsEnvironmentOperation;
 
-    protected $signature = 'environment:pulihkan
+    protected $signature = 'environment:restore
         {environment : Id baris environments yang dipulihkan}
-        {--hari= : Berapa hari lagi demo ini berlaku setelah dipulihkan}';
+        {--days= : Berapa hari lagi demo ini berlaku setelah dipulihkan}';
 
     protected $description = 'Kembalikan lingkungan yang dihapus lunak, selama masa tenggangnya belum habis';
 
@@ -93,9 +93,9 @@ final class PulihkanLingkungan extends Command
      * dipulihkan adalah demo yang sudah pernah kedaluwarsa sekali; memberinya periode penuh lagi
      * mengubah pemulihan menjadi cara memperpanjang demo tanpa batas tanpa pernah ada yang
      * memutuskannya. Dua minggu cukup untuk menyelesaikan percakapan yang tertunda, dan operator
-     * yang memang butuh lebih dapat menyebut angkanya lewat `--hari`.
+     * yang memang butuh lebih dapat menyebut angkanya lewat `--days`.
      */
-    public const PERPANJANGAN_HARI = 14;
+    public const EXTENSION_DAYS = 14;
 
     /**
      * Status yang boleh dikembalikan apa adanya dari riwayat.
@@ -106,32 +106,32 @@ final class PulihkanLingkungan extends Command
      * yang tidak akan pernah datang, dan tidak ada satu pun perintah yang menerima status itu
      * sebagai titik awal. `degraded` menerima keduanya: ia jujur, dan ia punya jalan keluar.
      */
-    private const STATUS_DIPERCAYA = ['provisioning', 'active', 'maintenance', 'degraded', 'suspended'];
+    private const TRUSTED_STATUSES = ['provisioning', 'active', 'maintenance', 'degraded', 'suspended'];
 
     /** Status yang dipakai ketika riwayatnya tidak menyebutkan apa pun yang dapat dipercaya. */
-    private const STATUS_TIDAK_DIKETAHUI = 'degraded';
+    private const UNKNOWN_STATUS = 'degraded';
 
     /**
      * Tenggat kuncinya. Sama pendeknya dengan sapuan, dan karena alasan yang sama: yang dikerjakan
      * satu `UPDATE` pada satu baris registry.
      */
-    protected function tenggatOperasiMenit(): int
+    protected function operationLeaseMinutes(): int
     {
         return 5;
     }
 
     public function handle(): int
     {
-        $hari = $this->hari();
+        $days = $this->days();
 
-        if ($hari === null) {
+        if ($days === null) {
             return self::FAILURE;
         }
 
         $id = (string) $this->argument('environment');
-        $lingkungan = Environment::query()->find($id);
+        $environment = Environment::query()->find($id);
 
-        if (! $lingkungan instanceof Environment) {
+        if (! $environment instanceof Environment) {
             $this->error(sprintf('Environment "%s" tidak ada di registry.', $id));
 
             return self::FAILURE;
@@ -139,91 +139,91 @@ final class PulihkanLingkungan extends Command
 
         // Aman dijalankan ulang, dan tanpa meninggalkan jejak. Riwayat yang penuh operasi yang
         // tidak mengerjakan apa-apa adalah riwayat yang berhenti dibaca orang — alasan yang sama
-        // dengan yang sudah dipakai `environment:konversi`.
-        if ($lingkungan->deleted_at === null) {
+        // dengan yang sudah dipakai `environment:convert`.
+        if ($environment->deleted_at === null) {
             $this->info(sprintf(
                 'Environment "%s" tidak sedang dihapus lunak (statusnya %s); tidak ada yang diubah.',
-                $lingkungan->slug,
-                $lingkungan->status,
+                $environment->slug,
+                $environment->status,
             ));
 
             return self::SUCCESS;
         }
 
-        if ($this->sudahDibuang($lingkungan)) {
+        if ($this->alreadyPurged($environment)) {
             $this->error(sprintf(
                 'Environment "%s" sudah dibuang permanen — databasenya tidak ada lagi. Yang tersisa '
                 .'hanya barisnya beserta riwayatnya, dan itu memang sengaja tidak ikut dihapus. '
                 .'Pelanggan yang membutuhkannya kembali harus memperoleh lingkungan baru.',
-                $lingkungan->slug,
+                $environment->slug,
             ));
 
             return self::FAILURE;
         }
 
-        $bolehDibuang = self::waktu($lingkungan->purge_after);
+        $purgeAfter = self::asTime($environment->purge_after);
 
-        if ($bolehDibuang !== null && $bolehDibuang->isPast()) {
+        if ($purgeAfter !== null && $purgeAfter->isPast()) {
             $this->error(sprintf(
                 'Masa tenggang environment "%s" habis pada %s. Ia sudah masuk antrean pembuangan '
                 .'dan databasenya boleh hilang kapan saja, jadi pemulihan di jendela ini adalah '
                 .'balapan dengan penghapusan yang sedang berjalan.',
-                $lingkungan->slug,
-                $bolehDibuang->toDateTimeString(),
+                $environment->slug,
+                $purgeAfter->toDateTimeString(),
             ));
 
             return self::FAILURE;
         }
 
-        $operasi = $this->bukaOperasi($lingkungan, 'restore');
+        $operation = $this->openOperation($environment, 'restore');
 
-        if (! $operasi instanceof EnvironmentOperation) {
+        if (! $operation instanceof EnvironmentOperation) {
             return self::FAILURE;
         }
 
-        $langkah = 'baca-riwayat';
+        $step = 'baca-riwayat';
 
         try {
-            $status = $this->statusPulih($lingkungan);
-            $berakhir = $lingkungan->kind === 'demo' ? now()->addDays($hari) : null;
+            $status = $this->restoredStatus($environment);
+            $expiresAt = $environment->kind === 'demo' ? now()->addDays($days) : null;
 
-            $langkah = 'lepas-penghapusan';
-            $this->lepaskanPenghapusan($lingkungan, $status, $berakhir);
+            $step = 'lepas-penghapusan';
+            $this->releaseDeletion($environment, $status, $expiresAt);
 
-            $operasi->update([
+            $operation->update([
                 'status' => 'succeeded',
-                'step' => $langkah,
+                'step' => $step,
                 'finished_at' => now(),
                 'lease_until' => null,
                 'detail' => [
                     'status_dipulihkan' => $status,
-                    'status_ditebak' => $status === self::STATUS_TIDAK_DIKETAHUI,
-                    'berakhir_baru' => $berakhir?->toIso8601String(),
-                    'boleh_dibuang_sebelumnya' => $bolehDibuang?->toIso8601String(),
+                    'status_ditebak' => $status === self::UNKNOWN_STATUS,
+                    'berakhir_baru' => $expiresAt?->toIso8601String(),
+                    'boleh_dibuang_sebelumnya' => $purgeAfter?->toIso8601String(),
                 ],
             ]);
 
-            $this->info(sprintf('Environment "%s" dipulihkan dengan status %s.', $lingkungan->slug, $status));
+            $this->info(sprintf('Environment "%s" dipulihkan dengan status %s.', $environment->slug, $status));
 
-            if ($status === self::STATUS_TIDAK_DIKETAHUI) {
+            if ($status === self::UNKNOWN_STATUS) {
                 $this->warn(sprintf(
                     '  Riwayatnya tidak menyebut keadaan sebelum ia dihapus, jadi statusnya %s — '
-                    .'belum dapat dirutekan. Jalankan `environment:siapkan %s` untuk memastikan '
+                    .'belum dapat dirutekan. Jalankan `environment:provision %s` untuk memastikan '
                     .'isinya lengkap.',
-                    self::STATUS_TIDAK_DIKETAHUI,
-                    $lingkungan->id,
+                    self::UNKNOWN_STATUS,
+                    $environment->id,
                 ));
             }
 
-            if ($berakhir !== null) {
-                $this->line(sprintf('  Masa berlakunya kini sampai %s.', $berakhir->toDateTimeString()));
+            if ($expiresAt !== null) {
+                $this->line(sprintf('  Masa berlakunya kini sampai %s.', $expiresAt->toDateTimeString()));
             }
 
             return self::SUCCESS;
         } catch (Throwable $e) {
-            $this->tutupOperasiSebagaiGagal($operasi, $langkah, $e);
+            $this->closeOperationAsFailed($operation, $step, $e);
 
-            $this->error(sprintf('Pemulihan berhenti di langkah "%s": %s', $langkah, $e->getMessage()));
+            $this->error(sprintf('Pemulihan berhenti di langkah "%s": %s', $step, $e->getMessage()));
             $this->line('Lingkungannya tetap dihapus lunak. Perbaiki sebabnya lalu jalankan perintah yang sama sekali lagi.');
 
             return self::FAILURE;
@@ -238,10 +238,10 @@ final class PulihkanLingkungan extends Command
      * pekerjaan lain — jadi ia dibaca di tempat yang memang miliknya. Artinya juga tidak berubah
      * karena itu: terisi berarti databasenya sudah tidak ada di mana pun.
      */
-    private function sudahDibuang(Environment $lingkungan): bool
+    private function alreadyPurged(Environment $environment): bool
     {
         return Environment::query()
-            ->whereKey($lingkungan->id)
+            ->whereKey($environment->id)
             ->whereNotNull('purged_at')
             ->exists();
     }
@@ -256,22 +256,22 @@ final class PulihkanLingkungan extends Command
      * Yang terbaru yang menang. Sebuah lingkungan boleh dihapus dan dipulihkan berkali-kali, dan
      * yang berlaku selalu keadaan sesaat sebelum penghapusan yang terakhir.
      */
-    private function statusPulih(Environment $lingkungan): string
+    private function restoredStatus(Environment $environment): string
     {
-        $jejak = EnvironmentOperation::query()
-            ->where('environment_id', $lingkungan->id)
+        $record = EnvironmentOperation::query()
+            ->where('environment_id', $environment->id)
             ->whereIn('operation', ['expire', 'soft_delete'])
             ->where('status', 'succeeded')
             ->orderByDesc('started_at')
             ->first();
 
-        $sebelumnya = self::statusDalam($jejak?->detail);
+        $previous = self::statusIn($record?->detail);
 
-        if ($sebelumnya !== null && in_array($sebelumnya, self::STATUS_DIPERCAYA, true)) {
-            return $sebelumnya;
+        if ($previous !== null && in_array($previous, self::TRUSTED_STATUSES, true)) {
+            return $previous;
         }
 
-        return self::STATUS_TIDAK_DIKETAHUI;
+        return self::UNKNOWN_STATUS;
     }
 
     /**
@@ -283,7 +283,7 @@ final class PulihkanLingkungan extends Command
      * perintah lain di masa lalu: apa pun yang tidak berbentuk seperti yang diharapkan dijawab
      * null, bukan dipaksakan.
      */
-    private static function statusDalam(mixed $detail): ?string
+    private static function statusIn(mixed $detail): ?string
     {
         if (is_string($detail)) {
             $detail = json_decode($detail, true);
@@ -301,17 +301,17 @@ final class PulihkanLingkungan extends Command
     /**
      * Membaca sebuah kolom waktu milik `Environment` sebagai waktu, apa pun yang dilihat analisa.
      *
-     * Alasannya sama dengan yang tertulis di `SapuLingkunganKedaluwarsa`: cast `datetime` milik
+     * Alasannya sama dengan yang tertulis di `SweepExpiredEnvironments`: cast `datetime` milik
      * model itu dideklarasikan lewat method `casts()`, dan analisa statis tetap melihatnya sebagai
      * teks. Yang datang saat berjalan selalu `Carbon`.
      */
-    private static function waktu(mixed $nilai): ?CarbonInterface
+    private static function asTime(mixed $value): ?CarbonInterface
     {
-        if ($nilai instanceof CarbonInterface) {
-            return $nilai;
+        if ($value instanceof CarbonInterface) {
+            return $value;
         }
 
-        return is_string($nilai) && $nilai !== '' ? Carbon::parse($nilai) : null;
+        return is_string($value) && $value !== '' ? Carbon::parse($value) : null;
     }
 
     /**
@@ -327,34 +327,34 @@ final class PulihkanLingkungan extends Command
      * Yang kalah menulis nol baris, dan nol baris di sini dilaporkan gagal — bukan diam-diam
      * dianggap berhasil.
      */
-    private function lepaskanPenghapusan(Environment $lingkungan, string $status, ?CarbonInterface $berakhir): void
+    private function releaseDeletion(Environment $environment, string $status, ?CarbonInterface $expiresAt): void
     {
-        $isi = [
+        $changes = [
             'status' => $status,
             'deleted_at' => null,
             'purge_after' => null,
         ];
 
-        if ($berakhir !== null) {
-            $isi['expires_at'] = $berakhir;
+        if ($expiresAt !== null) {
+            $changes['expires_at'] = $expiresAt;
         }
 
-        $koneksi = DB::connection($lingkungan->getConnectionName());
+        $koneksi = DB::connection($environment->getConnectionName());
 
-        $terkena = (int) $koneksi->transaction(fn (): int => Environment::query()
-            ->whereKey($lingkungan->id)
+        $affected = (int) $koneksi->transaction(fn (): int => Environment::query()
+            ->whereKey($environment->id)
             ->whereNotNull('deleted_at')
             ->whereNull('purged_at')
-            ->update($isi));
+            ->update($changes));
 
-        if ($terkena !== 1) {
+        if ($affected !== 1) {
             throw new RuntimeException(
                 'Barisnya berubah di sela pemeriksaan dan penulisan — ia sudah dipulihkan jalur '
                 .'lain, atau isinya keburu dibuang permanen. Periksa keadaannya sebelum mencoba lagi.'
             );
         }
 
-        $lingkungan->refresh();
+        $environment->refresh();
     }
 
     /**
@@ -364,20 +364,20 @@ final class PulihkanLingkungan extends Command
      * dipulihkan lalu kedaluwarsa pada hari yang sama adalah pemulihan yang dibatalkan sapuan
      * berikutnya, dan yang terlihat operator hanyalah perintah yang seolah tidak mengerjakan apa-apa.
      */
-    private function hari(): ?int
+    private function days(): ?int
     {
-        $nilai = $this->option('hari');
+        $value = $this->option('days');
 
-        if ($nilai === null || $nilai === '') {
-            return self::PERPANJANGAN_HARI;
+        if ($value === null || $value === '') {
+            return self::EXTENSION_DAYS;
         }
 
-        if (preg_match('/^[1-9][0-9]{0,3}$/', $nilai) !== 1) {
-            $this->error(sprintf('Masa berlaku "%s" tidak dikenali. Isi jumlah hari, minimal 1.', $nilai));
+        if (preg_match('/^[1-9][0-9]{0,3}$/', $value) !== 1) {
+            $this->error(sprintf('Masa berlaku "%s" tidak dikenali. Isi jumlah hari, minimal 1.', $value));
 
             return null;
         }
 
-        return (int) $nilai;
+        return (int) $value;
     }
 }

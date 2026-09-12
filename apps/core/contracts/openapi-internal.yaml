@@ -645,7 +645,7 @@ paths:
         yang tidak memakai kredensial app, dan satu-satunya yang bekerja pada tenant yang
         belum ada — jadi tiga header kredensial itu memang tidak dapat dipakai di sini.
         Penjaganya token bersama pada `Authorization: Bearer`; alasannya di
-        `App\Http\Middleware\HanyaPusatAdmin`.
+        `App\Http\Middleware\ControlPlaneOnly`.
 
         Di belakangnya berjalan `App\Actions\Onboarding\RegisterBusiness` — aksi yang sama
         persis yang dipakai layar pendaftaran mandiri, bukan salinannya. Yang lahir karena
@@ -671,17 +671,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [nama_badan_hukum, nama_admin, email_admin, app_ids]
+              required: [legal_name, admin_name, admin_email, app_ids]
               properties:
-                nama_badan_hukum:
+                legal_name:
                   type: string
                   maxLength: 255
                   description: Nama badan hukum pelanggan. Menjadi nama tenant dan dasar slug-nya.
-                nama_admin:
+                admin_name:
                   type: string
                   maxLength: 255
                   description: Nama orang yang menjadi owner pertama tenant ini.
-                email_admin:
+                admin_email:
                   type: string
                   format: email
                   maxLength: 255
@@ -701,12 +701,12 @@ paths:
                     ikut ditambahkan sendiri oleh graph dependency.
       responses:
         '201':
-          description: Tenant lahir. `kata_sandi_sementara` hanya muncul di sini, sekali.
+          description: Tenant lahir. `temporary_password` hanya muncul di sini, sekali.
           content:
             application/json:
               schema:
                 type: object
-                required: [tenant_id, environment_id, email, kata_sandi_sementara]
+                required: [tenant_id, environment_id, email, temporary_password]
                 properties:
                   tenant_id: { type: string, format: ulid }
                   environment_id:
@@ -714,7 +714,7 @@ paths:
                     format: ulid
                     description: Environment `production` pertama tenant ini.
                   email: { type: string, format: email }
-                  kata_sandi_sementara:
+                  temporary_password:
                     type: string
                     description: Dibuat Core, tidak dapat dibaca lagi setelah balasan ini.
         '401':
@@ -731,16 +731,16 @@ paths:
               schema: { $ref: '#/components/schemas/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
-  /environments/{lingkungan}/siapkan:
+  /environments/{environment}/provision:
     post:
       tags: [Pusat admin]
-      operationId: internal.environments.siapkan
+      operationId: internal.environments.provision
       summary: Siapkan database sebuah lingkungan, lalu pasang module yang dibeli tenantnya
       description: |
         **Pemanggilnya pusat admin, bukan app module** — penjaganya token bersama yang sama
         dengan `/tenants`.
 
-        Di belakangnya berjalan `environment:siapkan`, dan urutannya menentukan: database
+        Di belakangnya berjalan `environment:provision`, dan urutannya menentukan: database
         dibuat, seluruh migration Core dijalankan ke dalamnya, `database_name` dicatat,
         **lalu** tiap module yang dibeli tenantnya dipasang beserta data awalnya. Statusnya
         naik ke `active` sesudah semuanya — lingkungan yang setengah terisi harus menjadi
@@ -760,7 +760,7 @@ paths:
       security:
         - controlPlaneToken: []
       parameters:
-        - name: lingkungan
+        - name: environment
           in: path
           required: true
           schema: { type: string, format: ulid }
@@ -772,7 +772,7 @@ paths:
             schema:
               type: object
               properties:
-                diminta_oleh:
+                requested_by:
                   type: integer
                   description: |
                     Id user yang menekan tombolnya. Tercatat pada `environment_operations` supaya
@@ -787,7 +787,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status, database, modul]
+                required: [status, database, modules]
                 properties:
                   status:
                     type: string
@@ -796,7 +796,7 @@ paths:
                     type: string
                     nullable: true
                     description: Nama database yang kini dipakai lingkungan ini.
-                  modul:
+                  modules:
                     type: array
                     description: |
                       Dibaca dari database lingkungan itu, bukan disimpulkan dari entitlement
@@ -805,17 +805,17 @@ paths:
                       menggagalkan penyiapan yang sudah berhasil.
                     items:
                       type: object
-                      required: [id, versi, status, disemai]
+                      required: [id, version, status, seeded]
                       properties:
                         id: { type: string }
-                        versi: { type: string }
+                        version: { type: string }
                         status:
                           type: string
                           enum: [installed, disabled, uninstalled]
-                        disemai:
+                        seeded:
                           type: boolean
                           description: Data awal module ini sudah pernah diisi.
-                  catatan:
+                  output:
                     type: string
                     description: Keluaran mentah perintahnya, untuk ditempel ke laporan.
         '401':

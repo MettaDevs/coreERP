@@ -60,7 +60,7 @@ class HandleInertiaRequests extends Middleware
              * memperlakukan angka sandbox sebagai angka sungguhan, lalu mengambil keputusan di
              * atasnya.
              */
-            'lingkungan' => $this->lingkunganTampil($request),
+            'environment' => $this->environmentBanner($request),
             'auth' => [
                 'user' => $user,
                 'membership' => $membership ? [
@@ -167,20 +167,20 @@ class HandleInertiaRequests extends Middleware
     /**
      * Keterangan lingkungan untuk spanduk, atau null bila memang tidak ada yang perlu diumumkan.
      *
-     * Dibaca dari atribut permintaan yang ditulis `TetapkanLingkungan`, bukan dengan query sendiri:
+     * Dibaca dari atribut permintaan yang ditulis `ResolveEnvironment`, bukan dengan query sendiri:
      * dua tempat yang menjawab "lingkungan mana ini" adalah dua tempat yang dapat menjawab berbeda,
      * dan yang berbeda di sini berbentuk spanduk yang menyebut tempat yang salah.
      *
-     * @return array{jenis: string, nama: string}|null
+     * @return array{kind: string, name: string}|null
      */
-    private function lingkunganTampil(Request $request): ?array
+    private function environmentBanner(Request $request): ?array
     {
-        $lingkungan = $request->attributes->get('coreerp.environment');
+        $environment = $request->attributes->get('coreerp.environment');
 
-        if (! $lingkungan instanceof Environment || $lingkungan->produksi()) {
+        if (! $environment instanceof Environment || $environment->produksi()) {
             return null;
         }
 
-        return ['jenis' => $lingkungan->kind, 'nama' => $lingkungan->name];
+        return ['kind' => $environment->kind, 'name' => $environment->name];
     }
 }

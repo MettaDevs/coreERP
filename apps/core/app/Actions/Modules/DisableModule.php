@@ -6,7 +6,7 @@ namespace App\Actions\Modules;
 
 use App\Models\Environment;
 use App\Models\ModuleInstallation;
-use App\Support\Pusat\KoneksiLingkungan;
+use App\Support\ControlPlane\EnvironmentConnection;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -22,21 +22,21 @@ use RuntimeException;
  */
 final class DisableModule
 {
-    public function handle(string $moduleId, string $tenantId, ?Environment $lingkungan = null): ModuleInstallation
+    public function handle(string $moduleId, string $tenantId, ?Environment $environment = null): ModuleInstallation
     {
-        $tujuan = $lingkungan ?? $this->produksi($tenantId);
+        $target = $environment ?? $this->productionEnvironment($tenantId);
 
-        if (! $tujuan instanceof Environment) {
-            return $this->kerjakan($moduleId, $tenantId);
+        if (! $target instanceof Environment) {
+            return $this->apply($moduleId, $tenantId);
         }
 
-        return app(KoneksiLingkungan::class)->jalankanDi(
-            $tujuan,
-            fn (): ModuleInstallation => $this->kerjakan($moduleId, $tenantId),
+        return app(EnvironmentConnection::class)->runWithin(
+            $target,
+            fn (): ModuleInstallation => $this->apply($moduleId, $tenantId),
         );
     }
 
-    private function produksi(string $tenantId): ?Environment
+    private function productionEnvironment(string $tenantId): ?Environment
     {
         return Environment::query()
             ->where('tenant_id', $tenantId)
@@ -50,14 +50,14 @@ final class DisableModule
      * menonaktifkan module menuntut koneksi yang benar lebih dulu. Alasan lengkapnya di
      * {@see InstallModule}.
      */
-    private function kerjakan(string $moduleId, string $tenantId): ModuleInstallation
+    private function apply(string $moduleId, string $tenantId): ModuleInstallation
     {
-        $pemasangan = ModuleInstallation::query()
+        $installation = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
             ->where('module_id', $moduleId)
             ->first();
 
-        if ($pemasangan === null) {
+        if ($installation === null) {
             throw new RuntimeException(sprintf('Module "%s" tidak terpasang pada tenant ini.', $moduleId));
         }
 
@@ -70,20 +70,20 @@ final class DisableModule
                 'updated_at' => now(),
             ]);
 
-        // Bukan `$pemasangan->fresh()`. Model ini berkunci gabungan dan karena itu tidak
+        // Bukan `$installation->fresh()`. Model ini berkunci gabungan dan karena itu tidak
         // punya primary key tunggal; `fresh()` membangun query dari primary key dan
         // mengembalikan baris yang salah tanpa satu pun peringatan.
-        return $this->baca($moduleId, $tenantId);
+        return $this->read($moduleId, $tenantId);
     }
 
-    private function baca(string $moduleId, string $tenantId): ModuleInstallation
+    private function read(string $moduleId, string $tenantId): ModuleInstallation
     {
-        /** @var ModuleInstallation $pemasangan */
-        $pemasangan = ModuleInstallation::query()
+        /** @var ModuleInstallation $installation */
+        $installation = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
             ->where('module_id', $moduleId)
             ->firstOrFail();
 
-        return $pemasangan;
+        return $installation;
     }
 }

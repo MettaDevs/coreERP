@@ -77,7 +77,7 @@ class CoreCommandContractTest extends TestCase
     public function test_the_environment_provisioning_address_is_in_the_contract(): void
     {
         $this->assertContains(
-            '/environments/{lingkungan}/siapkan',
+            '/environments/{environment}/provision',
             $this->contract['paths'],
             'Kontrak Core tidak memuat rute penyiapan lingkungan. Tombol "Siapkan" memanggil alamat '
             .'yang tidak dijanjikan siapa pun.'

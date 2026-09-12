@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Concerns\MemegangOperasiLingkungan;
+use App\Console\Commands\Concerns\HoldsEnvironmentOperation;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use Carbon\CarbonInterface;
@@ -53,7 +53,7 @@ use Throwable;
  *
  * ## Yang tertahan selama demo, lalu terbit begitu bendera menyala
  *
- * Ada satu, dan hanya satu. Tiga titik di repo ini bertanya `LingkunganAktif::bolehKeluar()`:
+ * Ada satu, dan hanya satu. Tiga titik di repo ini bertanya `ActiveEnvironment::outboundAllowed()`:
  * penerbit event workflow, pengirim laporan kesalahan ke Discord, dan jaring HTTP global. Dua yang
  * terakhir tidak menumpuk apa pun — laporan yang ditekan hilang saat itu juga, dan panggilan yang
  * ditolak melempar di tempat. Yang pertama menumpuk: `PublishWorkflowEvents` memilih barisnya
@@ -68,7 +68,7 @@ use Throwable;
  * Karena itu konversi **melucuti antrean itu lebih dulu**, dan urutannya mengikat: lucuti, baru
  * nyalakan. Kebalikannya menyisakan jendela tempat proses yang mati meninggalkan antrean yang sudah
  * hidup dan tidak akan pernah dibersihkan siapa pun — jalur pelucutan milik `PublishWorkflowEvents`
- * hanya berjalan ketika `bolehKeluar()` **salah**, sehingga sesudah bendera menyala tidak ada lagi
+ * hanya berjalan ketika `outboundAllowed()` **salah**, sehingga sesudah bendera menyala tidak ada lagi
  * kesempatan kedua.
  *
  * Ditandai terbit, bukan dihapus. Itu pilihan yang sama dengan yang sudah diambil jalur pelucutan
@@ -85,7 +85,7 @@ use Throwable;
  *
  * ## Kenapa gagal TIDAK berarti `degraded`
  *
- * Ini satu-satunya tempat perintah ini sengaja menyimpang dari `environment:siapkan`. Di sana
+ * Ini satu-satunya tempat perintah ini sengaja menyimpang dari `environment:provision`. Di sana
  * kegagalan meninggalkan tempat yang setengah jadi, jadi menurunkannya ke `degraded` justru
  * melindungi: yang gagal disiapkan memang tidak boleh dimasuki.
  *
@@ -94,27 +94,27 @@ use Throwable;
  * yang sehat karena sebuah kegagalan pembukuan, tepat pada hari ia memutuskan membeli. Yang
  * ditandai gagal cukup operasinya, beserta langkah terakhir yang tercapai.
  */
-final class KonversiLingkungan extends Command
+final class ConvertEnvironment extends Command
 {
-    use MemegangOperasiLingkungan;
+    use HoldsEnvironmentOperation;
 
-    protected $signature = 'environment:konversi {environment : Id baris environments yang dikonversi}';
+    protected $signature = 'environment:convert {environment : Id baris environments yang dikonversi}';
 
     protected $description = 'Ubah sebuah lingkungan demo menjadi produksi di tempat, beserta datanya';
 
     /** Koneksi sementara ke database lingkungan yang sedang dikonversi. */
-    private const KONEKSI = 'lingkungan_dikonversi';
+    private const CONNECTION = 'environment_convert';
 
     /**
      * Berapa lama operasi ini boleh memegang kuncinya sebelum boleh direbut.
      *
-     * Lebih pendek daripada `environment:siapkan` dengan sengaja. Yang di sana menjalankan seluruh
+     * Lebih pendek daripada `environment:provision` dengan sengaja. Yang di sana menjalankan seluruh
      * migration Core ke database kosong; yang di sini hanya memperbarui baris — satu `UPDATE` pada
      * registry, dan sejumlah `UPDATE` berbatas pada antrean event. Tidak ada langkah yang wajar
      * berjalan belasan menit, jadi tenggat yang panjang hanya memperlama pemulihan ketika prosesnya
      * benar-benar mati.
      */
-    protected function tenggatOperasiMenit(): int
+    protected function operationLeaseMinutes(): int
     {
         return 15;
     }
@@ -126,14 +126,14 @@ final class KonversiLingkungan extends Command
      * seluruhnya adalah satu transaksi raksasa yang menahan baris-barisnya selama ia berjalan.
      * Dipotong supaya konversi tidak pernah menjadi operasi yang mengunci antrean orang.
      */
-    private const SEKALI_ANGKUT = 1000;
+    private const BATCH_SIZE = 1000;
 
     public function handle(): int
     {
         $id = (string) $this->argument('environment');
-        $lingkungan = Environment::query()->find($id);
+        $environment = Environment::query()->find($id);
 
-        if (! $lingkungan instanceof Environment) {
+        if (! $environment instanceof Environment) {
             $this->error(sprintf('Environment "%s" tidak ada di registry.', $id));
 
             return self::FAILURE;
@@ -149,16 +149,16 @@ final class KonversiLingkungan extends Command
         // Tidak ada operasi yang dibuka di sini. "Tidak mengubah apa pun" termasuk tidak menambah
         // baris riwayat — riwayat yang penuh operasi yang tidak mengerjakan apa-apa adalah riwayat
         // yang berhenti dibaca orang.
-        if ($lingkungan->produksi()) {
+        if ($environment->produksi()) {
             $this->info(sprintf(
                 'Environment "%s" sudah berjenis produksi; tidak ada yang diubah.',
-                $lingkungan->slug,
+                $environment->slug,
             ));
 
             return self::SUCCESS;
         }
 
-        if ($lingkungan->kind !== 'demo') {
+        if ($environment->kind !== 'demo') {
             // Sandbox berhenti di sini, dan sebabnya bukan kehati-hatian. Sandbox adalah salinan
             // sebuah produksi; mempromosikannya menghasilkan dua tempat berisi data yang sama,
             // keduanya mengaku produksi, keduanya boleh menghubungi pihak luar dengan nomor
@@ -169,79 +169,79 @@ final class KonversiLingkungan extends Command
                 'Environment "%s" berjenis %s. Hanya demo yang boleh dikonversi: sandbox adalah '
                 .'salinan sebuah produksi, dan mempromosikannya berarti dua tempat berisi data yang '
                 .'sama sama-sama mengaku produksi.',
-                $lingkungan->slug,
-                $lingkungan->kind,
+                $environment->slug,
+                $environment->kind,
             ));
 
             return self::FAILURE;
         }
 
-        if ($lingkungan->status !== 'active') {
+        if ($environment->status !== 'active') {
             $this->error(sprintf(
                 'Environment "%s" berstatus %s. Hanya yang aktif yang boleh dikonversi — lingkungan '
                 .'yang belum selesai disiapkan tidak punya apa pun untuk dipromosikan. Jalankan '
-                .'`environment:siapkan %s` lebih dulu.',
-                $lingkungan->slug,
-                $lingkungan->status,
-                $lingkungan->id,
+                .'`environment:provision %s` lebih dulu.',
+                $environment->slug,
+                $environment->status,
+                $environment->id,
             ));
 
             return self::FAILURE;
         }
 
-        $produksi = $this->produksiLain($lingkungan);
+        $production = $this->otherProduction($environment);
 
-        if ($produksi instanceof Environment) {
+        if ($production instanceof Environment) {
             $this->error(sprintf(
                 'Tenant ini sudah punya produksi hidup: "%s". Satu tenant hanya mengenal satu '
                 .'produksi, jadi demo "%s" tidak dapat menjadi yang kedua. Yang harus diputuskan '
                 .'lebih dulu adalah nasib produksi yang sudah ada — dipindahkan datanya, atau '
                 .'dihapus lunak — dan itu keputusan orang, bukan perintah ini.',
-                $produksi->slug,
-                $lingkungan->slug,
+                $production->slug,
+                $environment->slug,
             ));
 
             return self::FAILURE;
         }
 
-        $operasi = $this->bukaOperasi($lingkungan, 'convert');
+        $operation = $this->openOperation($environment, 'convert');
 
-        if (! $operasi instanceof EnvironmentOperation) {
+        if (! $operation instanceof EnvironmentOperation) {
             return self::FAILURE;
         }
 
-        $berakhir = $lingkungan->expires_at;
-        $langkah = 'lucuti-antrean';
+        $expiresAt = $environment->expires_at;
+        $step = 'lucuti-antrean';
 
         try {
-            $dilucuti = $this->lucutiAntreanEvent($lingkungan);
-            $this->line(sprintf('  %d event yang belum terbit ditandai terbit tanpa dikirim.', $dilucuti));
+            $disarmed = $this->disarmEventQueue($environment);
+            $this->line(sprintf('  %d event yang belum terbit ditandai terbit tanpa dikirim.', $disarmed));
 
-            $langkah = 'jadikan-produksi';
-            $this->jadikanProduksi($lingkungan);
+            $step = 'jadikan-produksi';
+            $this->promoteToProduction($environment);
 
-            $operasi->update([
+            $operation->update([
                 'status' => 'succeeded',
-                'step' => $langkah,
+                'step' => $step,
                 'finished_at' => now(),
                 'lease_until' => null,
                 'detail' => [
                     'jenis_sebelumnya' => 'demo',
-                    'event_dilucuti' => $dilucuti,
-                    'berakhir_dilepas' => self::waktu($berakhir),
+                    'event_dilucuti' => $disarmed,
+                    'berakhir_dilepas' => self::asIsoString($expiresAt),
                 ],
             ]);
 
             $this->info(sprintf(
                 'Environment "%s" kini produksi. Sambungan keluar menyala dan tanggal berakhirnya dilepas.',
-                $lingkungan->slug,
+                $environment->slug,
             ));
 
             return self::SUCCESS;
         } catch (Throwable $e) {
-            $this->tutupOperasiSebagaiGagal($operasi, $langkah, $e);
+            $this->closeOperationAsFailed($operation, $step, $e);
 
-            $this->error(sprintf('Konversi berhenti di langkah "%s": %s', $langkah, $e->getMessage()));
+            $this->error(sprintf('Konversi berhenti di langkah "%s": %s', $step, $e->getMessage()));
             $this->line(
                 'Lingkungannya dibiarkan sebagaimana adanya — ia masih demo yang sehat dan masih '
                 .'dapat dipakai. Perbaiki sebabnya lalu jalankan perintah yang sama sekali lagi.'
@@ -249,7 +249,7 @@ final class KonversiLingkungan extends Command
 
             return self::FAILURE;
         } finally {
-            DB::purge(self::KONEKSI);
+            DB::purge(self::CONNECTION);
         }
     }
 
@@ -266,13 +266,13 @@ final class KonversiLingkungan extends Command
      * pun. Nilai yang tersimpan di riwayat tidak boleh berubah bentuk karena setelan di tempat
      * lain.
      */
-    private static function waktu(mixed $nilai): ?string
+    private static function asIsoString(mixed $value): ?string
     {
-        if ($nilai instanceof CarbonInterface) {
-            return $nilai->toIso8601String();
+        if ($value instanceof CarbonInterface) {
+            return $value->toIso8601String();
         }
 
-        return is_string($nilai) && $nilai !== '' ? $nilai : null;
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**
@@ -283,13 +283,13 @@ final class KonversiLingkungan extends Command
      * tenant yang produksinya sudah dihapus lunak memang boleh punya produksi baru — dan perbedaan
      * seperti itu muncul sebagai penolakan yang tidak dapat dijelaskan siapa pun.
      */
-    private function produksiLain(Environment $lingkungan): ?Environment
+    private function otherProduction(Environment $environment): ?Environment
     {
         return Environment::query()
-            ->where('tenant_id', $lingkungan->tenant_id)
+            ->where('tenant_id', $environment->tenant_id)
             ->where('kind', 'production')
             ->whereNull('deleted_at')
-            ->where('id', '!=', $lingkungan->id)
+            ->where('id', '!=', $environment->id)
             ->first();
     }
 
@@ -301,9 +301,9 @@ final class KonversiLingkungan extends Command
      * memecahnya menjadi dua pernyataan berarti pernyataan pertama sudah ditolak — apa pun
      * urutannya.
      */
-    private function jadikanProduksi(Environment $lingkungan): void
+    private function promoteToProduction(Environment $environment): void
     {
-        $koneksi = DB::connection($lingkungan->getConnectionName());
+        $koneksi = DB::connection($environment->getConnectionName());
 
         try {
             // Savepoint. PostgreSQL membatalkan seluruh blok transaksi begitu satu pernyataan di
@@ -311,8 +311,8 @@ final class KonversiLingkungan extends Command
             // berlomba diselesaikan oleh partial unique index, bukan oleh pemeriksaan di atas.
             // Tanpa savepoint, penolakan yang sudah diperhitungkan ini menjatuhkan transaksi milik
             // siapa pun yang kebetulan membungkus perintah ini.
-            $koneksi->transaction(function () use ($lingkungan): void {
-                $lingkungan->update([
+            $koneksi->transaction(function () use ($environment): void {
+                $environment->update([
                     'kind' => 'production',
                     'outbound_allowed' => true,
                     'expires_at' => null,
@@ -343,29 +343,29 @@ final class KonversiLingkungan extends Command
      * baris milik tenant lain yang sama sekali tidak sedang dikonversi. Melucutinya berarti
      * membatalkan pengiriman event pelanggan yang tidak melakukan apa-apa.
      */
-    private function lucutiAntreanEvent(Environment $lingkungan): int
+    private function disarmEventQueue(Environment $environment): int
     {
-        $koneksi = $this->koneksiLingkungan($lingkungan);
-        $jumlah = 0;
+        $koneksi = $this->environmentConnection($environment);
+        $count = 0;
 
         while (true) {
             $id = $koneksi->table('outbox_events')
-                ->where('tenant_id', $lingkungan->tenant_id)
+                ->where('tenant_id', $environment->tenant_id)
                 ->whereNull('published_at')
                 ->orderBy('occurred_at')
-                ->limit(self::SEKALI_ANGKUT)
+                ->limit(self::BATCH_SIZE)
                 ->pluck('id')
                 ->all();
 
             if ($id === []) {
-                return $jumlah;
+                return $count;
             }
 
             // `whereNull` diulang pada penulisannya, bukan hanya pada pemilihannya: di keadaan
             // pooled sebuah penerbit yang sedang berjalan boleh saja menerbitkan baris yang sama
             // di sela keduanya, dan menimpa `published_at` miliknya akan memalsukan waktu terbit
             // sebuah event yang benar-benar terkirim.
-            $jumlah += $koneksi->table('outbox_events')
+            $count += $koneksi->table('outbox_events')
                 ->whereIn('id', $id)
                 ->whereNull('published_at')
                 ->update(['published_at' => now(), 'updated_at' => now()]);
@@ -382,29 +382,29 @@ final class KonversiLingkungan extends Command
      * seperti itu akan menemukan antrean yang kosong lalu melaporkan berhasil — penjaga yang hijau
      * karena buta, bentuk kegagalan yang sudah dua kali membakar repo ini.
      */
-    private function koneksiLingkungan(Environment $lingkungan): ConnectionInterface
+    private function environmentConnection(Environment $environment): ConnectionInterface
     {
-        $nama = $lingkungan->database_name;
+        $name = $environment->database_name;
 
-        if ($nama === null) {
+        if ($name === null) {
             return DB::connection();
         }
 
-        $bawaan = (string) config('database.default');
-        $konfigurasi = config('database.connections.'.$bawaan);
+        $default = (string) config('database.default');
+        $konfigurasi = config('database.connections.'.$default);
 
         if (! is_array($konfigurasi)) {
-            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $bawaan));
+            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
         }
 
-        $konfigurasi['database'] = $nama;
+        $konfigurasi['database'] = $name;
         // Laravel mendahulukan `url` di atas `database` bila ia terisi. Dibiarkan, seluruh
         // pelucutan di atas akan berjalan pada database pusat.
         $konfigurasi['url'] = null;
 
-        config(['database.connections.'.self::KONEKSI => $konfigurasi]);
-        DB::purge(self::KONEKSI);
+        config(['database.connections.'.self::CONNECTION => $konfigurasi]);
+        DB::purge(self::CONNECTION);
 
-        return DB::connection(self::KONEKSI);
+        return DB::connection(self::CONNECTION);
     }
 }

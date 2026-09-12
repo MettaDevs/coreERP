@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Observabilitas;
 
-use App\Support\Pusat\LingkunganAktif;
+use App\Support\ControlPlane\ActiveEnvironment;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -59,7 +59,7 @@ final class PengirimDiscord
             // sini dapat dibedakan dari penolakan jaring global, yang baru bekerja jauh di
             // hilir. Penjaga yang hasilnya tidak dapat dibedakan dari penjaga lain tidak
             // dapat dibuktikan merah.
-            if (! app(LingkunganAktif::class)->bolehKeluar()) {
+            if (! app(ActiveEnvironment::class)->outboundAllowed()) {
                 return;
             }
 

@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Http;
  *
  * Ketika sebuah produksi disalin menjadi sandbox, salinannya dilucuti sambungan keluarnya:
  * penerbit event berhenti mengirim, laporan ke Discord ditekan, dan sisanya ditolak jaring
- * global. Titik ini sengaja berada di luar daftar itu, dan `JaringSambunganKeluar` malah
+ * global. Titik ini sengaja berada di luar daftar itu, dan `OutboundGuard` malah
  * mengecualikan alamatnya dengan sengaja.
  *
  * Alasannya ada pada kalimat pertama docblock ini. Yang dilucuti dari sebuah salinan adalah

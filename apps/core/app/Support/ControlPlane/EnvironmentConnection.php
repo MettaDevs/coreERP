@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Pusat;
+namespace App\Support\ControlPlane;
 
 use App\Models\Environment;
 use Closure;
@@ -31,7 +31,7 @@ use RuntimeException;
  * module yang membaca `Tenant` di tengah blok ini akan mencarinya di database sandbox, tidak
  * menemukannya, lalu gagal dengan pesan yang tidak menyebut sebabnya sama sekali.
  *
- * Trait `MilikPusat` sudah menandai tabel-tabel itu, dan ia membaca `coreerp.control_connection`
+ * Trait `OwnedByControlPlane` sudah menandai tabel-tabel itu, dan ia membaca `coreerp.control_connection`
  * **setiap kali dipanggil**. Jadi menyetel kunci itu ke koneksi semula, selama blok berjalan,
  * menahan sisi pusat tetap di tempatnya. Ini pemakaian sungguhan pertama trait tersebut; sebelum
  * ini ia memang tidak melakukan apa-apa.
@@ -41,9 +41,9 @@ use RuntimeException;
  * Ia bukan `PenjagaKoneksi` yang merutekan permintaan HTTP. Yang itu menuntut jalur gagal-tertutup:
  * permintaan yang tidak dapat menentukan lingkungannya harus ditolak, bukan dilayani database
  * bawaan. Kelas ini dipanggil kode yang **sudah memegang** barisnya, jadi tidak ada yang perlu
- * ditebak. Lihat App\Http\Middleware\TetapkanLingkungan.
+ * ditebak. Lihat App\Http\Middleware\ResolveEnvironment.
  */
-final class KoneksiLingkungan
+final class EnvironmentConnection
 {
     /**
      * Koneksi kedua ke database pusat, dipakai hanya untuk pernyataan tingkat kluster.
@@ -51,10 +51,10 @@ final class KoneksiLingkungan
      * PostgreSQL menolak `CREATE DATABASE` dan `DROP DATABASE` di dalam blok transaksi, dan koneksi
      * bawaan sangat mungkin sedang berada di dalam satu — di suite test ia selalu begitu.
      */
-    public const PEMELIHARA = 'lingkungan_pemelihara';
+    public const MAINTENANCE = 'environment_maintenance';
 
     /** Nama koneksi yang menunjuk database pusat, yaitu koneksi bawaan yang sedang berlaku. */
-    public function pusat(): string
+    public function controlPlane(): string
     {
         return (string) config('database.default');
     }
@@ -67,15 +67,15 @@ final class KoneksiLingkungan
      * dan keadaan pemasangan pooled — di sana jawabannya koneksi bawaan, dan tidak ada yang perlu
      * digeser sama sekali.
      */
-    public function untuk(Environment $lingkungan): string
+    public function for(Environment $environment): string
     {
-        $database = $lingkungan->database_name;
+        $database = $environment->database_name;
 
         if (! is_string($database) || $database === '') {
-            return $this->pusat();
+            return $this->controlPlane();
         }
 
-        return $this->daftarkan('lingkungan_'.$lingkungan->id, $database);
+        return $this->register('environment_'.$environment->id, $database);
     }
 
     /**
@@ -90,20 +90,20 @@ final class KoneksiLingkungan
      * menutup PDO yang sedang dipakai, dan pemanggil yang memutari sepuluh module akan memutus
      * koneksinya sendiri sepuluh kali.
      */
-    public function daftarkan(string $nama, string $database): string
+    public function register(string $name, string $database): string
     {
-        if (config('database.connections.'.$nama.'.database') === $database) {
-            return $nama;
+        if (config('database.connections.'.$name.'.database') === $database) {
+            return $name;
         }
 
-        $konfigurasi = $this->konfigurasiDasar();
+        $konfigurasi = $this->baseConfig();
         $konfigurasi['database'] = $database;
         $konfigurasi['url'] = null;
 
-        config(['database.connections.'.$nama => $konfigurasi]);
-        DB::purge($nama);
+        config(['database.connections.'.$name => $konfigurasi]);
+        DB::purge($name);
 
-        return $nama;
+        return $name;
     }
 
     /**
@@ -113,7 +113,7 @@ final class KoneksiLingkungan
      * `public` dilewati: ia sudah ada di tiap database baru, dan `CREATE SCHEMA` atasnya menuntut
      * hak yang belum tentu dimiliki peran aplikasi.
      */
-    public function dirikanSkema(string $koneksi): void
+    public function createSchemas(string $koneksi): void
     {
         $konfigurasi = config('database.connections.'.$koneksi);
 
@@ -122,20 +122,20 @@ final class KoneksiLingkungan
         }
 
         /** @var array<string, mixed> $konfigurasi */
-        $daftar = $this->skemaDari($konfigurasi);
+        $list = $this->schemasFrom($konfigurasi);
 
-        foreach ($daftar as $skema) {
-            DB::connection($koneksi)->statement(sprintf('CREATE SCHEMA IF NOT EXISTS "%s"', $skema));
+        foreach ($list as $schema) {
+            DB::connection($koneksi)->statement(sprintf('CREATE SCHEMA IF NOT EXISTS "%s"', $schema));
         }
     }
 
-    /** Koneksi untuk pernyataan tingkat kluster; lihat {@see self::PEMELIHARA}. */
-    public function pemelihara(): string
+    /** Koneksi untuk pernyataan tingkat kluster; lihat {@see self::MAINTENANCE}. */
+    public function maintenance(): string
     {
-        config(['database.connections.'.self::PEMELIHARA => $this->konfigurasiDasar()]);
-        DB::purge(self::PEMELIHARA);
+        config(['database.connections.'.self::MAINTENANCE => $this->baseConfig()]);
+        DB::purge(self::MAINTENANCE);
 
-        return self::PEMELIHARA;
+        return self::MAINTENANCE;
     }
 
     /**
@@ -147,46 +147,46 @@ final class KoneksiLingkungan
      *
      * @template T
      *
-     * @param  Closure(): T  $kerjakan
+     * @param  Closure(): T  $callback
      * @return T
      */
-    public function jalankanDi(Environment $lingkungan, Closure $kerjakan): mixed
+    public function runWithin(Environment $environment, Closure $callback): mixed
     {
-        $pusat = $this->pusat();
-        $tujuan = $this->untuk($lingkungan);
+        $controlPlane = $this->controlPlane();
+        $target = $this->for($environment);
 
-        if ($tujuan === $pusat) {
-            return $kerjakan();
+        if ($target === $controlPlane) {
+            return $callback();
         }
 
-        $kendaliSebelumnya = config('coreerp.control_connection');
+        $previousControl = config('coreerp.control_connection');
 
         config([
-            'database.default' => $tujuan,
-            'coreerp.control_connection' => $pusat,
+            'database.default' => $target,
+            'coreerp.control_connection' => $controlPlane,
         ]);
 
         try {
-            return $kerjakan();
+            return $callback();
         } finally {
             // `finally`, dan tanpa satu pun cabang di dalamnya. Blok ini yang menentukan apakah
             // sebuah kegagalan di tengah pemasangan module berakhir sebagai kegagalan biasa atau
             // sebagai proses yang sisa hidupnya menulis ke database yang salah.
             config([
-                'database.default' => $pusat,
-                'coreerp.control_connection' => $kendaliSebelumnya,
+                'database.default' => $controlPlane,
+                'coreerp.control_connection' => $previousControl,
             ]);
         }
     }
 
     /** @return array<string, mixed> */
-    public function konfigurasiDasar(): array
+    public function baseConfig(): array
     {
-        $bawaan = $this->pusat();
-        $konfigurasi = config('database.connections.'.$bawaan);
+        $default = $this->controlPlane();
+        $konfigurasi = config('database.connections.'.$default);
 
         if (! is_array($konfigurasi)) {
-            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $bawaan));
+            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
         }
 
         /** @var array<string, mixed> $konfigurasi */
@@ -197,23 +197,23 @@ final class KoneksiLingkungan
      * @param  array<string, mixed>  $konfigurasi
      * @return list<string>
      */
-    private function skemaDari(array $konfigurasi): array
+    private function schemasFrom(array $konfigurasi): array
     {
         $search = $konfigurasi['search_path'] ?? 'public';
-        $daftar = is_array($search) ? $search : explode(',', (string) $search);
+        $list = is_array($search) ? $search : explode(',', (string) $search);
 
-        $hasil = [];
+        $result = [];
 
-        foreach ($daftar as $skema) {
-            $bersih = trim((string) $skema, " \t\"'");
+        foreach ($list as $schema) {
+            $clean = trim((string) $schema, " \t\"'");
 
-            if ($bersih === '' || $bersih === 'public' || preg_match('/^[a-z][a-z0-9_]*$/', $bersih) !== 1) {
+            if ($clean === '' || $clean === 'public' || preg_match('/^[a-z][a-z0-9_]*$/', $clean) !== 1) {
                 continue;
             }
 
-            $hasil[] = $bersih;
+            $result[] = $clean;
         }
 
-        return $hasil;
+        return $result;
     }
 }

@@ -1,12 +1,12 @@
 <?php
 
 use App\Http\Middleware\AuthenticateAppService;
+use App\Http\Middleware\ControlPlaneOnly;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\HanyaPusatAdmin;
 use App\Http\Middleware\LampirkanKonteksJejak;
+use App\Http\Middleware\ResolveEnvironment;
 use App\Http\Middleware\ResolveModuleContext;
-use App\Http\Middleware\TetapkanLingkungan;
 use App\Http\Middleware\WajibGantiSandi;
 use App\Support\Observabilitas\JejakAktif;
 use App\Support\Observabilitas\PelaporKesalahan;
@@ -38,7 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // Dipasang per grup rute di `routes/api.php`, bukan global: hanya perintah pusat admin
             // yang boleh dibuka token bersama, dan menyebarkannya lebih luas berarti menaruh satu
             // token yang sama di depan permukaan yang jauh lebih besar daripada yang dibutuhkan.
-            'pusat-admin' => HanyaPusatAdmin::class,
+            'control-plane' => ControlPlaneOnly::class,
         ]);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
@@ -55,10 +55,10 @@ return Application::configure(basePath: dirname(__DIR__))
          * identitas yang benar kelak, sistem harus tahu tenant mana ini sebelum orangnya mengetik
          * apa pun.
          *
-         * Ia tidak pernah menyala pada penempatan yang tidak menyetel `COREERP_DOMAIN_DASAR` —
+         * Ia tidak pernah menyala pada penempatan yang tidak menyetel `COREERP_BASE_DOMAIN` —
          * on-prem, lingkungan lokal, dan seluruh test suite yang ada. Bukan gagal; tidak menyala.
          */
-        $middleware->append(TetapkanLingkungan::class);
+        $middleware->append(ResolveEnvironment::class);
 
         $middleware->web(append: [
             HandleAppearance::class,

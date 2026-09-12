@@ -17,9 +17,9 @@ class Store extends Controller
     public function __invoke(Request $request, CreateCustomer $create): RedirectResponse
     {
         $input = $request->validate([
-            'nama_badan_hukum' => ['required', 'string', 'max:150'],
-            'nama_admin' => ['required', 'string', 'max:150'],
-            'email_admin' => ['required', 'string', 'email', 'max:150'],
+            'legal_name' => ['required', 'string', 'max:150'],
+            'admin_name' => ['required', 'string', 'max:150'],
+            'admin_email' => ['required', 'string', 'email', 'max:150'],
             // Bentuknya diperiksa di sini, **ketersediaannya tidak**. Yang tahu app mana tersedia,
             // apa prerequisite-nya, dan apakah ia ada di edisi ini hanyalah Core — dan ia memang
             // memeriksanya saat permintaannya tiba. Menyalin pemeriksaan itu ke sini berarti dua
@@ -39,9 +39,9 @@ class Store extends Controller
 
         try {
             $result = $create(
-                $input['nama_badan_hukum'],
-                $input['nama_admin'],
-                $input['email_admin'],
+                $input['legal_name'],
+                $input['admin_name'],
+                $input['admin_email'],
                 $apps,
             );
         } catch (CustomerRejected $rejected) {
@@ -69,7 +69,7 @@ class Store extends Controller
          */
         return redirect('/pelanggan')->with('credentials', [
             'tenant' => $result['tenant_id'],
-            'name' => $input['nama_badan_hukum'],
+            'name' => $input['legal_name'],
             'email' => $result['email'],
             'password' => $result['temporary_password'],
         ]);

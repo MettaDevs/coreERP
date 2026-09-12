@@ -3,12 +3,12 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Support\ControlPlane\ActiveEnvironment;
+use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\Observabilitas\PelaporKesalahan;
 use App\Support\ParameterWorkflow;
-use App\Support\Pusat\JaringSambunganKeluar;
-use App\Support\Pusat\LingkunganAktif;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -58,7 +58,7 @@ class AppServiceProvider extends ServiceProvider
          * yang menjaga ingatannya tidak menyeberang: pekerja antrean yang memungut job
          * berikutnya mendapat ikatan yang bersih, persis seperti permintaan HTTP berikutnya.
          */
-        $this->app->scoped(LingkunganAktif::class);
+        $this->app->scoped(ActiveEnvironment::class);
     }
 
     /**
@@ -81,7 +81,7 @@ class AppServiceProvider extends ServiceProvider
         // Dipasang tanpa syarat, termasuk on-prem dan di dalam test. Yang menentukan apakah ia
         // menolak sesuatu adalah baris `environments`, bukan pemasangannya — dan selama satu
         // tenant hanya punya produksi, ia tidak pernah menolak apa pun.
-        JaringSambunganKeluar::pasang();
+        OutboundGuard::install();
 
         Gate::define(
             'manage-access',

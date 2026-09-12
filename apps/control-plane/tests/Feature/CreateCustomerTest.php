@@ -83,9 +83,9 @@ class CreateCustomerTest extends TestCase
     private function input(): array
     {
         return [
-            'nama_badan_hukum' => 'PT Sumber Sehat Nusantara',
-            'nama_admin' => 'Siti Rahmawati',
-            'email_admin' => 'siti@sumbersehat.test',
+            'legal_name' => 'PT Sumber Sehat Nusantara',
+            'admin_name' => 'Siti Rahmawati',
+            'admin_email' => 'siti@sumbersehat.test',
             'app_ids' => ['hr'],
         ];
     }
@@ -132,7 +132,7 @@ class CreateCustomerTest extends TestCase
             'tenant_id' => '01JTENANTUJI0000000000000',
             'environment_id' => '01JENVUJI00000000000000',
             'email' => 'siti@sumbersehat.test',
-            'kata_sandi_sementara' => 'Gerbang-Sore-4417',
+            'temporary_password' => 'Gerbang-Sore-4417',
         ], 201)]);
 
         $this->actingAs($this->operator());
@@ -141,9 +141,9 @@ class CreateCustomerTest extends TestCase
 
         Http::assertSent(fn (OutboundRequest $request): bool => $request->url() === self::ENDPOINT
             && $request->hasHeader('Authorization', 'Bearer kunci-uji')
-            && $request['nama_badan_hukum'] === 'PT Sumber Sehat Nusantara'
-            && $request['nama_admin'] === 'Siti Rahmawati'
-            && $request['email_admin'] === 'siti@sumbersehat.test'
+            && $request['legal_name'] === 'PT Sumber Sehat Nusantara'
+            && $request['admin_name'] === 'Siti Rahmawati'
+            && $request['admin_email'] === 'siti@sumbersehat.test'
             && $request['app_ids'] === ['hr']);
 
         $this->get('/pelanggan')
@@ -157,7 +157,7 @@ class CreateCustomerTest extends TestCase
         Http::fake(['*' => Http::response([
             'tenant_id' => '01JTENANTUJI0000000000000',
             'email' => 'siti@sumbersehat.test',
-            'kata_sandi_sementara' => 'Gerbang-Sore-4417',
+            'temporary_password' => 'Gerbang-Sore-4417',
         ], 201)]);
 
         $this->actingAs($this->operator());
@@ -174,14 +174,14 @@ class CreateCustomerTest extends TestCase
     {
         Http::fake(['*' => Http::response([
             'message' => 'Data yang diberikan tidak sah.',
-            'errors' => ['email_admin' => ['Email ini sudah terdaftar.']],
+            'errors' => ['admin_email' => ['Email ini sudah terdaftar.']],
         ], 422)]);
 
         $this->actingAs($this->operator())
             ->post('/pelanggan', $this->input())
             // Galat formulir, bukan halaman 500. Keduanya berarti "ditolak", tetapi hanya yang
             // pertama yang menyebutkan apa yang harus diperbaiki — dan di isian mana.
-            ->assertSessionHasErrors(['email_admin' => 'Email ini sudah terdaftar.']);
+            ->assertSessionHasErrors(['admin_email' => 'Email ini sudah terdaftar.']);
     }
 
     public function test_an_unavailable_app_is_rejected_by_core_not_by_the_console(): void
@@ -255,12 +255,12 @@ class CreateCustomerTest extends TestCase
 
         $this->actingAs($this->operator())
             ->post('/pelanggan', [
-                'nama_badan_hukum' => '',
-                'nama_admin' => '',
-                'email_admin' => 'bukan-email',
+                'legal_name' => '',
+                'admin_name' => '',
+                'admin_email' => 'bukan-email',
                 'app_ids' => [],
             ])
-            ->assertSessionHasErrors(['nama_badan_hukum', 'nama_admin', 'email_admin', 'app_ids']);
+            ->assertSessionHasErrors(['legal_name', 'admin_name', 'admin_email', 'app_ids']);
 
         Http::assertNothingSent();
     }

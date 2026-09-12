@@ -4,7 +4,7 @@ import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
-import SpandukLingkungan from '@/components/spanduk-lingkungan';
+import EnvironmentBanner from '@/components/environment-banner';
 import type { AppLayoutProps } from '@/types';
 
 export default function AppSidebarLayout({ children }: AppLayoutProps) {
@@ -34,7 +34,7 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                             Spanduk yang bisa dibuang adalah spanduk yang dibuang orang pada hari
                             pertama, lalu tidak pernah terlihat lagi justru ketika ia dibutuhkan.
                         */}
-                        <SpandukLingkungan />
+                        <EnvironmentBanner />
                         <div className="min-w-0 flex-1 bg-muted/30">
                             {children}
                         </div>

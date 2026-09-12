@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Concerns\MemegangOperasiLingkungan;
+use App\Console\Commands\Concerns\HoldsEnvironmentOperation;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use Carbon\CarbonInterface;
@@ -58,21 +58,21 @@ use Throwable;
  * Tanpa argumen ia menyapu semua yang layak dibuang — itu yang dijalankan penjadwal. Dengan id ia
  * membuang satu, dan menolaknya dengan kalimat yang terbaca bila tidak layak.
  *
- * Yang mengikat: keduanya memanggil `alasanMenolak()` yang sama. Jalur bernama yang punya
+ * Yang mengikat: keduanya memanggil `refusalReason()` yang sama. Jalur bernama yang punya
  * pemeriksaannya sendiri adalah jalur yang kelak lebih longgar daripada sapuannya — dan yang lebih
  * longgar di sini berarti sebuah `DROP DATABASE` yang seharusnya tidak pernah terjadi.
  */
-final class HapusLingkunganPermanen extends Command
+final class PurgeEnvironment extends Command
 {
-    use MemegangOperasiLingkungan;
+    use HoldsEnvironmentOperation;
 
-    protected $signature = 'environment:hapus-permanen
+    protected $signature = 'environment:purge
         {environment? : Id satu baris environments; tanpa ini seluruh yang layak dibuang disapu}';
 
     protected $description = 'Buang database lingkungan yang masa tenggangnya sudah habis, beserta isinya';
 
     /** Koneksi kedua ke database pusat, dipakai hanya untuk `DROP DATABASE`. */
-    private const KONEKSI_PEMELIHARA = 'lingkungan_pembuang';
+    private const CONNECTION_MAINTENANCE = 'environment_purge';
 
     /**
      * Tenggat kuncinya, dan ia yang paling panjang di antara operasi lingkungan.
@@ -82,7 +82,7 @@ final class HapusLingkunganPermanen extends Command
      * memberi ruang untuk database besar di disk yang sibuk tanpa membuat sebuah proses yang
      * benar-benar mati menahan lingkungannya sampai sapuan besok.
      */
-    protected function tenggatOperasiMenit(): int
+    protected function operationLeaseMinutes(): int
     {
         return 15;
     }
@@ -92,10 +92,10 @@ final class HapusLingkunganPermanen extends Command
         $id = $this->argument('environment');
 
         if (is_string($id) && $id !== '') {
-            return $this->buangYangDisebut($id);
+            return $this->purgeNamed($id);
         }
 
-        return $this->sapuSemua();
+        return $this->sweepAll();
     }
 
     /**
@@ -113,7 +113,7 @@ final class HapusLingkunganPermanen extends Command
      * dasar. Ia juga menjaga `schedule:run` tetap berjalan: pengecualian yang lolos dari sebuah
      * filter menjatuhkan perintah terjadwal lain yang mengantre sesudahnya.
      */
-    public static function tidakAdaYangPerluDibuang(): bool
+    public static function nothingToPurge(): bool
     {
         try {
             return Environment::query()
@@ -130,17 +130,17 @@ final class HapusLingkunganPermanen extends Command
     }
 
     /** Membuang satu lingkungan yang disebut operator, beserta penolakan yang terbaca. */
-    private function buangYangDisebut(string $id): int
+    private function purgeNamed(string $id): int
     {
-        $lingkungan = Environment::query()->find($id);
+        $environment = Environment::query()->find($id);
 
-        if (! $lingkungan instanceof Environment) {
+        if (! $environment instanceof Environment) {
             $this->error(sprintf('Environment "%s" tidak ada di registry.', $id));
 
             return self::FAILURE;
         }
 
-        return $this->buangSatu($lingkungan) ? self::SUCCESS : self::FAILURE;
+        return $this->purgeOne($environment) ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -150,9 +150,9 @@ final class HapusLingkunganPermanen extends Command
      * Satu database yang menolak dibuang — sesi yang tidak dapat diputus, hak yang kurang — tidak
      * boleh membuat sisa antreannya menumpuk diam-diam sampai disknya penuh.
      */
-    private function sapuSemua(): int
+    private function sweepAll(): int
     {
-        $daftar = Environment::query()
+        $list = Environment::query()
             ->where('kind', '<>', 'production')
             ->where('status', 'soft_deleted')
             ->whereNotNull('deleted_at')
@@ -161,34 +161,34 @@ final class HapusLingkunganPermanen extends Command
             ->orderBy('purge_after')
             ->get();
 
-        if ($daftar->isEmpty()) {
+        if ($list->isEmpty()) {
             $this->info('Tidak ada lingkungan yang masa tenggangnya sudah habis.');
 
             return self::SUCCESS;
         }
 
-        $this->line(sprintf('%d lingkungan siap dibuang permanen.', $daftar->count()));
+        $this->line(sprintf('%d lingkungan siap dibuang permanen.', $list->count()));
 
-        $berhasil = 0;
-        $gagal = 0;
+        $succeeded = 0;
+        $failed = 0;
 
-        foreach ($daftar as $lingkungan) {
-            if ($this->buangSatu($lingkungan)) {
-                $berhasil++;
+        foreach ($list as $environment) {
+            if ($this->purgeOne($environment)) {
+                $succeeded++;
 
                 continue;
             }
 
-            $gagal++;
+            $failed++;
         }
 
-        $this->info(sprintf('Pembuangan selesai: %d dibuang, %d gagal.', $berhasil, $gagal));
+        $this->info(sprintf('Pembuangan selesai: %d dibuang, %d gagal.', $succeeded, $failed));
 
-        if ($gagal > 0) {
+        if ($failed > 0) {
             $this->error(sprintf(
                 '%d lingkungan tidak jadi dibuang. Sebabnya ada di `environment_operations` dan di '
                 .'log aplikasi; databasenya masih memakan disk sampai sebabnya dibereskan.',
-                $gagal,
+                $failed,
             ));
 
             return self::FAILURE;
@@ -198,83 +198,83 @@ final class HapusLingkunganPermanen extends Command
     }
 
     /** Membuang satu lingkungan, dan menelan kegagalannya supaya sisa antreannya tetap jalan. */
-    private function buangSatu(Environment $lingkungan): bool
+    private function purgeOne(Environment $environment): bool
     {
-        $sebab = $this->alasanMenolak($lingkungan);
+        $cause = $this->refusalReason($environment);
 
-        if ($sebab !== null) {
-            $this->error(sprintf('  "%s" tidak dibuang: %s', $lingkungan->slug, $sebab));
+        if ($cause !== null) {
+            $this->error(sprintf('  "%s" tidak dibuang: %s', $environment->slug, $cause));
 
             return false;
         }
 
-        $operasi = $this->bukaOperasi($lingkungan, 'purge');
+        $operation = $this->openOperation($environment, 'purge');
 
-        if (! $operasi instanceof EnvironmentOperation) {
+        if (! $operation instanceof EnvironmentOperation) {
             Log::warning('Pembuangan permanen dilewati karena operasi lain sedang berjalan.', [
-                'environment' => $lingkungan->id,
-                'slug' => $lingkungan->slug,
+                'environment' => $environment->id,
+                'slug' => $environment->slug,
             ]);
 
             return false;
         }
 
-        $langkah = 'periksa-ulang';
+        $step = 'periksa-ulang';
 
         try {
             // Diperiksa ulang dari barisnya yang baru dibaca, sesudah kuncinya dipegang.
             //
             // Pemeriksaan di atas berjalan sebelum kunci ada, dan di antara keduanya sebuah
-            // `environment:pulihkan` boleh saja menang — memulihkan lingkungan yang sedetik
+            // `environment:restore` boleh saja menang — memulihkan lingkungan yang sedetik
             // kemudian databasenya dibuang perintah ini. Jendelanya sempit dan akibatnya total,
             // jadi ia ditutup di sini: sesudah titik ini pemulihan tidak dapat masuk, karena
             // `environment_operations_satu_berjalan` hanya mengizinkan satu operasi per lingkungan.
-            $lingkungan->refresh();
-            $sebab = $this->alasanMenolak($lingkungan);
+            $environment->refresh();
+            $cause = $this->refusalReason($environment);
 
-            if ($sebab !== null) {
-                throw new RuntimeException('Keadaannya berubah sesudah kunci dipegang: '.$sebab);
+            if ($cause !== null) {
+                throw new RuntimeException('Keadaannya berubah sesudah kunci dipegang: '.$cause);
             }
 
-            $nama = $lingkungan->database_name;
-            $dihapusLunak = self::waktu($lingkungan->deleted_at);
-            $bolehDibuang = self::waktu($lingkungan->purge_after);
+            $name = $environment->database_name;
+            $deletedAt = self::asTime($environment->deleted_at);
+            $purgeAfter = self::asTime($environment->purge_after);
 
-            $langkah = 'buang-database';
-            $dibuang = $this->buangDatabase($nama);
+            $step = 'buang-database';
+            $dropped = $this->dropDatabase($name);
 
-            $this->line($dibuang
-                ? sprintf('  "%s": database "%s" dibuang.', $lingkungan->slug, (string) $nama)
-                : sprintf('  "%s": tidak punya database sendiri; hanya barisnya yang ditandai.', $lingkungan->slug));
+            $this->line($dropped
+                ? sprintf('  "%s": database "%s" dibuang.', $environment->slug, (string) $name)
+                : sprintf('  "%s": tidak punya database sendiri; hanya barisnya yang ditandai.', $environment->slug));
 
-            $langkah = 'tandai-dibuang';
-            $this->tandaiDibuang($lingkungan);
+            $step = 'tandai-dibuang';
+            $this->markPurged($environment);
 
-            $operasi->update([
+            $operation->update([
                 'status' => 'succeeded',
-                'step' => $langkah,
+                'step' => $step,
                 'finished_at' => now(),
                 'lease_until' => null,
                 'detail' => [
-                    'database' => $nama,
-                    'database_dibuang' => $dibuang,
-                    'dihapus_lunak_pada' => $dihapusLunak?->toIso8601String(),
-                    'boleh_dibuang_pada' => $bolehDibuang?->toIso8601String(),
+                    'database' => $name,
+                    'database_dibuang' => $dropped,
+                    'dihapus_lunak_pada' => $deletedAt?->toIso8601String(),
+                    'boleh_dibuang_pada' => $purgeAfter?->toIso8601String(),
                 ],
             ]);
 
             return true;
         } catch (Throwable $e) {
-            $this->tutupOperasiSebagaiGagal($operasi, $langkah, $e);
+            $this->closeOperationAsFailed($operation, $step, $e);
 
             Log::error('Pembuangan permanen gagal pada satu lingkungan.', [
-                'environment' => $lingkungan->id,
-                'slug' => $lingkungan->slug,
-                'langkah' => $langkah,
+                'environment' => $environment->id,
+                'slug' => $environment->slug,
+                'langkah' => $step,
                 'sebab' => $e->getMessage(),
             ]);
 
-            $this->error(sprintf('  "%s" gagal dibuang di langkah "%s": %s', $lingkungan->slug, $langkah, $e->getMessage()));
+            $this->error(sprintf('  "%s" gagal dibuang di langkah "%s": %s', $environment->slug, $step, $e->getMessage()));
 
             return false;
         }
@@ -287,43 +287,43 @@ final class HapusLingkunganPermanen extends Command
      * keluar adalah kalimat yang paling menjelaskan: yang sudah dibuang disebut sudah dibuang,
      * bukan disebut "masa tenggangnya habis" — padahal keduanya benar.
      */
-    private function alasanMenolak(Environment $lingkungan): ?string
+    private function refusalReason(Environment $environment): ?string
     {
         // Produksi, apa pun statusnya. Ia tempat kerja pelanggan yang sedang membayar, dan tidak
         // ada keadaan di rancangan ini yang membuat membuangnya lewat perintah terjadwal menjadi
         // jawaban yang benar. Constraint `environments_produksi_tidak_dibuang` menolaknya sekali
         // lagi di PostgreSQL; yang di sini ada supaya penolakannya berupa kalimat, bukan galat SQL.
-        if ($lingkungan->produksi()) {
+        if ($environment->produksi()) {
             return 'ia berjenis produksi. Produksi tidak pernah dibuang permanen lewat perintah ini, '
                 .'apa pun statusnya — yang harus diputuskan lebih dulu adalah nasib datanya, dan itu '
                 .'keputusan orang.';
         }
 
-        if ($lingkungan->status !== 'soft_deleted' || $lingkungan->deleted_at === null) {
+        if ($environment->status !== 'soft_deleted' || $environment->deleted_at === null) {
             return sprintf(
                 'ia belum dihapus lunak (statusnya %s). Masa tenggang adalah satu-satunya jendela '
                 .'tempat sebuah kesalahan masih dapat dibatalkan, dan melewatinya berarti membuang '
                 .'lingkungan yang mungkin masih dipakai.',
-                $lingkungan->status,
+                $environment->status,
             );
         }
 
-        if ($this->sudahDibuang($lingkungan)) {
+        if ($this->alreadyPurged($environment)) {
             return 'isinya sudah dibuang sebelumnya; yang tersisa hanya barisnya beserta riwayatnya.';
         }
 
-        $bolehDibuang = self::waktu($lingkungan->purge_after);
+        $purgeAfter = self::asTime($environment->purge_after);
 
-        if ($bolehDibuang === null) {
+        if ($purgeAfter === null) {
             return 'ia tidak punya tanggal boleh-dibuang. Itu seharusnya mustahil — '
                 .'`environments_hapus_berpasangan` mengikat keduanya — jadi barisnya perlu diperiksa '
                 .'tangan sebelum apa pun dibuang.';
         }
 
-        if ($bolehDibuang->isFuture()) {
+        if ($purgeAfter->isFuture()) {
             return sprintf(
                 'masa tenggangnya belum habis; isinya masih dapat dipulihkan sampai %s.',
-                $bolehDibuang->toDateTimeString(),
+                $purgeAfter->toDateTimeString(),
             );
         }
 
@@ -336,10 +336,10 @@ final class HapusLingkunganPermanen extends Command
      * Lewat query, bukan lewat properti modelnya: `purged_at` lahir bersama perintah ini dan
      * modelnya sedang dipegang pekerjaan lain.
      */
-    private function sudahDibuang(Environment $lingkungan): bool
+    private function alreadyPurged(Environment $environment): bool
     {
         return Environment::query()
-            ->whereKey($lingkungan->id)
+            ->whereKey($environment->id)
             ->whereNotNull('purged_at')
             ->exists();
     }
@@ -357,40 +357,40 @@ final class HapusLingkunganPermanen extends Command
      * Tiga penjaga berdiri sebelum satu perintah pun dikirim, dan ketiganya menjaga kesalahan yang
      * sama: membuang database yang bukan miliknya.
      */
-    private function buangDatabase(?string $nama): bool
+    private function dropDatabase(?string $name): bool
     {
-        if ($nama === null || $nama === '') {
+        if ($name === null || $name === '') {
             return false;
         }
 
         // Nama ditempel langsung ke DDL karena DDL memang tidak menerima parameter terikat. Yang
         // membuatnya aman bukan keyakinan melainkan bentuknya, yang diperiksa di sini: hanya huruf
         // kecil, angka, dan garis bawah, sehingga tidak ada yang dapat dikutip keluar.
-        if (preg_match('/^[a-z][a-z0-9_]{0,62}$/', $nama) !== 1) {
+        if (preg_match('/^[a-z][a-z0-9_]{0,62}$/', $name) !== 1) {
             throw new RuntimeException(sprintf(
                 'Nama database "%s" tidak berbentuk identifier yang aman; pembuangan dihentikan.',
-                $nama,
+                $name,
             ));
         }
 
-        $dasar = $this->konfigurasiDasar();
-        $terlarang = array_filter([
-            (string) ($dasar['database'] ?? ''),
+        $base = $this->baseConfig();
+        $forbidden = array_filter([
+            (string) ($base['database'] ?? ''),
             (string) config('coreerp.database'),
         ], static fn (string $n): bool => $n !== '');
 
         // Penjaga terakhir sebelum sesuatu yang tidak dapat dibatalkan. Sebuah baris registry yang
         // `database_name`-nya salah isi — disunting tangan, atau ditulis jalur yang keliru — akan
         // membuat perintah ini membuang database pusat beserta seluruh pelanggan di dalamnya.
-        if (in_array($nama, $terlarang, true)) {
+        if (in_array($name, $forbidden, true)) {
             throw new RuntimeException(sprintf(
                 'Database "%s" adalah database pusat, bukan milik sebuah lingkungan; pembuangan dihentikan.',
-                $nama,
+                $name,
             ));
         }
 
-        config(['database.connections.'.self::KONEKSI_PEMELIHARA => $dasar]);
-        DB::purge(self::KONEKSI_PEMELIHARA);
+        config(['database.connections.'.self::CONNECTION_MAINTENANCE => $base]);
+        DB::purge(self::CONNECTION_MAINTENANCE);
 
         try {
             // `PDO::exec`, bukan `statement()`. Yang terakhir menyiapkan pernyataannya lebih dulu,
@@ -405,13 +405,13 @@ final class HapusLingkunganPermanen extends Command
             // `IF EXISTS` yang membuatnya aman diulang: percobaan yang mati sesudah drop tetapi
             // sebelum pencatatannya akan menemukan database itu memang sudah tidak ada, lalu
             // menyelesaikan pencatatannya.
-            DB::connection(self::KONEKSI_PEMELIHARA)
+            DB::connection(self::CONNECTION_MAINTENANCE)
                 ->getPdo()
-                ->exec(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $nama));
+                ->exec(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $name));
 
             return true;
         } finally {
-            DB::purge(self::KONEKSI_PEMELIHARA);
+            DB::purge(self::CONNECTION_MAINTENANCE);
         }
     }
 
@@ -428,17 +428,17 @@ final class HapusLingkunganPermanen extends Command
      * yang dapat mengubah keadaannya di sela ini sudah dihalangi kunci operasi, dan compare-and-set
      * ini lapis terakhirnya.
      */
-    private function tandaiDibuang(Environment $lingkungan): void
+    private function markPurged(Environment $environment): void
     {
-        $koneksi = DB::connection($lingkungan->getConnectionName());
+        $koneksi = DB::connection($environment->getConnectionName());
 
-        $terkena = (int) $koneksi->transaction(fn (): int => Environment::query()
-            ->whereKey($lingkungan->id)
+        $affected = (int) $koneksi->transaction(fn (): int => Environment::query()
+            ->whereKey($environment->id)
             ->whereNotNull('deleted_at')
             ->whereNull('purged_at')
             ->update(['purged_at' => now()]));
 
-        if ($terkena !== 1) {
+        if ($affected !== 1) {
             throw new RuntimeException(
                 'Databasenya sudah dibuang, tetapi barisnya tidak dapat ditandai — keadaannya '
                 .'berubah di sela keduanya. Jalankan perintah yang sama lagi: dropnya aman diulang, '
@@ -446,33 +446,33 @@ final class HapusLingkunganPermanen extends Command
             );
         }
 
-        $lingkungan->refresh();
+        $environment->refresh();
     }
 
     /**
      * Membaca sebuah kolom waktu milik `Environment` sebagai waktu, apa pun yang dilihat analisa.
      *
-     * Alasannya sama dengan yang tertulis di `SapuLingkunganKedaluwarsa`: cast `datetime` milik
+     * Alasannya sama dengan yang tertulis di `SweepExpiredEnvironments`: cast `datetime` milik
      * model itu dideklarasikan lewat method `casts()`, dan analisa statis tetap melihatnya sebagai
      * teks. Yang datang saat berjalan selalu `Carbon`.
      */
-    private static function waktu(mixed $nilai): ?CarbonInterface
+    private static function asTime(mixed $value): ?CarbonInterface
     {
-        if ($nilai instanceof CarbonInterface) {
-            return $nilai;
+        if ($value instanceof CarbonInterface) {
+            return $value;
         }
 
-        return is_string($nilai) && $nilai !== '' ? Carbon::parse($nilai) : null;
+        return is_string($value) && $value !== '' ? Carbon::parse($value) : null;
     }
 
     /** @return array<string, mixed> */
-    private function konfigurasiDasar(): array
+    private function baseConfig(): array
     {
-        $bawaan = (string) config('database.default');
-        $konfigurasi = config('database.connections.'.$bawaan);
+        $default = (string) config('database.default');
+        $konfigurasi = config('database.connections.'.$default);
 
         if (! is_array($konfigurasi)) {
-            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $bawaan));
+            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
         }
 
         /** @var array<string, mixed> $konfigurasi */

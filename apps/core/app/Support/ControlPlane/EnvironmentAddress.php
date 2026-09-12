@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Pusat;
+namespace App\Support\ControlPlane;
 
 /**
  * Menghitung alamat sebuah lingkungan, dan membaca kembali alamat menjadi lingkungan.
@@ -57,16 +57,16 @@ namespace App\Support\Pusat;
  * berarti menambah nama kelima ke sertifikat yang sama — bukan menerbitkan sertifikat baru per
  * pelanggan.
  */
-final class AlamatLingkungan
+final class EnvironmentAddress
 {
     /**
      * @param  string  $tenant  slug tenant, unik di seluruh sistem
-     * @param  string  $lingkungan  slug lingkungan, unik di dalam tenantnya
+     * @param  string  $environment  slug lingkungan, unik di dalam tenantnya
      */
     private function __construct(
         public readonly string $tenant,
-        public readonly string $lingkungan,
-        public readonly string $jenis,
+        public readonly string $environment,
+        public readonly string $kind,
     ) {}
 
     /**
@@ -76,9 +76,9 @@ final class AlamatLingkungan
      * satu alamat, dan lingkungan pengembangan sebelum DNS disiapkan juga begitu. Selama ia kosong,
      * seluruh mekanisme di kelas ini tidak pernah menyala — bukan gagal, tidak menyala.
      */
-    public static function domainDasar(): string
+    public static function baseDomain(): string
     {
-        $domain = config('coreerp.domain_dasar');
+        $domain = config('coreerp.base_domain');
 
         return is_string($domain) ? mb_strtolower(trim($domain, ". \t\n\r\0\x0B")) : '';
     }
@@ -93,26 +93,26 @@ final class AlamatLingkungan
      *
      * @return list<string>
      */
-    public static function labelDikecualikan(): array
+    public static function reservedLabels(): array
     {
-        $daftar = config('coreerp.label_bukan_lingkungan', ['admin', 'www', 'api']);
+        $list = config('coreerp.reserved_labels', ['admin', 'www', 'api']);
 
-        return is_array($daftar) ? array_values(array_map(strval(...), $daftar)) : [];
+        return is_array($list) ? array_values(array_map(strval(...), $list)) : [];
     }
 
     /**
      * Apakah host ini berada di bawah domain kita, di luar alamat pangkalnya sendiri.
      *
-     * Dipisah dari `dariHost()` karena keduanya menjawab pertanyaan yang berbeda, dan bedanya
+     * Dipisah dari `fromHost()` karena keduanya menjawab pertanyaan yang berbeda, dan bedanya
      * menentukan apa yang terjadi pada alamat yang salah ketik. Host di luar domain kita bukan
      * urusan kita — ia lewat. Host **di bawah** domain kita yang tidak menunjuk lingkungan mana pun
      * adalah keadaan lain: dengan DNS wildcard, setiap label yang pernah diketik siapa pun sampai
      * ke sini, dan menyajikan aplikasi pangkal di sana berarti aplikasi kita dapat disajikan dari
      * alamat mana saja yang dikarang orang.
      */
-    public static function dibawahDomain(string $host): bool
+    public static function isUnderBaseDomain(string $host): bool
     {
-        $domain = self::domainDasar();
+        $domain = self::baseDomain();
 
         if ($domain === '') {
             return false;
@@ -128,25 +128,25 @@ final class AlamatLingkungan
         // domain yang sama tetapi tidak boleh dituntut menunjuk lingkungan. Diperiksa di sini dan
         // bukan di pemanggilnya, supaya kedua pertanyaan itu tidak pernah dijawab berbeda oleh dua
         // tempat.
-        $depan = substr($host, 0, -strlen('.'.$domain));
+        $prefix = substr($host, 0, -strlen('.'.$domain));
 
-        return ! in_array($depan, self::labelDikecualikan(), true);
+        return ! in_array($prefix, self::reservedLabels(), true);
     }
 
     /** Alamat lengkap sebuah lingkungan, tanpa skema dan tanpa porta. */
-    public static function untuk(string $tenant, string $lingkungan, string $jenis): ?string
+    public static function forEnvironment(string $tenant, string $environment, string $kind): ?string
     {
-        $domain = self::domainDasar();
+        $domain = self::baseDomain();
 
         if ($domain === '') {
             return null;
         }
 
-        if ($jenis === 'production') {
+        if ($kind === 'production') {
             return $tenant.'.'.$domain;
         }
 
-        return $tenant.'--'.$lingkungan.'.'.$jenis.'.'.$domain;
+        return $tenant.'--'.$environment.'.'.$kind.'.'.$domain;
     }
 
     /**
@@ -160,32 +160,32 @@ final class AlamatLingkungan
      * pengembangan, dan peramban modern menyelesaikan setiap `*.localhost` ke mesin sendiri
      * sehingga jalur ini dapat dicoba tanpa menyentuh DNS sama sekali.
      */
-    public static function dariHost(string $host): ?self
+    public static function fromHost(string $host): ?self
     {
-        $domain = self::domainDasar();
+        $domain = self::baseDomain();
 
         if ($domain === '') {
             return null;
         }
 
         $host = mb_strtolower((string) preg_replace('/:\d+$/', '', trim($host)));
-        $akhiran = '.'.$domain;
+        $suffix = '.'.$domain;
 
-        if (! str_ends_with($host, $akhiran)) {
+        if (! str_ends_with($host, $suffix)) {
             return null;
         }
 
-        $depan = substr($host, 0, -strlen($akhiran));
+        $prefix = substr($host, 0, -strlen($suffix));
 
-        if ($depan === '') {
+        if ($prefix === '') {
             return null;
         }
 
-        $label = explode('.', $depan);
+        $label = explode('.', $prefix);
 
         // Satu label: produksi. `<tenant>.contoh.co.id`
         if (count($label) === 1) {
-            if ($label[0] === '' || in_array($label[0], self::labelDikecualikan(), true)) {
+            if ($label[0] === '' || in_array($label[0], self::reservedLabels(), true)) {
                 return null;
             }
 
@@ -198,18 +198,18 @@ final class AlamatLingkungan
             return null;
         }
 
-        [$gabungan, $jenis] = $label;
+        [$combined, $kind] = $label;
 
         // Dua tanda hubung, dan tepat satu kemunculan. Keduanya diperiksa: `Str::slug()` tidak
         // pernah menghasilkan `--`, jadi label yang memuatnya lebih dari sekali bukan alamat yang
         // pernah kita cetak — dan menebak maksud orang yang mengetiknya lebih berbahaya daripada
         // menolaknya.
-        $bagian = explode('--', $gabungan);
+        $parts = explode('--', $combined);
 
-        if (count($bagian) !== 2 || $bagian[0] === '' || $bagian[1] === '') {
+        if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
             return null;
         }
 
-        return new self($bagian[0], $bagian[1], $jenis);
+        return new self($parts[0], $parts[1], $kind);
     }
 }

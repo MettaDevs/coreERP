@@ -1,11 +1,11 @@
 <?php
 
+use App\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Http\Controllers\Internal\FiscalCalendarDirectoryController;
 use App\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Http\Controllers\Internal\MemberDirectoryController;
 use App\Http\Controllers\Internal\OrganizationDirectoryController;
-use App\Http\Controllers\Internal\PembuatanTenantController;
-use App\Http\Controllers\Internal\PenyiapanLingkunganController;
+use App\Http\Controllers\Internal\TenantProvisioningController;
 use App\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Http\Controllers\NumberSequence\InternalNumberSequenceController;
 use App\Http\Controllers\Workflow\InternalWorkflowInstanceController;
@@ -32,7 +32,7 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
  *
  * Grupnya terpisah karena penjaganya berbeda, dan bedanya bukan selera: `internal-app` menuntut
  * app yang terpasang pada sebuah tenant, sedangkan yang di sini justru sedang membuat tenantnya.
- * Alasan lengkapnya di App\Http\Middleware\HanyaPusatAdmin.
+ * Alasan lengkapnya di App\Http\Middleware\ControlPlaneOnly.
  *
  * Throttle-nya juga terpisah. `internal-app` memberi kunci per app dan per tenant lewat header
  * kredensial yang tidak dikirim pemanggil ini — seluruh perintah pusat admin akan berbagi satu
@@ -40,7 +40,7 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
  * melahirkan tenant bukan sesuatu yang dilakukan puluhan kali per menit, dan ia menjalankan
  * migration beserta pemasangan module di belakangnya.
  */
-Route::prefix('internal/v1')->middleware(['throttle:30,1', 'pusat-admin'])->group(function (): void {
-    Route::post('tenants', [PembuatanTenantController::class, 'store']);
-    Route::post('environments/{lingkungan}/siapkan', [PenyiapanLingkunganController::class, 'store']);
+Route::prefix('internal/v1')->middleware(['throttle:30,1', 'control-plane'])->group(function (): void {
+    Route::post('tenants', [TenantProvisioningController::class, 'store']);
+    Route::post('environments/{environment}/provision', [EnvironmentProvisioningController::class, 'store']);
 });

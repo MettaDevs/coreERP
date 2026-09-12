@@ -2,12 +2,12 @@
 
 namespace Tests\Feature\ControlPlane;
 
-use App\Console\Commands\SiapkanLingkungan;
+use App\Console\Commands\ProvisionEnvironment;
 use App\Models\Client;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use App\Models\Tenant;
-use App\Support\Pusat\KoneksiLingkungan;
+use App\Support\ControlPlane\EnvironmentConnection;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * `environment:siapkan` benar-benar membuat database, dan benar-benar menolak yang harus ditolak.
+ * `environment:provision` benar-benar membuat database, dan benar-benar menolak yang harus ditolak.
  *
  * Test ini menyentuh PostgreSQL di luar transaksi milik `RefreshDatabase` — ia membuat database
  * sungguhan, menjalankan seluruh migration Core ke dalamnya, lalu membuangnya lagi. Itu disengaja:
@@ -27,12 +27,12 @@ use Tests\TestCase;
  * Seluruh database yang dibuat di sini bernama `env_ujisiapkan_...`. Awalan itu ada supaya sisa
  * yang lolos dari pembersihan langsung terbaca sebagai sampah test, bukan milik seseorang.
  */
-class SiapkanLingkunganTest extends TestCase
+class ProvisionEnvironmentTest extends TestCase
 {
     use RefreshDatabase;
 
     /** Awalan slug tenant uji; ia yang muncul di nama database dan yang dipakai membersihkannya. */
-    private const AWALAN = 'env_ujisiapkan';
+    private const PREFIX = 'env_ujisiapkan';
 
     private Tenant $tenant;
 
@@ -51,41 +51,41 @@ class SiapkanLingkunganTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->buangDatabaseUji();
+        $this->dropTestDatabases();
 
         parent::tearDown();
     }
 
     // ---------------------------------------------------------------- jalur merah
 
-    public function test_environment_yang_tidak_ada_ditolak(): void
+    public function test_an_environment_that_does_not_exist_is_rejected(): void
     {
-        $this->artisan('environment:siapkan', ['environment' => (string) Str::ulid()])
+        $this->artisan('environment:provision', ['environment' => (string) Str::ulid()])
             ->assertExitCode(Command::FAILURE);
 
         $this->assertSame(0, EnvironmentOperation::query()->count());
     }
 
-    public function test_environment_aktif_menolak_disiapkan_ulang(): void
+    public function test_an_active_environment_refuses_to_be_provisioned_again(): void
     {
-        $lingkungan = $this->buatLingkungan('active');
+        $environment = $this->makeEnvironment('active');
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::FAILURE);
 
         // Yang dijaga bukan pesannya melainkan akibatnya: tidak ada operasi yang dibuka, tidak ada
         // database yang dibuat, dan barisnya tidak bergeser sedikit pun.
         $this->assertSame(0, EnvironmentOperation::query()->count());
-        $this->assertSame([], $this->databaseUji());
-        $this->assertSame('active', $lingkungan->refresh()->status);
+        $this->assertSame([], $this->testDatabase());
+        $this->assertSame('active', $environment->refresh()->status);
     }
 
-    public function test_operasi_yang_sedang_berjalan_menolak_penyiapan_kedua(): void
+    public function test_a_running_operation_refuses_a_second_provisioning(): void
     {
-        $lingkungan = $this->buatLingkungan('provisioning');
+        $environment = $this->makeEnvironment('provisioning');
 
         EnvironmentOperation::create([
-            'environment_id' => $lingkungan->id,
+            'environment_id' => $environment->id,
             'operation' => 'copy',
             'status' => 'running',
             'step' => 'salin',
@@ -93,104 +93,104 @@ class SiapkanLingkunganTest extends TestCase
             'lease_until' => now()->addMinutes(30),
         ]);
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::FAILURE);
 
         // Penolakannya datang dari partial unique index, bukan dari pemeriksaan di kode — dan
         // karena perintah ini tidak pernah memiliki operasi itu, ia juga tidak boleh menurunkan
         // statusnya. Menurunkannya akan membuat operasi lain yang masih sehat terlihat gagal.
         $this->assertSame(1, EnvironmentOperation::query()->count());
-        $this->assertSame('provisioning', $lingkungan->refresh()->status);
-        $this->assertSame([], $this->databaseUji());
+        $this->assertSame('provisioning', $environment->refresh()->status);
+        $this->assertSame([], $this->testDatabase());
     }
 
-    public function test_kegagalan_meninggalkan_degraded_beserta_alasannya(): void
+    public function test_a_failure_leaves_degraded_together_with_its_reason(): void
     {
-        $lingkungan = $this->buatLingkungan('provisioning');
-        $nama = SiapkanLingkungan::namaDatabase($lingkungan);
+        $environment = $this->makeEnvironment('provisioning');
+        $name = ProvisionEnvironment::databaseName($environment);
 
         // Kegagalan yang dipentaskan, bukan yang ditiru: database sasaran sudah ada dan sudah
         // berisi tabel `users` dengan bentuk lain, jadi migration pertama Core benar-benar
         // ditolak PostgreSQL.
-        $skema = (string) config('database.connections.'.config('database.default').'.search_path');
-        $this->pemelihara()->unprepared(sprintf('CREATE DATABASE "%s"', $nama));
-        $sasaran = $this->koneksiKe($nama);
-        $sasaran->statement(sprintf('CREATE SCHEMA IF NOT EXISTS "%s"', $skema));
-        $sasaran->statement(sprintf('CREATE TABLE "%s"."users" (sengaja_salah integer)', $skema));
-        DB::purge('uji_sasaran');
+        $schema = (string) config('database.connections.'.config('database.default').'.search_path');
+        $this->maintenance()->unprepared(sprintf('CREATE DATABASE "%s"', $name));
+        $target = $this->connectionTo($name);
+        $target->statement(sprintf('CREATE SCHEMA IF NOT EXISTS "%s"', $schema));
+        $target->statement(sprintf('CREATE TABLE "%s"."users" (sengaja_salah integer)', $schema));
+        DB::purge('test_target');
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::FAILURE);
 
-        $lingkungan->refresh();
-        $this->assertSame('degraded', $lingkungan->status);
-        $this->assertNull($lingkungan->database_name, 'Lingkungan yang gagal tidak boleh mengaku punya database.');
-        $this->assertNull($lingkungan->schema_migrated_at);
+        $environment->refresh();
+        $this->assertSame('degraded', $environment->status);
+        $this->assertNull($environment->database_name, 'Lingkungan yang gagal tidak boleh mengaku punya database.');
+        $this->assertNull($environment->schema_migrated_at);
 
-        $operasi = EnvironmentOperation::query()->firstOrFail();
-        $this->assertSame('failed', $operasi->status);
-        $this->assertSame('migration', $operasi->step);
-        $this->assertNotNull($operasi->failure_message);
-        $this->assertNotSame('', trim((string) $operasi->failure_message));
-        $this->assertNotNull($operasi->finished_at);
+        $operation = EnvironmentOperation::query()->firstOrFail();
+        $this->assertSame('failed', $operation->status);
+        $this->assertSame('migration', $operation->step);
+        $this->assertNotNull($operation->failure_message);
+        $this->assertNotSame('', trim((string) $operation->failure_message));
+        $this->assertNotNull($operation->finished_at);
     }
 
     // ---------------------------------------------------------------- jalur hijau
 
-    public function test_penyiapan_membuat_database_yang_benar_benar_bermigrasi(): void
+    public function test_provisioning_creates_a_database_that_really_migrated(): void
     {
-        $lingkungan = $this->buatLingkungan('provisioning');
-        $nama = SiapkanLingkungan::namaDatabase($lingkungan);
+        $environment = $this->makeEnvironment('provisioning');
+        $name = ProvisionEnvironment::databaseName($environment);
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::SUCCESS);
 
-        $this->assertSame([$nama], $this->databaseUji(), 'Databasenya harus benar-benar ada di pg_database.');
-        $this->assertLessThanOrEqual(63, strlen($nama), 'Identifier PostgreSQL berhenti di 63 karakter.');
+        $this->assertSame([$name], $this->testDatabase(), 'Databasenya harus benar-benar ada di pg_database.');
+        $this->assertLessThanOrEqual(63, strlen($name), 'Identifier PostgreSQL berhenti di 63 karakter.');
 
         // Tabelnya ada di sana, bukan hanya databasenya. Sebuah database kosong yang statusnya
         // aktif adalah persis kegagalan yang perintah ini seharusnya cegah.
-        $sasaran = $this->koneksiKe($nama);
-        $this->assertTrue($sasaran->getSchemaBuilder()->hasTable('users'));
-        $this->assertTrue($sasaran->getSchemaBuilder()->hasTable('tenants'));
-        $this->assertTrue($sasaran->getSchemaBuilder()->hasTable('environments'));
+        $target = $this->connectionTo($name);
+        $this->assertTrue($target->getSchemaBuilder()->hasTable('users'));
+        $this->assertTrue($target->getSchemaBuilder()->hasTable('tenants'));
+        $this->assertTrue($target->getSchemaBuilder()->hasTable('environments'));
 
-        $lingkungan->refresh();
-        $this->assertSame('active', $lingkungan->status);
-        $this->assertSame($nama, $lingkungan->database_name);
-        $this->assertNotNull($lingkungan->schema_migrated_at);
-        $this->assertSame($this->migrationTerakhir(), $lingkungan->schema_fingerprint);
+        $environment->refresh();
+        $this->assertSame('active', $environment->status);
+        $this->assertSame($name, $environment->database_name);
+        $this->assertNotNull($environment->schema_migrated_at);
+        $this->assertSame($this->lastMigration(), $environment->schema_fingerprint);
 
-        $operasi = EnvironmentOperation::query()->firstOrFail();
-        $this->assertSame('succeeded', $operasi->status);
-        $this->assertSame('provision', $operasi->operation);
-        $this->assertNotNull($operasi->finished_at);
-        $this->assertNull($operasi->failure_message);
+        $operation = EnvironmentOperation::query()->firstOrFail();
+        $this->assertSame('succeeded', $operation->status);
+        $this->assertSame('provision', $operation->operation);
+        $this->assertNotNull($operation->finished_at);
+        $this->assertNull($operation->failure_message);
     }
 
-    public function test_dijalankan_ulang_atas_degraded_melanjutkan_tanpa_menggandakan(): void
+    public function test_run_again_over_degraded_continues_without_duplicating(): void
     {
-        $lingkungan = $this->buatLingkungan('provisioning');
-        $nama = SiapkanLingkungan::namaDatabase($lingkungan);
+        $environment = $this->makeEnvironment('provisioning');
+        $name = ProvisionEnvironment::databaseName($environment);
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::SUCCESS);
 
         // Sesuatu di luar perintah ini menjatuhkannya kembali — persis keadaan yang ditinggalkan
         // sebuah penyiapan yang mati di tengah.
-        $lingkungan->update(['status' => 'degraded']);
+        $environment->update(['status' => 'degraded']);
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::SUCCESS);
 
         // Melanjutkan, bukan menggandakan: satu database yang sama, nama yang sama, dan tidak ada
         // migration yang dijalankan dua kali karena riwayatnya hidup di dalam database itu.
-        $this->assertSame([$nama], $this->databaseUji());
+        $this->assertSame([$name], $this->testDatabase());
 
-        $lingkungan->refresh();
-        $this->assertSame('active', $lingkungan->status);
-        $this->assertSame($nama, $lingkungan->database_name);
-        $this->assertSame($this->migrationTerakhir(), $lingkungan->schema_fingerprint);
+        $environment->refresh();
+        $this->assertSame('active', $environment->status);
+        $this->assertSame($name, $environment->database_name);
+        $this->assertSame($this->lastMigration(), $environment->schema_fingerprint);
 
         $this->assertSame(2, EnvironmentOperation::query()->count());
         $this->assertSame(2, EnvironmentOperation::query()->where('status', 'succeeded')->count());
@@ -198,7 +198,7 @@ class SiapkanLingkunganTest extends TestCase
 
     // ---------------------------------------------------------------- perkakas
 
-    private function buatLingkungan(string $status): Environment
+    private function makeEnvironment(string $status): Environment
     {
         return Environment::create([
             'tenant_id' => $this->tenant->id,
@@ -212,13 +212,13 @@ class SiapkanLingkunganTest extends TestCase
     }
 
     /** Nama berkas migration terakhir menurut urutan yang dipakai Laravel sendiri. */
-    private function migrationTerakhir(): string
+    private function lastMigration(): string
     {
-        $berkas = glob(database_path('migrations').'/*.php') ?: [];
-        $nama = array_map(static fn (string $jalur): string => basename($jalur, '.php'), $berkas);
-        sort($nama);
+        $file = glob(database_path('migrations').'/*.php') ?: [];
+        $name = array_map(static fn (string $jalur): string => basename($jalur, '.php'), $file);
+        sort($name);
 
-        return (string) end($nama);
+        return (string) end($name);
     }
 
     /**
@@ -227,34 +227,34 @@ class SiapkanLingkunganTest extends TestCase
      * `RefreshDatabase` memegang transaksi pada koneksi bawaan, dan `CREATE DATABASE` maupun
      * `DROP DATABASE` dilarang berada di dalam transaksi. PDO terpisah satu-satunya jalan.
      */
-    private function pemelihara(): Connection
+    private function maintenance(): Connection
     {
         $konfigurasi = config('database.connections.'.config('database.default'));
-        config(['database.connections.uji_pemelihara' => $konfigurasi]);
+        config(['database.connections.test_maintenance' => $konfigurasi]);
 
-        return DB::connection('uji_pemelihara');
+        return DB::connection('test_maintenance');
     }
 
-    private function koneksiKe(string $database): Connection
+    private function connectionTo(string $database): Connection
     {
         $konfigurasi = config('database.connections.'.config('database.default'));
         $konfigurasi['database'] = $database;
         $konfigurasi['url'] = null;
-        config(['database.connections.uji_sasaran' => $konfigurasi]);
-        DB::purge('uji_sasaran');
+        config(['database.connections.test_target' => $konfigurasi]);
+        DB::purge('test_target');
 
-        return DB::connection('uji_sasaran');
+        return DB::connection('test_target');
     }
 
     /** @return list<string> */
-    private function databaseUji(): array
+    private function testDatabase(): array
     {
-        $baris = $this->pemelihara()->select(
+        $rows = $this->maintenance()->select(
             'select datname from pg_database where datname like ? order by datname',
-            [self::AWALAN.'%'],
+            [self::PREFIX.'%'],
         );
 
-        return array_map(static fn (object $d): string => (string) $d->datname, $baris);
+        return array_map(static fn (object $d): string => (string) $d->datname, $rows);
     }
 
     /**
@@ -264,27 +264,27 @@ class SiapkanLingkunganTest extends TestCase
      * ini sendiri. Tanpa itu satu sesi yang lupa ditutup cukup untuk meninggalkan database yatim,
      * dan yang berikutnya menumpuk di atasnya.
      */
-    private function buangDatabaseUji(): void
+    private function dropTestDatabases(): void
     {
-        DB::purge('uji_sasaran');
-        DB::purge('lingkungan_disiapkan');
+        DB::purge('test_target');
+        DB::purge('environment_provisioning');
 
-        foreach ($this->databaseUji() as $nama) {
-            $this->pemelihara()->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $nama));
+        foreach ($this->testDatabase() as $name) {
+            $this->maintenance()->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $name));
         }
 
-        DB::purge('uji_pemelihara');
+        DB::purge('test_maintenance');
     }
 
-    public function test_operasi_yang_tenggatnya_habis_diambil_alih(): void
+    public function test_an_operation_whose_lease_expired_is_taken_over(): void
     {
-        $lingkungan = $this->buatLingkungan('provisioning');
+        $environment = $this->makeEnvironment('provisioning');
 
         // Bentuk sebuah proses yang mati keras: barisnya dibuka, lalu prosesnya berhenti tanpa
         // pernah menutupnya. Tanpa tenggat, baris ini memegang kuncinya selamanya dan percobaan
         // ulang — satu-satunya pemulihan yang desain ini izinkan — tidak pernah bisa masuk.
-        $mati = EnvironmentOperation::create([
-            'environment_id' => $lingkungan->id,
+        $dead = EnvironmentOperation::create([
+            'environment_id' => $environment->id,
             'operation' => 'provision',
             'status' => 'running',
             'step' => 'migration',
@@ -292,30 +292,30 @@ class SiapkanLingkunganTest extends TestCase
             'lease_until' => now()->subHours(2),
         ]);
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::SUCCESS);
 
-        $mati->refresh();
+        $dead->refresh();
 
-        $this->assertSame('failed', $mati->status);
-        $this->assertNotNull($mati->finished_at);
-        $this->assertNull($mati->lease_until);
+        $this->assertSame('failed', $dead->status);
+        $this->assertNotNull($dead->finished_at);
+        $this->assertNull($dead->lease_until);
         // Alasannya menyebut langkah terakhir yang sempat tercapai. Baris yang hanya berbunyi
         // "diambil alih" menghapus satu-satunya petunjuk kenapa environment-nya tertinggal.
-        $this->assertStringContainsString('migration', (string) $mati->failure_message);
+        $this->assertStringContainsString('migration', (string) $dead->failure_message);
 
-        $this->assertSame('active', $lingkungan->refresh()->status);
+        $this->assertSame('active', $environment->refresh()->status);
         $this->assertSame(2, EnvironmentOperation::query()->count());
     }
 
-    public function test_operasi_yang_tenggatnya_masih_hidup_tidak_direbut(): void
+    public function test_an_operation_whose_lease_is_still_alive_is_not_seized(): void
     {
         // Pasangan hijau dari test di atas, dan ia yang membedakan pengambilalihan dari sekadar
         // menabrak kunci orang: penjaga yang merebut apa saja akan lulus test sebelumnya juga.
-        $lingkungan = $this->buatLingkungan('provisioning');
+        $environment = $this->makeEnvironment('provisioning');
 
-        $hidup = EnvironmentOperation::create([
-            'environment_id' => $lingkungan->id,
+        $alive = EnvironmentOperation::create([
+            'environment_id' => $environment->id,
             'operation' => 'provision',
             'status' => 'running',
             'step' => 'migration',
@@ -323,25 +323,25 @@ class SiapkanLingkunganTest extends TestCase
             'lease_until' => now()->addMinutes(25),
         ]);
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::FAILURE);
 
-        $this->assertSame('running', $hidup->refresh()->status);
+        $this->assertSame('running', $alive->refresh()->status);
         $this->assertSame(1, EnvironmentOperation::query()->count());
-        $this->assertSame('provisioning', $lingkungan->refresh()->status);
-        $this->assertSame([], $this->databaseUji());
+        $this->assertSame('provisioning', $environment->refresh()->status);
+        $this->assertSame([], $this->testDatabase());
     }
 
-    public function test_operasi_berjalan_wajib_membawa_tenggatnya(): void
+    public function test_a_running_operation_must_carry_its_lease(): void
     {
         // Ditegakkan database, bukan kode. Jalur yang lupa mengisi tenggat persis jalur yang akan
         // melahirkan kembali kebuntuan yang kolom ini ada untuk menutupnya.
-        $lingkungan = $this->buatLingkungan('provisioning');
+        $environment = $this->makeEnvironment('provisioning');
 
         $this->expectException(QueryException::class);
 
         EnvironmentOperation::create([
-            'environment_id' => $lingkungan->id,
+            'environment_id' => $environment->id,
             'operation' => 'provision',
             'status' => 'running',
             'step' => 'mulai',
@@ -354,7 +354,7 @@ class SiapkanLingkunganTest extends TestCase
     /**
      * Yang dijaga di sini adalah cacat yang tidak ditemukan satu pun test sebelumnya.
      *
-     * Sampai langkah `pasang-module` ada, `environment:siapkan` hanya menjalankan migration Core.
+     * Sampai langkah `pasang-module` ada, `environment:provision` hanya menjalankan migration Core.
      * Sebuah demo karena itu lahir dengan skema Core lengkap dan **nol tabel module** — dan seluruh
      * test pemasangan module tetap hijau, karena semuanya berjalan di database bawaan, satu-satunya
      * tempat yang memang sudah terisi.
@@ -363,36 +363,36 @@ class SiapkanLingkunganTest extends TestCase
      * modulenya ada di database lingkungan, dan catatan pemasangannya **tidak** ada di database
      * pusat. Tanpa yang kedua, pemasangan yang salah alamat tetap lolos.
      */
-    public function test_penyiapan_memasang_module_yang_dibeli_ke_database_lingkungannya(): void
+    public function test_provisioning_installs_the_purchased_modules_into_its_environments_database(): void
     {
-        $this->daftarkanApp('contoh-a');
-        $this->beri('contoh-a');
+        $this->registerApp('contoh-a');
+        $this->grant('contoh-a');
 
-        $lingkungan = $this->buatLingkungan('provisioning');
-        $nama = SiapkanLingkungan::namaDatabase($lingkungan);
+        $environment = $this->makeEnvironment('provisioning');
+        $name = ProvisionEnvironment::databaseName($environment);
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::SUCCESS);
 
-        $sasaran = $this->koneksiKe($nama);
+        $target = $this->connectionTo($name);
 
         $this->assertTrue(
-            $sasaran->getSchemaBuilder()->hasTable('contoh_a_m_barang'),
+            $target->getSchemaBuilder()->hasTable('contoh_a_m_barang'),
             'Migration module harus berjalan ke database lingkungan, bukan hanya migration Core.',
         );
 
-        $pemasangan = $sasaran->table('core_module_installations')
+        $installation = $target->table('core_module_installations')
             ->where('tenant_id', $this->tenant->id)
             ->where('module_id', 'contoh-a')
             ->first();
 
-        $this->assertNotNull($pemasangan, 'Catatan pemasangan hidup di database lingkungan itu sendiri.');
-        $this->assertSame('installed', $pemasangan->status);
-        $this->assertNotNull($pemasangan->seeded_at, 'Data awal module harus benar-benar diisi, bukan dilewati.');
+        $this->assertNotNull($installation, 'Catatan pemasangan hidup di database lingkungan itu sendiri.');
+        $this->assertSame('installed', $installation->status);
+        $this->assertNotNull($installation->seeded_at, 'Data awal module harus benar-benar diisi, bukan dilewati.');
 
         $this->assertGreaterThan(
             0,
-            $sasaran->table('contoh_a_m_barang')->where('tenant_id', $this->tenant->id)->count(),
+            $target->table('contoh_a_m_barang')->where('tenant_id', $this->tenant->id)->count(),
             'Seeder module menulis ke database lingkungan.',
         );
 
@@ -415,22 +415,22 @@ class SiapkanLingkunganTest extends TestCase
      * termasuk yang tidak ia bayar, di lingkungan yang justru paling sering diperlihatkan kepada
      * orang luar.
      */
-    public function test_module_yang_tidak_dibeli_tidak_ikut_terpasang(): void
+    public function test_a_module_that_was_not_purchased_is_not_installed(): void
     {
-        $this->daftarkanApp('contoh-a');
-        $this->daftarkanApp('contoh-b');
-        $this->beri('contoh-a');
+        $this->registerApp('contoh-a');
+        $this->registerApp('contoh-b');
+        $this->grant('contoh-a');
 
-        $lingkungan = $this->buatLingkungan('provisioning');
+        $environment = $this->makeEnvironment('provisioning');
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::SUCCESS);
 
-        $sasaran = $this->koneksiKe(SiapkanLingkungan::namaDatabase($lingkungan));
+        $target = $this->connectionTo(ProvisionEnvironment::databaseName($environment));
 
-        $this->assertTrue($sasaran->getSchemaBuilder()->hasTable('contoh_a_m_barang'));
+        $this->assertTrue($target->getSchemaBuilder()->hasTable('contoh_a_m_barang'));
         $this->assertFalse(
-            $sasaran->getSchemaBuilder()->hasTable('contoh_b_m_rak'),
+            $target->getSchemaBuilder()->hasTable('contoh_b_m_rak'),
             'Module yang entitlement-nya tidak ada tidak boleh ikut terpasang.',
         );
     }
@@ -446,40 +446,40 @@ class SiapkanLingkunganTest extends TestCase
      * ketiga yang membuat dua sebelumnya berarti: tabel `tenants` di database lingkungan memang
      * kosong, jadi baris yang terbaca tadi pasti datang dari pusat.
      */
-    public function test_sisi_pusat_tetap_di_pusat_selagi_koneksi_digeser(): void
+    public function test_the_control_plane_side_stays_on_the_control_plane_while_the_connection_is_shifted(): void
     {
-        $lingkungan = $this->buatLingkungan('provisioning');
+        $environment = $this->makeEnvironment('provisioning');
 
-        $this->artisan('environment:siapkan', ['environment' => $lingkungan->id])
+        $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::SUCCESS);
 
-        $lingkungan->refresh();
-        $pusat = (string) config('database.default');
+        $environment->refresh();
+        $controlPlane = (string) config('database.default');
 
-        app(KoneksiLingkungan::class)->jalankanDi($lingkungan, function () use ($pusat): void {
-            $digeser = (string) config('database.default');
+        app(EnvironmentConnection::class)->runWithin($environment, function () use ($controlPlane): void {
+            $shifted = (string) config('database.default');
 
-            $this->assertNotSame($pusat, $digeser, 'Koneksi bawaan harus benar-benar bergeser.');
+            $this->assertNotSame($controlPlane, $shifted, 'Koneksi bawaan harus benar-benar bergeser.');
             $this->assertNotNull(
                 Tenant::query()->find($this->tenant->id),
-                'Model bertanda MilikPusat harus tetap terbaca dari database pusat.',
+                'Model bertanda OwnedByControlPlane harus tetap terbaca dari database pusat.',
             );
             $this->assertSame(
                 0,
-                DB::connection($digeser)->table('tenants')->count(),
+                DB::connection($shifted)->table('tenants')->count(),
                 'Tabel tenants di database lingkungan memang kosong — itu yang membuat assertion di atas berarti.',
             );
         });
 
         $this->assertSame(
-            $pusat,
+            $controlPlane,
             (string) config('database.default'),
             'Koneksi bawaan harus kembali sesudah blok selesai.',
         );
     }
 
     /** Baris katalog `apps` untuk sebuah module yang memang ada di folder `modules/`. */
-    private function daftarkanApp(string $id): void
+    private function registerApp(string $id): void
     {
         DB::table('apps')->updateOrInsert(
             ['id' => $id],
@@ -495,7 +495,7 @@ class SiapkanLingkunganTest extends TestCase
     }
 
     /** Entitlement yang berlaku sekarang untuk tenant uji. */
-    private function beri(string $appId): void
+    private function grant(string $appId): void
     {
         DB::table('tenant_app_entitlements')->insert([
             'tenant_id' => $this->tenant->id,

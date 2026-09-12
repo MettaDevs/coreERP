@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use App\Models\User;
-use App\Support\Pusat\KoneksiLingkungan;
+use App\Support\ControlPlane\EnvironmentConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -20,9 +20,9 @@ use Throwable;
  *
  * ## Kenapa tombolnya baru ada sekarang
  *
- * Layar rincian lingkungan dulu hanya **menampilkan** perintah `environment:siapkan` untuk disalin
+ * Layar rincian lingkungan dulu hanya **menampilkan** perintah `environment:provision` untuk disalin
  * ke terminal, dan alasannya ditulis apa adanya di sana: arah konsol → Core belum punya jalur
- * autentikasi. Alasan itu sudah tidak berlaku. `HanyaPusatAdmin` lahir bersama pembuatan pelanggan,
+ * autentikasi. Alasan itu sudah tidak berlaku. `ControlPlaneOnly` lahir bersama pembuatan pelanggan,
  * sudah dipakai sungguhan, dan token yang sama persis yang menjaga pintu ini.
  *
  * ## Kenapa sinkron, padahal ia menjalankan migration
@@ -43,17 +43,17 @@ use Throwable;
  * Kalau kelak satu penyiapan benar-benar melampaui batas waktu yang wajar bagi peramban, yang
  * berubah adalah tempat perintah ini dijalankan, bukan bentuk jawabannya.
  */
-final class PenyiapanLingkunganController extends Controller
+final class EnvironmentProvisioningController extends Controller
 {
-    public function store(Request $permintaan, string $lingkungan, KoneksiLingkungan $koneksi): JsonResponse
+    public function store(Request $request, string $environmentId, EnvironmentConnection $connections): JsonResponse
     {
-        $baris = Environment::query()->whereKey($lingkungan)->whereNull('deleted_at')->first();
+        $environment = Environment::query()->whereKey($environmentId)->whereNull('deleted_at')->first();
 
-        if (! $baris instanceof Environment) {
+        if (! $environment instanceof Environment) {
             return response()->json(['message' => 'Lingkungan itu tidak ada di registry.'], 404);
         }
 
-        if (! in_array($baris->status, ['provisioning', 'degraded'], true)) {
+        if (! in_array($environment->status, ['provisioning', 'degraded'], true)) {
             // 409, bukan 422. Permintaannya tidak salah bentuk — ia datang ke keadaan yang salah,
             // dan itu keadaan yang bisa berubah sendiri sebelum orangnya menekan tombol.
             return response()->json([
@@ -61,33 +61,33 @@ final class PenyiapanLingkunganController extends Controller
                     'Lingkungan "%s" berstatus %s. Yang boleh disiapkan hanya yang berstatus '
                     .'provisioning atau degraded — menyiapkan ulang lingkungan yang sudah hidup '
                     .'akan menimpa isinya.',
-                    $baris->name,
-                    $baris->status,
+                    $environment->name,
+                    $environment->status,
                 ),
             ], 409);
         }
 
-        $keluar = Artisan::call('environment:siapkan', array_filter([
-            'environment' => $baris->id,
-            '--diminta-oleh' => $this->pemintanya($permintaan),
+        $exitCode = Artisan::call('environment:provision', array_filter([
+            'environment' => $environment->id,
+            '--requested-by' => $this->requestedBy($request),
         ]));
-        $catatan = trim(Artisan::output());
+        $output = trim(Artisan::output());
 
-        $baris->refresh();
+        $environment->refresh();
 
-        if ($keluar !== 0) {
+        if ($exitCode !== 0) {
             return response()->json([
-                'message' => $this->alasanGagal($baris) ?? 'Penyiapan gagal tanpa menyebut alasan.',
-                'status' => $baris->status,
-                'catatan' => $catatan,
+                'message' => $this->failureReason($environment) ?? 'Penyiapan gagal tanpa menyebut alasan.',
+                'status' => $environment->status,
+                'output' => $output,
             ], 422);
         }
 
         return response()->json([
-            'status' => $baris->status,
-            'database' => $baris->database_name,
-            'modul' => $this->modul($baris, $koneksi),
-            'catatan' => $catatan,
+            'status' => $environment->status,
+            'database' => $environment->database_name,
+            'modules' => $this->installedModules($environment, $connections),
+            'output' => $output,
         ]);
     }
 
@@ -100,9 +100,9 @@ final class PenyiapanLingkunganController extends Controller
      *
      * Kosong berarti riwayatnya berbunyi "Sistem", persis seperti perintah yang diketik di terminal.
      */
-    private function pemintanya(Request $permintaan): ?int
+    private function requestedBy(Request $request): ?int
     {
-        $id = $permintaan->input('diminta_oleh');
+        $id = $request->input('requested_by');
 
         if (! is_int($id) && ! (is_string($id) && $id !== '' && ctype_digit($id))) {
             return null;
@@ -116,24 +116,24 @@ final class PenyiapanLingkunganController extends Controller
     /**
      * Alasan yang tercatat pada operasi terakhir, bukan keluaran perintahnya.
      *
-     * Keluaran perintah ikut dikirim sebagai `catatan`, tetapi ia tidak boleh menjadi pesan
+     * Keluaran perintah ikut dikirim sebagai `output`, tetapi ia tidak boleh menjadi pesan
      * utamanya: yang tercatat di `environment_operations` itulah yang masih dapat dibaca besok
      * ketika tidak ada lagi yang ingat layar mana yang terbuka hari ini.
      */
-    private function alasanGagal(Environment $lingkungan): ?string
+    private function failureReason(Environment $environment): ?string
     {
-        $operasi = EnvironmentOperation::query()
-            ->where('environment_id', $lingkungan->id)
+        $operation = EnvironmentOperation::query()
+            ->where('environment_id', $environment->id)
             ->orderByDesc('started_at')
             ->first();
 
-        if (! $operasi instanceof EnvironmentOperation) {
+        if (! $operation instanceof EnvironmentOperation) {
             return null;
         }
 
-        $alasan = $operasi->failure_message;
+        $reason = $operation->failure_message;
 
-        return is_string($alasan) && $alasan !== '' ? $alasan : null;
+        return is_string($reason) && $reason !== '' ? $reason : null;
     }
 
     /**
@@ -147,33 +147,33 @@ final class PenyiapanLingkunganController extends Controller
      * menukar keberhasilan itu dengan 500 karena satu daftar tambahan tidak terbaca berarti operator
      * mengira penyiapannya gagal, lalu menjalankannya lagi.
      *
-     * @return list<array{id: string, versi: string, status: string, disemai: bool}>
+     * @return list<array{id: string, version: string, status: string, seeded: bool}>
      */
-    private function modul(Environment $lingkungan, KoneksiLingkungan $koneksi): array
+    private function installedModules(Environment $environment, EnvironmentConnection $connections): array
     {
         try {
-            $nama = $koneksi->untuk($lingkungan);
+            $connection = $connections->for($environment);
 
-            $baris = DB::connection($nama)
+            $rows = DB::connection($connection)
                 ->table('core_module_installations')
-                ->where('tenant_id', $lingkungan->tenant_id)
+                ->where('tenant_id', $environment->tenant_id)
                 ->orderBy('module_id')
                 ->get(['module_id', 'version', 'status', 'seeded_at']);
         } catch (Throwable) {
             return [];
         }
 
-        $hasil = [];
+        $result = [];
 
-        foreach ($baris as $satu) {
-            $hasil[] = [
-                'id' => (string) $satu->module_id,
-                'versi' => (string) $satu->version,
-                'status' => (string) $satu->status,
-                'disemai' => $satu->seeded_at !== null,
+        foreach ($rows as $row) {
+            $result[] = [
+                'id' => (string) $row->module_id,
+                'version' => (string) $row->version,
+                'status' => (string) $row->status,
+                'seeded' => $row->seeded_at !== null,
             ];
         }
 
-        return $hasil;
+        return $result;
     }
 }

@@ -7,11 +7,11 @@ namespace App\Actions\Modules;
 use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
 use App\Models\Environment;
 use App\Models\ModuleInstallation;
+use App\Support\ControlPlane\EnvironmentConnection;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleMigrator;
 use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\ModuleSeeder;
-use App\Support\Pusat\KoneksiLingkungan;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -57,27 +57,27 @@ final class InstallModule
         private readonly ModuleRegistry $registry,
         private readonly ModuleMigrator $migrator,
         private readonly ModuleSeeder $seeder,
-        private readonly EnsureNumberSequenceDrafts $urutanNomor,
-        private readonly KoneksiLingkungan $koneksi,
+        private readonly EnsureNumberSequenceDrafts $numberSequences,
+        private readonly EnvironmentConnection $connections,
     ) {}
 
-    public function handle(string $moduleId, string $tenantId, ?Environment $lingkungan = null): ModuleInstallation
+    public function handle(string $moduleId, string $tenantId, ?Environment $environment = null): ModuleInstallation
     {
-        $tujuan = $lingkungan ?? $this->produksi($tenantId);
+        $target = $environment ?? $this->productionEnvironment($tenantId);
 
-        if (! $tujuan instanceof Environment) {
+        if (! $target instanceof Environment) {
             // Tenant tanpa satu pun baris registry. Itu keadaan pemasangan lama yang belum
             // di-backfill, dan jawabannya database bawaan — sama seperti sebelum lingkungan ada.
-            return $this->pasang($moduleId, $tenantId);
+            return $this->install($moduleId, $tenantId);
         }
 
-        return $this->koneksi->jalankanDi(
-            $tujuan,
-            fn (): ModuleInstallation => $this->pasang($moduleId, $tenantId),
+        return $this->connections->runWithin(
+            $target,
+            fn (): ModuleInstallation => $this->install($moduleId, $tenantId),
         );
     }
 
-    private function produksi(string $tenantId): ?Environment
+    private function productionEnvironment(string $tenantId): ?Environment
     {
         return Environment::query()
             ->where('tenant_id', $tenantId)
@@ -86,7 +86,7 @@ final class InstallModule
             ->first();
     }
 
-    private function pasang(string $moduleId, string $tenantId): ModuleInstallation
+    private function install(string $moduleId, string $tenantId): ModuleInstallation
     {
         $module = $this->registry->cari($moduleId);
 
@@ -94,7 +94,7 @@ final class InstallModule
             throw new RuntimeException(sprintf('Module "%s" tidak ditemukan di folder modules/.', $moduleId));
         }
 
-        $this->pastikanDependencyTerpasang($module, $tenantId);
+        $this->ensureDependenciesInstalled($module, $tenantId);
 
         $this->migrator->naik($module);
 
@@ -122,17 +122,17 @@ final class InstallModule
         // dengan "Sequence aktif tidak ditemukan untuk aplikasi dan tenant ini".
         //
         // Letaknya sebelum seed karena seed module menerbitkan nomor sungguhan.
-        $this->urutanNomor->forTenantAndApp($tenantId, $module->id);
+        $this->numberSequences->forTenantAndApp($tenantId, $module->id);
 
         $this->seeder->jalankan($module, $tenantId);
 
-        /** @var ModuleInstallation $pemasangan */
-        $pemasangan = ModuleInstallation::query()
+        /** @var ModuleInstallation $installation */
+        $installation = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
             ->where('module_id', $module->id)
             ->firstOrFail();
 
-        return $pemasangan;
+        return $installation;
     }
 
     /**
@@ -140,27 +140,27 @@ final class InstallModule
      * katalog. Sebuah module boleh saja dikenal platform dan tetap tidak dimiliki tenant
      * yang sedang dipasangi.
      */
-    private function pastikanDependencyTerpasang(ModuleManifest $module, string $tenantId): void
+    private function ensureDependenciesInstalled(ModuleManifest $module, string $tenantId): void
     {
-        $kurang = [];
+        $missing = [];
 
-        foreach ($module->dependency as $butuh) {
-            $ada = ModuleInstallation::query()
+        foreach ($module->dependency as $needed) {
+            $installed = ModuleInstallation::query()
                 ->where('tenant_id', $tenantId)
-                ->where('module_id', $butuh)
+                ->where('module_id', $needed)
                 ->where('status', ModuleInstallation::STATUS_INSTALLED)
                 ->exists();
 
-            if (! $ada) {
-                $kurang[] = $butuh;
+            if (! $installed) {
+                $missing[] = $needed;
             }
         }
 
-        if ($kurang !== []) {
+        if ($missing !== []) {
             throw new RuntimeException(sprintf(
                 'Module "%s" membutuhkan %s, yang belum terpasang pada tenant ini.',
                 $module->id,
-                implode(', ', $kurang),
+                implode(', ', $missing),
             ));
         }
     }

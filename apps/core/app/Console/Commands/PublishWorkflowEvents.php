@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleRegistry;
-use App\Support\Pusat\LingkunganAktif;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
@@ -36,9 +36,9 @@ class PublishWorkflowEvents extends Command
 
     protected $description = 'Kirim keputusan workflow yang belum terkirim ke aplikasi penerima.';
 
-    public function handle(ModuleRegistry $registry, LingkunganAktif $lingkungan): int
+    public function handle(ModuleRegistry $registry, ActiveEnvironment $lingkungan): int
     {
-        if (! $lingkungan->bolehKeluar()) {
+        if (! $lingkungan->outboundAllowed()) {
             return $this->lucuti($lingkungan);
         }
 
@@ -126,7 +126,7 @@ class PublishWorkflowEvents extends Command
      * maupun yang kosong berujung pada hal yang sama — tidak ada yang akan dikirim — jadi
      * membedakan keduanya hanya menyisakan tumpukan baris yang tidak berarti apa-apa.
      */
-    private function lucuti(LingkunganAktif $lingkungan): int
+    private function lucuti(ActiveEnvironment $lingkungan): int
     {
         // Id dipungut lebih dulu lalu diperbarui lewat `whereIn`, bukan `limit()->update()`:
         // PostgreSQL tidak menerima LIMIT pada UPDATE, dan pembatasannya memang harus ikut —
@@ -147,7 +147,7 @@ class PublishWorkflowEvents extends Command
         $this->info(sprintf(
             '%d event ditandai terbit tanpa dikirim. %s',
             count($ids),
-            $lingkungan->alasanPenolakan(),
+            $lingkungan->refusalReason(),
         ));
 
         return self::SUCCESS;

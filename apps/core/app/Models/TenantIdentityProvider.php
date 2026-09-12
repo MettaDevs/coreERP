@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\Pusat\MilikPusat;
+use App\Support\ControlPlane\OwnedByControlPlane;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * produksi — atau lebih buruk, tidak mengubahnya, sehingga dua tempat menjawab berbeda.
  *
  * Model ini sengaja ada meski belum ada satu pun kode yang membacanya. Penjaga
- * `FkMenyeberangBatasTest` menurunkan daftar tabel sisi pusat dari model yang memakai `MilikPusat`,
+ * `FkMenyeberangBatasTest` menurunkan daftar tabel sisi pusat dari model yang memakai `OwnedByControlPlane`,
  * jadi tabel pusat **tanpa** model akan terhitung di sisi yang salah dan foreign key-nya terbaca
  * sebagai pelanggaran batas. Yang menjaga batas hanya dapat melihat apa yang ditandai.
  *
@@ -32,7 +32,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TenantIdentityProvider extends Model
 {
     use HasUlids;
-    use MilikPusat;
+    use OwnedByControlPlane;
 
     protected $table = 'tenant_identity_providers';
 

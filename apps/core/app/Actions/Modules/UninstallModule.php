@@ -6,8 +6,8 @@ namespace App\Actions\Modules;
 
 use App\Models\Environment;
 use App\Models\ModuleInstallation;
+use App\Support\ControlPlane\EnvironmentConnection;
 use App\Support\Modules\ModuleRegistry;
-use App\Support\Pusat\KoneksiLingkungan;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -28,21 +28,21 @@ final class UninstallModule
 {
     public function __construct(private readonly ModuleRegistry $registry) {}
 
-    public function handle(string $moduleId, string $tenantId, ?Environment $lingkungan = null): ModuleInstallation
+    public function handle(string $moduleId, string $tenantId, ?Environment $environment = null): ModuleInstallation
     {
-        $tujuan = $lingkungan ?? $this->produksi($tenantId);
+        $target = $environment ?? $this->productionEnvironment($tenantId);
 
-        if (! $tujuan instanceof Environment) {
-            return $this->kerjakan($moduleId, $tenantId);
+        if (! $target instanceof Environment) {
+            return $this->apply($moduleId, $tenantId);
         }
 
-        return app(KoneksiLingkungan::class)->jalankanDi(
-            $tujuan,
-            fn (): ModuleInstallation => $this->kerjakan($moduleId, $tenantId),
+        return app(EnvironmentConnection::class)->runWithin(
+            $target,
+            fn (): ModuleInstallation => $this->apply($moduleId, $tenantId),
         );
     }
 
-    private function produksi(string $tenantId): ?Environment
+    private function productionEnvironment(string $tenantId): ?Environment
     {
         return Environment::query()
             ->where('tenant_id', $tenantId)
@@ -56,18 +56,18 @@ final class UninstallModule
      * mencabut module menuntut koneksi yang benar lebih dulu. Alasan lengkapnya di
      * {@see InstallModule}.
      */
-    private function kerjakan(string $moduleId, string $tenantId): ModuleInstallation
+    private function apply(string $moduleId, string $tenantId): ModuleInstallation
     {
-        $pemasangan = ModuleInstallation::query()
+        $installation = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
             ->where('module_id', $moduleId)
             ->first();
 
-        if ($pemasangan === null) {
+        if ($installation === null) {
             throw new RuntimeException(sprintf('Module "%s" tidak terpasang pada tenant ini.', $moduleId));
         }
 
-        $this->pastikanTidakDibutuhkanModuleLain($moduleId, $tenantId);
+        $this->ensureNoOtherModuleNeedsIt($moduleId, $tenantId);
 
         DB::table('core_module_installations')
             ->where('tenant_id', $tenantId)
@@ -78,10 +78,10 @@ final class UninstallModule
                 'updated_at' => now(),
             ]);
 
-        // Bukan `$pemasangan->fresh()`. Model ini berkunci gabungan dan karena itu tidak
+        // Bukan `$installation->fresh()`. Model ini berkunci gabungan dan karena itu tidak
         // punya primary key tunggal; `fresh()` membangun query dari primary key dan
         // mengembalikan baris yang salah tanpa satu pun peringatan.
-        return $this->baca($moduleId, $tenantId);
+        return $this->read($moduleId, $tenantId);
     }
 
     /**
@@ -92,47 +92,47 @@ final class UninstallModule
      * dicabut. Module yang bergantung tapi tidak dimiliki tenant ini tidak menghalangi apa
      * pun.
      */
-    private function pastikanTidakDibutuhkanModuleLain(string $moduleId, string $tenantId): void
+    private function ensureNoOtherModuleNeedsIt(string $moduleId, string $tenantId): void
     {
-        $terpasang = ModuleInstallation::query()
+        $installed = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
             ->where('status', ModuleInstallation::STATUS_INSTALLED)
             ->pluck('module_id')
             ->all();
 
-        $penghalang = [];
+        $blockers = [];
 
-        foreach ($terpasang as $lain) {
-            if ($lain === $moduleId) {
+        foreach ($installed as $other) {
+            if ($other === $moduleId) {
                 continue;
             }
 
-            $manifest = $this->registry->cari((string) $lain);
+            $manifest = $this->registry->cari((string) $other);
 
             if ($manifest !== null && in_array($moduleId, $manifest->dependency, true)) {
-                $penghalang[] = (string) $lain;
+                $blockers[] = (string) $other;
             }
         }
 
-        if ($penghalang !== []) {
-            sort($penghalang);
+        if ($blockers !== []) {
+            sort($blockers);
 
             throw new RuntimeException(sprintf(
                 'Module "%s" masih dibutuhkan %s yang terpasang pada tenant ini. Cabut module itu lebih dulu.',
                 $moduleId,
-                implode(', ', $penghalang),
+                implode(', ', $blockers),
             ));
         }
     }
 
-    private function baca(string $moduleId, string $tenantId): ModuleInstallation
+    private function read(string $moduleId, string $tenantId): ModuleInstallation
     {
-        /** @var ModuleInstallation $pemasangan */
-        $pemasangan = ModuleInstallation::query()
+        /** @var ModuleInstallation $installation */
+        $installation = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
             ->where('module_id', $moduleId)
             ->firstOrFail();
 
-        return $pemasangan;
+        return $installation;
     }
 }

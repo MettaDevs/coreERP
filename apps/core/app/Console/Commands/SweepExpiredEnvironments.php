@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Concerns\MemegangOperasiLingkungan;
+use App\Console\Commands\Concerns\HoldsEnvironmentOperation;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use Carbon\CarbonInterface;
@@ -35,7 +35,7 @@ use Throwable;
  *
  * Akibatnya bagi perintah ini mengikat: ketiganya **wajib berubah dalam satu `UPDATE`**. Memecahnya
  * menjadi dua pernyataan berarti pernyataan pertama sudah ditolak, apa pun urutannya — persis
- * seperti `environment:konversi` yang wajib menaikkan jenis dan bendera keluar sekaligus.
+ * seperti `environment:convert` yang wajib menaikkan jenis dan bendera keluar sekaligus.
  *
  * ## Kenapa ia melanjutkan sesudah gagal
  *
@@ -69,14 +69,14 @@ use Throwable;
  * `soft_delete` juga tersedia di daftar jenis operasi, dan ia dibiarkan untuk penghapusan yang
  * benar-benar diputuskan seseorang. Yang ini tidak diputuskan siapa pun pada saat ia terjadi —
  * yang menentukannya tanggal yang sudah disepakati jauh hari. Nama yang menyebut sebabnya membuat
- * riwayatnya dapat dibaca tanpa membuka kode, dan `environment:pulihkan` menerima keduanya.
+ * riwayatnya dapat dibaca tanpa membuka kode, dan `environment:restore` menerima keduanya.
  */
-final class SapuLingkunganKedaluwarsa extends Command
+final class SweepExpiredEnvironments extends Command
 {
-    use MemegangOperasiLingkungan;
+    use HoldsEnvironmentOperation;
 
-    protected $signature = 'environment:sapu-kedaluwarsa
-        {--tenggang= : Berapa hari isinya masih disimpan sebelum boleh dibuang permanen}';
+    protected $signature = 'environment:sweep-expired
+        {--grace-days= : Berapa hari isinya masih disimpan sebelum boleh dibuang permanen}';
 
     protected $description = 'Hapus lunak setiap lingkungan demo yang masa berlakunya sudah lewat';
 
@@ -93,7 +93,7 @@ final class SapuLingkunganKedaluwarsa extends Command
      * satu siklus keputusan penuh dan tetap menjadikan disk fungsi dari jumlah pelanggan aktif,
      * bukan dari jumlah pelanggan yang pernah mencoba.
      */
-    public const TENGGANG_HARI = 30;
+    public const GRACE_DAYS = 30;
 
     /**
      * Tenggat kuncinya, dan ia pendek dengan sengaja.
@@ -103,16 +103,16 @@ final class SapuLingkunganKedaluwarsa extends Command
      * prosesnya mati karena itu tidak layak menahan lingkungannya sampai sapuan besok; lima menit
      * sudah jauh lebih panjang daripada apa pun yang wajar terjadi di sini.
      */
-    protected function tenggatOperasiMenit(): int
+    protected function operationLeaseMinutes(): int
     {
         return 5;
     }
 
     public function handle(): int
     {
-        $tenggang = $this->tenggang();
+        $graceDays = $this->graceDays();
 
-        if ($tenggang === null) {
+        if ($graceDays === null) {
             return self::FAILURE;
         }
 
@@ -122,48 +122,48 @@ final class SapuLingkunganKedaluwarsa extends Command
         //
         // `deleted_at` ikut disaring, kalau tidak sapuan besok akan mencoba menghapus lunak
         // lingkungan yang sudah dihapus lunak hari ini — dan gagal, setiap hari, selamanya.
-        $daftar = Environment::query()
+        $list = Environment::query()
             ->where('kind', 'demo')
             ->whereNull('deleted_at')
             ->where('expires_at', '<=', now())
             ->orderBy('expires_at')
             ->get();
 
-        if ($daftar->isEmpty()) {
+        if ($list->isEmpty()) {
             $this->info('Tidak ada lingkungan demo yang masa berlakunya sudah lewat.');
 
             return self::SUCCESS;
         }
 
-        $this->line(sprintf('%d lingkungan demo kedaluwarsa; masa tenggangnya %d hari.', $daftar->count(), $tenggang));
+        $this->line(sprintf('%d lingkungan demo kedaluwarsa; masa tenggangnya %d hari.', $list->count(), $graceDays));
 
-        $berhasil = 0;
-        $gagal = 0;
+        $succeeded = 0;
+        $failed = 0;
 
         // Status tidak ikut disaring, dan itu disengaja. Demo yang kedaluwarsa tetap kedaluwarsa
         // apa pun keadaannya — yang setengah jadi, yang degraded, maupun yang ditangguhkan. Satu
         // keadaan yang memang tidak boleh disentuh adalah lingkungan yang sedang dikerjakan operasi
         // lain, dan itu sudah dijaga kuncinya, bukan oleh daftar status yang harus dirawat tangan.
-        foreach ($daftar as $lingkungan) {
-            if ($this->sapuSatu($lingkungan, $tenggang)) {
-                $berhasil++;
+        foreach ($list as $environment) {
+            if ($this->sweepOne($environment, $graceDays)) {
+                $succeeded++;
 
                 continue;
             }
 
-            $gagal++;
+            $failed++;
         }
 
-        $this->info(sprintf('Sapuan selesai: %d tersapu, %d gagal.', $berhasil, $gagal));
+        $this->info(sprintf('Sapuan selesai: %d tersapu, %d gagal.', $succeeded, $failed));
 
-        if ($gagal > 0) {
+        if ($failed > 0) {
             // Merah, meski sebagian besar berhasil. Sapuan yang melaporkan sukses sambil
             // meninggalkan lingkungan yang tidak tersapu adalah sapuan yang tidak pernah diperiksa
             // siapa pun sampai disknya penuh.
             $this->error(sprintf(
                 '%d lingkungan tidak tersapu. Sebabnya ada di `environment_operations` dan di log '
                 .'aplikasi; jalankan perintah yang sama lagi setelah sebabnya dibereskan.',
-                $gagal,
+                $failed,
             ));
 
             return self::FAILURE;
@@ -178,71 +178,71 @@ final class SapuLingkunganKedaluwarsa extends Command
      * Mengembalikan false, bukan melempar. Itu bentuk yang membuat pemanggilnya tidak punya cara
      * untuk berhenti di tengah tanpa sengaja.
      */
-    private function sapuSatu(Environment $lingkungan, int $tenggang): bool
+    private function sweepOne(Environment $environment, int $graceDays): bool
     {
-        $operasi = $this->bukaOperasi($lingkungan, 'expire');
+        $operation = $this->openOperation($environment, 'expire');
 
-        if (! $operasi instanceof EnvironmentOperation) {
+        if (! $operation instanceof EnvironmentOperation) {
             // Kuncinya sedang dipegang operasi lain yang tenggatnya belum lewat. Ini kegagalan yang
             // paling mungkin terjadi dan satu-satunya yang tidak meninggalkan baris riwayat sendiri
             // — jadi log aplikasi satu-satunya tempat ia tercatat.
             Log::warning('Lingkungan kedaluwarsa dilewati karena operasi lain sedang berjalan.', [
-                'environment' => $lingkungan->id,
-                'slug' => $lingkungan->slug,
+                'environment' => $environment->id,
+                'slug' => $environment->slug,
             ]);
 
             return false;
         }
 
-        $sebelumnya = $lingkungan->status;
-        $kedaluwarsa = self::waktu($lingkungan->expires_at);
-        $langkah = 'hapus-lunak';
+        $previous = $environment->status;
+        $expired = self::asTime($environment->expires_at);
+        $step = 'hapus-lunak';
 
         try {
-            $sekarang = now();
-            $bolehDibuang = $sekarang->copy()->addDays($tenggang);
+            $now = now();
+            $purgeAfter = $now->copy()->addDays($graceDays);
 
-            $this->hapusLunak($lingkungan, $sekarang, $bolehDibuang);
+            $this->softDelete($environment, $now, $purgeAfter);
 
-            $operasi->update([
+            $operation->update([
                 'status' => 'succeeded',
-                'step' => $langkah,
+                'step' => $step,
                 'finished_at' => now(),
                 'lease_until' => null,
                 'detail' => [
                     // Status sebelumnya disimpan di sini karena barisnya sendiri sudah tidak dapat
                     // menyimpannya: `environments_status_hapus_sejalan` memaksa kolom status
-                    // menjadi `soft_deleted`. Tanpa catatan ini, `environment:pulihkan` harus
+                    // menjadi `soft_deleted`. Tanpa catatan ini, `environment:restore` harus
                     // menebak keadaan apa yang dikembalikannya — dan menebak `active` untuk
                     // lingkungan yang sebenarnya degraded berarti mengembalikannya sebagai tempat
                     // yang boleh dimasuki padahal ia tidak pernah selesai disiapkan.
-                    'status_sebelumnya' => $sebelumnya,
-                    'kedaluwarsa_pada' => $kedaluwarsa?->toIso8601String(),
-                    'boleh_dibuang_pada' => $bolehDibuang->toIso8601String(),
+                    'status_sebelumnya' => $previous,
+                    'kedaluwarsa_pada' => $expired?->toIso8601String(),
+                    'boleh_dibuang_pada' => $purgeAfter->toIso8601String(),
                 ],
             ]);
 
             $this->line(sprintf(
                 '  "%s" dihapus lunak; isinya masih dapat dipulihkan sampai %s.',
-                $lingkungan->slug,
-                $bolehDibuang->toDateTimeString(),
+                $environment->slug,
+                $purgeAfter->toDateTimeString(),
             ));
 
             return true;
         } catch (Throwable $e) {
-            $this->tutupOperasiSebagaiGagal($operasi, $langkah, $e);
+            $this->closeOperationAsFailed($operation, $step, $e);
 
             // Dua tempat, dan keduanya perlu. Riwayat operasinya yang dibaca operator saat
             // menelusuri satu lingkungan; log aplikasi yang dibaca ketika yang dicari justru
             // "apakah sapuan tadi malam berjalan mulus".
             Log::error('Sapuan lingkungan kedaluwarsa gagal pada satu lingkungan.', [
-                'environment' => $lingkungan->id,
-                'slug' => $lingkungan->slug,
-                'langkah' => $langkah,
+                'environment' => $environment->id,
+                'slug' => $environment->slug,
+                'langkah' => $step,
                 'sebab' => $e->getMessage(),
             ]);
 
-            $this->error(sprintf('  "%s" gagal disapu di langkah "%s": %s', $lingkungan->slug, $langkah, $e->getMessage()));
+            $this->error(sprintf('  "%s" gagal disapu di langkah "%s": %s', $environment->slug, $step, $e->getMessage()));
 
             return false;
         }
@@ -264,27 +264,27 @@ final class SapuLingkunganKedaluwarsa extends Command
      * daftar dibaca dan baris ini ditulis, seseorang di layar operator boleh saja sudah
      * menghapusnya lebih dulu. Menimpanya berarti memundurkan masa tenggang yang sudah berjalan.
      */
-    private function hapusLunak(Environment $lingkungan, CarbonInterface $sekarang, CarbonInterface $bolehDibuang): void
+    private function softDelete(Environment $environment, CarbonInterface $now, CarbonInterface $purgeAfter): void
     {
-        $koneksi = DB::connection($lingkungan->getConnectionName());
+        $koneksi = DB::connection($environment->getConnectionName());
 
-        $terkena = (int) $koneksi->transaction(fn (): int => Environment::query()
-            ->whereKey($lingkungan->id)
+        $affected = (int) $koneksi->transaction(fn (): int => Environment::query()
+            ->whereKey($environment->id)
             ->whereNull('deleted_at')
             ->update([
                 'status' => 'soft_deleted',
-                'deleted_at' => $sekarang,
-                'purge_after' => $bolehDibuang,
+                'deleted_at' => $now,
+                'purge_after' => $purgeAfter,
             ]));
 
-        if ($terkena !== 1) {
+        if ($affected !== 1) {
             throw new RuntimeException(
                 'Baris registrinya sudah dihapus lunak jalur lain di sela daftar dibaca dan baris '
                 .'ini ditulis. Tidak ada yang diubah; masa tenggang yang sudah berjalan dibiarkan.'
             );
         }
 
-        $lingkungan->refresh();
+        $environment->refresh();
     }
 
     /**
@@ -294,21 +294,21 @@ final class SapuLingkunganKedaluwarsa extends Command
      * berjalan pada hari yang sama, yaitu menghapus jendela yang menjadi satu-satunya alasan hapus
      * lunak ada. Salah ketik satu karakter tidak layak menjadi jalan menuju ke sana.
      */
-    private function tenggang(): ?int
+    private function graceDays(): ?int
     {
-        $nilai = $this->option('tenggang');
+        $value = $this->option('grace-days');
 
-        if ($nilai === null || $nilai === '') {
-            return self::TENGGANG_HARI;
+        if ($value === null || $value === '') {
+            return self::GRACE_DAYS;
         }
 
-        if (preg_match('/^[1-9][0-9]{0,3}$/', $nilai) !== 1) {
-            $this->error(sprintf('Masa tenggang "%s" tidak dikenali. Isi jumlah hari, minimal 1.', $nilai));
+        if (preg_match('/^[1-9][0-9]{0,3}$/', $value) !== 1) {
+            $this->error(sprintf('Masa tenggang "%s" tidak dikenali. Isi jumlah hari, minimal 1.', $value));
 
             return null;
         }
 
-        return (int) $nilai;
+        return (int) $value;
     }
 
     /**
@@ -319,12 +319,12 @@ final class SapuLingkunganKedaluwarsa extends Command
      * berjalan selalu `Carbon`, dan bentuk teksnya tetap dilayani di sini karena kebenaran kode ini
      * tidak layak bergantung pada apa yang kebetulan dilihat sebuah alat.
      */
-    private static function waktu(mixed $nilai): ?CarbonInterface
+    private static function asTime(mixed $value): ?CarbonInterface
     {
-        if ($nilai instanceof CarbonInterface) {
-            return $nilai;
+        if ($value instanceof CarbonInterface) {
+            return $value;
         }
 
-        return is_string($nilai) && $nilai !== '' ? Carbon::parse($nilai) : null;
+        return is_string($value) && $value !== '' ? Carbon::parse($value) : null;
     }
 }

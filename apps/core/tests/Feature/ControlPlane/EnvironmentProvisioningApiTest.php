@@ -17,7 +17,7 @@ use Tests\TestCase;
  * Pintu kedua pusat admin: menyalakan sebuah lingkungan tanpa membuka terminal.
  *
  * Yang dibuktikan di sini terutama jalur merahnya, karena jalur hijaunya — database sungguhan,
- * migration sungguhan, module sungguhan — sudah dibuktikan {@see SiapkanLingkunganTest} pada
+ * migration sungguhan, module sungguhan — sudah dibuktikan {@see ProvisionEnvironmentTest} pada
  * perintahnya langsung. Mengulanginya lewat HTTP hanya menambah satu menit pada suite tanpa
  * menambah satu pun keterangan.
  *
@@ -26,7 +26,7 @@ use Tests\TestCase;
  * penolakan itu meninggalkan operasi menggantung. Sebuah rute yang menolak tetapi sempat membuka
  * kunci operasi akan memblokir percobaan berikutnya selama tiga puluh menit.
  */
-final class PenyiapanLingkunganLewatApiTest extends TestCase
+final class EnvironmentProvisioningApiTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -49,15 +49,15 @@ final class PenyiapanLingkunganLewatApiTest extends TestCase
         ]);
     }
 
-    public function test_tanpa_token_ditolak_dan_tidak_membuka_operasi(): void
+    public function test_without_a_token_it_is_rejected_and_opens_no_operation(): void
     {
-        $lingkungan = $this->lingkungan('provisioning');
+        $environment = $this->environment('provisioning');
 
-        $this->postJson('/api/internal/v1/environments/'.$lingkungan->id.'/siapkan')
+        $this->postJson('/api/internal/v1/environments/'.$environment->id.'/provision')
             ->assertUnauthorized();
 
         $this->assertSame(0, EnvironmentOperation::query()->count());
-        $this->assertSame('provisioning', $lingkungan->refresh()->status);
+        $this->assertSame('provisioning', $environment->refresh()->status);
     }
 
     /**
@@ -66,23 +66,23 @@ final class PenyiapanLingkunganLewatApiTest extends TestCase
      * Jalur merah yang paling mudah ditulis terbalik: string kosong sama dengan string kosong, jadi
      * penjaga yang hanya membandingkan keduanya membuka rute ini pada setiap pemasangan on-prem.
      */
-    public function test_pemasangan_tanpa_token_menolak_bahkan_token_kosong(): void
+    public function test_an_installation_without_a_token_refuses_even_an_empty_token(): void
     {
         config()->set('coreerp.control_plane_token', null);
-        $lingkungan = $this->lingkungan('provisioning');
+        $environment = $this->environment('provisioning');
 
-        $this->withToken('')->postJson('/api/internal/v1/environments/'.$lingkungan->id.'/siapkan')
+        $this->withToken('')->postJson('/api/internal/v1/environments/'.$environment->id.'/provision')
             ->assertUnauthorized();
-        $this->withToken(self::TOKEN)->postJson('/api/internal/v1/environments/'.$lingkungan->id.'/siapkan')
+        $this->withToken(self::TOKEN)->postJson('/api/internal/v1/environments/'.$environment->id.'/provision')
             ->assertUnauthorized();
 
         $this->assertSame(0, EnvironmentOperation::query()->count());
     }
 
-    public function test_lingkungan_yang_tidak_ada_dijawab_404(): void
+    public function test_an_environment_that_does_not_exist_is_answered_404(): void
     {
         $this->withToken(self::TOKEN)
-            ->postJson('/api/internal/v1/environments/01jbukanlingkunganapapun00/siapkan')
+            ->postJson('/api/internal/v1/environments/01jbukanlingkunganapapun00/provision')
             ->assertNotFound();
 
         $this->assertSame(0, EnvironmentOperation::query()->count());
@@ -95,30 +95,30 @@ final class PenyiapanLingkunganLewatApiTest extends TestCase
      * satu huruf salah ketik pada id sudah cukup untuk sampai ke sana. Yang dijaga assertion di
      * bawah bukan kodenya melainkan akibatnya: tidak ada operasi yang dibuka sama sekali.
      */
-    public function test_lingkungan_yang_sudah_aktif_ditolak_409(): void
+    public function test_an_environment_that_is_already_active_is_rejected_409(): void
     {
-        $lingkungan = $this->lingkungan('active');
+        $environment = $this->environment('active');
 
         $this->withToken(self::TOKEN)
-            ->postJson('/api/internal/v1/environments/'.$lingkungan->id.'/siapkan')
+            ->postJson('/api/internal/v1/environments/'.$environment->id.'/provision')
             ->assertStatus(409)
-            ->assertJsonPath('message', fn (string $pesan): bool => str_contains($pesan, 'active'));
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'active'));
 
         $this->assertSame(0, EnvironmentOperation::query()->count());
-        $this->assertSame('active', $lingkungan->refresh()->status);
+        $this->assertSame('active', $environment->refresh()->status);
     }
 
-    public function test_lingkungan_yang_sudah_dihapus_lunak_dijawab_404(): void
+    public function test_an_environment_that_is_already_soft_deleted_is_answered_404(): void
     {
-        $lingkungan = $this->lingkungan('provisioning');
-        DB::table('environments')->where('id', $lingkungan->id)->update([
+        $environment = $this->environment('provisioning');
+        DB::table('environments')->where('id', $environment->id)->update([
             'status' => 'soft_deleted',
             'deleted_at' => now(),
             'purge_after' => now()->addMonth(),
         ]);
 
         $this->withToken(self::TOKEN)
-            ->postJson('/api/internal/v1/environments/'.$lingkungan->id.'/siapkan')
+            ->postJson('/api/internal/v1/environments/'.$environment->id.'/provision')
             ->assertNotFound();
     }
 
@@ -132,17 +132,17 @@ final class PenyiapanLingkunganLewatApiTest extends TestCase
      * Diuji lewat penolakan 409 supaya ia tidak ikut membuat database sungguhan: yang dibuktikan
      * adalah bahwa muatan itu diterima tanpa meledak, bukan bahwa penyiapannya berjalan.
      */
-    public function test_peminta_yang_tidak_ada_tidak_menggagalkan_permintaannya(): void
+    public function test_a_requester_that_does_not_exist_does_not_fail_the_request(): void
     {
-        $lingkungan = $this->lingkungan('active');
+        $environment = $this->environment('active');
 
         $this->withToken(self::TOKEN)
-            ->postJson('/api/internal/v1/environments/'.$lingkungan->id.'/siapkan', ['diminta_oleh' => 999999])
+            ->postJson('/api/internal/v1/environments/'.$environment->id.'/provision', ['requested_by' => 999999])
             ->assertStatus(409);
     }
 
     /** Pasangan hijaunya: operator yang sungguhan memang sampai ke kolom riwayat. */
-    public function test_peminta_yang_ada_tercatat_pada_operasinya(): void
+    public function test_a_requester_that_exists_is_recorded_on_its_operation(): void
     {
         $operator = User::create([
             'name' => 'Operator Uji',
@@ -153,25 +153,25 @@ final class PenyiapanLingkunganLewatApiTest extends TestCase
         // Bukan lewat HTTP: yang diuji di sini penyambungannya sampai ke baris operasi, dan
         // menjalankan seluruh penyiapan sungguhan hanya untuk membaca satu kolom berarti membayar
         // satu database baru per assertion.
-        $lingkungan = $this->lingkungan('provisioning');
+        $environment = $this->environment('provisioning');
 
         // `int`, bukan `(string)`. Itu bentuk yang benar-benar dikirim `Artisan::call()` dari
         // controller internal, dan versi pertama perintah ini hanya menerima string — sehingga
         // penyiapan lewat tombol berhasil sepenuhnya sambil mencatat "Sistem". Test yang memanggil
         // dengan `(string)` ikut setuju dengan cacatnya.
-        $this->artisan('environment:siapkan', [
-            'environment' => $lingkungan->id,
-            '--diminta-oleh' => $operator->id,
+        $this->artisan('environment:provision', [
+            'environment' => $environment->id,
+            '--requested-by' => $operator->id,
         ])->run();
 
-        $operasi = EnvironmentOperation::query()->where('environment_id', $lingkungan->id)->firstOrFail();
+        $operation = EnvironmentOperation::query()->where('environment_id', $environment->id)->firstOrFail();
 
-        $this->assertSame($operator->id, $operasi->requested_by);
+        $this->assertSame($operator->id, $operation->requested_by);
 
-        $this->buangDatabase($lingkungan);
+        $this->dropDatabase($environment);
     }
 
-    private function lingkungan(string $status): Environment
+    private function environment(string $status): Environment
     {
         return Environment::create([
             'tenant_id' => $this->tenant->id,
@@ -192,20 +192,20 @@ final class PenyiapanLingkunganLewatApiTest extends TestCase
      * memegang satu. `WITH (FORCE)` memutus sesi yang masih menempel; tanpa itu satu koneksi yang
      * lupa ditutup cukup untuk meninggalkan database yatim di mesin siapa pun yang menjalankannya.
      */
-    private function buangDatabase(Environment $lingkungan): void
+    private function dropDatabase(Environment $environment): void
     {
-        $nama = $lingkungan->refresh()->database_name;
+        $name = $environment->refresh()->database_name;
 
-        if (! is_string($nama) || $nama === '') {
+        if (! is_string($name) || $name === '') {
             return;
         }
 
-        DB::purge('lingkungan_disiapkan');
-        DB::purge('lingkungan_'.$lingkungan->id);
+        DB::purge('environment_provisioning');
+        DB::purge('environment_'.$environment->id);
 
-        config(['database.connections.uji_pembuang' => config('database.connections.'.config('database.default'))]);
-        DB::purge('uji_pembuang');
-        DB::connection('uji_pembuang')->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $nama));
-        DB::purge('uji_pembuang');
+        config(['database.connections.test_purge' => config('database.connections.'.config('database.default'))]);
+        DB::purge('test_purge');
+        DB::connection('test_purge')->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $name));
+        DB::purge('test_purge');
     }
 }

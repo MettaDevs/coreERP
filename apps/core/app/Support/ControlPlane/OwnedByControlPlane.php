@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Pusat;
+namespace App\Support\ControlPlane;
 
 /**
  * Penanda bahwa sebuah tabel hidup di sisi **pusat**, bukan di sisi environment.
@@ -31,7 +31,7 @@ namespace App\Support\Pusat;
  * Karena itu yang disimpan hanyalah **nama** koneksi, dan kosong berarti "ikut yang bawaan". On-prem
  * kosong selamanya: di sana memang tidak ada sisi pusat yang terpisah.
  */
-trait MilikPusat
+trait OwnedByControlPlane
 {
     public function getConnectionName(): ?string
     {

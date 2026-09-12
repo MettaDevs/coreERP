@@ -8,7 +8,7 @@ return [
      * environment, akses operator. Kosong berarti "ikut koneksi bawaan", dan itulah bawaannya.
      *
      * On-prem kosong selamanya: di sana tidak ada sisi pusat yang terpisah, dan Core memang harus
-     * sanggup menjadi keseluruhannya. Yang membacanya trait App\Support\Pusat\MilikPusat.
+     * sanggup menjadi keseluruhannya. Yang membacanya trait App\Support\ControlPlane\OwnedByControlPlane.
      */
     'control_connection' => env('COREERP_CONTROL_CONNECTION'),
 
@@ -20,7 +20,7 @@ return [
      *
      * **Kosong berarti satu alamat untuk semua, dan itu bawaannya.** On-prem melayani satu
      * pelanggan dari satu alamat selamanya, dan lingkungan pengembangan sebelum DNS disiapkan juga
-     * begitu. Selama ia kosong, `TetapkanLingkungan` tidak pernah menyala — bukan gagal, tidak
+     * begitu. Selama ia kosong, `ResolveEnvironment` tidak pernah menyala — bukan gagal, tidak
      * menyala — dan seluruh perilaku hari ini utuh.
      *
      * Untuk mencobanya di mesin sendiri, isi `localhost`: peramban modern menyelesaikan setiap
@@ -32,7 +32,7 @@ return [
      * tidak mencakup domain induknya. Alasan lengkapnya di
      * `docs/todo/environment-dan-pusat-admin/README.md`.
      */
-    'domain_dasar' => env('COREERP_DOMAIN_DASAR'),
+    'base_domain' => env('COREERP_BASE_DOMAIN'),
 
     /*
      * Label yang tidak pernah menjadi lingkungan, meski berada di bawah domain yang sama.
@@ -46,7 +46,7 @@ return [
      * keputusan produk, bukan keputusan pembangunan — pelanggan yang slug-nya kebetulan `api` akan
      * kehilangan alamatnya tanpa pernah tahu kenapa.
      */
-    'label_bukan_lingkungan' => ['admin', 'www', 'api'],
+    'reserved_labels' => ['admin', 'www', 'api'],
 
     // `deployment` dibuang pada 11 September 2026 bersama satu-satunya pembacanya: pendaftaran
     // usaha kini menulis baris `environments`, bukan `tenant_deployments`. Sebelumnya `pull_images`
@@ -63,7 +63,7 @@ return [
      *
      * Arah pusat → Core tidak dapat memakai kredensial app: penjaganya menuntut app yang terpasang
      * pada sebuah tenant, sedangkan pusat admin tidak terpasang di mana pun dan justru bekerja pada
-     * tenant yang belum ada. Lihat App\Http\Middleware\HanyaPusatAdmin.
+     * tenant yang belum ada. Lihat App\Http\Middleware\ControlPlaneOnly.
      *
      * Kosong berarti pemasangan ini **tidak menerima perintah pusat admin sama sekali** — bukan
      * menerima semuanya. Itu bawaan yang benar untuk on-prem dan lingkungan lokal, yang memang

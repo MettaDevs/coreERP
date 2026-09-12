@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\Pusat\MilikPusat;
+use App\Support\ControlPlane\OwnedByControlPlane;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -29,7 +29,7 @@ use Illuminate\Support\Carbon;
 class EnvironmentOperation extends Model
 {
     use HasUlids;
-    use MilikPusat;
+    use OwnedByControlPlane;
 
     public $timestamps = false;
 

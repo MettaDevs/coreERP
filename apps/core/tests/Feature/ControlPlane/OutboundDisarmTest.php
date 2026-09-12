@@ -10,8 +10,8 @@ use App\Models\Tenant;
 use App\Support\Modules\TenantScope;
 use App\Support\Observabilitas\LaporanKesalahan;
 use App\Support\Observabilitas\PengirimDiscord;
-use App\Support\Pusat\LingkunganAktif;
-use App\Support\Pusat\SambunganKeluarDitolak;
+use App\Support\ControlPlane\ActiveEnvironment;
+use App\Support\ControlPlane\OutboundRefused;
 use App\Support\Reporting\Rendering\PdfConverter;
 use App\Support\Reporting\Rendering\RenderedFile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,7 +37,7 @@ use Tests\TestCase;
  * pengecualian itu tidak diam-diam "dilengkapi" oleh orang berikutnya yang membaca daftar
  * pelucutan.
  */
-class PelucutanSambunganKeluarTest extends TestCase
+class OutboundDisarmTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -49,7 +49,7 @@ class PelucutanSambunganKeluarTest extends TestCase
     {
         parent::setUp();
 
-        $this->bersihkanPenjeda();
+        $this->clearThrottleMarker();
 
         $client = Client::create(['legal_name' => 'PT Uji', 'slug' => 'pt-uji', 'status' => 'active']);
         $this->tenantId = Tenant::create([
@@ -73,7 +73,7 @@ class PelucutanSambunganKeluarTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->bersihkanPenjeda();
+        $this->clearThrottleMarker();
 
         parent::tearDown();
     }
@@ -82,9 +82,9 @@ class PelucutanSambunganKeluarTest extends TestCase
     // Penerbit event workflow — bahaya paling konkret yang sudah ada di repo hari ini.
     // ---------------------------------------------------------------------------------
 
-    public function test_penerbit_event_tidak_mengirim_dari_lingkungan_uji(): void
+    public function test_the_event_publisher_does_not_send_from_a_test_environment(): void
     {
-        $this->pakai($this->sandbox());
+        $this->activate($this->sandbox());
         $id = $this->outbox();
         Http::fake();
 
@@ -100,17 +100,17 @@ class PelucutanSambunganKeluarTest extends TestCase
         $this->assertStringContainsString('ditandai terbit tanpa dikirim', Artisan::output());
     }
 
-    public function test_penerbit_event_tetap_mengirim_dari_produksi(): void
+    public function test_the_event_publisher_still_sends_from_production(): void
     {
-        $this->pakai($this->produksi());
+        $this->activate($this->production());
         $id = $this->outbox();
         Http::fake(['https://procurement.test/events' => Http::response(['data' => ['accepted' => true]])]);
 
         Artisan::call('workflow-events:publish');
 
-        Http::assertSent(fn ($permintaan) => $permintaan->url() === 'https://procurement.test/events'
-            && $permintaan->hasHeader('X-CoreERP-Event-Signature')
-            && $permintaan['id'] === $id);
+        Http::assertSent(fn ($request) => $request->url() === 'https://procurement.test/events'
+            && $request->hasHeader('X-CoreERP-Event-Signature')
+            && $request['id'] === $id);
         $this->assertNotNull(DB::table('outbox_events')->where('id', $id)->value('published_at'));
     }
 
@@ -127,46 +127,46 @@ class PelucutanSambunganKeluarTest extends TestCase
      * sebuah laporan diluluskan. Penanda yang tetap kosong berarti pengiriman berhenti
      * **sebelum** penjeda, yaitu di dalam kelas ini, jauh di hulu jaring global.
      */
-    public function test_laporan_discord_ditekan_di_lingkungan_uji(): void
+    public function test_the_discord_report_is_suppressed_in_a_test_environment(): void
     {
         config()->set('coreerp.discord.jeda_detik', 60);
-        $this->pakai($this->sandbox());
+        $this->activate($this->sandbox());
         Http::fake();
 
         PengirimDiscord::kirim(LaporanKesalahan::dari(new RuntimeException('gagal'), null));
 
         Http::assertNothingSent();
-        $this->assertSame([], $this->penandaPenjeda(), 'Penjeda sudah tersentuh, jadi yang menahan '
+        $this->assertSame([], $this->throttleMarker(), 'Penjeda sudah tersentuh, jadi yang menahan '
             .'kiriman ini bukan penjagaan di dalam PengirimDiscord melainkan sesuatu di hilirnya.');
     }
 
-    public function test_laporan_discord_tetap_terkirim_dari_produksi(): void
+    public function test_the_discord_report_is_still_sent_from_production(): void
     {
         config()->set('coreerp.discord.jeda_detik', 0);
-        $this->pakai($this->produksi());
+        $this->activate($this->production());
         Http::fake([self::WEBHOOK => Http::response('', 204)]);
 
         PengirimDiscord::kirim(LaporanKesalahan::dari(new RuntimeException('gagal'), null));
 
-        Http::assertSent(fn ($permintaan) => $permintaan->url() === self::WEBHOOK);
+        Http::assertSent(fn ($request) => $request->url() === self::WEBHOOK);
     }
 
     // ---------------------------------------------------------------------------------
     // Jaring global — lapis terakhir untuk panggilan yang belum ditulis siapa pun.
     // ---------------------------------------------------------------------------------
 
-    public function test_jaring_global_menolak_panggilan_yang_tidak_dijaga_siapa_pun(): void
+    public function test_the_global_guard_refuses_a_call_nobody_guards(): void
     {
-        $this->pakai($this->sandbox());
+        $this->activate($this->sandbox());
         Http::fake();
 
         try {
             Http::get('https://sistem-pelanggan.test/webhook?token=rahasia');
             $this->fail('Panggilan keluar dari lingkungan uji lolos tanpa suara.');
-        } catch (SambunganKeluarDitolak $ditolak) {
-            $this->assertStringContainsString('bukan produksi', $ditolak->getMessage());
-            $this->assertStringContainsString('sistem-pelanggan.test', $ditolak->getMessage());
-            $this->assertStringNotContainsString('rahasia', $ditolak->getMessage(), 'Query string '
+        } catch (OutboundRefused $rejected) {
+            $this->assertStringContainsString('bukan produksi', $rejected->getMessage());
+            $this->assertStringContainsString('sistem-pelanggan.test', $rejected->getMessage());
+            $this->assertStringNotContainsString('rahasia', $rejected->getMessage(), 'Query string '
                 .'ikut tercetak ke pesan galat, dan pesan galat dibaca lebih banyak orang daripada '
                 .'permintaannya sendiri.');
         }
@@ -181,20 +181,20 @@ class PelucutanSambunganKeluarTest extends TestCase
      * id environment di sana — jadi jaring yang hanya terbukti lewat ikatan eksplisit belum
      * terbukti pada jalur yang sebenarnya ditempuh pengguna.
      */
-    public function test_jaring_global_mengenali_lingkungan_lewat_tenant_aktif(): void
+    public function test_the_global_guard_recognises_the_environment_through_the_active_tenant(): void
     {
         $this->sandbox();
-        $this->app->forgetInstance(LingkunganAktif::class);
+        $this->app->forgetInstance(ActiveEnvironment::class);
         $this->app->instance(TenantScope::KUNCI, $this->tenantId);
         Http::fake();
 
-        $this->expectException(SambunganKeluarDitolak::class);
+        $this->expectException(OutboundRefused::class);
         Http::get('https://sistem-pelanggan.test/webhook');
     }
 
-    public function test_jaring_global_melepaskan_panggilan_dari_produksi(): void
+    public function test_the_global_guard_lets_a_call_from_production_through(): void
     {
-        $this->pakai($this->produksi());
+        $this->activate($this->production());
         Http::fake(['https://sistem-pelanggan.test/*' => Http::response(['ok' => true])]);
 
         $jawaban = Http::get('https://sistem-pelanggan.test/webhook');
@@ -216,36 +216,36 @@ class PelucutanSambunganKeluarTest extends TestCase
      * dan setiap demo adalah harga yang tidak dibayar oleh keamanan siapa pun — perendernya
      * tidak mengenal tenant dan tidak menyimpan apa pun.
      */
-    public function test_perender_pdf_tetap_boleh_dihubungi_dari_lingkungan_uji(): void
+    public function test_the_pdf_renderer_may_still_be_reached_from_a_test_environment(): void
     {
-        $this->pakai($this->sandbox());
+        $this->activate($this->sandbox());
         Http::fake([
             'core-renderer:3000/*' => Http::response('%PDF-1.4 palsu', 200, ['Content-Type' => 'application/pdf']),
         ]);
 
-        $sumber = (string) tempnam(sys_get_temp_dir(), 'uji-');
-        file_put_contents($sumber, 'dokumen');
+        $source = (string) tempnam(sys_get_temp_dir(), 'uji-');
+        file_put_contents($source, 'dokumen');
 
-        $hasil = (new PdfConverter)->convert(new RenderedFile($sumber, 'docx'));
+        $result = (new PdfConverter)->convert(new RenderedFile($source, 'docx'));
 
-        $this->assertSame('pdf', $hasil->format);
-        $this->assertSame('%PDF-1.4 palsu', file_get_contents($hasil->localPath));
-        Http::assertSent(fn ($permintaan) => str_contains($permintaan->url(), 'core-renderer:3000/forms/libreoffice/convert'));
+        $this->assertSame('pdf', $result->format);
+        $this->assertSame('%PDF-1.4 palsu', file_get_contents($result->localPath));
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'core-renderer:3000/forms/libreoffice/convert'));
 
-        $hasil->cleanup();
-        @unlink($sumber);
+        $result->cleanup();
+        @unlink($source);
     }
 
     // ---------------------------------------------------------------------------------
 
-    private function produksi(): Environment
+    private function production(): Environment
     {
-        return $this->buat('production', true);
+        return $this->make('production', true);
     }
 
     private function sandbox(): Environment
     {
-        return $this->buat('sandbox', false);
+        return $this->make('sandbox', false);
     }
 
     /**
@@ -255,16 +255,16 @@ class PelucutanSambunganKeluarTest extends TestCase
      * jadi kombinasi lain memang tidak dapat lahir. Menuliskannya sebagai dua pembuat yang
      * berbeda membuat test di atas gagal saat disusun, bukan saat dijalankan.
      */
-    private function buat(string $jenis, bool $bolehKeluar): Environment
+    private function make(string $kind, bool $outboundAllowed): Environment
     {
         return Environment::create([
             'tenant_id' => $this->tenantId,
-            'kind' => $jenis,
-            'name' => 'Uji '.$jenis,
+            'kind' => $kind,
+            'name' => 'Uji '.$kind,
             'slug' => 'uji-'.Str::lower(Str::random(6)),
             'database_name' => null,
             'status' => 'active',
-            'outbound_allowed' => $bolehKeluar,
+            'outbound_allowed' => $outboundAllowed,
         ]);
     }
 
@@ -272,13 +272,13 @@ class PelucutanSambunganKeluarTest extends TestCase
      * Mengikat environment yang sedang dikerjakan, seperti yang kelak dilakukan perintah
      * artisan, job antrean, dan scheduler.
      *
-     * Instansnya dilupakan lebih dulu karena `LingkunganAktif` memoisasi jawabannya: tanpa itu
+     * Instansnya dilupakan lebih dulu karena `ActiveEnvironment` memoisasi jawabannya: tanpa itu
      * test yang kebetulan sudah menyentuhnya akan terus membaca jawaban lama.
      */
-    private function pakai(Environment $lingkungan): void
+    private function activate(Environment $environment): void
     {
-        $this->app->forgetInstance(LingkunganAktif::class);
-        $this->app->instance(LingkunganAktif::KUNCI, $lingkungan->id);
+        $this->app->forgetInstance(ActiveEnvironment::class);
+        $this->app->instance(ActiveEnvironment::KEY, $environment->id);
     }
 
     private function outbox(): string
@@ -300,15 +300,15 @@ class PelucutanSambunganKeluarTest extends TestCase
     }
 
     /** @return list<string> */
-    private function penandaPenjeda(): array
+    private function throttleMarker(): array
     {
         return array_values(glob(storage_path('logs/.penjeda-kiriman').'/*') ?: []);
     }
 
-    private function bersihkanPenjeda(): void
+    private function clearThrottleMarker(): void
     {
-        foreach ($this->penandaPenjeda() as $berkas) {
-            @unlink($berkas);
+        foreach ($this->throttleMarker() as $file) {
+            @unlink($file);
         }
     }
 }

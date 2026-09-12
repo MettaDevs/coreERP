@@ -15,7 +15,7 @@ import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
-const formFields = ['nama_badan_hukum', 'nama_admin', 'email_admin', 'app_ids'];
+const formFields = ['legal_name', 'admin_name', 'admin_email', 'app_ids'];
 
 /**
  * Melahirkan satu pelanggan, beserta admin pertamanya.
@@ -38,9 +38,9 @@ export default function CreateDialog({
     const [open, setOpen] = useState(false);
     const { data, setData, post, processing, errors, reset, clearErrors } =
         useForm({
-            nama_badan_hukum: '',
-            nama_admin: '',
-            email_admin: '',
+            legal_name: '',
+            admin_name: '',
+            admin_email: '',
             app_ids: [] as string[],
         });
 
@@ -113,14 +113,12 @@ export default function CreateDialog({
                         )}
 
                         <div className="space-y-2">
-                            <Label htmlFor="nama_badan_hukum">
-                                Nama badan hukum
-                            </Label>
+                            <Label htmlFor="legal_name">Nama badan hukum</Label>
                             <Input
-                                id="nama_badan_hukum"
-                                value={data.nama_badan_hukum}
+                                id="legal_name"
+                                value={data.legal_name}
                                 onChange={(e) =>
-                                    setData('nama_badan_hukum', e.target.value)
+                                    setData('legal_name', e.target.value)
                                 }
                                 placeholder="PT Sumber Sehat Nusantara"
                             />
@@ -129,38 +127,38 @@ export default function CreateDialog({
                                 nama panggilan. Ia yang muncul di dokumen yang
                                 dicetak pelanggan.
                             </p>
-                            {errors.nama_badan_hukum && (
+                            {errors.legal_name && (
                                 <p className="text-destructive text-sm">
-                                    {errors.nama_badan_hukum}
+                                    {errors.legal_name}
                                 </p>
                             )}
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="nama_admin">Nama admin</Label>
+                            <Label htmlFor="admin_name">Nama admin</Label>
                             <Input
-                                id="nama_admin"
-                                value={data.nama_admin}
+                                id="admin_name"
+                                value={data.admin_name}
                                 onChange={(e) =>
-                                    setData('nama_admin', e.target.value)
+                                    setData('admin_name', e.target.value)
                                 }
                                 placeholder="Siti Rahmawati"
                             />
-                            {errors.nama_admin && (
+                            {errors.admin_name && (
                                 <p className="text-destructive text-sm">
-                                    {errors.nama_admin}
+                                    {errors.admin_name}
                                 </p>
                             )}
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="email_admin">Email admin</Label>
+                            <Label htmlFor="admin_email">Email admin</Label>
                             <Input
-                                id="email_admin"
+                                id="admin_email"
                                 type="email"
-                                value={data.email_admin}
+                                value={data.admin_email}
                                 onChange={(e) =>
-                                    setData('email_admin', e.target.value)
+                                    setData('admin_email', e.target.value)
                                 }
                                 placeholder="siti@sumbersehat.co.id"
                             />
@@ -170,9 +168,9 @@ export default function CreateDialog({
                                 dipakai untuk masuk, dan kata sandinya
                                 disampaikan operator.
                             </p>
-                            {errors.email_admin && (
+                            {errors.admin_email && (
                                 <p className="text-destructive text-sm">
-                                    {errors.email_admin}
+                                    {errors.admin_email}
                                 </p>
                             )}
                         </div>

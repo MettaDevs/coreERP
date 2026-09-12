@@ -39,7 +39,7 @@ final class ProvisionViaCore
     public function __invoke(Environment $environment, ?int $requestedBy = null): array
     {
         $endpoint = rtrim((string) config('core.base_url'), '/')
-            .'/api/internal/v1/environments/'.$environment->id.'/siapkan';
+            .'/api/internal/v1/environments/'.$environment->id.'/provision';
 
         try {
             $response = Http::withToken((string) config('core.token'))
@@ -48,7 +48,7 @@ final class ProvisionViaCore
                 // Siapa yang menekan tombolnya ikut dikirim supaya kolom "Oleh" pada riwayat
                 // operasi menyebut orangnya. Tanpa ini ia berbunyi "Sistem" — jawaban yang benar
                 // untuk penjadwal, dan jawaban yang salah untuk tombol.
-                ->post($endpoint, $requestedBy === null ? [] : ['diminta_oleh' => $requestedBy]);
+                ->post($endpoint, $requestedBy === null ? [] : ['requested_by' => $requestedBy]);
         } catch (ConnectionException $disconnected) {
             throw new EnvironmentRejected(
                 'Core tidak menjawab di '.$endpoint.' dalam batas waktu. Penyiapannya mungkin masih '
@@ -68,7 +68,7 @@ final class ProvisionViaCore
         return [
             'status' => is_string($payload['status'] ?? null) ? $payload['status'] : $environment->status,
             'database' => is_string($payload['database'] ?? null) ? $payload['database'] : null,
-            'modules' => $this->modules($payload['modul'] ?? null),
+            'modules' => $this->modules($payload['modules'] ?? null),
         ];
     }
 
@@ -116,9 +116,9 @@ final class ProvisionViaCore
 
             $clean[] = [
                 'id' => $item['id'],
-                'version' => is_string($item['versi'] ?? null) ? $item['versi'] : '—',
+                'version' => is_string($item['version'] ?? null) ? $item['version'] : '—',
                 'status' => is_string($item['status'] ?? null) ? $item['status'] : 'installed',
-                'seeded' => ($item['disemai'] ?? false) === true,
+                'seeded' => ($item['seeded'] ?? false) === true,
             ];
         }
 

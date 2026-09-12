@@ -43,9 +43,9 @@ final class CreateCustomer
                 ->acceptJson()
                 ->timeout(max(1, (int) config('core.timeout')))
                 ->post($endpoint, [
-                    'nama_badan_hukum' => $legalName,
-                    'nama_admin' => $adminName,
-                    'email_admin' => $adminEmail,
+                    'legal_name' => $legalName,
+                    'admin_name' => $adminName,
+                    'admin_email' => $adminEmail,
                     'app_ids' => $apps,
                 ]);
         } catch (ConnectionException $disconnected) {
@@ -157,7 +157,7 @@ final class CreateCustomer
 
         $tenant = $this->text($payload, 'tenant_id');
         $email = $this->text($payload, 'email');
-        $password = $this->text($payload, 'kata_sandi_sementara');
+        $password = $this->text($payload, 'temporary_password');
 
         if ($tenant === null || $email === null || $password === null) {
             /*

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Internal;
 
-use App\Support\Pusat\SandiSementara;
+use App\Support\ControlPlane\TemporaryPassword;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -16,10 +16,10 @@ use Illuminate\Validation\Rule;
  * membaca dan menulis bentuk ini orang yang sama yang membaca layarnya.
  *
  * Tidak ada field kata sandi, dan ketiadaannya disengaja. Kata sandi sementara dibuat Core sendiri
- * — lihat {@see SandiSementara}. Menerimanya dari pemanggil berarti menerima kata sandi yang sudah
+ * — lihat {@see TemporaryPassword}. Menerimanya dari pemanggil berarti menerima kata sandi yang sudah
  * diketahui pemanggil sebelum pemiliknya pernah melihatnya.
  */
-final class PembuatanTenantRequest extends FormRequest
+final class TenantProvisioningRequest extends FormRequest
 {
     /** Yang menentukan boleh-tidaknya adalah token pusat admin di middleware, bukan sesi. */
     public function authorize(): bool
@@ -31,9 +31,9 @@ final class PembuatanTenantRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama_badan_hukum' => ['required', 'string', 'max:255'],
-            'nama_admin' => ['required', 'string', 'max:255'],
-            'email_admin' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'legal_name' => ['required', 'string', 'max:255'],
+            'admin_name' => ['required', 'string', 'max:255'],
+            'admin_email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'app_ids' => ['required', 'array', 'min:1'],
             'app_ids.*' => [
                 'required',
@@ -49,13 +49,13 @@ final class PembuatanTenantRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $email = $this->input('email_admin');
+        $email = $this->input('admin_email');
 
         // Dirapikan sebelum diperiksa, bukan sesudah. `unique:users,email` membandingkan apa
         // adanya, sehingga "Owner@Contoh.test" lolos pemeriksaan lalu disimpan sebagai
         // "owner@contoh.test" oleh aksi pendaftaran — dua akun, satu email.
         if (is_string($email)) {
-            $this->merge(['email_admin' => Str::lower(trim($email))]);
+            $this->merge(['admin_email' => Str::lower(trim($email))]);
         }
     }
 

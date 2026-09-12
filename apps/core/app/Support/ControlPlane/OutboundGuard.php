@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Pusat;
+namespace App\Support\ControlPlane;
 
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\RequestInterface;
@@ -38,28 +38,28 @@ use Psr\Http\Message\RequestInterface;
  * ia berdiri, kelas ini yang menggagalkan lebih awal dengan pesan yang terbaca manusia —
  * itulah seluruh nilainya, dan bukan lebih.
  */
-final class JaringSambunganKeluar
+final class OutboundGuard
 {
-    public static function pasang(): void
+    public static function install(): void
     {
-        Http::globalRequestMiddleware(static function (RequestInterface $permintaan): RequestInterface {
+        Http::globalRequestMiddleware(static function (RequestInterface $request): RequestInterface {
             // Diresolusi di dalam closure, bukan ditangkap saat pemasangan. Closure ini hidup
             // selama proses; menangkap satu instance berarti pekerja antrean membawa jawaban
             // environment sebelumnya ke job berikutnya — kesalahan yang tidak pernah gagal,
             // hanya salah.
-            $lingkungan = app(LingkunganAktif::class);
+            $environment = app(ActiveEnvironment::class);
 
-            if ($lingkungan->bolehKeluar()) {
-                return $permintaan;
+            if ($environment->outboundAllowed()) {
+                return $request;
             }
 
-            if (self::layananDalam($permintaan->getUri()->getHost())) {
-                return $permintaan;
+            if (self::isInternalService($request->getUri()->getHost())) {
+                return $request;
             }
 
-            throw new SambunganKeluarDitolak(
-                $lingkungan->alasanPenolakan().' Yang dihentikan: '
-                .$permintaan->getMethod().' '.self::tujuan($permintaan).'.'
+            throw new OutboundRefused(
+                $environment->refusalReason().' Yang dihentikan: '
+                .$request->getMethod().' '.self::destination($request).'.'
             );
         });
     }
@@ -75,11 +75,11 @@ final class JaringSambunganKeluar
      * di sini berarti pencetakan mati di tempat yang tidak ada bahayanya, dan penjaga ini
      * memang bukan yang memikul beban keamanannya.
      */
-    private static function layananDalam(string $host): bool
+    private static function isInternalService(string $host): bool
     {
-        $perender = parse_url((string) config('reporting.renderer_url'), PHP_URL_HOST);
+        $renderer = parse_url((string) config('reporting.renderer_url'), PHP_URL_HOST);
 
-        return is_string($perender) && $perender !== '' && strcasecmp($host, $perender) === 0;
+        return is_string($renderer) && $renderer !== '' && strcasecmp($host, $renderer) === 0;
     }
 
     /**
@@ -89,13 +89,13 @@ final class JaringSambunganKeluar
      * identitas paling sering menumpang, jadi ia dibuang di sini alih-alih ikut tercetak di
      * tempat yang dibaca lebih banyak orang daripada permintaannya sendiri.
      */
-    private static function tujuan(RequestInterface $permintaan): string
+    private static function destination(RequestInterface $request): string
     {
-        $alamat = $permintaan->getUri();
-        $port = $alamat->getPort();
+        $address = $request->getUri();
+        $port = $address->getPort();
 
-        return $alamat->getScheme().'://'.$alamat->getHost()
+        return $address->getScheme().'://'.$address->getHost()
             .($port === null ? '' : ':'.$port)
-            .$alamat->getPath();
+            .$address->getPath();
     }
 }

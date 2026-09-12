@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Console\Commands\Concerns\MemegangOperasiLingkungan;
+use App\Console\Commands\Concerns\HoldsEnvironmentOperation;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use App\Support\Reporting\ExportStatus;
@@ -79,28 +79,28 @@ use Throwable;
  * — pelucutan, migration, dan pemeriksaan kesehatan ketiganya aman diulang. Tidak ada satu keadaan
  * pun yang menuntut database dibuang lebih dulu, jadi perintah ini tidak pernah membuang apa pun.
  *
- * ## Tiga method yang kembar dengan `SiapkanLingkungan`
+ * ## Tiga method yang kembar dengan `ProvisionEnvironment`
  *
- * `buatDatabase`, `siapkanKoneksi`, dan `konfigurasiDasar` di bawah adalah salinan dari perintah
+ * `createDatabase`, `prepareConnection`, dan `baseConfig` di bawah adalah salinan dari perintah
  * itu. Keduanya seharusnya mengangkat ketiganya ke sebuah trait bersama — persis seperti yang
  * sudah dilakukan terhadap protokol kuncinya — dan itu pekerjaan satu sesi yang memegang kedua
  * berkasnya sekaligus. Dicatat di sini supaya duplikasinya tidak terbaca sebagai kelalaian.
  */
-final class SalinLingkungan extends Command
+final class CopyEnvironment extends Command
 {
-    use MemegangOperasiLingkungan;
+    use HoldsEnvironmentOperation;
 
-    protected $signature = 'environment:salin
-        {sumber : Id baris environments produksi yang disalin}
-        {--nama= : Nama lingkungan sandbox yang lahir dari salinan ini}';
+    protected $signature = 'environment:copy
+        {source : Id baris environments produksi yang disalin}
+        {--name= : Nama lingkungan sandbox yang lahir dari salinan ini}';
 
     protected $description = 'Salin sebuah lingkungan produksi menjadi sandbox baru, lalu lucuti salinannya';
 
     /** Koneksi sementara ke database salinan yang sedang dibangun. */
-    private const KONEKSI_SASARAN = 'lingkungan_salinan';
+    private const CONNECTION_TARGET = 'environment_copy';
 
     /** Koneksi sementara ke database yang sedang disalin; dipakai membaca, tidak pernah menulis. */
-    private const KONEKSI_SUMBER = 'lingkungan_disalin';
+    private const CONNECTION_SOURCE = 'environment_copy_source';
 
     /**
      * Koneksi kedua ke database pusat, dipakai hanya untuk `CREATE DATABASE`.
@@ -108,10 +108,10 @@ final class SalinLingkungan extends Command
      * PostgreSQL menolak `CREATE DATABASE` di dalam blok transaksi, dan koneksi bawaan sangat
      * mungkin sedang berada di dalam satu — di suite test ia selalu begitu.
      */
-    private const KONEKSI_PEMELIHARA = 'pemelihara_salinan';
+    private const CONNECTION_MAINTENANCE = 'copy_maintenance';
 
     /** Nama sandbox bila operator tidak menyebutkan satu pun. */
-    private const NAMA_BAWAAN = 'Sandbox';
+    private const DEFAULT_NAME = 'Sandbox';
 
     /**
      * Status sasaran yang boleh dilanjutkan oleh percobaan berikutnya.
@@ -122,7 +122,7 @@ final class SalinLingkungan extends Command
      * Central menyebutnya Copy — tetapi ia operasi tersendiri yang harus meminta persetujuan,
      * bukan akibat sampingan dari mengetik nama yang sama dua kali.
      */
-    private const STATUS_SASARAN_BOLEH = ['copying', 'degraded'];
+    private const ALLOWED_TARGET_STATUSES = ['copying', 'degraded'];
 
     /**
      * Berapa kali ukuran database sumber harus tersedia di disk sebelum penyalinan dimulai.
@@ -133,33 +133,33 @@ final class SalinLingkungan extends Command
      * menghasilkan berkas terpotong, dan berkas terpotong adalah bentuk kegagalan yang paling
      * mahal dikenali.
      */
-    private const MARGIN_DISK = 1.2;
+    private const DISK_MARGIN = 1.2;
 
     /** Batas waktu satu proses klien PostgreSQL, dalam detik. */
-    private const BATAS_PROSES_DETIK = 3600;
+    private const PROCESS_TIMEOUT_SECONDS = 3600;
 
     /** Berapa sering tenggat operasi diperpanjang selagi proses panjang berjalan, dalam detik. */
-    private const JEDA_PERPANJANG_DETIK = 60;
+    private const LEASE_RENEWAL_SECONDS = 60;
 
     /** Berapa baris antrean event diangkat sekali jalan. */
-    private const SEKALI_ANGKUT = 1000;
+    private const BATCH_SIZE = 1000;
 
     /** Operasi yang sedang dipegang, disimpan supaya tenggatnya dapat diperpanjang dari mana saja. */
-    private ?EnvironmentOperation $operasi = null;
+    private ?EnvironmentOperation $operation = null;
 
     /** Waktu monotonik kapan tenggat boleh diperpanjang lagi. */
-    private float $perpanjangBerikutnya = 0.0;
+    private float $nextRenewalAt = 0.0;
 
     /**
      * Berapa lama operasi ini boleh memegang kuncinya sebelum boleh direbut.
      *
      * Jauh lebih panjang daripada dua operasi lain, dan itu tetap bukan jawaban yang cukup:
-     * `SiapkanLingkungan` sudah menuliskan bahwa penyalinan tidak masuk kategori "operasi yang
+     * `ProvisionEnvironment` sudah menuliskan bahwa penyalinan tidak masuk kategori "operasi yang
      * wajar selesai dalam satu tenggat", dan bahwa ia **harus memperpanjang tenggatnya sendiri
-     * selagi berjalan**. Itu dikerjakan di `perpanjangTenggat()`, dan angka ini hanya menentukan
+     * selagi berjalan**. Itu dikerjakan di `renewLease()`, dan angka ini hanya menentukan
      * berapa lama sebuah proses yang benar-benar mati menahan produksinya sebelum boleh direbut.
      */
-    protected function tenggatOperasiMenit(): int
+    protected function operationLeaseMinutes(): int
     {
         return 30;
     }
@@ -171,11 +171,11 @@ final class SalinLingkungan extends Command
      * `pg_dump` tidak membuktikan apa pun, dan yang benar adalah dilewati dengan alasan yang
      * terbaca — bukan hijau diam-diam.
      */
-    public static function klienTersedia(): bool
+    public static function clientsAvailable(): bool
     {
-        foreach (['pg_dump', 'pg_restore'] as $alat) {
+        foreach (['pg_dump', 'pg_restore'] as $tool) {
             try {
-                if (! Process::timeout(30)->run([$alat, '--version'])->successful()) {
+                if (! Process::timeout(30)->run([$tool, '--version'])->successful()) {
                     return false;
                 }
             } catch (Throwable) {
@@ -190,54 +190,54 @@ final class SalinLingkungan extends Command
 
     public function handle(): int
     {
-        $sumber = $this->sumberYangSah();
+        $source = $this->validSource();
 
-        if (! $sumber instanceof Environment) {
+        if (! $source instanceof Environment) {
             return self::FAILURE;
         }
 
-        $diketik = $this->option('nama');
-        $nama = trim(is_string($diketik) && trim($diketik) !== '' ? $diketik : self::NAMA_BAWAAN);
-        $slug = Str::slug($nama);
+        $typed = $this->option('name');
+        $name = trim(is_string($typed) && trim($typed) !== '' ? $typed : self::DEFAULT_NAME);
+        $slug = Str::slug($name);
 
-        if ($slug === '' || mb_strlen($nama) > 100 || mb_strlen($slug) > 120) {
+        if ($slug === '' || mb_strlen($name) > 100 || mb_strlen($slug) > 120) {
             $this->error('Nama sandbox harus berisi huruf atau angka, paling panjang 100 karakter.');
 
             return self::FAILURE;
         }
 
         // 1 — Tolak bila sasarannya bukan tempat yang boleh ditimpa, produksi paling utama.
-        $sasaran = $this->sasaranYangBoleh($sumber, $slug, $nama);
+        $target = $this->allowedTarget($source, $slug, $name);
 
-        if ($sasaran === false) {
+        if ($target === false) {
             return self::FAILURE;
         }
 
         // 2 — Tolak bila sudah ada salinan lain berjalan dari produksi yang sama.
-        if (! $this->tidakAdaSalinanLain($sumber)) {
+        if (! $this->noOtherCopyRunning($source)) {
             return self::FAILURE;
         }
 
         // 3 — Tolak bila disk menipis.
-        if (! $this->diskCukup($sumber)) {
+        if (! $this->hasEnoughDisk($source)) {
             return self::FAILURE;
         }
 
-        $sasaran = $sasaran instanceof Environment ? $sasaran : $this->buatBarisSasaran($sumber, $nama, $slug);
-        $operasi = $this->bukaOperasi($sasaran, 'copy');
+        $target = $target instanceof Environment ? $target : $this->createTargetRow($source, $name, $slug);
+        $operation = $this->openOperation($target, 'copy');
 
-        if (! $operasi instanceof EnvironmentOperation) {
+        if (! $operation instanceof EnvironmentOperation) {
             return self::FAILURE;
         }
 
-        $this->operasi = $operasi;
-        $this->perpanjangBerikutnya = hrtime(true) / 1_000_000_000 + self::JEDA_PERPANJANG_DETIK;
+        $this->operation = $operation;
+        $this->nextRenewalAt = hrtime(true) / 1_000_000_000 + self::LEASE_RENEWAL_SECONDS;
 
-        if (! $this->kunciSumber($operasi, $sumber)) {
+        if (! $this->lockSource($operation, $source)) {
             return self::FAILURE;
         }
 
-        return $this->kerjakan($sumber, $sasaran, $operasi);
+        return $this->apply($source, $target, $operation);
     }
 
     /**
@@ -249,29 +249,29 @@ final class SalinLingkungan extends Command
      * "berhenti di tengah, jalankan lagi perintah yang sama" — dan itu memang satu-satunya
      * pemulihan yang ada.
      */
-    private function kerjakan(Environment $sumber, Environment $sasaran, EnvironmentOperation $operasi): int
+    private function apply(Environment $source, Environment $target, EnvironmentOperation $operation): int
     {
-        $langkah = 'nama-database';
-        $berkas = null;
+        $step = 'nama-database';
+        $file = null;
 
         try {
-            $namaDb = SiapkanLingkungan::namaDatabase($sasaran);
+            $databaseName = ProvisionEnvironment::databaseName($target);
 
-            $langkah = 'buat-database';
-            $baru = $this->buatDatabase($namaDb, (string) $sumber->database_name);
-            $this->line($baru
-                ? sprintf('  database "%s" dibuat.', $namaDb)
-                : sprintf('  database "%s" sudah ada; dilanjutkan.', $namaDb));
+            $step = 'buat-database';
+            $created = $this->createDatabase($databaseName, (string) $source->database_name);
+            $this->line($created
+                ? sprintf('  database "%s" dibuat.', $databaseName)
+                : sprintf('  database "%s" sudah ada; dilanjutkan.', $databaseName));
 
-            $this->siapkanKoneksi(self::KONEKSI_SASARAN, $namaDb);
-            $this->siapkanKoneksi(self::KONEKSI_SUMBER, (string) $sumber->database_name);
+            $this->prepareConnection(self::CONNECTION_TARGET, $databaseName);
+            $this->prepareConnection(self::CONNECTION_SOURCE, (string) $source->database_name);
 
-            $langkah = 'salin';
+            $step = 'salin';
 
-            if ($this->sudahBerisiSalinan()) {
+            if ($this->alreadyRestored()) {
                 $this->line('  database sasaran sudah berisi salinan dari percobaan sebelumnya; dump dilewati.');
             } else {
-                if (! self::klienTersedia()) {
+                if (! self::clientsAvailable()) {
                     throw new RuntimeException(
                         'pg_dump atau pg_restore tidak ada di PATH proses ini. Penyalinan dijalankan '
                         .'sebagai klien lewat jaringan, bukan lewat docker socket, jadi keduanya '
@@ -280,62 +280,62 @@ final class SalinLingkungan extends Command
                     );
                 }
 
-                $berkas = $this->berkasDump($sasaran);
-                $this->jalankanKlien($this->perintahDump((string) $sumber->database_name, $berkas), 'pg_dump');
-                $this->line(sprintf('  dump selesai (%s).', $this->ukuranTerbaca((int) (filesize($berkas) ?: 0))));
+                $file = $this->dumpFile($target);
+                $this->runClient($this->dumpCommand((string) $source->database_name, $file), 'pg_dump');
+                $this->line(sprintf('  dump selesai (%s).', $this->humanSize((int) (filesize($file) ?: 0))));
 
-                $this->jalankanKlien($this->perintahRestore($namaDb, $berkas), 'pg_restore');
+                $this->runClient($this->restoreCommand($databaseName, $file), 'pg_restore');
                 $this->line('  restore selesai.');
             }
 
-            $langkah = 'lucuti';
-            $dilucuti = $this->lucuti();
-            $this->laporkanPelucutan($dilucuti);
+            $step = 'lucuti';
+            $disarmed = $this->disarm();
+            $this->reportDisarm($disarmed);
 
-            $langkah = 'migration';
-            $keluar = $this->callSilent('migrate', ['--database' => self::KONEKSI_SASARAN, '--force' => true]);
+            $step = 'migration';
+            $exitCode = $this->callSilent('migrate', ['--database' => self::CONNECTION_TARGET, '--force' => true]);
 
-            if ($keluar !== self::SUCCESS) {
-                throw new RuntimeException(sprintf('Perintah migrate berhenti dengan kode %d.', $keluar));
+            if ($exitCode !== self::SUCCESS) {
+                throw new RuntimeException(sprintf('Perintah migrate berhenti dengan kode %d.', $exitCode));
             }
 
-            $langkah = 'periksa-kesehatan';
-            $sidik = $this->periksaKesehatan();
+            $step = 'periksa-kesehatan';
+            $fingerprint = $this->checkHealth();
 
-            $langkah = 'aktifkan';
-            $sasaran->update([
-                'database_name' => $namaDb,
+            $step = 'aktifkan';
+            $target->update([
+                'database_name' => $databaseName,
                 'copied_at' => now(),
                 'schema_migrated_at' => now(),
-                'schema_fingerprint' => $sidik,
+                'schema_fingerprint' => $fingerprint,
                 'status' => 'active',
             ]);
 
-            $operasi->update([
+            $operation->update([
                 'status' => 'succeeded',
-                'step' => $langkah,
+                'step' => $step,
                 'finished_at' => now(),
                 'lease_until' => null,
-                'detail' => ['database' => $namaDb, 'sidik' => $sidik, 'dilucuti' => $dilucuti],
+                'detail' => ['database' => $databaseName, 'sidik' => $fingerprint, 'dilucuti' => $disarmed],
             ]);
 
             $this->info(sprintf(
                 'Sandbox "%s" aktif di database "%s", disalin dari "%s". Sambungan keluarnya mati.',
-                $sasaran->slug,
-                $namaDb,
-                $sumber->slug,
+                $target->slug,
+                $databaseName,
+                $source->slug,
             ));
 
             return self::SUCCESS;
         } catch (Throwable $e) {
-            $this->tutupOperasiSebagaiGagal($operasi, $langkah, $e);
-            $sasaran->update(['status' => 'degraded']);
+            $this->closeOperationAsFailed($operation, $step, $e);
+            $target->update(['status' => 'degraded']);
 
-            $this->error(sprintf('Penyalinan berhenti di langkah "%s": %s', $langkah, $e->getMessage()));
+            $this->error(sprintf('Penyalinan berhenti di langkah "%s": %s', $step, $e->getMessage()));
             $this->line(sprintf(
                 'Sandbox "%s" ditandai degraded. Perbaiki sebabnya lalu jalankan perintah yang sama '
                 .'sekali lagi — apa yang sudah tersalin tidak diulang.',
-                $sasaran->slug,
+                $target->slug,
             ));
 
             return self::FAILURE;
@@ -343,12 +343,12 @@ final class SalinLingkungan extends Command
             // Salinan utuh data produksi tidak boleh menginap di disk aplikasi, termasuk sesudah
             // kegagalan. Percobaan berikutnya membuat dump baru; itu ongkos yang jauh lebih murah
             // daripada berkas yang tidak ada yang mengingatnya.
-            if (is_string($berkas)) {
-                File::delete($berkas);
+            if (is_string($file)) {
+                File::delete($file);
             }
 
-            DB::purge(self::KONEKSI_SASARAN);
-            DB::purge(self::KONEKSI_SUMBER);
+            DB::purge(self::CONNECTION_TARGET);
+            DB::purge(self::CONNECTION_SOURCE);
         }
     }
 
@@ -363,54 +363,54 @@ final class SalinLingkungan extends Command
      * Menyalinnya berarti menyerahkan data pelanggan lain ke dalam sandbox milik satu pelanggan.
      * Itu kebocoran, bukan kesalahan teknis, dan ia tidak boleh diperlakukan sebagai kasus tepi.
      */
-    private function sumberYangSah(): ?Environment
+    private function validSource(): ?Environment
     {
-        $id = (string) $this->argument('sumber');
-        $sumber = Environment::query()->find($id);
+        $id = (string) $this->argument('source');
+        $source = Environment::query()->find($id);
 
-        if (! $sumber instanceof Environment) {
+        if (! $source instanceof Environment) {
             $this->error(sprintf('Environment "%s" tidak ada di registry.', $id));
 
             return null;
         }
 
-        if (! $sumber->produksi()) {
+        if (! $source->produksi()) {
             $this->error(sprintf(
                 'Environment "%s" berjenis %s. Yang disalin menjadi sandbox hanya produksi — '
                 .'menyalin sandbox menghasilkan salinan dari salinan, dan tidak ada seorang pun '
                 .'yang dapat mengatakan data di dalamnya berasal dari kapan.',
-                $sumber->slug,
-                $sumber->kind,
+                $source->slug,
+                $source->kind,
             ));
 
             return null;
         }
 
-        if ($sumber->status !== 'active') {
+        if ($source->status !== 'active') {
             $this->error(sprintf(
                 'Environment "%s" berstatus %s. Hanya yang aktif yang boleh disalin; yang lain '
                 .'sedang atau pernah berhenti di tengah sesuatu, dan salinannya akan mewarisi '
                 .'keadaan itu tanpa menyebutkannya.',
-                $sumber->slug,
-                $sumber->status,
+                $source->slug,
+                $source->status,
             ));
 
             return null;
         }
 
-        if ($sumber->database_name === null) {
+        if ($source->database_name === null) {
             $this->error(sprintf(
                 'Environment "%s" tidak punya database sendiri — ia ikut koneksi bawaan, dan di '
                 .'sana satu database memuat data banyak tenant sekaligus. Menyalinnya akan '
                 .'menyerahkan data pelanggan lain ke dalam sandbox ini. Pisahkan databasenya lebih '
-                .'dulu lewat `environment:siapkan`.',
-                $sumber->slug,
+                .'dulu lewat `environment:provision`.',
+                $source->slug,
             ));
 
             return null;
         }
 
-        return $sumber;
+        return $source;
     }
 
     /**
@@ -422,62 +422,62 @@ final class SalinLingkungan extends Command
      * slug produksinya `production` menunjuk **tepat ke database yang sedang dipakai bekerja**.
      * Tanpa pemeriksaan ini, satu kata yang diketik operator sudah cukup untuk menimpanya.
      */
-    private function sasaranYangBoleh(Environment $sumber, string $slug, string $nama): Environment|false|null
+    private function allowedTarget(Environment $source, string $slug, string $name): Environment|false|null
     {
-        $ada = Environment::query()
-            ->where('tenant_id', $sumber->tenant_id)
+        $existing = Environment::query()
+            ->where('tenant_id', $source->tenant_id)
             ->where('slug', $slug)
             ->whereNull('deleted_at')
             ->first();
 
-        if (! $ada instanceof Environment) {
+        if (! $existing instanceof Environment) {
             return null;
         }
 
-        if ($ada->produksi()) {
+        if ($existing->produksi()) {
             $this->error(sprintf(
                 'Nama "%s" menunjuk lingkungan PRODUKSI "%s" milik tenant ini. Penyalinan menolak '
                 .'sasaran produksi: seluruh fitur ini ada supaya salinan tidak dapat menyentuh '
                 .'yang asli, dan menimpanya adalah kebalikannya. Pakai nama lain.',
-                $nama,
-                $ada->slug,
+                $name,
+                $existing->slug,
             ));
 
             return false;
         }
 
-        if ($ada->id === $sumber->id) {
+        if ($existing->id === $source->id) {
             $this->error('Sasaran dan sumber adalah lingkungan yang sama.');
 
             return false;
         }
 
-        if (! in_array($ada->status, self::STATUS_SASARAN_BOLEH, true)) {
+        if (! in_array($existing->status, self::ALLOWED_TARGET_STATUSES, true)) {
             $this->error(sprintf(
                 'Tenant ini sudah punya lingkungan "%s" berstatus %s. Menyalin ke atasnya akan '
                 .'menimpa apa pun yang sedang dikerjakan orang di sana. Pakai nama lain, atau '
                 .'hapus dulu yang itu.',
-                $ada->slug,
-                $ada->status,
+                $existing->slug,
+                $existing->status,
             ));
 
             return false;
         }
 
-        if ($ada->source_environment_id !== $sumber->id) {
+        if ($existing->source_environment_id !== $source->id) {
             $this->error(sprintf(
                 'Lingkungan "%s" yang setengah jadi itu berasal dari sumber yang berbeda. '
                 .'Melanjutkannya dengan sumber ini akan menghasilkan satu database berisi dua '
                 .'salinan yang tidak berhubungan. Pakai nama lain.',
-                $ada->slug,
+                $existing->slug,
             ));
 
             return false;
         }
 
-        $this->line(sprintf('  melanjutkan sandbox "%s" yang sebelumnya berhenti di tengah.', $ada->slug));
+        $this->line(sprintf('  melanjutkan sandbox "%s" yang sebelumnya berhenti di tengah.', $existing->slug));
 
-        return $ada;
+        return $existing;
     }
 
     /**
@@ -488,30 +488,30 @@ final class SalinLingkungan extends Command
      * gagal operasi yang tenggatnya sudah lewat supaya percobaan ini boleh masuk, dan memberi
      * kalimat yang terbaca ketika penolakannya memang benar.
      */
-    private function tidakAdaSalinanLain(Environment $sumber): bool
+    private function noOtherCopyRunning(Environment $source): bool
     {
-        $berjalan = EnvironmentOperation::query()
-            ->where('source_environment_id', $sumber->id)
+        $running = EnvironmentOperation::query()
+            ->where('source_environment_id', $source->id)
             ->where('status', 'running')
             ->first();
 
-        if (! $berjalan instanceof EnvironmentOperation) {
+        if (! $running instanceof EnvironmentOperation) {
             return true;
         }
 
-        if ($berjalan->lease_until !== null && $berjalan->lease_until->isFuture()) {
+        if ($running->lease_until !== null && $running->lease_until->isFuture()) {
             $this->error(sprintf(
                 'Produksi "%s" sedang disalin oleh operasi %s dan tenggatnya belum lewat. Satu '
                 .'salinan pada satu waktu: dua `pg_dump` sekaligus membaca seluruh isi database '
                 .'yang sama dua kali, pada server yang melayani semua pelanggan.',
-                $sumber->slug,
-                $berjalan->id,
+                $source->slug,
+                $running->id,
             ));
 
             return false;
         }
 
-        $berjalan->update([
+        $running->update([
             'status' => 'failed',
             'finished_at' => now(),
             'lease_until' => null,
@@ -519,12 +519,12 @@ final class SalinLingkungan extends Command
                 'Tenggatnya habis pada %s tanpa pernah ditutup — prosesnya berhenti tanpa sempat '
                 .'melaporkan apa pun. Penyalinan berikutnya dari sumber yang sama mengambil alih, '
                 .'dan langkah terakhir yang sempat tercapai adalah "%s".',
-                (string) $berjalan->getOriginal('lease_until'),
-                $berjalan->step ?? 'tidak tercatat',
+                (string) $running->getOriginal('lease_until'),
+                $running->step ?? 'tidak tercatat',
             ),
         ]);
 
-        $this->warn(sprintf('Penyalinan %s yang tenggatnya sudah lewat ditandai gagal dan diambil alih.', $berjalan->id));
+        $this->warn(sprintf('Penyalinan %s yang tenggatnya sudah lewat ditandai gagal dan diambil alih.', $running->id));
 
         return true;
     }
@@ -544,35 +544,35 @@ final class SalinLingkungan extends Command
      * adalah pekerjaan control plane, yang memang berada di luar proses ini.
      * :::
      */
-    private function diskCukup(Environment $sumber): bool
+    private function hasEnoughDisk(Environment $source): bool
     {
-        $folder = $this->folderDump();
-        $sisa = disk_free_space($folder);
+        $folder = $this->dumpFolder();
+        $remaining = disk_free_space($folder);
 
-        if ($sisa === false) {
+        if ($remaining === false) {
             $this->error(sprintf('Sisa ruang di "%s" tidak dapat dibaca, jadi penyalinan tidak dimulai.', $folder));
 
             return false;
         }
 
-        $baris = DB::connection($this->koneksiPemelihara())
-            ->selectOne('select pg_database_size(?) as ukuran', [$sumber->database_name]);
+        $row = DB::connection($this->maintenanceConnection())
+            ->selectOne('select pg_database_size(?) as ukuran', [$source->database_name]);
 
-        $ukuran = is_object($baris) && property_exists($baris, 'ukuran') ? (int) $baris->ukuran : 0;
-        $butuh = (int) ceil($ukuran * self::MARGIN_DISK);
+        $size = is_object($row) && property_exists($row, 'ukuran') ? (int) $row->ukuran : 0;
+        $needed = (int) ceil($size * self::DISK_MARGIN);
 
-        DB::purge(self::KONEKSI_PEMELIHARA);
+        DB::purge(self::CONNECTION_MAINTENANCE);
 
-        if ($sisa < $butuh) {
+        if ($remaining < $needed) {
             $this->error(sprintf(
                 'Sisa ruang di "%s" hanya %s, sementara database "%s" berukuran %s dan dumpnya '
                 .'butuh sekitar %s. Disk yang penuh di tengah dump menghasilkan berkas terpotong, '
                 .'bukan galat yang jelas — jadi penyalinan ditolak sebelum dimulai.',
                 $folder,
-                $this->ukuranTerbaca((int) $sisa),
-                (string) $sumber->database_name,
-                $this->ukuranTerbaca($ukuran),
-                $this->ukuranTerbaca($butuh),
+                $this->humanSize((int) $remaining),
+                (string) $source->database_name,
+                $this->humanSize($size),
+                $this->humanSize($needed),
             ));
 
             return false;
@@ -580,8 +580,8 @@ final class SalinLingkungan extends Command
 
         $this->line(sprintf(
             '  sumber %s, sisa disk dump %s.',
-            $this->ukuranTerbaca($ukuran),
-            $this->ukuranTerbaca((int) $sisa),
+            $this->humanSize($size),
+            $this->humanSize((int) $remaining),
         ));
 
         return true;
@@ -589,16 +589,16 @@ final class SalinLingkungan extends Command
 
     // ------------------------------------------------------------------ registry
 
-    private function buatBarisSasaran(Environment $sumber, string $nama, string $slug): Environment
+    private function createTargetRow(Environment $source, string $name, string $slug): Environment
     {
         return Environment::create([
-            'tenant_id' => $sumber->tenant_id,
+            'tenant_id' => $source->tenant_id,
             'kind' => 'sandbox',
-            'name' => $nama,
+            'name' => $name,
             'slug' => $slug,
             'database_name' => null,
             'status' => 'copying',
-            'source_environment_id' => $sumber->id,
+            'source_environment_id' => $source->id,
             // Ditulis tegas, bukan dibiarkan mengambil bawaan kolom. `environments_keluar_ikut_jenis`
             // memang menolak nilai lain untuk sandbox, dan justru karena itu nilainya ditulis di
             // sini: yang membaca kode ini tidak perlu mencari constraint untuk tahu bahwa sandbox
@@ -610,30 +610,30 @@ final class SalinLingkungan extends Command
     /**
      * Menandai operasi ini sebagai pemegang sumbernya, dan menyerah bila kalah.
      *
-     * Kolomnya diisi lewat `UPDATE` terpisah karena `bukaOperasi()` milik trait tidak menerima
+     * Kolomnya diisi lewat `UPDATE` terpisah karena `openOperation()` milik trait tidak menerima
      * kolom tambahan, dan trait itu sengaja tidak disentuh — ia memegang protokol kunci yang
      * dipakai tiga perintah. Akibatnya ada jendela selebar satu pernyataan antara sisipan dan
      * pengisian ini; yang menutupnya tetap indeks, bukan urutan, jadi yang kalah memperoleh
      * penolakan yang bersih alih-alih penyalinan kedua yang berjalan diam-diam.
      */
-    private function kunciSumber(EnvironmentOperation $operasi, Environment $sumber): bool
+    private function lockSource(EnvironmentOperation $operation, Environment $source): bool
     {
         try {
-            $operasi->update(['source_environment_id' => $sumber->id]);
+            $operation->update(['source_environment_id' => $source->id]);
 
             return true;
-        } catch (QueryException $bentrok) {
-            if (! str_contains($bentrok->getMessage(), 'environment_operations_satu_salinan_per_sumber')) {
-                throw $bentrok;
+        } catch (QueryException $conflict) {
+            if (! str_contains($conflict->getMessage(), 'environment_operations_satu_salinan_per_sumber')) {
+                throw $conflict;
             }
 
-            $this->tutupOperasiSebagaiGagal($operasi, 'kunci-sumber', new RuntimeException(sprintf(
+            $this->closeOperationAsFailed($operation, 'kunci-sumber', new RuntimeException(sprintf(
                 'Penyalinan lain dari produksi "%s" menang lebih dulu di sela pemeriksaan dan '
                 .'penulisan. Tunggu sampai ia selesai, lalu jalankan perintah ini lagi.',
-                $sumber->slug,
+                $source->slug,
             )));
 
-            $this->error(sprintf('Produksi "%s" keburu dipegang penyalinan lain.', $sumber->slug));
+            $this->error(sprintf('Produksi "%s" keburu dipegang penyalinan lain.', $source->slug));
 
             return false;
         }
@@ -642,15 +642,15 @@ final class SalinLingkungan extends Command
     // ------------------------------------------------------------------ klien PostgreSQL
 
     /** @return list<string> */
-    private function perintahDump(string $database, string $berkas): array
+    private function dumpCommand(string $database, string $file): array
     {
-        $dasar = $this->konfigurasiDasar();
+        $base = $this->baseConfig();
 
         return [
             'pg_dump',
-            '--host='.(string) ($dasar['host'] ?? '127.0.0.1'),
-            '--port='.(string) ($dasar['port'] ?? '5432'),
-            '--username='.(string) ($dasar['username'] ?? ''),
+            '--host='.(string) ($base['host'] ?? '127.0.0.1'),
+            '--port='.(string) ($base['port'] ?? '5432'),
+            '--username='.(string) ($base['username'] ?? ''),
             // Tanpa ini `pg_dump` meminta kata sandi di terminal ketika kredensialnya ditolak, dan
             // sebuah perintah penjadwal yang menunggu ketikan menggantung selamanya tanpa pesan.
             '--no-password',
@@ -660,21 +660,21 @@ final class SalinLingkungan extends Command
             // karena sebuah GRANT adalah kegagalan yang tidak menjaga apa pun.
             '--no-owner',
             '--no-privileges',
-            '--file='.$berkas,
+            '--file='.$file,
             '--dbname='.$database,
         ];
     }
 
     /** @return list<string> */
-    private function perintahRestore(string $database, string $berkas): array
+    private function restoreCommand(string $database, string $file): array
     {
-        $dasar = $this->konfigurasiDasar();
+        $base = $this->baseConfig();
 
         return [
             'pg_restore',
-            '--host='.(string) ($dasar['host'] ?? '127.0.0.1'),
-            '--port='.(string) ($dasar['port'] ?? '5432'),
-            '--username='.(string) ($dasar['username'] ?? ''),
+            '--host='.(string) ($base['host'] ?? '127.0.0.1'),
+            '--port='.(string) ($base['port'] ?? '5432'),
+            '--username='.(string) ($base['username'] ?? ''),
             '--no-password',
             '--no-owner',
             '--no-privileges',
@@ -684,7 +684,7 @@ final class SalinLingkungan extends Command
             // "berhasil sebagian", bentuk kegagalan yang tidak berbunyi.
             '--single-transaction',
             '--dbname='.$database,
-            $berkas,
+            $file,
         ];
     }
 
@@ -692,37 +692,37 @@ final class SalinLingkungan extends Command
      * Menjalankan satu proses klien sambil menjaga kunci operasinya tetap hidup.
      *
      * Prosesnya dijalankan tidak-menunggu lalu ditunggui di sini, bukan dijalankan blocking, dan
-     * itu bukan gaya. `MemegangOperasiLingkungan` memberi tiap operasi tenggat, dan penyalinan
+     * itu bukan gaya. `HoldsEnvironmentOperation` memberi tiap operasi tenggat, dan penyalinan
      * database besar wajar melewatinya — tenggat yang habis selagi prosesnya justru sehat akan
      * membuat percobaan berikutnya merebut kunci dari penyalinan yang sedang berjalan, lalu dua
      * `pg_restore` menulis ke database yang sama. Selama menunggu, tenggatnya diperpanjang.
      *
-     * @param  list<string>  $perintah
+     * @param  list<string>  $command
      */
-    private function jalankanKlien(array $perintah, string $alat): void
+    private function runClient(array $command, string $tool): void
     {
-        $proses = Process::env($this->lingkunganKlien())
-            ->timeout(self::BATAS_PROSES_DETIK)
-            ->start($perintah);
+        $process = Process::env($this->clientEnvironment())
+            ->timeout(self::PROCESS_TIMEOUT_SECONDS)
+            ->start($command);
 
-        while ($proses->running()) {
+        while ($process->running()) {
             usleep(200_000);
-            $this->perpanjangTenggat();
+            $this->renewLease();
         }
 
-        $hasil = $proses->wait();
+        $result = $process->wait();
 
-        if ($hasil->successful()) {
+        if ($result->successful()) {
             return;
         }
 
-        $galat = trim($hasil->errorOutput());
+        $error = trim($result->errorOutput());
 
         throw new RuntimeException(sprintf(
             '%s berhenti dengan kode %d%s',
-            $alat,
-            (int) $hasil->exitCode(),
-            $galat === '' ? '.' : ': '.mb_substr($galat, 0, 800),
+            $tool,
+            (int) $result->exitCode(),
+            $error === '' ? '.' : ': '.mb_substr($error, 0, 800),
         ));
     }
 
@@ -735,19 +735,19 @@ final class SalinLingkungan extends Command
      *
      * @return array<string, string>
      */
-    private function lingkunganKlien(): array
+    private function clientEnvironment(): array
     {
-        $dasar = $this->konfigurasiDasar();
+        $base = $this->baseConfig();
 
-        $lingkungan = [
-            'PGPASSWORD' => (string) ($dasar['password'] ?? ''),
-            'PGSSLMODE' => (string) ($dasar['sslmode'] ?? 'prefer'),
+        $variables = [
+            'PGPASSWORD' => (string) ($base['password'] ?? ''),
+            'PGSSLMODE' => (string) ($base['sslmode'] ?? 'prefer'),
             // Klien PostgreSQL menulis pesannya mengikuti locale. Pesan galat yang bentuknya
             // berubah mengikuti setelan mesin adalah pesan yang tidak dapat dicocokkan siapa pun.
             'LC_MESSAGES' => 'C',
         ];
 
-        return array_filter($lingkungan, static fn (string $nilai): bool => $nilai !== '');
+        return array_filter($variables, static fn (string $value): bool => $value !== '');
     }
 
     /**
@@ -757,16 +757,16 @@ final class SalinLingkungan extends Command
      * dibekukan test mana pun lewat `travelTo`. Penjaga yang berhenti berdetak karena sebuah test
      * membekukan waktunya adalah penjaga yang gagal di tempat yang paling sulit dilacak.
      */
-    private function perpanjangTenggat(): void
+    private function renewLease(): void
     {
-        $sekarang = hrtime(true) / 1_000_000_000;
+        $now = hrtime(true) / 1_000_000_000;
 
-        if ($sekarang < $this->perpanjangBerikutnya || ! $this->operasi instanceof EnvironmentOperation) {
+        if ($now < $this->nextRenewalAt || ! $this->operation instanceof EnvironmentOperation) {
             return;
         }
 
-        $this->perpanjangBerikutnya = $sekarang + self::JEDA_PERPANJANG_DETIK;
-        $this->operasi->update(['lease_until' => now()->addMinutes($this->tenggatOperasiMenit())]);
+        $this->nextRenewalAt = $now + self::LEASE_RENEWAL_SECONDS;
+        $this->operation->update(['lease_until' => now()->addMinutes($this->operationLeaseMinutes())]);
     }
 
     // ------------------------------------------------------------------ pelucutan
@@ -774,7 +774,7 @@ final class SalinLingkungan extends Command
     /**
      * Melucuti salinannya, dan **tanpa** menyaring tenant.
      *
-     * Ini kebalikan dari `KonversiLingkungan`, dan perbedaannya disengaja — pelajarannya sama,
+     * Ini kebalikan dari `ConvertEnvironment`, dan perbedaannya disengaja — pelajarannya sama,
      * jawabannya berlawanan karena databasenya berbeda. Di sana pelucutan berjalan pada database
      * yang mungkin dibagi banyak tenant, jadi penyaringan `tenant_id` wajib: melucuti tanpa
      * penyaring akan membatalkan pengiriman event pelanggan yang tidak sedang dikonversi.
@@ -786,17 +786,17 @@ final class SalinLingkungan extends Command
      *
      * @return array<string, int>
      */
-    private function lucuti(): array
+    private function disarm(): array
     {
-        $k = DB::connection(self::KONEKSI_SASARAN);
+        $db = DB::connection(self::CONNECTION_TARGET);
 
         return [
-            'event' => $this->lucutiAntreanEvent($k),
-            'ekspor' => $this->lucutiEkspor($k),
-            'reservasi' => $this->lucutiReservasi($k),
-            'job' => $this->lucutiAntreanJob($k),
-            'kredensial' => $this->lucutiKredensial($k),
-            'registry' => $this->lucutiRegistrySalinan($k),
+            'event' => $this->disarmEventQueue($db),
+            'ekspor' => $this->disarmExports($db),
+            'reservasi' => $this->disarmReservations($db),
+            'job' => $this->disarmJobQueue($db),
+            'kredensial' => $this->disarmCredentials($db),
+            'registry' => $this->disarmCopiedRegistry($db),
         ];
     }
 
@@ -817,24 +817,24 @@ final class SalinLingkungan extends Command
      * "jenis yang ada penerbitnya sekarang" melainkan "baris yang ditulis selagi menghubungi luar
      * dilarang"; jenis ketiga yang lahir bulan depan akan memperoleh penerbitnya bulan depan juga.
      */
-    private function lucutiAntreanEvent(Connection $k): int
+    private function disarmEventQueue(Connection $db): int
     {
-        $jumlah = 0;
+        $count = 0;
 
         while (true) {
             /** @var list<string> $id */
-            $id = $k->table('outbox_events')
+            $id = $db->table('outbox_events')
                 ->whereNull('published_at')
                 ->orderBy('occurred_at')
-                ->limit(self::SEKALI_ANGKUT)
+                ->limit(self::BATCH_SIZE)
                 ->pluck('id')
                 ->all();
 
             if ($id === []) {
-                return $jumlah;
+                return $count;
             }
 
-            $jumlah += $k->table('outbox_events')
+            $count += $db->table('outbox_events')
                 ->whereIn('id', $id)
                 ->whereNull('published_at')
                 ->update(['published_at' => now(), 'updated_at' => now()]);
@@ -852,9 +852,9 @@ final class SalinLingkungan extends Command
      * ditampilkan kepada pengguna yang menunggu ekspornya. "failed" tanpa kalimat adalah cara
      * membuat orang mengulang ekspor yang sama sampai ia menyerah.
      */
-    private function lucutiEkspor(Connection $k): int
+    private function disarmExports(Connection $db): int
     {
-        return $k->table('report_exports')
+        return $db->table('report_exports')
             ->whereIn('status', [ExportStatus::QUEUED, ExportStatus::RUNNING])
             ->update([
                 'status' => ExportStatus::FAILED,
@@ -881,13 +881,13 @@ final class SalinLingkungan extends Command
      *
      * @return int jumlah reservasi yang dilepas
      */
-    private function lucutiReservasi(Connection $k): int
+    private function disarmReservations(Connection $db): int
     {
-        $menggantung = ['reserved', 'reconciliation_pending'];
+        $pending = ['reserved', 'reconciliation_pending'];
 
         /** @var list<string> $id */
-        $id = $k->table('number_sequence_reservations')
-            ->whereIn('status', $menggantung)
+        $id = $db->table('number_sequence_reservations')
+            ->whereIn('status', $pending)
             ->pluck('id')
             ->all();
 
@@ -895,11 +895,11 @@ final class SalinLingkungan extends Command
             return 0;
         }
 
-        $k->table('number_sequence_continuous_pool')
+        $db->table('number_sequence_continuous_pool')
             ->whereIn('reservation_id', $id)
             ->update(['status' => 'available', 'reservation_id' => null, 'updated_at' => now()]);
 
-        return $k->table('number_sequence_reservations')
+        return $db->table('number_sequence_reservations')
             ->whereIn('id', $id)
             ->update(['status' => 'cancelled', 'cancelled_at' => now(), 'updated_at' => now()]);
     }
@@ -920,9 +920,9 @@ final class SalinLingkungan extends Command
      * hapus fisik repo ini menjaga data pelanggan; ini bukan data, dan ia berada di dalam database
      * yang baru saja lahir.
      */
-    private function lucutiAntreanJob(Connection $k): int
+    private function disarmJobQueue(Connection $db): int
     {
-        return $k->table('jobs')->delete();
+        return $db->table('jobs')->delete();
     }
 
     /**
@@ -937,50 +937,50 @@ final class SalinLingkungan extends Command
      * pun token layanan, sehingga app module tidak dapat memanggilnya sampai token baru diterbitkan.
      * Itu memang keadaan yang dituju rancangan. Penerbitan ulangnya pekerjaan control plane.
      */
-    private function lucutiKredensial(Connection $k): int
+    private function disarmCredentials(Connection $db): int
     {
-        return $k->table('app_service_credentials')->delete();
+        return $db->table('app_service_credentials')->delete();
     }
 
     /**
      * Melucuti registry yang ikut tersalin ke dalam salinannya sendiri.
      *
      * ::: Lubang yang paling mudah terlewat, dan yang paling berbahaya
-     * `MilikPusat` hari ini tidak melakukan apa-apa: `coreerp.control_connection` kosong, jadi
+     * `OwnedByControlPlane` hari ini tidak melakukan apa-apa: `coreerp.control_connection` kosong, jadi
      * `environments` hidup di koneksi bawaan. Salinan sebuah produksi karena itu membawa **salinan
      * tabel `environments` milik produksi**, dan di dalam salinan itu tertulis `kind = 'production'`
      * dengan `outbound_allowed = true`.
      *
-     * `LingkunganAktif` membaca tabel itu. Begitu ada satu jalur yang menjadikan database sandbox
+     * `ActiveEnvironment` membaca tabel itu. Begitu ada satu jalur yang menjadikan database sandbox
      * sebagai koneksi bawaan — dan itulah persis yang dituju middleware pemilih environment —
      * sandbox akan membaca registry miliknya sendiri, menyimpulkan bahwa ia produksi, lalu
      * membuka seluruh sambungan keluarnya. Seluruh pelucutan di atas menjadi sia-sia oleh satu
      * tabel yang tidak ada yang mengira ikut tersalin.
      * :::
      *
-     * Barisnya diturunkan menjadi sandbox, bukan dihapus. Dihapus, `LingkunganAktif` tidak
+     * Barisnya diturunkan menjadi sandbox, bukan dihapus. Dihapus, `ActiveEnvironment` tidak
      * menemukan apa pun — dan "tidak tahu berarti boleh" adalah aturan yang tertulis di kelas itu,
      * sehingga menghapusnya justru membuka sambungan keluar alih-alih menutupnya. Yang aman adalah
      * registry yang menjawab "bukan produksi" dari sudut mana pun ia dibaca.
      */
-    private function lucutiRegistrySalinan(Connection $k): int
+    private function disarmCopiedRegistry(Connection $db): int
     {
-        return $k->table('environments')
-            ->where(static function (Builder $kueri): void {
-                $kueri->where('kind', '!=', 'sandbox')->orWhere('outbound_allowed', true);
+        return $db->table('environments')
+            ->where(static function (Builder $query): void {
+                $query->where('kind', '!=', 'sandbox')->orWhere('outbound_allowed', true);
             })
             ->update(['kind' => 'sandbox', 'outbound_allowed' => false, 'updated_at' => now()]);
     }
 
-    /** @param  array<string, int>  $dilucuti */
-    private function laporkanPelucutan(array $dilucuti): void
+    /** @param  array<string, int>  $disarmed */
+    private function reportDisarm(array $disarmed): void
     {
-        $this->line(sprintf('  %d event yang belum terbit ditandai terbit tanpa dikirim.', $dilucuti['event']));
-        $this->line(sprintf('  %d ekspor laporan yang antre ditandai gagal.', $dilucuti['ekspor']));
-        $this->line(sprintf('  %d reservasi nomor yang menggantung dilepas.', $dilucuti['reservasi']));
-        $this->line(sprintf('  %d job antrean dibuang.', $dilucuti['job']));
-        $this->line(sprintf('  %d kredensial layanan dibuang.', $dilucuti['kredensial']));
-        $this->line(sprintf('  %d baris registry di dalam salinan diturunkan menjadi sandbox.', $dilucuti['registry']));
+        $this->line(sprintf('  %d event yang belum terbit ditandai terbit tanpa dikirim.', $disarmed['event']));
+        $this->line(sprintf('  %d ekspor laporan yang antre ditandai gagal.', $disarmed['ekspor']));
+        $this->line(sprintf('  %d reservasi nomor yang menggantung dilepas.', $disarmed['reservasi']));
+        $this->line(sprintf('  %d job antrean dibuang.', $disarmed['job']));
+        $this->line(sprintf('  %d kredensial layanan dibuang.', $disarmed['kredensial']));
+        $this->line(sprintf('  %d baris registry di dalam salinan diturunkan menjadi sandbox.', $disarmed['registry']));
     }
 
     // ------------------------------------------------------------------ kesehatan
@@ -998,53 +998,53 @@ final class SalinLingkungan extends Command
      *
      * @return string sidik skema salinannya
      */
-    private function periksaKesehatan(): string
+    private function checkHealth(): string
     {
-        $sasaran = DB::connection(self::KONEKSI_SASARAN);
-        $sumber = DB::connection(self::KONEKSI_SUMBER);
+        $target = DB::connection(self::CONNECTION_TARGET);
+        $source = DB::connection(self::CONNECTION_SOURCE);
 
-        $sisa = [
-            'event yang belum terbit' => $sasaran->table('outbox_events')->whereNull('published_at')->count(),
-            'ekspor laporan yang antre' => $sasaran->table('report_exports')
+        $remaining = [
+            'event yang belum terbit' => $target->table('outbox_events')->whereNull('published_at')->count(),
+            'ekspor laporan yang antre' => $target->table('report_exports')
                 ->whereIn('status', [ExportStatus::QUEUED, ExportStatus::RUNNING])->count(),
-            'reservasi nomor yang menggantung' => $sasaran->table('number_sequence_reservations')
+            'reservasi nomor yang menggantung' => $target->table('number_sequence_reservations')
                 ->whereIn('status', ['reserved', 'reconciliation_pending'])->count(),
-            'job antrean' => $sasaran->table('jobs')->count(),
-            'kredensial layanan' => $sasaran->table('app_service_credentials')->count(),
-            'baris registry yang masih boleh menghubungi luar' => $sasaran->table('environments')
+            'job antrean' => $target->table('jobs')->count(),
+            'kredensial layanan' => $target->table('app_service_credentials')->count(),
+            'baris registry yang masih boleh menghubungi luar' => $target->table('environments')
                 ->where('outbound_allowed', true)->count(),
         ];
 
-        foreach ($sisa as $apa => $berapa) {
-            if ($berapa > 0) {
+        foreach ($remaining as $what => $count) {
+            if ($count > 0) {
                 throw new RuntimeException(sprintf(
                     'Salinan masih memuat %d %s sesudah dilucuti. Sandbox tidak diaktifkan: '
                     .'mengaktifkannya berarti menyalakan penjadwal di atas antrean produksi.',
-                    $berapa,
-                    $apa,
+                    $count,
+                    $what,
                 ));
             }
         }
 
-        $terpasangSumber = $sumber->table('core_module_installations')->count();
-        $terpasangSalinan = $sasaran->table('core_module_installations')->count();
+        $installedInSource = $source->table('core_module_installations')->count();
+        $installedInCopy = $target->table('core_module_installations')->count();
 
-        if ($terpasangSalinan !== $terpasangSumber) {
+        if ($installedInCopy !== $installedInSource) {
             throw new RuntimeException(sprintf(
                 'Sumber punya %d catatan pemasangan module dan salinannya %d. Catatan pemasangan '
                 .'tidak pernah disentuh penyalinan ini, jadi selisihnya berarti restorenya tidak utuh.',
-                $terpasangSumber,
-                $terpasangSalinan,
+                $installedInSource,
+                $installedInCopy,
             ));
         }
 
-        $baris = $sasaran->table('migrations')->orderByDesc('id')->first();
+        $row = $target->table('migrations')->orderByDesc('id')->first();
 
-        if (! is_object($baris) || ! property_exists($baris, 'migration')) {
+        if (! is_object($row) || ! property_exists($row, 'migration')) {
             throw new RuntimeException('Salinan tidak punya satu baris pun riwayat migration.');
         }
 
-        return (string) $baris->migration;
+        return (string) $row->migration;
     }
 
     // ------------------------------------------------------------------ database dan berkas
@@ -1052,41 +1052,41 @@ final class SalinLingkungan extends Command
     /**
      * Membuat database bila belum ada. Mengembalikan true bila ia benar-benar baru dibuat.
      *
-     * Kembaran `SiapkanLingkungan::buatDatabase`, dengan satu penjaga tambahan yang hanya masuk
+     * Kembaran `ProvisionEnvironment::createDatabase`, dengan satu penjaga tambahan yang hanya masuk
      * akal di sini: nama sasaran dibandingkan juga dengan nama database **sumber**. Sasaran yang
      * ternyata sumber berarti `pg_restore` menulis salinan ke atas produksi yang sedang dibacanya,
      * dan itu satu-satunya langkah di perintah ini yang tidak dapat dibatalkan.
      */
-    private function buatDatabase(string $nama, string $databaseSumber): bool
+    private function createDatabase(string $name, string $sourceDatabase): bool
     {
-        if (preg_match('/^[a-z][a-z0-9_]{0,62}$/', $nama) !== 1) {
-            throw new RuntimeException(sprintf('Nama database "%s" tidak berbentuk identifier yang aman.', $nama));
+        if (preg_match('/^[a-z][a-z0-9_]{0,62}$/', $name) !== 1) {
+            throw new RuntimeException(sprintf('Nama database "%s" tidak berbentuk identifier yang aman.', $name));
         }
 
-        $dasar = $this->konfigurasiDasar();
+        $base = $this->baseConfig();
 
-        if ($nama === (string) ($dasar['database'] ?? '')) {
+        if ($name === (string) ($base['database'] ?? '')) {
             throw new RuntimeException('Nama database salinan sama dengan database pusat; penyalinan dihentikan.');
         }
 
-        if ($nama === $databaseSumber) {
+        if ($name === $sourceDatabase) {
             throw new RuntimeException('Nama database salinan sama dengan databasenya sumber; penyalinan dihentikan.');
         }
 
-        config(['database.connections.'.self::KONEKSI_PEMELIHARA => $dasar]);
-        DB::purge(self::KONEKSI_PEMELIHARA);
+        config(['database.connections.'.self::CONNECTION_MAINTENANCE => $base]);
+        DB::purge(self::CONNECTION_MAINTENANCE);
 
         try {
-            $koneksi = DB::connection(self::KONEKSI_PEMELIHARA);
+            $koneksi = DB::connection(self::CONNECTION_MAINTENANCE);
 
-            if ($koneksi->selectOne('select 1 from pg_database where datname = ?', [$nama]) !== null) {
+            if ($koneksi->selectOne('select 1 from pg_database where datname = ?', [$name]) !== null) {
                 return false;
             }
 
             // `PDO::exec`, bukan `statement()` maupun `unprepared()`. Yang pertama menyiapkan
             // pernyataan lebih dulu, dan protokol extended query PostgreSQL membungkusnya dalam
             // transaksi implisit — persis yang dilarang untuk `CREATE DATABASE`.
-            $koneksi->getPdo()->exec(sprintf('CREATE DATABASE "%s"', $nama));
+            $koneksi->getPdo()->exec(sprintf('CREATE DATABASE "%s"', $name));
 
             return true;
         } catch (PDOException $e) {
@@ -1096,7 +1096,7 @@ final class SalinLingkungan extends Command
 
             throw $e;
         } finally {
-            DB::purge(self::KONEKSI_PEMELIHARA);
+            DB::purge(self::CONNECTION_MAINTENANCE);
         }
     }
 
@@ -1106,13 +1106,13 @@ final class SalinLingkungan extends Command
      * `url` dikosongkan karena Laravel mendahulukannya di atas `database` bila ia terisi — dan
      * bila itu terjadi, migration dan pelucutan di atas berjalan ke database pusat.
      *
-     * Schema tidak didirikan di sini, berbeda dengan `SiapkanLingkungan`. Dump membawa serta
+     * Schema tidak didirikan di sini, berbeda dengan `ProvisionEnvironment`. Dump membawa serta
      * `CREATE SCHEMA` miliknya sendiri, dan mendirikannya lebih dulu hanya akan membuat
      * `pg_restore` berhenti pada objek yang sudah ada.
      */
-    private function siapkanKoneksi(string $koneksi, string $database): void
+    private function prepareConnection(string $koneksi, string $database): void
     {
-        $konfigurasi = $this->konfigurasiDasar();
+        $konfigurasi = $this->baseConfig();
         $konfigurasi['database'] = $database;
         $konfigurasi['url'] = null;
 
@@ -1126,32 +1126,32 @@ final class SalinLingkungan extends Command
      * Tabel `migrations` dipakai sebagai penandanya karena ia satu-satunya tabel yang pasti ada
      * pada setiap database environment dan pasti tidak ada pada database yang baru dibuat.
      */
-    private function sudahBerisiSalinan(): bool
+    private function alreadyRestored(): bool
     {
-        return DB::connection(self::KONEKSI_SASARAN)->getSchemaBuilder()->hasTable('migrations');
+        return DB::connection(self::CONNECTION_TARGET)->getSchemaBuilder()->hasTable('migrations');
     }
 
-    private function folderDump(): string
+    private function dumpFolder(): string
     {
-        $folder = storage_path('app/salin-lingkungan');
+        $folder = storage_path('app/environment-copy');
         File::ensureDirectoryExists($folder);
 
         return $folder;
     }
 
-    private function berkasDump(Environment $sasaran): string
+    private function dumpFile(Environment $target): string
     {
-        return $this->folderDump().DIRECTORY_SEPARATOR.$sasaran->id.'.dump';
+        return $this->dumpFolder().DIRECTORY_SEPARATOR.$target->id.'.dump';
     }
 
     /** @return array<string, mixed> */
-    private function konfigurasiDasar(): array
+    private function baseConfig(): array
     {
-        $bawaan = (string) config('database.default');
-        $konfigurasi = config('database.connections.'.$bawaan);
+        $default = (string) config('database.default');
+        $konfigurasi = config('database.connections.'.$default);
 
         if (! is_array($konfigurasi)) {
-            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $bawaan));
+            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
         }
 
         /** @var array<string, mixed> $konfigurasi */
@@ -1164,26 +1164,26 @@ final class SalinLingkungan extends Command
      * Dipakai pemeriksaan disk, yang berjalan **sebelum** operasinya dibuka dan karena itu belum
      * punya koneksi sasaran mana pun. Ia hanya pernah memanggil `pg_database_size`.
      */
-    private function koneksiPemelihara(): string
+    private function maintenanceConnection(): string
     {
-        config(['database.connections.'.self::KONEKSI_PEMELIHARA => $this->konfigurasiDasar()]);
-        DB::purge(self::KONEKSI_PEMELIHARA);
+        config(['database.connections.'.self::CONNECTION_MAINTENANCE => $this->baseConfig()]);
+        DB::purge(self::CONNECTION_MAINTENANCE);
 
-        return self::KONEKSI_PEMELIHARA;
+        return self::CONNECTION_MAINTENANCE;
     }
 
     /** Ukuran dalam satuan yang terbaca manusia; pesan disk dibaca orang yang sedang panik. */
-    private function ukuranTerbaca(int $bita): string
+    private function humanSize(int $bytes): string
     {
-        $satuan = ['B', 'KB', 'MB', 'GB', 'TB'];
-        $nilai = (float) $bita;
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $value = (float) $bytes;
         $i = 0;
 
-        while ($nilai >= 1024 && $i < count($satuan) - 1) {
-            $nilai /= 1024;
+        while ($value >= 1024 && $i < count($units) - 1) {
+            $value /= 1024;
             $i++;
         }
 
-        return sprintf('%.1f %s', $nilai, $satuan[$i]);
+        return sprintf('%.1f %s', $value, $units[$i]);
     }
 }

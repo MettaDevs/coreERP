@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\Environment;
-use App\Support\Pusat\AlamatLingkungan;
-use App\Support\Pusat\LingkunganAktif;
+use App\Support\ControlPlane\EnvironmentAddress;
+use App\Support\ControlPlane\ActiveEnvironment;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,7 +30,7 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Alamat yang tidak cocok bukan kesalahan. Alamat pangkal, konsol operator, `localhost` polos, dan
  * seluruh penempatan on-prem semuanya jatuh ke sana — dan semuanya memang harus tetap bekerja
- * persis seperti sebelum middleware ini ada. Selama `coreerp.domain_dasar` kosong, ia bahkan tidak
+ * persis seperti sebelum middleware ini ada. Selama `coreerp.base_domain` kosong, ia bahkan tidak
  * pernah menyala sama sekali.
  *
  * Yang **ditolak** hanya alamat yang berbentuk alamat lingkungan tetapi tidak menunjuk lingkungan
@@ -49,16 +49,16 @@ use Symfony\Component\HttpFoundation\Response;
  * pekerjaan tersendiri: sebuah permintaan yang dirutekan ke database yang salah jauh lebih
  * berbahaya daripada permintaan yang tidak dirutekan sama sekali.
  */
-class TetapkanLingkungan
+class ResolveEnvironment
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $alamat = AlamatLingkungan::dariHost($request->getHost());
+        $address = EnvironmentAddress::fromHost($request->getHost());
 
-        if ($alamat === null) {
+        if ($address === null) {
             // Di luar domain kita — bukan urusan kita, lewat. Ini jalur yang dilalui on-prem,
             // lingkungan lokal, dan seluruh test yang ada.
-            if (! AlamatLingkungan::dibawahDomain($request->getHost())) {
+            if (! EnvironmentAddress::isUnderBaseDomain($request->getHost())) {
                 return $next($request);
             }
 
@@ -66,26 +66,26 @@ class TetapkanLingkungan
             // wildcard, setiap label yang pernah diketik siapa pun sampai ke sini, dan menyajikan
             // aplikasi pangkal di sana berarti aplikasi kita dapat disajikan dari alamat mana saja
             // yang dikarang orang. Label yang memang bukan lingkungan — konsol, pemasaran — sudah
-            // dikecualikan lebih dulu di `AlamatLingkungan`, dan jatuh ke cabang di atas.
+            // dikecualikan lebih dulu di `EnvironmentAddress`, dan jatuh ke cabang di atas.
             abort(404);
         }
 
-        $lingkungan = Environment::query()
-            ->whereHas('tenant', fn ($q) => $q->where('slug', $alamat->tenant))
-            ->where('slug', $alamat->lingkungan)
-            ->where('kind', $alamat->jenis)
+        $environment = Environment::query()
+            ->whereHas('tenant', fn ($q) => $q->where('slug', $address->tenant))
+            ->where('slug', $address->environment)
+            ->where('kind', $address->kind)
             ->whereNull('deleted_at')
             ->first();
 
         // Hanya `active` yang boleh dirutekan. Lingkungan yang sedang disiapkan, sedang disalin,
         // atau bermasalah adalah lingkungan yang **tidak dapat dimasuki** — bukan lingkungan yang
         // dimasuki lalu ternyata setengah jadi.
-        if (! $lingkungan instanceof Environment || $lingkungan->status !== 'active') {
+        if (! $environment instanceof Environment || $environment->status !== 'active') {
             abort(404);
         }
 
-        $request->attributes->set('coreerp.environment', $lingkungan);
-        app()->instance(LingkunganAktif::KUNCI, $lingkungan->id);
+        $request->attributes->set('coreerp.environment', $environment);
+        app()->instance(ActiveEnvironment::KEY, $environment->id);
 
         return $next($request);
     }

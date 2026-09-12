@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Boundary;
 
-use App\Support\Pusat\MilikPusat;
+use App\Support\ControlPlane\OwnedByControlPlane;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +37,7 @@ use Tests\TestCase;
  * berdiri di database sesudah seluruh migration berjalan, bukan apa yang seseorang ingat menulis.
  *
  * Nama tabel sisi pusat pun tidak ditulis ulang di sini. Ia diturunkan dari model yang memakai
- * `MilikPusat`, penanda yang sama yang dipakai `BatasPusatTest`. Dua daftar yang sama isinya di dua
+ * `OwnedByControlPlane`, penanda yang sama yang dipakai `BatasPusatTest`. Dua daftar yang sama isinya di dua
  * berkas akan menyimpang; yang satu ini tidak bisa, karena sumbernya memang cuma satu.
  *
  * ## Yang tidak terlihat oleh penjaga ini
@@ -69,7 +69,7 @@ class FkMenyeberangBatasTest extends TestCase
      *   belum terhitung di sana.
      * - `environments` ditunjuk oleh `environment_members`, yang sebenarnya milik sisi pusat juga.
      *   Ia tidak punya model Eloquent — `RegisterBusiness` menulisnya lewat `DB::table` — sehingga
-     *   tidak ada tempat memasang `MilikPusat` dan penurunan di bawah menempatkannya di sisi
+     *   tidak ada tempat memasang `OwnedByControlPlane` dan penurunan di bawah menempatkannya di sisi
      *   environment. Begitu ia punya model bertanda, baris ini hilang dengan sendirinya dan
      *   angkanya wajib diturunkan.
      *
@@ -180,7 +180,7 @@ class FkMenyeberangBatasTest extends TestCase
     {
         $diturunkan = $this->tabelSisiPusat();
 
-        $this->assertNotSame([], $diturunkan, 'Tidak satu pun model bertanda MilikPusat terbaca; penurunannya salah alamat dan seluruh penjaga ini lulus tanpa menguji apa pun.');
+        $this->assertNotSame([], $diturunkan, 'Tidak satu pun model bertanda OwnedByControlPlane terbaca; penurunannya salah alamat dan seluruh penjaga ini lulus tanpa menguji apa pun.');
 
         foreach (BatasPusatTest::modelSisiPusat() as [$kelas, $tabel]) {
             $this->assertContains($tabel, $diturunkan, sprintf(
@@ -193,7 +193,7 @@ class FkMenyeberangBatasTest extends TestCase
     }
 
     /**
-     * Nama tabel sisi pusat, diturunkan dari model yang memakai `MilikPusat`.
+     * Nama tabel sisi pusat, diturunkan dari model yang memakai `OwnedByControlPlane`.
      *
      * Modelnya dipindai dari berkas, bukan didaftar. Model yang lupa didaftarkan adalah persis
      * kegagalan yang penjaga ini ada untuk menangkapnya, jadi daftarnya tidak boleh jadi bahan
@@ -221,7 +221,7 @@ class FkMenyeberangBatasTest extends TestCase
                 continue;
             }
 
-            if (! in_array(MilikPusat::class, class_uses_recursive($kelas), true)) {
+            if (! in_array(OwnedByControlPlane::class, class_uses_recursive($kelas), true)) {
                 continue;
             }
 

@@ -138,7 +138,7 @@ FROM php:8.4-apache
 # memakai nilai bawaan, jadi artefak produksi selalu membawa ekstensinya. Perlu disadari
 # konsekuensinya: image yang diuji saat PR karena itu bukan image yang dikirim.
 ARG PASANG_OTEL=1
-# Klien PostgreSQL: `pg_dump` dan `pg_restore`, yang dipakai `environment:salin`.
+# Klien PostgreSQL: `pg_dump` dan `pg_restore`, yang dipakai `environment:copy`.
 #
 # Ia dijalankan sebagai **klien lewat jaringan**, bukan lewat docker socket. Jalur socket itulah
 # yang dulu membuat worker penempatan tidak pernah bisa berjalan di environment mana pun yang

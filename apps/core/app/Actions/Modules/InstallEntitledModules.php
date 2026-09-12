@@ -16,7 +16,7 @@ use Throwable;
  *
  * ## Kenapa ia perlu ada
  *
- * Sampai aksi ini ada, `environment:siapkan` hanya menjalankan migration Core. Akibatnya sebuah
+ * Sampai aksi ini ada, `environment:provision` hanya menjalankan migration Core. Akibatnya sebuah
  * demo lahir dengan skema Core yang lengkap dan **nol tabel module** — bukan kosong, hilang. Yang
  * menemukannya bukan test melainkan pertanyaan pemilik produk, dan itu masuk akal: seluruh test
  * pemasangan module berjalan di database bawaan, satu-satunya tempat yang memang sudah terisi.
@@ -40,12 +40,12 @@ use Throwable;
  * dibutuhkan lebih dulu keluar lebih dulu — sehingga daftar yang sama tidak akan kadang berhasil
  * dan kadang gagal tergantung urutan barisnya tertulis.
  */
-final class PasangModulYangDibeli
+final class InstallEntitledModules
 {
     public function __construct(
-        private readonly AppDependencyGraph $grafik,
+        private readonly AppDependencyGraph $graph,
         private readonly ModuleRegistry $registry,
-        private readonly InstallModule $pasang,
+        private readonly InstallModule $installer,
     ) {}
 
     /**
@@ -53,17 +53,17 @@ final class PasangModulYangDibeli
      *
      * @throws Throwable Satu module gagal dipasang. Sengaja tidak ditelan — lihat di bawah.
      */
-    public function untuk(Environment $lingkungan): array
+    public function into(Environment $environment): array
     {
-        $berhak = $this->berhak((string) $lingkungan->tenant_id);
+        $entitled = $this->entitledAppIds((string) $environment->tenant_id);
 
-        if ($berhak === []) {
+        if ($entitled === []) {
             return [];
         }
 
-        $terpasang = [];
+        $installed = [];
 
-        foreach ($this->grafik->resolveAvailable($berhak) as $id) {
+        foreach ($this->graph->resolveAvailable($entitled) as $id) {
             if ($this->registry->cari($id) === null) {
                 continue;
             }
@@ -78,12 +78,12 @@ final class PasangModulYangDibeli
              * langkah di jalur ini sanggup melihat pekerjaannya sendiri, jadi pengulangan melewati
              * yang sudah selesai.
              */
-            $this->pasang->handle($id, (string) $lingkungan->tenant_id, $lingkungan);
+            $this->installer->handle($id, (string) $environment->tenant_id, $environment);
 
-            $terpasang[] = $id;
+            $installed[] = $id;
         }
 
-        return $terpasang;
+        return $installed;
     }
 
     /**
@@ -95,7 +95,7 @@ final class PasangModulYangDibeli
      *
      * @return list<string>
      */
-    private function berhak(string $tenantId): array
+    private function entitledAppIds(string $tenantId): array
     {
         $id = TenantAppEntitlement::query()
             ->where('tenant_id', $tenantId)

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Pusat;
+namespace App\Support\ControlPlane;
 
 use RuntimeException;
 
@@ -13,4 +13,4 @@ use RuntimeException;
  * membedakan "ditolak karena tempatnya" dari "gagal karena jaringannya" harus bisa melakukannya
  * tanpa membaca isi pesan.
  */
-class SambunganKeluarDitolak extends RuntimeException {}
+class OutboundRefused extends RuntimeException {}

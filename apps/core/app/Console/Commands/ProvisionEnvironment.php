@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Actions\Modules\PasangModulYangDibeli;
-use App\Console\Commands\Concerns\MemegangOperasiLingkungan;
+use App\Actions\Modules\InstallEntitledModules;
+use App\Console\Commands\Concerns\HoldsEnvironmentOperation;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
-use App\Support\Pusat\KoneksiLingkungan;
+use App\Support\ControlPlane\EnvironmentConnection;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use PDOException;
@@ -48,17 +48,17 @@ use Throwable;
  * setengah bermigrasi. Sebabnya ikut disimpan di `environment_operations`, karena cacat yang paling
  * sering berulang di repo ini adalah kegagalan yang tidak dapat dibaca siapa pun keesokan harinya.
  */
-final class SiapkanLingkungan extends Command
+final class ProvisionEnvironment extends Command
 {
-    use MemegangOperasiLingkungan;
+    use HoldsEnvironmentOperation;
 
-    protected $signature = 'environment:siapkan {environment : Id baris environments yang disiapkan}'
-        .' {--diminta-oleh= : Id user yang meminta; dipakai konsol operator supaya riwayatnya bernama}';
+    protected $signature = 'environment:provision {environment : Id baris environments yang disiapkan}'
+        .' {--requested-by= : Id user yang meminta; dipakai konsol operator supaya riwayatnya bernama}';
 
     protected $description = 'Buatkan database sebuah environment, jalankan migration Core ke dalamnya, lalu aktifkan';
 
     /** Koneksi sementara ke database environment yang sedang disiapkan. */
-    private const KONEKSI = 'lingkungan_disiapkan';
+    private const CONNECTION = 'environment_provisioning';
 
     /**
      * Status yang boleh disiapkan.
@@ -67,11 +67,11 @@ final class SiapkanLingkungan extends Command
      * termurah menghapus data pelanggan tanpa sengaja, dan satu huruf salah ketik pada id sudah
      * cukup untuk sampai ke sana.
      */
-    private const STATUS_BOLEH = ['provisioning', 'degraded'];
+    private const ALLOWED_STATUSES = ['provisioning', 'degraded'];
 
     public function __construct(
-        private readonly PasangModulYangDibeli $modul,
-        private readonly KoneksiLingkungan $koneksi,
+        private readonly InstallEntitledModules $modules,
+        private readonly EnvironmentConnection $connections,
     ) {
         parent::__construct();
     }
@@ -90,7 +90,7 @@ final class SiapkanLingkungan extends Command
      * `environment:copy` kelak tidak masuk kategori itu — ia harus memperpanjang tenggatnya sendiri
      * selagi berjalan, dan itu pekerjaan yang lahir bersama perintahnya.
      */
-    protected function tenggatOperasiMenit(): int
+    protected function operationLeaseMinutes(): int
     {
         return 30;
     }
@@ -107,7 +107,7 @@ final class SiapkanLingkungan extends Command
      * Testnya ikut setuju dengan asumsi yang salah itu, karena ia memanggil perintahnya dengan
      * `(string) $id`. Yang menemukannya satu panggilan HTTP sungguhan.
      */
-    protected function dimintaOleh(): ?int
+    protected function requestedBy(): ?int
     {
         // `$this->input->getOption()`, bukan `$this->option()`. Keduanya membaca nilai yang sama,
         // tetapi PHPDoc Laravel menyatakan yang kedua mengembalikan `string|array|bool|null` —
@@ -115,7 +115,7 @@ final class SiapkanLingkungan extends Command
         // yang pertama membuat pemeriksaan `int` di bawah menjadi pemeriksaan yang jujur, bukan
         // cabang yang menurut analisa statis tidak pernah tercapai padahal ia justru satu-satunya
         // yang tercapai di jalur sungguhan.
-        $id = $this->input->getOption('diminta-oleh');
+        $id = $this->input->getOption('requested-by');
 
         if (is_int($id)) {
             return $id;
@@ -127,53 +127,53 @@ final class SiapkanLingkungan extends Command
     public function handle(): int
     {
         $id = (string) $this->argument('environment');
-        $lingkungan = Environment::query()->find($id);
+        $environment = Environment::query()->find($id);
 
-        if (! $lingkungan instanceof Environment) {
+        if (! $environment instanceof Environment) {
             $this->error(sprintf('Environment "%s" tidak ada di registry.', $id));
 
             return self::FAILURE;
         }
 
-        if (! in_array($lingkungan->status, self::STATUS_BOLEH, true)) {
+        if (! in_array($environment->status, self::ALLOWED_STATUSES, true)) {
             $this->error(sprintf(
                 'Environment "%s" berstatus %s. Yang boleh disiapkan hanya %s — menyiapkan ulang '
                 .'lingkungan yang sudah hidup akan menimpa isinya.',
-                $lingkungan->slug,
-                $lingkungan->status,
-                implode(' atau ', self::STATUS_BOLEH),
+                $environment->slug,
+                $environment->status,
+                implode(' atau ', self::ALLOWED_STATUSES),
             ));
 
             return self::FAILURE;
         }
 
-        $operasi = $this->bukaOperasi($lingkungan, 'provision');
+        $operation = $this->openOperation($environment, 'provision');
 
-        if (! $operasi instanceof EnvironmentOperation) {
+        if (! $operation instanceof EnvironmentOperation) {
             return self::FAILURE;
         }
 
-        $langkah = 'nama-database';
+        $step = 'nama-database';
 
         try {
-            $nama = self::namaDatabase($lingkungan);
+            $name = self::databaseName($environment);
 
-            $langkah = 'buat-database';
-            $baru = $this->buatDatabase($nama);
-            $this->line($baru
-                ? sprintf('  database "%s" dibuat.', $nama)
-                : sprintf('  database "%s" sudah ada; dilanjutkan.', $nama));
+            $step = 'buat-database';
+            $created = $this->createDatabase($name);
+            $this->line($created
+                ? sprintf('  database "%s" dibuat.', $name)
+                : sprintf('  database "%s" sudah ada; dilanjutkan.', $name));
 
-            $langkah = 'migration';
-            $this->siapkanKoneksi($nama);
-            $keluar = $this->callSilent('migrate', ['--database' => self::KONEKSI, '--force' => true]);
+            $step = 'migration';
+            $this->prepareConnection($name);
+            $exitCode = $this->callSilent('migrate', ['--database' => self::CONNECTION, '--force' => true]);
 
-            if ($keluar !== self::SUCCESS) {
-                throw new RuntimeException(sprintf('Perintah migrate berhenti dengan kode %d.', $keluar));
+            if ($exitCode !== self::SUCCESS) {
+                throw new RuntimeException(sprintf('Perintah migrate berhenti dengan kode %d.', $exitCode));
             }
 
-            $langkah = 'sidik-skema';
-            $sidik = $this->sidikSkema();
+            $step = 'sidik-skema';
+            $fingerprint = $this->schemaFingerprint();
 
             /*
              * Databasenya dicatat **sebelum** module dipasang, dan statusnya belum dinaikkan.
@@ -184,42 +184,42 @@ final class SiapkanLingkungan extends Command
              * `provisioning` sampai isinya lengkap — lingkungan yang setengah terisi harus menjadi
              * tempat yang tidak dapat dimasuki, bukan tempat yang dimasuki lalu ternyata separuh.
              */
-            $langkah = 'catat-database';
-            $lingkungan->update([
-                'database_name' => $nama,
+            $step = 'catat-database';
+            $environment->update([
+                'database_name' => $name,
                 'schema_migrated_at' => now(),
-                'schema_fingerprint' => $sidik,
+                'schema_fingerprint' => $fingerprint,
             ]);
 
-            $langkah = 'pasang-module';
-            $modul = $this->modul->untuk($lingkungan);
-            $this->line($modul === []
+            $step = 'pasang-module';
+            $modules = $this->modules->into($environment);
+            $this->line($modules === []
                 ? '  tidak ada module yang dibeli tenant ini; hanya skema Core yang dipasang.'
-                : sprintf('  module terpasang: %s.', implode(', ', $modul)));
+                : sprintf('  module terpasang: %s.', implode(', ', $modules)));
 
-            $langkah = 'aktifkan';
-            $lingkungan->update(['status' => 'active']);
+            $step = 'aktifkan';
+            $environment->update(['status' => 'active']);
 
-            $operasi->update([
+            $operation->update([
                 'status' => 'succeeded',
-                'step' => $langkah,
+                'step' => $step,
                 'finished_at' => now(),
                 'lease_until' => null,
-                'detail' => ['database' => $nama, 'sidik' => $sidik, 'module' => $modul],
+                'detail' => ['database' => $name, 'sidik' => $fingerprint, 'module' => $modules],
             ]);
 
-            $this->info(sprintf('Environment "%s" aktif di database "%s" (sidik %s).', $lingkungan->slug, $nama, $sidik));
+            $this->info(sprintf('Environment "%s" aktif di database "%s" (sidik %s).', $environment->slug, $name, $fingerprint));
 
             return self::SUCCESS;
         } catch (Throwable $e) {
-            $this->tandaiGagal($lingkungan, $operasi, $langkah, $e);
+            $this->markFailed($environment, $operation, $step, $e);
 
-            $this->error(sprintf('Penyiapan berhenti di langkah "%s": %s', $langkah, $e->getMessage()));
+            $this->error(sprintf('Penyiapan berhenti di langkah "%s": %s', $step, $e->getMessage()));
             $this->line('Environment ditandai degraded. Perbaiki sebabnya lalu jalankan perintah yang sama sekali lagi.');
 
             return self::FAILURE;
         } finally {
-            DB::purge(self::KONEKSI);
+            DB::purge(self::CONNECTION);
         }
     }
 
@@ -237,15 +237,15 @@ final class SiapkanLingkungan extends Command
      * ulang setelah sebuah environment dihapus lunak, dan nama database yang terulang akan ditolak
      * unique index-nya justru pada environment pengganti yang sah.
      */
-    public static function namaDatabase(Environment $lingkungan): string
+    public static function databaseName(Environment $environment): string
     {
-        $sidik = substr(hash('sha256', $lingkungan->id), 0, 10);
-        $terbaca = self::bersihkan($lingkungan->tenant->slug).'_'.self::bersihkan($lingkungan->slug);
+        $fingerprint = substr(hash('sha256', $environment->id), 0, 10);
+        $readable = self::sanitize($environment->tenant->slug).'_'.self::sanitize($environment->slug);
 
         // 63 dikurangi awalan `env_`, pemisah sebelum sidik, dan sidiknya sendiri.
-        $terbaca = rtrim(substr($terbaca, 0, 63 - 4 - 1 - 10), '_');
+        $readable = rtrim(substr($readable, 0, 63 - 4 - 1 - 10), '_');
 
-        return 'env_'.$terbaca.'_'.$sidik;
+        return 'env_'.$readable.'_'.$fingerprint;
     }
 
     /**
@@ -255,27 +255,27 @@ final class SiapkanLingkungan extends Command
      * Yang membuat itu aman bukan keyakinan melainkan bentuk namanya, yang diperiksa sebaris di
      * bawah: hanya huruf kecil, angka, dan garis bawah, sehingga tidak ada yang bisa dikutip keluar.
      */
-    private function buatDatabase(string $nama): bool
+    private function createDatabase(string $name): bool
     {
-        if (preg_match('/^[a-z][a-z0-9_]{0,62}$/', $nama) !== 1) {
-            throw new RuntimeException(sprintf('Nama database "%s" tidak berbentuk identifier yang aman.', $nama));
+        if (preg_match('/^[a-z][a-z0-9_]{0,62}$/', $name) !== 1) {
+            throw new RuntimeException(sprintf('Nama database "%s" tidak berbentuk identifier yang aman.', $name));
         }
 
-        $dasar = $this->koneksi->konfigurasiDasar();
+        $base = $this->connections->baseConfig();
 
         // Penjaga terakhir sebelum sesuatu yang tidak bisa dibatalkan. Kalau perhitungan nama
         // pernah menghasilkan nama database pusat, langkah berikutnya akan menjalankan seluruh
         // migration ke atas data kerja orang.
-        if ($nama === (string) ($dasar['database'] ?? '')) {
+        if ($name === (string) ($base['database'] ?? '')) {
             throw new RuntimeException('Nama database environment sama dengan database pusat; penyiapan dihentikan.');
         }
 
-        $pemelihara = $this->koneksi->pemelihara();
+        $maintenance = $this->connections->maintenance();
 
         try {
-            $koneksi = DB::connection($pemelihara);
+            $koneksi = DB::connection($maintenance);
 
-            if ($koneksi->selectOne('select 1 from pg_database where datname = ?', [$nama]) !== null) {
+            if ($koneksi->selectOne('select 1 from pg_database where datname = ?', [$name]) !== null) {
                 return false;
             }
 
@@ -284,7 +284,7 @@ final class SiapkanLingkungan extends Command
             // transaksi implisit — persis yang dilarang untuk `CREATE DATABASE`. Yang kedua
             // menuntut literal-string, dan nama database di sini memang tidak pernah literal;
             // yang menjaganya adalah pemeriksaan bentuk identifier di awal method ini.
-            $koneksi->getPdo()->exec(sprintf('CREATE DATABASE "%s"', $nama));
+            $koneksi->getPdo()->exec(sprintf('CREATE DATABASE "%s"', $name));
 
             return true;
         } catch (PDOException $e) {
@@ -296,21 +296,21 @@ final class SiapkanLingkungan extends Command
 
             throw $e;
         } finally {
-            DB::purge($pemelihara);
+            DB::purge($maintenance);
         }
     }
 
     /**
      * Mendaftarkan koneksi ke database yang baru, lalu mendirikan schema yang ditunjuk search_path.
      *
-     * Isinya pindah ke {@see KoneksiLingkungan} ketika pemasangan module ikut membutuhkannya.
+     * Isinya pindah ke {@see EnvironmentConnection} ketika pemasangan module ikut membutuhkannya.
      * Salinan ketiga dari logika yang sama adalah salinan yang akan menyimpang, dan yang menyimpang
      * di sini adalah jawaban atas pertanyaan "database mana".
      */
-    private function siapkanKoneksi(string $nama): void
+    private function prepareConnection(string $name): void
     {
-        $this->koneksi->daftarkan(self::KONEKSI, $nama);
-        $this->koneksi->dirikanSkema(self::KONEKSI);
+        $this->connections->register(self::CONNECTION, $name);
+        $this->connections->createSchemas(self::CONNECTION);
     }
 
     /**
@@ -319,15 +319,15 @@ final class SiapkanLingkungan extends Command
      * Bukan kolom versi yang harus dijaga seseorang. Justru karena versinya cuma satu, "tertinggal"
      * adalah fakta yang dihitung dengan membandingkan sidik environment terhadap sidik image.
      */
-    private function sidikSkema(): string
+    private function schemaFingerprint(): string
     {
-        $baris = DB::connection(self::KONEKSI)->table('migrations')->orderByDesc('id')->first();
+        $row = DB::connection(self::CONNECTION)->table('migrations')->orderByDesc('id')->first();
 
-        if (! is_object($baris) || ! property_exists($baris, 'migration')) {
+        if (! is_object($row) || ! property_exists($row, 'migration')) {
             throw new RuntimeException('Migration berjalan tanpa meninggalkan satu baris pun riwayat.');
         }
 
-        return (string) $baris->migration;
+        return (string) $row->migration;
     }
 
     /**
@@ -337,18 +337,18 @@ final class SiapkanLingkungan extends Command
      * pesan kosong pun diganti nama kelas pengecualiannya — sebuah baris yang ditolak database di
      * sini akan menelan sebab kegagalan yang sebenarnya dan menggantinya dengan sebab palsu.
      */
-    private function tandaiGagal(Environment $lingkungan, EnvironmentOperation $operasi, string $langkah, Throwable $e): void
+    private function markFailed(Environment $environment, EnvironmentOperation $operation, string $step, Throwable $e): void
     {
-        $this->tutupOperasiSebagaiGagal($operasi, $langkah, $e);
+        $this->closeOperationAsFailed($operation, $step, $e);
 
-        $lingkungan->update(['status' => 'degraded']);
+        $environment->update(['status' => 'degraded']);
     }
 
     /** Mengubah sepotong slug menjadi bagian identifier yang sah, tanpa membuatnya unik. */
-    private static function bersihkan(string $teks): string
+    private static function sanitize(string $text): string
     {
-        $bersih = preg_replace('/[^a-z0-9]+/', '_', mb_strtolower($teks)) ?? '';
+        $clean = preg_replace('/[^a-z0-9]+/', '_', mb_strtolower($text)) ?? '';
 
-        return trim($bersih, '_');
+        return trim($clean, '_');
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-use App\Console\Commands\HapusLingkunganPermanen;
+use App\Console\Commands\PurgeEnvironment;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -42,18 +42,18 @@ Schedule::command('reporting:purge-exports')
  * menyaring dengan nama itu tidak membedakan keduanya sama sekali.
  *
  * Yang membedakannya `skip()`, dan hanya perintah yang merusak yang memakainya: on-prem tidak
- * pernah punya lingkungan yang dihapus lunak, jadi di sana `environment:hapus-permanen` tidak
+ * pernah punya lingkungan yang dihapus lunak, jadi di sana `environment:purge` tidak
  * perlu bangun sama sekali. Sapuan tidak diberi penjaga serupa karena ia memang tidak berbahaya
  * ketika tidak ada yang perlu disapu — dan penjaga yang tidak menjaga apa-apa hanyalah satu query
  * tambahan yang kelak salah.
  */
-Schedule::command('environment:sapu-kedaluwarsa')
+Schedule::command('environment:sweep-expired')
     ->dailyAt('03:00')
     ->onOneServer()
     ->withoutOverlapping();
 
-Schedule::command('environment:hapus-permanen')
+Schedule::command('environment:purge')
     ->dailyAt('03:30')
     ->onOneServer()
     ->withoutOverlapping()
-    ->skip(fn (): bool => HapusLingkunganPermanen::tidakAdaYangPerluDibuang());
+    ->skip(fn (): bool => PurgeEnvironment::nothingToPurge());

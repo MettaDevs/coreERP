@@ -48,8 +48,8 @@ class ProvisionEnvironmentTest extends TestCase
         Http::fake(['*' => Http::response([
             'status' => 'active',
             'database' => 'env_contoh_peragaan_abc1234567',
-            'modul' => [
-                ['id' => 'human-resources', 'versi' => '1.0.0', 'status' => 'installed', 'disemai' => true],
+            'modules' => [
+                ['id' => 'human-resources', 'version' => '1.0.0', 'status' => 'installed', 'seeded' => true],
             ],
         ])]);
 
@@ -60,7 +60,7 @@ class ProvisionEnvironmentTest extends TestCase
         $response->assertSessionHas('message', fn (string $message): bool => str_contains($message, 'env_contoh_peragaan_abc1234567')
             && str_contains($message, 'human-resources'));
 
-        Http::assertSent(fn (OutboundRequest $request): bool => $request->url() === self::BASE_URL.'/api/internal/v1/environments/'.$environment->id.'/siapkan'
+        Http::assertSent(fn (OutboundRequest $request): bool => $request->url() === self::BASE_URL.'/api/internal/v1/environments/'.$environment->id.'/provision'
             && $request->method() === 'POST'
             // Bearer, bukan header kustom. Cacat itu pernah nyata: kedua sisi hijau, panggilan
             // sungguhannya 401, dan masing-masing suite memalsukan lawan bicaranya.
@@ -68,7 +68,7 @@ class ProvisionEnvironmentTest extends TestCase
             // Operatornya ikut dikirim. Tanpa ini, kolom "Oleh" pada riwayat berbunyi "Sistem"
             // untuk tombol yang baru saja ditekan manusia — riwayat yang berbohong justru pada
             // kolom yang ada untuk menjawabnya.
-            && $request['diminta_oleh'] === $operator->id);
+            && $request['requested_by'] === $operator->id);
     }
 
     public function test_a_core_rejection_becomes_a_readable_error_not_a_500(): void

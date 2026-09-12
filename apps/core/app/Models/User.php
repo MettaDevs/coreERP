@@ -3,7 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Support\Pusat\MilikPusat;
+use App\Support\ControlPlane\OwnedByControlPlane;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -42,7 +42,7 @@ class User extends Authenticatable implements PasskeyUser
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
-    use MilikPusat;
+    use OwnedByControlPlane;
 
     /**
      * Bawaan kolom penanda, ditulis di model dan bukan hanya di skema.

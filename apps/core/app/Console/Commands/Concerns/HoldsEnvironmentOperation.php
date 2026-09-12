@@ -13,7 +13,7 @@ use Throwable;
 /**
  * Membuka, memegang, dan menutup satu baris operasi atas sebuah lingkungan.
  *
- * Diangkat dari `SiapkanLingkungan` dan `KonversiLingkungan` pada 12 September 2026, ketika
+ * Diangkat dari `ProvisionEnvironment` dan `ConvertEnvironment` pada 12 September 2026, ketika
  * keduanya sudah memegang salinan yang sama. Bukan demi kerapian: yang disalin di sini adalah
  * **protokol kunci**, dan dua salinan protokol kunci adalah dua kesempatan untuk menyimpang pada
  * hal yang justru tidak terlihat ketika ia salah. Operasi ketiga yang lahir besok mewarisi
@@ -40,7 +40,7 @@ use Throwable;
  * saja akan lulus test "operasi mati dapat diambil alih" juga — karena itu pasangan hijaunya
  * wajib: operasi yang masih hidup terbukti **tidak** direbut.
  */
-trait MemegangOperasiLingkungan
+trait HoldsEnvironmentOperation
 {
     /**
      * Berapa lama sebuah operasi boleh memegang kuncinya sebelum boleh direbut.
@@ -54,7 +54,7 @@ trait MemegangOperasiLingkungan
      * sehat, dan itu jawaban yang benar hanya selama tidak ada operasi yang memang wajar berjalan
      * selama itu. Operasi panjang sungguhan harus memperpanjang tenggatnya sendiri selagi berjalan.
      */
-    abstract protected function tenggatOperasiMenit(): int;
+    abstract protected function operationLeaseMinutes(): int;
 
     /**
      * Membuka satu baris operasi, atau menolak karena sudah ada yang berjalan.
@@ -72,12 +72,12 @@ trait MemegangOperasiLingkungan
      * seseorang; menampilkan "Sistem" untuk tombol yang baru saja ditekan manusia adalah riwayat
      * yang berbohong justru pada kolom yang ada untuk itu.
      */
-    protected function dimintaOleh(): ?int
+    protected function requestedBy(): ?int
     {
         return null;
     }
 
-    protected function bukaOperasi(Environment $lingkungan, string $jenis, bool $ambilAlih = true): ?EnvironmentOperation
+    protected function openOperation(Environment $environment, string $kind, bool $takeOver = true): ?EnvironmentOperation
     {
         $koneksi = DB::connection((new EnvironmentOperation)->getConnectionName());
 
@@ -86,28 +86,28 @@ trait MemegangOperasiLingkungan
             // perintah di dalamnya ditolak, jadi sisipan yang sejak awal memang boleh ditolak akan
             // menjatuhkan transaksi milik siapa pun yang kebetulan membungkus perintah ini.
             return $koneksi->transaction(fn (): EnvironmentOperation => EnvironmentOperation::create([
-                'environment_id' => $lingkungan->id,
-                'operation' => $jenis,
+                'environment_id' => $environment->id,
+                'operation' => $kind,
                 'status' => 'running',
                 'step' => 'mulai',
                 'started_at' => now(),
-                'lease_until' => now()->addMinutes($this->tenggatOperasiMenit()),
-                'requested_by' => $this->dimintaOleh(),
+                'lease_until' => now()->addMinutes($this->operationLeaseMinutes()),
+                'requested_by' => $this->requestedBy(),
             ]));
-        } catch (QueryException $bentrok) {
-            if (! str_contains($bentrok->getMessage(), 'environment_operations_satu_berjalan')) {
-                throw $bentrok;
+        } catch (QueryException $conflict) {
+            if (! str_contains($conflict->getMessage(), 'environment_operations_satu_berjalan')) {
+                throw $conflict;
             }
 
-            if ($ambilAlih && $this->ambilAlihYangKedaluwarsa($lingkungan)) {
-                return $this->bukaOperasi($lingkungan, $jenis, ambilAlih: false);
+            if ($takeOver && $this->takeOverExpired($environment)) {
+                return $this->openOperation($environment, $kind, takeOver: false);
             }
 
             $this->error(sprintf(
                 'Sudah ada operasi yang berjalan atas environment "%s" dan tenggatnya belum lewat. '
                 .'Tunggu sampai ia selesai, atau tunggu tenggatnya habis — percobaan berikutnya akan '
                 .'mengambil alih sendiri.',
-                $lingkungan->slug,
+                $environment->slug,
             ));
 
             return null;
@@ -121,19 +121,19 @@ trait MemegangOperasiLingkungan
      * tidak dihapus — riwayat yang kehilangan operasi mati menghilangkan satu-satunya petunjuk
      * kenapa sebuah lingkungan tertinggal.
      */
-    protected function ambilAlihYangKedaluwarsa(Environment $lingkungan): bool
+    protected function takeOverExpired(Environment $environment): bool
     {
-        $kedaluwarsa = EnvironmentOperation::query()
-            ->where('environment_id', $lingkungan->id)
+        $expired = EnvironmentOperation::query()
+            ->where('environment_id', $environment->id)
             ->where('status', 'running')
             ->where('lease_until', '<', now())
             ->first();
 
-        if (! $kedaluwarsa instanceof EnvironmentOperation) {
+        if (! $expired instanceof EnvironmentOperation) {
             return false;
         }
 
-        $kedaluwarsa->update([
+        $expired->update([
             'status' => 'failed',
             'finished_at' => now(),
             'lease_until' => null,
@@ -141,14 +141,14 @@ trait MemegangOperasiLingkungan
                 'Tenggatnya habis pada %s tanpa pernah ditutup — prosesnya berhenti tanpa sempat '
                 .'melaporkan apa pun. Operasi ini diambil alih percobaan berikutnya, dan langkah '
                 .'terakhir yang sempat tercapai adalah "%s".',
-                (string) $kedaluwarsa->getOriginal('lease_until'),
-                $kedaluwarsa->step ?? 'tidak tercatat',
+                (string) $expired->getOriginal('lease_until'),
+                $expired->step ?? 'tidak tercatat',
             ),
         ]);
 
         $this->warn(sprintf(
             'Operasi %s yang tenggatnya sudah lewat ditandai gagal dan diambil alih.',
-            $kedaluwarsa->id,
+            $expired->id,
         ));
 
         return true;
@@ -164,18 +164,18 @@ trait MemegangOperasiLingkungan
      * Tenggatnya dilepas bersamaan. Ia hanya berarti selama operasinya berjalan, dan baris selesai
      * yang masih membawa tenggat terbaca seolah ia masih memegang sesuatu.
      */
-    protected function tutupOperasiSebagaiGagal(EnvironmentOperation $operasi, string $langkah, Throwable $sebab): void
+    protected function closeOperationAsFailed(EnvironmentOperation $operation, string $step, Throwable $cause): void
     {
-        $pesan = trim($sebab->getMessage());
+        $message = trim($cause->getMessage());
 
-        if ($pesan === '') {
-            $pesan = $sebab::class;
+        if ($message === '') {
+            $message = $cause::class;
         }
 
-        $operasi->update([
+        $operation->update([
             'status' => 'failed',
-            'step' => $langkah,
-            'failure_message' => mb_substr($pesan, 0, 2000),
+            'step' => $step,
+            'failure_message' => mb_substr($message, 0, 2000),
             'finished_at' => now(),
             'lease_until' => null,
         ]);

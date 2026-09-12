@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Pusat;
+namespace App\Support\ControlPlane;
 
 /**
  * Kata sandi sementara yang dibuatkan operator untuk admin pertama sebuah tenant.
@@ -25,7 +25,7 @@ namespace App\Support\Pusat;
  * membuat orang menempelkan sandinya ke tempat yang lebih tidak aman. Alfabetnya tinggal 54
  * karakter, dan pada 20 karakter itu masih di atas seratus bit — tidak ada yang dikorbankan.
  */
-final class SandiSementara
+final class TemporaryPassword
 {
     private const HURUF_KECIL = 'abcdefghijkmnopqrstuvwxyz';
 
@@ -38,36 +38,36 @@ final class SandiSementara
 
     private const PANJANG = 20;
 
-    public static function buat(): string
+    public static function generate(): string
     {
         // Satu karakter dijamin dari tiap golongan lebih dulu. Mengacak dari alfabet gabungan
         // lalu berharap keempatnya muncul adalah cara membuat sandi yang sesekali ditolak aturan
         // produksi — dan kegagalan itu akan muncul pada pelanggan, bukan pada test.
-        $karakter = [
-            self::ambil(self::HURUF_KECIL),
-            self::ambil(self::HURUF_BESAR),
-            self::ambil(self::ANGKA),
-            self::ambil(self::TANDA),
+        $characters = [
+            self::pick(self::HURUF_KECIL),
+            self::pick(self::HURUF_BESAR),
+            self::pick(self::ANGKA),
+            self::pick(self::TANDA),
         ];
 
-        $alfabet = self::HURUF_KECIL.self::HURUF_BESAR.self::ANGKA.self::TANDA;
-        for ($i = count($karakter); $i < self::PANJANG; $i++) {
-            $karakter[] = self::ambil($alfabet);
+        $alphabet = self::HURUF_KECIL.self::HURUF_BESAR.self::ANGKA.self::TANDA;
+        for ($i = count($characters); $i < self::PANJANG; $i++) {
+            $characters[] = self::pick($alphabet);
         }
 
         // Tanpa pengacakan ini, empat karakter pertama selalu berasal dari golongan yang sama
         // berurutan — bentuk yang dapat ditebak, dan yang mempersempit ruang pencarian.
-        for ($i = count($karakter) - 1; $i > 0; $i--) {
+        for ($i = count($characters) - 1; $i > 0; $i--) {
             $j = random_int(0, $i);
-            [$karakter[$i], $karakter[$j]] = [$karakter[$j], $karakter[$i]];
+            [$characters[$i], $characters[$j]] = [$characters[$j], $characters[$i]];
         }
 
-        return implode('', $karakter);
+        return implode('', $characters);
     }
 
     /** `random_int` dan bukan `rand`: yang ini saja yang dijamin aman secara kriptografis. */
-    private static function ambil(string $alfabet): string
+    private static function pick(string $alphabet): string
     {
-        return $alfabet[random_int(0, strlen($alfabet) - 1)];
+        return $alphabet[random_int(0, strlen($alphabet) - 1)];
     }
 }

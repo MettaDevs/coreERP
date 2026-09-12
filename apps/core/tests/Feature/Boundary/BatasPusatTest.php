@@ -13,7 +13,7 @@ use App\Models\Tenant;
 use App\Models\TenantIdentityProvider;
 use App\Models\TenantMembership;
 use App\Models\User;
-use App\Support\Pusat\MilikPusat;
+use App\Support\ControlPlane\OwnedByControlPlane;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -57,9 +57,9 @@ class BatasPusatTest extends TestCase
     public function test_model_sisi_pusat_memakai_penandanya(string $kelas, string $tabel): void
     {
         $this->assertContains(
-            MilikPusat::class,
+            OwnedByControlPlane::class,
             class_uses_recursive($kelas),
-            $kelas.' memegang tabel `'.$tabel.'` yang disepakati milik sisi pusat, tetapi tidak memakai MilikPusat. '
+            $kelas.' memegang tabel `'.$tabel.'` yang disepakati milik sisi pusat, tetapi tidak memakai OwnedByControlPlane. '
             .'Tanpa penanda itu ia akan tertinggal di database environment pada hari kedua sisi dipisah.'
         );
     }
@@ -81,7 +81,7 @@ class BatasPusatTest extends TestCase
         $this->assertSame(
             'pgsql_test_secondary',
             Environment::query()->getConnection()->getName(),
-            'Penanda MilikPusat terpasang tetapi tidak memindahkan koneksi. Ia tidak menjaga apa pun.'
+            'Penanda OwnedByControlPlane terpasang tetapi tidak memindahkan koneksi. Ia tidak menjaga apa pun.'
         );
     }
 

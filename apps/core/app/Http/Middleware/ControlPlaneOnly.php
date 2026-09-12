@@ -35,21 +35,21 @@ use Symfony\Component\HttpFoundation\Response;
  * lawan string kosong bernilai benar, sehingga penjaga yang lupa memeriksanya akan membuka rute
  * pembuatan tenant kepada siapa pun yang mengirim header kosong.
  */
-final class HanyaPusatAdmin
+final class ControlPlaneOnly
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $seharusnya = config('coreerp.control_plane_token');
-        $dibawa = $request->bearerToken();
+        $expected = config('coreerp.control_plane_token');
+        $presented = $request->bearerToken();
 
-        if (! is_string($seharusnya) || $seharusnya === '') {
+        if (! is_string($expected) || $expected === '') {
             abort(401, 'Pemasangan ini tidak menerima perintah pusat admin.');
         }
 
         // `hash_equals` dan bukan `===`: keduanya benar, tetapi yang ini tidak berhenti lebih awal
         // pada karakter pertama yang berbeda, sehingga lamanya jawaban tidak membocorkan berapa
         // banyak karakter tebakan yang sudah tepat.
-        if (! is_string($dibawa) || ! hash_equals($seharusnya, $dibawa)) {
+        if (! is_string($presented) || ! hash_equals($expected, $presented)) {
             abort(401, 'Token pusat admin tidak dikenali.');
         }
 
