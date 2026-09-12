@@ -22,18 +22,35 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
+/**
+ * Satu-satunya jalur yang melahirkan tenant, dan sejak hari ini ia dipakai dua pintu.
+ *
+ * Pintu pertama pendaftaran mandiri: orangnya sendiri yang mengetik kata sandinya. Pintu kedua
+ * operator vendor, yang mengisikan nama dan email pelanggan lalu menerima kata sandi sementara
+ * buatan sistem — lihat `docs/todo/environment-dan-pusat-admin/README.md`, irisan 3.
+ *
+ * Yang membedakan keduanya hanya **asal kata sandinya** dan **apakah pemiliknya wajib
+ * menggantinya**. Selebihnya — slug, client, tenant, environment produksi, keanggotaan owner,
+ * entitlement, role Owner, sampai pemasangan module — sama persis, dan memang harus sama persis:
+ * dua salinan alur ini adalah dua tempat yang akan menyimpang, dan yang menyimpang di sini adalah
+ * rantai izin.
+ *
+ * Karena itu yang ditambahkan untuk pintu kedua cuma satu kunci opsional pada `$data`. Tanpa kunci
+ * itu, jalur pendaftaran mandiri menjalankan query yang sama persis seperti sebelumnya.
+ */
 class RegisterBusiness
 {
     public function __construct(private AppDependencyGraph $dependencyGraph) {}
 
     /**
-     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>}  $data
+     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>,must_change_password?:bool}  $data
      */
     public function handle(array $data): User
     {
         $hashedPassword = Hash::make($data['password']);
+        $wajibGantiSandi = $data['must_change_password'] ?? false;
 
-        return DB::transaction(function () use ($data, $hashedPassword): User {
+        return DB::transaction(function () use ($data, $hashedPassword, $wajibGantiSandi): User {
             $appIds = $this->dependencyGraph->resolveAvailable($data['app_ids']);
             $slug = $this->uniqueSlug($data['business_name']);
             $user = User::create([
@@ -41,6 +58,13 @@ class RegisterBusiness
                 'email' => Str::lower($data['email']),
                 'password' => $hashedPassword,
             ]);
+            // Ditulis terpisah, bukan disisipkan ke `User::create` di atas, dan itu disengaja:
+            // penanda ini di luar `Fillable` supaya tidak ada permintaan yang bisa menyalakannya,
+            // dan pendaftaran mandiri tidak menjalankan satu query pun lebih banyak daripada
+            // kemarin.
+            if ($wajibGantiSandi) {
+                $user->forceFill(['must_change_password' => true])->save();
+            }
             $client = Client::create([
                 'legal_name' => $data['business_name'],
                 'slug' => $slug,

@@ -61,9 +61,18 @@ class SecurityController extends Controller
      */
     public function update(PasswordUpdateRequest $request): RedirectResponse
     {
-        $request->user()->update([
+        $pengguna = $request->user();
+
+        $pengguna->update([
             'password' => $request->password,
         ]);
+
+        // Penandanya dilepas di sini, dan hanya di sini. Yang membuktikan kata sandi sementara
+        // sudah tidak beredar bukan kunjungan ke layar ini melainkan pergantiannya — penjaga yang
+        // melepas penanda begitu layarnya dibuka akan melepaskannya pada orang yang menutup tab.
+        if ($pengguna->must_change_password) {
+            $pengguna->forceFill(['must_change_password' => false])->save();
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Password updated.')]);
 

@@ -28,6 +28,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
+ * @property bool $must_change_password
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -44,6 +45,20 @@ class User extends Authenticatable implements PasskeyUser
     use MilikPusat;
 
     /**
+     * Bawaan kolom penanda, ditulis di model dan bukan hanya di skema.
+     *
+     * Bawaan database baru berlaku setelah barisnya tersimpan, sehingga model yang baru dibuat
+     * mengembalikan `null` untuk kolom ini sampai ia dibaca ulang. `null` kebetulan falsy dan
+     * kebetulan berperilaku benar — dan "kebetulan benar" bukan sesuatu yang boleh ditumpangi
+     * penjaga yang menentukan ke mana seseorang boleh pergi.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'must_change_password' => false,
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -54,6 +69,10 @@ class User extends Authenticatable implements PasskeyUser
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            // Sengaja tidak ikut `Fillable` di atas. Penanda ini menentukan ke mana seseorang
+            // boleh pergi setelah masuk, jadi ia hak — dan hak tidak boleh dapat ditentukan isi
+            // sebuah permintaan. Yang menyalakannya hanya pintu operator, lewat `forceFill`.
+            'must_change_password' => 'boolean',
             /* @chisel-2fa */
             'two_factor_confirmed_at' => 'datetime',
             /* @end-chisel-2fa */

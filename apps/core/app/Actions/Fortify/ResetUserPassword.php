@@ -22,8 +22,13 @@ class ResetUserPassword implements ResetsUserPasswords
             'password' => $this->passwordRules(),
         ])->validate();
 
+        // Jalur lupa-sandi juga menggantikan kata sandi sementara, jadi penandanya ikut padam di
+        // sini. Kalau tidak, pemilik yang kehilangan sandi sementaranya lalu menyetel ulang lewat
+        // email akan tetap terkurung di layar ganti kata sandi — dengan sandi yang sudah tidak
+        // diketahui siapa pun lagi.
         $user->forceFill([
             'password' => $input['password'],
+            'must_change_password' => false,
         ])->save();
     }
 }

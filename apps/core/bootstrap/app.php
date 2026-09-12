@@ -3,8 +3,10 @@
 use App\Http\Middleware\AuthenticateAppService;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\HanyaPusatAdmin;
 use App\Http\Middleware\LampirkanKonteksJejak;
 use App\Http\Middleware\ResolveModuleContext;
+use App\Http\Middleware\WajibGantiSandi;
 use App\Support\Observabilitas\JejakAktif;
 use App\Support\Observabilitas\PelaporKesalahan;
 use Illuminate\Foundation\Application;
@@ -32,6 +34,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'internal-app' => AuthenticateAppService::class,
             'konteks-module' => ResolveModuleContext::class,
+            // Dipasang per grup rute di `routes/api.php`, bukan global: hanya perintah pusat admin
+            // yang boleh dibuka token bersama, dan menyebarkannya lebih luas berarti menaruh satu
+            // token yang sama di depan permukaan yang jauh lebih besar daripada yang dibutuhkan.
+            'pusat-admin' => HanyaPusatAdmin::class,
         ]);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
@@ -44,6 +50,13 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            // Sesudah Inertia, bukan sebelum: yang dikembalikannya pengalihan biasa, dan Inertia
+            // sudah tahu cara menerjemahkan pengalihan menjadi kunjungan di sisi peramban.
+            //
+            // Global pada grup web dan bukan pada segelintir rute, karena kata sandi yang pernah
+            // dilihat orang lain membuat **seluruh** sesi itu meragukan, bukan sebagian. Akun
+            // tanpa penandanya tidak tersentuh — kolomnya berbawaan `false`.
+            WajibGantiSandi::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

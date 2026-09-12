@@ -21,6 +21,19 @@ return [
         'password' => env('COREERP_PROVIDER_PASSWORD'),
     ],
     'app_context_signing_key' => env('COREERP_APP_CONTEXT_SIGNING_KEY'),
+
+    /*
+     * Token bersama yang dipegang pusat admin ketika ia memerintah Core.
+     *
+     * Arah pusat → Core tidak dapat memakai kredensial app: penjaganya menuntut app yang terpasang
+     * pada sebuah tenant, sedangkan pusat admin tidak terpasang di mana pun dan justru bekerja pada
+     * tenant yang belum ada. Lihat App\Http\Middleware\HanyaPusatAdmin.
+     *
+     * Kosong berarti pemasangan ini **tidak menerima perintah pusat admin sama sekali** — bukan
+     * menerima semuanya. Itu bawaan yang benar untuk on-prem dan lingkungan lokal, yang memang
+     * tidak punya pusat admin.
+     */
+    'control_plane_token' => env('COREERP_CONTROL_PLANE_TOKEN'),
     // Penerima event Core yang berjalan sebagai proses tersendiri. Tiap baris:
     // `{"type": "...", "url": "...", "module": "..."}`. Kunci `module` opsional dan berisi id
     // module; bila module dengan id itu dimuat runtime ini, `workflow-events:publish` berhenti

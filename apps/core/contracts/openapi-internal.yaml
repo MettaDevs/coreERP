@@ -46,6 +46,10 @@ tags:
     description: Penerbitan nomor dokumen. Counter dimiliki Core, tidak pernah app.
   - name: Workflow
     description: Pengajuan workflow. Keputusannya kembali sebagai event, bukan response.
+  - name: Pusat admin
+    description: |
+      Perintah dari konsol operator vendor. Satu-satunya tag di berkas ini yang pemanggilnya
+      bukan app module, dan karena itu satu-satunya yang tidak memakai kredensial app.
 
 paths:
   /members:
@@ -631,8 +635,112 @@ paths:
               schema: { $ref: '#/components/schemas/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /tenants:
+    post:
+      tags: [Pusat admin]
+      operationId: internal.tenants.store
+      summary: Lahirkan tenant beserta admin pertamanya
+      description: |
+        **Pemanggilnya pusat admin, bukan app module.** Satu-satunya endpoint di berkas ini
+        yang tidak memakai kredensial app, dan satu-satunya yang bekerja pada tenant yang
+        belum ada — jadi tiga header kredensial itu memang tidak dapat dipakai di sini.
+        Penjaganya token bersama pada `Authorization: Bearer`; alasannya di
+        `App\Http\Middleware\HanyaPusatAdmin`.
+
+        Di belakangnya berjalan `App\Actions\Onboarding\RegisterBusiness` — aksi yang sama
+        persis yang dipakai layar pendaftaran mandiri, bukan salinannya. Yang lahir karena
+        itu bukan hanya baris `tenants`: client, environment produksi, keanggotaan owner,
+        role Owner beserta seluruh duty app yang dibeli, entitlement, satuan bawaan, dan
+        pemasangan tiap module yang ada di edisi ini.
+
+        Kata sandi sementara **dibuat Core**, tidak pernah dikirim pemanggil, dan dipulangkan
+        **sekali** di balasan ini. Ia tidak dapat dibaca lagi setelahnya; yang tersimpan hanya
+        hash-nya. Pemiliknya wajib menggantinya saat masuk pertama — sampai itu terjadi, satu
+        satunya halaman yang dapat dicapainya adalah layar ganti kata sandi.
+
+        Nama fieldnya bahasa Indonesia karena pembaca dan penulisnya operator, bukan app.
+
+        Balasannya sengaja **tanpa envelope `data`** — berbeda dari seluruh endpoint lain di
+        berkas ini. Aturan envelope itu milik permukaan app-ke-Core; yang ini perintah
+        vendor-ke-vendor dengan satu pemanggil yang diketahui namanya.
+      security:
+        - controlPlaneToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nama_badan_hukum, nama_admin, email_admin, app_ids]
+              properties:
+                nama_badan_hukum:
+                  type: string
+                  maxLength: 255
+                  description: Nama badan hukum pelanggan. Menjadi nama tenant dan dasar slug-nya.
+                nama_admin:
+                  type: string
+                  maxLength: 255
+                  description: Nama orang yang menjadi owner pertama tenant ini.
+                email_admin:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  description: |
+                    Dirapikan menjadi huruf kecil sebelum diperiksa, lalu wajib belum terdaftar.
+                    Email yang sudah punya akun ditolak 422 — sampai "satu orang banyak tenant"
+                    dikerjakan, tidak ada jalur menambahkan orang yang sudah punya akun ke tenant
+                    kedua.
+                app_ids:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items: { type: string }
+                  description: |
+                    App yang dibeli pelanggan. Tiap id wajib ada di katalog dengan status
+                    `available`; app yang belum tersedia ditolak 422. Prerequisite transitifnya
+                    ikut ditambahkan sendiri oleh graph dependency.
+      responses:
+        '201':
+          description: Tenant lahir. `kata_sandi_sementara` hanya muncul di sini, sekali.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenant_id, environment_id, email, kata_sandi_sementara]
+                properties:
+                  tenant_id: { type: string, format: ulid }
+                  environment_id:
+                    type: string
+                    format: ulid
+                    description: Environment `production` pertama tenant ini.
+                  email: { type: string, format: email }
+                  kata_sandi_sementara:
+                    type: string
+                    description: Dibuat Core, tidak dapat dibaca lagi setelah balasan ini.
+        '401':
+          description: |
+            Token pusat admin salah, tidak dikirim, atau pemasangan ini memang tidak menyetel
+            token sama sekali — dan yang terakhir juga 401, bukan terbuka.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422':
+          description: Email sudah terdaftar, app tidak tersedia, atau field wajib kurang.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
 components:
   securitySchemes:
+    controlPlaneToken:
+      type: http
+      scheme: bearer
+      description: |
+        Token bersama yang dipegang pusat admin dan Core (`COREERP_CONTROL_PLANE_TOKEN`).
+        Ia menyatakan **proses mana** yang memanggil, bukan operator mana — jejak audit per
+        orang tetap harus datang dari sisi konsol. Kosong di sisi Core berarti pemasangan itu
+        menolak setiap perintah pusat admin.
     appId:
       type: apiKey
       in: header
