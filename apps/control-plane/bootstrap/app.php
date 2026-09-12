@@ -1,7 +1,7 @@
 <?php
 
-use ControlPlane\Http\Middleware\HanyaOperator;
-use ControlPlane\Http\Middleware\SiapkanInertia;
+use ControlPlane\Http\Middleware\HandleInertiaRequests;
+use ControlPlane\Http\Middleware\OperatorOnly;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -22,11 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
-            SiapkanInertia::class,
+            HandleInertiaRequests::class,
         ]);
 
         $middleware->alias([
-            'operator' => HanyaOperator::class,
+            'operator' => OperatorOnly::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

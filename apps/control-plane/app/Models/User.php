@@ -27,13 +27,13 @@ class User extends Authenticatable
     protected $hidden = ['password', 'remember_token'];
 
     /** @return HasOne<ProviderAccess, $this> */
-    public function aksesProvider(): HasOne
+    public function providerAccess(): HasOne
     {
         return $this->hasOne(ProviderAccess::class, 'user_id');
     }
 
     public function operator(): bool
     {
-        return $this->aksesProvider()->where('role', 'provider_admin')->exists();
+        return $this->providerAccess()->where('role', 'provider_admin')->exists();
     }
 }

@@ -10,7 +10,7 @@ export default function Login() {
         password: '',
     });
 
-    function kirim(e: FormEvent) {
+    function submit(e: FormEvent) {
         e.preventDefault();
         post('/login');
     }
@@ -19,7 +19,7 @@ export default function Login() {
         <div className="bg-muted/30 text-foreground flex min-h-screen items-center justify-center px-6">
             <Head title="Masuk" />
             <form
-                onSubmit={kirim}
+                onSubmit={submit}
                 className="bg-background w-full max-w-sm space-y-5 rounded-lg border p-8 shadow-sm"
             >
                 <div>

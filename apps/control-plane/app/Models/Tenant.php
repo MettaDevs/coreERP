@@ -33,15 +33,15 @@ class Tenant extends Model
     /**
      * Pilihan pelanggan untuk formulir, urut nama.
      *
-     * @return list<array{id: string, nama: string}>
+     * @return list<array{id: string, name: string}>
      */
-    public static function pilihan(): array
+    public static function options(): array
     {
         return array_values(
             self::query()
                 ->orderBy('name')
                 ->get(['id', 'name'])
-                ->map(fn (self $t): array => ['id' => $t->id, 'nama' => $t->name])
+                ->map(fn (self $t): array => ['id' => $t->id, 'name' => $t->name])
                 ->all()
         );
     }
@@ -53,30 +53,30 @@ class Tenant extends Model
      * dilahirkan — untuk membaca kata sandi sementaranya — jadi barisnya harus ada di tempat mata
      * jatuh pertama kali, bukan di akhir daftar yang panjang.
      *
-     * @return list<array{id: string, nama: string, lingkungan: int, dibuat: ?string}>
+     * @return list<array{id: string, name: string, environments: int, createdAt: ?string}>
      */
-    public static function daftar(): array
+    public static function forScreen(): array
     {
         return array_values(
             self::query()
-                ->withCount(['lingkungan as jumlah_lingkungan' => self::hanyaYangHidup(...)])
+                ->withCount(['environments as environments_count' => self::onlyLive(...)])
                 ->orderByDesc('created_at')
                 ->orderBy('name')
                 ->get(['id', 'name', 'created_at'])
                 ->map(fn (self $t): array => [
                     'id' => $t->id,
-                    'nama' => $t->name,
-                    'lingkungan' => (int) $t->getAttribute('jumlah_lingkungan'),
-                    'dibuat' => $t->created_at?->toDateString(),
+                    'name' => $t->name,
+                    'environments' => (int) $t->getAttribute('environments_count'),
+                    'createdAt' => $t->created_at?->toDateString(),
                 ])
                 ->all()
         );
     }
 
-    /** @return HasMany<Lingkungan, $this> */
-    public function lingkungan(): HasMany
+    /** @return HasMany<Environment, $this> */
+    public function environments(): HasMany
     {
-        return $this->hasMany(Lingkungan::class, 'tenant_id');
+        return $this->hasMany(Environment::class, 'tenant_id');
     }
 
     /**
@@ -86,10 +86,10 @@ class Tenant extends Model
      * yang menyebut hal yang sama dengan nilai berbeda selalu membuat yang membacanya berhenti
      * mempercayai keduanya.
      *
-     * @param  Builder<Lingkungan>  $kueri
+     * @param  Builder<Environment>  $query
      */
-    private static function hanyaYangHidup(Builder $kueri): void
+    private static function onlyLive(Builder $query): void
     {
-        $kueri->whereNull('deleted_at');
+        $query->whereNull('deleted_at');
     }
 }

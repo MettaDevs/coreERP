@@ -20,13 +20,13 @@
         <script>
             (function () {
                 try {
-                    var pilihan = localStorage.getItem('tampilan');
-                    var gelap = pilihan === 'gelap'
-                        || (pilihan !== 'terang'
+                    var choice = localStorage.getItem('theme');
+                    var dark = choice === 'dark'
+                        || (choice !== 'light'
                             && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-                    document.documentElement.classList.toggle('dark', gelap);
-                    document.documentElement.style.colorScheme = gelap ? 'dark' : 'light';
+                    document.documentElement.classList.toggle('dark', dark);
+                    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
                 } catch (e) {
                     // Peramban yang memblokir penyimpanan situs tetap mendapat tema terang.
                 }

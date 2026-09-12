@@ -2,24 +2,24 @@
 
 declare(strict_types=1);
 
-use ControlPlane\Http\Controllers\Keluar;
-use ControlPlane\Http\Controllers\Lingkungan\Daftar as DaftarLingkungan;
-use ControlPlane\Http\Controllers\Lingkungan\Rincian as RincianLingkungan;
-use ControlPlane\Http\Controllers\Lingkungan\Siapkan as SiapkanLingkungan;
-use ControlPlane\Http\Controllers\Lingkungan\Simpan as SimpanLingkungan;
-use ControlPlane\Http\Controllers\Masuk;
-use ControlPlane\Http\Controllers\Pelanggan\Daftar as DaftarPelanggan;
-use ControlPlane\Http\Controllers\Pelanggan\Simpan as SimpanPelanggan;
+use ControlPlane\Http\Controllers\Customers\Index as CustomerIndex;
+use ControlPlane\Http\Controllers\Customers\Store as CustomerStore;
+use ControlPlane\Http\Controllers\Environments\Index as EnvironmentIndex;
+use ControlPlane\Http\Controllers\Environments\Provision as EnvironmentProvision;
+use ControlPlane\Http\Controllers\Environments\Show as EnvironmentShow;
+use ControlPlane\Http\Controllers\Environments\Store as EnvironmentStore;
+use ControlPlane\Http\Controllers\Login;
+use ControlPlane\Http\Controllers\Logout;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/lingkungan');
 
 Route::middleware('guest')->group(function (): void {
-    Route::get('/login', [Masuk::class, 'form'])->name('login');
-    Route::post('/login', [Masuk::class, 'kirim']);
+    Route::get('/login', [Login::class, 'form'])->name('login');
+    Route::post('/login', [Login::class, 'submit']);
 });
 
-Route::post('/logout', Keluar::class)->middleware('auth');
+Route::post('/logout', Logout::class)->middleware('auth');
 
 /*
  * Setiap alamat di bawah lewat `auth` DAN `operator`.
@@ -30,11 +30,11 @@ Route::post('/logout', Keluar::class)->middleware('auth');
  * menampilkan data yang sama dijaga gate.
  */
 Route::middleware(['auth', 'operator'])->group(function (): void {
-    Route::get('/pelanggan', DaftarPelanggan::class)->name('pelanggan.daftar');
-    Route::post('/pelanggan', SimpanPelanggan::class)->name('pelanggan.simpan');
+    Route::get('/pelanggan', CustomerIndex::class)->name('customers.index');
+    Route::post('/pelanggan', CustomerStore::class)->name('customers.store');
 
-    Route::get('/lingkungan', DaftarLingkungan::class)->name('lingkungan.daftar');
-    Route::post('/lingkungan', SimpanLingkungan::class)->name('lingkungan.simpan');
-    Route::get('/lingkungan/{lingkungan}', RincianLingkungan::class)->name('lingkungan.rincian');
-    Route::post('/lingkungan/{lingkungan}/siapkan', SiapkanLingkungan::class)->name('lingkungan.siapkan');
+    Route::get('/lingkungan', EnvironmentIndex::class)->name('environments.index');
+    Route::post('/lingkungan', EnvironmentStore::class)->name('environments.store');
+    Route::get('/lingkungan/{lingkungan}', EnvironmentShow::class)->name('environments.show');
+    Route::post('/lingkungan/{lingkungan}/siapkan', EnvironmentProvision::class)->name('environments.provision');
 });

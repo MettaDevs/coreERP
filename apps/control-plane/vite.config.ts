@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import { defineConfig } from 'vite';
 
-// apps/pusat-admin/vite.config.ts -> apps/pusat-admin -> apps -> akar repo
+// apps/control-plane/vite.config.ts -> apps/control-plane -> apps -> akar repo
 const akarRepo = fileURLToPath(new URL('../..', import.meta.url));
 
 /*

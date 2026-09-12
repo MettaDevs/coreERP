@@ -23,7 +23,7 @@ return [
      * pesan galat yang lahir dari panggilan gagal: yang harus terbaca operator adalah "alamat ini
      * yang dicoba", bukan "entah kenapa".
      */
-    'alamat' => rtrim((string) env('COREERP_URL', 'http://localhost:8000'), '/'),
+    'base_url' => rtrim((string) env('COREERP_URL', 'http://localhost:8000'), '/'),
 
     /*
      * Kunci yang dikirim sebagai `Authorization: Bearer`, dan Core yang memeriksanya.
@@ -43,7 +43,7 @@ return [
      * lebih lambat. Batas bawaan Guzzle (30 detik) ditulis di sini apa adanya supaya ia dapat
      * dinaikkan tanpa menyentuh kode ketika seseorang menemukannya terlalu pendek.
      */
-    'tenggat' => (int) env('COREERP_TIMEOUT', 30),
+    'timeout' => (int) env('COREERP_TIMEOUT', 30),
 
     /*
      * Batas menunggu khusus penyiapan lingkungan, dalam detik.
@@ -57,6 +57,6 @@ return [
      * Terputus di sini tidak membatalkan apa pun di sisi Core — perintahnya berjalan sampai
      * selesai dan memang aman diulang. Yang rusak hanya kepercayaan operator pada layarnya.
      */
-    'tenggat_siapkan' => (int) env('COREERP_TIMEOUT_SIAPKAN', 300),
+    'provision_timeout' => (int) env('COREERP_PROVISION_TIMEOUT', 300),
 
 ];

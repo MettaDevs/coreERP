@@ -4,7 +4,7 @@
  * Satu koneksi saja, dan ia menunjuk database yang sama dengan Core.
  *
  * Itu bukan kompromi sementara yang lupa dirapikan melainkan keadaan Irisan 1 apa adanya: batasnya
- * sudah ditarik di tingkat kode (penanda `MilikPusat` di Core), databasenya belum dipisah. Ketika
+ * sudah ditarik di tingkat kode (penanda `OwnedByControlPlane` di Core), databasenya belum dipisah. Ketika
  * ia dipisah kelak, yang berubah hanya isi `DB_DATABASE` di berkas env ini — bukan satu baris pun
  * kode di sini.
  */

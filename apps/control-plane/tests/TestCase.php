@@ -34,14 +34,14 @@ abstract class TestCase extends BaseTestCase
          * `parent::setUp()` karena di situlah pengosongannya berjalan, dan kerusakannya tidak
          * dapat dibatalkan.
          */
-        $baca = static fn (string $kunci): string => (string) (getenv($kunci) ?: ($_ENV[$kunci] ?? ''));
+        $read = static fn (string $key): string => (string) (getenv($key) ?: ($_ENV[$key] ?? ''));
 
-        $koneksi = $baca('DB_CONNECTION');
-        $jalur = $baca('DB_TEST_SCHEMA') ?: 'coreerp_test';
+        $connection = $read('DB_CONNECTION');
+        $schema = $read('DB_TEST_SCHEMA') ?: 'coreerp_test';
 
-        if ($koneksi !== 'pgsql_test' || $jalur === 'public') {
+        if ($connection !== 'pgsql_test' || $schema === 'public') {
             $this->fail(
-                'Suite ini menunjuk koneksi "'.$koneksi.'" dengan schema "'.$jalur.'". '
+                'Suite ini menunjuk koneksi "'.$connection.'" dengan schema "'.$schema.'". '
                 .'Konsol operator membangun ulang skema Core saat test, jadi ia hanya boleh '
                 .'berjalan di schema test — bukan di schema kerja siapa pun.'
             );
@@ -79,13 +79,13 @@ abstract class TestCase extends BaseTestCase
      */
     protected function setUpTraits(): array
     {
-        $bawaan = (string) config('database.default');
-        $databaseUji = (string) config('database.connections.'.$bawaan.'.database');
-        $databaseKerja = (string) config('database.connections.pgsql.database');
+        $default = (string) config('database.default');
+        $testDatabase = (string) config('database.connections.'.$default.'.database');
+        $workingDatabase = (string) config('database.connections.pgsql.database');
 
-        if ($databaseKerja !== '' && $databaseUji === $databaseKerja) {
+        if ($workingDatabase !== '' && $testDatabase === $workingDatabase) {
             $this->fail(
-                'Koneksi test menunjuk database "'.$databaseUji.'", yang sama dengan database kerja. '
+                'Koneksi test menunjuk database "'.$testDatabase.'", yang sama dengan database kerja. '
                 .'Suite ini menjalankan migrate:fresh, jadi ia akan membuang seluruh tabel database '
                 .'yang sedang dipakai bekerja. Buat database terpisah lalu setel DB_TEST_DATABASE.'
             );

@@ -1,7 +1,7 @@
-export type Operator = { nama: string; email: string };
+export type Operator = { name: string; email: string };
 
 /*
- * Props bersama dari `SiapkanInertia`, dinyatakan sekali untuk seluruh konsol.
+ * Props bersama dari `HandleInertiaRequests`, dinyatakan sekali untuk seluruh konsol.
  *
  * Tanpa ini setiap komponen yang membacanya harus menulis ulang bentuknya sebagai generic
  * `usePage<...>()`, dan bentuk yang ditulis di banyak tempat adalah bentuk yang kelak berbeda di
@@ -11,8 +11,8 @@ declare module '@inertiajs/core' {
     export interface InertiaConfig {
         sharedPageProps: {
             operator: Operator | null;
-            pesan: string | null;
-            [kunci: string]: unknown;
+            message: string | null;
+            [key: string]: unknown;
         };
     }
 }
