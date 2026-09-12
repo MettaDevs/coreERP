@@ -91,7 +91,7 @@ COPY apps/core/package.json ./apps/core/
 # hanya menyalin `COPY --from=vendor /repo/apps/core`. Jalur 1 `scripts/verify-edition.sh` menagih
 # hasilnya: ia menghitung folder di `/repo/apps` pada image yang sudah jadi dan menolak apa pun
 # selain `core`.
-COPY apps/pusat-admin/package.json ./apps/pusat-admin/
+COPY apps/control-plane/package.json ./apps/control-plane/
 COPY packages/ui ./packages/ui
 # npm dapat diam-diam melewatkan optional native binding ketika unduhannya gagal
 # (npm/cli#4828): instalasinya tetap melapor sukses, lalu build meledak jauh

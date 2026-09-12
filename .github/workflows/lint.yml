@@ -152,7 +152,7 @@ jobs:
   # atas. `eslint.config.js` berada di akar repo dan `npm run lint:check` milik Core menjalankan
   # `eslint ../..`, jadi konsol ini sudah masuk jangkauannya sejak berkasnya ada. Prettier tidak:
   # ia bekerja dari daftar pola, bukan dari satu konfigurasi yang menjangkau semuanya, sehingga
-  # satu pola untuk `apps/pusat-admin/resources/js` ditambahkan ke `format:check` milik Core.
+  # satu pola untuk `apps/control-plane/resources/js` ditambahkan ke `format:check` milik Core.
   #
   # Keduanya ditaruh di job Core dan bukan di sini karena node beserta `npm ci` sudah terpasang di
   # sana. Job kedua yang memasangnya lagi membayar dua menit untuk memeriksa berkas yang sama.
@@ -162,7 +162,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: apps/pusat-admin
+        working-directory: apps/control-plane
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

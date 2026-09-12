@@ -162,7 +162,7 @@ jobs:
       # satu langkah pun di alur ini berubah warna.
       #
       # Tidak ada image edisi yang dibangun ulang di sini. Dua image sekali pakai berisi dua baris
-      # sudah cukup: satu hanya memuat `apps/core`, satu lagi ditambah `apps/pusat-admin`.
+      # sudah cukup: satu hanya memuat `apps/core`, satu lagi ditambah `apps/control-plane`.
       # Skripnya yang gagal sendiri bila pemeriksanya tetap hijau pada image yang bocor — atau
       # bila ia justru merah pada image yang bersih, karena pemeriksa yang selalu merah akan
       # dimatikan orang pertama yang terhalang olehnya.

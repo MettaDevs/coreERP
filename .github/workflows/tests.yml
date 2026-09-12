@@ -236,7 +236,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: apps/pusat-admin
+        working-directory: apps/control-plane
 
     services:
       postgres:

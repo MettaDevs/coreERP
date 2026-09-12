@@ -45,7 +45,7 @@ apps/core/bootstrap/cache/*.php
 # `workspaces` pada `package.json` akar tetapi tidak ada di konteks membuatnya berhenti sebelum
 # satu paket pun terpasang.
 #
-# `apps/pusat-admin` sekarang memang ada di `workspaces` akar, dan karena itu satu berkas
+# `apps/control-plane` sekarang memang ada di `workspaces` akar, dan karena itu satu berkas
 # dikecualikan di bawah: manifest npm-nya, nol baris kode. Pengecualian itu menjawab kebutuhan
 # `npm ci` dan tidak lebih; seluruh `app/`, `routes/`, `resources/`, dan `config/`-nya tetap tidak
 # pernah masuk konteks. Kalau kelak ada berkas kedua yang ingin dikecualikan, berhenti dulu —
@@ -53,5 +53,5 @@ apps/core/bootstrap/cache/*.php
 # sesuatu dari perkakas vendor".
 apps/provider-console
 apps/web-shell
-apps/pusat-admin
-!apps/pusat-admin/package.json
+apps/control-plane
+!apps/control-plane/package.json
