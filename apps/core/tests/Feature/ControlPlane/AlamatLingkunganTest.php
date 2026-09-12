@@ -56,22 +56,22 @@ class AlamatLingkunganTest extends TestCase
         config(['coreerp.domain_dasar' => 'contoh.co.id']);
 
         $this->assertSame(
-            'ivs-uat.sandbox.contoh.co.id',
+            'ivs--uat.sandbox.contoh.co.id',
             AlamatLingkungan::untuk('ivs', 'uat', 'sandbox'),
         );
     }
 
-    public function test_slug_lingkungan_bertanda_hubung_tidak_terbelah_di_tempat_yang_salah(): void
+    public function test_kedua_sisi_boleh_bertanda_hubung(): void
     {
-        // Memotong dari kanan akan menghasilkan tenant "ivs-peragaan" dan lingkungan "penjualan" —
-        // dua nama yang tidak pernah ada. Slug tenant tidak pernah memuat tanda hubung dari sisi
-        // kanan; slug lingkungan justru sering.
+        // Ini yang membunuh pemisah tanda-hubung-tunggal: SLUG TENANT juga bertanda hubung —
+        // `uniqueSlug()` meng-slugify nama badan hukum, jadi "PT Sinar Abadi" menjadi
+        // `pt-sinar-abadi`. Dengan satu tanda hubung, alamat ini ambigu dari kedua arah.
         config(['coreerp.domain_dasar' => 'contoh.co.id']);
 
-        $alamat = AlamatLingkungan::dariHost('ivs-peragaan-penjualan.demo.contoh.co.id');
+        $alamat = AlamatLingkungan::dariHost('pt-sinar-abadi--peragaan-penjualan.demo.contoh.co.id');
 
         $this->assertNotNull($alamat);
-        $this->assertSame('ivs', $alamat->tenant);
+        $this->assertSame('pt-sinar-abadi', $alamat->tenant);
         $this->assertSame('peragaan-penjualan', $alamat->lingkungan);
         $this->assertSame('demo', $alamat->jenis);
     }
@@ -96,7 +96,7 @@ class AlamatLingkunganTest extends TestCase
         // `pelanggan.demo.localhost:8000` adalah bentuk yang dipakai selama pengembangan.
         config(['coreerp.domain_dasar' => 'localhost']);
 
-        $alamat = AlamatLingkungan::dariHost('ivs-uji.demo.localhost:8000');
+        $alamat = AlamatLingkungan::dariHost('ivs--uji.demo.localhost:8000');
 
         $this->assertNotNull($alamat);
         $this->assertSame('ivs', $alamat->tenant);
@@ -152,7 +152,7 @@ class AlamatLingkunganTest extends TestCase
 
         $lingkungan = $this->lingkungan('demo', 'peragaan', 'active');
 
-        $this->get('http://ujialamat-peragaan.demo.contoh.co.id/login')->assertOk();
+        $this->get('http://ujialamat--peragaan.demo.contoh.co.id/login')->assertOk();
 
         $this->assertTrue(app()->bound(LingkunganAktif::KUNCI));
         $this->assertSame($lingkungan->id, app(LingkunganAktif::KUNCI));
@@ -166,7 +166,7 @@ class AlamatLingkunganTest extends TestCase
 
         $this->lingkungan('demo', 'belumjadi', 'provisioning');
 
-        $this->get('http://ujialamat-belumjadi.demo.contoh.co.id/login')->assertNotFound();
+        $this->get('http://ujialamat--belumjadi.demo.contoh.co.id/login')->assertNotFound();
         $this->assertFalse(app()->bound(LingkunganAktif::KUNCI));
     }
 
@@ -176,7 +176,7 @@ class AlamatLingkunganTest extends TestCase
 
         // 404 dan bukan 403: keberadaan sebuah lingkungan adalah informasi, dan 403 memberi tahu
         // penanya bahwa pelanggan itu memang punya demo.
-        $this->get('http://ujialamat-tidakada.demo.contoh.co.id/login')->assertNotFound();
+        $this->get('http://ujialamat--tidakada.demo.contoh.co.id/login')->assertNotFound();
     }
 
     public function test_jenis_yang_salah_pada_alamat_tidak_menemukan_apa_pun(): void
@@ -187,7 +187,44 @@ class AlamatLingkunganTest extends TestCase
 
         $this->lingkungan('demo', 'peragaan', 'active');
 
-        $this->get('http://ujialamat-peragaan.sandbox.contoh.co.id/login')->assertNotFound();
+        $this->get('http://ujialamat--peragaan.sandbox.contoh.co.id/login')->assertNotFound();
+    }
+
+    public function test_label_tanpa_pemisah_ganda_ditolak(): void
+    {
+        // Bentuk lama, yang sempat dicetak percobaan pertama. Ia ambigu, jadi ditolak alih-alih
+        // ditebak — menebak menghasilkan tenant yang tidak pernah ada, diam-diam.
+        config(['coreerp.domain_dasar' => 'contoh.co.id']);
+
+        $this->assertNull(AlamatLingkungan::dariHost('pt-sinar-abadi-peragaan.demo.contoh.co.id'));
+    }
+
+    public function test_pemisah_ganda_lebih_dari_sekali_ditolak(): void
+    {
+        config(['coreerp.domain_dasar' => 'contoh.co.id']);
+
+        $this->assertNull(AlamatLingkungan::dariHost('a--b--c.demo.contoh.co.id'));
+    }
+
+    public function test_alamat_berbentuk_lingkungan_yang_tidak_terurai_menjawab_404(): void
+    {
+        // Dengan DNS wildcard, setiap label yang pernah diketik siapa pun sampai ke sini.
+        // Menyajikan aplikasi pangkal di sana berarti aplikasi kita dapat disajikan dari alamat
+        // mana saja yang dikarang orang.
+        config(['coreerp.domain_dasar' => 'contoh.co.id']);
+
+        $this->get('http://karangan-orang.demo.contoh.co.id/login')->assertNotFound();
+    }
+
+    public function test_label_konsol_tidak_dituntut_menunjuk_lingkungan(): void
+    {
+        // Konsol operator dan alamat pemasaran hidup di bawah domain yang sama dan berbentuk satu
+        // label — persis bentuk alamat produksi. Tanpa pengecualian ini, konsolnya mati dengan 404
+        // yang tidak menyebut sebabnya sama sekali.
+        config(['coreerp.domain_dasar' => 'contoh.co.id']);
+
+        $this->get('http://admin.contoh.co.id/login')->assertOk();
+        $this->get('http://www.contoh.co.id/login')->assertOk();
     }
 
     private function lingkungan(string $jenis, string $slug, string $status): Environment

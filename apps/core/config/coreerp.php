@@ -16,7 +16,7 @@ return [
      * Domain dasar yang di bawahnya tiap lingkungan memperoleh alamatnya sendiri.
      *
      *   production : <tenant>.contoh.co.id
-     *   selain itu : <tenant>-<lingkungan>.<jenis>.contoh.co.id
+     *   selain itu : <tenant>--<lingkungan>.<jenis>.contoh.co.id
      *
      * **Kosong berarti satu alamat untuk semua, dan itu bawaannya.** On-prem melayani satu
      * pelanggan dari satu alamat selamanya, dan lingkungan pengembangan sebelum DNS disiapkan juga
@@ -24,7 +24,7 @@ return [
      * menyala — dan seluruh perilaku hari ini utuh.
      *
      * Untuk mencobanya di mesin sendiri, isi `localhost`: peramban modern menyelesaikan setiap
-     * `*.localhost` ke mesin sendiri, jadi `pelanggan-uji.demo.localhost:8000` bekerja tanpa
+     * `*.localhost` ke mesin sendiri, jadi `pelanggan--uji.demo.localhost:8000` bekerja tanpa
      * menyentuh DNS sama sekali.
      *
      * Di server, bentuk ini menuntut satu sertifikat berisi empat nama — `*.contoh.co.id`,
@@ -33,6 +33,20 @@ return [
      * `docs/todo/environment-dan-pusat-admin/README.md`.
      */
     'domain_dasar' => env('COREERP_DOMAIN_DASAR'),
+
+    /*
+     * Label yang tidak pernah menjadi lingkungan, meski berada di bawah domain yang sama.
+     *
+     * Konsol operator dan alamat pemasaran berbentuk satu label — persis bentuk alamat produksi.
+     * Tanpa daftar ini, `admin.contoh.co.id` akan dicari sebagai tenant bernama "admin", tidak
+     * ditemukan, lalu dijawab 404: konsol operator mati dengan pesan yang tidak menyebut sebabnya
+     * sama sekali.
+     *
+     * Menambah baris di sini berarti menyatakan label itu memang bukan milik pelanggan. Itu
+     * keputusan produk, bukan keputusan pembangunan — pelanggan yang slug-nya kebetulan `api` akan
+     * kehilangan alamatnya tanpa pernah tahu kenapa.
+     */
+    'label_bukan_lingkungan' => ['admin', 'www', 'api'],
 
     // `deployment` dibuang pada 11 September 2026 bersama satu-satunya pembacanya: pendaftaran
     // usaha kini menulis baris `environments`, bukan `tenant_deployments`. Sebelumnya `pull_images`

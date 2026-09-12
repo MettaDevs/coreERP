@@ -56,7 +56,18 @@ class TetapkanLingkungan
         $alamat = AlamatLingkungan::dariHost($request->getHost());
 
         if ($alamat === null) {
-            return $next($request);
+            // Di luar domain kita — bukan urusan kita, lewat. Ini jalur yang dilalui on-prem,
+            // lingkungan lokal, dan seluruh test yang ada.
+            if (! AlamatLingkungan::dibawahDomain($request->getHost())) {
+                return $next($request);
+            }
+
+            // **Di bawah** domain kita tetapi tidak terurai. Itu keadaan yang berbeda: dengan DNS
+            // wildcard, setiap label yang pernah diketik siapa pun sampai ke sini, dan menyajikan
+            // aplikasi pangkal di sana berarti aplikasi kita dapat disajikan dari alamat mana saja
+            // yang dikarang orang. Label yang memang bukan lingkungan — konsol, pemasaran — sudah
+            // dikecualikan lebih dulu di `AlamatLingkungan`, dan jatuh ke cabang di atas.
+            abort(404);
         }
 
         $lingkungan = Environment::query()
