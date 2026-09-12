@@ -638,6 +638,68 @@ tidak ada yang membutuhkan environment sebelum environment diketahui.
 
 Lapis pertama tidak dapat dihapus tanpa sengaja. Lapis kedua yang membuat pesannya berguna.
 
+### Yang harus ikut dipaku ketika koneksi bawaan digeser
+
+Menggeser `database.default` memindahkan **semua** yang tidak menyebut koneksinya sendiri. Sebagian
+besar tabel memang harus ikut pindah — itu gunanya. Yang tidak boleh ikut adalah tabel sisi pusat,
+dan daftarnya lebih panjang daripada daftar model bertrait `OwnedByControlPlane`.
+
+| Yang dipaku | Kunci config | Kalau lupa |
+| --- | --- | --- |
+| Model sisi pusat | `coreerp.control_connection` | `users`, `tenants`, `clients`, registry environment dicari di database lingkungan |
+| Sesi | `session.connection` | Setiap permintaan ke alamat lingkungan memulai sesi baru; login tidak pernah bertahan |
+| Cache | `cache.stores.database.connection` | Pembatas laju login berjalan per lingkungan, bukan per pemasangan |
+| Kunci cache | `cache.stores.database.lock_connection` | Dua pekerja memegang kunci yang sama tanpa saling melihat |
+| Antrean | `queue.connections.database.connection` | Job yang dilahirkan di sandbox menunggu di tabel `jobs` yang tidak dibaca pekerja mana pun |
+| Job gagal | `queue.failed.database` | Kegagalan job tersebar di puluhan database dan tidak pernah dibaca |
+| Token reset sandi | `auth.passwords.users.connection` | Tautan reset sandi dibuat di satu database dan dicari di database lain |
+
+Dipaku lewat config, bukan lewat urutan middleware, dan bedanya menentukan. Urutan mengandalkan
+sesuatu yang berjalan lebih dulu; pakuan mengandalkan nilai yang memang disetel. Penjaga database
+dev yang gagal sebelumnya di repo ini gagal persis karena ia memeriksa niat, bukan akibat.
+
+### Dua hal yang ditemukan saat menelusuri jalur masuk, dan keduanya tidak akan berbunyi
+
+**Passkey tidak ikut terpaku oleh `OwnedByControlPlane`.** `User` memang memakai trait itu, tetapi
+`passkeys()` adalah relasi, dan Eloquent memberi model terkait koneksi dari **properti** `$connection`
+— bukan dari `getConnectionName()` yang trait itu timpa. Properti itu null, jadi model passkey jatuh
+ke koneksi bawaan, yaitu database lingkungan. Akibatnya: pelanggan yang masuk dengan passkey dari
+alamat lingkungannya tidak menemukan passkey-nya sendiri.
+
+Menambal dengan mewariskan koneksi ke setiap relasi salah — sebuah model sisi pusat boleh punya
+relasi ke data tenant, dan pewarisan buta akan menyeret yang itu ikut ke pusat. Yang benar menandai
+model terkaitnya: `Laravel\Passkeys\Passkeys::usePasskeyModel()` menerima kelas pengganti, jadi
+`App\Models\Passkey` mewarisi milik paket lalu memakai `OwnedByControlPlane` sendiri.
+
+**`fortify.passkeys.allowed_origins` berisi satu alamat.** Ia diturunkan dari `app.url`, sedangkan
+pelanggan masuk dari `<tenant>.contoh.co.id`. WebAuthn menerima `relying_party_id` yang merupakan
+akhiran terdaftar dari origin — jadi `contoh.co.id` sah untuk seluruh subdomain — tetapi daftar
+origin yang diizinkan tetap diperiksa apa adanya. Sampai daftarnya diturunkan dari domain dasar,
+passkey hanya bekerja pada satu alamat.
+
+Keduanya tidak akan pernah merah di suite mana pun hari ini: seluruh test berjalan pada satu
+database dan satu alamat.
+
+### Gagal tertutup: 404 dan 503 menjawab pertanyaan yang berbeda
+
+| Keadaan | Jawaban | Kenapa |
+| --- | --- | --- |
+| Di bawah domain kita, tidak terurai | 404 | Keberadaan sebuah lingkungan adalah informasi; 403 memberi tahu penanya bahwa demo itu memang ada |
+| Terurai, tetapi belum pernah punya skema | 404 | Ia memang belum pernah ada bagi siapa pun |
+| Terurai, pernah hidup, sekarang tidak aktif | **503** | Pemiliknya sudah tahu ia ada. Menyembunyikannya tidak melindungi apa pun dan membuat gangguan terbaca seperti salah ketik |
+
+Pembedanya `schema_migrated_at`: terisi berarti lingkungan itu pernah benar-benar berdiri.
+
+### Lapis gagal-tertutup kedua menunggu database pusat benar-benar terpisah
+
+Rancangan ini menyebut dua lapis, dan yang pertama — koneksi bawaan menunjuk database yang tidak ada
+— **belum dapat dipasang**. Ia menuntut `coreerp.control_connection` menunjuk koneksi bernama yang
+benar-benar terpisah, sedangkan hari ini ia kosong dan seluruh tabel berbagi satu database.
+
+Yang sudah berlaku sekarang: selama satu permintaan berada di lingkungan yang punya database sendiri,
+`control_connection` **diisi** dengan koneksi semula. Jadi pakuan sisi pusat nyata, bahkan sebelum
+databasenya dipisah. Yang belum nyata hanyalah ledakan otomatis bagi jalur yang lupa menggeser.
+
 ### Empat jalur yang wajib disebut
 
 Keempatnya pernah menjadi sumber bug kelas ini di sistem mana pun yang melakukannya.
@@ -777,6 +839,77 @@ Environment yang gagal di tengah ditandai dan **menolak dirutekan**, dengan hala
 environment buruk tidak menyandera yang lain, dan ia juga tidak diam-diam melayani skema yang belum
 selesai dimigrasi.
 
+### `environment:upgrade` — satu perintah, tiga pekerjaan
+
+Ia memutari setiap lingkungan yang punya databasenya sendiri, dan untuk masing-masing menjalankan:
+
+1. **migration Core** ke dalam database itu;
+2. **migration module** untuk tiap module yang tercatat terpasang di sana;
+3. **pemasangan module yang baru dibeli** — `InstallEntitledModules` dipanggil apa adanya, dan ia
+   melewati yang sudah terpasang tanpa mengisi ulang data awalnya.
+
+Langkah ketiga itu yang menutup lingkaran. Sebuah tenant yang membeli app tambahan bulan depan tidak
+menuntut jalur tersendiri: entitlementnya bertambah, perintah yang sama memasangnya di setiap tempat
+kerja tenant itu.
+
+Lingkungan yang `database_name`-nya kosong dilewati, dan itu bukan kelalaian: ia memang tinggal di
+database pusat, yang sudah dimigrasi `php artisan migrate` biasa sebelum perintah ini berjalan.
+
+### Kegagalan satu lingkungan tidak boleh menyandera yang lain
+
+Loop naif yang berhenti di lingkungan ketiga membuat yang keempat sampai terakhir tidak pernah
+dimigrasi — dan karena penjadwal membuang keluarannya, tidak ada yang tahu sampai sesuatu pecah
+berbulan-bulan kemudian.
+
+Jadi: tiap lingkungan dibungkus sendiri, kegagalan dicatat, loop berlanjut, dan kode keluar perintahnya
+bukan nol bila ada satu pun yang gagal. Ringkasan di akhir menyebut nama yang berhasil dan yang tidak,
+karena keluaran yang hanya berbunyi "3 gagal" memaksa orangnya membuka database untuk tahu yang mana.
+
+### Gagal berarti `maintenance`, bukan `degraded`
+
+Keduanya sama-sama tidak dirutekan, tetapi artinya berbeda dan jawabannya berbeda.
+
+`degraded` untuk lingkungan yang **penyiapannya** gagal: ia belum pernah hidup, jadi 404 benar.
+`maintenance` untuk lingkungan yang **pembaruannya** gagal: ia hidup kemarin dan pemiliknya tahu ia
+ada, jadi 503 benar.
+
+Dan berhenti melayani memang jawaban yang benar di sana, meski terasa keras. Kode yang sudah terpasang
+menuntut skema baru; melayaninya di atas skema lama berarti pelanggan bertemu galat yang tidak dapat
+dijelaskan siapa pun, satu per satu, sepanjang hari. Yang salah bukan pilihan berhentinya melainkan
+membiarkan kegagalannya tidak terlihat.
+
+### Seed yang harus sampai ke pelanggan lama adalah migration, bukan seeder
+
+Ini aturan, bukan selera, dan ia menjawab setengah dari pertanyaan "kalau saya menambah seed".
+
+`seeded_at` menandai **sekali seumur pemasangan**. Itu memang bentuk yang benar untuk data awal:
+pelanggan yang menonaktifkan module lalu mengaktifkannya lagi tidak boleh mendapat master bawaan
+dobel. Akibatnya, seeder yang ditambahi baris baru pada versi berikutnya **tidak akan pernah berjalan**
+untuk tenant yang sudah memasangnya.
+
+Jadi pembagiannya:
+
+| Jenisnya | Ditulis sebagai | Sampai ke |
+| --- | --- | --- |
+| Data awal saat module dipasang | seeder module | Tenant yang baru memasang |
+| Data acuan baru untuk semua | **migration data** | Semua, lama maupun baru |
+
+Core sudah menganut pola itu tanpa pernah menuliskannya: `seed_country_regions` adalah migration,
+bukan seeder. Yang belum ada hanya kalimat yang mengikatnya, dan kalimat itu sekarang ada di
+`AGENTS.md`.
+
+### Ongkos yang sudah diketahui dan belum dibayar
+
+Menjalankan `environment:upgrade` sebagai bagian dari rilis berarti **setiap rilis tertahan sampai
+seluruh lingkungan selesai dimigrasi.** Sepuluh lingkungan tidak terasa; dua ratus adalah jendela
+pemeliharaan berpuluh menit bagi semua pelanggan sekaligus.
+
+Untuk tahun pertama itu diterima dengan sadar, dan alasannya angka: 5–10 prospek per minggu, dan tidak
+semuanya jadi. Jalan keluarnya sudah dirancang di bagian
+[Migration yang menyebar ke banyak environment](#migration-yang-menyebar-ke-banyak-environment) —
+jendela per lingkungan beserta pembatalan otomatisnya, dan *deployment rings*. Keduanya pekerjaan
+tersendiri, dan tidak satu pun dari keduanya menjadi mendesak sebelum lingkungannya berpuluh.
+
 ::: warning Masalah yang harus diputuskan sebelum pelanggan ke-50, bukan sesudahnya
 `deploy/compose.edition.yaml` menjalankan `core-migrate` sebagai layanan sekali-jalan, dan ketiga
 layanan lain menunggunya selesai. Membuatnya memutari setiap environment berarti **setiap rilis
@@ -825,6 +958,126 @@ kelas bug sekaligus: environment baru yang lahir dengan skema tertinggal.
 
 Belum dikerjakan, dan sengaja dicatat sebagai perbaikan, bukan syarat.
 :::
+
+## Layar Pembaruan: memantau armada dari satu tempat
+
+Perintah `environment:upgrade` menjawab "bagaimana caranya"; layar ini menjawab "bagaimana kami
+tahu ia berhasil". AWS menyebut keharusannya tanpa basa-basi: *"the system should enable tenants to
+be onboarded, managed, and operated through a single pane of glass"*, dan yang harus disimpan control
+plane disebut eksplisit — *"You need to know which version of infrastructure, software, or feature
+each tenant uses, what they're eligible to migrate to, and the time-based data associated with those
+states. Tracking this information is often one of the responsibilities of a control plane."*
+
+### Yang ditiru, beserta alasannya
+
+**Dipantau dengan menanyakan daftar operasi, bukan daftar environment.** Business Central menyatakan
+ini sebagai aturan, bukan saran: *"consumers should rely on the `status` field of the corresponding
+`EnvironmentOperation` response to monitor the status of the underlying operation. So, to get the
+updated status of the operation, consumers should poll the `Get environment operations for all
+environments` endpoint rather than `Get Environments`"*.
+
+Kita sudah punya tabelnya sejak Irisan 1 — `environment_operations`, lengkap dengan status, langkah,
+alasan gagal, waktu mulai dan selesai, serta siapa yang meminta. **Pemantauannya karena itu gratis;
+yang kurang hanya layarnya.**
+
+**Sasaran dihitung ulang saat eksekusi, bukan saat tombol ditekan.** Azure SQL Elastic Jobs
+menyebutnya *dynamic enumeration*: *"Dynamic enumeration ensures that jobs run across all databases
+that exist in the server or pool at the time of job execution."* Dan ia menyebut kenapa itu penting
+justru untuk kasus seperti kita: *"especially in SaaS customer scenarios where databases are added or
+deleted dynamically."*
+
+Akibatnya di kode kita: perintahnya membaca `environments` saat berjalan. Lingkungan yang lahir satu
+menit setelah tombol ditekan ikut, tanpa didaftarkan ke mana pun.
+
+**Skrip pembaruan wajib aman diulang.** Elastic Jobs menuntutnya sebagai syarat, bukan anjuran:
+*"An elastic job's T-SQL scripts must be idempotent, that is, if the script succeeds and it runs
+again, the same result occurs."* `environment:provision` sudah begitu sejak awal, dan
+`environment:upgrade` mewarisi sifat itu dari komponen yang sama.
+
+**Kolom yang berulang di lebih dari satu vendor.** Versi sekarang, versi target berikutnya, status
+operasi, waktu mulai dan selesai, pesan galat, dan siapa yang memicunya. Business Central memberi
+nama field-nya sendiri — `versionDetails.version`, "Latest Available Version", "Next Update",
+`errorMessage`, `createdBy` — dan Elastic Jobs memberi padanan barisnya: `start_time`, `end_time`,
+`last_message`, `current_attempts`.
+
+### Bentuk layarnya
+
+Satu halaman, `/pembaruan`.
+
+Kepala halaman menyebut **versi platform** — sidik skema milik image yang sedang berjalan — beserta
+hitungan: berapa mutakhir, berapa tertinggal, berapa bermasalah. Satu tombol: **Perbarui semua yang
+tertinggal**.
+
+Tabelnya satu baris per lingkungan:
+
+| Kolom | Isinya |
+| --- | --- |
+| Pelanggan / Lingkungan | Nama badan hukum dan nama tempat kerjanya |
+| Jenis | Produksi, Demo, Sandbox |
+| Versi | Sidik skema lingkungan itu, dipendekkan |
+| Keadaan | Mutakhir · Tertinggal · Sedang diperbarui · Gagal · Belum punya database |
+| Operasi terakhir | Hasil, langkah terakhir, dan alasan bila gagal |
+| Waktu | Mulai dan selesai |
+| Oleh | Operator yang memicunya, atau Sistem |
+| Aksi | Perbarui — hanya untuk yang tertinggal atau gagal |
+
+"Keadaan" yang dibaca operator, bukan sidiknya. Sidik skema adalah nama berkas migration sepanjang
+lima puluh karakter; ia jawaban yang benar untuk mesin dan jawaban yang tidak terbaca untuk manusia.
+
+### Yang sengaja TIDAK ditiru, dan kenapa
+
+**Jendela pembaruan per lingkungan.** Business Central punya seluruh mesinnya: minimum enam jam,
+bawaan 20:00–06:00 waktu setempat, dan pembatalan otomatis — *"Updates that fail to complete before
+the end of the update window are canceled to ensure the environment is operational during business
+hours. The update is automatically rescheduled seven days later and notification recipients are
+informed."*
+
+Ia menjawab masalah yang belum kita punya: ribuan environment di banyak zona waktu, dengan jendela
+bisnis yang berbeda-beda. Pada sepuluh lingkungan di satu zona waktu, yang dibutuhkan hanyalah
+operator yang menekan tombol pada jam yang ia pilih sendiri. Membangun penjadwal, pembatalan
+otomatis, dan penjadwalan ulang sekarang berarti empat mekanisme baru yang tidak satu pun dapat
+diuji pada armada seukuran ini.
+
+**Pemberitahuan email.** Sama alasannya, ditambah satu fakta: repo ini tidak punya satu pun jalur
+email. Memasang pemberitahuan berarti membangun jalur itu lebih dulu.
+
+**Deployment rings.** Azure mendefinisikannya dengan jelas — canary, early adopter, users — dan
+Business Central benar-benar menyimpan `ringName` pada tiap environment. Ia berguna ketika rilis
+menyentuh cukup banyak pelanggan sehingga urutannya menentukan. Sepuluh pelanggan tidak punya urutan
+yang berarti.
+
+**Baris induk per rollout.** Elastic Jobs memisahkan eksekusi induk dan anak — *"`step_id` ... `NULL`
+indicates this execution is the parent job execution"*. Kita tidak, karena `environment_operations`
+berkunci asing ke sebuah environment dan sebuah rollout tidak dimiliki environment mana pun.
+Hitungan "berapa berjalan" dihitung dari barisnya, bukan disimpan di baris kedua yang harus dijaga
+tetap sepakat.
+
+Keempatnya dicatat di sini beserta sumbernya supaya yang menambahkannya kelak tidak memulai dari nol.
+
+### Percobaan ulang: tiga, bukan sepuluh
+
+Elastic Jobs mengulang sepuluh kali dengan backoff ×2,0, batas 120 detik, dan tenggat langkah dua
+belas jam. Angka itu masuk akal untuk kegagalan jaringan sesaat pada armada ribuan database.
+
+Migration yang ditolak PostgreSQL karena bentuknya salah akan ditolak lagi dengan cara yang sama
+sepuluh kali, dan yang dihasilkan hanya sepuluh baris kegagalan yang sama. Tiga cukup untuk melewati
+putusnya koneksi sesaat, dan sisanya memang butuh manusia.
+
+Tiap percobaan membuka barisnya sendiri di `environment_operations`, jadi riwayat percobaannya
+terbaca tanpa kolom penghitung — percobaan yang gagal ditutup sebagai `failed` sebelum percobaan
+berikutnya boleh membuka kuncinya.
+
+### Satu hal yang tidak dijawab vendor mana pun
+
+Apakah kegagalan satu tenant seharusnya menghentikan tenant lain. Business Central, Elastic Jobs,
+Power Platform, dan AWS tidak satu pun menyatakannya. Yang paling dekat hanya nilai
+`SucceededWithSkipped` pada `job_executions` — bukti bahwa sebagian target boleh dilewati tanpa
+menggagalkan induknya, dan itu bukti tidak langsung.
+
+Keputusan kita: **lanjut.** Loop yang berhenti di lingkungan ketiga membuat yang keempat sampai
+terakhir tidak pernah dimigrasi, dan karena penjadwal membuang keluarannya, tidak ada yang tahu
+sampai sesuatu pecah berbulan-bulan kemudian. Yang menggantikan penghentian adalah kode keluar bukan
+nol beserta ringkasan yang menyebut nama — bukan diamnya.
 
 ## Operasi Copy, beserta pelucutannya
 
@@ -1690,6 +1943,23 @@ Dibaca dari sumbernya pada 11 September 2026.
 - [Copy an environment — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/tenant-admin-center-environments-copy) — **daftar pelucutannya**, dan pernyataan bahwa kepatuhan privasi ditangani terpisah
 - [Environment planning — Dynamics 365 F&O](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/organization-administration/environment-planning) — tier dan bentuk topologinya
 - [Refresh database — Dynamics 365 F&O](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/database/database-refresh) — satu refresh pada satu waktu, di luar jam sibuk
+
+**Memantau dan menjalankan pembaruan ke banyak database sekaligus** — dibaca pada 12 September 2026
+
+- [Managing updates in the admin center — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/tenant-admin-center-update-management) — field yang ditampilkan per environment, jendela pembaruan minimum enam jam, dan pembatalan otomatis di ujung jendela
+- [Update cycles — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/update-rollout-timeline) — update period, grace period, enforced period, dan penjadwalan ulang tujuh hari sesudah gagal
+- [Admin Center API: environments — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/administration-center-api_environments) — **aturan bahwa status dipantau dari daftar operasi, bukan dari daftar environment**, beserta enum `Queued`/`Scheduled`/`Running`/`Succeeded`/`Failed`/`Canceled`/`Skipped`
+- [Environment lifecycle trace telemetry — Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/telemetry-environment-lifecycle-trace) — delapan event daur hidup pembaruan beserta dimensinya; peta yang berguna kalau kelak kita mengirim sinyal serupa ke SigNoz
+- [Elastic Jobs overview — Azure SQL](https://learn.microsoft.com/en-us/azure/azure-sql/database/elastic-jobs-overview?view=azuresql) — *dynamic enumeration*, dan pernyataan bahwa skrip job **wajib idempoten**
+- [`jobs.job_executions`](https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/jobs-job-executions-elastic-jobs-transact-sql?view=azuresqldb-current) — sepuluh nilai `lifecycle`, beserta kolom yang layak ditiru sebagai kolom layar
+- [`jobs.sp_add_jobstep`](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-add-jobstep-elastic-jobs-transact-sql?view=azuresqldb-current) — angka percobaan ulang bawaannya: 10 kali, backoff ×2,0, batas 120 detik, tenggat langkah 12 jam
+- [Considerations for updating a multitenant solution — Azure](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/updates) — *deployment rings*, dan kalimat yang mengikat control plane: ia wajib tahu versi apa yang dipakai tiap tenant dan boleh naik ke mana
+- [General design principles — AWS SaaS Lens](https://docs.aws.amazon.com/wellarchitected/latest/saas-lens/general-design-principles.html) — *single pane of glass*, dan keharusan membuat tampilan operasional yang sadar tenant
+- [Multi-tenant SaaS partitioning models for PostgreSQL — AWS](https://docs.aws.amazon.com/prescriptive-guidance/latest/saas-multitenant-managed-postgresql/partitioning-models.html) — silo, bridge, pool; **ongkos model silo ditulis apa adanya**, dan model kita silo
+
+Satu hal yang **tidak** terjawab sumber mana pun, dan dicatat supaya tidak dikira sudah diputuskan
+orang lain: apakah kegagalan satu tenant seharusnya menghentikan tenant lain. Keempat vendor diam.
+Keputusan "lanjut" adalah keputusan kita sendiri, beserta risikonya sendiri.
 
 **ERP lain yang memecahkan persoalan yang sama**
 
