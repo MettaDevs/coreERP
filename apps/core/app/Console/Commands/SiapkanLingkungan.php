@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\MemegangOperasiLingkungan;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use Illuminate\Console\Command;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use PDOException;
 use RuntimeException;
@@ -48,6 +48,8 @@ use Throwable;
  */
 final class SiapkanLingkungan extends Command
 {
+    use MemegangOperasiLingkungan;
+
     protected $signature = 'environment:siapkan {environment : Id baris environments yang disiapkan}';
 
     protected $description = 'Buatkan database sebuah environment, jalankan migration Core ke dalamnya, lalu aktifkan';
@@ -89,7 +91,10 @@ final class SiapkanLingkungan extends Command
      * `environment:copy` kelak tidak masuk kategori itu — ia harus memperpanjang tenggatnya sendiri
      * selagi berjalan, dan itu pekerjaan yang lahir bersama perintahnya.
      */
-    private const TENGGAT_MENIT = 30;
+    protected function tenggatOperasiMenit(): int
+    {
+        return 30;
+    }
 
     public function handle(): int
     {
@@ -114,7 +119,7 @@ final class SiapkanLingkungan extends Command
             return self::FAILURE;
         }
 
-        $operasi = $this->bukaOperasi($lingkungan);
+        $operasi = $this->bukaOperasi($lingkungan, 'provision');
 
         if (! $operasi instanceof EnvironmentOperation) {
             return self::FAILURE;
@@ -196,98 +201,6 @@ final class SiapkanLingkungan extends Command
         $terbaca = rtrim(substr($terbaca, 0, 63 - 4 - 1 - 10), '_');
 
         return 'env_'.$terbaca.'_'.$sidik;
-    }
-
-    /**
-     * Membuka satu baris operasi, atau menolak karena sudah ada yang berjalan.
-     *
-     * Tidak ada penguncian di sini, dan itu disengaja. Partial unique index
-     * `environment_operations_satu_berjalan` sudah menjadi kuncinya; menambah pemeriksaan
-     * "apakah ada yang berjalan" di depannya hanya memindahkan balapan satu baris ke atas tanpa
-     * menutupnya. Jadi barisnya disisipkan apa adanya, dan bentrokan yang muncul diterjemahkan.
-     */
-    private function bukaOperasi(Environment $lingkungan, bool $ambilAlih = true): ?EnvironmentOperation
-    {
-        $koneksi = DB::connection((new EnvironmentOperation)->getConnectionName());
-
-        try {
-            // Savepoint, dan itu bukan hiasan. PostgreSQL membatalkan **seluruh** blok transaksi
-            // begitu satu perintah di dalamnya ditolak, jadi sisipan yang sejak awal memang boleh
-            // ditolak akan menjatuhkan transaksi milik siapa pun yang kebetulan membungkus
-            // perintah ini. Savepoint membuat penolakannya berhenti pada dirinya sendiri.
-            return $koneksi->transaction(fn (): EnvironmentOperation => EnvironmentOperation::create([
-                'environment_id' => $lingkungan->id,
-                'operation' => 'provision',
-                'status' => 'running',
-                'step' => 'mulai',
-                'started_at' => now(),
-                'lease_until' => now()->addMinutes(self::TENGGAT_MENIT),
-            ]));
-        } catch (QueryException $e) {
-            if (! str_contains($e->getMessage(), 'environment_operations_satu_berjalan')) {
-                throw $e;
-            }
-
-            if ($ambilAlih && $this->ambilAlihYangKedaluwarsa($lingkungan)) {
-                return $this->bukaOperasi($lingkungan, ambilAlih: false);
-            }
-
-            $this->error(sprintf(
-                'Sudah ada operasi yang berjalan atas environment "%s" dan tenggatnya belum lewat. '
-                .'Tunggu sampai ia selesai, atau tunggu tenggatnya habis — percobaan berikutnya akan '
-                .'mengambil alih sendiri.',
-                $lingkungan->slug,
-            ));
-
-            return null;
-        }
-    }
-
-    /**
-     * Menyatakan gagal operasi yang tenggatnya sudah lewat, supaya percobaan ini boleh masuk.
-     *
-     * Ini pasangan dari kunci di atas, dan tanpanya kunci itu berubah menjadi kebuntuan. Proses yang
-     * mati keras — OOM, container dibunuh, koneksi putus di tengah migration — tidak sempat menutup
-     * barisnya, sehingga indeks "satu operasi berjalan" menolak percobaan ulang yang merupakan
-     * satu-satunya pemulihan yang desain ini izinkan.
-     *
-     * Yang diambil alih **hanya** yang tenggatnya lewat. Operasi yang masih hidup tetap menang, dan
-     * itulah yang membedakan pengambilalihan dari sekadar menabrak kunci orang.
-     *
-     * Ia menulis alasannya apa adanya, bukan menghapus barisnya. Riwayat yang kehilangan operasi
-     * mati justru menghilangkan satu-satunya petunjuk kenapa sebuah environment tertinggal.
-     */
-    private function ambilAlihYangKedaluwarsa(Environment $lingkungan): bool
-    {
-        $kedaluwarsa = EnvironmentOperation::query()
-            ->where('environment_id', $lingkungan->id)
-            ->where('status', 'running')
-            ->where('lease_until', '<', now())
-            ->first();
-
-        if (! $kedaluwarsa instanceof EnvironmentOperation) {
-            return false;
-        }
-
-        $kedaluwarsa->update([
-            'status' => 'failed',
-            'finished_at' => now(),
-            'lease_until' => null,
-            'failure_message' => sprintf(
-                'Tenggatnya habis pada %s tanpa pernah ditutup — prosesnya berhenti tanpa sempat '
-                .'melaporkan apa pun. Operasi ini diambil alih percobaan berikutnya, dan langkah '
-                .'terakhir yang sempat tercapai adalah "%s".',
-                (string) $kedaluwarsa->getOriginal('lease_until'),
-                $kedaluwarsa->step ?? 'tidak tercatat',
-            ),
-        ]);
-
-        $this->warn(sprintf(
-            'Operasi %s yang tenggatnya sudah lewat ditandai gagal dan diambil alih.',
-            $kedaluwarsa->id,
-        ));
-
-        return true;
     }
 
     /**
@@ -391,21 +304,7 @@ final class SiapkanLingkungan extends Command
      */
     private function tandaiGagal(Environment $lingkungan, EnvironmentOperation $operasi, string $langkah, Throwable $e): void
     {
-        $pesan = trim($e->getMessage());
-
-        if ($pesan === '') {
-            $pesan = $e::class;
-        }
-
-        $operasi->update([
-            'status' => 'failed',
-            'step' => $langkah,
-            'failure_message' => mb_substr($pesan, 0, 2000),
-            'finished_at' => now(),
-            // Tenggatnya dilepas bersamaan. Ia hanya berarti selama operasinya berjalan, dan baris
-            // selesai yang masih membawa tenggat terbaca seolah ia masih memegang sesuatu.
-            'lease_until' => null,
-        ]);
+        $this->tutupOperasiSebagaiGagal($operasi, $langkah, $e);
 
         $lingkungan->update(['status' => 'degraded']);
     }
