@@ -51,17 +51,40 @@ class CoreCommandContractTest extends TestCase
             );
         }
 
-        if (! function_exists('yaml_parse_file')) {
-            // Ekstensi `yaml` tidak ada di mesin mana pun yang dipakai repo ini, jadi kontraknya
-            // dibaca dengan pembaca sederhana di bawah alih-alih menambah dependensi demi satu test.
-            $this->contract = $this->readNaively((string) file_get_contents($file));
+        /*
+         * Kedua cabang WAJIB menghasilkan bentuk yang sama, dan itu pelajaran mahal.
+         *
+         * Sebelumnya cabang `yaml_parse_file` menyimpan hasil parse apa adanya — dan di sana
+         * `paths` adalah map yang KUNCINYA alamat, bukan daftar alamat. `assertContains()`
+         * memeriksa nilai, jadi seluruh pemeriksaan alamat gagal; dan `lines` tidak ada sama
+         * sekali, jadi pemeriksaan token meledak sebagai ErrorException.
+         *
+         * Ia tidak pernah terlihat karena tidak ada mesin pengembang di sini yang memasang
+         * ekstensi `yaml` — komentar lama bahkan menyatakan itu sebagai alasan. Runner CI
+         * memasangnya, jadi test yang seharusnya menjaga kontrak justru merah HANYA di tempat
+         * yang menjaganya.
+         *
+         * Sekarang keduanya dinormalkan di sini, sekali, sebelum satu assertion pun berjalan.
+         */
+        $lines = array_map(trim(...), explode('
+', (string) file_get_contents($file)));
+
+        if (function_exists('yaml_parse_file')) {
+            /** @var array<string, mixed> $parsed */
+            $parsed = yaml_parse_file($file);
+            $paths = is_array($parsed['paths'] ?? null) ? array_keys($parsed['paths']) : [];
+
+            $this->contract = [
+                'paths' => array_map(strval(...), $paths),
+                'lines' => $lines,
+            ];
 
             return;
         }
 
-        /** @var array<string, mixed> $parsed */
-        $parsed = yaml_parse_file($file);
-        $this->contract = $parsed;
+        // Tanpa ekstensinya, alamatnya dipungut dari bentuk barisnya. Menambah dependensi demi
+        // satu test tidak sepadan, dan pembaca sederhana ini cukup untuk pertanyaan yang diajukan.
+        $this->contract = $this->readNaively((string) file_get_contents($file));
     }
 
     public function test_the_address_the_console_calls_is_in_the_contract(): void
