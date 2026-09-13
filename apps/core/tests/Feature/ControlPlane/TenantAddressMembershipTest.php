@@ -6,6 +6,7 @@ namespace Tests\Feature\ControlPlane;
 
 use App\Models\Client;
 use App\Models\Environment;
+use App\Models\ProviderAccess;
 use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
@@ -140,6 +141,23 @@ class TenantAddressMembershipTest extends TestCase
         $this->actingAs($user)
             ->get('http://tenanta.contoh.co.id/join')
             ->assertOk();
+    }
+
+    /**
+     * Akun vendor tidak ditolak — akses vendor ke tenant pelanggan diputuskan "bebas dulu".
+     *
+     * Tetapi ia juga tidak memperoleh workspace tenant lain: vendor yang anggota tenant B masuk ke
+     * alamat A **tanpa** workspace, bukan dengan workspace B.
+     */
+    public function test_a_vendor_account_is_let_in_but_without_another_tenants_workspace(): void
+    {
+        $vendor = $this->memberOf($this->tenantB);
+        ProviderAccess::create(['user_id' => $vendor->id, 'role' => 'provider_admin']);
+
+        $this->actingAs($vendor)
+            ->get('http://tenanta.contoh.co.id/dashboard')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('auth.membership', null));
     }
 
     // ------------------------------------------------------------------ yang tidak berubah

@@ -32,11 +32,16 @@ use Symfony\Component\HttpFoundation\Response;
  * Tamu tidak disentuh — halaman masuk memang harus tampil di alamat tenant. Penempatan tanpa
  * domain dasar dan alamat pangkal juga tidak: di sana tidak ada tenant pemilik alamat.
  *
- * ## Yang belum
+ * ## Akun vendor tidak ditolak
  *
- * Akses vendor ke tenant pelanggan diputuskan "bebas dulu", tetapi belum punya jalur di workspace
- * — akun vendor tanpa keanggotaan sebelumnya pun tidak mendapat workspace tenant itu. Middleware
- * ini karena itu tidak membuka pengecualian untuknya; jalurnya perlu dirancang tersendiri.
+ * Pemilik produk memutuskan akses vendor ke tenant pelanggan "bebas dulu", dan akun vendor ditandai
+ * `provider_access` — penanda yang sama yang membuka katalog aplikasi dan pemantauan identitas.
+ * Menolaknya di sini akan membatalkan keputusan itu diam-diam.
+ *
+ * Yang **tidak** ikut dibebaskan adalah workspace-nya. Saringan di `CurrentWorkspace` tetap berlaku
+ * bagi vendor, jadi vendor yang bukan anggota tenant ini tidak memperoleh workspace tenant lain di
+ * alamat ini — ia masuk tanpa workspace. Jalur vendor yang benar-benar bekerja di dalam tenant
+ * pelanggan belum ada, dan perlu dirancang tersendiri.
  */
 class RequireTenantMembershipAtAddress
 {
@@ -52,6 +57,10 @@ class RequireTenantMembershipAtAddress
         }
 
         if (in_array($request->route()?->getName(), self::ALWAYS_REACHABLE, true)) {
+            return $next($request);
+        }
+
+        if ($request->user()->providerAccess()->exists()) {
             return $next($request);
         }
 
