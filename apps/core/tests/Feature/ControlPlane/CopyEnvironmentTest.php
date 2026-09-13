@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Concerns\DropsTestDatabases;
 use Tests\TestCase;
 
 /**
@@ -47,6 +48,7 @@ use Tests\TestCase;
 #[Group('serial')]
 class CopyEnvironmentTest extends TestCase
 {
+    use DropsTestDatabases;
     use RefreshDatabase;
 
     /** Awalan slug tenant uji; ia yang muncul di nama database dan yang dipakai membersihkannya. */
@@ -78,9 +80,14 @@ class CopyEnvironmentTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->dropTestDatabases();
-
-        parent::tearDown();
+        // `finally`, dan bukan kerapian: pembuangan database yang gagal di sini pernah melewati
+        // `parent::tearDown()`, meninggalkan transaksi `RefreshDatabase` terbuka, dan membuat test
+        // berikutnya menunggu kuncinya selamanya. Lihat `DropsTestDatabases`.
+        try {
+            $this->dropTestDatabases();
+        } finally {
+            parent::tearDown();
+        }
     }
 
     // ------------------------------------------------------------------ jalur merah: penolakan
@@ -91,7 +98,7 @@ class CopyEnvironmentTest extends TestCase
             ->assertExitCode(Command::FAILURE);
 
         $this->assertSame(0, EnvironmentOperation::query()->count());
-        $this->assertSame([], $this->testDatabase());
+        $this->assertSame([], $this->createdTestDatabases());
     }
 
     public function test_a_sandbox_may_not_be_copied(): void
@@ -134,7 +141,7 @@ class CopyEnvironmentTest extends TestCase
 
         $this->assertSame(0, EnvironmentOperation::query()->count());
         $this->assertSame(1, Environment::query()->count());
-        $this->assertSame([], $this->testDatabase(), 'Tidak satu pun database boleh lahir dari penolakan.');
+        $this->assertSame([], $this->createdTestDatabases(), 'Tidak satu pun database boleh lahir dari penolakan.');
     }
 
     public function test_another_copy_still_alive_refuses_a_second_copy(): void
@@ -208,7 +215,7 @@ class CopyEnvironmentTest extends TestCase
         $this->assertSame($databaseName, $sandbox->database_name);
         $this->assertNotNull($sandbox->copied_at);
         $this->assertNotNull($sandbox->schema_fingerprint);
-        $this->assertContains($databaseName, $this->testDatabase(), 'Databasenya harus benar-benar ada di pg_database.');
+        $this->assertContains($databaseName, $this->createdTestDatabases(), 'Databasenya harus benar-benar ada di pg_database.');
 
         // Datanya benar-benar menyeberang, bukan hanya skemanya. Sebuah database yang bermigrasi
         // tanpa satu baris pun terlihat persis seperti penyalinan yang berhasil.
@@ -377,7 +384,7 @@ class CopyEnvironmentTest extends TestCase
         $this->assertSame('active', $sandbox->status);
         $this->assertSame($databaseName, $sandbox->database_name);
         $this->assertSame(2, Environment::query()->count());
-        $this->assertCount(2, $this->testDatabase());
+        $this->assertCount(2, $this->createdTestDatabases());
 
         $operation = EnvironmentOperation::query()->where('operation', 'copy')->get();
         $this->assertCount(2, $operation);
@@ -592,7 +599,7 @@ class CopyEnvironmentTest extends TestCase
     }
 
     /** @return list<string> */
-    private function test_database(): array
+    private function createdTestDatabases(): array
     {
         $rows = $this->maintenance()->select(
             'select datname from pg_database where datname like ? order by datname',
@@ -615,8 +622,8 @@ class CopyEnvironmentTest extends TestCase
             DB::purge($koneksi);
         }
 
-        foreach ($this->testDatabase() as $name) {
-            $this->maintenance()->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $name));
+        foreach ($this->createdTestDatabases() as $name) {
+            $this->dropTestDatabase($this->maintenance(), $name);
         }
 
         DB::purge('test_maintenance');

@@ -231,8 +231,28 @@ jobs:
       #
       # Jadwal mingguan menjalankan semuanya tanpa pengecualian. Yang dijaga sapuan itu berubah
       # jarang; biayanya dibayar pada setiap perubahan apa pun.
-      - name: Tests
-        run: php artisan test --parallel ${{ github.event_name == 'pull_request' && '--exclude-group=lambat' || '' }}
+      # Dua jalur, dan jalur keduanya wajib.
+      #
+      # Empat kelas bertanda `#[Group('serial')]` membuat dan membuang database PostgreSQL
+      # sungguhan. Menjalankannya bersama yang lain di banyak proses membuat mereka saling
+      # membuang database milik yang lain — itu sebabnya `composer test:parallel` dan
+      # `composer test:serial` dipisah sejak 13 September 2026.
+      #
+      # Alur ini tidak ikut dipisah waktu itu, dan akibatnya terukur: suite yang sebelumnya
+      # selesai dalam 9 menit menembus batas 30 menit dan dibatalkan GitHub. Bukan karena
+      # lambat — karena buntu. `ProvisionEnvironmentTest` gagal di `tearDown`, transaksi
+      # `RefreshDatabase` karena itu tidak pernah dibatalkan, dan tiap test berikutnya di
+      # pekerja yang sama menunggu kunci `clients_slug_unique` selamanya.
+      - name: Tests (paralel)
+        # Flag diulang, bukan dipisah koma. PHPUnit 12 membaca `--exclude-group=serial,lambat` sebagai
+        # SATU grup bernama "serial,lambat" — diukur: 795 test ikut, keempat kelas serial di dalamnya,
+        # dan run paralel buntu di `ProvisionEnvironmentTest` sampai tenggat 10 menit habis.
+        run: php artisan test --parallel --exclude-group=serial ${{ github.event_name == 'pull_request' && '--exclude-group=lambat' || '' }}
+
+      # Satu proses, tanpa `--parallel`. Yang dijaga di sini bukan kecepatan melainkan
+      # kepemilikan: tiap kelas membuat databasenya sendiri dan membuangnya lagi di `tearDown`.
+      - name: Tests (serial)
+        run: php artisan test --group=serial
 
   # Konsol operator diuji terpisah dari Core, dan itu sengaja.
   #

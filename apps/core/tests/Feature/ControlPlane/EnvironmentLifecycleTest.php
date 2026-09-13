@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Concerns\DropsTestDatabases;
 use Tests\TestCase;
 
 /**
@@ -42,6 +43,7 @@ use Tests\TestCase;
 #[Group('serial')]
 class EnvironmentLifecycleTest extends TestCase
 {
+    use DropsTestDatabases;
     use RefreshDatabase;
 
     /** Awalan nama database uji; ia yang dipakai membuang sisa-sisanya. */
@@ -64,9 +66,14 @@ class EnvironmentLifecycleTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->dropTestDatabases();
-
-        parent::tearDown();
+        // `finally`, dan bukan kerapian: pembuangan database yang gagal di sini pernah melewati
+        // `parent::tearDown()`, meninggalkan transaksi `RefreshDatabase` terbuka, dan membuat test
+        // berikutnya menunggu kuncinya selamanya. Lihat `DropsTestDatabases`.
+        try {
+            $this->dropTestDatabases();
+        } finally {
+            parent::tearDown();
+        }
     }
 
     // ------------------------------------------------------- sapuan: jalur hijau
@@ -644,7 +651,7 @@ class EnvironmentLifecycleTest extends TestCase
         );
 
         foreach ($rows as $database) {
-            $this->maintenance()->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', (string) $database->datname));
+            $this->dropTestDatabase($this->maintenance(), (string) $database->datname);
         }
 
         DB::purge('test_maintenance');

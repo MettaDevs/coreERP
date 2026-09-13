@@ -37,6 +37,11 @@ class TrustedProxyTest extends TestCase
 {
     protected function setUp(): void
     {
+        // Ketiganya, bukan dua. Repository env Laravel membaca `$_SERVER` lebih dulu, dan pemuat
+        // `.env` menulis ke sana. Tanpa baris pertama, `COREERP_TRUSTED_PROXIES=` yang kosong di
+        // `.env.example` — yang disalin CI — mengalahkan nilai test ini, dan test hanya hijau di
+        // mesin yang `.env`-nya kebetulan sudah berisi `*`. Terukur: merah di CI, hijau di laptop.
+        $_SERVER['COREERP_TRUSTED_PROXIES'] = '*';
         $_ENV['COREERP_TRUSTED_PROXIES'] = '*';
         putenv('COREERP_TRUSTED_PROXIES=*');
 
@@ -45,7 +50,7 @@ class TrustedProxyTest extends TestCase
 
     protected function tearDown(): void
     {
-        unset($_ENV['COREERP_TRUSTED_PROXIES']);
+        unset($_SERVER['COREERP_TRUSTED_PROXIES'], $_ENV['COREERP_TRUSTED_PROXIES']);
         putenv('COREERP_TRUSTED_PROXIES');
 
         parent::tearDown();

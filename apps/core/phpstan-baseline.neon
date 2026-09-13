@@ -919,12 +919,6 @@ parameters:
 			path: app/Support/WorkflowRuntime.php
 
 		-
-			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
-			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 1
-			path: bootstrap/app.php
-
-		-
 			message: '#^Undefined variable\: \$tableName$#'
 			identifier: variable.undefined
 			count: 1

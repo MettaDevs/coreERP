@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Concerns\DropsTestDatabases;
 use Tests\TestCase;
 
 /**
@@ -37,6 +38,7 @@ use Tests\TestCase;
 #[Group('serial')]
 class ConvertEnvironmentTest extends TestCase
 {
+    use DropsTestDatabases;
     use RefreshDatabase;
 
     /** Awalan slug tenant uji; ia yang muncul di nama database dan yang dipakai membersihkannya. */
@@ -71,9 +73,14 @@ class ConvertEnvironmentTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->dropTestDatabases();
-
-        parent::tearDown();
+        // `finally`, dan bukan kerapian: pembuangan database yang gagal di sini pernah melewati
+        // `parent::tearDown()`, meninggalkan transaksi `RefreshDatabase` terbuka, dan membuat test
+        // berikutnya menunggu kuncinya selamanya. Lihat `DropsTestDatabases`.
+        try {
+            $this->dropTestDatabases();
+        } finally {
+            parent::tearDown();
+        }
     }
 
     // ---------------------------------------------------------------- jalur merah
@@ -481,7 +488,7 @@ class ConvertEnvironmentTest extends TestCase
     }
 
     /** @return list<string> */
-    private function test_database(): array
+    private function createdTestDatabases(): array
     {
         $rows = $this->maintenance()->select(
             'select datname from pg_database where datname like ? order by datname',
@@ -503,8 +510,8 @@ class ConvertEnvironmentTest extends TestCase
         DB::purge('environment_provisioning');
         DB::purge('environment_convert');
 
-        foreach ($this->testDatabase() as $name) {
-            $this->maintenance()->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $name));
+        foreach ($this->createdTestDatabases() as $name) {
+            $this->dropTestDatabase($this->maintenance(), $name);
         }
 
         DB::purge('test_maintenance');
