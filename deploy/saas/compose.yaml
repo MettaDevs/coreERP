@@ -224,7 +224,7 @@ services:
   # Kalau node ini mati, yang hilang kemampuan MEMBUAT pelanggan baru; pelanggan yang sudah ada
   # tetap bekerja lewat Core.
   core-console:
-    profiles: [edge]
+    profiles: [console]
     image: ${CONSOLE_IMAGE:?CONSOLE_IMAGE wajib}
     restart: unless-stopped
     environment:

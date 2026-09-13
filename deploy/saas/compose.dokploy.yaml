@@ -1,0 +1,31 @@
+# Tindihan untuk mesin yang SUDAH punya Traefik — misalnya yang dikelola Dokploy.
+#
+# ## Kenapa tindihan, bukan cabang di berkas utama
+#
+# Compose tidak dapat memasang network secara bersyarat. Menaruh `dokploy-network` di berkas utama
+# membuat setiap mesin yang tidak memilikinya gagal menyala — termasuk laptop pengembang, yang
+# justru paling sering memakainya. Tindihan menyatakan bedanya di satu tempat, dan hanya dipakai
+# di mesin yang memang begitu keadaannya.
+#
+# Pakai bersama berkas utama, TANPA `--profile edge`:
+#
+#   docker compose --env-file /etc/coreerp/saas.env \
+#       -f deploy/saas/compose.yaml -f deploy/saas/compose.dokploy.yaml \
+#       --profile data --profile migrate --profile app --profile console --profile scheduler up -d
+#
+# Traefik yang sudah ada menjangkau container lewat network ini, dan rutenya ditulis sebagai berkas
+# di folder dinamis miliknya — bukan sebagai label, supaya satu berkas memuat seluruh rute CoreERP
+# dan dapat dibaca sekaligus.
+
+services:
+  core-app:
+    networks: [default, renderer, dokploy-network]
+
+  core-console:
+    networks: [default, dokploy-network]
+
+networks:
+  # Dibuat Dokploy saat ia dipasang. `external` berarti compose ini tidak pernah membuat maupun
+  # menghapusnya — merusaknya akan menjatuhkan setiap situs lain di mesin yang sama.
+  dokploy-network:
+    external: true
