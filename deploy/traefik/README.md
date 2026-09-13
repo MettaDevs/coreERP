@@ -6,6 +6,37 @@ Let's Encrypt lewat tantangan DNS-01 pada zona Cloudflare.
 Rancangan beserta alasannya ada di
 [environment dan pusat admin](../../docs/todo/environment-dan-pusat-admin/README.md).
 
+## Hanya ingin mencoba alamat per lingkungan di laptop? Berkas ini tidak dibutuhkan
+
+Untuk uji ujung-ke-ujung — membuat tenant, memberinya lingkungan, membuka alamatnya — tidak perlu
+Traefik, sertifikat, token Cloudflare, maupun berkas `hosts`. Cukup dua setelan env:
+
+`apps/core/.env`
+
+```
+COREERP_BASE_DOMAIN=erp.localhost
+```
+
+`apps/control-plane/.env`
+
+```
+COREERP_BASE_DOMAIN=erp.localhost
+COREERP_ADDRESS_SCHEME=http
+COREERP_ADDRESS_PORT=8000
+```
+
+Lalu nyalakan ulang kedua dev server. Alamatnya menjadi
+`http://<tenant>--<lingkungan>.<jenis>.erp.localhost:8000`, dan konsol mencetaknya persis begitu.
+
+**Kenapa tanpa `hosts`.** `.localhost` dicadangkan RFC 6761 untuk mesin sendiri, termasuk setiap
+subdomainnya. Diukur di Windows 11 pada 13 September 2026: `pt-uji--peragaan.demo.erp.localhost`
+diselesaikan ke `127.0.0.1` dan `::1` oleh sistem operasi, tanpa satu baris pun di `hosts`.
+
+**Jangan `.local`.** Nama itu milik mDNS (RFC 6762). Di mesin yang sama `pt-uji.erp.local` tidak
+terselesaikan sama sekali, dan di macOS ia dilempar ke Bonjour.
+
+Yang tidak dapat diuji dengan cara ini hanyalah TLS itu sendiri — untuk itulah sisa berkas ini.
+
 ## Kenapa ini dapat dicoba di laptop
 
 Tantangan DNS-01 berupa **record TXT**, bukan permintaan HTTP masuk. Jadi mesin di balik NAT —
