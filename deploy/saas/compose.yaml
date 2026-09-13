@@ -151,6 +151,18 @@ services:
     profiles: [migrate]
     image: ${COREERP_IMAGE:?COREERP_IMAGE wajib}
     restart: 'no'
+    depends_on:
+      # `required: false` — inilah yang membuat satu berkas melayani dua bentuk node.
+      #
+      # Di node data, `core-db` ikut menyala dan layanan ini menunggunya sehat. Di node aplikasi,
+      # `core-db` tidak termasuk profil yang aktif, dan tanpa `required: false` compose akan
+      # menolak menyala sama sekali karena menuntut layanan yang memang tidak ada di sana.
+      #
+      # Percobaan pertama membuang `depends_on` seluruhnya demi alasan itu, dan akibatnya migration
+      # berjalan sebelum PostgreSQL menerima koneksi: "Connection refused" pada penyebaran pertama.
+      core-db:
+        condition: service_healthy
+        required: false
     environment:
       <<: *app-environment
       OTEL_PHP_AUTOLOAD_ENABLED: 'false'
@@ -168,6 +180,18 @@ services:
     profiles: [app]
     image: ${COREERP_IMAGE:?COREERP_IMAGE wajib}
     restart: unless-stopped
+    depends_on:
+      # `required: false` — inilah yang membuat satu berkas melayani dua bentuk node.
+      #
+      # Di node data, `core-db` ikut menyala dan layanan ini menunggunya sehat. Di node aplikasi,
+      # `core-db` tidak termasuk profil yang aktif, dan tanpa `required: false` compose akan
+      # menolak menyala sama sekali karena menuntut layanan yang memang tidak ada di sana.
+      #
+      # Percobaan pertama membuang `depends_on` seluruhnya demi alasan itu, dan akibatnya migration
+      # berjalan sebelum PostgreSQL menerima koneksi: "Connection refused" pada penyebaran pertama.
+      core-db:
+        condition: service_healthy
+        required: false
     environment: *app-environment
     networks: [default, renderer]
     volumes:
@@ -188,6 +212,18 @@ services:
     profiles: [worker]
     image: ${COREERP_IMAGE:?COREERP_IMAGE wajib}
     restart: unless-stopped
+    depends_on:
+      # `required: false` — inilah yang membuat satu berkas melayani dua bentuk node.
+      #
+      # Di node data, `core-db` ikut menyala dan layanan ini menunggunya sehat. Di node aplikasi,
+      # `core-db` tidak termasuk profil yang aktif, dan tanpa `required: false` compose akan
+      # menolak menyala sama sekali karena menuntut layanan yang memang tidak ada di sana.
+      #
+      # Percobaan pertama membuang `depends_on` seluruhnya demi alasan itu, dan akibatnya migration
+      # berjalan sebelum PostgreSQL menerima koneksi: "Connection refused" pada penyebaran pertama.
+      core-db:
+        condition: service_healthy
+        required: false
     environment:
       <<: *app-environment
       CONTAINER_ROLE: worker
@@ -201,6 +237,18 @@ services:
     profiles: [scheduler]
     image: ${COREERP_IMAGE:?COREERP_IMAGE wajib}
     restart: unless-stopped
+    depends_on:
+      # `required: false` — inilah yang membuat satu berkas melayani dua bentuk node.
+      #
+      # Di node data, `core-db` ikut menyala dan layanan ini menunggunya sehat. Di node aplikasi,
+      # `core-db` tidak termasuk profil yang aktif, dan tanpa `required: false` compose akan
+      # menolak menyala sama sekali karena menuntut layanan yang memang tidak ada di sana.
+      #
+      # Percobaan pertama membuang `depends_on` seluruhnya demi alasan itu, dan akibatnya migration
+      # berjalan sebelum PostgreSQL menerima koneksi: "Connection refused" pada penyebaran pertama.
+      core-db:
+        condition: service_healthy
+        required: false
     environment:
       <<: *app-environment
       CONTAINER_ROLE: scheduler
