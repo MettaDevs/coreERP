@@ -106,9 +106,16 @@ services:
     volumes:
       - core-db-data:/var/lib/postgresql/data
 
+  # Image diambil dari quay.io, BUKAN Docker Hub.
+  #
+  # `minio/mc` di Docker Hub menjawab "pull access denied ... repository does not exist" — MinIO
+  # memindahkan distribusi resminya, dan yang tertinggal di sana tidak dapat ditarik tanpa login.
+  # Ditemukan saat penyebaran pertama, bukan saat menulis berkas ini.
+  #
+  # Keduanya tetap dapat ditimpa lewat env, untuk mesin yang punya cermin registry sendiri.
   core-minio:
     profiles: [data]
-    image: minio/minio:latest
+    image: ${MINIO_IMAGE:-quay.io/minio/minio:latest}
     restart: unless-stopped
     command: ['server', '/data', '--console-address', ':9001']
     environment:
@@ -127,7 +134,7 @@ services:
   # Sekali jalan, dan aman diulang: `mb --ignore-existing` tidak mengeluh pada bucket yang sudah ada.
   core-minio-init:
     profiles: [data]
-    image: minio/mc:latest
+    image: ${MINIO_MC_IMAGE:-quay.io/minio/mc:latest}
     restart: 'no'
     depends_on:
       core-minio:
