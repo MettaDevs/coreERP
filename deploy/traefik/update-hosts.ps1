@@ -33,8 +33,11 @@ $hostsPath = Join-Path $env:SystemRoot 'System32\drivers\etc\hosts'
 
 # Diperiksa di depan, dan sengaja tidak meminta elevasi sendiri. Skrip yang menaikkan haknya sendiri
 # adalah skrip yang dijalankan orang tanpa membaca apa yang akan ditulisnya ke berkas sistem.
+# `-WhatIf` dikecualikan supaya siapa pun dapat melihat apa yang AKAN ditulis tanpa menaikkan hak
+# lebih dulu. Menuntut Administrator untuk sekadar melihat adalah cara tercepat membuat orang
+# menjalankannya langsung tanpa pernah melihat isinya.
 $identity = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
-if (-not $identity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+if (-not $WhatIfPreference -and -not $identity.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     throw "Berkas hosts hanya dapat ditulis sebagai Administrator. Buka PowerShell lewat 'Run as administrator', lalu jalankan lagi."
 }
 
@@ -45,18 +48,44 @@ if (-not (Test-Path $coreDir)) {
 
 Push-Location $coreDir
 try {
-    # `--bare` supaya penandanya ditulis di sini, bukan oleh perintahnya. Yang menentukan bentuk
-    # berkas hosts adalah skrip ini; perintahnya cukup menyediakan daftarnya.
-    $generated = & php artisan environment:hosts --bare "--ip=$Ip" 2>&1
+    <#
+        TANPA `2>&1`, dan itu bukan kelalaian.
+
+        PowerShell 5.1 membungkus tiap baris stderr sebuah program native menjadi ErrorRecord
+        begitu ia diarahkan begitu. Dengan $ErrorActionPreference = 'Stop', satu peringatan PHP yang
+        sama sekali tidak berbahaya — "The opentelemetry extension must be loaded" misalnya —
+        berubah menjadi NativeCommandError yang menghentikan seluruh skrip.
+
+        Terjadi pada percobaan pertama: skripnya mati sebelum menulis satu baris pun, dan yang
+        terlihat hanyalah tumpukan merah tentang ekstensi yang tidak ada hubungannya dengan hosts.
+
+        Jadi stderr dibiarkan mengalir ke konsol apa adanya, dan yang menentukan berhasil atau tidak
+        cuma $LASTEXITCODE.
+    #>
+    $generated = & php artisan environment:hosts --bare "--ip=$Ip"
     if ($LASTEXITCODE -ne 0) {
-        throw "environment:hosts gagal:`n$($generated -join [Environment]::NewLine)"
+        throw "environment:hosts gagal dengan kode $LASTEXITCODE. Jalankan perintahnya langsung untuk melihat sebabnya: php artisan environment:hosts"
     }
 }
 finally {
     Pop-Location
 }
 
-$block = @($begin) + @($generated | Where-Object { $_ -match '\S' }) + @($end)
+<#
+    Hanya baris yang benar-benar berbentuk "<ip> <nama>" yang lolos.
+
+    Penjaga kedua, dan ia perlu: apa pun yang tersasar ke stdout — peringatan PHP, keluaran
+    debug, banner perkakas — akan tertulis ke berkas hosts sebagai baris sampah kalau yang
+    disaring hanya "baris tidak kosong". Berkas hosts yang rusak mematikan resolusi nama di
+    seluruh mesin, bukan hanya untuk repo ini.
+#>
+$entries = @($generated | Where-Object { $_ -match '^\s*\d{1,3}(\.\d{1,3}){3}\s+\S+\s*$' })
+
+if ($entries.Count -eq 0) {
+    throw "environment:hosts tidak memulangkan satu pun alamat. Periksa COREERP_BASE_DOMAIN di apps/core/.env."
+}
+
+$block = @($begin) + $entries + @($end)
 
 $current = Get-Content -Path $hostsPath
 $from = [Array]::IndexOf($current, $begin)
