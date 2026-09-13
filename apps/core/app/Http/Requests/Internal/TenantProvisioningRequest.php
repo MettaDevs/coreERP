@@ -27,11 +27,61 @@ final class TenantProvisioningRequest extends FormRequest
         return true;
     }
 
+    /**
+     * Jenis lingkungan pertama, dipersempit ke tiga nilai yang memang mungkin.
+     *
+     * Aturan validasi di atas sudah menjaminnya, tetapi jaminan itu tidak terbaca oleh analisis
+     * statis — dan yang menerima nilainya, `RegisterBusiness`, memang menuntut salah satu dari
+     * ketiganya. Dipersempit di sini, di tempat yang mengetahui aturannya, alih-alih dipaksa
+     * dengan cast di pemanggil.
+     *
+     * @return 'production'|'demo'|'none'
+     */
+    public function firstEnvironment(): string
+    {
+        $nilai = $this->string('first_environment', 'production')->toString();
+
+        return match ($nilai) {
+            'demo' => 'demo',
+            'none' => 'none',
+            default => 'production',
+        };
+    }
+
+    public function firstEnvironmentExpiresAt(): ?string
+    {
+        $nilai = $this->input('first_environment_expires_at');
+
+        return is_string($nilai) && $nilai !== '' ? $nilai : null;
+    }
+
     /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
             'legal_name' => ['required', 'string', 'max:255'],
+            /*
+             * Jenis lingkungan pertama, dan ia OPSIONAL dengan bawaan `production`.
+             *
+             * Opsional supaya pemanggil lama — dan setiap test yang sudah ada — tidak berubah
+             * perilakunya. Yang berubah hanya bahwa operator sekarang DAPAT memilih: calon
+             * pelanggan yang belum tentu jadi membeli tidak perlu diberi produksi kosong yang
+             * tidak pernah dipakai siapa pun sekaligus mengunci alamatnya.
+             */
+            'first_environment' => ['sometimes', 'in:production,demo,none'],
+            /*
+             * Wajib bila demo, dilarang bila bukan.
+             *
+             * Aturan yang sama sudah berdiri di layar pembuatan lingkungan, dan alasannya sama:
+             * demo tanpa tanggal berakhir tinggal selamanya, dan tidak ada yang menyadarinya
+             * sampai disknya penuh.
+             */
+            'first_environment_expires_at' => [
+                'exclude_unless:first_environment,demo',
+                'required',
+                'date',
+                'after:today',
+            ],
             'admin_name' => ['required', 'string', 'max:255'],
             'admin_email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'app_ids' => ['required', 'array', 'min:1'],

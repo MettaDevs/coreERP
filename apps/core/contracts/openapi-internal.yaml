@@ -676,7 +676,36 @@ paths:
                 legal_name:
                   type: string
                   maxLength: 255
-                  description: Nama badan hukum pelanggan. Menjadi nama tenant dan dasar slug-nya.
+                  description: |
+                    Nama pelanggan — perusahaan atau grupnya. Menjadi nama tenant dan dasar
+                    slug-nya, dan slug itulah yang muncul sebagai label pertama pada alamat
+                    lingkungannya.
+
+                    **Bukan** nama badan hukum tertentu: satu tenant boleh memuat beberapa badan
+                    hukum sekaligus, dan masing-masing didaftarkan di dalam ERP sebagai organisasi
+                    berjenis legal entity, lengkap dengan kode perusahaan dan kode negaranya.
+                first_environment:
+                  type: string
+                  enum: [production, demo, none]
+                  default: production
+                  description: |
+                    Jenis tempat kerja pertama tenant ini.
+
+                    Bawaannya `production`, dan itu yang dipakai pendaftaran mandiri: orang yang
+                    mendaftar sendiri memang datang untuk bekerja. Operator yang melahirkan tenant
+                    bagi calon pelanggan biasanya memilih `demo` — produksi yang terlanjur lahir
+                    adalah tempat kerja kosong yang tidak pernah dipakai siapa pun sekaligus alamat
+                    yang sudah terpakai.
+
+                    `none` melahirkan tenant tanpa satu pun lingkungan. Entitlement-nya tetap
+                    tercatat, jadi lingkungan yang dibuat kemudian memasang module yang sama persis.
+                first_environment_expires_at:
+                  type: string
+                  format: date
+                  description: |
+                    Tanggal berakhir, **wajib bila `first_environment` bernilai `demo`** dan
+                    diabaikan selainnya. Demo tanpa tanggal berakhir tinggal selamanya, dan tidak
+                    ada yang menyadarinya sampai disknya penuh.
                 admin_name:
                   type: string
                   maxLength: 255

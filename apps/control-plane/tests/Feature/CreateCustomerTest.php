@@ -79,6 +79,65 @@ class CreateCustomerTest extends TestCase
         return User::query()->findOrFail($id);
     }
 
+    /**
+     * Pilihan lingkungan pertama diteruskan apa adanya ke Core.
+     *
+     * Sampai sekarang setiap pelanggan baru selalu memperoleh produksi, dan itu salah untuk jalur
+     * yang paling sering dipakai: calon pelanggan yang belum tentu jadi membeli. Produksi yang
+     * terlanjur lahir adalah tempat kerja kosong yang tidak pernah dipakai siapa pun sekaligus
+     * alamat yang sudah terpakai.
+     */
+    public function test_the_first_environment_choice_reaches_core(): void
+    {
+        Http::fake([self::ENDPOINT => Http::response([
+            'tenant_id' => '01hzz', 'environment_id' => null,
+            'email' => 'siti@sumbersehat.test', 'temporary_password' => 'rahasia',
+        ], 201)]);
+
+        $this->actingAs($this->operator())->post('/pelanggan', [
+            ...$this->input(),
+            'first_environment' => 'demo',
+            'first_environment_expires_at' => now()->addDays(30)->toDateString(),
+        ])->assertRedirect();
+
+        Http::assertSent(fn (OutboundRequest $request): bool => $request['first_environment'] === 'demo'
+            && is_string($request['first_environment_expires_at']));
+    }
+
+    /**
+     * Demo tanpa tanggal berakhir ditolak sebelum satu panggilan pun keluar.
+     *
+     * Tanpa itu ia tinggal selamanya, dan tidak ada yang menyadarinya sampai disknya penuh. Aturan
+     * yang sama sudah berdiri di layar pembuatan lingkungan; yang di sini menjaganya pada pintu
+     * kedua.
+     */
+    public function test_a_demo_without_an_expiry_never_reaches_core(): void
+    {
+        Http::preventStrayRequests();
+
+        $this->actingAs($this->operator())->post('/pelanggan', [
+            ...$this->input(),
+            'first_environment' => 'demo',
+        ])->assertSessionHasErrors('first_environment_expires_at');
+    }
+
+    /** Tenant boleh lahir tanpa satu pun lingkungan, dan operator menambahkannya kemudian. */
+    public function test_a_customer_may_be_born_without_any_environment(): void
+    {
+        Http::fake([self::ENDPOINT => Http::response([
+            'tenant_id' => '01hzz', 'environment_id' => null,
+            'email' => 'siti@sumbersehat.test', 'temporary_password' => 'rahasia',
+        ], 201)]);
+
+        $this->actingAs($this->operator())->post('/pelanggan', [
+            ...$this->input(),
+            'first_environment' => 'none',
+        ])->assertRedirect();
+
+        Http::assertSent(fn (OutboundRequest $request): bool => $request['first_environment'] === 'none'
+            && ! isset($request['first_environment_expires_at']));
+    }
+
     /** @return array<string, mixed> */
     private function input(): array
     {
@@ -87,6 +146,10 @@ class CreateCustomerTest extends TestCase
             'admin_name' => 'Siti Rahmawati',
             'admin_email' => 'siti@sumbersehat.test',
             'app_ids' => ['hr'],
+            // Jenis tempat kerja pertamanya, dan formulir selalu mengirimkannya. `production`
+            // dipilih di sini karena ia yang tidak menuntut tanggal berakhir — test yang menguji
+            // hal LAIN tidak boleh ikut memikul aturan demo.
+            'first_environment' => 'production',
         ];
     }
 

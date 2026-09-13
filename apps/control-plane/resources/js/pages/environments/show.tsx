@@ -24,6 +24,7 @@ type Environment = {
     outboundAllowed: boolean;
     database: string;
     ownDatabase: boolean;
+    url: string | null;
     expiresAt: string | null;
     tenant: string;
     createdAt: string | null;
@@ -166,6 +167,32 @@ export default function Show({
                 <section className="rounded-lg border bg-background p-5">
                     <h2 className="mb-2 text-sm font-semibold">Keterangan</h2>
                     <dl>
+                        {/*
+                            Alamatnya didahulukan, di atas jenis dan status.
+
+                            Itu satu-satunya hal di halaman ini yang perlu disalin dan dikirim ke
+                            pelanggan. Sisanya keterangan untuk operator sendiri — dan sebelum baris
+                            ini ada, tidak ada satu pun tempat di konsol yang menyebutkan ke mana
+                            pelanggan harus diarahkan.
+                        */}
+                        {environment.url && (
+                            <Row label="Alamat">
+                                <a
+                                    href={environment.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-mono text-xs break-all underline underline-offset-4"
+                                >
+                                    {environment.url}
+                                </a>
+                                {environment.status !== 'active' && (
+                                    <span className="ms-2 text-xs text-muted-foreground">
+                                        — belum dapat dibuka sampai statusnya
+                                        Aktif
+                                    </span>
+                                )}
+                            </Row>
+                        )}
                         <Row label="Jenis">
                             <KindBadge kind={environment.kind} />
                         </Row>

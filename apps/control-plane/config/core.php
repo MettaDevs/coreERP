@@ -67,4 +67,15 @@ return [
      */
     'trusted_proxies' => env('COREERP_TRUSTED_PROXIES'),
 
+    /*
+     * Domain dasar yang sama dengan yang dipakai Core untuk merutekan lingkungan.
+     *
+     * Dipakai HANYA untuk menampilkan alamat di layar operator. Yang sungguhan merutekan adalah
+     * Core; kalau nilai di sini berbeda, yang salah adalah yang tercetak — dan itu terlihat
+     * seketika karena alamatnya tidak dapat dibuka.
+     *
+     * Kosong berarti penempatan satu alamat, dan layar tidak menampilkan kolom alamat sama sekali.
+     */
+    'base_domain' => env('COREERP_BASE_DOMAIN'),
+
 ];

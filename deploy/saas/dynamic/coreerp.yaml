@@ -1,0 +1,62 @@
+# Rute, sertifikat, dan daftar backend. Dibaca ulang otomatis; mengubahnya tidak menuntut restart.
+#
+# ## Menambah node aplikasi kedua = menambah SATU baris
+#
+# Di bawah `services.core.loadBalancer.servers`. Traefik langsung membagi permintaan ke keduanya,
+# dan `healthCheck` mengeluarkan yang mati dari rotasi dalam hitungan detik — tanpa siapa pun
+# menyunting DNS.
+#
+# Itu yang membedakan load balancer dari round-robin DNS: DNS tidak pernah tahu sebuah server mati,
+# dan tetap mengirimi sepertiga pengunjungmu ke sana sampai seseorang menghapus recordnya sendiri.
+
+http:
+  routers:
+    console:
+      rule: 'Host(`admin.erp.grenery.xyz`)'
+      priority: 100
+      entryPoints: [websecure]
+      service: console
+      tls:
+        certResolver: cloudflare
+        domains: &wildcard
+          - main: 'erp.grenery.xyz'
+            sans:
+              - '*.erp.grenery.xyz'
+              - '*.demo.erp.grenery.xyz'
+              - '*.sandbox.erp.grenery.xyz'
+
+    core:
+      rule: 'Host(`erp.grenery.xyz`) || HostRegexp(`^[a-z0-9-]+\.erp\.grenery\.xyz$`) || HostRegexp(`^[a-z0-9-]+\.(demo|sandbox)\.erp\.grenery\.xyz$`)'
+      priority: 10
+      entryPoints: [websecure]
+      service: core
+      tls:
+        certResolver: cloudflare
+        domains: *wildcard
+
+  services:
+    core:
+      loadBalancer:
+        servers:
+          # VPS-1 — satu mesin dengan Traefik, jadi dihubungi lewat nama layanan.
+          - url: 'http://core-app:80'
+          # VPS-2 — tambahkan barisnya di sini, menunjuk ALAMAT PRIVAT-nya. Contoh:
+          # - url: 'http://10.0.0.12:8000'
+        passHostHeader: true
+        # Inilah yang membuat mematikan satu node tidak terasa. Tanpa ini, Traefik terus mengirim
+        # permintaan ke node mati dan sebagian pengunjung menerima 502 — persis kelemahan DNS
+        # round-robin yang ingin kita hindari.
+        healthCheck:
+          path: /up
+          interval: 10s
+          timeout: 3s
+
+    console:
+      loadBalancer:
+        servers:
+          - url: 'http://core-console:80'
+        passHostHeader: true
+        healthCheck:
+          path: /login
+          interval: 10s
+          timeout: 3s

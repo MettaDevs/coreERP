@@ -25,6 +25,8 @@ final class CreateCustomer
 {
     /**
      * @param  list<string>  $apps  Id app yang dibeli. Ketersediaannya diputuskan Core, bukan di sini.
+     * @param  'production'|'demo'|'none'  $firstEnvironment  Jenis tempat kerja pertamanya.
+     * @param  ?string  $firstEnvironmentExpiresAt  Wajib untuk demo, diabaikan selainnya.
      * @return array{tenant_id: string, environment_id: ?string, email: string, temporary_password: string}
      *
      * @throws CustomerRejected Core menjawab, dan jawabannya "tidak".
@@ -35,6 +37,8 @@ final class CreateCustomer
         string $adminName,
         string $adminEmail,
         array $apps,
+        string $firstEnvironment = 'production',
+        ?string $firstEnvironmentExpiresAt = null,
     ): array {
         $endpoint = $this->endpoint();
 
@@ -47,6 +51,12 @@ final class CreateCustomer
                     'admin_name' => $adminName,
                     'admin_email' => $adminEmail,
                     'app_ids' => $apps,
+                    'first_environment' => $firstEnvironment,
+                    // Dibuang ketika kosong, bukan dikirim null. Aturan Core memakai
+                    // `exclude_unless`, dan kunci yang hadir bernilai null tetap dianggap hadir.
+                    ...($firstEnvironmentExpiresAt === null
+                        ? []
+                        : ['first_environment_expires_at' => $firstEnvironmentExpiresAt]),
                 ]);
         } catch (ConnectionException $disconnected) {
             // Sengaja tidak ditelan dan tidak dipercantik. Sebab yang paling sering adalah

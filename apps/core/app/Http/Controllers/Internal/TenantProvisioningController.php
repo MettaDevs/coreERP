@@ -38,6 +38,8 @@ final class TenantProvisioningController extends Controller
             'business_name' => $request->string('legal_name')->toString(),
             'app_ids' => $request->appIds(),
             'must_change_password' => true,
+            'first_environment' => $request->firstEnvironment(),
+            'first_environment_expires_at' => $request->firstEnvironmentExpiresAt(),
         ]);
 
         $membership = TenantMembership::query()
@@ -46,10 +48,17 @@ final class TenantProvisioningController extends Controller
             ->latest('created_at')
             ->firstOrFail();
 
-        $production = Environment::query()
+        /*
+         * Lingkungan pertamanya — dan ia boleh TIDAK ADA.
+         *
+         * Sebelumnya baris ini `firstOrFail()` pada `kind = production`, karena produksi memang
+         * selalu lahir. Sejak jenisnya dapat dipilih, menuntutnya ada berarti 500 pada jalur yang
+         * justru paling wajar: operator yang membuat pelanggan tanpa lingkungan dulu.
+         */
+        $environment = Environment::query()
             ->where('tenant_id', $membership->tenant_id)
-            ->where('kind', 'production')
-            ->firstOrFail();
+            ->orderBy('created_at')
+            ->first();
 
         // Satu-satunya kesempatan membaca kata sandi ini. Ia tidak disimpan di mana pun dalam
         // bentuk yang dapat dibaca lagi — yang tersimpan hanya hash-nya, sama seperti kata sandi
@@ -57,7 +66,7 @@ final class TenantProvisioningController extends Controller
         // bukan meminta seseorang membacakannya dari database.
         return response()->json([
             'tenant_id' => $membership->tenant_id,
-            'environment_id' => $production->id,
+            'environment_id' => $environment?->id,
             'email' => $owner->email,
             'temporary_password' => $temporaryPassword,
         ], 201);

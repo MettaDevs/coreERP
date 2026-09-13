@@ -1,0 +1,50 @@
+# Daftar abaikan KHUSUS untuk image konsol operator.
+#
+# BuildKit mencari `<jalur-Dockerfile>.dockerignore` lebih dulu, dan baru jatuh ke `.dockerignore`
+# di akar konteks bila berkas ini tidak ada. Keberadaannya karena itu menggantikan daftar akar
+# sepenuhnya untuk bangunan ini saja.
+#
+# ## Kenapa ia harus ada, dan kenapa daftar akar TIDAK boleh diubah
+#
+# `.dockerignore` di akar membuang `apps/control-plane` seluruhnya — disengaja, dan dijaga
+# `scripts/verify-edition.sh` yang menghitung folder di `/repo/apps` pada image yang sudah jadi
+# lalu menolak apa pun selain `core`. Perkakas vendor memegang data seluruh pelanggan sekaligus;
+# ia tidak boleh punya satu pun jalan masuk ke image yang dikirim ke mesin pelanggan.
+#
+# Melonggarkan daftar itu supaya konsol dapat dibangun akan merusak penjaganya demi kemudahan
+# membangun — persis pertukaran yang dilarang komentar di sana. Yang benar: daftar terpisah, dan
+# arah pengecualiannya dibalik. Di sini justru **Core** yang tidak boleh ikut.
+
+.git
+.github
+docs
+graphify-out
+artifacts
+**/node_modules
+**/vendor
+packages/ui/dist
+**/.env
+
+# Core tidak ikut. Konsol tidak membaca satu baris pun kodenya — ia berbicara dengan Core lewat
+# HTTP, dan skema database dibacanya lewat modelnya sendiri.
+#
+# `package.json`-nya dikecualikan karena `apps/core` terdaftar di `workspaces` akar, dan `npm ci`
+# berhenti sebelum memasang apa pun bila sebuah workspace yang disebut ternyata tidak ada di
+# konteks. Nol baris kode, hanya manifest — batas yang sama yang dipakai daftar akar untuk konsol.
+apps/core
+!apps/core/package.json
+
+# Module tidak ikut. Ia milik runtime Core; konsol tidak memuat satu pun di antaranya, dan
+# tidak satu pun terdaftar sebagai workspace npm.
+modules
+
+apps/provider-console
+apps/web-shell
+
+# Isi storage milik mesin pembangun, bukan milik rilis. Docker mengisi named volume yang masih
+# kosong dari isi image pada path yang sama, jadi berkas yang ikut di sini berakhir di storage
+# server pada boot pertama.
+apps/control-plane/storage/**
+!apps/control-plane/storage/**/.gitignore
+apps/control-plane/bootstrap/cache/*.php
+apps/control-plane/public/build

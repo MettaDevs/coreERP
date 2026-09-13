@@ -15,7 +15,14 @@ import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
-const formFields = ['legal_name', 'admin_name', 'admin_email', 'app_ids'];
+const formFields = [
+    'legal_name',
+    'admin_name',
+    'admin_email',
+    'app_ids',
+    'first_environment',
+    'first_environment_expires_at',
+];
 
 /**
  * Melahirkan satu pelanggan, beserta admin pertamanya.
@@ -42,6 +49,8 @@ export default function CreateDialog({
             admin_name: '',
             admin_email: '',
             app_ids: [] as string[],
+            first_environment: 'demo',
+            first_environment_expires_at: '',
         });
 
     // Galat yang bukan milik satu isian. Dikumpulkan dari sisa kunci, bukan dari satu nama yang
@@ -113,19 +122,21 @@ export default function CreateDialog({
                         )}
 
                         <div className="space-y-2">
-                            <Label htmlFor="legal_name">Nama badan hukum</Label>
+                            <Label htmlFor="legal_name">Nama pelanggan</Label>
                             <Input
                                 id="legal_name"
                                 value={data.legal_name}
                                 onChange={(e) =>
                                     setData('legal_name', e.target.value)
                                 }
-                                placeholder="PT Sumber Sehat Nusantara"
+                                placeholder="Sumber Sehat Group"
                             />
                             <p className="text-xs text-muted-foreground">
-                                Nama resmi seperti tertulis di aktanya, bukan
-                                nama panggilan. Ia yang muncul di dokumen yang
-                                dicetak pelanggan.
+                                Nama perusahaan atau grupnya, bukan nama badan
+                                hukum tertentu. Satu pelanggan boleh memuat
+                                beberapa badan hukum sekaligus, dan
+                                masing-masing didaftarkan di dalam ERP-nya
+                                lengkap dengan kode perusahaan dan negaranya.
                             </p>
                             {errors.legal_name && (
                                 <p className="text-sm text-destructive">
@@ -133,6 +144,71 @@ export default function CreateDialog({
                                 </p>
                             )}
                         </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="first_environment">
+                                Lingkungan pertama
+                            </Label>
+                            <select
+                                id="first_environment"
+                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
+                                value={data.first_environment}
+                                onChange={(e) =>
+                                    setData('first_environment', e.target.value)
+                                }
+                            >
+                                <option value="demo">
+                                    Demo — berbatas waktu, database sendiri
+                                </option>
+                                <option value="production">
+                                    Produksi — tempat kerja sebenarnya
+                                </option>
+                                <option value="none">
+                                    Belum — ditambahkan nanti
+                                </option>
+                            </select>
+                            <p className="text-xs text-muted-foreground">
+                                Calon pelanggan yang belum tentu jadi membeli
+                                tidak perlu diberi produksi. Produksi yang
+                                terlanjur lahir adalah tempat kerja kosong yang
+                                tidak pernah dipakai siapa pun, sekaligus alamat
+                                yang sudah terpakai.
+                            </p>
+                            {errors.first_environment && (
+                                <p className="text-sm text-destructive">
+                                    {errors.first_environment}
+                                </p>
+                            )}
+                        </div>
+
+                        {data.first_environment === 'demo' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="first_environment_expires_at">
+                                    Berakhir pada
+                                </Label>
+                                <Input
+                                    id="first_environment_expires_at"
+                                    type="date"
+                                    value={data.first_environment_expires_at}
+                                    onChange={(e) =>
+                                        setData(
+                                            'first_environment_expires_at',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Demo wajib punya tanggal berakhir. Tanpa itu
+                                    ia tinggal selamanya, dan tidak ada yang
+                                    menyadarinya sampai disknya penuh.
+                                </p>
+                                {errors.first_environment_expires_at && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.first_environment_expires_at}
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label htmlFor="admin_name">Nama admin</Label>

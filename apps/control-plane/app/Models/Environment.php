@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ControlPlane\Models;
 
+use ControlPlane\Environments\EnvironmentAddress;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -121,6 +122,37 @@ class Environment extends Model
             'database' => $this->database(),
             'expiresAt' => $this->expires_at?->toDateString(),
             'tenant' => $this->tenant->name ?? 'Tanpa tenant',
+            /*
+             * Alamat yang diketik pelanggan — dan sampai sekarang ia tidak pernah ditampilkan
+             * di mana pun.
+             *
+             * Operator yang baru saja membuat lingkungan tidak punya cara mengetahui ke mana
+             * pelanggannya harus diarahkan: bentuknya dihitung `EnvironmentAddress`, dan satu
+             * satunya tempat aturan itu tertulis adalah kode Core. Menyuruh orang menyusunnya
+             * sendiri dari slug tenant, slug lingkungan, dan jenisnya adalah cara tercepat
+             * melahirkan alamat yang salah ketik lalu dilaporkan sebagai "tidak bisa dibuka".
+             *
+             * Kosong ketika domain dasar belum disetel — on-prem dan pengembangan lokal — dan di
+             * sana memang tidak ada alamat per lingkungan sama sekali.
+             */
+            'url' => $this->url(),
         ];
+    }
+
+    /**
+     * Alamat lengkap lingkungan ini, atau null bila penempatan ini satu alamat untuk semua.
+     *
+     * Aturannya dihitung di satu tempat — `EnvironmentAddress` — dan dibaca dari sana, bukan
+     * disusun ulang di layar. Dua tempat yang menyusun alamat yang sama akan menyimpang, dan
+     * penyimpangannya berbentuk pelanggan yang tidak dapat masuk ke alamat yang dicetak sistem
+     * itu sendiri.
+     */
+    public function url(): ?string
+    {
+        return EnvironmentAddress::forEnvironment(
+            $this->tenant->slug ?? '',
+            $this->slug,
+            $this->kind,
+        );
     }
 }

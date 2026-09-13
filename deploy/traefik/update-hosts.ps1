@@ -22,7 +22,15 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     # Alamat yang dituju tiap nama. Ubah bila dev server tidak berjalan di mesin ini.
-    [string] $Ip = '127.0.0.1'
+    [string] $Ip = '127.0.0.1',
+
+    # Buang blok ERP dan kembalikan resolusi ke DNS sungguhan.
+    #
+    # WAJIB dipakai begitu alamatnya menunjuk server. Berkas hosts MENUTUPI DNS, jadi selama
+    # blok ini ada, peramban tetap bicara ke laptop sendiri — dan yang terlihat adalah "Bad
+    # Gateway" dari server lokal yang backendnya sudah mati, bukan dari server yang sebenarnya
+    # sehat. Satu jam terbuang karena ini; keduanya terlihat persis sama dari luar.
+    [switch] $Remove
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,6 +52,29 @@ if (-not $WhatIfPreference -and -not $identity.IsInRole([Security.Principal.Wind
 $coreDir = Join-Path $PSScriptRoot '..\..\apps\core'
 if (-not (Test-Path $coreDir)) {
     throw "Folder apps/core tidak ditemukan dari $PSScriptRoot. Jalankan skrip ini dari dalam repo."
+}
+
+if ($Remove) {
+    $current = Get-Content -Path $hostsPath
+    $from = [Array]::IndexOf($current, $begin)
+    $to = [Array]::IndexOf($current, $end)
+
+    if ($from -lt 0 -or $to -le $from) {
+        Write-Output "Blok $begin tidak ada di $hostsPath. Tidak ada yang perlu dibuang."
+        return
+    }
+
+    $result = @()
+    if ($from -gt 0) { $result += $current[0..($from - 1)] }
+    if ($to -lt ($current.Length - 1)) { $result += $current[($to + 1)..($current.Length - 1)] }
+
+    if ($PSCmdlet.ShouldProcess($hostsPath, "Membuang blok alamat lingkungan")) {
+        Copy-Item -Path $hostsPath -Destination "$hostsPath.cadangan-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        Set-Content -Path $hostsPath -Value $result -Encoding ASCII
+        & ipconfig /flushdns | Out-Null
+        Write-Output "Blok dibuang. Alamat sekarang mengikuti DNS sungguhan."
+    }
+    return
 }
 
 Push-Location $coreDir

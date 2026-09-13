@@ -20,6 +20,7 @@ type Row = {
     status: string;
     outboundAllowed: boolean;
     database: string;
+    url: string | null;
     expiresAt: string | null;
     tenant: string;
 };
@@ -49,7 +50,7 @@ export default function Index({
                             <TableHead>Pelanggan</TableHead>
                             <TableHead>Jenis</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead>Database</TableHead>
+                            <TableHead>Alamat</TableHead>
                             <TableHead>Berakhir</TableHead>
                             <TableHead />
                         </TableRow>
@@ -80,8 +81,28 @@ export default function Index({
                                 <TableCell>
                                     <StatusBadge status={row.status} />
                                 </TableCell>
-                                <TableCell className="font-mono text-xs">
-                                    {row.database}
+                                {/*
+                                    Alamat menggantikan nama database di kolom ini.
+
+                                    Keduanya sama-sama teknis, tetapi cuma satu yang perlu dikirim
+                                    ke pelanggan — dan nama database tetap terbaca di halaman
+                                    rincian bagi yang memang mencarinya.
+                                */}
+                                <TableCell className="max-w-[22rem] font-mono text-xs break-all">
+                                    {row.url ? (
+                                        <a
+                                            href={row.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="underline underline-offset-4"
+                                        >
+                                            {row.url.replace('https://', '')}
+                                        </a>
+                                    ) : (
+                                        <span className="text-muted-foreground">
+                                            {row.database}
+                                        </span>
+                                    )}
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
                                     {row.expiresAt ?? 'Tidak berakhir'}
