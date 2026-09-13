@@ -81,6 +81,17 @@ ENV WAYFINDER_COMMAND=true
 # skrip `install` milik dependensi ikut berjalan di dalam image.
 COPY package.json package-lock.json .npmrc ./
 COPY apps/core/package.json ./apps/core/
+# Manifest pusat admin ikut, dan **hanya** manifestnya — nol berkas sumber.
+#
+# Ia disebut `workspaces` pada `package.json` akar, dan `npm ci` berhenti sebelum satu paket pun
+# terpasang bila sebuah workspace yang disebut di sana tidak ada di konteks pembangunan. Kegagalannya
+# menuduh lockfile, bukan folder yang hilang, jadi ia mahal didiagnosa.
+#
+# Yang menjaga pusat admin tetap di luar image pelanggan bukan baris ini melainkan tahap akhir, yang
+# hanya menyalin `COPY --from=vendor /repo/apps/core`. Jalur 1 `scripts/verify-edition.sh` menagih
+# hasilnya: ia menghitung folder di `/repo/apps` pada image yang sudah jadi dan menolak apa pun
+# selain `core`.
+COPY apps/control-plane/package.json ./apps/control-plane/
 COPY packages/ui ./packages/ui
 # npm dapat diam-diam melewatkan optional native binding ketika unduhannya gagal
 # (npm/cli#4828): instalasinya tetap melapor sukses, lalu build meledak jauh
@@ -127,7 +138,27 @@ FROM php:8.4-apache
 # memakai nilai bawaan, jadi artefak produksi selalu membawa ekstensinya. Perlu disadari
 # konsekuensinya: image yang diuji saat PR karena itu bukan image yang dikirim.
 ARG PASANG_OTEL=1
-RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev unzip \
+# Klien PostgreSQL: `pg_dump` dan `pg_restore`, yang dipakai `environment:copy`.
+#
+# Ia dijalankan sebagai **klien lewat jaringan**, bukan lewat docker socket. Jalur socket itulah
+# yang dulu membuat worker penempatan tidak pernah bisa berjalan di environment mana pun yang
+# dihasilkan repo ini: kode yang harus berbicara dengan daemon di luar dirinya untuk mengerjakan
+# hal yang sebenarnya bisa ia kerjakan sendiri. Harga jalur klien satu paket di image ini.
+#
+# **Versinya 17, dan angka itu punya alasan yang harus dibaca sebelum diubah.** `pg_dump` menolak
+# server yang **lebih baru** daripada dirinya, tetapi bekerja normal terhadap server yang lebih
+# lama. Repo ini menyebut dua versi server yang berbeda — `deploy/compose.edition.yaml` menjalankan
+# `postgres:16-alpine` sementara halaman release menampilkan `postgres:17` — dan selama
+# ketidakcocokan itu belum diputuskan pemilik produk, klien 17 adalah satu-satunya angka yang aman
+# terhadap keduanya. Menurunkannya ke 16 akan membuat penyalinan gagal pada armada mana pun yang
+# ternyata sudah berjalan di 17, dan gagalnya baru terlihat saat menyalin.
+#
+# Paketnya datang dari Debian sendiri: image dasar ini trixie, dan trixie membawa klien 17. Tidak
+# ada repositori pihak ketiga, tidak ada kunci yang harus dipercaya. Itu berhenti benar pada hari
+# image dasarnya pindah ke rilis Debian yang membawa versi lain, dan pada hari itu barisnya gagal
+# saat membangun — bukan diam-diam memasang klien yang terlalu tua.
+ARG VERSI_KLIEN_PG=17
+RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev libpng-dev libjpeg62-turbo-dev unzip "postgresql-client-${VERSI_KLIEN_PG}" \
     && docker-php-ext-configure gd --with-jpeg \
     && docker-php-ext-install bcmath gd intl pdo_pgsql pgsql zip \
     && if [ "$PASANG_OTEL" = "1" ]; then \

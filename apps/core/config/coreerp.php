@@ -3,6 +3,51 @@
 return [
     // Canonical official apps. Entitlements and module installations reference these IDs.
     'database' => 'core_erp',
+    /*
+     * Nama koneksi untuk tabel sisi pusat — identitas, pelanggan, daftar tenant, registry
+     * environment, akses operator. Kosong berarti "ikut koneksi bawaan", dan itulah bawaannya.
+     *
+     * On-prem kosong selamanya: di sana tidak ada sisi pusat yang terpisah, dan Core memang harus
+     * sanggup menjadi keseluruhannya. Yang membacanya trait App\Support\ControlPlane\OwnedByControlPlane.
+     */
+    'control_connection' => env('COREERP_CONTROL_CONNECTION'),
+
+    /*
+     * Domain dasar yang di bawahnya tiap lingkungan memperoleh alamatnya sendiri.
+     *
+     *   production : <tenant>.contoh.co.id
+     *   selain itu : <tenant>--<lingkungan>.<jenis>.contoh.co.id
+     *
+     * **Kosong berarti satu alamat untuk semua, dan itu bawaannya.** On-prem melayani satu
+     * pelanggan dari satu alamat selamanya, dan lingkungan pengembangan sebelum DNS disiapkan juga
+     * begitu. Selama ia kosong, `ResolveEnvironment` tidak pernah menyala — bukan gagal, tidak
+     * menyala — dan seluruh perilaku hari ini utuh.
+     *
+     * Untuk mencobanya di mesin sendiri, isi `localhost`: peramban modern menyelesaikan setiap
+     * `*.localhost` ke mesin sendiri, jadi `pelanggan--uji.demo.localhost:8000` bekerja tanpa
+     * menyentuh DNS sama sekali.
+     *
+     * Di server, bentuk ini menuntut satu sertifikat berisi empat nama — `*.contoh.co.id`,
+     * `*.demo.contoh.co.id`, `*.sandbox.contoh.co.id`, dan `contoh.co.id` sendiri, karena wildcard
+     * tidak mencakup domain induknya. Alasan lengkapnya di
+     * `docs/todo/environment-dan-pusat-admin/README.md`.
+     */
+    'base_domain' => env('COREERP_BASE_DOMAIN'),
+
+    /*
+     * Label yang tidak pernah menjadi lingkungan, meski berada di bawah domain yang sama.
+     *
+     * Konsol operator dan alamat pemasaran berbentuk satu label — persis bentuk alamat produksi.
+     * Tanpa daftar ini, `admin.contoh.co.id` akan dicari sebagai tenant bernama "admin", tidak
+     * ditemukan, lalu dijawab 404: konsol operator mati dengan pesan yang tidak menyebut sebabnya
+     * sama sekali.
+     *
+     * Menambah baris di sini berarti menyatakan label itu memang bukan milik pelanggan. Itu
+     * keputusan produk, bukan keputusan pembangunan — pelanggan yang slug-nya kebetulan `api` akan
+     * kehilangan alamatnya tanpa pernah tahu kenapa.
+     */
+    'reserved_labels' => ['admin', 'www', 'api'],
+
     // `deployment` dibuang pada 11 September 2026 bersama satu-satunya pembacanya: pendaftaran
     // usaha kini menulis baris `environments`, bukan `tenant_deployments`. Sebelumnya `pull_images`
     // dan `release_root` dibuang dengan alasan yang sama. Tempat kerja sebuah tenant sekarang fakta
@@ -12,6 +57,19 @@ return [
         'password' => env('COREERP_PROVIDER_PASSWORD'),
     ],
     'app_context_signing_key' => env('COREERP_APP_CONTEXT_SIGNING_KEY'),
+
+    /*
+     * Token bersama yang dipegang pusat admin ketika ia memerintah Core.
+     *
+     * Arah pusat → Core tidak dapat memakai kredensial app: penjaganya menuntut app yang terpasang
+     * pada sebuah tenant, sedangkan pusat admin tidak terpasang di mana pun dan justru bekerja pada
+     * tenant yang belum ada. Lihat App\Http\Middleware\ControlPlaneOnly.
+     *
+     * Kosong berarti pemasangan ini **tidak menerima perintah pusat admin sama sekali** — bukan
+     * menerima semuanya. Itu bawaan yang benar untuk on-prem dan lingkungan lokal, yang memang
+     * tidak punya pusat admin.
+     */
+    'control_plane_token' => env('COREERP_CONTROL_PLANE_TOKEN'),
     // Penerima event Core yang berjalan sebagai proses tersendiri. Tiap baris:
     // `{"type": "...", "url": "...", "module": "..."}`. Kunci `module` opsional dan berisi id
     // module; bila module dengan id itu dimuat runtime ini, `workflow-events:publish` berhenti
@@ -68,4 +126,12 @@ return [
         'value_stream' => 'Value stream',
         'retail_channel' => 'Retail channel',
     ],
+    /*
+     * Proxy yang boleh dipercaya header `X-Forwarded-*`-nya. Kosong berarti tidak satu pun.
+     *
+     * Dibaca `AppServiceProvider`, bukan `bootstrap/app.php` — alasannya tertulis di sana, dan ia
+     * bukan selera: closure middleware berjalan sebelum berkas env dimuat.
+     */
+    'trusted_proxies' => env('COREERP_TRUSTED_PROXIES'),
+
 ];

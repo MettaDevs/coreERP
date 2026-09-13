@@ -2,7 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Passkey;
 use App\Models\User;
+use App\Support\ControlPlane\ActiveEnvironment;
+use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\Observabilitas\PelaporKesalahan;
@@ -10,6 +13,7 @@ use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Date;
@@ -19,6 +23,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Passkeys\Passkeys;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -47,6 +52,16 @@ class AppServiceProvider extends ServiceProvider
         // Alasan yang sama untuk parameter workflow: jawabannya tidak berubah di tengah satu
         // permintaan, dan sebuah workflow bercabang akan menanyakannya berkali-kali.
         $this->app->scoped(ParameterWorkflow::class);
+
+        /*
+         * Scoped, dan itu yang membuat `lupakan()` pada kelas itu jarang diperlukan.
+         *
+         * Jawabannya ditanyakan ulang oleh setiap titik yang menjaga sambungan keluar, dan
+         * setiap pertanyaan berarti satu query kalau instansnya baru tiap kali. Scoped juga
+         * yang menjaga ingatannya tidak menyeberang: pekerja antrean yang memungut job
+         * berikutnya mendapat ikatan yang bersih, persis seperti permintaan HTTP berikutnya.
+         */
+        $this->app->scoped(ActiveEnvironment::class);
     }
 
     /**
@@ -54,6 +69,27 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        /*
+         * Proxy tepercaya disetel DI SINI, bukan di `bootstrap/app.php`.
+         *
+         * Closure `withMiddleware()` dijalankan `afterResolving(HttpKernel::class)`, dan kernel
+         * di-resolve SEBELUM `LoadEnvironmentVariables` berjalan. Akibatnya `env()` di dalam closure
+         * itu selalu memulangkan null, dan pemanggilan `trustProxies()` di sana tidak pernah
+         * melakukan apa pun. Ia terbaca benar dan terbukti mati.
+         *
+         * Gejalanya hanya muncul di belakang proxy: Laravel membaca alamat dari koneksi ke proxy —
+         * yang memang `http` — lalu menerbitkan setiap pengalihan sebagai `http://`. Peramban
+         * dilempar ke porta 80, dan yang terlihat bukan "salah setel proxy" melainkan galat milik
+         * apa pun yang kebetulan mendengar di sana.
+         *
+         * Ditemukan dengan membukanya lewat Traefik, bukan oleh test.
+         */
+        $proxies = config('coreerp.trusted_proxies');
+
+        if (is_string($proxies) && $proxies !== '') {
+            TrustProxies::at($proxies === '*' ? '*' : array_map(trim(...), explode(',', $proxies)));
+        }
+
         // Prevent touch() utime warning from crashing Blade view rendering on containerized environments
         set_error_handler(function ($severity, $message) {
             if (str_contains($message, 'touch(): Utime failed')) {
@@ -63,8 +99,22 @@ class AppServiceProvider extends ServiceProvider
             return false;
         }, E_WARNING);
 
+        /*
+         * Passkey dibaca dari database pusat, bukan dari database lingkungan.
+         *
+         * Dipasang di sini karena satu-satunya pintunya milik paket, dan alasan lengkapnya beserta
+         * kenapa menandai `User` saja tidak cukup ada di {@see Passkey}. Tanpa baris ini, pelanggan
+         * yang masuk dengan passkey dari alamat lingkungannya tidak menemukan passkey miliknya.
+         */
+        Passkeys::usePasskeyModel(Passkey::class);
+
         $this->configureDefaults();
         $this->hentikanPenerusanLogKeOtel();
+
+        // Dipasang tanpa syarat, termasuk on-prem dan di dalam test. Yang menentukan apakah ia
+        // menolak sesuatu adalah baris `environments`, bukan pemasangannya — dan selama satu
+        // tenant hanya punya produksi, ia tidak pernah menolak apa pun.
+        OutboundGuard::install();
 
         Gate::define(
             'manage-access',

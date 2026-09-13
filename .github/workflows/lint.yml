@@ -143,3 +143,42 @@ jobs:
       #   with:
       #     commit_message: fix code style
       #     commit_options: '--no-verify'
+
+  # Konsol operator. Job tersendiri karena `working-directory` job di atas menunjuk `apps/core`,
+  # dan dua folder kerja dalam satu job berarti setiap langkah harus menyebutkan miliknya sendiri —
+  # bentuk yang membuat satu langkah yang lupa diam-diam memeriksa aplikasi yang salah.
+  #
+  # Tidak ada langkah frontend di sini, dan berkas TypeScript-nya tetap terperiksa — oleh job di
+  # atas. `eslint.config.js` berada di akar repo dan `npm run lint:check` milik Core menjalankan
+  # `eslint ../..`, jadi konsol ini sudah masuk jangkauannya sejak berkasnya ada. Prettier tidak:
+  # ia bekerja dari daftar pola, bukan dari satu konfigurasi yang menjangkau semuanya, sehingga
+  # satu pola untuk `apps/control-plane/resources/js` ditambahkan ke `format:check` milik Core.
+  #
+  # Keduanya ditaruh di job Core dan bukan di sini karena node beserta `npm ci` sudah terpasang di
+  # sana. Job kedua yang memasangnya lagi membayar dua menit untuk memeriksa berkas yang sama.
+  konsol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: apps/control-plane
+
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+
+      - name: Install PHP Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-progress --prefer-dist
+
+      - name: Run Pint
+        run: composer lint:check
+
+      - name: Run Type Analysis
+        run: composer types:check

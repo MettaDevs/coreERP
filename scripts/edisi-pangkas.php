@@ -209,8 +209,16 @@ function pangkasComposer(string $akar, array $dibuang): void
     $paket = array_column($dibuang, 'paket');
     sort($paket);
 
-    // `--ignore-platform-req=ext-gd` menyamai baris `composer install` di bawahnya: image
-    // composer tidak membawa ext-gd, sedangkan penyelesaian dependency memeriksanya.
+    // Kedua `--ignore-platform-req` menyamai baris `composer install` pada Dockerfile: image
+    // composer tidak membawa `ext-gd` maupun `ext-opentelemetry`, sedangkan penyelesaian
+    // dependency memeriksa keduanya.
+    //
+    // Yang kedua sempat tertinggal, dan akibatnya seluruh pembangunan edisi berhenti di sini:
+    // `open-telemetry/opentelemetry-auto-laravel` menuntut `ext-opentelemetry`, jadi `composer
+    // remove` menolak menyelesaikan dependency sebelum satu paket pun dibuang. Pesannya menuduh
+    // paket module yang sedang dibuang, bukan ekstensi yang hilang — itu yang membuatnya mahal
+    // didiagnosa. Kalau kelak ada ekstensi ketiga yang hanya ada di image runtime, ia harus
+    // ditambahkan di kedua tempat sekaligus.
     jalankan(
         $app,
         array_merge(
@@ -223,6 +231,7 @@ function pangkasComposer(string $akar, array $dibuang): void
                 '--no-audit',
                 '--no-interaction',
                 '--ignore-platform-req=ext-gd',
+                '--ignore-platform-req=ext-opentelemetry',
             ],
         ),
     );

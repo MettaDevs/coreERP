@@ -120,6 +120,19 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "test:parallel": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test --parallel --exclude-group serial"
+        ],
+        "test:serial": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan test --group serial"
+        ],
+        "test:fast": [
+            "Composer\\Config::disableProcessTimeout",
+            "@test:parallel",
+            "@test:serial"
         ]
     },
     "extra": {
@@ -143,5 +156,10 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "scripts-descriptions": {
+        "test:parallel": "Seluruh test kecuali yang membuat database sungguhan, di semua core.",
+        "test:serial": "Hanya test yang membuat dan membuang database PostgreSQL sungguhan. Wajib berurutan.",
+        "test:fast": "Keduanya, berurutan: yang paralel dulu, lalu yang serial."
+    }
 }

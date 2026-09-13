@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Modules;
 
 use App\Actions\NumberSequence\EnsureNumberSequenceDrafts;
+use App\Models\Environment;
 use App\Models\ModuleInstallation;
+use App\Support\ControlPlane\EnvironmentConnection;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleMigrator;
 use App\Support\Modules\ModuleRegistry;
@@ -25,6 +27,29 @@ use RuntimeException;
  * terpasang tanpa menyentuh data dan tanpa mengisi ulang data awal, sehingga perintah ini
  * aman dijalankan dua kali — sifat yang dibutuhkan admin pelanggan yang menjalankan
  * pembaruan on-prem dengan tangan.
+ *
+ * ## Yang dipasang bukan tenant, melainkan lingkungannya
+ *
+ * Entitlement milik tenant: ia yang menentukan module apa yang **boleh** ada. Pemasangan milik
+ * lingkungan: ia yang menentukan module apa yang **benar-benar** ada di satu tempat kerja. Sebuah
+ * tenant dengan produksi dan demo punya dua database, dan pertanyaan "HR terpasang?" punya dua
+ * jawaban yang berbeda di sana — karena migrationnya memang berjalan atau tidak berjalan di dua
+ * tempat terpisah.
+ *
+ * Karena itu `core_module_installations` tidak diberi kolom `environment_id`. Ia justru **tinggal
+ * di database lingkungan itu sendiri**, berdampingan dengan riwayat migration yang ia gambarkan.
+ * Dua alasan, dan yang kedua yang menentukan:
+ *
+ * 1. `environment:copy` menyalin database secara fisik, sehingga catatan pemasangan ikut apa adanya
+ *    tanpa satu baris kode pun — dan ia memang sudah memeriksa jumlahnya sesudah restore.
+ * 2. `seeded_at` dan riwayat migration harus sepakat. Kalau catatannya di database pusat sementara
+ *    tabelnya di database lingkungan, sebuah restore dari cadangan yang lebih tua membuat keduanya
+ *    berselisih diam-diam: catatannya bilang sudah disemai, tabelnya kosong, dan seed tidak pernah
+ *    berjalan lagi. Satu database membuat keduanya berhasil atau gagal bersama.
+ *
+ * Menyebut lingkungan itu **opsional**, dan kosong berarti lingkungan produksi tenant ini. Produksi
+ * hari ini `database_name`-nya kosong — yaitu database bawaan — sehingga jalur tanpa penyebutan
+ * berjalan persis seperti sebelum pemisahan ini ada.
  */
 final class InstallModule
 {
@@ -32,10 +57,36 @@ final class InstallModule
         private readonly ModuleRegistry $registry,
         private readonly ModuleMigrator $migrator,
         private readonly ModuleSeeder $seeder,
-        private readonly EnsureNumberSequenceDrafts $urutanNomor,
+        private readonly EnsureNumberSequenceDrafts $numberSequences,
+        private readonly EnvironmentConnection $connections,
     ) {}
 
-    public function handle(string $moduleId, string $tenantId): ModuleInstallation
+    public function handle(string $moduleId, string $tenantId, ?Environment $environment = null): ModuleInstallation
+    {
+        $target = $environment ?? $this->productionEnvironment($tenantId);
+
+        if (! $target instanceof Environment) {
+            // Tenant tanpa satu pun baris registry. Itu keadaan pemasangan lama yang belum
+            // di-backfill, dan jawabannya database bawaan — sama seperti sebelum lingkungan ada.
+            return $this->install($moduleId, $tenantId);
+        }
+
+        return $this->connections->runWithin(
+            $target,
+            fn (): ModuleInstallation => $this->install($moduleId, $tenantId),
+        );
+    }
+
+    private function productionEnvironment(string $tenantId): ?Environment
+    {
+        return Environment::query()
+            ->where('tenant_id', $tenantId)
+            ->where('kind', 'production')
+            ->whereNull('deleted_at')
+            ->first();
+    }
+
+    private function install(string $moduleId, string $tenantId): ModuleInstallation
     {
         $module = $this->registry->cari($moduleId);
 
@@ -43,7 +94,7 @@ final class InstallModule
             throw new RuntimeException(sprintf('Module "%s" tidak ditemukan di folder modules/.', $moduleId));
         }
 
-        $this->pastikanDependencyTerpasang($module, $tenantId);
+        $this->ensureDependenciesInstalled($module, $tenantId);
 
         $this->migrator->naik($module);
 
@@ -71,17 +122,17 @@ final class InstallModule
         // dengan "Sequence aktif tidak ditemukan untuk aplikasi dan tenant ini".
         //
         // Letaknya sebelum seed karena seed module menerbitkan nomor sungguhan.
-        $this->urutanNomor->forTenantAndApp($tenantId, $module->id);
+        $this->numberSequences->forTenantAndApp($tenantId, $module->id);
 
         $this->seeder->jalankan($module, $tenantId);
 
-        /** @var ModuleInstallation $pemasangan */
-        $pemasangan = ModuleInstallation::query()
+        /** @var ModuleInstallation $installation */
+        $installation = ModuleInstallation::query()
             ->where('tenant_id', $tenantId)
             ->where('module_id', $module->id)
             ->firstOrFail();
 
-        return $pemasangan;
+        return $installation;
     }
 
     /**
@@ -89,27 +140,27 @@ final class InstallModule
      * katalog. Sebuah module boleh saja dikenal platform dan tetap tidak dimiliki tenant
      * yang sedang dipasangi.
      */
-    private function pastikanDependencyTerpasang(ModuleManifest $module, string $tenantId): void
+    private function ensureDependenciesInstalled(ModuleManifest $module, string $tenantId): void
     {
-        $kurang = [];
+        $missing = [];
 
-        foreach ($module->dependency as $butuh) {
-            $ada = ModuleInstallation::query()
+        foreach ($module->dependency as $needed) {
+            $installed = ModuleInstallation::query()
                 ->where('tenant_id', $tenantId)
-                ->where('module_id', $butuh)
+                ->where('module_id', $needed)
                 ->where('status', ModuleInstallation::STATUS_INSTALLED)
                 ->exists();
 
-            if (! $ada) {
-                $kurang[] = $butuh;
+            if (! $installed) {
+                $missing[] = $needed;
             }
         }
 
-        if ($kurang !== []) {
+        if ($missing !== []) {
             throw new RuntimeException(sprintf(
                 'Module "%s" membutuhkan %s, yang belum terpasang pada tenant ini.',
                 $module->id,
-                implode(', ', $kurang),
+                implode(', ', $missing),
             ));
         }
     }

@@ -155,3 +155,16 @@ jobs:
             exit 1
           fi
           echo "Pemeriksa gagal seperti yang diharapkan, dengan kode keluar $kode."
+
+      # Pasangan merah untuk jalur 1 — folder aplikasi di dalam image — dan ia berdiri sendiri
+      # karena jalur itu berdiri sendiri. `--anggap-tidak-dibeli` di langkah atas hanya
+      # menggerakkan ketiga jalur modul: pemeriksaan folder aplikasi boleh rusak sepenuhnya tanpa
+      # satu langkah pun di alur ini berubah warna.
+      #
+      # Tidak ada image edisi yang dibangun ulang di sini. Dua image sekali pakai berisi dua baris
+      # sudah cukup: satu hanya memuat `apps/core`, satu lagi ditambah `apps/control-plane`.
+      # Skripnya yang gagal sendiri bila pemeriksanya tetap hijau pada image yang bocor — atau
+      # bila ia justru merah pada image yang bersih, karena pemeriksa yang selalu merah akan
+      # dimatikan orang pertama yang terhalang olehnya.
+      - name: Buktikan pemeriksa folder aplikasi bisa merah
+        run: bash scripts/verify-edition.sh --buktikan-aplikasi-bisa-merah

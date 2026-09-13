@@ -73,19 +73,31 @@ Route::get('api/v1/control/apps', fn () => response()->json([
     ]),
 ]))->name('api.control.apps.index');
 
+/*
+ * Penukaran kode undangan sengaja BERADA DI LUAR grup `guest`.
+ *
+ * Selama ia dijaga `guest`, orang yang sudah punya akun tidak dapat mencapainya sama sekali — dan
+ * "satu orang di banyak tenant" mustahil lewat jalur mana pun: ia harus keluar lebih dulu, lalu
+ * menukar kode memakai email yang pasti ditolak karena sudah terdaftar.
+ *
+ * Yang memilih jalurnya adalah controller-nya, dari ada atau tidaknya pengguna pada permintaan.
+ * Orang baru mengirim nama, email, dan kata sandi; orang yang sudah masuk hanya mengirim kodenya.
+ */
+Route::get('join', fn () => Inertia::render('auth/join', [
+    'passwordRules' => Password::defaults()->toPasswordRulesString(),
+    'authenticated' => auth()->check(),
+]))->name('join');
+Route::post('join', [InvitationRedemptionController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('join.store');
+Route::post('api/v1/invitation-redemptions', [InvitationRedemptionController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('api.invitation-redemptions.store');
+
 Route::middleware('guest')->group(function () {
-    Route::get('join', fn () => Inertia::render('auth/join', [
-        'passwordRules' => Password::defaults()->toPasswordRulesString(),
-    ]))->name('join');
-    Route::post('join', [InvitationRedemptionController::class, 'store'])
-        ->middleware('throttle:5,1')
-        ->name('join.store');
     Route::post('api/v1/business-registrations', [BusinessRegistrationController::class, 'store'])
         ->middleware('throttle:'.config('coreerp.registration_rate_limit', 5).',1')
         ->name('api.business-registrations.store');
-    Route::post('api/v1/invitation-redemptions', [InvitationRedemptionController::class, 'store'])
-        ->middleware('throttle:5,1')
-        ->name('api.invitation-redemptions.store');
 });
 
 Route::middleware(['auth'])->group(function () {

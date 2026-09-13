@@ -138,7 +138,27 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('LARAVEL_PARALLEL_TESTING') ? 'public' : env('DB_TEST_SCHEMA', 'coreerp_test'),
+            /*
+             * `public` hanya bila mode paralel benar-benar berjalan — dan itu ditandai adanya
+             * TOKEN, bukan sekadar adanya sakelarnya.
+             *
+             * Di mode paralel tiap pekerja memperoleh databasenya sendiri (`<db>_test_<token>`),
+             * jadi di sana database itulah batas isolasinya dan schema `coreerp_test` tidak
+             * dipakai. Tetapi sakelar tanpa token adalah keadaan yang tidak pernah dimaksudkan
+             * siapa pun: nama databasenya jatuh kembali ke `DB_DATABASE` — yaitu database kerja
+             * pengembang — sementara schema-nya sudah terlanjur `public`.
+             *
+             * Akibatnya bukan test yang gagal melainkan **database kerja yang dikosongkan**, dan
+             * ia tidak berbunyi sama sekali: `DatabaseTruncation` mengecualikan tabel `migrations`,
+             * sehingga yang tertinggal adalah skema utuh berisi nol baris. Sudah terjadi dua kali
+             * pada 11 dan 12 September 2026; yang hilang tenant, akun operator, dan katalog app.
+             *
+             * Dengan token ikut diperiksa, sakelar yang tertinggal di lingkungan shell berakhir
+             * pada schema test yang benar — merah kalau memang salah, bukan merusak.
+             */
+            'search_path' => env('LARAVEL_PARALLEL_TESTING') && env('TEST_TOKEN')
+                ? 'public'
+                : env('DB_TEST_SCHEMA', 'coreerp_test'),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 

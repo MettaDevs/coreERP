@@ -4,9 +4,50 @@
     {
       "name": "docs",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "docs:dev"],
+      "runtimeArgs": [
+        "run",
+        "docs:dev"
+      ],
       "cwd": "docs",
       "port": 5173
+    },
+    {
+      "name": "core",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "-S",
+        "0.0.0.0:8000",
+        "-t",
+        "public",
+        "server.php"
+      ],
+      "cwd": "apps/core",
+      "port": 8000
+    },
+    {
+      "name": "control-plane",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "-S",
+        "0.0.0.0:8001",
+        "-t",
+        "public",
+        "server.php"
+      ],
+      "cwd": "apps/control-plane",
+      "port": 8001
+    },
+    {
+      "name": "core-worker",
+      "runtimeExecutable": "php",
+      "runtimeArgs": [
+        "artisan",
+        "queue:work",
+        "--tries=1",
+        "--timeout=900"
+      ],
+      "cwd": "apps/core",
+      "port": 8002
     }
   ]
 }

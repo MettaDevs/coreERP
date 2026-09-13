@@ -1,0 +1,50 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "coreerp/control-plane",
+    "type": "project",
+    "description": "Konsol operator vendor. Tidak pernah ikut ke server pelanggan.",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4",
+        "inertiajs/inertia-laravel": "^3.0",
+        "laravel/framework": "^13.17"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.9",
+        "laravel/pint": "^1.27",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.9.3",
+        "phpstan/phpstan": "2.2.5",
+        "phpunit/phpunit": "^12.5.23"
+    },
+    "autoload": {
+        "psr-4": {
+            "ControlPlane\\": "app/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ControlPlane\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "lint": "pint --parallel",
+        "lint:check": "pint --parallel --test",
+        "types:check": "phpstan analyse --memory-limit=512M",
+        "test": [
+            "@lint:check",
+            "@types:check",
+            "@php artisan test"
+        ]
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        },
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

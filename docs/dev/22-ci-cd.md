@@ -184,9 +184,30 @@ benar-benar dikirim; tanpa itu ia cuma janji.
 Karena itu pemangkasannya dibuat skrip, bukan dikerjakan tangan per pelanggan.
 `scripts/edisi-pangkas.php` membuang module yang tidak dibeli dari pohon bangunan di dalam
 Dockerfile, `scripts/build-edition.sh` membangun satu image per edisi, dan
-`scripts/verify-edition.sh` memeriksa tiga jalur kebocoran yang masing-masing bisa bocor
-sendiri-sendiri: berkas dan nama namespace di dalam image, tabel yang terbentuk ketika migration
-dijalankan ke database kosong, dan bundel JavaScript. Satu saja bocor, alurnya gagal.
+`scripts/verify-edition.sh` memeriksa empat jalur kebocoran yang masing-masing bisa bocor
+sendiri-sendiri: folder aplikasi di bawah `apps/` di dalam image, berkas dan nama namespace,
+tabel yang terbentuk ketika migration dijalankan ke database kosong, dan bundel JavaScript. Satu
+saja bocor, alurnya gagal.
+
+Jalur pertama berbeda sifatnya dari ketiga sisanya. Ketiganya bertanya "modul yang tidak dibeli
+apakah ikut?", sedangkan yang pertama bertanya "aplikasi selain Core apakah ikut?" — dan ia
+memakai **daftar yang diizinkan**, bukan daftar yang dilarang. Bedanya menentukan: aplikasi kedua
+yang lahir besok tertangkap tanpa ada yang perlu mendaftarkannya. Ia juga menolak ketika
+`/repo/apps` ternyata kosong, karena pemindai yang tidak menemukan subjek tidak dapat dibedakan
+dari pemindai yang tidak menemukan pelanggaran.
+
+Satu pengecualian tercatat di `.dockerignore`, dan ia sengaja sempit: **manifest npm** milik
+`apps/control-plane` ikut ke konteks pembangunan, isi foldernya tidak. Sebabnya mekanis — folder itu
+disebut `workspaces` pada `package.json` akar, dan `npm ci` di tahap `assets` berhenti sebelum satu
+paket pun terpasang bila sebuah workspace yang disebut di sana tidak ada. Nol baris kode konsol ikut
+masuk, dan tahap akhir tetap hanya menyalin `apps/core`, jadi jalur pertama di atas tetap yang
+menagihnya. Kalau kelak ada berkas kedua yang ingin dikecualikan, pertanyaannya bukan "apakah berkas
+ini aman" melainkan "kenapa image pelanggan membutuhkan sesuatu dari perkakas vendor".
+
+Bukti-bisa-merahnya terpisah dari milik ketiga jalur lain. `--anggap-tidak-dibeli` hanya
+menggeser daftar modul, jadi pemeriksaan aplikasi dapat rusak total tanpa satu pun langkah CI
+berubah warna; karena itu ia punya modenya sendiri, `--buktikan-aplikasi-bisa-merah`, yang
+membangun dua image alpine sekali pakai alih-alih membangun ulang image edisi.
 
 Daftar edisi dibaca dari folder `editions/`, tidak ditulis di dalam alur. Sebuah edisi baru yang
 tidak ikut terbangun adalah kegagalan yang tidak berbunyi — pelanggannya baru tahu saat

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Observabilitas;
 
+use App\Support\ControlPlane\ActiveEnvironment;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
@@ -23,6 +24,14 @@ use Throwable;
  * **Tidak ada jalur yang boleh melempar,** aturan yang sama dengan seluruh isi folder ini.
  * Discord yang mati, webhook yang dicabut, atau jaringan yang diblokir tidak boleh menjadi
  * kegagalan kedua yang menimpa kegagalan pertama.
+ *
+ * **Di lingkungan yang bukan produksi, kiriman ini ditekan.** Bukan karena laporannya tidak
+ * berharga, melainkan karena channel itu dibaca sebagai "ada yang rusak pada pelanggan".
+ * Sandbox berisi salinan produksi menghasilkan kesalahan yang persis sama bentuknya, sehingga
+ * tanpa penekanan ini satu orang yang sedang mencoba-coba di sandbox membangunkan tim dengan
+ * peringatan yang tidak menunjuk apa pun — dan peringatan yang beberapa kali terbukti palsu
+ * adalah peringatan yang berikutnya tidak dibaca. Laporannya tetap utuh di berkas log dan di
+ * SigNoz; yang hilang hanya dering notifikasinya.
  */
 final class PengirimDiscord
 {
@@ -40,6 +49,17 @@ final class PengirimDiscord
             $webhook = self::webhook();
 
             if ($webhook === null) {
+                return;
+            }
+
+            // Ditanyakan **sebelum** penjeda disentuh, dan urutannya bukan selera. Penjeda
+            // menulis penanda begitu ia meluluskan sebuah laporan; kalau ia berjalan lebih
+            // dulu, sandbox membakar jatah kiriman untuk pesan yang memang tidak akan pernah
+            // berangkat — dan pada saat yang sama urutan itulah yang membuat penekanan di
+            // sini dapat dibedakan dari penolakan jaring global, yang baru bekerja jauh di
+            // hilir. Penjaga yang hasilnya tidak dapat dibedakan dari penjaga lain tidak
+            // dapat dibuktikan merah.
+            if (! app(ActiveEnvironment::class)->outboundAllowed()) {
                 return;
             }
 

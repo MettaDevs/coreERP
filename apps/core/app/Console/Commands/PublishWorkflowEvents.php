@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\Modules\ModuleManifest;
 use App\Support\Modules\ModuleRegistry;
 use Illuminate\Console\Command;
@@ -35,8 +36,12 @@ class PublishWorkflowEvents extends Command
 
     protected $description = 'Kirim keputusan workflow yang belum terkirim ke aplikasi penerima.';
 
-    public function handle(ModuleRegistry $registry): int
+    public function handle(ModuleRegistry $registry, ActiveEnvironment $lingkungan): int
     {
+        if (! $lingkungan->outboundAllowed()) {
+            return $this->lucuti($lingkungan);
+        }
+
         $key = (string) config('coreerp.app_context_signing_key');
         $semua = collect(config('coreerp.event_endpoints', []))
             ->filter(fn (mixed $endpoint): bool => is_array($endpoint) && in_array($endpoint['type'] ?? null, self::TYPES, true) && isset($endpoint['url']))
@@ -98,6 +103,52 @@ class PublishWorkflowEvents extends Command
             }
             DB::table('outbox_events')->where('id', $event->id)->whereNull('published_at')->update(['published_at' => now(), 'updated_at' => now()]);
         }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Menandai terbit tanpa mengirim, di lingkungan yang tidak boleh menghubungi luar.
+     *
+     * Ini bahaya paling konkret yang benar-benar ada di repo hari ini, dan ia tidak butuh
+     * module baru untuk muncul: `outbox_events` ikut tersalin ketika sebuah produksi disalin
+     * menjadi sandbox, dan baris yang belum terbit di sana menunjuk endpoint yang sama persis
+     * dengan yang dipakai produksi. Perintah ini berjalan di penjadwal, jadi tanpa penjagaan
+     * di sini sandbox akan mengirim **ulang** keputusan produksi ke sistem sungguhan —
+     * beberapa menit setelah salinannya selesai, tanpa ada yang menekan tombol apa pun.
+     *
+     * Ditandai terbit, bukan dibiarkan menggantung. Baris yang tidak pernah ditandai akan
+     * diambil ulang setiap kali perintah ini berjalan, selamanya; antrean yang tidak pernah
+     * menyusut menyembunyikan baris yang benar-benar gagal terkirim, dan di sandbox ia
+     * menyembunyikannya tanpa satu pun manfaat sebagai gantinya.
+     *
+     * Penjagaan berdiri **sebelum** setelan endpoint dibaca. Di sini konfigurasi yang lengkap
+     * maupun yang kosong berujung pada hal yang sama — tidak ada yang akan dikirim — jadi
+     * membedakan keduanya hanya menyisakan tumpukan baris yang tidak berarti apa-apa.
+     */
+    private function lucuti(ActiveEnvironment $lingkungan): int
+    {
+        // Id dipungut lebih dulu lalu diperbarui lewat `whereIn`, bukan `limit()->update()`:
+        // PostgreSQL tidak menerima LIMIT pada UPDATE, dan pembatasannya memang harus ikut —
+        // salinan produksi yang besar tidak boleh menjadi satu transaksi raksasa.
+        $ids = DB::table('outbox_events')
+            ->whereIn('type', self::TYPES)
+            ->whereNull('published_at')
+            ->orderBy('occurred_at')
+            ->limit((int) $this->option('limit'))
+            ->pluck('id')
+            ->all();
+
+        if ($ids !== []) {
+            DB::table('outbox_events')->whereIn('id', $ids)->whereNull('published_at')
+                ->update(['published_at' => now(), 'updated_at' => now()]);
+        }
+
+        $this->info(sprintf(
+            '%d event ditandai terbit tanpa dikirim. %s',
+            count($ids),
+            $lingkungan->refusalReason(),
+        ));
 
         return self::SUCCESS;
     }
