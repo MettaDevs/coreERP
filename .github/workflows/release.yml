@@ -35,13 +35,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
-    # Alasannya ditulis lengkap di alur tests. Perhatikan bedanya dengan alur edition: di sana
-    # ekstensi `opentelemetry` juga dilewatkan saat membangun image, karena image-nya hanya
-    # dipakai untuk verifikasi. Di sini tidak — image yang dibangun alur ini adalah image yang
-    # benar-benar dikirim ke pelanggan, dan ia harus utuh.
-    env:
-      OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
-
     services:
       postgres:
         image: postgres:16-alpine
@@ -57,7 +50,15 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+    # SATU blok `env`. Commit 282e730 (11 September 2026) menambahkan blok kedua, dan YAML dengan
+    # kunci ganda ditolak GitHub sebelum satu langkah pun berjalan — alur ini tidak menerbitkan
+    # satu image pun sejak itu, dengan "workflow file issue" dalam 0 detik di setiap push.
     env:
+      # Alasannya ditulis lengkap di alur tests. Perhatikan bedanya dengan alur edition: di sana
+      # ekstensi `opentelemetry` juga dilewatkan saat membangun image, karena image-nya hanya
+      # dipakai untuk verifikasi. Di sini tidak — image yang dibangun alur ini adalah image yang
+      # benar-benar dikirim ke pelanggan, dan ia harus utuh.
+      OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
       DB_HOST: 127.0.0.1
       DB_PORT: '5432'
       DB_DATABASE: core_erp
