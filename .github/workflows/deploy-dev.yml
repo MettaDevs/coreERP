@@ -59,6 +59,23 @@ jobs:
           printf '%s\n' "${{ secrets.DEV_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
+          # Penjaga ini ada karena kegagalannya sudah terjadi sungguhan.
+          #
+          # Secretnya diisi dengan `ssh-keyscan -t ed25519 <host> | gh secret set`, dan server ini
+          # ternyata hanya punya kunci host RSA. Keyscan memulangkan nol kunci — hanya satu baris
+          # komentar `# host:22 SSH-2.0-OpenSSH_9.6p1` — dan `gh secret set` menyimpannya tanpa
+          # mengeluh sedikit pun. Penyebaran pertama mati dengan "Host key verification failed",
+          # kalimat yang tidak menyebut bahwa yang salah justru isi secretnya.
+          #
+          # Diperiksa DI SINI, bukan dibiarkan muncul sebagai kegagalan ssh, karena kalimat di
+          # bawah menyebut sebab dan obatnya sekaligus.
+          if ! grep -qE '^[^#[:space:]]+ +(ssh-(rsa|ed25519)|ecdsa-)' ~/.ssh/known_hosts; then
+            echo "::error::Secret DEV_KNOWN_HOSTS tidak memuat satu pun baris kunci host."
+            echo "Isi ulang dengan keluaran lengkap 'ssh-keyscan <host>' — TANPA -t, supaya jenis"
+            echo "kunci apa pun yang dipunyai server ikut terbawa. Baris komentar saja tidak cukup."
+            exit 1
+          fi
+
       - name: Pasang di server dev
         env:
           DEV_HOST: ${{ secrets.DEV_HOST }}
@@ -84,12 +101,47 @@ jobs:
           docker tag coreerp:baru coreerp:dev
           docker tag coreerp-console:baru coreerp-console:dev
 
-          # `migrate` ikut: ia menjalankan migration Core, mendaftarkan manifest app, lalu
-          # `environment:upgrade` yang membawa SETIAP database lingkungan ke skema yang berlaku.
-          # Tanpa profil itu, kode baru berjalan di atas skema lama.
-          docker compose --env-file /etc/coreerp/saas.env \
-            -f deploy/saas/compose.yaml -f deploy/saas/compose.dokploy.yaml \
-            --profile data --profile migrate --profile app --profile console --profile scheduler \
+          compose() {
+            docker compose --env-file /etc/coreerp/saas.env \
+              -f deploy/saas/compose.yaml -f deploy/saas/compose.dokploy.yaml "$@"
+          }
+
+          # Penyebarannya bertahap, dan bukan demi kerapian.
+          #
+          # Percobaan pertama memakai satu perintah untuk seluruhnya — seluruh profil sekaligus,
+          # lalu `up -d --wait`. Perintah itu memulangkan 1 pada penyebaran yang BERHASIL: `--wait`
+          # menunggu setiap container yang ia nyalakan mencapai running/healthy, dan container
+          # sekali-jalan — `core-minio-init`, `core-migrate` — tidak pernah mencapainya. Mereka
+          # selesai lalu keluar, dan compose melaporkannya sebagai kegagalan apa pun kode keluarnya:
+          #
+          #   container coreerp-saas-core-minio-init-1 exited (0)   ->  exit 1
+          #
+          # Yang jauh lebih buruk daripada merah palsunya: migration yang benar-benar GAGAL juga
+          # memulangkan 1. Diukur langsung di server — migrate yang keluar dengan kode 7 dan
+          # penyebaran yang seluruhnya sehat sama-sama berbunyi `exit 1`, tidak terbedakan.
+          #
+          # `compose wait` memulangkan kode keluar container itu sendiri (diukur: 0 ketika berhasil,
+          # 7 ketika gagal), jadi tiap tahap punya suaranya sendiri. `bash -e` yang menghentikannya.
+
+          # 1. Data. `core-minio-init` membuat bucket lalu keluar; ditunggu terpisah.
+          compose --profile data up -d
+          compose --profile data wait core-minio-init
+
+          # 2. Migrasi — migration Core, manifest app, lalu `environment:upgrade` yang membawa
+          #    SETIAP database lingkungan ke skema yang berlaku. `--force-recreate` supaya ia
+          #    benar-benar berjalan tiap penyebaran: tanpa itu, commit yang tidak mengubah image
+          #    melewatinya, dan app yang baru dibeli tenant tidak pernah terpasang.
+          compose --profile migrate up -d --force-recreate core-migrate
+          compose --profile migrate wait core-migrate
+
+          # 3. Yang melayani. Baru sesudah migrasi selesai, jadi tidak ada container baru yang
+          #    melayani di atas skema lama.
+          #
+          #    `worker` ikut, dan sebelumnya tidak — itu cacat yang berdiri sendiri.
+          #    `QUEUE_CONNECTION` di stack ini `database`, dan tanpa satu pun worker, tombol
+          #    "Perbarui" di layar armada serta setiap ekspor laporan mengantre selamanya tanpa
+          #    pesan galat apa pun.
+          compose --profile app --profile console --profile scheduler --profile worker \
             up -d --wait --wait-timeout 600
 
           docker image prune -f --filter 'until=168h' >/dev/null || true
@@ -124,6 +176,9 @@ jobs:
             sleep 3
           done
 
+          # Penjaga terakhir, dan ia menangkap yang lolos dari tahap di atas: layanan yang menyala
+          # lalu mati sendiri beberapa detik kemudian — worker yang koneksinya ditolak, misalnya.
+          # `--wait` sudah selesai sebelum itu sempat terjadi.
           gagal=$(docker compose --env-file /etc/coreerp/saas.env \
             -f /opt/coreerp/deploy/saas/compose.yaml -f /opt/coreerp/deploy/saas/compose.dokploy.yaml \
             ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}' \
