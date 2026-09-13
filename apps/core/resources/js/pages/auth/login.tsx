@@ -19,12 +19,47 @@ import { request } from '@/routes/password';
 type Props = {
     status?: string;
     canResetPassword: boolean;
+    /** Null di alamat yang tidak menawarkan SSO; tombolnya tidak tampil sama sekali. */
+    ssoLoginUrl?: string | null;
+    /** Kalimat untuk kode kegagalan yang dikenal server. Tidak pernah teks bebas dari alamat. */
+    ssoError?: string | null;
 };
 
-export default function Login({ status, canResetPassword }: Props) {
+export default function Login({
+    status,
+    canResetPassword,
+    ssoLoginUrl,
+    ssoError,
+}: Props) {
     return (
         <>
             <Head title="Log in" />
+
+            {ssoError && (
+                <div
+                    role="alert"
+                    className="mb-2 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                >
+                    {ssoError}
+                </div>
+            )}
+
+            {ssoLoginUrl && (
+                <div className="flex flex-col gap-3">
+                    {/* Tautan biasa, bukan kunjungan Inertia: tujuannya alamat penyedia di domain lain. */}
+                    <Button
+                        asChild
+                        variant="outline"
+                        className="w-full"
+                        data-test="sso-login-button"
+                    >
+                        <a href={ssoLoginUrl}>Masuk dengan SSO</a>
+                    </Button>
+                    <div className="text-center text-xs text-muted-foreground uppercase">
+                        atau
+                    </div>
+                </div>
+            )}
 
             {/* @chisel-passkeys */}
             <PasskeyVerify />

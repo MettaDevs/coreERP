@@ -39,6 +39,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        // Dipanggil server penyedia identitas, bukan peramban: tidak ada sesi dan tidak ada token
+        // CSRF yang dapat dibawanya. Yang menjaganya tanda tangan logout token itu sendiri.
+        $middleware->validateCsrfTokens(except: ['sso/backchannel-logout']);
+
         // Global, bukan per grup: rute `internal/v1` yang dipanggil app lain juga membawa
         // tenant (ditulis `AuthenticateAppService`), dan justru panggilan antar-layanan itu
         // yang paling sulit ditelusuri tanpa atribut tenant pada span-nya.

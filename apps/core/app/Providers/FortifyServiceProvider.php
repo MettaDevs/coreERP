@@ -5,9 +5,11 @@ namespace App\Providers;
 /* @chisel-registration */
 
 use App\Actions\Fortify\CreateNewUser;
-/* @end-chisel-registration */
 use App\Actions\Fortify\ResetUserPassword;
 use App\Models\CoreApp;
+/* @end-chisel-registration */
+use App\Support\Sso\SsoFailure;
+use App\Support\Sso\TenantSso;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -57,6 +59,10 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/login', [
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'status' => $request->session()->get('status'),
+            // Null di alamat yang tidak menawarkan SSO — tombolnya tidak tampil sama sekali.
+            'ssoLoginUrl' => app(TenantSso::class)->loginUrlFor($request),
+            // Hanya kalimat untuk kode yang dikenal. Teks bebas dari query string tidak pernah dicetak.
+            'ssoError' => SsoFailure::messageFor($request->query('sso_error')),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [

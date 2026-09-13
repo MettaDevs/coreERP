@@ -134,4 +134,21 @@ return [
      */
     'trusted_proxies' => env('COREERP_TRUSTED_PROXIES'),
 
+    /*
+     * Penyedia identitas bersama — satu untuk semua tenant yang memilih mode `bersama`.
+     *
+     * Kosong berarti tidak ada SSO sama sekali, dan itu bawaannya: tombol masuk lewat SSO tidak
+     * tampil, dan setiap rute `/sso/*` menjawab 404. Ketiganya harus terisi; separuh terisi
+     * diperlakukan sama dengan kosong, bukan dicoba lalu gagal di tengah upacara OIDC.
+     *
+     * Rahasianya hidup di env, bukan di `tenant_identity_providers.setelan`: kolom itu sengaja hanya
+     * memuat yang tidak rahasia, dan penyedia bersama memang milik penempatan, bukan milik tenant.
+     * Penyedia milik tenant sendiri (`sendiri`) belum dibangun, begitu pula tempat rahasianya.
+     */
+    'sso' => [
+        'issuer' => env('COREERP_SSO_ISSUER'),
+        'client_id' => env('COREERP_SSO_CLIENT_ID'),
+        'client_secret' => env('COREERP_SSO_CLIENT_SECRET'),
+    ],
+
 ];

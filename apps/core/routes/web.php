@@ -6,6 +6,8 @@ use App\Http\Controllers\Access\MembershipController;
 use App\Http\Controllers\Access\RoleController;
 use App\Http\Controllers\Access\SecurityConfigurationController;
 use App\Http\Controllers\AppLaunchManifestController;
+use App\Http\Controllers\Auth\SsoBackchannelLogoutController;
+use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
@@ -93,6 +95,21 @@ Route::post('join', [InvitationRedemptionController::class, 'store'])
 Route::post('api/v1/invitation-redemptions', [InvitationRedemptionController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('api.invitation-redemptions.store');
+
+/*
+ * Masuk lewat penyedia identitas bersama. Bentuk tiga langkah dan dua alamatnya dijelaskan di
+ * SsoLoginController. Keempatnya menjawab 404 selama penyedia tidak disetel.
+ */
+Route::middleware(['guest', 'throttle:30,1'])->group(function () {
+    Route::get('sso/masuk', [SsoLoginController::class, 'start'])->name('sso.start');
+    Route::get('sso/serah', [SsoLoginController::class, 'handoff'])->name('sso.handoff');
+});
+Route::get('sso/callback', [SsoLoginController::class, 'callback'])
+    ->middleware('throttle:30,1')
+    ->name('sso.callback');
+Route::post('sso/backchannel-logout', SsoBackchannelLogoutController::class)
+    ->middleware('throttle:60,1')
+    ->name('sso.backchannel-logout');
 
 Route::middleware('guest')->group(function () {
     Route::post('api/v1/business-registrations', [BusinessRegistrationController::class, 'store'])

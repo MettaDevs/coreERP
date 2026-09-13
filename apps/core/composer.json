@@ -24,6 +24,7 @@
         "apperp/human-resources": "@dev",
         "apperp/management-aset": "@dev",
         "dedoc/scramble": "^0.13.35",
+        "firebase/php-jwt": "^7.1",
         "inertiajs/inertia-laravel": "^3.0",
         "laravel/chisel": "^0.1.0",
         "laravel/fortify": "^1.37.2",
