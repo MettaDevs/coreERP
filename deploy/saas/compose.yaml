@@ -1,0 +1,306 @@
+# Penyebaran SaaS multi-node. Satu berkas, peran dipilih saat dijalankan lewat `--profile`.
+#
+# ## Kenapa satu berkas dengan profile, bukan empat berkas
+#
+# Empat berkas berarti empat salinan definisi layanan yang sama, dan definisi yang disalin adalah
+# definisi yang kelak berbeda di salah satunya — biasanya pada variabel lingkungan, dan biasanya
+# baru ketahuan sebagai "kenapa node kedua berperilaku lain". Satu berkas tidak dapat menyimpang
+# dari dirinya sendiri.
+#
+# ## Ini BUKAN `compose.edition.yaml`
+#
+# Yang itu bundle on-prem: satu mesin milik pelanggan, seluruh layanan di dalamnya, image dimuat
+# dari `images.tar.gz` tanpa internet. Bentuk itu benar untuk on-prem dan sengaja tidak diubah.
+#
+# Yang ini penyebaran SaaS milik kita sendiri: beberapa node, database terpisah dari aplikasi, dan
+# Traefik sebagai pintu depan sekaligus pembagi beban.
+#
+# ## Menjalankannya
+#
+#   # VPS-1 — data, pintu depan, aplikasi, penjadwal
+#   docker compose --env-file /etc/coreerp/saas.env -f deploy/saas/compose.yaml \
+#       --profile data --profile migrate --profile edge --profile app --profile scheduler up -d
+#
+#   # VPS-2 — aplikasi dan pekerja saja
+#   docker compose --env-file /etc/coreerp/saas.env -f deploy/saas/compose.yaml \
+#       --profile app --profile worker up -d
+#
+# Penjadwal HANYA di satu node. Dua penjadwal berarti penyapuan lingkungan kedaluwarsa berjalan dua
+# kali, dan reservasi nomor dilepas dua kali.
+#
+# `migrate` juga hanya di satu node — tetapi kalau ia terlanjur berjalan di dua, tidak ada yang
+# rusak: `environment:upgrade` yang menemukan kunci operasi sudah dipegang akan melewatinya dan
+# keluar dengan kode sukses. Itu sudah ada testnya.
+
+name: coreerp-saas
+
+x-app-environment: &app-environment
+  APP_ENV: ${APP_ENV:-production}
+  APP_DEBUG: ${APP_DEBUG:-false}
+  APP_URL: ${APP_URL:?APP_URL wajib}
+  APP_KEY: ${CORE_APP_KEY:?CORE_APP_KEY wajib}
+
+  # Di node aplikasi yang TIDAK menjalankan database, ini menunjuk IP privat node data.
+  # Bawaannya nama layanan, yang benar hanya ketika keduanya satu mesin.
+  DB_CONNECTION: pgsql
+  DB_HOST: ${DB_HOST:-core-db}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_DATABASE: ${DB_DATABASE:-core_erp}
+  DB_USERNAME: ${DB_USERNAME:-core_erp}
+  DB_PASSWORD: ${CORE_DB_PASSWORD:?CORE_DB_PASSWORD wajib}
+
+  # Ketiganya di database, dan itulah yang membuat banyak node mungkin sama sekali.
+  #
+  # Sesi di berkas berarti orang yang dilempar ke node lain kehilangan loginnya, dan penawarnya
+  # sticky session — yang lalu membuat satu node mati menjatuhkan semua orang yang menempel padanya.
+  # Dengan sesi di database, permintaan boleh mendarat di node mana pun, tiap kali.
+  SESSION_DRIVER: database
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+
+  # Berkas unggahan ke object storage, bukan ke volume lokal.
+  #
+  # Ini satu-satunya state yang masih bocor keluar dari database, dan ia yang paling sulit
+  # ketahuan: berkas yang diunggah ke node kedua tidak ada di node pertama, tanpa satu pun galat —
+  # ia hanya "kadang hilang" tergantung node mana yang kebetulan melayani permintaan unduhnya.
+  #
+  # `config/filesystems.php` sudah punya disk `s3` lengkap dengan endpoint dan path-style, jadi
+  # MinIO tidak menuntut satu baris kode pun.
+  FILESYSTEM_DISK: ${FILESYSTEM_DISK:-s3}
+  AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-coreerp}
+  AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD wajib}
+  AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+  AWS_BUCKET: ${AWS_BUCKET:-coreerp}
+  AWS_ENDPOINT: ${AWS_ENDPOINT:-http://core-minio:9000}
+  AWS_USE_PATH_STYLE_ENDPOINT: 'true'
+
+  COREERP_BASE_DOMAIN: ${COREERP_BASE_DOMAIN:?COREERP_BASE_DOMAIN wajib}
+  # Wajib di belakang Traefik. Tanpanya Laravel membaca alamat dari koneksi ke proxy — yang memang
+  # `http` — lalu menerbitkan setiap pengalihan sebagai `http://`, dan peramban berputar-putar.
+  COREERP_TRUSTED_PROXIES: ${COREERP_TRUSTED_PROXIES:-*}
+  COREERP_PROVIDER_EMAIL: ${COREERP_PROVIDER_EMAIL}
+  COREERP_PROVIDER_PASSWORD: ${COREERP_PROVIDER_PASSWORD}
+  COREERP_RENDERER_URL: ${COREERP_RENDERER_URL:-http://core-renderer:3000}
+
+services:
+  # ------------------------------------------------------------------ data
+
+  core-db:
+    profiles: [data]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-core_erp}
+      POSTGRES_USER: ${DB_USERNAME:-core_erp}
+      POSTGRES_PASSWORD: ${CORE_DB_PASSWORD:?CORE_DB_PASSWORD wajib}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-core_erp} -d ${DB_DATABASE:-core_erp}']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Terikat ke alamat privat, BUKAN ke semua antarmuka. Node aplikasi kedua menghubunginya lewat
+    # jaringan privat; internet tidak pernah perlu melihat porta ini.
+    ports:
+      - '${DB_BIND:-127.0.0.1}:5432:5432'
+    volumes:
+      - core-db-data:/var/lib/postgresql/data
+
+  core-minio:
+    profiles: [data]
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-coreerp}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD wajib}
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    ports:
+      - '${MINIO_BIND:-127.0.0.1}:9000:9000'
+    volumes:
+      - core-minio-data:/data
+
+  # Sekali jalan, dan aman diulang: `mb --ignore-existing` tidak mengeluh pada bucket yang sudah ada.
+  core-minio-init:
+    profiles: [data]
+    image: minio/mc:latest
+    restart: 'no'
+    depends_on:
+      core-minio:
+        condition: service_healthy
+    entrypoint: ['sh', '-c']
+    command:
+      - >-
+        mc alias set lokal http://core-minio:9000 "${MINIO_ROOT_USER:-coreerp}" "${MINIO_ROOT_PASSWORD}" &&
+        mc mb --ignore-existing "lokal/${AWS_BUCKET:-coreerp}"
+
+  # ------------------------------------------------------------------ migrasi
+
+  core-migrate:
+    profiles: [migrate]
+    image: ${COREERP_IMAGE:?COREERP_IMAGE wajib}
+    restart: 'no'
+    environment:
+      <<: *app-environment
+      OTEL_PHP_AUTOLOAD_ENABLED: 'false'
+    entrypoint: ['sh', '-c']
+    command:
+      - >-
+        php artisan migrate --force --no-interaction &&
+        php artisan db:seed --force --no-interaction &&
+        php artisan app:register-manifest --no-interaction &&
+        php artisan environment:upgrade --no-interaction
+
+  # ------------------------------------------------------------------ aplikasi
+
+  core-app:
+    profiles: [app]
+    image: ${COREERP_IMAGE:?COREERP_IMAGE wajib}
+    restart: unless-stopped
+    environment: *app-environment
+    networks: [default, renderer]
+    volumes:
+      # Hanya log. Unggahan sudah pindah ke object storage — volume bersama untuknya justru yang
+      # membuat node tidak dapat dibuang begitu saja.
+      - core-logs:/repo/apps/core/storage/logs
+    # Terikat privat: yang menghadap internet cuma Traefik. Di node yang menjalankan Traefik, ia
+    # bahkan dihubungi lewat nama layanan dan porta ini tidak terpakai sama sekali.
+    ports:
+      - '${APP_BIND:-127.0.0.1}:8000:80'
+    healthcheck:
+      test: ['CMD', 'php', '-r', "exit(@file_get_contents('http://127.0.0.1/up') === false);"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  core-worker:
+    profiles: [worker]
+    image: ${COREERP_IMAGE:?COREERP_IMAGE wajib}
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+      CONTAINER_ROLE: worker
+      OTEL_SERVICE_NAME: coreerp-worker
+    networks: [default, renderer]
+    volumes:
+      - core-logs:/repo/apps/core/storage/logs
+
+  # TEPAT SATU node. Dua penjadwal berarti penyapuan kedaluwarsa berjalan dua kali.
+  core-scheduler:
+    profiles: [scheduler]
+    image: ${COREERP_IMAGE:?COREERP_IMAGE wajib}
+    restart: unless-stopped
+    environment:
+      <<: *app-environment
+      CONTAINER_ROLE: scheduler
+      OTEL_SERVICE_NAME: coreerp-scheduler
+    volumes:
+      - core-logs:/repo/apps/core/storage/logs
+
+  core-renderer:
+    profiles: [app, worker]
+    image: gotenberg/gotenberg:8
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --api-timeout=120s
+      - --libreoffice-restart-after=50
+      - --chromium-disable-routes=true
+    networks: [renderer]
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:3000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Konsol operator vendor. SATU instansi, dan ia tidak ikut dibagi beban.
+  #
+  # Ia perkakas internal yang dipakai segelintir orang, bukan permukaan pelanggan — menyalinnya ke
+  # node kedua hanya menambah tempat yang harus diperbarui tanpa menambah satu pun yang tertolong.
+  # Kalau node ini mati, yang hilang kemampuan MEMBUAT pelanggan baru; pelanggan yang sudah ada
+  # tetap bekerja lewat Core.
+  core-console:
+    profiles: [edge]
+    image: ${CONSOLE_IMAGE:?CONSOLE_IMAGE wajib}
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${CONSOLE_URL:?CONSOLE_URL wajib}
+      APP_KEY: ${CONSOLE_APP_KEY:?CONSOLE_APP_KEY wajib}
+      # Skema yang dibacanya milik Core, dan ia membaca database yang sama.
+      DB_CONNECTION: pgsql
+      DB_HOST: ${DB_HOST:-core-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE:-core_erp}
+      DB_USERNAME: ${DB_USERNAME:-core_erp}
+      DB_PASSWORD: ${CORE_DB_PASSWORD:?CORE_DB_PASSWORD wajib}
+      # Berkas, bukan database — konsol sengaja tidak punya migration, jadi ia tidak boleh
+      # menuntut tabel yang harus lahir di suatu tempat. Satu instansi membuat itu aman.
+      SESSION_DRIVER: file
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
+      CACHE_STORE: file
+      # Dihubungi di dalam jaringan compose, bukan lewat Traefik. Panggilan konsol ke Core tidak
+      # perlu keluar ke internet lalu masuk lagi hanya untuk sampai ke container sebelah.
+      COREERP_URL: ${COREERP_INTERNAL_URL:-http://core-app:80}
+      CONTROL_PLANE_TOKEN: ${CONTROL_PLANE_TOKEN:?CONTROL_PLANE_TOKEN wajib}
+      COREERP_PROVISION_TIMEOUT: ${COREERP_PROVISION_TIMEOUT:-300}
+      COREERP_TRUSTED_PROXIES: ${COREERP_TRUSTED_PROXIES:-*}
+    volumes:
+      # Sesi operator hidup di sini. Tanpa volume, setiap penyebaran melempar keluar semua orang
+      # yang sedang membuka konsol — termasuk yang sedang di tengah membuat pelanggan.
+      - core-console-storage:/repo/apps/control-plane/storage
+
+  # ------------------------------------------------------------------ pintu depan
+
+  # Hanya di node data, dan itu keputusan sadar: kalau node itu mati, databasenya ikut mati — jadi
+  # pintu depan yang selamat tidak menyelamatkan apa pun. Menaruhnya di tempat lain hanya menambah
+  # satu titik yang bisa rusak tanpa menambah satu pun yang bertahan.
+  traefik:
+    profiles: [edge]
+    image: traefik:v3.3
+    restart: unless-stopped
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN wajib}
+    command:
+      - --log.level=INFO
+      - --accesslog=true
+      - --api.dashboard=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL:?ACME_EMAIL wajib}
+      - --certificatesresolvers.cloudflare.acme.storage=/acme/acme.json
+      - --certificatesresolvers.cloudflare.acme.caserver=${ACME_CA_SERVER:-https://acme-staging-v02.api.letsencrypt.org/directory}
+      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./dynamic:/etc/traefik/dynamic:ro
+      - acme:/acme
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+networks:
+  default:
+  # Tanpa jalan keluar. Perender menerima dokumen milik pelanggan, jadi ia tidak boleh dapat
+  # menghubungi apa pun di luar.
+  renderer:
+    internal: true
+
+volumes:
+  core-console-storage:
+  core-db-data:
+  core-minio-data:
+  core-logs:
+  acme:
