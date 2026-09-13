@@ -43,7 +43,7 @@ class RegisterBusiness
     public function __construct(private AppDependencyGraph $dependencyGraph) {}
 
     /**
-     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>,must_change_password?:bool}  $data
+     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>,must_change_password?:bool,first_environment?:'production'|'demo'|'none',first_environment_expires_at?:?string}  $data
      */
     public function handle(array $data): User
     {
@@ -92,18 +92,44 @@ class RegisterBusiness
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-            // Tempat kerja pertama tenant ini, dan satu-satunya yang boleh berjenis `production`.
-            // `database_name` kosong berarti ia ikut database koneksi bawaan — keadaan pooled dan
-            // on-prem, dan di sana ia permanen.
-            $environment = Environment::create([
-                'tenant_id' => $tenant->id,
-                'kind' => 'production',
-                'name' => 'Production',
-                'slug' => $slug,
-                'database_name' => null,
-                'status' => 'active',
-                'outbound_allowed' => true,
-            ]);
+            /*
+             * Tempat kerja pertama tenant ini — dan jenisnya **dipilih**, tidak lagi selalu produksi.
+             *
+             * Pendaftaran mandiri tetap melahirkan produksi tanpa menyebut apa pun: orang yang
+             * mendaftar sendiri memang datang untuk bekerja. Tetapi operator yang melahirkan tenant
+             * bagi calon pelanggan sering belum tahu apakah mereka jadi membeli — yang ia butuhkan
+             * hari itu sebuah demo berbatas waktu, dan produksi yang terlanjur lahir adalah tempat
+             * kerja kosong yang tidak pernah dipakai siapa pun sekaligus alamat yang sudah terpakai.
+             *
+             * `none` juga sah: tenant boleh berdiri tanpa satu pun lingkungan, dan operator
+             * menambahkannya kemudian dari layar Lingkungan.
+             *
+             * `database_name` kosong berarti ia ikut database koneksi bawaan — keadaan pooled dan
+             * on-prem, dan di sana ia permanen. Demo justru sebaliknya: ia memperoleh databasenya
+             * sendiri saat disiapkan, dan karena itu lahir sebagai `provisioning`, bukan `active`.
+             */
+            $jenisPertama = $data['first_environment'] ?? 'production';
+            $environment = null;
+
+            if ($jenisPertama !== 'none') {
+                $produksi = $jenisPertama === 'production';
+
+                $environment = Environment::create([
+                    'tenant_id' => $tenant->id,
+                    'kind' => $jenisPertama,
+                    'name' => $produksi ? 'Production' : 'Peragaan',
+                    'slug' => $produksi ? $slug : 'peragaan',
+                    'database_name' => null,
+                    // Produksi ikut database bawaan, jadi ia langsung dapat dimasuki. Yang bukan
+                    // produksi belum punya database sama sekali sampai seseorang menekan Siapkan —
+                    // menyatakannya aktif berarti mengiklankan alamat yang dijawab 503.
+                    'status' => $produksi ? 'active' : 'provisioning',
+                    // Di luar produksi, webhook dan pengiriman otomatis dimatikan. Itu satu-satunya
+                    // alasan lingkungan terpisah dapat dipercaya memegang salinan data sungguhan.
+                    'outbound_allowed' => $produksi,
+                    'expires_at' => $produksi ? null : ($data['first_environment_expires_at'] ?? null),
+                ]);
+            }
             $membership = TenantMembership::create([
                 'tenant_id' => $tenant->id,
                 'user_id' => $user->id,
@@ -112,13 +138,18 @@ class RegisterBusiness
             ]);
             // Indeks navigasi: ia menentukan environment mana yang muncul di pengalih, bukan apa
             // yang boleh dikerjakan di dalamnya. Hak tetap berasal dari membership di atas.
-            DB::table('environment_members')->insert([
-                'environment_id' => $environment->id,
-                'user_id' => $user->id,
-                'status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            //
+            // Dilewati ketika tenant lahir tanpa lingkungan: tidak ada yang perlu diindekskan, dan
+            // barisnya berkunci asing ke `environments`.
+            if ($environment instanceof Environment) {
+                DB::table('environment_members')->insert([
+                    'environment_id' => $environment->id,
+                    'user_id' => $user->id,
+                    'status' => 'active',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             foreach ($appIds as $appId) {
                 $tenant->entitlements()->create([
@@ -158,6 +189,19 @@ class RegisterBusiness
             }
 
             DB::afterCommit(function () use ($appIds, $idEvent, $tenant, $environment): void {
+                /*
+                 * Tanpa lingkungan, tidak ada tempat untuk memasang module — dan itu bukan
+                 * kegagalan melainkan keadaan yang sah.
+                 *
+                 * Entitlementnya sudah tercatat pada tenant, jadi begitu operator membuat
+                 * lingkungan pertamanya dan menekan Siapkan, `InstallEntitledModules` memasang
+                 * persis daftar yang sama. Yang dipisahkan di sini justru pembedaan yang menjadi
+                 * dasar seluruh rancangan: entitlement milik tenant, pemasangan milik lingkungan.
+                 */
+                if (! $environment instanceof Environment) {
+                    return;
+                }
+
                 $registry = app(ModuleRegistry::class);
 
                 foreach ($appIds as $appId) {

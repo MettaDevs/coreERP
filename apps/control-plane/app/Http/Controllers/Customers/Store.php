@@ -20,6 +20,15 @@ class Store extends Controller
             'legal_name' => ['required', 'string', 'max:150'],
             'admin_name' => ['required', 'string', 'max:150'],
             'admin_email' => ['required', 'string', 'email', 'max:150'],
+            // Jenis tempat kerja pertamanya. Core yang menjadi penentu akhirnya; yang di sini
+            // menjaga operator mendapat pesan di bawah kolomnya alih-alih penolakan dari jaringan.
+            'first_environment' => ['required', 'in:production,demo,none'],
+            'first_environment_expires_at' => [
+                'exclude_unless:first_environment,demo',
+                'required',
+                'date',
+                'after:today',
+            ],
             // Bentuknya diperiksa di sini, **ketersediaannya tidak**. Yang tahu app mana tersedia,
             // apa prerequisite-nya, dan apakah ia ada di edisi ini hanyalah Core — dan ia memang
             // memeriksanya saat permintaannya tiba. Menyalin pemeriksaan itu ke sini berarti dua
@@ -29,6 +38,8 @@ class Store extends Controller
         ], [
             'app_ids.required' => 'Pilih setidaknya satu app yang dibeli.',
             'app_ids.min' => 'Pilih setidaknya satu app yang dibeli.',
+            'first_environment_expires_at.required' => 'Lingkungan demo wajib punya tanggal berakhir.',
+            'first_environment_expires_at.after' => 'Tanggal berakhir harus sesudah hari ini.',
         ]);
 
         $apps = [];
@@ -43,6 +54,16 @@ class Store extends Controller
                 $input['admin_name'],
                 $input['admin_email'],
                 $apps,
+                // Dipersempit di sini, bukan dipaksa dengan cast: aturan `in:` di atas sudah
+                // menjaminnya, tetapi jaminan itu tidak terbaca analisis statis.
+                match ($input['first_environment']) {
+                    'demo' => 'demo',
+                    'none' => 'none',
+                    default => 'production',
+                },
+                isset($input['first_environment_expires_at']) && is_string($input['first_environment_expires_at'])
+                    ? $input['first_environment_expires_at']
+                    : null,
             );
         } catch (CustomerRejected $rejected) {
             // Penolakan Core dipulangkan sebagai kesalahan formulir, bukan halaman 500. Keduanya
