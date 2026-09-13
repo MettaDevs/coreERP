@@ -75,7 +75,27 @@ x-edition-environment: &edition-environment
   # terbatas, membayar dua kali untuk isi yang sama bukan pilihan yang netral.
   OTEL_PHP_DISABLED_INSTRUMENTATIONS: ${OTEL_PHP_DISABLED_INSTRUMENTATIONS:-psr3}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
-  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://103.122.2.94:4318}
+  # KOSONG, dan itu keputusan yang dibayar mahal kalau dibalik.
+  #
+  # Sebelumnya baris ini memuat alamat kolektor milik VENDOR sebagai bawaan. Sakelar di atas
+  # memang mati, jadi tidak ada yang pernah terkirim — tetapi komentar di atas mengundang
+  # menyalakannya dengan satu baris, dan pelanggan yang menyalakannya tanpa menyebut alamat
+  # sendiri akan mengirimkan trace dan log-nya ke mesin kami. Trace memuat pernyataan SQL, URL,
+  # dan id tenant.
+  #
+  # Untuk pelanggan healthcare itu data yang **tidak boleh kami terima**, bukan sekadar tidak
+  # ingin. Dan ia bertentangan dengan aturan yang kami tulis sendiri: on-prem perpetual berdiri
+  # sendiri, tanpa telemetry wajib. Bawaan yang menelepon rumah begitu dinyalakan bukan "berdiri
+  # sendiri".
+  #
+  # Kosong berarti pelanggan yang menyalakan telemetry WAJIB menyebut ke mana ia dikirim. Kalau
+  # ia lupa, exporter-nya gagal berisik di mesinnya sendiri — dan gagal berisik jauh lebih baik
+  # daripada berhasil diam-diam ke tempat yang salah.
+  #
+  # Alamat kolektor kami sendiri tinggal di `.env` server, tempatnya memang sejak awal. Sebuah
+  # artefak yang memuat fakta spesifik-lingkungan berhenti dapat dipromosikan: image yang diuji
+  # bukan lagi image yang dikirim.
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
   OTEL_PROPAGATORS: ${OTEL_PROPAGATORS:-baggage,tracecontext}
   OTEL_PHP_LOG_DESTINATION: ${OTEL_PHP_LOG_DESTINATION:-none}
 
