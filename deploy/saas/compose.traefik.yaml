@@ -1,0 +1,53 @@
+# Pintu depan milik kita sendiri, untuk mesin yang BELUM punya.
+#
+# ## Kenapa berkas terpisah, bukan profile di berkas utama
+#
+# Compose menginterpolasi seluruh berkas sebelum memilih profile. Selama Traefik ada di sana,
+# penjaga `${VAR:?}` miliknya ikut menyala di mesin yang tidak pernah menjalankannya — dan
+# perintahnya berhenti dengan "CF_DNS_API_TOKEN wajib" untuk layanan yang memang tidak diminta.
+#
+# Ditemukan dengan menjalankannya di server yang sudah punya Traefik sendiri.
+#
+# Dan pemisahan ini lebih jujur: "apakah mesin ini membawa pintu depannya sendiri" adalah fakta
+# tentang MESIN, sama seperti "apakah ia ikut jaringan Traefik yang sudah ada" pada
+# `compose.dokploy.yaml`. Keduanya tindihan, dan tepat satu di antaranya dipakai per mesin.
+#
+#   docker compose --env-file /etc/coreerp/saas.env #       -f deploy/saas/compose.yaml -f deploy/saas/compose.traefik.yaml #       --profile data --profile migrate --profile app --profile console --profile scheduler up -d
+
+services:
+
+  # Hanya di node data, dan itu keputusan sadar: kalau node itu mati, databasenya ikut mati — jadi
+  # pintu depan yang selamat tidak menyelamatkan apa pun. Menaruhnya di tempat lain hanya menambah
+  # satu titik yang bisa rusak tanpa menambah satu pun yang bertahan.
+  traefik:
+    image: traefik:v3.3
+    restart: unless-stopped
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN wajib}
+    command:
+      - --log.level=INFO
+      - --accesslog=true
+      - --api.dashboard=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --certificatesresolvers.cloudflare.acme.email=${ACME_EMAIL:?ACME_EMAIL wajib}
+      - --certificatesresolvers.cloudflare.acme.storage=/acme/acme.json
+      - --certificatesresolvers.cloudflare.acme.caserver=${ACME_CA_SERVER:-https://acme-staging-v02.api.letsencrypt.org/directory}
+      - --certificatesresolvers.cloudflare.acme.dnschallenge=true
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.cloudflare.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./dynamic:/etc/traefik/dynamic:ro
+      - acme:/acme
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+volumes:
+  acme:
