@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
+use Tests\Concerns\DropsTestDatabases;
 use Tests\TestCase;
 
 /**
@@ -31,6 +32,7 @@ use Tests\TestCase;
 #[Group('serial')]
 class ProvisionEnvironmentTest extends TestCase
 {
+    use DropsTestDatabases;
     use RefreshDatabase;
 
     /** Awalan slug tenant uji; ia yang muncul di nama database dan yang dipakai membersihkannya. */
@@ -53,9 +55,14 @@ class ProvisionEnvironmentTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->dropTestDatabases();
-
-        parent::tearDown();
+        // `finally`, dan bukan kerapian: pembuangan database yang gagal di sini pernah melewati
+        // `parent::tearDown()`, meninggalkan transaksi `RefreshDatabase` terbuka, dan membuat test
+        // berikutnya menunggu kuncinya selamanya. Lihat `DropsTestDatabases`.
+        try {
+            $this->dropTestDatabases();
+        } finally {
+            parent::tearDown();
+        }
     }
 
     // ---------------------------------------------------------------- jalur merah
@@ -78,7 +85,7 @@ class ProvisionEnvironmentTest extends TestCase
         // Yang dijaga bukan pesannya melainkan akibatnya: tidak ada operasi yang dibuka, tidak ada
         // database yang dibuat, dan barisnya tidak bergeser sedikit pun.
         $this->assertSame(0, EnvironmentOperation::query()->count());
-        $this->assertSame([], $this->testDatabase());
+        $this->assertSame([], $this->createdTestDatabases());
         $this->assertSame('active', $environment->refresh()->status);
     }
 
@@ -103,7 +110,7 @@ class ProvisionEnvironmentTest extends TestCase
         // statusnya. Menurunkannya akan membuat operasi lain yang masih sehat terlihat gagal.
         $this->assertSame(1, EnvironmentOperation::query()->count());
         $this->assertSame('provisioning', $environment->refresh()->status);
-        $this->assertSame([], $this->testDatabase());
+        $this->assertSame([], $this->createdTestDatabases());
     }
 
     public function test_a_failure_leaves_degraded_together_with_its_reason(): void
@@ -147,7 +154,7 @@ class ProvisionEnvironmentTest extends TestCase
         $this->artisan('environment:provision', ['environment' => $environment->id])
             ->assertExitCode(Command::SUCCESS);
 
-        $this->assertSame([$name], $this->testDatabase(), 'Databasenya harus benar-benar ada di pg_database.');
+        $this->assertSame([$name], $this->createdTestDatabases(), 'Databasenya harus benar-benar ada di pg_database.');
         $this->assertLessThanOrEqual(63, strlen($name), 'Identifier PostgreSQL berhenti di 63 karakter.');
 
         // Tabelnya ada di sana, bukan hanya databasenya. Sebuah database kosong yang statusnya
@@ -187,7 +194,7 @@ class ProvisionEnvironmentTest extends TestCase
 
         // Melanjutkan, bukan menggandakan: satu database yang sama, nama yang sama, dan tidak ada
         // migration yang dijalankan dua kali karena riwayatnya hidup di dalam database itu.
-        $this->assertSame([$name], $this->testDatabase());
+        $this->assertSame([$name], $this->createdTestDatabases());
 
         $environment->refresh();
         $this->assertSame('active', $environment->status);
@@ -249,7 +256,7 @@ class ProvisionEnvironmentTest extends TestCase
     }
 
     /** @return list<string> */
-    private function test_database(): array
+    private function createdTestDatabases(): array
     {
         $rows = $this->maintenance()->select(
             'select datname from pg_database where datname like ? order by datname',
@@ -271,8 +278,8 @@ class ProvisionEnvironmentTest extends TestCase
         DB::purge('test_target');
         DB::purge('environment_provisioning');
 
-        foreach ($this->testDatabase() as $name) {
-            $this->maintenance()->unprepared(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $name));
+        foreach ($this->createdTestDatabases() as $name) {
+            $this->dropTestDatabase($this->maintenance(), $name);
         }
 
         DB::purge('test_maintenance');
@@ -331,7 +338,7 @@ class ProvisionEnvironmentTest extends TestCase
         $this->assertSame('running', $alive->refresh()->status);
         $this->assertSame(1, EnvironmentOperation::query()->count());
         $this->assertSame('provisioning', $environment->refresh()->status);
-        $this->assertSame([], $this->testDatabase());
+        $this->assertSame([], $this->createdTestDatabases());
     }
 
     public function test_a_running_operation_must_carry_its_lease(): void
