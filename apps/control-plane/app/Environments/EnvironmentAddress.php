@@ -43,7 +43,8 @@ final class EnvironmentAddress
     }
 
     /**
-     * Alamat lengkap sebuah lingkungan, berikut skemanya. Null berarti tidak ada alamat khusus.
+     * Alamat lengkap sebuah lingkungan, berikut skema dan portanya. Null berarti tidak ada alamat
+     * khusus.
      *
      * | Jenis | Bentuk |
      * | --- | --- |
@@ -63,8 +64,35 @@ final class EnvironmentAddress
             return null;
         }
 
-        return $kind === 'production'
-            ? 'https://'.$tenant.'.'.$domain
-            : 'https://'.$tenant.'--'.$environment.'.'.$kind.'.'.$domain;
+        $host = $kind === 'production'
+            ? $tenant.'.'.$domain
+            : $tenant.'--'.$environment.'.'.$kind.'.'.$domain;
+
+        return self::scheme().'://'.$host.self::portSuffix();
+    }
+
+    /**
+     * Skema yang dicetak: `http` hanya bila disetel begitu, selain itu `https`.
+     *
+     * Nilai asing tidak diteruskan apa adanya. Salah ketik di env tidak boleh menghasilkan tautan
+     * berskema karangan yang terlihat seperti alamat sungguhan.
+     */
+    private static function scheme(): string
+    {
+        return config('core.address_scheme') === 'http' ? 'http' : 'https';
+    }
+
+    /** `:8000`, atau kosong bila porta tidak disetel atau sama dengan bawaan skemanya. */
+    private static function portSuffix(): string
+    {
+        $port = config('core.address_port');
+
+        if (! is_numeric($port) || (int) $port <= 0) {
+            return '';
+        }
+
+        $default = self::scheme() === 'http' ? 80 : 443;
+
+        return (int) $port === $default ? '' : ':'.(int) $port;
     }
 }

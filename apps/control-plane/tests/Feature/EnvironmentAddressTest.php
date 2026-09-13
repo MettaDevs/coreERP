@@ -32,7 +32,13 @@ class EnvironmentAddressTest extends TestCase
     {
         parent::setUp();
 
-        config(['core.base_domain' => 'contoh.co.id']);
+        // Skema dan porta dipaku juga, bukan dibiarkan ikut env. Pengembang yang menyetel
+        // `COREERP_ADDRESS_SCHEME=http` di laptopnya tidak boleh membuat test di bawah ini merah.
+        config([
+            'core.base_domain' => 'contoh.co.id',
+            'core.address_scheme' => 'https',
+            'core.address_port' => null,
+        ]);
     }
 
     /** Dipaku sama dengan Core: `ivs.contoh.co.id`. */
@@ -79,6 +85,60 @@ class EnvironmentAddressTest extends TestCase
         config(['core.base_domain' => null]);
 
         $this->assertNull(EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+    }
+
+    /**
+     * Di laptop pengembang, alamat yang dicetak harus dapat diklik dari mesin yang mencetaknya.
+     *
+     * Dev server Core melayani `http` di porta 8000 tanpa proxy di depannya. Tanpa skema dan porta
+     * yang dapat disetel, layar mencetak `https://...erp.localhost` — terlihat benar, tidak terbuka.
+     */
+    public function test_local_development_prints_http_with_its_port(): void
+    {
+        config([
+            'core.base_domain' => 'erp.localhost',
+            'core.address_scheme' => 'http',
+            'core.address_port' => '8000',
+        ]);
+
+        $this->assertSame(
+            'http://pt-sinar-abadi--peragaan.demo.erp.localhost:8000',
+            EnvironmentAddress::forEnvironment('pt-sinar-abadi', 'peragaan', 'demo'),
+        );
+        $this->assertSame(
+            'http://pt-sinar-abadi.erp.localhost:8000',
+            EnvironmentAddress::forEnvironment('pt-sinar-abadi', 'pt-sinar-abadi', 'production'),
+        );
+    }
+
+    /** Porta yang sama dengan bawaan skemanya tidak ikut tercetak. */
+    public function test_the_default_port_of_a_scheme_is_not_printed(): void
+    {
+        config(['core.address_scheme' => 'https', 'core.address_port' => '443']);
+        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+
+        config(['core.address_scheme' => 'http', 'core.address_port' => '80']);
+        $this->assertSame('http://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+    }
+
+    /**
+     * Setelan kosong — keadaan setiap server — tetap `https` tanpa porta.
+     *
+     * Env yang dibiarkan kosong memulangkan string kosong, bukan null. Keduanya harus berarti sama.
+     */
+    public function test_empty_settings_mean_https_without_a_port(): void
+    {
+        config(['core.address_scheme' => '', 'core.address_port' => '']);
+
+        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+    }
+
+    /** Skema salah ketik tidak menghasilkan tautan berskema karangan. */
+    public function test_an_unknown_scheme_falls_back_to_https(): void
+    {
+        config(['core.address_scheme' => 'htps']);
+
+        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
     }
 
     /** Tenant atau lingkungan tanpa slug tidak menghasilkan alamat setengah jadi. */

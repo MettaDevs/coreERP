@@ -78,4 +78,17 @@ return [
      */
     'base_domain' => env('COREERP_BASE_DOMAIN'),
 
+    /*
+     * Skema dan porta alamat yang dicetak di layar operator.
+     *
+     * Bawaannya `https` tanpa porta, dan itu yang berlaku di setiap server: Traefik menutup TLS di
+     * 443. Di laptop pengembang keduanya berbeda — dev server Core melayani `http` di porta 8000,
+     * tanpa proxy di depannya — dan tanpa kedua kunci ini layar mencetak
+     * `https://pt-x.erp.localhost`, tautan yang tidak dapat dibuka dari mesin yang mencetaknya.
+     *
+     * Porta yang sama dengan bawaan skemanya (443 untuk https, 80 untuk http) tidak dicetak.
+     */
+    'address_scheme' => env('COREERP_ADDRESS_SCHEME', 'https'),
+    'address_port' => env('COREERP_ADDRESS_PORT'),
+
 ];
