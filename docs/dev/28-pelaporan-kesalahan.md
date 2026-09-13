@@ -190,9 +190,28 @@ di `.env` membuatnya *terlihat* dikonfigurasi padahal tidak pernah terbaca.
 | `OTEL_PHP_AUTOLOAD_ENABLED` | `true` | `false` | Saklar utama. Mati berarti tidak ada trace dan tidak ada catatan yang dikirim |
 | `OTEL_LOGS_EXPORTER` | `otlp` | `otlp` | Tujuan catatan. Tidak berpengaruh selama saklar utama mati |
 | `OTEL_PHP_DISABLED_INSTRUMENTATIONS` | `psr3` | `psr3` | Lihat catatan di bawah |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | alamat SigNoz | alamat SigNoz | |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | alamat SigNoz | **wajib diisi sendiri** | Kosong secara bawaan, dan itu disengaja — lihat di bawah |
 
 Berkas log ditulis tanpa bergantung pada satu pun dari variabel di atas.
+
+### Kenapa alamat kolektor kosong di on-prem, bukan diisi alamat kami
+
+Sampai 13 September 2026, `deploy/compose.edition.yaml` membawa alamat kolektor **milik vendor**
+sebagai nilai bawaan. Saklar utama memang mati, jadi tidak ada yang pernah terkirim — tetapi
+menyalakannya cuma satu baris, dan pelanggan yang menyalakannya tanpa menyebut alamat sendiri akan
+mengirimkan trace serta catatannya ke mesin kami. Trace memuat pernyataan SQL, URL, dan id tenant.
+
+Untuk pelanggan healthcare itu data yang **tidak boleh kami terima**, bukan sekadar tidak ingin. Dan
+ia bertentangan dengan aturan yang ditulis di `AGENTS.md`: on-prem perpetual berdiri sendiri, tanpa
+telemetry wajib — bawaan yang menelepon rumah begitu dinyalakan bukan "berdiri sendiri".
+
+Kosong berarti pemasang yang menyalakan telemetry **wajib** menyebut tujuannya. Kalau ia lupa,
+exporter-nya gagal berisik di mesinnya sendiri, dan gagal berisik jauh lebih baik daripada berhasil
+diam-diam ke tempat yang salah.
+
+Aturan umumnya, dan ia berlaku di luar telemetry: **alamat lingkungan tertentu tidak pernah menjadi
+nilai bawaan di dalam artefak.** Artefak yang memuat fakta spesifik-lingkungan berhenti dapat
+dipromosikan — image yang diuji bukan lagi image yang dikirim.
 
 Pengiriman Discord berdiri sendiri dan **tidak** terikat saklar OpenTelemetry. Ketiganya
 adalah `.env` Laravel biasa, karena yang membacanya Laravel dan bukan SDK:

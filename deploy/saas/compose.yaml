@@ -95,6 +95,20 @@ x-app-environment: &app-environment
   COREERP_PROVIDER_PASSWORD: ${COREERP_PROVIDER_PASSWORD}
   COREERP_RENDERER_URL: ${COREERP_RENDERER_URL:-http://core-renderer:3000}
 
+  # Telemetry OpenTelemetry. Mati secara bawaan, dan alamatnya kosong secara bawaan.
+  #
+  # Keduanya diteruskan apa adanya dari berkas env supaya TIDAK ADA alamat kolektor yang pernah
+  # tertulis di repo. Bundle on-prem pernah membawa alamat kolektor vendor sebagai bawaan, dan
+  # akibatnya pelanggan yang menyalakan telemetry tanpa menyebut alamat sendiri akan mengirimkan
+  # trace-nya — beserta SQL, URL, dan id tenant di dalamnya — ke mesin kami.
+  #
+  # Variabel ini harus sampai sebagai variabel lingkungan container, bukan lewat `.env` Laravel:
+  # SDK-nya menyalakan diri saat autoload Composer, sebelum Laravel membaca `.env` sama sekali.
+  OTEL_PHP_AUTOLOAD_ENABLED: ${OTEL_PHP_AUTOLOAD_ENABLED:-false}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+  OTEL_PHP_DISABLED_INSTRUMENTATIONS: ${OTEL_PHP_DISABLED_INSTRUMENTATIONS:-psr3}
+
 services:
   # ------------------------------------------------------------------ data
 

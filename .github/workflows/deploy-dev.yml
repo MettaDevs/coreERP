@@ -1,0 +1,137 @@
+# Setiap merge ke `main` mendarat di server dev.
+#
+# ## Kenapa server yang membangun, bukan CI
+#
+# Tidak ada registry image di susunan ini. Membangun di CI berarti menambah registry — satu layanan
+# lagi untuk dipasang, dijaga, dan dibayar — demi memindahkan pekerjaan yang server dev-nya sendiri
+# sanggup kerjakan dalam beberapa menit dengan delapan core.
+#
+# Itu berhenti benar pada hari node aplikasi kedua menyala: dua node yang masing-masing membangun
+# image dari commit yang sama dapat menghasilkan isi yang berbeda, dan yang berbeda di antara
+# keduanya tidak akan terlihat sampai sesuatu berperilaku lain di salah satunya. Pada hari itu,
+# registry menjadi wajib.
+#
+# ## Kenapa deploy tidak menunggu test
+#
+# Ia berjalan pada `main`, dan `main` hanya menerima perubahan lewat pull request — yang testnya
+# sudah dijalankan alur `tests.yml` sebelum merge. Menjalankannya lagi di sini menunda penyebaran
+# tanpa memeriksa satu hal baru pun.
+#
+# ## Yang TIDAK dilakukan alur ini
+#
+# **Tidak menyentuh produksi.** Ia hanya tahu satu host, dan host itu server dev. Produksi kelak
+# menuntut gerbang manual — bukan karena alurnya berbeda, melainkan karena keputusannya berbeda.
+#
+# **Tidak memegang sudo.** User `deploy` di server hanya anggota grup `docker` dan `coreerp`: ia
+# dapat menjalankan container dan membaca satu berkas rahasia, tidak lebih. Secret yang bocor
+# karena itu tidak berarti root.
+
+name: deploy-dev
+
+on:
+  push:
+    branches: [main]
+  # Dapat dijalankan tangan, untuk memasang ulang tanpa commit baru — misalnya sesudah menyunting
+  # `/etc/coreerp/saas.env` di server.
+  workflow_dispatch:
+
+concurrency:
+  # Dua penyebaran yang berjalan bersamaan akan saling menimpa image dengan tag yang sama, dan yang
+  # menang ditentukan urutan acak. `cancel-in-progress` dimatikan dengan sengaja: membatalkan
+  # penyebaran di tengah `docker compose up` meninggalkan stack separuh jadi.
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Siapkan kunci SSH
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Kunci host dipin dari secret, BUKAN diterima begitu saja. `StrictHostKeyChecking=no`
+          # membuat alur ini menyerahkan kredensialnya kepada siapa pun yang berhasil menyamar
+          # sebagai server itu.
+          printf '%s\n' "${{ secrets.DEV_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Pasang di server dev
+        env:
+          DEV_HOST: ${{ secrets.DEV_HOST }}
+          DEV_USER: ${{ secrets.DEV_USER }}
+        run: |
+          ssh -o BatchMode=yes "$DEV_USER@$DEV_HOST" 'bash -seu' <<'REMOTE'
+          cd /opt/coreerp
+
+          # Repo ini dimiliki user lain, dan git menolak bekerja di repo milik orang lain sejak
+          # CVE-2022-24765. `--add` idempoten, jadi alur ini menyembuhkan dirinya sendiri pada
+          # server yang dibangun ulang alih-alih gagal dengan "dubious ownership".
+          git config --global --add safe.directory /opt/coreerp 2>/dev/null || true
+
+          git fetch --quiet origin
+          git checkout -q main 2>/dev/null || git checkout -q -b main origin/main
+          git reset --hard -q origin/main
+          echo "commit: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
+
+          # Dibangun ke tag sementara lebih dulu. Build yang gagal karena itu tidak pernah
+          # mengganti image yang sedang melayani — stack lama tetap berjalan, dan alur ini merah.
+          docker build -q -f apps/core/Dockerfile -t coreerp:baru .
+          docker build -q -f apps/control-plane/Dockerfile -t coreerp-console:baru .
+          docker tag coreerp:baru coreerp:dev
+          docker tag coreerp-console:baru coreerp-console:dev
+
+          # `migrate` ikut: ia menjalankan migration Core, mendaftarkan manifest app, lalu
+          # `environment:upgrade` yang membawa SETIAP database lingkungan ke skema yang berlaku.
+          # Tanpa profil itu, kode baru berjalan di atas skema lama.
+          docker compose --env-file /etc/coreerp/saas.env \
+            -f deploy/saas/compose.yaml -f deploy/saas/compose.dokploy.yaml \
+            --profile data --profile migrate --profile app --profile console --profile scheduler \
+            up -d --wait --wait-timeout 600
+
+          docker image prune -f --filter 'until=168h' >/dev/null || true
+          REMOTE
+
+      - name: Buktikan ia benar-benar melayani
+        env:
+          DEV_HOST: ${{ secrets.DEV_HOST }}
+          DEV_USER: ${{ secrets.DEV_USER }}
+        run: |
+          ssh -o BatchMode=yes "$DEV_USER@$DEV_HOST" 'bash -seu' <<'REMOTE'
+          # Diperiksa dari dalam server, lewat jaringan container — bukan dari runner. Yang ingin
+          # dibuktikan aplikasinya menjawab, dan memeriksanya lewat internet publik akan
+          # memerahkan penyebaran karena sebab yang tidak ada hubungannya: DNS, TLS, atau firewall.
+          #
+          # Diulang, bukan sekali tembak. `compose up --wait` memang menunggu healthcheck, tetapi
+          # pemeriksaan yang berjalan pada detik pertama sesudahnya tetap berbalapan dengan
+          # container yang baru saja dibuat — dan pada dry-run pertama ia memang kalah, sementara
+          # permintaan yang sama semenit kemudian menjawab 200.
+          #
+          # Penyebaran yang merah karena balapan adalah penyebaran yang orang belajar abaikan.
+          for percobaan in $(seq 1 20); do
+            if docker exec coreerp-saas-core-console-1 curl -sf -o /dev/null --max-time 10 http://core-app/up; then
+              echo "core menjawab /up (percobaan $percobaan)"
+              break
+            fi
+            if [ "$percobaan" = "20" ]; then
+              echo "core tidak pernah menjawab /up sesudah 20 percobaan"
+              docker logs --tail 40 coreerp-saas-core-app-1 || true
+              exit 1
+            fi
+            sleep 3
+          done
+
+          gagal=$(docker compose --env-file /etc/coreerp/saas.env \
+            -f /opt/coreerp/deploy/saas/compose.yaml -f /opt/coreerp/deploy/saas/compose.dokploy.yaml \
+            ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}' \
+            | awk '$2 == "exited" && $3 != "0" { print $1 }')
+
+          if [ -n "$gagal" ]; then
+            echo "layanan yang keluar dengan galat: $gagal"
+            exit 1
+          fi
+          echo "tidak ada layanan yang keluar dengan galat"
+          REMOTE
