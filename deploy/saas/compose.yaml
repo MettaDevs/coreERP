@@ -331,6 +331,15 @@ services:
       CONTROL_PLANE_TOKEN: ${CONTROL_PLANE_TOKEN:?CONTROL_PLANE_TOKEN wajib}
       COREERP_PROVISION_TIMEOUT: ${COREERP_PROVISION_TIMEOUT:-300}
       COREERP_TRUSTED_PROXIES: ${COREERP_TRUSTED_PROXIES:-*}
+      # Nilai yang SAMA dengan milik Core, dari variabel yang sama. Konsol hanya mencetak alamat
+      # lingkungan, Core yang merutekannya — dan tanpa baris ini kolom Alamat di layar operator
+      # server tidak pernah tampil sama sekali, karena domain dasar yang kosong berarti "satu alamat
+      # untuk semua". Terukur di server dev pada 13 September 2026: `printenv COREERP_BASE_DOMAIN`
+      # di container konsol kosong, sementara container Core berisi `erp.grenery.xyz`.
+      #
+      # Skema dan porta sengaja tidak diteruskan: bawaannya `https` tanpa porta, dan itu yang
+      # berlaku di setiap server.
+      COREERP_BASE_DOMAIN: ${COREERP_BASE_DOMAIN:?COREERP_BASE_DOMAIN wajib}
     volumes:
       # Sesi operator hidup di sini. Tanpa volume, setiap penyebaran melempar keluar semua orang
       # yang sedang membuka konsol — termasuk yang sedang di tengah membuat pelanggan.
