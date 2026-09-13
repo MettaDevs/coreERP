@@ -5,6 +5,7 @@ use App\Http\Middleware\ControlPlaneOnly;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LampirkanKonteksJejak;
+use App\Http\Middleware\RequireTenantMembershipAtAddress;
 use App\Http\Middleware\ResolveEnvironment;
 use App\Http\Middleware\ResolveModuleContext;
 use App\Http\Middleware\ResolvePasskeyOrigin;
@@ -65,6 +66,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             HandleAppearance::class,
+            // Sebelum Inertia: akun yang bukan anggota tenant pemilik alamat ditolak sebelum prop
+            // workspace sempat disusun. Sesudah sesi, karena yang diperiksa akun yang sudah masuk.
+            RequireTenantMembershipAtAddress::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             // Sesudah Inertia, bukan sebelum: yang dikembalikannya pengalihan biasa, dan Inertia

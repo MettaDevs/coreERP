@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Environment;
 use App\Models\Organization;
 use App\Models\TenantMembership;
 use Illuminate\Database\Eloquent\Collection;
@@ -42,7 +43,8 @@ final class CurrentWorkspace
             return new Collection;
         }
 
-        $kunci = (string) $user->getAuthIdentifier();
+        $tenantOfAddress = $this->tenantOfAddress($request);
+        $kunci = $user->getAuthIdentifier().'|'.($tenantOfAddress ?? '*');
 
         if (array_key_exists($kunci, $this->ingatanKeanggotaan)) {
             return $this->ingatanKeanggotaan[$kunci];
@@ -51,8 +53,29 @@ final class CurrentWorkspace
         return $this->ingatanKeanggotaan[$kunci] = $user->memberships()
             ->with('tenant')
             ->where('status', 'active')
+            ->when($tenantOfAddress !== null, fn ($query) => $query->where('tenant_id', $tenantOfAddress))
             ->orderBy('created_at')
             ->get();
+    }
+
+    /**
+     * Tenant pemilik alamat yang sedang dibuka, atau null bila alamat ini bukan milik tenant mana pun.
+     *
+     * Di alamat sebuah tenant, **hanya** keanggotaan di tenant itu yang dipertimbangkan — keanggotaan
+     * di tenant lain tidak ada artinya di sini, sekalipun sesi mengingatnya sebagai pilihan terakhir.
+     * Sebelum ini alamat dan sesi tidak pernah dicocokkan: anggota tenant B yang membuka alamat
+     * tenant A dilayani dengan workspace B, di atas koneksi yang sudah digeser ke database A.
+     *
+     * Null pada on-prem, pengembangan tanpa domain dasar, dan alamat pangkal — di sana perilakunya
+     * sama persis seperti sebelum ada alamat per tenant. Atributnya ditulis `ResolveEnvironment`;
+     * dibaca dari sana, bukan dengan query sendiri, supaya "lingkungan mana ini" hanya punya satu
+     * jawaban.
+     */
+    public function tenantOfAddress(Request $request): ?string
+    {
+        $environment = $request->attributes->get('coreerp.environment');
+
+        return $environment instanceof Environment ? $environment->tenant_id : null;
     }
 
     public function membership(Request $request): ?TenantMembership
