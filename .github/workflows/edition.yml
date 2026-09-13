@@ -30,17 +30,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
-    # Alasannya ditulis lengkap di alur tests.
-    #
-    # `PASANG_OTEL: '0'` melewatkan kompilasi ekstensi `opentelemetry` saat membangun image.
-    # Alur ini membangun dua image pada setiap PR hanya untuk membuktikan pemangkasan module
-    # bekerja, lalu membuangnya. Konsekuensinya disadari dan diterima: image yang diverifikasi
-    # di sini bukan image yang dikirim ke pelanggan. Yang dikirim dibangun `release.yml`, dan
-    # alur itu sengaja tidak menyetel variabel ini.
-    env:
-      OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
-      PASANG_OTEL: '0'
-
     services:
       postgres:
         image: postgres:16-alpine
@@ -56,7 +45,21 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+    # SATU blok `env`, dan bukan kerapian. Commit 282e730 (11 September 2026) menambahkan blok
+    # kedua di atas `services`, dan YAML dengan kunci ganda ditolak GitHub sebelum satu langkah pun
+    # berjalan: setiap push sesudahnya berakhir "workflow file issue" dalam 0 detik, dan
+    # pemeriksa kebocoran edisi tidak menjaga satu PR pun sejak itu. Parser YAML yang longgar —
+    # termasuk `yaml.safe_load` Python — diam-diam memakai blok terakhir, jadi berkasnya terlihat sah.
     env:
+      # OTEL_PHP_DISABLED_INSTRUMENTATIONS: alasannya ditulis lengkap di alur tests.
+      #
+      # `PASANG_OTEL: '0'` melewatkan kompilasi ekstensi `opentelemetry` saat membangun image.
+      # Alur ini membangun dua image pada setiap PR hanya untuk membuktikan pemangkasan module
+      # bekerja, lalu membuangnya. Konsekuensinya disadari dan diterima: image yang diverifikasi
+      # di sini bukan image yang dikirim ke pelanggan. Yang dikirim dibangun `release.yml`, dan
+      # alur itu sengaja tidak menyetel variabel ini.
+      OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
+      PASANG_OTEL: '0'
       DB_HOST: 127.0.0.1
       DB_PORT: '5432'
       DB_DATABASE: core_erp
