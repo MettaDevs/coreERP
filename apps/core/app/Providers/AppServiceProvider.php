@@ -8,6 +8,7 @@ use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\OutboundGuard;
 use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
+use App\Support\License\SiteLicense;
 use App\Support\Observabilitas\PelaporKesalahan;
 use App\Support\ParameterWorkflow;
 use Carbon\CarbonImmutable;
@@ -62,6 +63,11 @@ class AppServiceProvider extends ServiceProvider
          * berikutnya mendapat ikatan yang bersih, persis seperti permintaan HTTP berikutnya.
          */
         $this->app->scoped(ActiveEnvironment::class);
+
+        // Berkas lisensi dibaca sekali per permintaan, bukan sekali per pembaca — dan scoped, bukan
+        // singleton, supaya berkas baru yang dipasang agen terbaca pada permintaan berikutnya tanpa
+        // menunggu pekerja PHP diganti. Alasan lengkapnya di kelas itu.
+        $this->app->scoped(SiteLicense::class);
     }
 
     /**

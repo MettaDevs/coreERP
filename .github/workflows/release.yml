@@ -155,5 +155,56 @@ jobs:
 
             digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$tujuan")"
             echo "$edisi -> $digest" >> "$GITHUB_STEP_SUMMARY"
+            echo "$edisi $digest" >> "$RUNNER_TEMP/digest-edisi.txt"
           done
+
+      # Berkas rilis untuk situs on-prem yang dikelola lewat agen: ditandatangani di sini, lalu
+      # didaftarkan ke admin.erp. admin.erp tidak pernah memegang kunci privat rilis — itu yang
+      # membuat konsol yang dibobol tidak dapat membuat rilis. Rancangannya di
+      # `docs/todo/on-prem-dikelola/README.md`.
+      #
+      # Dilewati dengan pemberitahuan, bukan gagal, selama rahasianya belum disetel: alur rilis
+      # sudah berjalan sebelum langkah ini ada, dan ia tidak boleh merah hanya karena situs belum
+      # dipakai siapa pun.
+      #
+      # Nomor rilis yang sudah terdaftar dijawab 409 bila isinya berubah. Itu keadaan normal pada
+      # setiap push ke main yang tidak menaikkan `rilis:` di manifest edisi, jadi dicatat sebagai
+      # pemberitahuan — rilis untuk situs lahir ketika nomornya dinaikkan.
+      - name: Daftarkan berkas rilis ke admin.erp
+        env:
+          KUNCI_RILIS: ${{ secrets.RELEASE_SIGNING_KEY }}
+          TOKEN_RILIS: ${{ secrets.CONSOLE_RELEASE_TOKEN }}
+          ALAMAT_ADMIN: ${{ vars.CONSOLE_URL }}
+        run: |
+          if [ -z "$KUNCI_RILIS" ] || [ -z "$TOKEN_RILIS" ] || [ -z "$ALAMAT_ADMIN" ]; then
+            echo "::notice::RELEASE_SIGNING_KEY, CONSOLE_RELEASE_TOKEN, atau CONSOLE_URL belum disetel; berkas rilis situs tidak didaftarkan."
+            exit 0
+          fi
+
+          kunci="$RUNNER_TEMP/kunci-rilis.pem"
+          umask 077
+          printf '%s\n' "$KUNCI_RILIS" > "$kunci"
+
+          while read -r edisi digest; do
+            folder="$RUNNER_TEMP/rilis-$edisi"
+            bash scripts/build-release-files.sh "$edisi" "$digest" "$folder" --kunci "$kunci"
+
+            status="$(curl -sS -o "$RUNNER_TEMP/jawaban-$edisi.json" -w '%{http_code}' \
+              -H "Authorization: Bearer $TOKEN_RILIS" \
+              -F "manifest=@$folder/manifest.json" \
+              -F "compose=@$folder/compose.yaml" \
+              -F "update_script=@$folder/update.sh" \
+              -F "checksums=@$folder/SHA256SUMS" \
+              -F "signature=@$folder/SHA256SUMS.sig" \
+              "$ALAMAT_ADMIN/api/releases/v1")"
+
+            case "$status" in
+              201) echo "$edisi: rilis baru terdaftar" >> "$GITHUB_STEP_SUMMARY" ;;
+              200) echo "$edisi: rilis sudah terdaftar dengan isi yang sama" >> "$GITHUB_STEP_SUMMARY" ;;
+              409) echo "::notice::$edisi: nomor rilis sudah terdaftar dengan isi lain; naikkan rilis: di editions/$edisi.yaml untuk menerbitkannya." ;;
+              *) echo "::error::$edisi: pendaftaran rilis gagal ($status)"; cat "$RUNNER_TEMP/jawaban-$edisi.json"; rm -f "$kunci"; exit 1 ;;
+            esac
+          done < "$RUNNER_TEMP/digest-edisi.txt"
+
+          rm -f "$kunci"
 

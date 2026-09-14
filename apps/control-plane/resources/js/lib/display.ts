@@ -62,6 +62,42 @@ export const fleetStateLabels: Record<string, string> = {
     unknown: 'Belum terbaca',
 };
 
+/**
+ * Keadaan sebuah situs dilihat dari admin.erp.
+ *
+ * `stale` berbunyi "Tidak melapor", bukan "Mati". Konsol ini hanya tahu laporannya berhenti datang —
+ * sebabnya dapat berupa server yang mati, internet klien yang putus, atau agen yang berhenti — dan
+ * kata yang menebak salah satunya membuat operator mencari di tempat yang keliru.
+ */
+export const siteStateLabels: Record<string, string> = {
+    not_enrolled: 'Belum terdaftar',
+    enrolled: 'Terdaftar',
+    stale: 'Tidak melapor',
+    revoked: 'Dicabut',
+};
+
+export const connectivityLabels: Record<string, string> = {
+    online: 'Online',
+    offline: 'Offline',
+};
+
+export const siteOperationLabels: Record<string, string> = {
+    upgrade: 'Perbarui',
+    backup: 'Cadangkan',
+    install_license: 'Pasang lisensi',
+    rotate_key: 'Ganti kunci situs',
+    send_diagnostics: 'Kirim diagnosa',
+};
+
+export const siteOperationStatusLabels: Record<string, string> = {
+    requested: 'Menunggu diambil agen',
+    running: 'Berjalan',
+    succeeded: 'Berhasil',
+    failed: 'Gagal',
+    cancelled: 'Dibatalkan',
+    expired: 'Tidak pernah diambil',
+};
+
 export function labelFor(labels: Record<string, string>, key: string): string {
     return labels[key] ?? key;
 }

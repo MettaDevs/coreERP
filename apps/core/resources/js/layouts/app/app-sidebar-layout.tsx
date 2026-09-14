@@ -5,6 +5,7 @@ import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import EnvironmentBanner from '@/components/environment-banner';
+import SiteLicenseBanner from '@/components/site-license-banner';
 import type { AppLayoutProps } from '@/types';
 
 export default function AppSidebarLayout({ children }: AppLayoutProps) {
@@ -35,6 +36,11 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                             pertama, lalu tidak pernah terlihat lagi justru ketika ia dibutuhkan.
                         */}
                         <EnvironmentBanner />
+                        {/*
+                            Peringatan lisensi, bila ada. Hanya memberi tahu: isi halaman di
+                            bawahnya tetap dirender dan dapat dipakai penuh.
+                        */}
+                        <SiteLicenseBanner />
                         <div className="min-w-0 flex-1 bg-muted/30">
                             {children}
                         </div>

@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\TenantMembership;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
+use App\Support\License\SiteLicense;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -61,6 +62,17 @@ class HandleInertiaRequests extends Middleware
              * atasnya.
              */
             'environment' => $this->environmentBanner($request),
+            /*
+             * Keadaan lisensi situs, untuk spanduk peringatan — dan hanya itu.
+             *
+             * Closure, supaya berkasnya tidak dibaca pada permintaan yang tidak meminta prop ini.
+             * Tamu memperoleh null tanpa pembacaan apa pun: halaman masuk tidak memuat spanduknya,
+             * dan keadaan pemasangan tidak perlu diumumkan kepada orang yang belum dikenal.
+             *
+             * Tidak ada yang lain membaca nilai ini untuk memutuskan boleh-tidaknya sesuatu. Lisensi
+             * adalah tanda, bukan kunci — lihat App\Support\License\SiteLicense.
+             */
+            'siteLicense' => fn (): ?array => $user ? app(SiteLicense::class)->state()->toArray() : null,
             'auth' => [
                 'user' => $user,
                 'membership' => $membership ? [

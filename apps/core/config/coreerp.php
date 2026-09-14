@@ -151,4 +151,27 @@ return [
         'client_secret' => env('COREERP_SSO_CLIENT_SECRET'),
     ],
 
+    /*
+     * Lisensi situs on-prem — sebuah tanda, bukan kunci.
+     *
+     * Berkasnya diterbitkan admin.erp, ditandatangani kunci rilis, lalu dipasang agen di server
+     * pelanggan. Core membacanya **hanya untuk menampilkan peringatan**: ketika masa berlakunya
+     * mendekat, sudah lewat, atau berkasnya tidak dapat dipercaya. Tidak ada permintaan yang
+     * ditolak dan tidak ada fitur yang disembunyikan karenanya. Pelanggan kita fasilitas kesehatan;
+     * aplikasi yang berhenti berarti pelayanan pasien berhenti. Pembayaran ditegakkan lewat kontrak,
+     * bukan lewat kode. Pembacanya App\Support\License\SiteLicense.
+     *
+     * `path` kosong berarti fitur ini mati, dan itu bawaannya: SaaS dan lingkungan lokal memang
+     * tidak punya lisensi situs, jadi tidak ada yang perlu diperingatkan. Tanda tangannya dibaca
+     * dari `<path>.sig` di sebelahnya — satu jalur yang disetel, bukan dua yang dapat menunjuk
+     * pasangan yang berbeda.
+     */
+    'license' => [
+        'path' => env('COREERP_LICENSE_PATH'),
+        'public_key_path' => env('COREERP_LICENSE_PUBLIC_KEY_PATH'),
+        // Berapa hari sebelum tanggal berakhir peringatannya mulai tampil. Tiga puluh hari cukup
+        // untuk satu siklus penagihan dan pengiriman berkas baru, termasuk lewat flashdisk.
+        'warn_days' => 30,
+    ],
+
 ];

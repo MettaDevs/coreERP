@@ -1,0 +1,60 @@
+# Satu putaran agen situs CoreERP: lapor keadaan, ambil satu operasi, kerjakan. Dinyalakan
+# coreerp-agent.timer; tidak berjalan terus-menerus.
+#
+# Jalur /opt/coreerp di bawah ditulis ulang pasang.sh bila COREERP_HOME berbeda.
+
+[Unit]
+Description=Agen situs CoreERP (satu putaran)
+Documentation=https://github.com/MettaDevs/coreERP/tree/main/deploy/agent
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/coreerp/bin/coreerp-agent run
+# Setelan server yang tidak dibawa rilis, misalnya COREERP_FOLDER_CADANGAN ke disk kedua. Berkasnya
+# boleh tidak ada; tanda minus membuat ketiadaannya bukan kegagalan.
+EnvironmentFile=-/opt/coreerp/agent/agent.env
+Environment=COREERP_HOME=/opt/coreerp
+
+# Pembaruan memuat image, menjalankan migrasi, dan menunggu kesehatan. Bawaan systemd 90 detik akan
+# membunuh update.sh di tengah migrasi — keadaan yang paling ingin dihindari.
+TimeoutStartSec=2h
+# SIGTERM hanya ke proses utama: update.sh yang sedang memulihkan database tidak ikut dihentikan saat
+# unitnya dihentikan, sama dengan alasan agen tidak membunuhnya ketika operasinya dilepas admin.erp.
+KillMode=process
+
+# --- Pengerasan yang tidak memutus akses ke Docker ---------------------------------------------------
+#
+# Agen berjalan sebagai root karena mengendalikan Docker, dan akses ke soket Docker setara root —
+# menjalankannya sebagai pengguna di grup `docker` tidak lebih aman, hanya terlihat lebih aman. Yang
+# dipasang di sini karena itu bukan pembatas hak, melainkan penutup jalan yang memang tidak dipakai.
+#
+# Yang sengaja TIDAK dipasang, karena memutus agen:
+#   ProtectSystem=strict  update.sh dan agen menulis ke /opt/coreerp dan folder cadangan yang lokasinya
+#                         disetel klien; daftar ReadWritePaths yang tertinggal membuat pembaruan gagal
+#                         di tengah jalan.
+#   ProtectHome=yes       Docker CLI membaca /root/.docker: kredensial registry untuk menarik image
+#                         privat, dan plugin Compose bila dipasang dari paket Docker sendiri.
+#   PrivateNetwork=yes    agen harus menjangkau admin.erp dan registry.
+#   PrivateDevices=yes, CapabilityBoundingSet=
+#                         klien Docker tidak membutuhkannya, tetapi update.sh memanggil `stat` dan
+#                         `docker volume inspect` atas folder milik root; memangkas kapabilitas root
+#                         di sini tidak menambah batas apa pun selama soket Docker terbuka.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+# AF_NETLINK ikut karena getaddrinfo di glibc memakainya untuk memeriksa alamat lokal; tanpanya
+# resolusi nama admin.erp dapat gagal dengan cara yang tidak menyebut sebabnya.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+UMask=0077

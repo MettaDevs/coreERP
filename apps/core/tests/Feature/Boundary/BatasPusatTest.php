@@ -7,8 +7,14 @@ namespace Tests\Feature\Boundary;
 use App\Models\Client;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
+use App\Models\OperatorAuditEvent;
 use App\Models\Organization;
 use App\Models\ProviderAccess;
+use App\Models\Site;
+use App\Models\SiteEnrollmentToken;
+use App\Models\SiteOperation;
+use App\Models\SiteRelease;
+use App\Models\SiteReport;
 use App\Models\Tenant;
 use App\Models\TenantIdentityProvider;
 use App\Models\TenantMembership;
@@ -47,6 +53,12 @@ class BatasPusatTest extends TestCase
             [Environment::class, 'environments'],
             [EnvironmentOperation::class, 'environment_operations'],
             [TenantIdentityProvider::class, 'tenant_identity_providers'],
+            [Site::class, 'sites'],
+            [SiteEnrollmentToken::class, 'site_enrollment_tokens'],
+            [SiteOperation::class, 'site_operations'],
+            [SiteReport::class, 'site_reports'],
+            [SiteRelease::class, 'site_releases'],
+            [OperatorAuditEvent::class, 'operator_audit_events'],
         ];
     }
 
