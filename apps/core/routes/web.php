@@ -32,6 +32,7 @@ use App\Models\CoreApp;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
+use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\Rules\Password;
@@ -100,9 +101,17 @@ Route::post('api/v1/invitation-redemptions', [InvitationRedemptionController::cl
  * Masuk lewat penyedia identitas bersama. Bentuk tiga langkah dan dua alamatnya dijelaskan di
  * SsoLoginController. Keempatnya menjawab 404 selama penyedia tidak disetel.
  */
-Route::middleware(['guest', 'throttle:30,1'])->group(function () {
-    Route::get('sso/masuk', [SsoLoginController::class, 'start'])->name('sso.start');
-    Route::get('sso/serah', [SsoLoginController::class, 'handoff'])->name('sso.handoff');
+Route::get('sso/masuk', [SsoLoginController::class, 'start'])
+    ->middleware(['guest', 'throttle:30,1'])
+    ->name('sso.start');
+// Bukan `guest`: upacara "hubungkan" kembali ke sini dengan akun yang sedang masuk.
+Route::get('sso/serah', [SsoLoginController::class, 'handoff'])
+    ->middleware('throttle:30,1')
+    ->name('sso.handoff');
+// Hanya dari layar keamanan, sesudah kata sandi dikonfirmasi ulang. Lihat SsoLoginController.
+Route::middleware(['auth', RequirePassword::class, 'throttle:10,1'])->group(function () {
+    Route::post('sso/hubungkan', [SsoLoginController::class, 'connect'])->name('sso.connect');
+    Route::delete('sso/hubungkan', [SsoLoginController::class, 'disconnect'])->name('sso.disconnect');
 });
 Route::get('sso/callback', [SsoLoginController::class, 'callback'])
     ->middleware('throttle:30,1')

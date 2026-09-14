@@ -21,7 +21,11 @@ final class SsoFailure extends RuntimeException
 
     public const INVALID_TOKEN = 'token-tidak-sah';
 
-    public const ACCOUNT_NOT_FOUND = 'akun-belum-terdaftar';
+    /** Akun SSO ini belum pernah dihubungkan ke akun CoreERP mana pun. */
+    public const NOT_LINKED = 'belum-terhubung';
+
+    /** Akun SSO ini sudah terhubung ke akun CoreERP lain, atau akun ini sudah terhubung ke akun SSO lain. */
+    public const LINKED_ELSEWHERE = 'terhubung-ke-akun-lain';
 
     public const NOT_A_MEMBER = 'bukan-anggota';
 
@@ -32,7 +36,8 @@ final class SsoFailure extends RuntimeException
         self::PROVIDER_UNREACHABLE,
         self::REJECTED_BY_PROVIDER,
         self::INVALID_TOKEN,
-        self::ACCOUNT_NOT_FOUND,
+        self::NOT_LINKED,
+        self::LINKED_ELSEWHERE,
         self::NOT_A_MEMBER,
         self::EXPIRED,
     ];
@@ -49,7 +54,8 @@ final class SsoFailure extends RuntimeException
             self::PROVIDER_UNREACHABLE => 'Penyedia SSO sedang tidak dapat dihubungi. Coba lagi sebentar lagi, atau masuk dengan kata sandi.',
             self::REJECTED_BY_PROVIDER => 'Penyedia SSO tidak mengizinkan masuk ke aplikasi ini.',
             self::INVALID_TOKEN => 'Tanda masuk dari penyedia SSO tidak dapat diverifikasi.',
-            self::ACCOUNT_NOT_FOUND => 'Akun SSO ini belum terdaftar di CoreERP. Minta undangan dari admin tenant Anda.',
+            self::NOT_LINKED => 'Akun SSO ini belum terhubung ke akun CoreERP. Masuk dengan kata sandi, lalu hubungkan SSO di Pengaturan > Keamanan.',
+            self::LINKED_ELSEWHERE => 'Akun SSO ini sudah terhubung ke akun CoreERP lain, atau akun Anda sudah terhubung ke akun SSO yang berbeda.',
             self::NOT_A_MEMBER => 'Akun ini bukan anggota aktif tenant ini.',
             self::EXPIRED => 'Upacara masuk sudah kedaluwarsa. Tekan tombol masuk lewat SSO sekali lagi.',
             default => null,

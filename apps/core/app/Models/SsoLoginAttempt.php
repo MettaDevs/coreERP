@@ -24,6 +24,9 @@ use Illuminate\Support\Carbon;
  * @property string $return_origin
  * @property string $redirect_uri
  * @property ?int $user_id
+ * @property ?int $link_user_id
+ * @property ?string $subject
+ * @property ?string $subject_email
  * @property ?string $handoff_token_hash
  * @property Carbon $expires_at
  * @property ?Carbon $completed_at
@@ -46,6 +49,9 @@ class SsoLoginAttempt extends Model
         'return_origin',
         'redirect_uri',
         'user_id',
+        'link_user_id',
+        'subject',
+        'subject_email',
         'handoff_token_hash',
         'expires_at',
         'completed_at',
@@ -75,6 +81,12 @@ class SsoLoginAttempt extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** Upacara "hubungkan", bukan upacara masuk. */
+    public function isLinking(): bool
+    {
+        return $this->link_user_id !== null;
     }
 
     public function hasExpired(): bool

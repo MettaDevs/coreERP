@@ -10,8 +10,13 @@ use Illuminate\Support\Facades\Schema;
  * ## `external_identities`
  *
  * Satu baris = "subjek `sub` dari penerbit `iss` adalah user ini". Dicocokkan lewat pasangan itu,
- * bukan lewat email: email dapat berganti di penyedia, `sub` tidak. Email hanya dipakai **sekali**,
- * saat penautan pertama, dan hanya bila penyedia menyatakannya terverifikasi.
+ * **tidak pernah lewat email**.
+ *
+ * Barisnya hanya lahir ketika orangnya sudah membuktikan diri pemilik akun CoreERP — masuk dengan
+ * kata sandinya, mengonfirmasinya lagi di layar keamanan, lalu menekan "Hubungkan SSO". Klaim
+ * `email_verified` dari penyedia tidak cukup: diperiksa di kode penyedia pada 14 September 2026,
+ * pendaftaran mandiri di sana langsung menulis `email_verified_at = now()` tanpa verifikasi apa
+ * pun, jadi siapa saja dapat mendaftar dengan email orang lain dan memperoleh klaim itu.
  *
  * ## `sso_login_attempts`
  *
@@ -45,7 +50,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['issuer', 'subject']);
-            $table->index('user_id');
+            // Satu akun CoreERP satu akun SSO per penerbit — ditegakkan di sini, bukan hanya
+            // diperiksa di kode. Dua upacara hubungkan yang berbalapan tidak boleh sama-sama menang.
+            $table->unique(['user_id', 'issuer']);
         });
 
         Schema::create('sso_login_attempts', function (Blueprint $table): void {
@@ -60,6 +67,18 @@ return new class extends Migration
             $table->string('return_origin');
             $table->string('redirect_uri');
             $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
+            // Terisi hanya pada upacara "hubungkan": akun CoreERP yang sedang masuk dan meminta
+            // akun SSO-nya ditautkan. Kosong berarti upacara masuk biasa.
+            $table->foreignId('link_user_id')->nullable()->constrained('users')->cascadeOnDelete();
+            // Subjek yang sudah terverifikasi di `callback`, menunggu dihubungkan di `handoff`.
+            //
+            // Hubungannya sengaja TIDAK dibuat di `callback`. Di sana belum ada bukti bahwa peramban
+            // yang kembali dari penyedia adalah peramban yang memulai upacara — cookie itu hanya
+            // terbaca di alamat tenant. Membuatnya di `callback` berarti penyerang dapat memulai
+            // "hubungkan" dari akunnya sendiri, mengirim tautan penyedia ke korban, dan akun SSO
+            // korban tertaut ke akun penyerang begitu korban mengkliknya.
+            $table->string('subject')->nullable();
+            $table->string('subject_email')->nullable();
             $table->string('handoff_token_hash', 64)->nullable()->unique();
             $table->timestamp('expires_at');
             $table->timestamp('completed_at')->nullable();

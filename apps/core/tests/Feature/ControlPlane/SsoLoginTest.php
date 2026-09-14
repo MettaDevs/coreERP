@@ -114,9 +114,9 @@ class SsoLoginTest extends TestCase
         );
     }
 
-    public function test_a_member_completes_the_whole_ceremony_and_is_signed_in_at_the_tenant_address(): void
+    public function test_a_linked_member_completes_the_whole_ceremony_and_is_signed_in_at_the_tenant_address(): void
     {
-        $user = $this->memberWithEmail('anggota@contoh.co.id');
+        $user = $this->linkedMember('subjek-anggota');
 
         [$start, $state] = $this->startCeremony();
         $callback = $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state);
@@ -129,18 +129,12 @@ class SsoLoginTest extends TestCase
             ->assertRedirect('/dashboard');
 
         $this->assertAuthenticatedAs($user);
-        $this->assertDatabaseHas('external_identities', [
-            'user_id' => $user->id,
-            'issuer' => self::ISSUER,
-            'subject' => 'subjek-anggota',
-        ]);
     }
 
     /** Sesudah tertaut, `sub` yang menentukan — email yang berganti di penyedia tidak memutusnya. */
     public function test_once_linked_the_subject_wins_over_a_changed_email(): void
     {
-        $user = $this->memberWithEmail('lama@contoh.co.id');
-        ExternalIdentity::create(['user_id' => $user->id, 'issuer' => self::ISSUER, 'subject' => 'subjek-anggota']);
+        $user = $this->linkedMember('subjek-anggota', 'lama@contoh.co.id');
         $this->claimOverrides = ['email' => 'baru@tempat-lain.co.id'];
 
         $this->completeCeremony('subjek-anggota');
@@ -150,56 +144,189 @@ class SsoLoginTest extends TestCase
 
     // ------------------------------------------------------------------ penolakan: akun
 
-    public function test_an_email_without_a_coreerp_account_is_not_given_one(): void
+    /**
+     * Inti berkas ini: email yang sama dan "terverifikasi" TIDAK membuka akun yang belum terhubung.
+     *
+     * Pendaftaran mandiri di penyedia menandai email terverifikasi tanpa memverifikasinya. Siapa pun
+     * dapat mendaftar di sana dengan email admin tenant ini, dan token yang ia bawa pulang persis
+     * seperti di bawah — sah, bertanda tangan, `email_verified: true`.
+     */
+    public function test_an_unlinked_sso_account_is_refused_even_when_its_verified_email_matches_a_member(): void
+    {
+        $member = $this->memberWithEmail('anggota@contoh.co.id');
+        $this->claimOverrides = ['email_verified' => true];
+
+        $this->completeCeremony('subjek-penyerang', email: 'anggota@contoh.co.id')
+            ->assertRedirect('http://tenanta.contoh.co.id/login?sso_error=belum-terhubung');
+
+        $this->assertGuest();
+        $this->assertSame(0, ExternalIdentity::query()->count());
+        $this->assertNotNull($member->fresh());
+    }
+
+    public function test_an_sso_account_with_no_coreerp_account_is_not_given_one(): void
     {
         $this->completeCeremony('subjek-asing', email: 'tidak-terdaftar@contoh.co.id')
-            ->assertRedirect('http://tenanta.contoh.co.id/login?sso_error=akun-belum-terdaftar');
+            ->assertRedirect('http://tenanta.contoh.co.id/login?sso_error=belum-terhubung');
 
         $this->assertGuest();
         $this->assertSame(0, User::query()->where('email', 'tidak-terdaftar@contoh.co.id')->count());
     }
 
-    public function test_an_unverified_email_is_never_used_to_link(): void
-    {
-        $this->memberWithEmail('anggota@contoh.co.id');
-        $this->claimOverrides = ['email_verified' => false];
-
-        $this->completeCeremony('subjek-anggota')
-            ->assertRedirect('http://tenanta.contoh.co.id/login?sso_error=akun-belum-terdaftar');
-
-        $this->assertSame(0, ExternalIdentity::query()->count());
-    }
-
-    /** Email yang berpindah tangan di penyedia tidak boleh menyerahkan akun yang sudah tertaut. */
-    public function test_an_account_already_linked_to_another_subject_is_not_relinked_by_email(): void
-    {
-        $user = $this->memberWithEmail('anggota@contoh.co.id');
-        ExternalIdentity::create(['user_id' => $user->id, 'issuer' => self::ISSUER, 'subject' => 'subjek-pemilik-lama']);
-
-        $this->completeCeremony('subjek-pemilik-baru')
-            ->assertRedirect('http://tenanta.contoh.co.id/login?sso_error=akun-belum-terdaftar');
-
-        $this->assertGuest();
-    }
-
-    public function test_a_valid_account_that_is_not_a_member_of_this_tenant_is_refused(): void
+    public function test_a_linked_account_that_is_not_a_member_of_this_tenant_is_refused(): void
     {
         $other = $this->tenantWithProduction('tenantb');
         $user = User::factory()->create(['email' => 'orang-b@contoh.co.id']);
         TenantMembership::create(['tenant_id' => $other->id, 'user_id' => $user->id, 'system_role' => 'owner', 'status' => 'active']);
+        ExternalIdentity::create(['user_id' => $user->id, 'issuer' => self::ISSUER, 'subject' => 'subjek-b']);
 
         $this->completeCeremony('subjek-b', email: 'orang-b@contoh.co.id')
             ->assertRedirect('http://tenanta.contoh.co.id/login?sso_error=bukan-anggota');
 
         $this->assertGuest();
-        $this->assertSame(0, ExternalIdentity::query()->count(), 'Penolakan tidak boleh meninggalkan tautan.');
+    }
+
+    // ------------------------------------------------------------------ menghubungkan
+
+    public function test_a_signed_in_member_connects_their_own_sso_account(): void
+    {
+        $user = $this->memberWithEmail('anggota@contoh.co.id');
+        $this->claimOverrides = ['sub' => 'subjek-baru', 'email' => 'anggota.sso@contoh.co.id'];
+
+        [$start, $state] = $this->startConnect($user);
+        $handoffUrl = (string) $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state)->headers->get('Location');
+
+        $this->assertStringStartsWith('http://tenanta.contoh.co.id/sso/serah?token=', $handoffUrl);
+        $this->assertSame(0, ExternalIdentity::query()->count(), 'Hubungan belum boleh lahir sebelum peramban yang memulai kembali.');
+
+        $this->withCookie(SsoLoginController::ATTEMPT_COOKIE, $this->browserSecret($start))
+            ->get($handoffUrl)
+            ->assertRedirect('/settings/security');
+
+        $this->assertDatabaseHas('external_identities', [
+            'user_id' => $user->id,
+            'issuer' => self::ISSUER,
+            'subject' => 'subjek-baru',
+            'email_at_link' => 'anggota.sso@contoh.co.id',
+        ]);
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_connecting_requires_the_password_to_be_confirmed_again(): void
+    {
+        $user = $this->memberWithEmail('anggota@contoh.co.id');
+
+        $this->actingAs($user)
+            ->post('http://tenanta.contoh.co.id/sso/hubungkan')
+            ->assertRedirectContains('confirm-password');
+
+        $this->assertSame(0, SsoLoginAttempt::query()->count());
+    }
+
+    /**
+     * Penyerang memulai "hubungkan" dari akunnya sendiri, lalu mengirim tautan penyedia ke korban.
+     *
+     * Korban mengkliknya dan masuk di penyedia dengan akun SSO miliknya. Token serahnya mendarat di
+     * peramban korban — yang tidak memegang cookie penyerang, dan tidak sedang masuk sebagai
+     * penyerang. Tidak ada hubungan yang boleh lahir dari situ.
+     */
+    public function test_a_connect_ceremony_started_by_one_account_cannot_bind_someone_elses_sso_account(): void
+    {
+        $attacker = $this->memberWithEmail('penyerang@contoh.co.id');
+        $victim = $this->memberWithEmail('korban@contoh.co.id');
+        $this->claimOverrides = ['sub' => 'subjek-korban', 'email' => 'korban@contoh.co.id'];
+
+        [, $state] = $this->startConnect($attacker);
+        $handoffUrl = (string) $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state)->headers->get('Location');
+
+        $this->actingAs($victim)->get($handoffUrl)->assertRedirect();
+        auth()->logout();
+        $this->get($handoffUrl)->assertRedirect();
+
+        $this->assertSame(0, ExternalIdentity::query()->count());
+    }
+
+    /** Peramban yang sama, tetapi sesinya sudah berganti akun sebelum upacara hubungkan selesai. */
+    public function test_a_connect_ceremony_is_not_finished_by_a_different_signed_in_account(): void
+    {
+        $starter = $this->memberWithEmail('pemulai@contoh.co.id');
+        $other = $this->memberWithEmail('lain@contoh.co.id');
+        $this->claimOverrides = ['sub' => 'subjek-pemulai'];
+
+        [$start, $state] = $this->startConnect($starter);
+        $handoffUrl = (string) $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state)->headers->get('Location');
+
+        $this->actingAs($other)
+            ->withCookie(SsoLoginController::ATTEMPT_COOKIE, $this->browserSecret($start))
+            ->get($handoffUrl)
+            ->assertRedirect('/login?sso_error=kedaluwarsa');
+
+        $this->assertSame(0, ExternalIdentity::query()->count());
+    }
+
+    public function test_a_subject_already_linked_to_someone_else_is_not_taken_over(): void
+    {
+        $owner = $this->linkedMember('subjek-diambil', 'pemilik@contoh.co.id');
+        $user = $this->memberWithEmail('anggota@contoh.co.id');
+        $this->claimOverrides = ['sub' => 'subjek-diambil'];
+
+        [, $state] = $this->startConnect($user);
+
+        $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state)
+            ->assertRedirect('http://tenanta.contoh.co.id/settings/security?sso_error=terhubung-ke-akun-lain');
+
+        $this->assertSame([$owner->id], ExternalIdentity::query()->pluck('user_id')->map(fn ($id) => (int) $id)->all());
+    }
+
+    public function test_an_account_already_linked_is_not_silently_relinked_to_another_subject(): void
+    {
+        $user = $this->linkedMember('subjek-lama');
+        $this->claimOverrides = ['sub' => 'subjek-baru'];
+
+        [, $state] = $this->startConnect($user);
+
+        $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state)
+            ->assertRedirect('http://tenanta.contoh.co.id/settings/security?sso_error=terhubung-ke-akun-lain');
+
+        $this->assertSame(['subjek-lama'], ExternalIdentity::query()->pluck('subject')->all());
+    }
+
+    public function test_disconnecting_removes_only_this_accounts_link_and_needs_the_password_again(): void
+    {
+        $user = $this->linkedMember('subjek-anggota');
+        $this->linkedMember('subjek-lain', 'lain@contoh.co.id');
+
+        $this->actingAs($user)->delete('http://tenanta.contoh.co.id/sso/hubungkan')->assertRedirectContains('confirm-password');
+        $this->assertSame(2, ExternalIdentity::query()->count());
+
+        $this->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->delete('http://tenanta.contoh.co.id/sso/hubungkan')
+            ->assertRedirect('/settings/security');
+
+        $this->assertSame(['subjek-lain'], ExternalIdentity::query()->pluck('subject')->all());
+    }
+
+    public function test_the_security_page_offers_connecting_only_at_an_address_that_uses_sso(): void
+    {
+        $user = $this->memberWithEmail('anggota@contoh.co.id');
+
+        $this->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get('http://tenanta.contoh.co.id/settings/security')
+            ->assertInertia(fn ($page) => $page->where('sso.canConnect', true)->where('sso.linked', false));
+
+        $this->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->get('http://contoh.co.id/settings/security')
+            ->assertInertia(fn ($page) => $page->where('sso.canConnect', false));
     }
 
     // ------------------------------------------------------------------ penolakan: token
 
     public function test_a_token_for_another_client_is_refused(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
         $this->claimOverrides = ['aud' => 'aplikasi-lain'];
 
         $this->completeCeremony('subjek-anggota')
@@ -208,7 +335,7 @@ class SsoLoginTest extends TestCase
 
     public function test_a_token_from_another_issuer_is_refused(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
         $this->claimOverrides = ['iss' => 'https://penerbit-lain.uji'];
 
         $this->completeCeremony('subjek-anggota')
@@ -217,7 +344,7 @@ class SsoLoginTest extends TestCase
 
     public function test_a_token_carrying_another_ceremonys_nonce_is_refused(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
         $this->claimOverrides = ['nonce' => 'nonce-upacara-lain'];
 
         $this->completeCeremony('subjek-anggota')
@@ -227,7 +354,7 @@ class SsoLoginTest extends TestCase
     /** Tanda tangan dari kunci yang tidak ada di JWKS penyedia, dengan `kid` yang sama. */
     public function test_a_token_signed_by_a_foreign_key_is_refused(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
         [$this->signWith] = $this->makeSigningKey('kunci-uji');
 
         $this->completeCeremony('subjek-anggota')
@@ -238,7 +365,7 @@ class SsoLoginTest extends TestCase
 
     public function test_an_expired_token_is_refused(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
         $this->claimOverrides = ['iat' => time() - 7200, 'exp' => time() - 3600];
 
         $this->completeCeremony('subjek-anggota')
@@ -263,7 +390,7 @@ class SsoLoginTest extends TestCase
      */
     public function test_the_handoff_is_refused_without_the_cookie_from_the_browser_that_started_it(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
 
         [, $state] = $this->startCeremony();
         $handoffUrl = (string) $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state)->headers->get('Location');
@@ -278,7 +405,7 @@ class SsoLoginTest extends TestCase
 
     public function test_a_handoff_token_opens_one_session_only(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
 
         [$start, $state] = $this->startCeremony();
         $handoffUrl = (string) $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state)->headers->get('Location');
@@ -297,7 +424,7 @@ class SsoLoginTest extends TestCase
     /** Token serah milik tenant A tidak membuka sesi di alamat tenant B. */
     public function test_a_handoff_token_does_not_open_another_tenants_address(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
         $this->tenantWithProduction('tenantb');
 
         [$start, $state] = $this->startCeremony();
@@ -313,7 +440,7 @@ class SsoLoginTest extends TestCase
 
     public function test_a_ceremony_that_outlived_its_window_is_refused(): void
     {
-        $this->memberWithEmail('anggota@contoh.co.id');
+        $this->linkedMember('subjek-anggota');
 
         [, $state] = $this->startCeremony();
         SsoLoginAttempt::query()->update(['expires_at' => now()->subMinute()]);
@@ -519,6 +646,27 @@ class SsoLoginTest extends TestCase
             'n' => $b64url($details['rsa']['n']),
             'e' => $b64url($details['rsa']['e']),
         ]]]];
+    }
+
+    /** Anggota tenant ini yang sudah menghubungkan akun SSO-nya. */
+    private function linkedMember(string $subject, string $email = 'anggota@contoh.co.id'): User
+    {
+        $user = $this->memberWithEmail($email);
+        ExternalIdentity::create(['user_id' => $user->id, 'issuer' => self::ISSUER, 'subject' => $subject]);
+
+        return $user;
+    }
+
+    /** @return array{0: TestResponse, 1: string} */
+    private function startConnect(User $user): array
+    {
+        $response = $this->actingAs($user)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->post('http://tenanta.contoh.co.id/sso/hubungkan');
+
+        parse_str((string) parse_url((string) $response->headers->get('Location'), PHP_URL_QUERY), $query);
+
+        return [$response, (string) ($query['state'] ?? '')];
     }
 
     private function memberWithEmail(string $email): User
