@@ -1,5 +1,5 @@
 import { Button } from '@apperp/ui/button';
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, router } from '@inertiajs/react';
 import { useRef } from 'react';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
 import Heading from '@/components/heading';
@@ -15,8 +15,19 @@ import PasswordInput from '@/components/password-input';
 import { edit } from '@/routes/security';
 /* @end-chisel-2fa */
 
+type SsoState = {
+    linked: boolean;
+    emailAtLink: string | null;
+    linkedAt: string | null;
+    /** Benar hanya di alamat tenant yang memilih SSO; upacaranya harus kembali ke sana. */
+    canConnect: boolean;
+};
+
 type Props = {
     passwordRules: string;
+    /** Null bila penempatan ini tidak menyetel penyedia identitas; bagiannya tidak tampil. */
+    sso: SsoState | null;
+    ssoError: string | null;
 } /* @chisel-passkeys */ & ManagePasskeysProps /* @end-chisel-passkeys */ /* @chisel-2fa */ &
     ManageTwoFactorProps /* @end-chisel-2fa */;
 
@@ -133,6 +144,67 @@ export default function Security(props: Props) {
                     passkeys={props.passkeys}
                 />
                 {/* @end-chisel-passkeys */}
+
+                {props.sso && (
+                    <div className="flex flex-col gap-6">
+                        <Heading
+                            variant="small"
+                            title="Akun SSO"
+                            description="Hubungkan akun SSO supaya berikutnya Anda dapat masuk lewat SSO. Hanya akun yang Anda hubungkan sendiri dari sini yang dapat dipakai."
+                        />
+
+                        {props.ssoError && (
+                            <div
+                                role="alert"
+                                className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                            >
+                                {props.ssoError}
+                            </div>
+                        )}
+
+                        {props.sso.linked ? (
+                            <div className="flex flex-wrap items-center justify-between gap-4">
+                                <p className="text-sm text-muted-foreground">
+                                    Terhubung
+                                    {props.sso.emailAtLink
+                                        ? ` sebagai ${props.sso.emailAtLink}`
+                                        : ''}
+                                    {props.sso.linkedAt
+                                        ? `, ${props.sso.linkedAt}`
+                                        : ''}
+                                    .
+                                </p>
+                                <Button
+                                    variant="outline"
+                                    data-test="sso-disconnect-button"
+                                    onClick={() =>
+                                        router.delete('/sso/hubungkan', {
+                                            preserveScroll: true,
+                                        })
+                                    }
+                                >
+                                    Putuskan
+                                </Button>
+                            </div>
+                        ) : props.sso.canConnect ? (
+                            <div>
+                                <Button
+                                    data-test="sso-connect-button"
+                                    onClick={() =>
+                                        router.post('/sso/hubungkan')
+                                    }
+                                >
+                                    Hubungkan SSO
+                                </Button>
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                Buka pengaturan ini dari alamat tenant yang
+                                memakai SSO untuk menghubungkan akun.
+                            </p>
+                        )}
+                    </div>
+                )}
             </main>
         </>
     );

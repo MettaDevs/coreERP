@@ -6,6 +6,8 @@ use App\Http\Controllers\Access\MembershipController;
 use App\Http\Controllers\Access\RoleController;
 use App\Http\Controllers\Access\SecurityConfigurationController;
 use App\Http\Controllers\AppLaunchManifestController;
+use App\Http\Controllers\Auth\SsoBackchannelLogoutController;
+use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
@@ -30,6 +32,7 @@ use App\Models\CoreApp;
 use App\Support\CurrentWorkspace;
 use App\Support\LaunchableAppCatalog;
 use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
+use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\Rules\Password;
@@ -93,6 +96,29 @@ Route::post('join', [InvitationRedemptionController::class, 'store'])
 Route::post('api/v1/invitation-redemptions', [InvitationRedemptionController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('api.invitation-redemptions.store');
+
+/*
+ * Masuk lewat penyedia identitas bersama. Bentuk tiga langkah dan dua alamatnya dijelaskan di
+ * SsoLoginController. Keempatnya menjawab 404 selama penyedia tidak disetel.
+ */
+Route::get('sso/masuk', [SsoLoginController::class, 'start'])
+    ->middleware(['guest', 'throttle:30,1'])
+    ->name('sso.start');
+// Bukan `guest`: upacara "hubungkan" kembali ke sini dengan akun yang sedang masuk.
+Route::get('sso/serah', [SsoLoginController::class, 'handoff'])
+    ->middleware('throttle:30,1')
+    ->name('sso.handoff');
+// Hanya dari layar keamanan, sesudah kata sandi dikonfirmasi ulang. Lihat SsoLoginController.
+Route::middleware(['auth', RequirePassword::class, 'throttle:10,1'])->group(function () {
+    Route::post('sso/hubungkan', [SsoLoginController::class, 'connect'])->name('sso.connect');
+    Route::delete('sso/hubungkan', [SsoLoginController::class, 'disconnect'])->name('sso.disconnect');
+});
+Route::get('sso/callback', [SsoLoginController::class, 'callback'])
+    ->middleware('throttle:30,1')
+    ->name('sso.callback');
+Route::post('sso/backchannel-logout', SsoBackchannelLogoutController::class)
+    ->middleware('throttle:60,1')
+    ->name('sso.backchannel-logout');
 
 Route::middleware('guest')->group(function () {
     Route::post('api/v1/business-registrations', [BusinessRegistrationController::class, 'store'])

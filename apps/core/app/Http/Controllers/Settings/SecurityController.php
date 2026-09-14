@@ -5,7 +5,13 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
+use App\Models\ExternalIdentity;
+use App\Models\User;
+use App\Support\Sso\SharedIdentityProvider;
+use App\Support\Sso\SsoFailure;
+use App\Support\Sso\TenantSso;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -42,6 +48,8 @@ class SecurityController extends Controller
                 : [],
             /* @end-chisel-passkeys */
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
+            'sso' => $this->ssoState($request->user(), $request),
+            'ssoError' => SsoFailure::messageFor($request->query('sso_error')),
         ];
 
         /* @chisel-2fa */
@@ -54,6 +62,36 @@ class SecurityController extends Controller
         /* @end-chisel-2fa */
 
         return Inertia::render('settings/security', $props);
+    }
+
+    /**
+     * Keadaan hubungan akun ini dengan penyedia identitas bersama, untuk layar keamanan.
+     *
+     * Null bila penempatan ini tidak menyetel penyedia — bagiannya tidak tampil sama sekali.
+     * `canConnect` hanya benar di alamat tenant yang memilih SSO: upacara hubungkan harus kembali
+     * ke alamat tenant, dan di alamat lain tidak ada tempat kembali.
+     *
+     * @return array{linked: bool, emailAtLink: ?string, linkedAt: ?string, canConnect: bool}|null
+     */
+    private function ssoState(User $user, Request $request): ?array
+    {
+        $provider = app(SharedIdentityProvider::class);
+
+        if (! $provider->isConfigured()) {
+            return null;
+        }
+
+        $identity = ExternalIdentity::query()
+            ->where('user_id', $user->id)
+            ->where('issuer', $provider->issuer())
+            ->first();
+
+        return [
+            'linked' => $identity instanceof ExternalIdentity,
+            'emailAtLink' => $identity?->email_at_link,
+            'linkedAt' => $identity?->created_at?->diffForHumans(),
+            'canConnect' => app(TenantSso::class)->loginUrlFor($request) !== null,
+        ];
     }
 
     /**

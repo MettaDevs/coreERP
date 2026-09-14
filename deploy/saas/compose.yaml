@@ -76,6 +76,11 @@ x-app-environment: &app-environment
   AWS_USE_PATH_STYLE_ENDPOINT: 'true'
 
   COREERP_BASE_DOMAIN: ${COREERP_BASE_DOMAIN:?COREERP_BASE_DOMAIN wajib}
+  # Penyedia identitas bersama. Boleh kosong, dan kosong berarti tidak ada SSO: tombolnya tidak
+  # tampil dan rute /sso/* menjawab 404. Rahasianya hanya di /etc/coreerp/saas.env, tidak di repo.
+  COREERP_SSO_ISSUER: ${COREERP_SSO_ISSUER:-}
+  COREERP_SSO_CLIENT_ID: ${COREERP_SSO_CLIENT_ID:-}
+  COREERP_SSO_CLIENT_SECRET: ${COREERP_SSO_CLIENT_SECRET:-}
   # Wajib di belakang Traefik. Tanpanya Laravel membaca alamat dari koneksi ke proxy — yang memang
   # `http` — lalu menerbitkan setiap pengalihan sebagai `http://`, dan peramban berputar-putar.
   COREERP_TRUSTED_PROXIES: ${COREERP_TRUSTED_PROXIES:-*}
@@ -340,6 +345,15 @@ services:
       # Skema dan porta sengaja tidak diteruskan: bawaannya `https` tanpa porta, dan itu yang
       # berlaku di setiap server.
       COREERP_BASE_DOMAIN: ${COREERP_BASE_DOMAIN:?COREERP_BASE_DOMAIN wajib}
+      # Klien SSO milik konsol sendiri ("CoreERP Admin"), terpisah dari klien Core. Kosong berarti
+      # tanpa SSO: tombolnya tidak tampil dan konsol bekerja seperti sebelumnya.
+      CONSOLE_SSO_ISSUER: ${CONSOLE_SSO_ISSUER:-}
+      CONSOLE_SSO_CLIENT_ID: ${CONSOLE_SSO_CLIENT_ID:-}
+      CONSOLE_SSO_CLIENT_SECRET: ${CONSOLE_SSO_CLIENT_SECRET:-}
+      # Pintu kata sandi tetap terbuka sampai setiap operator menghubungkan SSO-nya; sesudah itu
+      # setel `false` dan sisakan akun darurat di daftar di bawahnya.
+      CONSOLE_PASSWORD_LOGIN: ${CONSOLE_PASSWORD_LOGIN:-true}
+      CONSOLE_BREAK_GLASS_EMAILS: ${CONSOLE_BREAK_GLASS_EMAILS:-}
     volumes:
       # Sesi operator hidup di sini. Tanpa volume, setiap penyebaran melempar keluar semua orang
       # yang sedang membuka konsol — termasuk yang sedang di tengah membuat pelanggan.
