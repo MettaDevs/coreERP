@@ -405,7 +405,10 @@ uji_templat_dan_compose() {
     sama 'setiap variabel compose ada di env.template' "${kurang[*]}" ''
     pastikan 'env.template menyebut COREERP_LICENSE_DIR' grep -q '^COREERP_LICENSE_DIR=' "$TEMPLAT_ENV"
 
-    # shellcheck disable=SC2016 # ${COREERP_LICENSE_DIR:-...} adalah teks harfiah yang dicari di compose
+    # Bawaan compose menjaga pemasangan beli-putus; on-prem dikelola mengikat ke loopback lewat templatnya.
+    sama 'env.template mengikat port aplikasi ke loopback' "$(grep '^CORE_APP_BIND=' "$TEMPLAT_ENV")" 'CORE_APP_BIND=127.0.0.1'
+
+    # shellcheck disable=SC2016 # ${COREERP_LICENSE_DIR:-...} dan ${CORE_APP_BIND:-...} adalah teks harfiah yang dicari di compose
     python3 -c '
 import sys, yaml
 with open(sys.argv[1]) as f:
@@ -416,6 +419,11 @@ assert lingkungan["COREERP_LICENSE_PUBLIC_KEY_PATH"] == "/run/coreerp-license/li
 mount = "${COREERP_LICENSE_DIR:-/opt/coreerp/agent/license}:/run/coreerp-license:ro"
 for layanan in ("core-app", "core-worker", "core-scheduler"):
     assert mount in compose["services"][layanan]["volumes"], layanan + " tidak me-mount folder lisensi"
+port = compose["services"]["core-app"]["ports"]
+assert port == ["${CORE_APP_BIND:-0.0.0.0}:${CORE_APP_PORT:-8000}:80"], "port core-app: %r" % port
+# Layanan lain yang menerbitkan port lolos dari CORE_APP_BIND dan terbuka ke semua alamat.
+penerbit = sorted(nama for nama, layanan in compose["services"].items() if "ports" in layanan)
+assert penerbit == ["core-app"], "layanan yang menerbitkan port: %r" % penerbit
 ' "$COMPOSE_EDISI"
 
     # build-bundle.sh membaca image pendamping secara harfiah dari berkas compose; perubahan berkas itu
@@ -1134,6 +1142,11 @@ uji_17_pasang_offline() {
     pastikan 'kata sandi provider 24 huruf dan angka' cocok_pola "$kata_sandi" '^[A-Za-z0-9]{24}$'
     sama 'kata sandi provider dicetak tepat sekali' "$(grep -c -- "$kata_sandi" <<< "$keluaran")" 1
     sama 'folder lisensi' "$(sed -n 's/^COREERP_LICENSE_DIR=//p' "$rumah/.env")" "$rumah/agent/license"
+    sama 'port dan alamat ikat bawaan dari env.template' \
+        "$(grep -E '^CORE_APP_(PORT|BIND)=' "$rumah/.env" | sort | paste -sd' ')" 'CORE_APP_BIND=127.0.0.1 CORE_APP_PORT=8000'
+    sama 'agent.env menyimpan folder cadangan yang disebut saat memasang' \
+        "$(grep -v '^#' "$rumah/agent/agent.env")" "COREERP_FOLDER_CADANGAN=$rumah/cadangan"
+    sama 'mode agent.env' "$(stat -c %a "$rumah/agent/agent.env")" 600
 
     pastikan 'unit service memakai COREERP_HOME' grep -qxF "ExecStart=$rumah/bin/coreerp-agent run" "$folder_systemd/coreerp-agent.service"
     pastikan 'unit timer terpasang' grep -q '^OnUnitActiveSec=60s' "$folder_systemd/coreerp-agent.timer"
@@ -1145,11 +1158,208 @@ uji_17_pasang_offline() {
     memuat 'langkah berikutnya menyebut bootstrap-tenant' "$keluaran" 'coreerp-agent bootstrap-tenant'
 
     # Dijalankan ulang: .env tidak ditimpa dan kata sandi tidak dicetak lagi.
-    sidik_env="$(sha256sum < "$rumah/.env")"
+    sidik_env="$(cat "$rumah/.env" "$rumah/agent/agent.env" | sha256sum)"
     keluaran_ulang="$(pasang 2>&1)" || { printf '%s\n' "$keluaran_ulang"; return 1; }
-    sama '.env tidak ditimpa' "$(sha256sum < "$rumah/.env")" "$sidik_env"
+    sama '.env dan agent.env tidak ditimpa' "$(cat "$rumah/.env" "$rumah/agent/agent.env" | sha256sum)" "$sidik_env"
     harus_gagal 'kata sandi tidak dicetak ulang' grep -q -- "$kata_sandi" <<< "$keluaran_ulang"
     memuat 'pemasangan ulang menjelaskan .env' "$keluaran_ulang" 'sudah ada; tidak ditimpa'
+}
+
+# dengarkan PORT — soket TCP sungguhan yang mendengarkan PORT di semua alamat IPv4, sampai subshell
+# pengujian yang memanggilnya selesai. pasang.sh membacanya dari /proc seperti di server klien.
+dengarkan() {
+    local siap="$KERJA/dengar-$1.siap"
+
+    rm -f "$siap"
+    python3 -c '
+import socket, sys, time
+s = socket.socket()
+s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+s.bind(("0.0.0.0", int(sys.argv[1])))
+s.listen()
+open(sys.argv[2], "w").close()
+time.sleep(600)
+' "$1" "$siap" >/dev/null 2>&1 &
+    PENDENGAR+=("$!")
+    # shellcheck disable=SC2064 # daftar PID memang dibekukan saat trap dipasang
+    trap "kill ${PENDENGAR[*]} 2>/dev/null || true" EXIT
+
+    for _ in $(seq 1 100); do
+        [ ! -f "$siap" ] || return 0
+        sleep 0.1
+    done
+
+    printf 'soket uji di port %s tidak menyala\n' "$1"
+    return 1
+}
+
+PENDENGAR=()
+
+uji_18_pasang_port_dan_setelan() {
+    local rumah="$KERJA/rumah-port" paket="$KERJA/paket-port" bundle="$KERJA/bundle-port"
+    local folder_bin="$KERJA/bin-port" folder_systemd="$KERJA/systemd-port" cadangan="$KERJA/cadangan-port"
+    local keluaran sidik diharapkan
+
+    buat_paket "$paket" 01JSITUSPORT00000000000000 token-port-0123456789abcdef0123456789ab
+    mkdir -p "$bundle"
+    tulis_berkas_rilis "$bundle" apotek-uji 0.8.0 "$KERJA/kunci/rilis.key" --dengan-image
+
+    # pasang_port PROYEK [pilihan pasang.sh...] — keluaran di $KERJA/log/pasang-port.log
+    pasang_port() {
+        local proyek="$1"
+        shift
+        env COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$folder_systemd" COREERP_BIN_DIR="$folder_bin" \
+            COREERP_PROYEK="$proyek" COREERP_FOLDER_CADANGAN="$cadangan" \
+            bash "$PASANG" --paket "$paket" --bundle "$bundle" "$@" > "$KERJA/log/pasang-port.log" 2>&1
+    }
+
+    # Port bawaan dari env.template sudah didengar layanan lain: ditolak sebelum satu berkas pun ditulis.
+    dengarkan 8000
+    harus_gagal 'pemasangan pertama di port bawaan yang terpakai ditolak' pasang_port coreerp-situs
+    memuat 'penolakan menyebut port bawaan' "$(cat "$KERJA/log/pasang-port.log")" 'Port 8000 sudah didengar'
+    memuat 'penolakan menyebut cara memilih port lain' "$(cat "$KERJA/log/pasang-port.log")" '--app-port PORT'
+    pastikan 'tidak ada yang ditulis ke COREERP_HOME' test ! -e "$rumah"
+    pastikan 'unit systemd tidak ditulis' test ! -e "$folder_systemd"
+
+    # Port yang disebut lewat --app-port juga diperiksa.
+    dengarkan 18080
+    harus_gagal 'port pilihan yang terpakai ditolak' pasang_port coreerp-situs --app-port 18080
+    memuat 'penolakan menyebut port pilihan' "$(cat "$KERJA/log/pasang-port.log")" 'Port 18080 sudah didengar'
+    pastikan 'tidak ada yang ditulis ke COREERP_HOME' test ! -e "$rumah"
+
+    harus_gagal 'port di luar rentang ditolak' pasang_port coreerp-situs --app-port 70000
+    memuat 'penolakan port tidak sah' "$(cat "$KERJA/log/pasang-port.log")" '--app-port tidak sah: 70000'
+    harus_gagal 'alamat ikat yang bukan IPv4 ditolak' pasang_port coreerp-situs --app-port 18081 --app-bind 10.0.0
+    memuat 'penolakan alamat tidak sah' "$(cat "$KERJA/log/pasang-port.log")" '--app-bind tidak sah: 10.0.0'
+    harus_gagal 'oktet di atas 255 ditolak' pasang_port coreerp-situs --app-port 18081 --app-bind 10.0.0.256
+    pastikan 'tidak ada yang ditulis ke COREERP_HOME' test ! -e "$rumah"
+
+    # Nilai yang akan ditolak agen saat membaca agent.env tidak ditulis ke sana.
+    harus_gagal 'nilai berspasi untuk agent.env ditolak' pasang_port 'coreerp situs' --app-port 18081
+    memuat 'penolakan menyebut agent.env' "$(cat "$KERJA/log/pasang-port.log")" 'COREERP_PROYEK tidak dapat ditulis ke agent.env'
+    pastikan 'tidak ada yang ditulis ke COREERP_HOME' test ! -e "$rumah"
+
+    # Port bebas dan alamat ikat pilihan: keduanya sampai ke .env, proyek dan folder cadangan ke agent.env.
+    pasang_port coreerp-situs --app-port 18081 --app-bind 172.17.0.1 || { cat "$KERJA/log/pasang-port.log"; return 1; }
+    keluaran="$(cat "$KERJA/log/pasang-port.log")"
+
+    sama '.env memakai port dan alamat ikat pilihan' \
+        "$(grep -E '^CORE_APP_(PORT|BIND)=' "$rumah/.env" | sort | paste -sd' ')" 'CORE_APP_BIND=172.17.0.1 CORE_APP_PORT=18081'
+    memuat 'alamat aplikasi dicetak untuk reverse proxy' "$keluaran" 'aplikasi didengar di 172.17.0.1:18081'
+    sama 'agent.env menyimpan proyek dan folder cadangan' "$(grep -v '^#' "$rumah/agent/agent.env")" \
+        "COREERP_PROYEK=coreerp-situs"$'\n'"COREERP_FOLDER_CADANGAN=$cadangan"
+    sama 'mode agent.env' "$(stat -c %a "$rumah/agent/agent.env")" 600
+
+    # Dijalankan ulang sementara port pilihannya didengar — di server sungguhan oleh CoreERP sendiri.
+    dengarkan 18081
+    sidik="$(cat "$rumah/.env" "$rumah/agent/agent.env" | sha256sum)"
+    pasang_port coreerp-situs || { cat "$KERJA/log/pasang-port.log"; return 1; }
+    sama 'pemasangan ulang tidak memeriksa port lagi dan tidak menimpa apa pun' \
+        "$(cat "$rumah/.env" "$rumah/agent/agent.env" | sha256sum)" "$sidik"
+
+    # Proyek lain disebut sesudah agent.env berdiri: ditolak, bukan diam-diam berbeda dari timer.
+    harus_gagal 'proyek yang berbeda dari agent.env ditolak' pasang_port coreerp-lain
+    memuat 'penolakan menyebut kedua nilai' "$(cat "$KERJA/log/pasang-port.log")" 'menyebut COREERP_PROYEK yang berbeda'
+    memuat 'penolakan menyebut nilai yang diminta' "$(cat "$KERJA/log/pasang-port.log")" 'diminta  : coreerp-lain'
+    sama 'agent.env tidak berubah' "$(cat "$rumah/.env" "$rumah/agent/agent.env" | sha256sum)" "$sidik"
+
+    # Perintah manual lewat pembungkus di PATH — tanpa COREERP_PROYEK di lingkungannya — memakai proyek
+    # yang disebut saat memasang.
+    mkdir -p "$rumah/keadaan"
+    printf 'ghcr.io/mettadevs/edisi-apotek-uji@sha256:%064d' 8 > "$rumah/keadaan/versi-sehat"
+    printf 'name: coreerp\n' > "$rumah/keadaan/compose-sehat.yaml"
+    : > "$FAKE_DOCKER_JSON_LOG"
+
+    env -u COREERP_HOME -u COREERP_FOLDER_CADANGAN "$folder_bin/coreerp-agent" bootstrap-tenant \
+        --admin-name 'Admin Port' --admin-email admin@port.test >/dev/null
+
+    diharapkan="$(jq -cn --arg env "$rumah/.env" '["compose","--project-name","coreerp-situs","--env-file",$env]')"
+    sama 'bootstrap-tenant lewat pembungkus memakai proyek dari agent.env' \
+        "$(jq -c 'select(.args | index("tenant:bootstrap-site")) | .args[0:5]' "$FAKE_DOCKER_JSON_LOG")" "$diharapkan"
+}
+
+uji_19_agent_env() {
+    local rumah="$KERJA/rumah-setelan" rumah_bundle="$KERJA/rumah-setelan-bundle" rumah_tolak="$KERJA/rumah-setelan-tolak"
+    local bundle="$KERJA/bundle-setelan" kunci_kode kunci dikecualikan
+
+    rm -rf "$rumah" "$rumah_bundle" "$rumah_tolak"
+    mkdir -p "$rumah_tolak/agent"
+
+    # tolak KETERANGAN BARIS POTONGAN_PESAN [BERKAS_YANG_TIDAK_BOLEH_LAHIR]
+    tolak() {
+        local status=0
+
+        printf '%s\n' "$2" > "$rumah_tolak/agent/agent.env"
+        env COREERP_HOME="$rumah_tolak" bash "$AGEN" --version > "$KERJA/log/setelan-tolak.log" 2>&1 || status=$?
+
+        # Diperiksa sebelum penolakannya: pembacaan yang menjalankan barisnya lalu menolak tetap cacat.
+        [ -z "${4:-}" ] || pastikan "$1: barisnya tidak dijalankan" test ! -e "$4"
+
+        if [ "$status" -eq 0 ]; then
+            printf 'agent.env diterima padahal harus ditolak: %s\n' "$1"
+            return 1
+        fi
+
+        memuat "$1" "$(cat "$KERJA/log/setelan-tolak.log")" "$3"
+    }
+
+    # Berkasnya tidak pernah dijalankan sebagai skrip.
+    tolak 'substitusi perintah di nilai ditolak' "COREERP_PROYEK=\$(touch $KERJA/tersentuh-nilai)" \
+        'nilai COREERP_PROYEK memuat huruf yang tidak diterima' "$KERJA/tersentuh-nilai"
+    tolak 'baris perintah ditolak' "touch $KERJA/tersentuh-baris" 'bukan KUNCI=nilai' "$KERJA/tersentuh-baris"
+    tolak 'nilai berkutip ditolak' 'COREERP_PROYEK="coreerp situs"' 'nilai COREERP_PROYEK memuat huruf yang tidak diterima'
+    tolak 'bentuk export ditolak' 'export COREERP_PROYEK=coreerp-situs' 'bukan KUNCI=nilai'
+    tolak 'variabel di luar COREERP_* ditolak' 'PATH=/tmp' 'PATH bukan setelan yang dibaca agen'
+
+    # Nilai baris yang ditolak tidak dicetak: keluaran agen masuk journald.
+    tolak 'rahasia yang keliru ditaruh ditolak' 'CORE_DB_PASSWORD=RahasiaJanganTercetak' 'CORE_DB_PASSWORD bukan setelan'
+    harus_gagal 'nilainya tidak tercetak' grep -q RahasiaJanganTercetak "$KERJA/log/setelan-tolak.log"
+
+    # Daftar yang diterima diturunkan dari kode: setiap COREERP_* yang dibaca agen atau update.sh diterima,
+    # kecuali yang sengaja dikecualikan — dan yang dikecualikan memang masih dibaca kode.
+    dikecualikan=(COREERP_HOME COREERP_UPDATE_SCRIPT COREERP_LEWATI_PERIKSA_CADANGAN)
+    kunci_kode="$(grep -ohE '\$\{COREERP_[A-Z0-9_]+' "$AGEN" "$UPDATE_SH" | cut -c3- | sort -u)"
+
+    for kunci in "${dikecualikan[@]}"; do
+        pastikan "$kunci masih dibaca kode" grep -qxF "$kunci" <<< "$kunci_kode"
+        tolak "$kunci ditolak" "$kunci=/tmp/lain" "$kunci bukan setelan yang dibaca agen"
+    done
+
+    grep -vxF "${dikecualikan[@]/#/-e}" <<< "$kunci_kode" | sed 's/$/=nilai-uji/' > "$rumah_tolak/agent/agent.env"
+    pastikan 'setiap setelan lain yang dibaca kode diterima' env COREERP_HOME="$rumah_tolak" bash "$AGEN" --version
+
+    cp -a "$COREERP_HOME" "$rumah"
+
+    proyek_bootstrap() {
+        : > "$FAKE_DOCKER_JSON_LOG"
+        "$@" bootstrap-tenant --admin-name 'Admin Setelan' --admin-email admin@setelan.test >/dev/null
+        jq -r 'select(.args | index("tenant:bootstrap-site")) | .args[2]' "$FAKE_DOCKER_JSON_LOG"
+    }
+
+    # Komentar, baris kosong, dan kunci yang disebut dua kali: yang terakhir berlaku, sama dengan systemd.
+    printf '%s\n' '# setelan uji' '' '  ; komentar systemd' 'COREERP_PROYEK=coreerp-lama' 'COREERP_PROYEK=coreerp-situs' \
+        > "$rumah/agent/agent.env"
+
+    sama 'perintah manual memakai COREERP_PROYEK dari agent.env' \
+        "$(proyek_bootstrap env COREERP_HOME="$rumah" bash "$AGEN")" coreerp-situs
+    sama 'lingkungan perintah menang atas agent.env' \
+        "$(proyek_bootstrap env COREERP_HOME="$rumah" COREERP_PROYEK=coreerp-terminal bash "$AGEN")" coreerp-terminal
+
+    # Setelan dari agent.env diekspor sampai ke update.sh yang dijalankan agen.
+    cp -a "$KERJA/rumah-offline" "$rumah_bundle"
+    cp "$KERJA/kunci/rilis.pub" "$rumah_bundle/kunci-rilis.pub"
+    printf 'COREERP_PROYEK=coreerp-situs\nCOREERP_FOLDER_CADANGAN=%s\n' "$KERJA/cadangan-disk-kedua" \
+        > "$rumah_bundle/agent/agent.env"
+    mkdir -p "$bundle"
+    tulis_berkas_rilis "$bundle" apotek-uji 0.1.0 "$KERJA/kunci/rilis.key" --dengan-image
+    rm -f "$KERJA/lingkungan-update"
+
+    env -u COREERP_FOLDER_CADANGAN COREERP_HOME="$rumah_bundle" FAKE_UPDATE_LINGKUNGAN="$KERJA/lingkungan-update" \
+        bash "$AGEN" install-bundle "$bundle" > "$KERJA/log/setelan-install-bundle.log" 2>&1 \
+        || { cat "$KERJA/log/setelan-install-bundle.log"; return 1; }
+    sama 'update.sh menerima proyek dan folder cadangan dari agent.env' "$(cat "$KERJA/lingkungan-update")" \
+        "COREERP_PROYEK=coreerp-situs"$'\n'"COREERP_FOLDER_CADANGAN=$KERJA/cadangan-disk-kedua"
+
 }
 
 # --- Jalankan ------------------------------------------------------------------------------------------
@@ -1179,6 +1389,8 @@ uji '14 operasi di luar daftar tertutup ditolak' uji_14_operasi_asing
 uji '15 bootstrap-tenant: argumen diteruskan, kata sandi tidak disimpan' uji_15_bootstrap_tenant
 uji '16 update.sh tanpa images.tar.gz menarik image dan tetap memeriksa digest' uji_16_update_sh_tanpa_arsip_image
 uji '17 pasang.sh offline: .env, unit, pendaftaran, bundle' uji_17_pasang_offline
+uji '18 pasang.sh: port terpakai ditolak di pemasangan pertama; port, alamat ikat, dan agent.env ditulis' uji_18_pasang_port_dan_setelan
+uji '19 agent.env dibaca agen sendiri: isi di luar daftar ditolak, lingkungan menang, diteruskan ke update.sh' uji_19_agent_env
 
 printf '\n%d lulus, %d gagal, %d dilewati\n' "$lulus" "$gagal_uji" "$dilewati"
 
