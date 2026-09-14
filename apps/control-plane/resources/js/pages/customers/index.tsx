@@ -30,11 +30,11 @@ export default function Index({
 }) {
     return (
         <Shell
-            title="Pelanggan"
+            title="Tenant"
             description="Setiap perusahaan yang punya tempatnya sendiri di sistem ini, beserta jumlah lingkungannya."
             actions={<CreateDialog app={app} />}
         >
-            <Head title="Pelanggan" />
+            <Head title="Tenant" />
 
             {/*
                 Kartunya di atas tabel, bukan di bawahnya. Ia hanya muncul beberapa detik setelah
@@ -59,7 +59,7 @@ export default function Index({
                                     colSpan={3}
                                     className="py-10 text-center text-sm text-muted-foreground"
                                 >
-                                    Belum ada pelanggan. Sampai ada, layar
+                                    Belum ada tenant. Sampai ada, layar
                                     Lingkungan tidak punya siapa pun untuk
                                     dibuatkan tempat kerja.
                                 </TableCell>

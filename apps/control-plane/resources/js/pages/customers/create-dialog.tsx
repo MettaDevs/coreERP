@@ -11,6 +11,7 @@ import {
 } from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
+import { NativeSelect } from '@apperp/ui/native-select';
 import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -25,7 +26,7 @@ const formFields = [
 ];
 
 /**
- * Melahirkan satu pelanggan, beserta admin pertamanya.
+ * Melahirkan satu tenant, beserta admin pertamanya.
  *
  * Dialog ini **tidak menulis apa pun ke database.** Ia mengirim isiannya ke Core, dan Core yang
  * membuat tenant, environment, membership, role Owner, entitlement, serta memasang module yang
@@ -77,7 +78,7 @@ export default function CreateDialog({
 
     function submit(e: FormEvent) {
         e.preventDefault();
-        post('/pelanggan', {
+        post('/tenant', {
             onSuccess: () => {
                 reset();
                 setOpen(false);
@@ -100,12 +101,12 @@ export default function CreateDialog({
             }}
         >
             <DialogTrigger asChild>
-                <Button>Pelanggan baru</Button>
+                <Button>Tenant baru</Button>
             </DialogTrigger>
             <DialogContent>
                 <form onSubmit={submit}>
                     <DialogHeader>
-                        <DialogTitle>Pelanggan baru</DialogTitle>
+                        <DialogTitle>Tenant baru</DialogTitle>
                         <DialogDescription>
                             Core yang membuatnya. Konsol ini hanya memerintah,
                             lalu menampilkan kata sandi sementaranya satu kali.
@@ -122,18 +123,18 @@ export default function CreateDialog({
                         )}
 
                         <div className="space-y-2">
-                            <Label htmlFor="legal_name">Nama pelanggan</Label>
                             <Input
                                 id="legal_name"
+                                label="Nama tenant"
+                                required
                                 value={data.legal_name}
                                 onChange={(e) =>
                                     setData('legal_name', e.target.value)
                                 }
-                                placeholder="Sumber Sehat Group"
                             />
                             <p className="text-xs text-muted-foreground">
                                 Nama perusahaan atau grupnya, bukan nama badan
-                                hukum tertentu. Satu pelanggan boleh memuat
+                                hukum tertentu. Satu tenant boleh memuat
                                 beberapa badan hukum sekaligus, dan
                                 masing-masing didaftarkan di dalam ERP-nya
                                 lengkap dengan kode perusahaan dan negaranya.
@@ -146,12 +147,9 @@ export default function CreateDialog({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="first_environment">
-                                Lingkungan pertama
-                            </Label>
-                            <select
+                            <NativeSelect
                                 id="first_environment"
-                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
+                                label="Lingkungan pertama"
                                 value={data.first_environment}
                                 onChange={(e) =>
                                     setData('first_environment', e.target.value)
@@ -166,13 +164,13 @@ export default function CreateDialog({
                                 <option value="none">
                                     Belum — ditambahkan nanti
                                 </option>
-                            </select>
+                            </NativeSelect>
                             <p className="text-xs text-muted-foreground">
-                                Calon pelanggan yang belum tentu jadi membeli
-                                tidak perlu diberi produksi. Produksi yang
-                                terlanjur lahir adalah tempat kerja kosong yang
-                                tidak pernah dipakai siapa pun, sekaligus alamat
-                                yang sudah terpakai.
+                                Calon tenant yang belum tentu jadi membeli tidak
+                                perlu diberi produksi. Produksi yang terlanjur
+                                lahir adalah tempat kerja kosong yang tidak
+                                pernah dipakai siapa pun, sekaligus alamat yang
+                                sudah terpakai.
                             </p>
                             {errors.first_environment && (
                                 <p className="text-sm text-destructive">
@@ -183,11 +181,10 @@ export default function CreateDialog({
 
                         {data.first_environment === 'demo' && (
                             <div className="space-y-2">
-                                <Label htmlFor="first_environment_expires_at">
-                                    Berakhir pada
-                                </Label>
                                 <Input
                                     id="first_environment_expires_at"
+                                    label="Berakhir pada"
+                                    required
                                     type="date"
                                     value={data.first_environment_expires_at}
                                     onChange={(e) =>
@@ -211,14 +208,14 @@ export default function CreateDialog({
                         )}
 
                         <div className="space-y-2">
-                            <Label htmlFor="admin_name">Nama admin</Label>
                             <Input
                                 id="admin_name"
+                                label="Nama admin"
+                                required
                                 value={data.admin_name}
                                 onChange={(e) =>
                                     setData('admin_name', e.target.value)
                                 }
-                                placeholder="Siti Rahmawati"
                             />
                             {errors.admin_name && (
                                 <p className="text-sm text-destructive">
@@ -228,15 +225,15 @@ export default function CreateDialog({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="admin_email">Email admin</Label>
                             <Input
                                 id="admin_email"
+                                label="Email admin"
+                                required
                                 type="email"
                                 value={data.admin_email}
                                 onChange={(e) =>
                                     setData('admin_email', e.target.value)
                                 }
-                                placeholder="siti@sumbersehat.co.id"
                             />
                             <p className="text-xs text-muted-foreground">
                                 Tidak ada surat yang dikirim ke alamat ini —
@@ -257,7 +254,7 @@ export default function CreateDialog({
                                 <p className="rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground">
                                     Katalog app kosong. Daftarkan manifest app
                                     di Core lebih dulu — tanpa satu pun app,
-                                    pelanggan lahir ke peluncur yang kosong.
+                                    tenant lahir ke peluncur yang kosong.
                                 </p>
                             ) : (
                                 <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
@@ -306,7 +303,7 @@ export default function CreateDialog({
 
                     <DialogFooter>
                         <Button type="submit" disabled={processing}>
-                            {processing ? 'Meminta Core…' : 'Buat pelanggan'}
+                            {processing ? 'Meminta Core…' : 'Buat tenant'}
                         </Button>
                     </DialogFooter>
                 </form>

@@ -9,7 +9,6 @@ import {
     DialogTrigger,
 } from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
-import { Label } from '@apperp/ui/label';
 import { NativeSelect } from '@apperp/ui/native-select';
 import { useForm } from '@inertiajs/react';
 import { useState } from 'react';
@@ -72,9 +71,9 @@ export default function CreateDialog({
 
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                            <Label htmlFor="kind">Jenis</Label>
                             <NativeSelect
                                 id="kind"
+                                label="Jenis"
                                 value={data.kind}
                                 onChange={(e) =>
                                     setData('kind', e.target.value)
@@ -94,9 +93,9 @@ export default function CreateDialog({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="tenant">Pelanggan</Label>
                             <NativeSelect
                                 id="tenant"
+                                label="Tenant"
                                 value={data.tenant_id}
                                 onChange={(e) =>
                                     setData('tenant_id', e.target.value)
@@ -116,14 +115,14 @@ export default function CreateDialog({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="name">Nama</Label>
                             <Input
                                 id="name"
+                                label="Nama"
+                                required
                                 value={data.name}
                                 onChange={(e) =>
                                     setData('name', e.target.value)
                                 }
-                                placeholder="Uji coba penagihan"
                             />
                             {errors.name && (
                                 <p className="text-sm text-destructive">
@@ -134,11 +133,10 @@ export default function CreateDialog({
 
                         {demo && (
                             <div className="space-y-2">
-                                <Label htmlFor="expires_at">
-                                    Berakhir pada
-                                </Label>
                                 <Input
                                     id="expires_at"
+                                    label="Berakhir pada"
+                                    required
                                     type="date"
                                     value={data.expires_at}
                                     onChange={(e) =>
@@ -200,7 +198,7 @@ export default function CreateDialog({
                             <p className="pt-2 text-xs text-muted-foreground">
                                 {production
                                     ? 'Produksi boleh menghubungi dunia luar: email, webhook, dan pengiriman otomatis berjalan seperti biasa.'
-                                    : 'Di luar produksi, webhook dan pengiriman otomatis dimatikan. Itu satu-satunya alasan lingkungan terpisah ada — supaya salinan tidak menghubungi pelanggan sungguhan.'}
+                                    : 'Di luar produksi, webhook dan pengiriman otomatis dimatikan. Itu satu-satunya alasan lingkungan terpisah ada — supaya salinan tidak menghubungi orang sungguhan.'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                                 Yang tercatat di sini baru registry-nya.

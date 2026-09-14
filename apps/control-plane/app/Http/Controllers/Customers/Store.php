@@ -88,7 +88,7 @@ class Store extends Controller
          * ia tinggal di riwayat peramban, di access log, dan di header Referer setiap permintaan
          * berikutnya — tiga tempat yang tidak pernah dibersihkan siapa pun.
          */
-        return redirect('/pelanggan')->with('credentials', [
+        return redirect('/tenant')->with('credentials', [
             'tenant' => $result['tenant_id'],
             'name' => $input['legal_name'],
             'email' => $result['email'],

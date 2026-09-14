@@ -54,7 +54,7 @@ export default function CredentialsCard({
                 Akun admin untuk {credentials.name} sudah dibuat
             </h2>
             <p className="mt-1 text-sm">
-                Sampaikan dua baris di bawah kepada pelanggan sekarang.{' '}
+                Sampaikan dua baris di bawah kepada admin tenant sekarang.{' '}
                 <strong className="font-semibold">
                     Kata sandinya tidak akan muncul lagi
                 </strong>{' '}
@@ -115,8 +115,8 @@ export default function CredentialsCard({
             )}
 
             <p className="mt-3 text-xs text-muted-foreground">
-                Tenant {credentials.tenant}. Minta pelanggan menggantinya pada
-                masuk pertama.
+                Tenant {credentials.tenant}. Minta admin tenant menggantinya
+                pada masuk pertama.
             </p>
         </section>
     );

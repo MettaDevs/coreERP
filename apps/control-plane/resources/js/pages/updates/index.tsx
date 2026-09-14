@@ -184,7 +184,7 @@ export default function Index({
                     <TableHeader>
                         <TableRow>
                             <TableHead>Lingkungan</TableHead>
-                            <TableHead>Pelanggan</TableHead>
+                            <TableHead>Tenant</TableHead>
                             <TableHead>Jenis</TableHead>
                             <TableHead>Keadaan</TableHead>
                             <TableHead>Sidik skema</TableHead>
