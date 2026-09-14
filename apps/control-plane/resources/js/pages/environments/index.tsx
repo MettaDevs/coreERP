@@ -47,7 +47,7 @@ export default function Index({
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nama</TableHead>
-                            <TableHead>Pelanggan</TableHead>
+                            <TableHead>Tenant</TableHead>
                             <TableHead>Jenis</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Alamat</TableHead>

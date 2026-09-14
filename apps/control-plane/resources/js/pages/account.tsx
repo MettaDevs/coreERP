@@ -1,6 +1,5 @@
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
-import { Label } from '@apperp/ui/label';
 import { Head, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import Shell from '@/components/shell';
@@ -81,11 +80,10 @@ export default function Account({ sso, ssoError }: Props) {
                         </p>
 
                         <div className="space-y-2">
-                            <Label htmlFor="password">
-                                Kata sandi konsol Anda
-                            </Label>
                             <Input
                                 id="password"
+                                label="Kata sandi konsol Anda"
+                                required
                                 type="password"
                                 autoComplete="current-password"
                                 value={data.password}

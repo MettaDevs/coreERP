@@ -94,7 +94,7 @@ class CreateCustomerTest extends TestCase
             'email' => 'siti@sumbersehat.test', 'temporary_password' => 'rahasia',
         ], 201)]);
 
-        $this->actingAs($this->operator())->post('/pelanggan', [
+        $this->actingAs($this->operator())->post('/tenant', [
             ...$this->input(),
             'first_environment' => 'demo',
             'first_environment_expires_at' => now()->addDays(30)->toDateString(),
@@ -115,7 +115,7 @@ class CreateCustomerTest extends TestCase
     {
         Http::preventStrayRequests();
 
-        $this->actingAs($this->operator())->post('/pelanggan', [
+        $this->actingAs($this->operator())->post('/tenant', [
             ...$this->input(),
             'first_environment' => 'demo',
         ])->assertSessionHasErrors('first_environment_expires_at');
@@ -129,7 +129,7 @@ class CreateCustomerTest extends TestCase
             'email' => 'siti@sumbersehat.test', 'temporary_password' => 'rahasia',
         ], 201)]);
 
-        $this->actingAs($this->operator())->post('/pelanggan', [
+        $this->actingAs($this->operator())->post('/tenant', [
             ...$this->input(),
             'first_environment' => 'none',
         ])->assertRedirect();
@@ -200,7 +200,7 @@ class CreateCustomerTest extends TestCase
 
         $this->actingAs($this->operator());
 
-        $this->post('/pelanggan', $this->input())->assertRedirect('/pelanggan');
+        $this->post('/tenant', $this->input())->assertRedirect('/tenant');
 
         Http::assertSent(fn (OutboundRequest $request): bool => $request->url() === self::ENDPOINT
             && $request->hasHeader('Authorization', 'Bearer kunci-uji')
@@ -209,7 +209,7 @@ class CreateCustomerTest extends TestCase
             && $request['admin_email'] === 'siti@sumbersehat.test'
             && $request['app_ids'] === ['hr']);
 
-        $this->get('/pelanggan')
+        $this->get('/tenant')
             ->assertOk()
             ->assertSee('Gerbang-Sore-4417')
             ->assertSee('siti@sumbersehat.test');
@@ -224,13 +224,13 @@ class CreateCustomerTest extends TestCase
         ], 201)]);
 
         $this->actingAs($this->operator());
-        $this->post('/pelanggan', $this->input())->assertRedirect('/pelanggan');
+        $this->post('/tenant', $this->input())->assertRedirect('/tenant');
 
-        $this->get('/pelanggan')->assertSee('Gerbang-Sore-4417');
+        $this->get('/tenant')->assertSee('Gerbang-Sore-4417');
 
         // Sekali, dan benar-benar sekali. Kata sandi yang masih terbaca besok adalah kata sandi
         // yang tersimpan di suatu tempat — dan tempat itu akan ditemukan orang lain.
-        $this->get('/pelanggan')->assertOk()->assertDontSee('Gerbang-Sore-4417');
+        $this->get('/tenant')->assertOk()->assertDontSee('Gerbang-Sore-4417');
     }
 
     public function test_a_core_rejection_becomes_an_error_on_the_field_it_points_to(): void
@@ -241,7 +241,7 @@ class CreateCustomerTest extends TestCase
         ], 422)]);
 
         $this->actingAs($this->operator())
-            ->post('/pelanggan', $this->input())
+            ->post('/tenant', $this->input())
             // Galat formulir, bukan halaman 500. Keduanya berarti "ditolak", tetapi hanya yang
             // pertama yang menyebutkan apa yang harus diperbaiki — dan di isian mana.
             ->assertSessionHasErrors(['admin_email' => 'Email ini sudah terdaftar.']);
@@ -255,7 +255,7 @@ class CreateCustomerTest extends TestCase
         ], 422)]);
 
         $this->actingAs($this->operator())
-            ->post('/pelanggan', $this->input())
+            ->post('/tenant', $this->input())
             ->assertSessionHasErrors(['app_ids' => 'App "hr" tidak tersedia di edisi ini.']);
 
         // Konsol tetap mengirimkannya. Menyaring lebih dulu di sini berarti dua daftar app yang
@@ -268,7 +268,7 @@ class CreateCustomerTest extends TestCase
         Http::fake(['*' => Http::response(['message' => 'Unauthenticated.'], 401)]);
 
         $this->actingAs($this->operator())
-            ->post('/pelanggan', $this->input())
+            ->post('/tenant', $this->input())
             ->assertSessionHasErrors('core');
 
         // "Unauthenticated." adalah jawaban bawaan Laravel, dan ia tidak memberi tahu siapa pun
@@ -285,7 +285,7 @@ class CreateCustomerTest extends TestCase
         ));
 
         $this->actingAs($this->operator())
-            ->post('/pelanggan', $this->input())
+            ->post('/tenant', $this->input())
             ->assertSessionHasErrors('core');
 
         $message = $this->error('core');
@@ -304,12 +304,12 @@ class CreateCustomerTest extends TestCase
         Http::fake(['*' => Http::response(['tenant_id' => '01JTENANTUJI0000000000000'], 201)]);
 
         $this->actingAs($this->operator())
-            ->post('/pelanggan', $this->input())
+            ->post('/tenant', $this->input())
             ->assertSessionHasErrors('core');
 
         $message = $this->error('core');
         $this->assertStringContainsString(self::ENDPOINT, $message);
-        $this->assertStringContainsString('periksa daftar pelanggan', $message);
+        $this->assertStringContainsString('periksa daftar tenant', $message);
     }
 
     public function test_empty_input_is_rejected_before_core_is_called(): void
@@ -317,7 +317,7 @@ class CreateCustomerTest extends TestCase
         Http::fake();
 
         $this->actingAs($this->operator())
-            ->post('/pelanggan', [
+            ->post('/tenant', [
                 'legal_name' => '',
                 'admin_name' => '',
                 'admin_email' => 'bukan-email',
@@ -333,10 +333,10 @@ class CreateCustomerTest extends TestCase
         Http::fake();
 
         // 404, bukan 403. Pengguna biasa tidak perlu tahu alamat ini ada.
-        $this->actingAs($this->ordinaryUser())->get('/pelanggan')->assertNotFound();
+        $this->actingAs($this->ordinaryUser())->get('/tenant')->assertNotFound();
 
         $this->actingAs($this->ordinaryUser())
-            ->post('/pelanggan', $this->input())
+            ->post('/tenant', $this->input())
             ->assertNotFound();
 
         // Penjaga yang menolak halamannya tetapi membiarkan panggilannya keluar adalah penjaga
@@ -346,7 +346,15 @@ class CreateCustomerTest extends TestCase
 
     public function test_a_guest_is_redirected_to_the_login_page(): void
     {
+        $this->get('/tenant')->assertRedirect('/login');
+    }
+
+    /** Layar ini dulu bernama Pelanggan. Penanda buku dan tautan lama tetap sampai. */
+    public function test_the_old_address_still_leads_to_the_tenant_screen(): void
+    {
+        // Di dalam kelompok `auth` + `operator` yang sama: alamat lama tidak membuka pintu baru.
         $this->get('/pelanggan')->assertRedirect('/login');
+        $this->actingAs($this->operator())->get('/pelanggan')->assertRedirect('/tenant');
     }
 
     public function test_the_index_counts_environments_that_are_still_alive(): void
@@ -377,7 +385,7 @@ class CreateCustomerTest extends TestCase
                 'purge_after' => now()->addDays(30),
             ]);
 
-        $this->actingAs($operator)->get('/pelanggan')
+        $this->actingAs($operator)->get('/tenant')
             ->assertOk()
             ->assertSee('PT Punya Dua')
             // Angkanya harus sama dengan yang terbaca di layar Lingkungan, yang juga menyaring
@@ -411,7 +419,7 @@ class CreateCustomerTest extends TestCase
 
         // Menawarkan app yang belum tersedia berarti membiarkan operator menjanjikannya kepada
         // pelanggan di telepon, lalu Core menolaknya beberapa detik kemudian.
-        $this->actingAs($this->operator())->get('/pelanggan')
+        $this->actingAs($this->operator())->get('/tenant')
             ->assertOk()
             ->assertSee('Kepegawaian')
             ->assertDontSee('Rencana Produksi');

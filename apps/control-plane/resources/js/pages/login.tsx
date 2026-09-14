@@ -1,6 +1,5 @@
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
-import { Label } from '@apperp/ui/label';
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
@@ -86,9 +85,10 @@ export default function Login({
                         )}
 
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
                             <Input
                                 id="email"
+                                label="Email"
+                                required
                                 type="email"
                                 autoComplete="username"
                                 value={data.email}
@@ -104,9 +104,10 @@ export default function Login({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="password">Kata sandi</Label>
                             <Input
                                 id="password"
+                                label="Kata sandi"
+                                required
                                 type="password"
                                 autoComplete="current-password"
                                 value={data.password}

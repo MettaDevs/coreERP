@@ -179,8 +179,8 @@ final class CreateCustomer
              */
             throw new CoreUnreachable(
                 'Core menjawab '.$response->status().' dari '.$endpoint.', tetapi jawabannya tidak '
-                .'memuat kata sandi sementara. Pelanggannya mungkin sudah terlanjur dibuat: '
-                .'periksa daftar pelanggan sebelum mencoba lagi, dan pastikan COREERP_URL benar-'
+                .'memuat kata sandi sementara. Tenant-nya mungkin sudah terlanjur dibuat: '
+                .'periksa daftar tenant sebelum mencoba lagi, dan pastikan COREERP_URL benar-'
                 .'benar menunjuk runtime Core.',
             );
         }

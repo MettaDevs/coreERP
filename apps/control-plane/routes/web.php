@@ -44,8 +44,11 @@ Route::post('/sso/backchannel-logout', SsoBackchannelLogout::class)->middleware(
  * menampilkan data yang sama dijaga gate.
  */
 Route::middleware(['auth', 'operator'])->group(function (): void {
-    Route::get('/pelanggan', CustomerIndex::class)->name('customers.index');
-    Route::post('/pelanggan', CustomerStore::class)->name('customers.store');
+    Route::get('/tenant', CustomerIndex::class)->name('customers.index');
+    Route::post('/tenant', CustomerStore::class)->name('customers.store');
+    // Alamat lama, sebelum layar ini berganti nama menjadi Tenant pada 14 September 2026. Penanda
+    // buku dan tautan yang sudah dibagikan tetap sampai.
+    Route::redirect('/pelanggan', '/tenant');
 
     Route::get('/lingkungan', EnvironmentIndex::class)->name('environments.index');
     Route::post('/lingkungan', EnvironmentStore::class)->name('environments.store');

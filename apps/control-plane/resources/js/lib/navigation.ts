@@ -1,13 +1,13 @@
 export type NavItem = { href: string; title: string };
 
 /**
- * Tiga butir, urutannya mengikuti alur kerja dan bukan abjad: pelanggan lahir lebih dulu,
+ * Tiga butir, urutannya mengikuti alur kerja dan bukan abjad: tenant lahir lebih dulu,
  * lingkungannya menyusul, dan Pembaruan dibaca sesudah keduanya ada. Layar Lingkungan tidak dapat
  * berbuat apa-apa untuk perusahaan yang belum menjadi pelanggan, dan layar Pembaruan tidak punya
  * apa pun untuk dibandingkan sebelum ada lingkungan.
  */
 export const navigation: NavItem[] = [
-    { href: '/pelanggan', title: 'Pelanggan' },
+    { href: '/tenant', title: 'Tenant' },
     { href: '/lingkungan', title: 'Lingkungan' },
     { href: '/pembaruan', title: 'Pembaruan' },
 ];
