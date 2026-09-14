@@ -37,13 +37,16 @@ use Illuminate\Support\Str;
  *
  * Karena itu yang ditambahkan untuk pintu kedua cuma satu kunci opsional pada `$data`. Tanpa kunci
  * itu, jalur pendaftaran mandiri menjalankan query yang sama persis seperti sebelumnya.
+ *
+ * Pintu ketiga, `tenant:bootstrap-site`, mengikuti aturan yang sama: ia hanya menambahkan
+ * `tenant_id`, supaya tenant di server on-prem lahir dengan id yang sudah dicatat admin.erp.
  */
 class RegisterBusiness
 {
     public function __construct(private AppDependencyGraph $dependencyGraph) {}
 
     /**
-     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>,must_change_password?:bool,first_environment?:'production'|'demo'|'none',first_environment_expires_at?:?string}  $data
+     * @param  array{name:string,email:string,password:string,business_name:string,app_ids:list<string>,must_change_password?:bool,first_environment?:'production'|'demo'|'none',first_environment_expires_at?:?string,tenant_id?:string}  $data
      */
     public function handle(array $data): User
     {
@@ -70,12 +73,27 @@ class RegisterBusiness
                 'slug' => $slug,
                 'status' => 'active',
             ]);
-            $tenant = Tenant::create([
+            $tenant = new Tenant([
                 'client_id' => $client->id,
                 'name' => $data['business_name'],
                 'slug' => $slug,
                 'status' => 'active',
             ]);
+            /*
+             * Id yang **diberikan**, bukan dibuat — hanya untuk server on-prem.
+             *
+             * Catatan komersial tenant tinggal di admin.erp, datanya di server pelanggan, dan keduanya
+             * harus menyebut id yang sama supaya laporan, tiket dukungan, dan SSO menunjuk tenant yang
+             * sama tanpa tabel penerjemah. Lihat `tenant:bootstrap-site`.
+             *
+             * Ditulis langsung ke atributnya, bukan lewat `Fillable`: tidak ada permintaan yang boleh
+             * memilih id tenantnya sendiri. `HasUlids` hanya membuat id ketika kolomnya kosong, jadi
+             * tanpa kunci ini jalurnya persis seperti kemarin.
+             */
+            if (isset($data['tenant_id'])) {
+                $tenant->id = $data['tenant_id'];
+            }
+            $tenant->save();
             app(ProvisionDefaultUnitsOfMeasure::class)->forTenant($tenant->id);
             // Tenant provisioning adalah fakta lintas app. Payload starter sengaja
             // kosong: setiap app memilih template versinya sendiri dari konfigurasi,

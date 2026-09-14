@@ -5,10 +5,20 @@
 #   ./update.sh                     # memakai bundle di folder yang sama dengan skrip ini
 #   ./update.sh /media/usb/coreerp-apotek-sejahtera-0.2.0
 #
+# Dua bentuk folder diterima, dan keduanya melewati pemeriksaan yang sama:
+#
+# - **Bundle** dari `build-bundle.sh`, yang membawa `images.tar.gz`. Untuk server tanpa internet;
+#   image dimuat dari arsip itu.
+# - **Berkas rilis online**, yang diambil agen situs dari admin.erp: bentuk yang sama dikurangi
+#   `images.tar.gz`. Image ditarik dari registry. Manifest menyebut image edisi lewat digest registry
+#   (`ghcr.io/…@sha256:…`), dan id image yang ditarik tetap diperiksa terhadap `digest` di manifest —
+#   pemeriksaan yang sama dengan jalur bundle. Rantainya tidak putus: tanda tangan menjamin
+#   `SHA256SUMS`, `SHA256SUMS` menjamin `manifest.json`, manifest menyebut isi image.
+#
 # Urutannya tetap, dan tidak boleh diacak:
 #
 #   periksa tanda tangan → periksa checksum → periksa lokasi cadangan → cadangkan database →
-#   muat image → ganti container → migrasi → periksa kesehatan → mundur bila gagal
+#   muat atau tarik image → ganti container → migrasi → periksa kesehatan → mundur bila gagal
 #
 # Tiga hal yang membedakannya dari skrip pemasangan biasa, dan ketiganya sengaja:
 #
@@ -60,7 +70,7 @@ langkah() {
     printf '\n==> %s\n' "$*"
 }
 
-for perintah in docker openssl sha256sum gzip; do
+for perintah in docker openssl sha256sum; do
     command -v "$perintah" >/dev/null 2>&1 \
         || gagal "Perintah \`$perintah\` tidak ada di PATH." "Ia dibutuhkan untuk memasang bundle."
 done
@@ -68,11 +78,21 @@ done
 docker compose version >/dev/null 2>&1 || gagal 'Docker Compose v2 dibutuhkan.'
 docker info >/dev/null 2>&1 || gagal 'Docker tidak berjalan, atau pengguna ini tidak dapat mengaksesnya.'
 
-for berkas in manifest.json images.tar.gz compose.yaml SHA256SUMS; do
+# `images.tar.gz` tidak ada di daftar ini: ketiadaannya berarti berkas rilis online, bukan bundle yang
+# rusak. Lihat bagian atas berkas ini.
+for berkas in manifest.json compose.yaml SHA256SUMS; do
     [ -f "$bundle/$berkas" ] || gagal \
         "Bundle tidak lengkap: $bundle/$berkas tidak ada." \
         "Folder yang diperiksa: $bundle"
 done
+
+membawa_image=0
+[ ! -f "$bundle/images.tar.gz" ] || membawa_image=1
+
+if [ "$membawa_image" -eq 1 ]; then
+    command -v gzip >/dev/null 2>&1 \
+        || gagal "Perintah \`gzip\` tidak ada di PATH." 'Ia dibutuhkan untuk memuat images.tar.gz.'
+fi
 
 [ -f "$BERKAS_ENV" ] || gagal \
     "Berkas setelan tidak ditemukan: $BERKAS_ENV" \
@@ -121,6 +141,25 @@ printf '    tanda tangan sah\n'
 
 langkah 'Memeriksa checksum'
 
+# `sha256sum --check` hanya memeriksa berkas yang **tercantum**. Sejak `images.tar.gz` boleh tidak ada,
+# SHA256SUMS yang sah milik berkas rilis online — yang memang tidak mencantumkan arsip image — dapat
+# dipasangkan dengan `images.tar.gz` selundupan, dan arsip itu akan lolos tanpa diperiksa sama sekali.
+# Image edisi masih tertangkap pemeriksaan digest di bawah; image pendamping tidak. Karena itu setiap
+# berkas yang ada di folder wajib tercantum.
+tercantum() {
+    awk -v nama="$1" '{ n = $2; sub(/^\*/, "", n); if (n == nama) ada = 1 } END { exit !ada }' "$bundle/SHA256SUMS"
+}
+
+for berkas in manifest.json compose.yaml images.tar.gz update.sh; do
+    if [ -f "$bundle/$berkas" ] && ! tercantum "$berkas"; then
+        gagal \
+            "Berkas $berkas tidak tercantum di SHA256SUMS." \
+            '' \
+            'Tanda tangan hanya menjamin berkas yang tercantum di daftar checksum. Berkas yang tidak' \
+            'tercantum bukan bagian dari rilis yang kami terbitkan. Jangan memasang folder ini.'
+    fi
+done
+
 if ! (cd "$bundle" && sha256sum --quiet --check SHA256SUMS); then
     gagal \
         'Checksum bundle TIDAK cocok.' \
@@ -166,6 +205,15 @@ if [ -n "$titik_data_db" ] && [ -d "$titik_data_db" ]; then
     fi
 
     printf '    cadangan berada di filesystem yang berbeda\n'
+elif [ -z "$titik_data_db" ] && [ ! -s "$BERKAS_VERSI_SEHAT" ]; then
+    # Pemasangan pertama di server bersih: volume database belum pernah dibuat, jadi letaknya memang
+    # belum ada untuk dibandingkan — dan belum ada data yang dapat hilang. Ditemukan saat skrip ini
+    # pertama kali dijalankan agen di mesin kosong: pemeriksaan yang menolak di sini membuat
+    # pemasangan pertama mustahil tanpa menyetel jalur secara manual.
+    #
+    # Pemeriksaannya ditunda, bukan dihapus. Pembaruan berikutnya — yang pertama kali benar-benar
+    # mencadangkan — menemukan volumenya dan memeriksa seperti biasa.
+    printf '    ditunda: pemasangan pertama, belum ada data database untuk dibandingkan\n'
 elif [ "${COREERP_LEWATI_PERIKSA_CADANGAN:-0}" = '1' ]; then
     printf '    DILEWATI atas permintaan (COREERP_LEWATI_PERIKSA_CADANGAN=1)\n' >&2
 else
@@ -236,15 +284,49 @@ else
     langkah 'Melewati pencadangan: belum ada versi terpasang'
 fi
 
-# --- 5. Muat image -------------------------------------------------------------------------------
+# --- 5. Muat atau tarik image --------------------------------------------------------------------
 
-langkah 'Memuat image dari bundle'
+if [ "$membawa_image" -eq 1 ]; then
+    langkah 'Memuat image dari bundle'
 
-gzip -dc "$bundle/images.tar.gz" | docker load >/dev/null
+    gzip -dc "$bundle/images.tar.gz" | docker load >/dev/null
+else
+    langkah 'Menarik image dari registry'
+
+    # Daftar pendamping dibaca dari manifest yang sudah lolos tanda tangan dan checksum. Manifest dibaca
+    # utuh sebagai satu baris dulu, karena alur rilis boleh menulis larik ini melintasi beberapa baris.
+    pendamping="$(tr -d '\n\r' < "$bundle/manifest.json" \
+        | sed -n 's/.*"image_pendamping"[[:space:]]*:[[:space:]]*\[\([^]]*\)\].*/\1/p' \
+        | tr ',' '\n' | sed 's/^[[:space:]]*"//; s/"[[:space:]]*$//' | sed '/^$/d')"
+
+    # Image edisi yang disebut lewat digest tidak dapat berubah isi, jadi yang sudah ada tidak ditarik
+    # ulang — server yang internetnya putus-sambung tetap dapat mengulang pembaruan yang terhenti.
+    # Yang disebut lewat tag selalu ditarik: tag dapat dipindahkan.
+    if [[ "$image" == *@sha256:* ]] && docker image inspect "$image" >/dev/null 2>&1; then
+        printf '    sudah ada: %s\n' "$image"
+    else
+        printf '    menarik:   %s\n' "$image"
+        docker pull --quiet "$image" >/dev/null || gagal "Image $image gagal ditarik dari registry."
+    fi
+
+    # Image pendamping hanya ditarik bila belum ada. Menariknya ulang setiap pembaruan berarti
+    # PostgreSQL dapat berganti isi di bawah tag yang sama tanpa rilis kita berubah; menyematkannya
+    # lewat digest dicatat sebagai pekerjaan lanjutan di rancangan on-prem dikelola.
+    while IFS= read -r satu; do
+        [ -n "$satu" ] || continue
+
+        if docker image inspect "$satu" >/dev/null 2>&1; then
+            printf '    sudah ada: %s\n' "$satu"
+        else
+            printf '    menarik:   %s\n' "$satu"
+            docker pull --quiet "$satu" >/dev/null || gagal "Image pendamping $satu gagal ditarik dari registry."
+        fi
+    done <<< "$pendamping"
+fi
 
 digest_terpasang="$(docker image inspect "$image" --format '{{.Id}}' 2>/dev/null || true)"
 
-[ -n "$digest_terpasang" ] || gagal "Image $image tidak ada sesudah dimuat dari bundle."
+[ -n "$digest_terpasang" ] || gagal "Image $image tidak ada sesudah dimuat atau ditarik."
 
 if [ -n "$digest" ] && [ "$digest" != "$digest_terpasang" ]; then
     gagal \

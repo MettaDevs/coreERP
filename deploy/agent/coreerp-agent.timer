@@ -1,0 +1,18 @@
+# Menyalakan satu putaran agen tiap menit. Seberapa sering agen benar-benar menghubungi admin.erp
+# ditentukan `interval_seconds` dari admin.erp; putaran yang datang lebih cepat keluar tanpa bekerja.
+#
+# Jeda acak kecil menyebar kunjungan banyak situs yang menyala pada detik yang sama sesudah listrik
+# padam serentak, supaya admin.erp tidak menerima semuanya sekaligus.
+
+[Unit]
+Description=Jadwal agen situs CoreERP
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=60s
+RandomizedDelaySec=15s
+AccuracySec=5s
+Unit=coreerp-agent.service
+
+[Install]
+WantedBy=timers.target

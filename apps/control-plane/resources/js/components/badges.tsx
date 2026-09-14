@@ -4,6 +4,7 @@ import {
     kindLabels,
     labelFor,
     moduleStatusLabels,
+    siteStateLabels,
     statusLabels,
 } from '@/lib/display';
 
@@ -89,6 +90,28 @@ export function FleetStateBadge({ state }: { state: string }) {
     return (
         <Badge variant="outline" className={classes}>
             {labelFor(fleetStateLabels, state)}
+        </Badge>
+    );
+}
+
+/**
+ * Keadaan situs. `stale` merah: situs yang tidak melapor adalah server klien yang tidak dapat kita
+ * lihat, dan itu keadaan yang harus ditanyakan hari itu juga — berbeda dari lingkungan yang
+ * tertinggal migrasi.
+ */
+export function SiteStateBadge({ state }: { state: string }) {
+    const classes =
+        state === 'enrolled'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            : state === 'stale'
+              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+              : state === 'not_enrolled'
+                ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
+                : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+
+    return (
+        <Badge variant="outline" className={classes}>
+            {labelFor(siteStateLabels, state)}
         </Badge>
     );
 }

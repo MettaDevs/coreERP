@@ -98,6 +98,22 @@ x-edition-environment: &edition-environment
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
   OTEL_PROPAGATORS: ${OTEL_PROPAGATORS:-baggage,tracecontext}
   OTEL_PHP_LOG_DESTINATION: ${OTEL_PHP_LOG_DESTINATION:-none}
+  # Lisensi bertanda tangan yang dipasang agen situs, beserta kunci publik pemeriksanya. Keduanya
+  # datang lewat bind mount `x-license-mount` di bawah, bukan dari image: lisensi berganti tanpa rilis.
+  #
+  # Core membacanya **hanya untuk menampilkan peringatan** ketika masa sewa mendekat atau lewat, dan
+  # tidak pernah untuk mengunci. Klien kita fasilitas kesehatan; aplikasi yang berhenti karena tagihan
+  # berarti pelayanan pasien yang berhenti. Pemasangan tanpa agen — on-prem beli putus — tidak punya
+  # berkas ini sama sekali, dan Core harus tetap berjalan tanpa peringatan apa pun.
+  COREERP_LICENSE_PATH: /run/coreerp-license/license.json
+  COREERP_LICENSE_PUBLIC_KEY_PATH: /run/coreerp-license/license-public.pem
+
+# Hanya-baca: yang menulis lisensi hanya agen di host, setelah tanda tangannya diperiksa. Container
+# yang dapat menulis ke sini dapat memadamkan peringatannya sendiri.
+#
+# Bila foldernya tidak ada, Docker membuatnya kosong; itu keadaan yang benar untuk pemasangan tanpa
+# agen.
+x-license-mount: &license-mount ${COREERP_LICENSE_DIR:-/opt/coreerp/agent/license}:/run/coreerp-license:ro
 
 services:
   core-db:
@@ -177,6 +193,7 @@ services:
       # tepat pada saat seseorang datang untuk membacanya. Nama berkas dibedakan per peran
       # (lihat `config/logging.php`), jadi ketiga container aman berbagi satu volume.
       - core-logs:/repo/apps/core/storage/logs
+      - *license-mount
     ports:
       - '${CORE_APP_PORT:-8000}:80'
     healthcheck:
@@ -205,6 +222,7 @@ services:
     volumes:
       - core-storage:/repo/apps/core/storage/app
       - core-logs:/repo/apps/core/storage/logs
+      - *license-mount
 
   # Tepat satu replika. Tanpa penjadwal, `number-sequences:recover` tidak pernah berjalan dan
   # reservasi nomor berkelanjutan yang kedaluwarsa tidak pernah dilepas.
@@ -225,6 +243,7 @@ services:
       OTEL_SERVICE_NAME: coreerp-scheduler
     volumes:
       - core-logs:/repo/apps/core/storage/logs
+      - *license-mount
 
   # Stateless, tidak mengenal tenant, dan **tidak punya jalan keluar** — lihat network `renderer`
   # di bawah. Ia hanya mengubah dokumen yang sudah diisi menjadi PDF.

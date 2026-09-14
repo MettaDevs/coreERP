@@ -322,3 +322,20 @@ jobs:
       # memotongnya.
       - name: Tests
         run: php artisan test
+
+  # Agen situs on-prem (`deploy/agent/`). Ia bash, jadi tidak ada suite PHP yang menyentuhnya; tanpa
+  # job ini perubahan pada agen, `update.sh`, atau `pasang.sh` sampai ke main tanpa satu pun test
+  # dijalankan. Container Ubuntu bersih, sama dengan cara menjalankannya di mesin pengembang — dan
+  # server tiruannya memeriksa tanda tangan serta skema dari `openapi-agent.yaml` yang sama.
+  agen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Tests
+        run: docker run --rm -v "$PWD":/repo -w /repo ubuntu:24.04 bash deploy/agent/tests/run-tests.sh

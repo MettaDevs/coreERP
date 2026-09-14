@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+#
+# `docker` tiruan untuk menguji agen dan update.sh tanpa Docker sungguhan di dalam container uji.
+#
+# Ia tidak menirukan Docker; ia hanya menjawab perintah yang dipanggil kedua skrip itu, dan mencatat
+# setiap pemanggilan supaya pengujian dapat memeriksa apa yang diminta:
+#
+#   FAKE_DOCKER_LOG          satu baris per pemanggilan, argumen digabung spasi
+#   FAKE_DOCKER_LOG_LENGKAP  sama, tetapi tidak pernah dikosongkan pengujian
+#   FAKE_DOCKER_JSON_LOG     satu objek JSON per pemanggilan: {"args": [...], "edition_image": "..."}
+#
+# Setelan perilaku:
+#
+#   FAKE_DOCKER_ROOT          jawaban `docker info --format {{.DockerRootDir}}`
+#   FAKE_DOCKER_IMAGE_ADA     image yang dianggap sudah ada sebelum ditarik, dipisah spasi
+#   FAKE_DOCKER_IMAGE_ID      id image yang dijawab `docker image inspect`
+#   FAKE_DOCKER_PGDUMP_GAGAL  1 membuat pg_dump gagal
+#   FAKE_KATA_SANDI           kata sandi sementara yang dicetak tenant:bootstrap-site tiruan
+
+set -euo pipefail
+
+log="${FAKE_DOCKER_LOG:-/dev/null}"
+printf '%s\n' "$*" >> "$log"
+
+# Salinan yang tidak pernah dikosongkan pengujian, untuk memeriksa sesuatu yang tidak pernah dipanggil
+# sepanjang seluruh putaran uji.
+[ -z "${FAKE_DOCKER_LOG_LENGKAP:-}" ] || printf '%s\n' "$*" >> "$FAKE_DOCKER_LOG_LENGKAP"
+
+# JSON disusun di bash, bukan dengan `jq --args`: jq tetap membaca argumen berawalan minus sesudah
+# --args sebagai opsinya sendiri, dan `docker pull --quiet` lalu gagal karena jq, bukan karena Docker.
+teks_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\t'/\\t}"
+    printf '"%s"' "$s"
+}
+
+if [ -n "${FAKE_DOCKER_JSON_LOG:-}" ]; then
+    {
+        printf '{"args":['
+        pemisah=''
+        for satu in "$@"; do
+            printf '%s%s' "$pemisah" "$(teks_json "$satu")"
+            pemisah=','
+        done
+        printf '],"edition_image":%s}\n' "$(teks_json "${EDITION_IMAGE:-}")"
+    } >> "$FAKE_DOCKER_JSON_LOG"
+fi
+
+ada_image() {
+    local ref="$1" satu
+
+    for satu in ${FAKE_DOCKER_IMAGE_ADA:-}; do
+        [ "$satu" != "$ref" ] || return 0
+    done
+
+    grep -qxF -e "pull $ref" -e "pull --quiet $ref" "$log" 2>/dev/null && return 0
+    grep -qx 'load' "$log" 2>/dev/null && return 0
+    return 1
+}
+
+case "${1:-}" in
+    info)
+        [ "${2:-}" != --format ] || printf '%s\n' "${FAKE_DOCKER_ROOT:-/}"
+        ;;
+    volume)
+        exit 1
+        ;;
+    load)
+        cat > /dev/null
+        ;;
+    pull)
+        :
+        ;;
+    image)
+        [ "${2:-}" = inspect ] || exit 1
+        if ! ada_image "${3:-}"; then
+            printf 'Error: No such image: %s\n' "${3:-}" >&2
+            exit 1
+        fi
+        printf '%s\n' "${FAKE_DOCKER_IMAGE_ID:-sha256:tiruan}"
+        ;;
+    inspect)
+        printf 'healthy\n'
+        ;;
+    compose)
+        shift
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --project-name | -p | --env-file | -f) shift 2 ;;
+                *) break ;;
+            esac
+        done
+
+        case "${1:-}" in
+            version)
+                printf 'Docker Compose version v2.0.0-tiruan\n'
+                ;;
+            ps)
+                if [ "${2:-}" = -q ]; then
+                    printf 'c0ffee\n'
+                    exit 0
+                fi
+                # Kunci Labels sengaja ikut di sini: agen tidak boleh meneruskannya ke laporan.
+                printf '%s\n' \
+                    '{"Service":"core-app","State":"running","Health":"healthy","Labels":"rahasia=jangan-dikirim"}' \
+                    '{"Service":"core-db","State":"running","Health":""}'
+                ;;
+            exec)
+                shift
+                [ "${1:-}" != -T ] || shift
+                case "$*" in
+                    'core-db pg_dump'*)
+                        if [ "${FAKE_DOCKER_PGDUMP_GAGAL:-0}" = 1 ]; then
+                            printf 'pg_dump: koneksi ditolak (tiruan)\n' >&2
+                            exit 1
+                        fi
+                        printf 'PGDMP-tiruan'
+                        ;;
+                    'core-app php artisan tenant:bootstrap-site'*)
+                        printf 'Tenant dilahirkan.\nKata sandi sementara: %s\n' "${FAKE_KATA_SANDI:-RahasiaSementara-123}"
+                        ;;
+                esac
+                ;;
+        esac
+        ;;
+esac

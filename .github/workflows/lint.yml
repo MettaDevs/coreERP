@@ -182,3 +182,10 @@ jobs:
 
       - name: Run Type Analysis
         run: composer types:check
+
+      # Agen di server klien dan alur rilis dibangun dari kontraknya, bukan dari kode PHP ini. Tidak
+      # ada test yang gagal ketika satu route API lupa ditulis di kontrak; langkah ini yang menyadarinya.
+      - name: Check agent API contract coverage
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 contracts/check-contract-coverage.py

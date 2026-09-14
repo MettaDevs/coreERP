@@ -354,7 +354,16 @@ services:
       # setel `false` dan sisakan akun darurat di daftar di bawahnya.
       CONSOLE_PASSWORD_LOGIN: ${CONSOLE_PASSWORD_LOGIN:-true}
       CONSOLE_BREAK_GLASS_EMAILS: ${CONSOLE_BREAK_GLASS_EMAILS:-}
+      # Situs on-prem yang dikelola lewat agen. Kunci-kuncinya berkas di host, dipasang hanya-baca;
+      # yang tidak ada berarti fiturnya tertutup, bukan terbuka. Kunci PRIVAT rilis tidak pernah
+      # ada di server ini.
+      CONSOLE_RELEASE_PUBLIC_KEY_PATH: ${CONSOLE_RELEASE_PUBLIC_KEY_PATH:-/run/coreerp-kunci/rilis-publik.pem}
+      CONSOLE_RELEASE_TOKEN: ${CONSOLE_RELEASE_TOKEN:-}
+      CONSOLE_LICENSE_PRIVATE_KEY_PATH: ${CONSOLE_LICENSE_PRIVATE_KEY_PATH:-/run/coreerp-kunci/lisensi-privat.pem}
+      CONSOLE_LICENSE_PUBLIC_KEY_PATH: ${CONSOLE_LICENSE_PUBLIC_KEY_PATH:-/run/coreerp-kunci/lisensi-publik.pem}
+      CONSOLE_AGENT_SOURCE_REF: ${CONSOLE_AGENT_SOURCE_REF:-main}
     volumes:
+      - ${COREERP_KUNCI_DIR:-/etc/coreerp/kunci}:/run/coreerp-kunci:ro
       # Sesi operator hidup di sini. Tanpa volume, setiap penyebaran melempar keluar semua orang
       # yang sedang membuka konsol — termasuk yang sedang di tengah membuat pelanggan.
       - core-console-storage:/repo/apps/control-plane/storage
