@@ -10,7 +10,7 @@ name: coreerp
 # Dua image di bawah ditulis **harfiah**, bukan lewat variabel, dan itu disengaja: `build-bundle.sh`
 # membacanya dari berkas ini untuk menentukan apa saja yang harus ikut disimpan ke dalam bundle.
 # Menggantinya menjadi variabel membuat keduanya lolos dari pembacaan itu, dan bundle-nya akan
-# terlihat lengkap sampai ia dicoba di mesin tanpa internet.
+# terlihat lengkap padahal masih harus menarik keduanya dari registry saat dipasang.
 #
 # `docs` sengaja tidak ada di sini. Ia satu image lagi yang harus ikut menyeberang, dan dokumentasi
 # bukan bagian yang membuat aplikasi berjalan; pelanggan yang memintanya mendapat bundle terpisah.
@@ -48,9 +48,9 @@ x-edition-environment: &edition-environment
   # Trace OpenTelemetry. Variabel ini **harus** ada di sini, bukan di `.env` Laravel: SDK-nya
   # menyalakan diri saat autoload Composer, sebelum Laravel membaca `.env` sama sekali.
   #
-  # Mati secara bawaan, dan itu disengaja. Bundle ini dipasang di mesin pelanggan yang sering
-  # tidak punya jalan keluar ke internet; kalau ekspor menyala sementara alamat kolektornya tak
-  # terjangkau, setiap request membayar waktu tunggu koneksi TCP sebelum proses PHP-nya berakhir.
+  # Mati secara bawaan, dan itu disengaja. Bundle ini dipasang di mesin pelanggan yang umumnya
+  # tidak punya kolektor trace; kalau ekspor menyala sementara alamat kolektornya tak terjangkau,
+  # setiap request membayar waktu tunggu koneksi TCP sebelum proses PHP-nya berakhir.
   # Menyalakannya cukup satu baris di `.env` pemasangan: OTEL_PHP_AUTOLOAD_ENABLED=true.
   OTEL_PHP_AUTOLOAD_ENABLED: ${OTEL_PHP_AUTOLOAD_ENABLED:-false}
   # Bukan variabel yang boleh ditimpa dari luar: nilainya dibedakan per peran di blok layanan

@@ -47,13 +47,6 @@ final class SiteOperations
             throw new SiteRejected('site_not_enrolled', 'Situs ini belum terdaftar; agen belum pernah menyambung.');
         }
 
-        if ($site->connectivity !== 'online') {
-            throw new SiteRejected(
-                'site_offline',
-                'Situs offline tidak menarik operasi. Pembaruannya dikirim sebagai bundle, dan lisensinya sebagai file.',
-            );
-        }
-
         $parameters = match ($operation) {
             'upgrade' => $this->upgradeParameters($site, $input),
             'install_license' => $this->licenseParameters($site, $input),

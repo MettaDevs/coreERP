@@ -170,7 +170,7 @@ return [
         'path' => env('COREERP_LICENSE_PATH'),
         'public_key_path' => env('COREERP_LICENSE_PUBLIC_KEY_PATH'),
         // Berapa hari sebelum tanggal berakhir peringatannya mulai tampil. Tiga puluh hari cukup
-        // untuk satu siklus penagihan dan pengiriman berkas baru, termasuk lewat flashdisk.
+        // untuk satu siklus penagihan dan pemasangan lisensi baru.
         'warn_days' => 30,
     ],
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Menyusun berkas rilis jalur online untuk satu edisi: bundle tanpa arsip image.
+# Menyusun berkas rilis yang ditarik agen situs untuk satu edisi: bundle tanpa arsip image.
 #
 #   scripts/build-release-files.sh <edisi> <image@sha256:digest> <folder keluaran> [--kunci <kunci privat>]
 #

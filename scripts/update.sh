@@ -3,13 +3,13 @@
 # Memasang atau memutakhirkan satu edisi CoreERP dari sebuah bundle, di server pelanggan.
 #
 #   ./update.sh                     # memakai bundle di folder yang sama dengan skrip ini
-#   ./update.sh /media/usb/coreerp-apotek-sejahtera-0.2.0
+#   ./update.sh /opt/coreerp/agent/releases/apotek-sejahtera-0.2.0
 #
 # Dua bentuk folder diterima, dan keduanya melewati pemeriksaan yang sama:
 #
-# - **Bundle** dari `build-bundle.sh`, yang membawa `images.tar.gz`. Untuk server tanpa internet;
-#   image dimuat dari arsip itu.
-# - **Berkas rilis online**, yang diambil agen situs dari admin.erp: bentuk yang sama dikurangi
+# - **Bundle** dari `build-bundle.sh`, yang membawa `images.tar.gz`. Image dimuat dari arsip itu, tanpa
+#   menarik apa pun dari registry.
+# - **Berkas rilis**, yang diambil agen situs dari admin.erp: bentuk yang sama dikurangi
 #   `images.tar.gz`. Image ditarik dari registry. Manifest menyebut image edisi lewat digest registry
 #   (`ghcr.io/…@sha256:…`), dan id image yang ditarik tetap diperiksa terhadap `digest` di manifest —
 #   pemeriksaan yang sama dengan jalur bundle. Rantainya tidak putus: tanda tangan menjamin
@@ -78,7 +78,7 @@ done
 docker compose version >/dev/null 2>&1 || gagal 'Docker Compose v2 dibutuhkan.'
 docker info >/dev/null 2>&1 || gagal 'Docker tidak berjalan, atau pengguna ini tidak dapat mengaksesnya.'
 
-# `images.tar.gz` tidak ada di daftar ini: ketiadaannya berarti berkas rilis online, bukan bundle yang
+# `images.tar.gz` tidak ada di daftar ini: ketiadaannya berarti berkas rilis, bukan bundle yang
 # rusak. Lihat bagian atas berkas ini.
 for berkas in manifest.json compose.yaml SHA256SUMS; do
     [ -f "$bundle/$berkas" ] || gagal \
@@ -142,7 +142,7 @@ printf '    tanda tangan sah\n'
 langkah 'Memeriksa checksum'
 
 # `sha256sum --check` hanya memeriksa berkas yang **tercantum**. Sejak `images.tar.gz` boleh tidak ada,
-# SHA256SUMS yang sah milik berkas rilis online — yang memang tidak mencantumkan arsip image — dapat
+# SHA256SUMS yang sah milik berkas rilis — yang memang tidak mencantumkan arsip image — dapat
 # dipasangkan dengan `images.tar.gz` selundupan, dan arsip itu akan lolos tanpa diperiksa sama sekali.
 # Image edisi masih tertangkap pemeriksaan digest di bawah; image pendamping tidak. Karena itu setiap
 # berkas yang ada di folder wajib tercantum.

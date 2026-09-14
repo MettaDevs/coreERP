@@ -51,7 +51,6 @@ final class SiteScreens extends Controller
             'name' => ['required', 'string', 'max:100'],
             'edition' => ['required', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
             'address' => ['nullable', 'url:https,http', 'max:255'],
-            'connectivity' => ['required', 'in:'.implode(',', Site::CONNECTIVITIES)],
             'update_window_start' => ['nullable', 'date_format:H:i', 'required_with:update_window_end'],
             'update_window_end' => ['nullable', 'date_format:H:i', 'required_with:update_window_start'],
         ], [
@@ -72,7 +71,6 @@ final class SiteScreens extends Controller
                 OperatorAudit::record($request, 'site.created', 'site', $site->id, [
                     'tenant_id' => $site->tenant_id,
                     'edition' => $site->edition,
-                    'connectivity' => $site->connectivity,
                 ]);
 
                 return $site;
@@ -81,7 +79,7 @@ final class SiteScreens extends Controller
             throw ValidationException::withMessages(['name' => 'Tenant ini sudah punya situs dengan nama itu.']);
         }
 
-        return redirect('/situs/'.$site->id)->with('message', 'Situs "'.$site->name.'" tercatat. Buat perintah pasang atau paket pendaftarannya.');
+        return redirect('/situs/'.$site->id)->with('message', 'Situs "'.$site->name.'" tercatat. Buat perintah pasangnya.');
     }
 
     public function show(string $site, SiteOperations $operations): InertiaResponse
@@ -161,7 +159,6 @@ final class SiteScreens extends Controller
             'name' => $site->name,
             'tenant' => $site->tenant->name ?? 'Tanpa tenant',
             'edition' => $site->edition,
-            'connectivity' => $site->connectivity,
             'state' => match (true) {
                 $site->revoked() => 'revoked',
                 ! $site->enrolled() => 'not_enrolled',
@@ -170,7 +167,6 @@ final class SiteScreens extends Controller
             },
             'reportedRelease' => $site->reported_release,
             'lastSeenAt' => $site->last_seen_at?->toDateTimeString(),
-            'lastSeenVia' => $site->last_seen_via,
         ];
     }
 }

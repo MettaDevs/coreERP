@@ -4,11 +4,6 @@
 #
 #   coreerp-agent enroll --admin-url https://admin.erp.contoh --token <token>
 #   coreerp-agent run [--now]
-#   coreerp-agent write-report [folder]
-#   coreerp-agent import-package <folder paket>
-#   coreerp-agent confirm-enrollment
-#   coreerp-agent install-bundle <folder bundle>
-#   coreerp-agent install-license <berkas lisensi>
 #   coreerp-agent bootstrap-tenant --admin-name <nama> --admin-email <email>
 #
 # Agen ini **menarik**, bukan didorong. Server klinik hampir selalu di belakang router tanpa port masuk,
@@ -66,7 +61,6 @@ KUNCI_SITUS_PUBLIK="$FOLDER_AGEN/site-public.pem"
 KUNCI_TERTUNDA="$FOLDER_AGEN/site-key.pem.tertunda"
 FOLDER_LISENSI="$FOLDER_AGEN/license"
 FOLDER_RILIS="$FOLDER_AGEN/releases"
-FOLDER_KOTAK_KELUAR="$FOLDER_AGEN/outbox"
 FOLDER_LOG="$FOLDER_AGEN/log"
 BERKAS_KEADAAN="$FOLDER_AGEN/state.json"
 BERKAS_KUNCI_PUTARAN="$FOLDER_AGEN/run.lock"
@@ -74,10 +68,11 @@ BERKAS_KUNCI_PUTARAN="$FOLDER_AGEN/run.lock"
 # --- Setelan server: lingkungan proses, lalu agent.env, lalu bawaan ------------------------------------
 #
 # agent.env dulu hanya dibaca unit systemd lewat `EnvironmentFile=`. Perintah yang dijalankan tangan lewat
-# /usr/local/bin/coreerp-agent — install-bundle, bootstrap-tenant — tidak pernah melihatnya dan diam-diam
+# /usr/local/bin/coreerp-agent — bootstrap-tenant, run --now — tidak pernah melihatnya dan diam-diam
 # memakai bawaan: bootstrap-tenant masuk ke proyek compose `coreerp` walaupun situs ini berjalan di proyek
-# lain, dan install-bundle menjalankan update.sh dengan folder cadangan bawaan, bukan disk kedua yang
-# disebut agent.env. Agen karena itu membacanya sendiri, supaya timer dan terminal memakai setelan yang sama.
+# lain, dan pembaruan yang dijalankan run dari terminal memberi update.sh folder cadangan bawaan, bukan disk
+# kedua yang disebut agent.env. Agen karena itu membacanya sendiri, supaya timer dan terminal memakai
+# setelan yang sama.
 #
 # Berkasnya TIDAK di-`source`. Ia ditulis tangan di server klien dan dibaca proses root; baris `$(...)` di
 # sana tidak boleh menjadi perintah. Hanya `KUNCI=nilai` yang diterima, dan hanya kunci di daftar di bawah —
@@ -192,13 +187,8 @@ bantuan() {
     cat <<'TEKS'
 Agen situs CoreERP.
 
-  coreerp-agent enroll --admin-url URL --token TOKEN   mendaftarkan situs online
+  coreerp-agent enroll --admin-url URL --token TOKEN   mendaftarkan situs ke admin.erp
   coreerp-agent run [--now]                             satu putaran: lapor, ambil operasi, kerjakan
-  coreerp-agent write-report [FOLDER]                   menulis file laporan bertanda tangan
-  coreerp-agent import-package FOLDER                   mendaftarkan situs offline dari paket pendaftaran
-  coreerp-agent confirm-enrollment                      menghapus token pendaftaran sesudah situs terikat
-  coreerp-agent install-bundle FOLDER                   memasang bundle rilis yang dibawa dengan flashdisk
-  coreerp-agent install-license BERKAS                  memasang lisensi yang dibawa dengan flashdisk
   coreerp-agent bootstrap-tenant --admin-name NAMA --admin-email EMAIL
                                                         melahirkan tenant dan admin pertamanya (sekali,
                                                         dari terminal, sesudah rilis pertama terpasang)
@@ -224,9 +214,9 @@ periksa_perintah() {
 
 # --- Validasi nilai yang ikut masuk ke jalur berkas, URL, dan header ----------------------------------
 #
-# Nilai-nilai ini datang dari admin.erp atau dari paket di flashdisk. Mereka dipakai menyusun jalur
-# berkas dan URL, jadi bentuknya dibatasi sebelum dipakai: id berisi `../` akan menulis di luar folder
-# agen, dan id berisi tanda kutip akan merusak header tanda tangan.
+# Nilai-nilai ini datang dari admin.erp. Mereka dipakai menyusun jalur berkas dan URL, jadi bentuknya
+# dibatasi sebelum dipakai: id berisi `../` akan menulis di luar folder agen, dan id berisi tanda kutip
+# akan merusak header tanda tangan.
 
 cocok() {
     [[ "$1" =~ $2 ]]
@@ -303,7 +293,7 @@ periksa_alamat_admin() {
 # --- Berkas situs dan keadaan ---------------------------------------------------------------------------
 
 siapkan_folder() {
-    mkdir -p "$FOLDER_AGEN" "$FOLDER_RILIS" "$FOLDER_KOTAK_KELUAR" "$FOLDER_LOG"
+    mkdir -p "$FOLDER_AGEN" "$FOLDER_RILIS" "$FOLDER_LOG"
     chmod 0700 "$FOLDER_AGEN"
 
     # Folder lisensi dibaca Core dari dalam container lewat bind mount hanya-baca, oleh pengguna yang
@@ -314,19 +304,17 @@ siapkan_folder() {
 
 SITUS_ID=''
 SITUS_ADMIN=''
-SITUS_KANAL=''
 
 muat_situs() {
     [ -f "$BERKAS_SITUS" ] || gagal \
         "Situs ini belum terdaftar: $BERKAS_SITUS tidak ada." \
-        "Daftarkan dengan \`coreerp-agent enroll\` (online) atau \`coreerp-agent import-package\` (offline)."
+        "Daftarkan dengan \`coreerp-agent enroll\`."
 
     jq -e 'type == "object"' "$BERKAS_SITUS" >/dev/null 2>&1 \
         || gagal "$BERKAS_SITUS bukan JSON yang dapat dibaca."
 
     SITUS_ID="$(jq -r '.site_id // "" | tostring' "$BERKAS_SITUS")"
     SITUS_ADMIN="$(jq -r '.admin_url // "" | tostring' "$BERKAS_SITUS")"
-    SITUS_KANAL="$(jq -r '.channel // "" | tostring' "$BERKAS_SITUS")"
 
     id_sah "$SITUS_ID" || gagal "Id situs di $BERKAS_SITUS tidak sah."
     [ -f "$KUNCI_SITUS" ] || gagal "Kunci situs tidak ditemukan: $KUNCI_SITUS"
@@ -670,9 +658,8 @@ periksa_berkas_rilis() {
     fi
 
     # `sha256sum --check` hanya memeriksa berkas yang tercantum. Berkas yang tidak tercantum lolos tanpa
-    # diperiksa sama sekali — termasuk arsip image yang diselipkan ke samping berkas rilis online.
+    # diperiksa sama sekali.
     wajib=(manifest.json compose.yaml update.sh)
-    [ ! -e "$folder/images.tar.gz" ] || wajib+=(images.tar.gz)
 
     for satu in "${wajib[@]}"; do
         berkas_tercantum "$folder/SHA256SUMS" "$satu" \
@@ -996,9 +983,6 @@ ambil_lisensi() {
 
 # pasang_lisensi BERKAS_JSON FILTER — pulang 1 dengan ALASAN bila ditolak.
 #
-# Satu-satunya jalan lisensi masuk ke server ini: operasi `install_license`, subcommand
-# `install-license`, dan paket pendaftaran offline semuanya lewat sini.
-#
 # Kunci pemeriksanya kunci lisensi yang datang dari admin.erp, bukan kunci rilis. Lisensi hanya
 # menyalakan atau memadamkan peringatan di Core — tidak mengunci dan tidak membuka apa pun — jadi lisensi
 # palsu dari admin.erp yang dibobol hanya menyembunyikan peringatan.
@@ -1202,10 +1186,8 @@ perintah_enroll() {
             tenant_id: $d.tenant_id,
             tenant_name: $d.tenant_name,
             admin_url: $alamat,
-            channel: "online",
             interval_seconds: $d.interval_seconds,
-            update_window: $d.update_window,
-            enrolled: true
+            update_window: $d.update_window
           }' > "$BERKAS_SITUS.baru"
 
     mv -f "$SEMENTARA/site-key.pem" "$KUNCI_SITUS"
@@ -1236,15 +1218,6 @@ perintah_run() {
         catat 'Putaran agen lain masih berjalan; putaran ini dilewati.'
         exit 0
     fi
-
-    case "$SITUS_KANAL" in
-        online) ;;
-        offline)
-            catat "Situs ini berkanal offline: tidak ada yang dikirim. Tulis laporan dengan \`coreerp-agent write-report\`."
-            exit 0
-            ;;
-        *) gagal "Kanal situs tidak dikenal di $BERKAS_SITUS: $SITUS_KANAL" ;;
-    esac
 
     periksa_alamat_admin "$SITUS_ADMIN"
 
@@ -1300,190 +1273,6 @@ perintah_run() {
     exit "$hasil"
 }
 
-perintah_write_report() {
-    local keluar="${1:-$FOLDER_KOTAK_KELUAR}" laporan isi token nama tujuan belum_terikat konten tanda
-
-    muat_situs
-    mkdir -p "$keluar"
-
-    laporan="$SEMENTARA/laporan.json"
-    isi="$SEMENTARA/isi-laporan.json"
-    susun_laporan "$laporan"
-
-    belum_terikat="$(jq -r 'if .enrolled == false then "ya" else "tidak" end' "$BERKAS_SITUS")"
-
-    # Selama situs offline belum diikat, file laporan juga yang mengantar kunci publik situs ke admin.erp,
-    # beserta token pendaftaran sebagai buktinya. Sesudah terikat, keduanya tidak ikut lagi.
-    if [ "$belum_terikat" = ya ]; then
-        token="$(jq -r '.enrollment_token // "" | tostring' "$BERKAS_SITUS")"
-        [ -n "$token" ] || gagal "Situs belum terikat, tetapi $BERKAS_SITUS tidak memuat token pendaftaran."
-
-        jq -c -j -n --slurpfile r "$laporan" --arg token "$token" --rawfile kunci "$KUNCI_SITUS_PUBLIK" \
-            '{report: $r[0], enrollment: {token: $token, public_key: $kunci}}' > "$isi"
-    else
-        jq -c -j -n --slurpfile r "$laporan" '{report: $r[0], enrollment: null}' > "$isi"
-    fi
-
-    # Tanda tangan atas byte isi yang persis sama dengan yang di-base64-kan. Membungkus isi dalam base64
-    # alih-alih menaruh objeknya langsung menghindari pertanyaan "JSON yang mana yang ditandatangani"
-    # sesudah seseorang membuka file itu di editor yang merapikan spasinya.
-    konten="$(base64 -w0 "$isi")"
-    tanda="$(openssl dgst -sha256 -sign "$KUNCI_SITUS" "$isi" | base64 -w0)"
-
-    nama="laporan-$SITUS_ID-$(cap_waktu).json"
-    tujuan="$keluar/$nama"
-
-    jq -n --arg konten "$konten" --arg tanda "$tanda" \
-        '{format: "coreerp-site-report-v1", content: $konten, signature: $tanda}' > "$keluar/.$nama.baru"
-
-    mv -f "$keluar/.$nama.baru" "$tujuan"
-
-    printf '%s\n' "$tujuan"
-    printf '\nBawa berkas ini ke admin.erp dan unggah di halaman situs.\n' >&2
-
-    if [ "$belum_terikat" = ya ]; then
-        printf "Sesudah admin.erp menerimanya, jalankan \`coreerp-agent confirm-enrollment\` supaya token\\n" >&2
-        printf 'pendaftaran dihapus dari server ini.\n' >&2
-    fi
-}
-
-perintah_import_package() {
-    local paket="${1:-}" berkas
-
-    [ -n "$paket" ] || gagal 'Pemakaian: coreerp-agent import-package FOLDER'
-    berkas="$paket/site.json"
-    [ -f "$berkas" ] || gagal "Paket pendaftaran tidak lengkap: $berkas tidak ada."
-
-    # Diperiksa terpisah dari site.json: kunci situs yang mungkin sudah terikat ke admin.erp tidak boleh
-    # tertimpa diam-diam, termasuk ketika site.json-nya hilang atau terhapus.
-    [ ! -e "$KUNCI_SITUS" ] || gagal \
-        "Server ini sudah punya kunci situs: $KUNCI_SITUS" \
-        '' \
-        'Paket pendaftaran tidak dipasang di atasnya. Kunci itu mungkin sudah dikenal admin.erp, dan' \
-        'menimpanya memutus situs ini dari pengelolaan tanpa jalan kembali.'
-
-    [ ! -e "$BERKAS_SITUS" ] || gagal "Situs ini sudah terdaftar: $BERKAS_SITUS sudah ada."
-
-    jq -e '
-        type == "object"
-        and (.site_id | type) == "string"
-        and (.tenant_id | type) == "string"
-        and (.tenant_name | type) == "string"
-        and .channel == "offline"
-        and (.enrollment_token | type) == "string" and (.enrollment_token | length) > 0
-        and ((.license_public_key == null) or ((.license_public_key | type) == "string"))
-        and ((.license == null) or ((.license | type) == "object"))' "$berkas" >/dev/null 2>&1 \
-        || gagal "$berkas bukan paket pendaftaran offline yang sah."
-
-    SITUS_ID="$(jq -r '.site_id' "$berkas")"
-    id_sah "$SITUS_ID" || gagal 'Paket menyebut id situs yang tidak sah.'
-
-    if jq -e '.license != null and .license_public_key == null' "$berkas" >/dev/null; then
-        gagal 'Paket membawa lisensi tanpa kunci publik lisensi; lisensinya tidak dapat diperiksa.'
-    fi
-
-    siapkan_folder
-
-    if jq -e '.license_public_key != null' "$berkas" >/dev/null; then
-        jq -j '.license_public_key' "$berkas" > "$FOLDER_LISENSI/license-public.pem"
-        chmod 0644 "$FOLDER_LISENSI/license-public.pem"
-    fi
-
-    # Lisensi diperiksa sebelum kunci situs dibuat dan site.json ditulis, supaya paket yang ditolak tidak
-    # meninggalkan situs setengah terdaftar.
-    if jq -e '.license != null' "$berkas" >/dev/null; then
-        pasang_lisensi "$berkas" '.license' || gagal "Lisensi di paket ditolak: $ALASAN"
-        printf '    lisensi terpasang\n'
-    fi
-
-    buat_kunci "$SEMENTARA/site-key.pem" "$SEMENTARA/site-public.pem"
-
-    jq '{
-          site_id: .site_id,
-          tenant_id: .tenant_id,
-          tenant_name: .tenant_name,
-          admin_url: (.admin_url // null),
-          channel: "offline",
-          interval_seconds: null,
-          update_window: (.update_window // null),
-          enrolled: false,
-          enrollment_token: .enrollment_token
-        }' "$berkas" > "$BERKAS_SITUS.baru"
-
-    mv -f "$SEMENTARA/site-key.pem" "$KUNCI_SITUS"
-    mv -f "$SEMENTARA/site-public.pem" "$KUNCI_SITUS_PUBLIK"
-    mv -f "$BERKAS_SITUS.baru" "$BERKAS_SITUS"
-    pastikan_keadaan
-
-    printf '    situs %s terdaftar di server ini (belum terikat di admin.erp)\n' "$SITUS_ID"
-    printf '\nLangkah berikutnya:\n'
-    printf '  1. coreerp-agent install-bundle <folder bundle>   bila rilis pertama belum terpasang\n'
-    printf '  2. coreerp-agent bootstrap-tenant --admin-name NAMA --admin-email EMAIL\n'
-    printf '  3. coreerp-agent write-report                     menulis laporan pertama ke %s\n' "$FOLDER_KOTAK_KELUAR"
-    printf '  4. Bawa berkas laporan itu ke admin.erp; laporan pertama yang mengikat kunci situs ini.\n'
-}
-
-perintah_confirm_enrollment() {
-    muat_situs
-
-    if jq -e '.enrolled == false' "$BERKAS_SITUS" >/dev/null; then
-        ubah_json "$BERKAS_SITUS" '.enrolled = true | del(.enrollment_token)'
-        printf 'Situs %s ditandai terikat; token pendaftaran dihapus dari server ini.\n' "$SITUS_ID"
-    else
-        printf 'Situs %s sudah terikat.\n' "$SITUS_ID"
-    fi
-}
-
-perintah_install_bundle() {
-    local bundle="${1:-}" id log skrip status_pipa langkah_akhir
-
-    [ -n "$bundle" ] || gagal 'Pemakaian: coreerp-agent install-bundle FOLDER'
-    [ -d "$bundle" ] || gagal "Folder bundle tidak ditemukan: $bundle"
-    bundle="$(cd "$bundle" && pwd)"
-
-    muat_situs
-
-    exec 9>>"$BERKAS_KUNCI_PUTARAN"
-    flock -w 120 9 || gagal 'Putaran agen lain masih berjalan lebih dari dua menit; coba lagi nanti.'
-
-    langkah 'Memeriksa bundle'
-
-    periksa_berkas_rilis "$bundle" || gagal "Bundle ditolak: $ALASAN"
-
-    [ -f "$bundle/images.tar.gz" ] || gagal \
-        'Bundle ini tidak membawa images.tar.gz.' \
-        'Server tanpa internet tidak dapat menarik image dari registry; mintalah bundle lengkap dari build-bundle.sh.'
-
-    izinkan_rilis "$MANIFEST_EDISI" "$MANIFEST_RILIS" || gagal "Bundle ditolak: $ALASAN"
-
-    printf '    edisi %s, rilis %s: tanda tangan dan checksum sah\n' "$MANIFEST_EDISI" "$MANIFEST_RILIS"
-
-    id="offline-$(cap_waktu)"
-    log="$FOLDER_LOG/operasi-$id.log"
-    : > "$log"
-    skrip="${COREERP_UPDATE_SCRIPT:-$bundle/update.sh}"
-
-    set +e
-    bash "$skrip" "$bundle" </dev/null 9>&- 2>&1 | tee -a "$log"
-    status_pipa=("${PIPESTATUS[@]}")
-    set -e
-
-    langkah_akhir="$(sed -n 's/^==> //p' "$log" | tail -n 1)"
-
-    if [ "${status_pipa[0]}" -ne 0 ]; then
-        catat_operasi_terakhir "$id" failed "$langkah_akhir"
-        gagal "Pemasangan bundle gagal pada langkah: ${langkah_akhir:-(sebelum langkah pertama)}" \
-            "Log lengkap: $log" \
-            "Hasil ini ikut di laporan berikutnya: jalankan \`coreerp-agent write-report\`."
-    fi
-
-    catat_rilis_terpasang
-    catat_operasi_terakhir "$id" succeeded "Rilis $MANIFEST_RILIS terpasang"
-
-    printf "\\nRilis %s terpasang. Tulis laporan dengan \`coreerp-agent write-report\` dan bawa ke admin.erp.\\n" \
-        "$MANIFEST_RILIS"
-}
-
 # Melahirkan tenant di Core dengan id yang sama dengan catatan di admin.erp, beserta admin pertamanya.
 #
 # **Hanya dijalankan manusia di terminal**, tidak pernah dari `run` maupun timer, dan keluarannya tidak
@@ -1529,9 +1318,8 @@ perintah_bootstrap_tenant() {
         gagal \
             'Belum ada rilis yang terpasang dan terbukti sehat di server ini.' \
             '' \
-            'Tenant dilahirkan di dalam aplikasi yang sedang berjalan. Pasang rilis pertama lebih dulu:' \
-            '  online : minta "Perbarui" dari halaman situs di admin.erp' \
-            '  offline: coreerp-agent install-bundle <folder bundle>'
+            'Tenant dilahirkan di dalam aplikasi yang sedang berjalan. Pasang rilis pertama lebih dulu dengan' \
+            'meminta "Perbarui" dari halaman situs di admin.erp.'
     fi
 
     [ -f "$BERKAS_ENV" ] || gagal "Berkas setelan tidak ditemukan: $BERKAS_ENV"
@@ -1550,19 +1338,6 @@ perintah_bootstrap_tenant() {
         "--name=$tenant_nama" \
         "--admin-name=$nama_admin" \
         "--admin-email=$email_admin" 9>&-
-}
-
-perintah_install_license() {
-    local berkas="${1:-}"
-
-    [ -n "$berkas" ] || gagal 'Pemakaian: coreerp-agent install-license BERKAS'
-    [ -f "$berkas" ] || gagal "Berkas lisensi tidak ditemukan: $berkas"
-
-    muat_situs
-
-    pasang_lisensi "$berkas" '.' || gagal "Lisensi ditolak: $ALASAN"
-
-    printf 'Lisensi terpasang di %s\n' "$FOLDER_LISENSI/license.json"
 }
 
 utama() {
@@ -1590,11 +1365,6 @@ utama() {
     case "$perintah" in
         enroll) perintah_enroll "$@" ;;
         run) perintah_run "$@" ;;
-        write-report) perintah_write_report "$@" ;;
-        import-package) perintah_import_package "$@" ;;
-        confirm-enrollment) perintah_confirm_enrollment "$@" ;;
-        install-bundle) perintah_install_bundle "$@" ;;
-        install-license) perintah_install_license "$@" ;;
         bootstrap-tenant) perintah_bootstrap_tenant "$@" ;;
         *) gagal "Perintah tidak dikenal: $perintah" "$(bantuan)" ;;
     esac

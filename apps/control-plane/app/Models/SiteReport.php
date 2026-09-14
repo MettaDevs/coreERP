@@ -13,7 +13,6 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $site_id
- * @property string $via
  * @property array<string, mixed> $payload
  * @property string $payload_hash
  * @property Carbon $reported_at
@@ -25,7 +24,7 @@ class SiteReport extends Model
 
     protected $table = 'site_reports';
 
-    protected $fillable = ['site_id', 'via', 'payload', 'payload_hash', 'reported_at', 'received_at'];
+    protected $fillable = ['site_id', 'payload', 'payload_hash', 'reported_at', 'received_at'];
 
     protected function casts(): array
     {

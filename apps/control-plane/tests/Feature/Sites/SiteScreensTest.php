@@ -11,13 +11,10 @@ use ControlPlane\Models\SiteOperation;
 use ControlPlane\Models\SiteRelease;
 use ControlPlane\Models\User;
 use Illuminate\Database\QueryException;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Testing\TestResponse;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Layar Situs dan tindakan operator: konfirmasi tertulis, jejak audit, dan jalur offline.
+ * Layar Situs dan tindakan operator: konfirmasi tertulis dan jejak audit.
  */
 class SiteScreensTest extends SiteTestCase
 {
@@ -52,7 +49,6 @@ class SiteScreensTest extends SiteTestCase
             'tenant_id' => $tenant,
             'name' => 'Server Klinik Pusat',
             'edition' => 'apotek-sejahtera',
-            'connectivity' => 'online',
             'update_window_start' => '22:00',
             'update_window_end' => '04:00',
         ])->assertRedirect();
@@ -73,7 +69,6 @@ class SiteScreensTest extends SiteTestCase
             'tenant_id' => $this->tenant(),
             'name' => 'Setengah Jendela',
             'edition' => 'apotek-sejahtera',
-            'connectivity' => 'online',
             'update_window_start' => '22:00',
         ])->assertSessionHasErrors('update_window_end');
 
@@ -171,17 +166,13 @@ class SiteScreensTest extends SiteTestCase
             ->assertInertia(fn ($page) => $page->where('releases', ['0.10.0', '0.9.0']));
     }
 
-    public function test_an_offline_or_unenrolled_site_does_not_accept_operations(): void
+    public function test_an_unenrolled_site_does_not_accept_operations(): void
     {
-        $operator = $this->operator();
-        $offline = $this->enrolledSite(0, ['name' => 'Luring', 'connectivity' => 'offline']);
-        $unenrolled = $this->site(['name' => 'Belum']);
+        $site = $this->site(['name' => 'Belum']);
 
-        foreach ([$offline, $unenrolled] as $site) {
-            $this->actingAs($operator)
-                ->post("/situs/{$site->id}/operasi", ['operation' => 'backup', 'confirm_name' => $site->name])
-                ->assertSessionHasErrors('operation');
-        }
+        $this->actingAs($this->operator())
+            ->post("/situs/{$site->id}/operasi", ['operation' => 'backup', 'confirm_name' => $site->name])
+            ->assertSessionHasErrors('operation');
 
         $this->assertSame(0, SiteOperation::query()->count());
     }
@@ -228,13 +219,13 @@ class SiteScreensTest extends SiteTestCase
 
     // ------------------------------------------------------------------ pendaftaran
 
-    public function test_the_online_install_command_is_shown_once_and_its_token_is_not_audited(): void
+    public function test_the_install_command_is_shown_once_and_its_token_is_not_audited(): void
     {
         $site = $this->site();
         config(['sites.agent_source_ref' => 'abc123', 'app.url' => 'https://admin.contoh.test']);
 
         $response = $this->actingAs($this->operator())
-            ->post("/situs/{$site->id}/pendaftaran-online", ['confirm_name' => $site->name])
+            ->post("/situs/{$site->id}/pendaftaran", ['confirm_name' => $site->name])
             ->assertRedirect("/situs/{$site->id}");
 
         $command = (string) session('enrollment')['command'];
@@ -248,83 +239,6 @@ class SiteScreensTest extends SiteTestCase
 
         $this->assertStringNotContainsString($token, (string) json_encode(OperatorAuditEvent::query()->sole()->detail));
         $response->assertSessionHas('enrollment');
-    }
-
-    public function test_the_offline_package_carries_a_token_only_for_an_unenrolled_offline_site(): void
-    {
-        $operator = $this->operator();
-        $offline = $this->site(['name' => 'Luring', 'connectivity' => 'offline']);
-
-        $response = $this->actingAs($operator)->post("/situs/{$offline->id}/paket-pendaftaran", ['confirm_name' => 'Luring'])->assertOk();
-        $package = json_decode((string) $response->streamedContent(), true);
-
-        $this->assertSame($offline->id, $package['site_id']);
-        $this->assertSame($offline->tenant_id, $package['tenant_id']);
-        $this->assertSame('offline', $package['channel']);
-        $this->assertSame(hash('sha256', $package['enrollment_token']), SiteEnrollmentToken::query()->sole()->token_hash);
-
-        $enrolled = $this->enrolledSite(0, ['name' => 'Sudah', 'connectivity' => 'offline']);
-        $this->actingAs($operator)->post("/situs/{$enrolled->id}/paket-pendaftaran", ['confirm_name' => 'Sudah'])->assertSessionHasErrors('confirm_name');
-    }
-
-    // ------------------------------------------------------------------ file laporan offline
-
-    public function test_the_first_report_file_binds_the_site_key_with_its_offline_token(): void
-    {
-        $site = $this->site(['name' => 'Luring', 'connectivity' => 'offline']);
-        $token = $this->enrollmentToken($site, 'offline', now()->addDays(30));
-        $key = $this->rsaKey(2);
-
-        $this->upload($site, $this->reportFile($site, $key, ['token' => $token, 'public_key' => $key['public']]))
-            ->assertRedirect("/situs/{$site->id}")
-            ->assertSessionHasNoErrors();
-
-        $site->refresh();
-        $this->assertSame(trim($key['public']), trim((string) $site->public_key));
-        $this->assertSame('file', $site->last_seen_via);
-        $this->assertNotNull(SiteEnrollmentToken::query()->sole()->used_at);
-
-        // Sesudah terikat, file berikutnya diperiksa dengan kunci yang tersimpan.
-        $this->upload($site, $this->reportFile($site, $key, null, ['release' => '0.2.0']))->assertSessionHasNoErrors();
-        $this->assertSame('0.2.0', $site->refresh()->reported_release);
-
-        $this->upload($site, $this->reportFile($site, $this->rsaKey(3), null, ['release' => '9.9.9']))->assertSessionHasErrors('report');
-        $this->assertSame('0.2.0', $site->refresh()->reported_release);
-    }
-
-    /**
-     * Tanpa token, siapa pun dapat membuat pasangan kunci sendiri dan mengikatnya ke situs mana saja.
-     */
-    public function test_a_report_file_with_a_wrong_token_or_forged_signature_binds_nothing(): void
-    {
-        $site = $this->site(['name' => 'Luring', 'connectivity' => 'offline']);
-        $token = $this->enrollmentToken($site, 'offline', now()->addDays(30));
-        $key = $this->rsaKey(2);
-
-        $this->upload($site, $this->reportFile($site, $key, ['token' => str_repeat('z', 48), 'public_key' => $key['public']]))
-            ->assertSessionHasErrors('report');
-
-        // Kunci yang dibawa file bukan kunci yang menandatanganinya.
-        $this->upload($site, $this->reportFile($site, $this->rsaKey(3), ['token' => $token, 'public_key' => $key['public']]))
-            ->assertSessionHasErrors('report');
-
-        $this->assertNull($site->refresh()->public_key);
-        $this->assertNull(SiteEnrollmentToken::query()->sole()->used_at);
-    }
-
-    public function test_a_token_for_another_site_does_not_bind_this_one(): void
-    {
-        $tenant = $this->tenant();
-        $site = $this->site(['name' => 'Luring A', 'connectivity' => 'offline', 'tenant_id' => $tenant]);
-        $other = $this->site(['name' => 'Luring B', 'connectivity' => 'offline', 'tenant_id' => $tenant]);
-        $otherToken = $this->enrollmentToken($other, 'offline', now()->addDays(30));
-        $key = $this->rsaKey(2);
-
-        $this->upload($site, $this->reportFile($site, $key, ['token' => $otherToken, 'public_key' => $key['public']]))
-            ->assertSessionHasErrors('report');
-
-        $this->assertNull($site->refresh()->public_key);
-        $this->assertNull($other->refresh()->public_key);
     }
 
     // ------------------------------------------------------------------ jejak audit
@@ -349,38 +263,5 @@ class SiteScreensTest extends SiteTestCase
         }
 
         $this->assertSame('site.revoked', $event->refresh()->action);
-    }
-
-    // ------------------------------------------------------------------ pembantu
-
-    /**
-     * @param  array{private: string, public: string}  $key
-     * @param  array{token: string, public_key: string}|null  $enrollment
-     * @param  array<string, mixed>  $overrides
-     */
-    private function reportFile(Site $site, array $key, ?array $enrollment, array $overrides = []): string
-    {
-        $content = (string) json_encode(['report' => $this->report($site, $overrides), 'enrollment' => $enrollment], JSON_UNESCAPED_SLASHES);
-        openssl_sign($content, $signature, $key['private'], OPENSSL_ALGO_SHA256);
-
-        return (string) json_encode([
-            'format' => 'coreerp-site-report-v1',
-            'content' => base64_encode($content),
-            'signature' => base64_encode((string) $signature),
-        ]);
-    }
-
-    /** @return TestResponse<Response> */
-    private function upload(Site $site, string $contents): TestResponse
-    {
-        return $this->actingAs($this->operatorOnce())
-            ->post("/situs/{$site->id}/laporan", ['report' => UploadedFile::fake()->createWithContent('laporan.json', $contents)]);
-    }
-
-    private ?User $cachedOperator = null;
-
-    private function operatorOnce(): User
-    {
-        return $this->cachedOperator ??= $this->operator('pengunggah@contoh.test');
     }
 }

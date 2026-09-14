@@ -22,9 +22,10 @@
 #     SHA256SUMS.sig    tanda tangan atas SHA256SUMS, bila kunci privat disebut
 #
 # **Seluruh** image, bukan hanya image edisi. Runtime-nya juga membutuhkan PostgreSQL dan perender
-# PDF, dan keduanya datang dari registry publik. Bundle yang hanya membawa image edisi akan gagal
-# menyala di mesin tanpa internet — dan gagalnya pada langkah menyalakan container, sesudah admin
-# mengira pemasangannya berhasil. Ongkosnya nyata: bundle menjadi ratusan megabyte lebih besar.
+# PDF, dan keduanya datang dari registry publik. Bundle yang hanya membawa image edisi masih harus
+# menarik keduanya saat dipasang — dan bila tarikan itu gagal, gagalnya pada langkah menyalakan
+# container, sesudah admin mengira pemasangannya berhasil. Ongkosnya nyata: bundle menjadi ratusan
+# megabyte lebih besar.
 #
 # **Checksum dan tanda tangan bukan pengganti satu sama lain.** Checksum menjaga dari berkas yang
 # rusak saat disalin; tanda tangan menjaga dari berkas yang diganti orang. Bundle tanpa tanda tangan
@@ -170,7 +171,7 @@ done <<< "$daftar_module"
 
 # Image pendamping dibaca dari berkas compose yang ikut di dalam bundle, bukan ditulis tangan di
 # sini. Daftar yang ditulis tangan akan menyimpang pada hari sebuah layanan ditambahkan, dan
-# menyimpangnya baru ketahuan di mesin pelanggan yang tidak punya internet untuk menambalnya.
+# menyimpangnya baru ketahuan di mesin pelanggan.
 pendamping=()
 
 while IFS= read -r baris; do
@@ -182,8 +183,8 @@ done < <(grep -oE '^[[:space:]]*image:[[:space:]]*[^$[:space:]][^[:space:]]*' "$
 if [ ${#pendamping[@]} -eq 0 ]; then
     gagal \
         "Tidak satu pun image pendamping terbaca dari $berkas_compose." \
-        'Runtime membutuhkan PostgreSQL dan perender PDF; bundle tanpa keduanya akan gagal menyala' \
-        'di mesin tanpa internet, dan gagalnya baru terlihat sesudah admin mengira berhasil.'
+        'Runtime membutuhkan PostgreSQL dan perender PDF; bundle tanpa keduanya bergantung pada registry' \
+        'saat dipasang, dan gagalnya baru terlihat sesudah admin mengira berhasil.'
 fi
 
 mkdir -p "$tujuan"
