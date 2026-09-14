@@ -32,7 +32,7 @@ function initials(name: string): string {
 }
 
 /**
- * Kaki sidebar: siapa yang sedang masuk, pilihan tampilan, dan pintu keluar.
+ * Kaki sidebar: siapa yang sedang masuk, pilihan tampilan, halaman Akun, dan pintu keluar.
  *
  * Core menaruh pilihan tampilan di halaman Setelan dan hanya menautkannya dari menu ini. Konsol
  * operator tidak punya halaman setelan sama sekali — satu halaman yang isinya satu pilihan adalah
@@ -109,6 +109,12 @@ export default function OperatorMenu() {
                             </DropdownMenuRadioItem>
                         </DropdownMenuRadioGroup>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            className="cursor-pointer"
+                            onSelect={() => router.visit('/akun')}
+                        >
+                            Akun
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                             className="cursor-pointer"
                             onSelect={() => router.post('/logout')}

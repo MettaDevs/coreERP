@@ -345,6 +345,15 @@ services:
       # Skema dan porta sengaja tidak diteruskan: bawaannya `https` tanpa porta, dan itu yang
       # berlaku di setiap server.
       COREERP_BASE_DOMAIN: ${COREERP_BASE_DOMAIN:?COREERP_BASE_DOMAIN wajib}
+      # Klien SSO milik konsol sendiri ("CoreERP Admin"), terpisah dari klien Core. Kosong berarti
+      # tanpa SSO: tombolnya tidak tampil dan konsol bekerja seperti sebelumnya.
+      CONSOLE_SSO_ISSUER: ${CONSOLE_SSO_ISSUER:-}
+      CONSOLE_SSO_CLIENT_ID: ${CONSOLE_SSO_CLIENT_ID:-}
+      CONSOLE_SSO_CLIENT_SECRET: ${CONSOLE_SSO_CLIENT_SECRET:-}
+      # Pintu kata sandi tetap terbuka sampai setiap operator menghubungkan SSO-nya; sesudah itu
+      # setel `false` dan sisakan akun darurat di daftar di bawahnya.
+      CONSOLE_PASSWORD_LOGIN: ${CONSOLE_PASSWORD_LOGIN:-true}
+      CONSOLE_BREAK_GLASS_EMAILS: ${CONSOLE_BREAK_GLASS_EMAILS:-}
     volumes:
       # Sesi operator hidup di sini. Tanpa volume, setiap penyebaran melempar keluar semua orang
       # yang sedang membuka konsol — termasuk yang sedang di tengah membuat pelanggan.

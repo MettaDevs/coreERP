@@ -1,5 +1,6 @@
 <?php
 
+use ControlPlane\Http\Middleware\EndSessionAfterProviderLogout;
 use ControlPlane\Http\Middleware\HandleInertiaRequests;
 use ControlPlane\Http\Middleware\OperatorOnly;
 use Illuminate\Foundation\Application;
@@ -22,8 +23,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            // Sebelum Inertia: sesi yang operatornya sudah keluar di penyedia diakhiri sebelum
+            // halaman apa pun sempat disusun untuknya.
+            EndSessionAfterProviderLogout::class,
             HandleInertiaRequests::class,
         ]);
+
+        // Dipanggil server penyedia identitas, bukan peramban: tidak ada sesi dan tidak ada token
+        // CSRF yang dapat dibawanya. Yang menjaganya tanda tangan logout token itu sendiri.
+        $middleware->validateCsrfTokens(except: ['sso/backchannel-logout']);
 
         $middleware->alias([
             'operator' => OperatorOnly::class,
