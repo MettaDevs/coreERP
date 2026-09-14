@@ -10,6 +10,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use stdClass;
 use Throwable;
 
@@ -127,8 +128,25 @@ class IdentityProvider
 
         $claims = $this->decode($idToken);
 
-        if (! isset($claims['nonce']) || ! is_string($claims['nonce']) || ! hash_equals($nonce, $claims['nonce'])) {
-            throw new SsoFailure(SsoFailure::INVALID_TOKEN, 'nonce ID token tidak cocok dengan upacara ini.');
+        // OIDC Core §3.1.3.7 butir 11: nonce yang dikirim di permintaan otorisasi wajib kembali di ID
+        // token. Penyedia bersama hari ini tidak mengembalikannya pada alur kode: nonce tidak disimpan
+        // bersama kode otorisasi, dan `OidcTokenController` menerbitkan ID token dengan nonce `null`.
+        // Terukur 14 September 2026 — operator pertama yang mencoba menghubungkan akun ditolak di sini.
+        //
+        // Yang dilonggarkan hanya ketiadaannya. Nonce yang ADA tetap harus sama persis. Ketiadaannya
+        // tidak membuka jalan karena perlindungan yang sama sudah dipegang PKCE: kode otorisasi hanya
+        // dapat ditukar dengan verifier milik upacara ini, dan ID token diambil sendiri dari endpoint
+        // token, bukan diterima dari peramban. RFC 9700 §2.1.1 menerima PKCE atau nonce sebagai
+        // pembela injeksi kode — salah satunya cukup. Penyedia ini menegakkan PKCE untuk setiap kode
+        // yang diterbitkan dengan challenge, dan klien ini selalu mengirim challenge.
+        //
+        // Setiap ketiadaan dicatat, supaya perbaikan di sisi penyedia terlihat begitu berlaku.
+        if (array_key_exists('nonce', $claims)) {
+            if (! is_string($claims['nonce']) || ! hash_equals($nonce, $claims['nonce'])) {
+                throw new SsoFailure(SsoFailure::INVALID_TOKEN, 'nonce ID token tidak cocok dengan upacara ini.');
+            }
+        } else {
+            Log::warning('Konsol SSO: ID token tidak memuat nonce; diterima karena upacara ini memakai PKCE.', ['iss' => $this->issuer()]);
         }
 
         if (! isset($claims['sub']) || ! is_string($claims['sub']) || $claims['sub'] === '') {
@@ -192,14 +210,21 @@ class IdentityProvider
         $claims = json_decode((string) json_encode($payload), true);
 
         if (($claims['iss'] ?? null) !== $this->issuer()) {
-            throw new SsoFailure(SsoFailure::INVALID_TOKEN, 'iss token tidak sama dengan penyedia yang disetel.');
+            throw new SsoFailure(SsoFailure::INVALID_TOKEN, sprintf(
+                'iss token "%s" tidak sama dengan penyedia yang disetel "%s".',
+                is_string($claims['iss'] ?? null) ? $claims['iss'] : '-',
+                $this->issuer(),
+            ));
         }
 
         $audience = $claims['aud'] ?? null;
         $audiences = is_array($audience) ? $audience : [$audience];
 
         if (! in_array($this->clientId(), $audiences, true)) {
-            throw new SsoFailure(SsoFailure::INVALID_TOKEN, 'aud token bukan klien ini.');
+            throw new SsoFailure(SsoFailure::INVALID_TOKEN, sprintf(
+                'aud token (%s) bukan klien ini.',
+                implode(', ', array_map(static fn (mixed $value): string => is_string($value) ? $value : '-', $audiences)),
+            ));
         }
 
         return $claims;

@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -351,6 +352,22 @@ class SsoLoginTest extends TestCase
             ->assertRedirect('http://tenanta.contoh.co.id/login?sso_error=token-tidak-sah');
     }
 
+    /**
+     * Penyedia bersama tidak mengembalikan nonce pada alur kode. Ketiadaannya diterima karena PKCE
+     * sudah menjaga upacara ini — dan dicatat. Nonce yang ada tetap harus sama (test di atas).
+     */
+    public function test_a_token_without_a_nonce_is_accepted_under_pkce_and_noted(): void
+    {
+        $user = $this->linkedMember('subjek-anggota');
+        $this->claimOverrides = ['nonce' => null];
+        $log = Log::spy();
+
+        $this->completeCeremony('subjek-anggota')->assertRedirect('/dashboard');
+
+        $this->assertAuthenticatedAs($user);
+        $log->shouldHaveReceived('warning')->withArgs(fn (string $message) => str_contains($message, 'tidak memuat nonce'))->once();
+    }
+
     /** Tanda tangan dari kunci yang tidak ada di JWKS penyedia, dengan `kid` yang sama. */
     public function test_a_token_signed_by_a_foreign_key_is_refused(): void
     {
@@ -598,6 +615,9 @@ class SsoLoginTest extends TestCase
             'iat' => time(),
             'exp' => time() + 3600,
         ], $this->claimOverrides);
+
+        // `null` di pengganti berarti klaimnya tidak ada sama sekali, seperti penyedia yang lupa mengirimnya.
+        $claims = array_filter($claims, static fn (mixed $value): bool => $value !== null);
 
         return JWT::encode($claims, $this->signWith ?? $this->privateKey, 'RS256', 'kunci-uji');
     }

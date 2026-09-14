@@ -12,6 +12,7 @@ use Firebase\JWT\JWT;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -242,6 +243,35 @@ class SsoLoginTest extends TestCase
     public function test_a_token_carrying_another_ceremonys_nonce_is_refused(): void
     {
         $this->assertTokenRefused(['nonce' => 'nonce-upacara-lain']);
+    }
+
+    /**
+     * `sso.mettamedic.id` tidak mengembalikan nonce pada alur kode — terukur saat operator pertama
+     * menghubungkan akunnya. Ketiadaannya diterima karena PKCE sudah menjaga upacara ini, dan dicatat.
+     */
+    public function test_a_token_without_a_nonce_is_accepted_under_pkce_and_noted(): void
+    {
+        $operator = $this->operator('operator@contoh.test');
+        $this->link($operator, 'subjek-operator');
+        $this->claimOverrides = ['nonce' => null];
+        $log = Log::spy();
+
+        $this->completeLogin('subjek-operator')->assertRedirect('/lingkungan');
+
+        $this->assertAuthenticatedAs($operator);
+        $log->shouldHaveReceived('warning')->withArgs(fn (string $message) => str_contains($message, 'tidak memuat nonce'))->once();
+    }
+
+    /** Menghubungkan akun juga harus berjalan dengan penyedia yang sama. */
+    public function test_connecting_works_with_a_provider_that_drops_the_nonce(): void
+    {
+        $operator = $this->operator('operator@contoh.test');
+        $this->claimOverrides = ['sub' => 'subjek-baru', 'nonce' => null];
+
+        $state = $this->startConnect($operator);
+        $this->get('/sso/callback?code=kode-uji&state='.$state)->assertRedirect('/akun');
+
+        $this->assertSame(['subjek-baru'], ExternalIdentity::query()->pluck('subject')->all());
     }
 
     public function test_an_expired_token_is_refused(): void
@@ -642,6 +672,9 @@ class SsoLoginTest extends TestCase
             'iat' => time(),
             'exp' => time() + 3600,
         ], $this->claimOverrides);
+
+        // `null` di pengganti berarti klaimnya tidak ada sama sekali, seperti penyedia yang lupa mengirimnya.
+        $claims = array_filter($claims, static fn (mixed $value): bool => $value !== null);
 
         return JWT::encode($claims, $this->signWith ?? $this->privateKey, 'RS256', 'kunci-uji');
     }
