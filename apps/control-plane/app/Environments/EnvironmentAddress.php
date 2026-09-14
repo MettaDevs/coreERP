@@ -43,30 +43,29 @@ final class EnvironmentAddress
     }
 
     /**
-     * Alamat lengkap sebuah lingkungan, berikut skema dan portanya. Null berarti tidak ada alamat
-     * khusus.
+     * Alamat lengkap lingkungan milik tenant ini dengan jenis ini, berikut skema dan portanya.
+     * Null berarti tidak ada alamat khusus.
      *
      * | Jenis | Bentuk |
      * | --- | --- |
      * | `production` | `<tenant>.<domain>` |
-     * | selain itu | `<tenant>--<lingkungan>.<jenis>.<domain>` |
+     * | `demo`, `sandbox` | `<tenant>.<jenis>.<domain>` |
      *
      * Produksi tanpa label jenis, karena itu alamat yang dipakai pelanggan sehari-hari dan ia tidak
-     * perlu mengumumkan dirinya. Pemisahnya DUA tanda hubung: `Str::slug()` tidak pernah
-     * menghasilkan dua berurutan, sementara satu tanda hubung membuat `pt-sinar-abadi` + `peragaan`
-     * tidak dapat dibedakan dari `pt` + `sinar-abadi-peragaan`.
+     * perlu mengumumkan dirinya. Slug lingkungan tidak ikut: satu tenant hanya punya satu lingkungan
+     * hidup per jenis, dan label jenis yang tetap itulah yang membuat satu sertifikat wildcard cukup.
      */
-    public static function forEnvironment(string $tenant, string $environment, string $kind): ?string
+    public static function forEnvironment(string $tenant, string $kind): ?string
     {
         $domain = self::baseDomain();
 
-        if ($domain === '' || $tenant === '' || $environment === '') {
+        if ($domain === '' || $tenant === '') {
             return null;
         }
 
         $host = $kind === 'production'
             ? $tenant.'.'.$domain
-            : $tenant.'--'.$environment.'.'.$kind.'.'.$domain;
+            : $tenant.'.'.$kind.'.'.$domain;
 
         return self::scheme().'://'.$host.self::portSuffix();
     }

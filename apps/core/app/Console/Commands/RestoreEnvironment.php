@@ -175,6 +175,29 @@ final class RestoreEnvironment extends Command
             return self::FAILURE;
         }
 
+        // Satu tenant, satu lingkungan hidup per jenis — alamatnya hanya memuat tenant dan jenis.
+        // Demo baru yang lahir selama yang lama dalam masa tenggang sudah memegang alamat itu.
+        // Diperiksa di sini supaya penolakannya terbaca; yang benar-benar menegakkannya tetap
+        // `environments_satu_per_jenis` dan `environments_satu_produksi`.
+        $occupant = Environment::query()
+            ->where('tenant_id', $environment->tenant_id)
+            ->where('kind', $environment->kind)
+            ->whereNull('deleted_at')
+            ->first();
+
+        if ($occupant instanceof Environment) {
+            $this->error(sprintf(
+                'Tenant ini sudah punya %s hidup lain, "%s". Satu tenant hanya boleh punya satu per '
+                .'jenis, karena alamatnya hanya memuat tenant dan jenis. Hapus "%s" dulu bila yang '
+                .'lama yang ingin dipakai lagi.',
+                $environment->kind,
+                $occupant->slug,
+                $occupant->slug,
+            ));
+
+            return self::FAILURE;
+        }
+
         $operation = $this->openOperation($environment, 'restore');
 
         if (! $operation instanceof EnvironmentOperation) {

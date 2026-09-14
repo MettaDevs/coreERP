@@ -89,7 +89,7 @@ final class PrintEnvironmentHosts extends Command
                 continue;
             }
 
-            $host = EnvironmentAddress::forEnvironment($tenant, $environment->slug, $environment->kind);
+            $host = EnvironmentAddress::forEnvironment($tenant, $environment->kind);
 
             if ($host === null) {
                 continue;

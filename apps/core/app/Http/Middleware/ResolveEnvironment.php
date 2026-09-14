@@ -39,7 +39,7 @@ use Symfony\Component\HttpFoundation\Response;
  * sudah dihapus, atau belum selesai disiapkan. Menerimanya diam-diam dan melayaninya dengan
  * database bawaan adalah cara termurah memperlihatkan data tenant lain.
  *
- * **404, bukan 403.** Keberadaan sebuah lingkungan adalah informasi: `pelanggan-a.demo.contoh.co.id`
+ * **404, bukan 403.** Keberadaan sebuah lingkungan adalah informasi: `pelanggan-a.demo.erp.contoh.co.id`
  * yang menjawab 403 memberi tahu penanya bahwa pelanggan A memang punya demo.
  *
  * ## Ia sekarang memindahkan koneksi databasenya
@@ -90,9 +90,10 @@ class ResolveEnvironment
             abort(404);
         }
 
+        // Tenant + jenis menunjuk tepat satu lingkungan hidup: `environments_satu_produksi` dan
+        // `environments_satu_per_jenis` di database pusat yang menjaminnya, bukan urutan baris.
         $environment = Environment::query()
             ->whereHas('tenant', fn ($q) => $q->where('slug', $address->tenant))
-            ->where('slug', $address->environment)
             ->where('kind', $address->kind)
             ->whereNull('deleted_at')
             ->first();

@@ -10,7 +10,9 @@ use App\Models\Tenant;
 use App\Support\ControlPlane\ActiveEnvironment;
 use App\Support\ControlPlane\EnvironmentAddress;
 use App\Support\ControlPlane\EnvironmentConnection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -48,7 +50,7 @@ class EnvironmentAddressTest extends TestCase
 
         $this->assertSame(
             'ivs.contoh.co.id',
-            EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'),
+            EnvironmentAddress::forEnvironment('ivs', 'production'),
         );
     }
 
@@ -57,23 +59,22 @@ class EnvironmentAddressTest extends TestCase
         config(['coreerp.base_domain' => 'contoh.co.id']);
 
         $this->assertSame(
-            'ivs--uat.sandbox.contoh.co.id',
-            EnvironmentAddress::forEnvironment('ivs', 'uat', 'sandbox'),
+            'ivs.sandbox.contoh.co.id',
+            EnvironmentAddress::forEnvironment('ivs', 'sandbox'),
         );
     }
 
-    public function test_both_sides_may_carry_hyphens(): void
+    public function test_a_hyphenated_tenant_slug_stays_whole(): void
     {
-        // Ini yang membunuh pemisah tanda-hubung-tunggal: SLUG TENANT juga bertanda hubung —
         // `uniqueSlug()` meng-slugify nama badan hukum, jadi "PT Sinar Abadi" menjadi
-        // `pt-sinar-abadi`. Dengan satu tanda hubung, alamat ini ambigu dari kedua arah.
-        config(['coreerp.base_domain' => 'contoh.co.id']);
+        // `pt-sinar-abadi`. Tenant dan jenis kini dipisah titik, jadi tanda hubung di dalam slug
+        // tidak pernah dapat dibaca sebagai pemisah.
+        config(['coreerp.base_domain' => 'erp.contoh.co.id']);
 
-        $address = EnvironmentAddress::fromHost('pt-sinar-abadi--peragaan-penjualan.demo.contoh.co.id');
+        $address = EnvironmentAddress::fromHost('pt-sinar-abadi.demo.erp.contoh.co.id');
 
         $this->assertNotNull($address);
         $this->assertSame('pt-sinar-abadi', $address->tenant);
-        $this->assertSame('peragaan-penjualan', $address->environment);
         $this->assertSame('demo', $address->kind);
     }
 
@@ -81,23 +82,24 @@ class EnvironmentAddressTest extends TestCase
     {
         config(['coreerp.base_domain' => 'contoh.co.id']);
 
-        $host = EnvironmentAddress::forEnvironment('ivs', 'uji-coba', 'sandbox');
-        $this->assertNotNull($host);
+        foreach (['production', 'demo', 'sandbox'] as $kind) {
+            $host = EnvironmentAddress::forEnvironment('pt-sinar-abadi', $kind);
+            $this->assertNotNull($host);
 
-        $parsedBack = EnvironmentAddress::fromHost($host);
+            $parsedBack = EnvironmentAddress::fromHost($host);
 
-        $this->assertNotNull($parsedBack);
-        $this->assertSame('ivs', $parsedBack->tenant);
-        $this->assertSame('uji-coba', $parsedBack->environment);
-        $this->assertSame('sandbox', $parsedBack->kind);
+            $this->assertNotNull($parsedBack, $host);
+            $this->assertSame('pt-sinar-abadi', $parsedBack->tenant);
+            $this->assertSame($kind, $parsedBack->kind);
+        }
     }
 
     public function test_the_port_does_not_get_in_the_way(): void
     {
-        // `pelanggan.demo.localhost:8000` adalah bentuk yang dipakai selama pengembangan.
-        config(['coreerp.base_domain' => 'localhost']);
+        // `pelanggan.demo.erp.localhost:8000` adalah bentuk yang dipakai selama pengembangan.
+        config(['coreerp.base_domain' => 'erp.localhost']);
 
-        $address = EnvironmentAddress::fromHost('ivs--uji.demo.localhost:8000');
+        $address = EnvironmentAddress::fromHost('ivs.demo.erp.localhost:8000');
 
         $this->assertNotNull($address);
         $this->assertSame('ivs', $address->tenant);
@@ -110,7 +112,7 @@ class EnvironmentAddressTest extends TestCase
         config(['coreerp.base_domain' => null]);
 
         $this->assertNull(EnvironmentAddress::fromHost('apa.pun.contoh.co.id'));
-        $this->assertNull(EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+        $this->assertNull(EnvironmentAddress::forEnvironment('ivs', 'production'));
     }
 
     public function test_the_root_address_is_not_an_environment_address(): void
@@ -135,6 +137,19 @@ class EnvironmentAddressTest extends TestCase
         config(['coreerp.base_domain' => 'contoh.co.id']);
 
         $this->assertNull(EnvironmentAddress::fromHost('a.b.c.contoh.co.id'));
+        // Bentuk yang ditimbang dan ditolak: slug lingkungan sebagai label sendiri. Setiap nama
+        // lingkungan akan menuntut sertifikat wildcard baru.
+        $this->assertNull(EnvironmentAddress::fromHost('ivs.peragaan.demo.contoh.co.id'));
+    }
+
+    /** Label kedua hanya boleh jenis yang memang berlabel — bukan karangan, bukan produksi. */
+    public function test_only_labelled_kinds_are_read_as_a_kind(): void
+    {
+        config(['coreerp.base_domain' => 'contoh.co.id']);
+
+        $this->assertNull(EnvironmentAddress::fromHost('ivs.uat.contoh.co.id'));
+        $this->assertNull(EnvironmentAddress::fromHost('ivs.production.contoh.co.id'));
+        $this->assertNull(EnvironmentAddress::fromHost('.demo.contoh.co.id'));
     }
 
     // ------------------------------------------------------------------ middleware
@@ -153,7 +168,7 @@ class EnvironmentAddressTest extends TestCase
 
         $environment = $this->environment('demo', 'peragaan', 'active');
 
-        $this->get('http://ujialamat--peragaan.demo.contoh.co.id/login')->assertOk();
+        $this->get('http://ujialamat.demo.contoh.co.id/login')->assertOk();
 
         $this->assertTrue(app()->bound(ActiveEnvironment::KEY));
         $this->assertSame($environment->id, app(ActiveEnvironment::KEY));
@@ -167,7 +182,7 @@ class EnvironmentAddressTest extends TestCase
 
         $this->environment('demo', 'belumjadi', 'provisioning');
 
-        $this->get('http://ujialamat--belumjadi.demo.contoh.co.id/login')->assertNotFound();
+        $this->get('http://ujialamat.demo.contoh.co.id/login')->assertNotFound();
         $this->assertFalse(app()->bound(ActiveEnvironment::KEY));
     }
 
@@ -177,7 +192,7 @@ class EnvironmentAddressTest extends TestCase
 
         // 404 dan bukan 403: keberadaan sebuah lingkungan adalah informasi, dan 403 memberi tahu
         // penanya bahwa pelanggan itu memang punya demo.
-        $this->get('http://ujialamat--tidakada.demo.contoh.co.id/login')->assertNotFound();
+        $this->get('http://ujialamat.demo.contoh.co.id/login')->assertNotFound();
     }
 
     public function test_the_wrong_kind_in_the_address_finds_nothing(): void
@@ -188,23 +203,73 @@ class EnvironmentAddressTest extends TestCase
 
         $this->environment('demo', 'peragaan', 'active');
 
-        $this->get('http://ujialamat--peragaan.sandbox.contoh.co.id/login')->assertNotFound();
+        $this->get('http://ujialamat.sandbox.contoh.co.id/login')->assertNotFound();
     }
 
-    public function test_a_label_without_the_double_separator_is_rejected(): void
-    {
-        // Bentuk lama, yang sempat dicetak percobaan pertama. Ia ambigu, jadi ditolak alih-alih
-        // ditebak — menebak menghasilkan tenant yang tidak pernah ada, diam-diam.
-        config(['coreerp.base_domain' => 'contoh.co.id']);
-
-        $this->assertNull(EnvironmentAddress::fromHost('pt-sinar-abadi-peragaan.demo.contoh.co.id'));
-    }
-
-    public function test_the_double_separator_more_than_once_is_rejected(): void
+    /**
+     * Alamat bentuk lama, `<tenant>--<lingkungan>.<jenis>.…`, tidak lagi membuka apa pun.
+     *
+     * Ia terurai sebagai tenant bernama `ujialamat--peragaan` — slug yang tidak pernah dapat lahir,
+     * karena `Str::slug()` tidak menghasilkan dua tanda hubung berurutan — dan dijawab 404.
+     */
+    public function test_the_old_double_hyphen_address_no_longer_opens_anything(): void
     {
         config(['coreerp.base_domain' => 'contoh.co.id']);
 
-        $this->assertNull(EnvironmentAddress::fromHost('a--b--c.demo.contoh.co.id'));
+        $this->environment('demo', 'peragaan', 'active');
+
+        $this->get('http://ujialamat--peragaan.demo.contoh.co.id/login')->assertNotFound();
+        $this->assertFalse(app()->bound(ActiveEnvironment::KEY));
+    }
+
+    /** Demo yang dihapus lunak tidak memegang alamatnya; demo hidup yang menggantikannya yang dilayani. */
+    public function test_a_soft_deleted_demo_does_not_hold_the_address(): void
+    {
+        config(['coreerp.base_domain' => 'contoh.co.id']);
+
+        $old = $this->environment('demo', 'lama', 'active');
+        $old->forceFill(['status' => 'soft_deleted', 'deleted_at' => now(), 'purge_after' => now()->addWeek()])->save();
+        $living = $this->environment('demo', 'baru', 'active');
+
+        $this->get('http://ujialamat.demo.contoh.co.id/login')->assertOk();
+
+        $this->assertSame($living->id, app(ActiveEnvironment::KEY));
+    }
+
+    /**
+     * Dua demo hidup untuk satu tenant adalah keadaan yang tidak dapat diwakili.
+     *
+     * Alamatnya hanya memuat tenant dan jenis, jadi keduanya akan menunjuk satu alamat dan yang
+     * dilayani ditentukan urutan baris. Yang menolaknya database, bukan kode yang harus diingat.
+     */
+    public function test_the_database_refuses_a_second_living_demo_or_sandbox(): void
+    {
+        foreach (['demo', 'sandbox'] as $kind) {
+            $this->environment($kind, $kind.'-pertama', 'active');
+
+            try {
+                // Savepoint: PostgreSQL membatalkan seluruh transaksi test begitu satu pernyataan
+                // ditolak, dan pernyataan berikutnya di test ini masih harus berjalan.
+                DB::transaction(fn () => $this->environment($kind, $kind.'-kedua', 'active'));
+                $this->fail(sprintf('%s kedua untuk tenant yang sama tidak boleh tersimpan.', $kind));
+            } catch (UniqueConstraintViolationException $e) {
+                $this->assertStringContainsString('environments_satu_per_jenis', $e->getMessage());
+            }
+        }
+
+        // Tenant lain tidak terhalang.
+        $other = Tenant::create([
+            'client_id' => $this->tenant->client_id,
+            'name' => 'PT Tetangga',
+            'slug' => 'tetangga',
+            'status' => 'active',
+        ]);
+        Environment::create([
+            'tenant_id' => $other->id, 'kind' => 'demo', 'name' => 'Demo', 'slug' => 'demo-pertama',
+            'database_name' => null, 'status' => 'active', 'outbound_allowed' => false, 'expires_at' => now()->addMonth(),
+        ]);
+
+        $this->assertSame(3, Environment::query()->count());
     }
 
     public function test_an_environment_shaped_address_that_does_not_parse_answers_404(): void
@@ -214,6 +279,7 @@ class EnvironmentAddressTest extends TestCase
         // mana saja yang dikarang orang.
         config(['coreerp.base_domain' => 'contoh.co.id']);
 
+        $this->get('http://karangan.orang.contoh.co.id/login')->assertNotFound();
         $this->get('http://karangan-orang.demo.contoh.co.id/login')->assertNotFound();
     }
 
@@ -324,7 +390,7 @@ class EnvironmentAddressTest extends TestCase
             }
         });
 
-        $this->get('http://ujialamat--tersambung.demo.contoh.co.id/login')->assertOk();
+        $this->get('http://ujialamat.demo.contoh.co.id/login')->assertOk();
 
         $this->assertSame([$environment->id], $recorded);
     }
@@ -348,7 +414,7 @@ class EnvironmentAddressTest extends TestCase
             'schema_migrated_at' => now()->subDay(),
         ])->save();
 
-        $this->get('http://ujialamat--pernahhidup.demo.contoh.co.id/login')
+        $this->get('http://ujialamat.demo.contoh.co.id/login')
             ->assertStatus(503);
 
         // Tidak ada yang digeser: permintaannya ditolak sebelum pemilih koneksi dipanggil, dan
@@ -365,7 +431,7 @@ class EnvironmentAddressTest extends TestCase
         $environment = $this->environment('demo', 'gagalsiap', 'active');
         $environment->forceFill(['status' => 'degraded', 'schema_migrated_at' => null])->save();
 
-        $this->get('http://ujialamat--gagalsiap.demo.contoh.co.id/login')->assertNotFound();
+        $this->get('http://ujialamat.demo.contoh.co.id/login')->assertNotFound();
     }
 
     private function environment(string $kind, string $slug, string $status): Environment

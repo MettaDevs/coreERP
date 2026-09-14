@@ -169,9 +169,10 @@ class EnvironmentLifecycleTest extends TestCase
 
     public function test_the_sweep_continues_after_one_environment_fails(): void
     {
+        // Tiga tenant: satu tenant hanya boleh punya satu demo hidup.
         $first = $this->make('demo', 'active', 'satu', now()->subDays(3));
-        $failed = $this->make('demo', 'active', 'dua', now()->subDays(2));
-        $last = $this->make('demo', 'active', 'tiga', now()->subDay());
+        $failed = $this->make('demo', 'active', 'dua', now()->subDays(2), tenant: $this->anotherTenant('dua'));
+        $last = $this->make('demo', 'active', 'tiga', now()->subDay(), tenant: $this->anotherTenant('tiga'));
 
         // Kegagalan yang sungguhan, ditanam di PostgreSQL, bukan di PHP. Yang diuji justru
         // perilakunya terhadap pernyataan yang ditolak database: tanpa SAVEPOINT, penolakan pada
@@ -205,7 +206,7 @@ class EnvironmentLifecycleTest extends TestCase
     public function test_an_environment_under_another_operation_is_skipped_without_stopping_the_sweep(): void
     {
         $busy = $this->make('demo', 'active', 'sibuk', now()->subDays(2));
-        $free = $this->make('demo', 'active', 'bebas', now()->subDay());
+        $free = $this->make('demo', 'active', 'bebas', now()->subDay(), tenant: $this->anotherTenant('bebas'));
 
         EnvironmentOperation::create([
             'environment_id' => $busy->id,
@@ -305,6 +306,27 @@ class EnvironmentLifecycleTest extends TestCase
     }
 
     // ------------------------------------------------------- pemulihan: jalur merah
+
+    /**
+     * Demo baru yang lahir selama yang lama dalam masa tenggang memegang alamat `<tenant>.demo.…`.
+     * Memulihkan yang lama ditolak dengan kalimat yang terbaca, dan tidak meninggalkan riwayat.
+     */
+    public function test_a_demo_is_not_restored_over_a_living_demo_of_the_same_tenant(): void
+    {
+        $old = $this->make('demo', 'active', 'lama', now()->subDay());
+        $this->artisan('environment:sweep-expired')->assertExitCode(Command::SUCCESS);
+        $this->assertSame('soft_deleted', $old->refresh()->status);
+
+        $living = $this->make('demo', 'active', 'baru');
+
+        $this->artisan('environment:restore', ['environment' => $old->id])
+            ->expectsOutputToContain('sudah punya demo hidup lain')
+            ->assertExitCode(Command::FAILURE);
+
+        $this->assertSame('soft_deleted', $old->refresh()->status);
+        $this->assertNull($living->refresh()->deleted_at);
+        $this->assertSame(0, EnvironmentOperation::query()->where('operation', 'restore')->count());
+    }
 
     public function test_a_grace_period_that_has_run_out_refuses_to_be_restored(): void
     {
@@ -524,7 +546,7 @@ class EnvironmentLifecycleTest extends TestCase
             'Sapuan tidak diberi penjaga; ia memang tidak berbahaya ketika tidak ada yang perlu disapu.',
         );
 
-        $demo = $this->make('demo', 'active', 'menunggu', now()->subDay());
+        $demo = $this->make('demo', 'active', 'menunggu', now()->subDay(), tenant: $this->anotherTenant('menunggu'));
         $this->softDeleteDirectly($demo, now()->addDays(30));
 
         $this->assertTrue(
@@ -542,10 +564,10 @@ class EnvironmentLifecycleTest extends TestCase
      * `environments_keluar_ikut_jenis` mengikat keduanya, jadi kombinasi lain memang tidak dapat
      * lahir. Menurunkannya membuat fixture yang salah gagal saat disusun, bukan saat dijalankan.
      */
-    private function make(string $kind, string $status, string $slug, ?CarbonInterface $expiresAt = null, ?string $database = null): Environment
+    private function make(string $kind, string $status, string $slug, ?CarbonInterface $expiresAt = null, ?string $database = null, ?Tenant $tenant = null): Environment
     {
         return Environment::create([
-            'tenant_id' => $this->tenant->id,
+            'tenant_id' => ($tenant ?? $this->tenant)->id,
             'kind' => $kind,
             'name' => 'Uji '.$slug,
             'slug' => 'ujidaur-'.$slug,
@@ -553,6 +575,17 @@ class EnvironmentLifecycleTest extends TestCase
             'status' => $status,
             'outbound_allowed' => $kind === 'production',
             'expires_at' => $kind === 'demo' ? ($expiresAt ?? now()->addDays(30)) : $expiresAt,
+        ]);
+    }
+
+    /** Tenant kedua di klien yang sama, untuk test yang butuh lebih dari satu demo hidup. */
+    private function anotherTenant(string $suffix): Tenant
+    {
+        return Tenant::create([
+            'client_id' => $this->tenant->client_id,
+            'name' => 'PT Uji Daur '.$suffix,
+            'slug' => 'ujidaur-'.$suffix,
+            'status' => 'active',
         ]);
     }
 

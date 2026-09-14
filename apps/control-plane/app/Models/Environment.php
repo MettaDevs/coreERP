@@ -149,10 +149,6 @@ class Environment extends Model
      */
     public function url(): ?string
     {
-        return EnvironmentAddress::forEnvironment(
-            $this->tenant->slug ?? '',
-            $this->slug,
-            $this->kind,
-        );
+        return EnvironmentAddress::forEnvironment($this->tenant->slug ?? '', $this->kind);
     }
 }

@@ -1808,9 +1808,18 @@ konsol. Itu hanya dapat dibuktikan di lingkungan yang kedua aplikasinya hidup.
 Middleware yang menentukan tenant **dan** environment dari host, spanduk di Shell pelanggan, dan
 tempat setelan penyedia identitas per tenant.
 
-Bentuk alamatnya: produksi `<tenant>.contoh.co.id`, selain itu
-`<tenant>--<lingkungan>.<jenis>.contoh.co.id`. **Pemisahnya dua tanda hubung**, dan itu bukan
-selera — lihat peringatan di bawah.
+Bentuk alamatnya: produksi `<tenant>.erp.contoh.co.id`, demo dan sandbox
+`<tenant>.<jenis>.erp.contoh.co.id`. Satu tenant karena itu punya **paling banyak satu lingkungan
+hidup per jenis**, dijaga `environments_satu_produksi` dan `environments_satu_per_jenis` di database
+pusat.
+
+::: info Diganti 14 September 2026
+Bentuk pertamanya `<tenant>--<lingkungan>.<jenis>.contoh.co.id`, supaya satu tenant dapat punya
+banyak demo. Pemilik produk memilih alamat yang terbaca manusia di atas kemampuan itu. Slug
+lingkungan sebagai label sendiri (`<tenant>.<lingkungan>.…`) ditimbang dan ditolak: wildcard hanya
+mencakup satu label, jadi setiap nama lingkungan akan menuntut sertifikat wildcard baru. Peringatan
+tentang pemisah dua tanda hubung di bawah tetap disimpan sebagai riwayat.
+:::
 
 Ia **tidak pernah menyala** tanpa `COREERP_DOMAIN_DASAR`. Bukan gagal; tidak menyala. On-prem,
 lingkungan lokal, dan seluruh suite yang ada berjalan persis seperti sebelumnya.

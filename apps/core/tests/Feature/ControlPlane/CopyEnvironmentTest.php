@@ -144,10 +144,29 @@ class CopyEnvironmentTest extends TestCase
         $this->assertSame([], $this->createdTestDatabases(), 'Tidak satu pun database boleh lahir dari penolakan.');
     }
 
+    /** Satu tenant, satu sandbox hidup: alamatnya `<tenant>.sandbox.…` hanya memuat tenant dan jenis. */
+    public function test_a_tenant_that_already_has_a_sandbox_refuses_a_copy_under_another_name(): void
+    {
+        $production = $this->environment('production', 'ujisalin', 'env_ujisalin_palsu_5');
+        $this->environment('sandbox', 'kotak-lama', null);
+
+        $this->artisan('environment:copy', ['source' => $production->id, '--name' => 'Kotak Baru'])
+            ->expectsOutputToContain('sudah punya sandbox "kotak-lama"')
+            ->assertExitCode(Command::FAILURE);
+
+        $this->assertSame(0, EnvironmentOperation::query()->count());
+        $this->assertSame(2, Environment::query()->count(), 'Sasaran tidak boleh lahir dari penolakan.');
+        $this->assertSame([], $this->createdTestDatabases());
+    }
+
     public function test_another_copy_still_alive_refuses_a_second_copy(): void
     {
         $production = $this->environment('production', 'ujisalin', 'env_ujisalin_palsu_3');
+        // Sandbox yang sedang disalin dari produksi yang sama. Satu tenant hanya boleh punya satu
+        // sandbox, jadi percobaan kedua yang realistis adalah melanjutkan sandbox yang sama — dan
+        // yang harus menolaknya penyalinan yang masih hidup, bukan aturan satu-sandbox.
         $otherSandbox = $this->environment('sandbox', 'kotak-satu', null);
+        $otherSandbox->forceFill(['status' => 'copying', 'source_environment_id' => $production->id])->save();
 
         EnvironmentOperation::create([
             'environment_id' => $otherSandbox->id,
@@ -159,7 +178,8 @@ class CopyEnvironmentTest extends TestCase
             'lease_until' => now()->addMinutes(20),
         ]);
 
-        $this->artisan('environment:copy', ['source' => $production->id, '--name' => 'Kotak Dua'])
+        $this->artisan('environment:copy', ['source' => $production->id, '--name' => 'Kotak Satu'])
+            ->expectsOutputToContain('sedang disalin')
             ->assertExitCode(Command::FAILURE);
 
         // Penolakannya tidak boleh menyentuh operasi yang sehat, dan tidak boleh meninggalkan
@@ -177,7 +197,11 @@ class CopyEnvironmentTest extends TestCase
         $production = $this->environment('production', 'ujisalin', 'env_ujisalin_palsu_4');
 
         foreach (['kotak-satu', 'kotak-dua'] as $i => $slug) {
-            $sandbox = $this->environment('sandbox', $slug, null);
+            // Sandbox kedua milik tenant lain: satu tenant hanya boleh punya satu sandbox hidup, dan
+            // yang diuji di sini indeks operasi per sumber, bukan indeks sandbox per tenant.
+            $sandbox = $i === 0
+                ? $this->environment('sandbox', $slug, null)
+                : $this->sandboxOfAnotherTenant($slug);
 
             if ($i === 1) {
                 $this->expectException(QueryException::class);
@@ -411,6 +435,26 @@ class CopyEnvironmentTest extends TestCase
             'database_name' => $database,
             'status' => 'active',
             'outbound_allowed' => $kind === 'production',
+        ]);
+    }
+
+    private function sandboxOfAnotherTenant(string $slug): Environment
+    {
+        $tenant = Tenant::create([
+            'client_id' => $this->tenant->client_id,
+            'name' => 'PT Tetangga Salin',
+            'slug' => $this->tenant->slug.'-tetangga',
+            'status' => 'active',
+        ]);
+
+        return Environment::create([
+            'tenant_id' => $tenant->id,
+            'kind' => 'sandbox',
+            'name' => Str::headline($slug),
+            'slug' => $slug,
+            'database_name' => null,
+            'status' => 'active',
+            'outbound_allowed' => false,
         ]);
     }
 

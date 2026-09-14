@@ -354,14 +354,16 @@ class CreateCustomerTest extends TestCase
         $operator = $this->operator();
         $tenant = $this->tenant('PT Punya Dua');
 
-        foreach (['Uji A', 'Uji B', 'Sudah Dibuang'] as $name) {
+        // Tiga jenis berbeda: satu tenant hanya boleh punya satu lingkungan hidup per jenis.
+        foreach (['Uji A' => 'production', 'Uji B' => 'sandbox', 'Sudah Dibuang' => 'demo'] as $name => $kind) {
             Environment::query()->create([
                 'tenant_id' => $tenant,
-                'kind' => 'sandbox',
+                'kind' => $kind,
                 'name' => $name,
                 'slug' => Str::slug($name),
                 'status' => 'provisioning',
-                'outbound_allowed' => false,
+                'outbound_allowed' => $kind === 'production',
+                'expires_at' => $kind === 'demo' ? now()->addMonth() : null,
                 'created_by' => $operator->id,
             ]);
         }

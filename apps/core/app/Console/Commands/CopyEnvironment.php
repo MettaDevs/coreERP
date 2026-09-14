@@ -223,7 +223,22 @@ final class CopyEnvironment extends Command
             return self::FAILURE;
         }
 
-        $target = $target instanceof Environment ? $target : $this->createTargetRow($source, $name, $slug);
+        if (! $target instanceof Environment) {
+            try {
+                $target = $this->createTargetRow($source, $name, $slug);
+            } catch (QueryException $conflict) {
+                // Sandbox lain lahir di sela pemeriksaan di atas dan sisipan ini. Yang memutuskan
+                // indeksnya, bukan pemeriksaan tadi — dan yang kalah mendapat penolakan yang terbaca.
+                if (! str_contains($conflict->getMessage(), 'environments_satu_per_jenis')) {
+                    throw $conflict;
+                }
+
+                $this->error('Tenant ini memperoleh sandbox lain di sela pemeriksaan dan penulisan. Periksa daftar lingkungannya sebelum mencoba lagi.');
+
+                return self::FAILURE;
+            }
+        }
+
         $operation = $this->openOperation($target, 'copy');
 
         if (! $operation instanceof EnvironmentOperation) {
@@ -431,6 +446,27 @@ final class CopyEnvironment extends Command
             ->first();
 
         if (! $existing instanceof Environment) {
+            // Nama baru. Tetapi satu tenant hanya boleh punya satu sandbox hidup — alamatnya
+            // `<tenant>.sandbox.<domain>` hanya memuat tenant dan jenis — jadi sandbox lain yang
+            // masih hidup menutup jalannya, apa pun namanya.
+            $sandbox = Environment::query()
+                ->where('tenant_id', $source->tenant_id)
+                ->where('kind', 'sandbox')
+                ->whereNull('deleted_at')
+                ->first();
+
+            if ($sandbox instanceof Environment) {
+                $this->error(sprintf(
+                    'Tenant ini sudah punya sandbox "%s". Satu tenant hanya boleh punya satu sandbox. '
+                    .'Salin ulang ke nama yang sama untuk melanjutkan yang setengah jadi, atau hapus '
+                    .'"%s" dulu.',
+                    $sandbox->slug,
+                    $sandbox->slug,
+                ));
+
+                return false;
+            }
+
             return null;
         }
 
@@ -965,6 +1001,14 @@ final class CopyEnvironment extends Command
      */
     private function disarmCopiedRegistry(Connection $db): int
     {
+        // `environments_satu_per_jenis` menolak penurunan di bawah begitu satu tenant punya lebih
+        // dari satu baris. Biasanya ia tidak ada di sini: sumber salinan selalu database lingkungan
+        // sendiri, dan migration indeks itu melewati koneksi `environment_*`. Tetapi database
+        // lingkungan yang pernah dimigrasi lewat koneksi bernama lain membawanya, dan penyalinannya
+        // akan jatuh di tengah jalan. Registry di salinan bukan yang berwenang, jadi indeksnya yang
+        // dibuang, bukan penurunannya yang dilonggarkan.
+        $db->statement('DROP INDEX IF EXISTS environments_satu_per_jenis');
+
         return $db->table('environments')
             ->where(static function (Builder $query): void {
                 $query->where('kind', '!=', 'sandbox')->orWhere('outbound_allowed', true);
