@@ -46,31 +46,34 @@ class EnvironmentAddressTest extends TestCase
     {
         $this->assertSame(
             'https://ivs.contoh.co.id',
-            EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'),
+            EnvironmentAddress::forEnvironment('ivs', 'production'),
         );
     }
 
-    /** Dipaku sama dengan Core: `ivs--uat.sandbox.contoh.co.id`. */
+    /** Dipaku sama dengan Core: `ivs.sandbox.contoh.co.id`. */
     public function test_other_than_production_carries_its_kind_label(): void
     {
         $this->assertSame(
-            'https://ivs--uat.sandbox.contoh.co.id',
-            EnvironmentAddress::forEnvironment('ivs', 'uat', 'sandbox'),
+            'https://ivs.sandbox.contoh.co.id',
+            EnvironmentAddress::forEnvironment('ivs', 'sandbox'),
         );
     }
 
     /**
-     * Pemisahnya dua tanda hubung, dan slug yang memuat tanda hubung tunggal tetap utuh.
-     *
-     * Percobaan pertama Core memakai satu, dengan alasan "slug tenant tidak pernah memuat tanda
-     * hubung" — dan alasan itu salah pada pelanggan sungguhan, karena `Str::slug()` mengubah
-     * "PT Sinar Abadi" menjadi `pt-sinar-abadi`.
+     * Bentuk yang dipilih pemilik produk 14 September 2026: `<tenant>.<jenis>.<domain>`, tanpa
+     * `--` dan tanpa slug lingkungan. Dipaku sama dengan Core.
      */
-    public function test_hyphenated_slugs_survive_the_double_hyphen_separator(): void
+    public function test_a_hyphenated_tenant_is_followed_by_its_kind_label_only(): void
     {
+        config(['core.base_domain' => 'erp.grenery.xyz']);
+
         $this->assertSame(
-            'https://pt-sinar-abadi--peragaan-penjualan.demo.contoh.co.id',
-            EnvironmentAddress::forEnvironment('pt-sinar-abadi', 'peragaan-penjualan', 'demo'),
+            'https://pt-nusantara-sehat.demo.erp.grenery.xyz',
+            EnvironmentAddress::forEnvironment('pt-nusantara-sehat', 'demo'),
+        );
+        $this->assertSame(
+            'https://pt-nusantara-sehat.erp.grenery.xyz',
+            EnvironmentAddress::forEnvironment('pt-nusantara-sehat', 'production'),
         );
     }
 
@@ -84,7 +87,7 @@ class EnvironmentAddressTest extends TestCase
     {
         config(['core.base_domain' => null]);
 
-        $this->assertNull(EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+        $this->assertNull(EnvironmentAddress::forEnvironment('ivs', 'production'));
     }
 
     /**
@@ -102,12 +105,12 @@ class EnvironmentAddressTest extends TestCase
         ]);
 
         $this->assertSame(
-            'http://pt-sinar-abadi--peragaan.demo.erp.localhost:8000',
-            EnvironmentAddress::forEnvironment('pt-sinar-abadi', 'peragaan', 'demo'),
+            'http://pt-sinar-abadi.demo.erp.localhost:8000',
+            EnvironmentAddress::forEnvironment('pt-sinar-abadi', 'demo'),
         );
         $this->assertSame(
             'http://pt-sinar-abadi.erp.localhost:8000',
-            EnvironmentAddress::forEnvironment('pt-sinar-abadi', 'pt-sinar-abadi', 'production'),
+            EnvironmentAddress::forEnvironment('pt-sinar-abadi', 'production'),
         );
     }
 
@@ -115,10 +118,10 @@ class EnvironmentAddressTest extends TestCase
     public function test_the_default_port_of_a_scheme_is_not_printed(): void
     {
         config(['core.address_scheme' => 'https', 'core.address_port' => '443']);
-        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'production'));
 
         config(['core.address_scheme' => 'http', 'core.address_port' => '80']);
-        $this->assertSame('http://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+        $this->assertSame('http://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'production'));
     }
 
     /**
@@ -130,7 +133,7 @@ class EnvironmentAddressTest extends TestCase
     {
         config(['core.address_scheme' => '', 'core.address_port' => '']);
 
-        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'production'));
     }
 
     /** Skema salah ketik tidak menghasilkan tautan berskema karangan. */
@@ -138,13 +141,13 @@ class EnvironmentAddressTest extends TestCase
     {
         config(['core.address_scheme' => 'htps']);
 
-        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'ivs', 'production'));
+        $this->assertSame('https://ivs.contoh.co.id', EnvironmentAddress::forEnvironment('ivs', 'production'));
     }
 
-    /** Tenant atau lingkungan tanpa slug tidak menghasilkan alamat setengah jadi. */
+    /** Tenant tanpa slug tidak menghasilkan alamat setengah jadi. */
     public function test_a_missing_slug_never_produces_a_half_built_address(): void
     {
-        $this->assertNull(EnvironmentAddress::forEnvironment('', 'ivs', 'production'));
-        $this->assertNull(EnvironmentAddress::forEnvironment('ivs', '', 'demo'));
+        $this->assertNull(EnvironmentAddress::forEnvironment('', 'production'));
+        $this->assertNull(EnvironmentAddress::forEnvironment('', 'demo'));
     }
 }

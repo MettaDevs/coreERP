@@ -111,6 +111,13 @@ final class CreateEnvironment
                     );
                 }
 
+                if (str_contains($conflict->getMessage(), 'environments_satu_per_jenis')) {
+                    throw new EnvironmentRejected(
+                        'Tenant '.$tenant->name.' sudah punya lingkungan '.$kind.'. Satu tenant hanya boleh punya satu demo dan satu sandbox, karena alamatnya hanya memuat tenant dan jenis.',
+                        previous: $conflict,
+                    );
+                }
+
                 if (! str_contains($conflict->getMessage(), 'environments_slug_per_tenant')) {
                     throw $conflict;
                 }

@@ -180,15 +180,39 @@ class CreateEnvironmentTest extends TestCase
         $this->assertSame(1, Environment::query()->where('tenant_id', $tenant)->count());
     }
 
+    /**
+     * Alamatnya `<tenant>.<jenis>.<domain>`, jadi demo kedua akan menunjuk alamat yang sama.
+     * Ditolak `environments_satu_per_jenis` di database, dan operator membaca sebabnya.
+     */
+    public function test_a_second_demo_or_sandbox_for_the_same_tenant_is_rejected(): void
+    {
+        $tenant = $this->tenant('PT Dua Demo');
+        $operator = $this->operator();
+
+        foreach (['demo', 'sandbox'] as $kind) {
+            $fields = ['tenant_id' => $tenant, 'kind' => $kind, 'expires_at' => now()->addMonth()->toDateString()];
+
+            $this->actingAs($operator)->post('/lingkungan', $fields + ['name' => 'Pertama'])->assertRedirect();
+
+            $this->actingAs($operator)
+                ->post('/lingkungan', $fields + ['name' => 'Kedua'])
+                ->assertSessionHasErrors(['name' => 'Tenant PT Dua Demo sudah punya lingkungan '.$kind.'. Satu tenant hanya boleh punya satu demo dan satu sandbox, karena alamatnya hanya memuat tenant dan jenis.']);
+        }
+
+        $this->assertSame(2, Environment::query()->where('tenant_id', $tenant)->count());
+    }
+
     public function test_the_same_name_in_one_tenant_gets_a_different_slug(): void
     {
         $tenant = $this->tenant('PT Nama Kembar');
         $operator = $this->operator();
 
-        foreach ([1, 2] as $_) {
+        // Dua jenis berbeda: satu tenant hanya boleh punya satu sandbox, jadi nama kembar yang
+        // realistis datang dari jenis yang lain.
+        foreach (['sandbox', 'production'] as $kind) {
             $this->actingAs($operator)->post('/lingkungan', [
                 'tenant_id' => $tenant,
-                'kind' => 'sandbox',
+                'kind' => $kind,
                 'name' => 'Uji Coba',
             ])->assertRedirect();
         }

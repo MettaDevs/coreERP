@@ -31,7 +31,7 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * WebAuthn mengizinkan RP ID berupa host itu sendiri **atau** sufiks domain yang dapat didaftarkan
  * darinya. `erp.contoh.co.id` sah untuk `pelanggan.erp.contoh.co.id` maupun untuk
- * `pelanggan--uat.demo.erp.contoh.co.id`.
+ * `pelanggan.demo.erp.contoh.co.id`.
  *
  * Memilih sufiksnya berarti **satu passkey berlaku di seluruh tenant milik orang itu** — dan itu
  * memang yang diputuskan: satu orang boleh berada di banyak tenant (konsultan, akuntan, operator
