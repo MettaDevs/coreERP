@@ -36,6 +36,7 @@ export default withMermaid({
       'todo/entrypointPERMISSIONprevilage/index.md',
     'todo/api-untuk-integrator/README.md': 'todo/api-untuk-integrator/index.md',
     'todo/bundle-on-prem/README.md': 'todo/bundle-on-prem/index.md',
+    'todo/on-prem-dikelola/README.md': 'todo/on-prem-dikelola/index.md',
     'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
     'todo/environment-dan-pusat-admin/README.md':
       'todo/environment-dan-pusat-admin/index.md',
@@ -257,6 +258,10 @@ export default withMermaid({
                 {
                   text: 'Bundle dan pemasangan di server pelanggan',
                   link: '/todo/bundle-on-prem/',
+                },
+                {
+                  text: 'On-prem yang dikelola vendor',
+                  link: '/todo/on-prem-dikelola/',
                 },
               ],
             },
