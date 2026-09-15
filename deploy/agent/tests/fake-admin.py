@@ -602,7 +602,7 @@ class Penangan(BaseHTTPRequestHandler):
             catatan['status'] = 409
             return self.json_jawaban(409, {'error': 'operation_not_held'}, jalur_kontrak, 'post')
 
-        # Satu robot per operasi; memanggil ulang memutar rahasianya. Kata sandi berawalan tetap supaya pengujian
+        # Satu robot per operasi; memanggil ulang mengganti robotnya. Kata sandi berawalan tetap supaya pengujian
         # dapat mencarinya di disk dan di log tanpa tiruan ini pernah menyebutnya di /_test/state.
         jawaban = {
             'registry': REGISTRY_UJI,

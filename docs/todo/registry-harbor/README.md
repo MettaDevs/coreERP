@@ -211,8 +211,9 @@ sebenarnya; setel kedaluwarsa token robot serendah yang tidak memutus pull besar
   (`running`, lease belum habis). Selain itu `409`.
 - Situs yang dicabut: `401`, sama dengan endpoint agen lain.
 - Jawaban: `{registry, username, password, expires_at}`. `registry` adalah host, bukan URL.
-- Dipanggil ulang selama operasi yang sama: robot yang sama boleh diputar rahasianya, bukan robot baru
-  menumpuk.
+- Dipanggil ulang selama operasi yang sama: robot lama dihapus lalu robot baru dibuat, sehingga nama
+  penggunanya ikut berganti. Harbor v2.15.2 tidak mengenal izin `robot:update`, jadi robot sistem tidak dapat
+  memutar rahasia robot lain (diukur 15 September 2026). Satu operasi tetap memegang paling banyak satu robot.
 - Setiap penerbitan dan penghapusan robot dicatat di `operator_audit_events` bersama operasinya.
 
 ### Manifest rilis v2
