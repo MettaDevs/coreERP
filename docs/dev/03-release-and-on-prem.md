@@ -313,6 +313,53 @@ Jika customer secara eksplisit membeli managed support, Compose dapat menambahka
 
 Rollback image hanya boleh dilakukan bila migration kompatibel mundur. Jika tidak, gunakan forward fix dari release baru dan restore backup dengan prosedur recovery yang jelas.
 
+### Perubahan skema dan mundur
+
+**Yang dimundurkan saat rilis bermasalah adalah image, bukan database.** Migration tidak ikut mundur,
+dan `down()` tidak pernah dipakai di produksi: memulihkan database dari cadangan membuang setiap
+transaksi yang ditulis sesudah pembaruan, dan `down()` yang menghapus kolom membuang isinya. Di server
+klinik, yang hilang adalah rekam medis dan kuitansi.
+
+Karena itu setiap rilis wajib **kompatibel N-1**: skema sesudah migration rilis N harus tetap dapat
+dipakai kode rilis N-1.
+
+| Perubahan di migration | Kode rilis sebelumnya | Boleh dalam satu rilis |
+| --- | --- | --- |
+| Tabel baru | tidak mengenalnya | ya |
+| Kolom baru yang boleh kosong atau punya nilai bawaan | tidak menyebutnya | ya |
+| Index, constraint yang melonggarkan | tetap menulis nilai yang sah | ya |
+| Kolom wajib diisi tanpa nilai bawaan pada tabel yang sudah ada | gagal saat menyisipkan baris | tidak |
+| Menghapus atau mengganti nama kolom atau tabel | gagal saat membaca atau menulis | tidak |
+| Mengubah tipe kolom, `SET NOT NULL`, constraint yang mengetatkan | gagal pada nilai yang dulu sah | tidak |
+
+Perubahan yang memang harus merusak dikerjakan bertahap (**expand/contract**):
+
+1. **Expand** — tambah kolom atau tabel baru yang boleh kosong. Kode lama tetap jalan.
+2. Kode baru menulis ke yang lama dan yang baru, dan data lama diisikan ke yang baru.
+3. Kode baru membaca dari yang baru.
+4. **Contract** — yang lama dihapus, paling cepat satu rilis sesudah tidak ada kode yang membacanya.
+   Migration-nya membawa penanda `@kontrak` beserta alasannya.
+
+Mundur otomatis yang **memulihkan database** hanya terjadi di dalam pembaruan itu sendiri: `update.sh`
+mencadangkan database tepat sebelum migration, dan memulihkannya bila migration gagal atau aplikasi
+tidak menjadi sehat. Pada saat itu belum ada transaksi yang lahir di rilis baru selain yang ditulis
+selama jendela pembaruan — alasan pembaruan hanya dijalankan di jendela yang disepakati.
+
+Masalah yang ketahuan jam atau hari sesudahnya diselesaikan dengan salah satu dari tiga cara ini,
+berurutan dari yang dipilih lebih dulu:
+
+1. **Matikan fiturnya** tanpa mundur apa pun, bila fitur itu punya sakelar.
+2. **Maju ke rilis perbaikan** (1.2.1), bukan mundur ke 1.1.0.
+3. **Jalankan image rilis sebelumnya** di atas database yang ada. Ini aman karena aturan N-1.
+
+Pemulihan database dari cadangan hanya untuk bencana, dan ia keputusan manusia di lokasi — bukan tombol.
+
+**Penjaganya** `apps/core/tests/Feature/Boundary/MigrasiKompatibelMundurTest.php`. Ia membaca `up()`
+setiap migration Core dan modul, dan menolak pola yang merusak kode lama kecuali migration itu
+membawa `@kontrak <alasan>` (langkah contract) atau `@kompatibel-mundur <alasan>` (pola yang terbaca
+merusak tetapi aman, misalnya melebarkan tipe kolom). Migration yang lahir sebelum aturan ini berlaku
+dicatat di daftar beku di test itu, dan daftar itu hanya boleh berkurang.
+
 ## Disable dan uninstall
 
 ```text

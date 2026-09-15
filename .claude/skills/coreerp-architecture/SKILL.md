@@ -1,6 +1,6 @@
 ---
 name: coreerp-architecture
-description: Guard CoreERP architecture boundaries, organization model, authorization, contracts, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, module installation, deployment, product launcher, upgrades, SaaS/on-prem packaging, or module availability UI/API. Also use when touching any cross-module surface — OpenAPI/AsyncAPI contract files, `internal/v1` endpoints, published events, webhooks, event envelopes or versions — or when adding a route another module calls.
+description: Guard CoreERP architecture boundaries, organization model, authorization, contracts, and lifecycle truth. Use when changing tenant or organization scope, legal entities, operating units, hierarchies, workforce/positions, roles/permissions, module catalog, entitlement, onboarding, provisioning, module installation, deployment, product launcher, upgrades, database migrations or release rollback, SaaS/on-prem packaging, or module availability UI/API. Also use when touching any cross-module surface — OpenAPI/AsyncAPI contract files, `internal/v1` endpoints, published events, webhooks, event envelopes or versions — or when adding a route another module calls.
 ---
 
 # CoreERP Architecture
@@ -15,6 +15,7 @@ Read only the sections relevant to the task:
 - `docs/dev/01a-tenant-and-org-hierarchy.md` defines the CoreERP organization model.
 - `docs/dev/08-query-scopes-and-schema.md` defines organization persistence and query scope.
 - `docs/dev/09-identity-and-access.md` defines workforce and responsibility-based access.
+- `docs/dev/03-release-and-on-prem.md` defines releases, updates, and the N-1 schema rule that makes rolling back an image safe without touching the database.
 - `docs/references/dynamics-365-organization-model.md` records the Microsoft Dynamics 365 sources and the mapping decisions used by CoreERP.
 
 The Dynamics reference governs organization, workforce, and responsibility-based security inside a tenant. CoreERP's tenant, entitlement, deployment, and on-prem boundaries remain separate decisions.
@@ -294,6 +295,37 @@ Before implementing organization, workforce, or access changes:
 5. Add the smallest test that rejects cross-tenant references, invalid classification, hierarchy cycles/history rewrites, or scope escalation relevant to the change.
 
 If the required source of truth does not exist, stop and report the missing registry or schema. Do not substitute entitlement, hard-coded catalog data, or optimistic UI and call it installed.
+
+### Schema change and rollback gate
+
+Apply before writing or reviewing any migration in `apps/core/database/migrations` or `modules/*/*/database/migrations`. The canonical rule is `docs/dev/03-release-and-on-prem.md`, section "Perubahan skema dan mundur".
+
+**A bad release is rolled back by running the previous image, never by rolling back the database.** Migrations do not roll back and `down()` is never used in production. Restoring a backup discards every transaction written after the update, which on a clinic server means medical records and receipts.
+
+Every release must therefore be **N-1 compatible**: the schema after release N's migrations must still work with release N-1's code.
+
+- **Allowed in one release:** new tables; new columns that are nullable or have a default; indexes; constraints that only loosen.
+- **Not allowed in the release that needs them:**
+  - dropping or renaming a column or table;
+  - changing a column type;
+  - `SET NOT NULL`;
+  - adding a required column without a default to an existing table;
+  - a constraint that tightens.
+- **Breaking changes use expand/contract across releases:**
+  1. add the new column or table;
+  2. write both and backfill;
+  3. read the new one;
+  4. drop the old one at least one release after no code reads it.
+- **The drop migration** carries a `@kontrak <reason>` docblock tag. A pattern that looks destructive but is safe for old code, such as widening a type, carries `@kompatibel-mundur <reason>`. Both need a real reason; they are reviewed decisions, not silent exceptions.
+- **The guard is `apps/core/tests/Feature/Boundary/MigrasiKompatibelMundurTest.php`.** Never add a new migration to its frozen `SEBELUM_ATURAN` list; that list only shrinks.
+- **After an update, recover in this order:**
+  1. turn the feature off;
+  2. roll forward to a fix release;
+  3. run the previous image on the current database.
+
+  Restoring the database happens only inside the update itself (`scripts/update.sh` restores the pre-migration backup when migration or health fails) or as a human disaster-recovery decision, never as a button.
+
+If a requested change cannot be made N-1 compatible in one release, stop and propose the expand/contract split instead of writing the destructive migration.
 
 ## Module completion gate: concurrency and load
 
