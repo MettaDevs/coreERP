@@ -23,6 +23,7 @@ const formFields = [
     'app_ids',
     'first_environment',
     'first_environment_expires_at',
+    'first_environment_hosting',
 ];
 
 /**
@@ -52,6 +53,7 @@ export default function CreateDialog({
             app_ids: [] as string[],
             first_environment: 'demo',
             first_environment_expires_at: '',
+            first_environment_hosting: 'provider',
         });
 
     // Galat yang bukan milik satu isian. Dikumpulkan dari sisa kunci, bukan dari satu nama yang
@@ -178,6 +180,41 @@ export default function CreateDialog({
                                 </p>
                             )}
                         </div>
+
+                        {data.first_environment === 'production' && (
+                            <div className="space-y-2">
+                                <NativeSelect
+                                    id="first_environment_hosting"
+                                    label="Jalan di mana"
+                                    value={data.first_environment_hosting}
+                                    onChange={(e) =>
+                                        setData(
+                                            'first_environment_hosting',
+                                            e.target.value,
+                                        )
+                                    }
+                                >
+                                    <option value="provider">
+                                        Server kita — langsung dapat dipakai
+                                    </option>
+                                    <option value="client_server">
+                                        Server klien — dipasang dengan satu
+                                        perintah
+                                    </option>
+                                </NativeSelect>
+                                <p className="text-xs text-muted-foreground">
+                                    Server klien berarti aplikasinya berjalan di
+                                    server milik klien dan dikelola dari sini.
+                                    Sesudah tenant lahir, buka lingkungan
+                                    produksinya untuk membuat perintah pasang.
+                                </p>
+                                {errors.first_environment_hosting && (
+                                    <p className="text-sm text-destructive">
+                                        {errors.first_environment_hosting}
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         {data.first_environment === 'demo' && (
                             <div className="space-y-2">

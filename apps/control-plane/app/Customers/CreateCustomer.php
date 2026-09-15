@@ -27,6 +27,7 @@ final class CreateCustomer
      * @param  list<string>  $apps  Id app yang dibeli. Ketersediaannya diputuskan Core, bukan di sini.
      * @param  'production'|'demo'|'none'  $firstEnvironment  Jenis tempat kerja pertamanya.
      * @param  ?string  $firstEnvironmentExpiresAt  Wajib untuk demo, diabaikan selainnya.
+     * @param  'provider'|'client_server'  $firstEnvironmentHosting  Tempat produksinya berjalan; selain produksi diabaikan.
      * @return array{tenant_id: string, environment_id: ?string, email: string, temporary_password: string}
      *
      * @throws CustomerRejected Core menjawab, dan jawabannya "tidak".
@@ -39,6 +40,7 @@ final class CreateCustomer
         array $apps,
         string $firstEnvironment = 'production',
         ?string $firstEnvironmentExpiresAt = null,
+        string $firstEnvironmentHosting = 'provider',
     ): array {
         $endpoint = $this->endpoint();
 
@@ -57,6 +59,12 @@ final class CreateCustomer
                     ...($firstEnvironmentExpiresAt === null
                         ? []
                         : ['first_environment_expires_at' => $firstEnvironmentExpiresAt]),
+                    // Hanya dikirim untuk produksi di server klien. Tanpa field ini Core melahirkan
+                    // lingkungan di server kita, persis seperti sebelum pilihan ini ada — jadi
+                    // permintaan untuk jalur lama tetap byte yang sama dengan kemarin.
+                    ...($firstEnvironment === 'production' && $firstEnvironmentHosting === 'client_server'
+                        ? ['first_environment_hosting' => 'client_server']
+                        : []),
                 ]);
         } catch (ConnectionException $disconnected) {
             // Sengaja tidak ditelan dan tidak dipercantik. Sebab yang paling sering adalah
