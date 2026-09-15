@@ -122,7 +122,12 @@ final class SweepExpiredEnvironments extends Command
         //
         // `deleted_at` ikut disaring, kalau tidak sapuan besok akan mencoba menghapus lunak
         // lingkungan yang sudah dihapus lunak hari ini — dan gagal, setiap hari, selamanya.
+        //
+        // Server klien disaring meski hari ini ia tidak pernah demo. Sapuan menghapus lunak, dan
+        // lingkungan di server klien bukan milik penjadwal server ini untuk ditutup — kalaupun kelak
+        // server klien boleh menjalankan demo, masa berlakunya diurus admin.erp bersama agennya.
         $list = Environment::query()
+            ->hostedByProvider()
             ->where('kind', 'demo')
             ->whereNull('deleted_at')
             ->where('expires_at', '<=', now())

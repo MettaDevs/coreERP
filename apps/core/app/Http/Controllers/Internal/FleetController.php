@@ -101,6 +101,18 @@ final class FleetController extends Controller
      */
     public function upgrade(Request $request, ?string $environmentId = null): JsonResponse
     {
+        // Satu lingkungan yang disebut dan berjalan di server klien ditolak dengan kalimatnya. Daftar
+        // armada di bawah sudah menyaringnya, sehingga tanpa ini jawabannya 404 "tidak ada di
+        // registry" — salah tentang baris yang ada, dan layar konsol menampilkannya sebagai id yang
+        // hilang. Server klien diperbarui agennya dengan paket edisinya, bukan dari rilis server ini.
+        if ($environmentId !== null) {
+            $named = Environment::query()->whereKey($environmentId)->whereNull('deleted_at')->first();
+
+            if ($named instanceof Environment && $named->hostedOnClientServer()) {
+                return response()->json(['message' => $named->clientServerRefusal('Pembaruan dari server ini')], 409);
+            }
+        }
+
         $platform = $this->platformFingerprint();
         $central = $this->fingerprintOf((string) config('database.default'));
         $latest = $this->latestOperations();
@@ -194,11 +206,21 @@ final class FleetController extends Controller
         return $fingerprint === $platform ? 'current' : 'behind';
     }
 
-    /** @return list<Environment> */
+    /**
+     * Armada yang dijalankan server ini.
+     *
+     * Produksi di server klien bukan bagiannya. Sidik yang dilaporkan untuk lingkungan tanpa database
+     * sendiri adalah sidik database pusat, jadi ia akan tampil "mutakhir" atau "tertinggal" menurut
+     * rilis server ini — dua jawaban yang sama-sama tidak benar tentang server yang diperbarui agennya
+     * sendiri — dan tombol "Perbarui semua yang tertinggal" akan mengantrekannya.
+     *
+     * @return list<Environment>
+     */
     private function environments(): array
     {
         /** @var list<Environment> $rows */
         $rows = Environment::query()
+            ->hostedByProvider()
             ->with('tenant:id,name,slug')
             ->whereNull('deleted_at')
             ->orderBy('tenant_id')

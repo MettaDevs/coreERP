@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Boundary;
 
 use App\Models\Client;
+use App\Models\ConsoleSetting;
 use App\Models\Environment;
 use App\Models\EnvironmentOperation;
 use App\Models\OperatorAuditEvent;
@@ -58,6 +59,7 @@ class BatasPusatTest extends TestCase
             [SiteOperation::class, 'site_operations'],
             [SiteReport::class, 'site_reports'],
             [SiteRelease::class, 'site_releases'],
+            [ConsoleSetting::class, 'console_settings'],
             [OperatorAuditEvent::class, 'operator_audit_events'],
         ];
     }

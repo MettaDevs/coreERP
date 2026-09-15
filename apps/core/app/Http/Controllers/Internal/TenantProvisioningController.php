@@ -40,6 +40,7 @@ final class TenantProvisioningController extends Controller
             'must_change_password' => true,
             'first_environment' => $request->firstEnvironment(),
             'first_environment_expires_at' => $request->firstEnvironmentExpiresAt(),
+            'first_environment_hosting' => $request->firstEnvironmentHosting(),
         ]);
 
         $membership = TenantMembership::query()

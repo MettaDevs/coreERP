@@ -706,6 +706,26 @@ paths:
                     Tanggal berakhir, **wajib bila `first_environment` bernilai `demo`** dan
                     diabaikan selainnya. Demo tanpa tanggal berakhir tinggal selamanya, dan tidak
                     ada yang menyadarinya sampai disknya penuh.
+                first_environment_hosting:
+                  type: string
+                  enum: [provider, client_server]
+                  default: provider
+                  description: |
+                    Tempat lingkungan pertama berjalan.
+
+                    `provider` — di server kami, persis seperti sebelum field ini ada.
+
+                    `client_server` — produksi tenant ini dipasang di server milik klien lewat satu
+                    perintah pasang dari admin.erp. **Hanya sah bersama `first_environment`
+                    `production`** (atau tanpa `first_environment`, yang berarti produksi); selainnya
+                    ditolak 422 pada field ini. Lingkungannya lahir dengan `hosting = client_server`
+                    dan status `provisioning` — belum berjalan sampai perintah pasangnya dijalankan —
+                    tanpa database di server ini, dan tanpa satu pun module terpasang di sini.
+                    Entitlement app-nya tetap tercatat; dari situlah edisi paketnya diturunkan.
+
+                    Core di server ini tidak pernah merutekan, menyiapkan, menyalin, memperbarui,
+                    atau memasang module ke lingkungan seperti itu: alamatnya dijawab 404, dan
+                    perintah atas lingkungan itu ditolak 409.
                 admin_name:
                   type: string
                   maxLength: 255
@@ -754,7 +774,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '422':
-          description: Email sudah terdaftar, app tidak tersedia, atau field wajib kurang.
+          description: |
+            Email sudah terdaftar, app tidak tersedia, field wajib kurang, atau
+            `first_environment_hosting` `client_server` bersama jenis selain produksi.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ValidationError' }
@@ -862,6 +884,10 @@ paths:
             Statusnya bukan `provisioning` maupun `degraded`. Menyiapkan ulang lingkungan yang
             sudah hidup akan menimpa isinya, jadi ia ditolak — dan ini keadaan yang dapat
             berubah sendiri sebelum orangnya menekan tombol, bukan permintaan yang salah bentuk.
+
+            Atau lingkungan itu berjalan di server klien (`hosting = client_server`): database
+            dan isinya ada di sana, bukan di server ini, dan penyiapannya dikerjakan perintah
+            pasang. Ditolak apa pun statusnya — produksi server klien memang lahir `provisioning`.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -893,6 +919,10 @@ paths:
         pusat: `environments` menyimpan sidik skema tiap lingkungan, `environment_operations`
         menyimpan riwayatnya. Daftar module per lingkungan memang menuntut database lingkungannya,
         dan karena itu ia tinggal di layar rincian satu lingkungan — bukan di sini.
+
+        **Lingkungan yang berjalan di server klien tidak ikut.** Armada ini adalah yang dijalankan
+        server ini; server klien diperbarui agennya dengan paket edisinya sendiri, dan sidiknya
+        tidak dapat dibandingkan dengan image di sini.
       security:
         - controlPlaneToken: []
       responses:
@@ -1038,6 +1068,10 @@ paths:
         Sama dengan `POST /environments/upgrade`, dibatasi ke satu baris. Lingkungan yang statusnya
         tidak boleh diperbarui — sedang disiapkan, sedang disalin, sudah diarsipkan — dilewati
         tanpa job, dan `queued_count` nol yang menyebutnya.
+
+        Lingkungan yang berjalan di server klien tidak dilewati diam-diam melainkan ditolak 409:
+        ia disebut dengan id-nya, dan jawaban kosong akan terbaca seperti pembaruan yang tidak
+        perlu.
       security:
         - controlPlaneToken: []
       parameters:
@@ -1075,6 +1109,13 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
         '404':
           description: Lingkungan itu tidak ada di registry, atau sudah diarsipkan.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            Lingkungan itu berjalan di server klien. Pembaruannya dikerjakan agen di server itu,
+            bukan rilis server ini.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

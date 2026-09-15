@@ -139,6 +139,15 @@ final class ConvertEnvironment extends Command
             return self::FAILURE;
         }
 
+        // Di depan jawaban "sudah produksi". Lingkungan server klien memang selalu produksi, dan
+        // menjawabnya "tidak ada yang diubah" dengan kode keluar nol menyembunyikan bahwa perintah
+        // ini sedang diarahkan ke tempat yang tidak dapat disentuhnya sama sekali.
+        if ($environment->hostedOnClientServer()) {
+            $this->error($environment->clientServerRefusal('Konversi'));
+
+            return self::FAILURE;
+        }
+
         // Aman dijalankan ulang, dan ia berdiri paling depan.
         //
         // Yang dituju bukan kenyamanan melainkan bentuk pemulihan yang seluruh rancangan ini
@@ -282,6 +291,10 @@ final class ConvertEnvironment extends Command
      * pemeriksaan yang lebih ketat daripada indeksnya akan menolak konversi yang sebenarnya sah —
      * tenant yang produksinya sudah dihapus lunak memang boleh punya produksi baru — dan perbedaan
      * seperti itu muncul sebagai penolakan yang tidak dapat dijelaskan siapa pun.
+     *
+     * Produksi yang berjalan di server klien **tidak** disaring, dengan alasan yang sama: indeksnya
+     * menghitungnya. Ia produksi hidup tenant ini, hanya saja di tempat lain, dan demo yang naik di
+     * sebelahnya berarti dua tempat yang sama-sama mengaku produksi.
      */
     private function otherProduction(Environment $environment): ?Environment
     {
