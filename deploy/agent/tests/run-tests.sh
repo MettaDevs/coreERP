@@ -311,10 +311,22 @@ buat_rilis() {
     tulis_berkas_rilis "$KERJA/rilis/$1/$2" "$1" "${3:-$2}" "${4:-$KERJA/kunci/rilis.key}"
 }
 
-# buat_lisensi BERKAS SITUS BERLAKU_SAMPAI KUNCI — mencetak {license, signature}.
+APPS_LISENSI='["human-resources","management-aset"]'
+
+# buat_lisensi BERKAS SITUS BERLAKU_SAMPAI KUNCI [VERSI] [APPS] — lisensi format versi 2 bertanda tangan
+# KUNCI; mencetak {license, signature}.
+#
+# VERSI dan APPS disisipkan harfiah sebagai JSON, dan SITUS kosong menghilangkan site_id, supaya bentuk
+# yang salah dapat ditandatangani dengan kunci yang sah. Tanpa itu penolakan bentuk tidak dapat dibedakan
+# dari penolakan tanda tangan.
 buat_lisensi() {
-    printf '{"site_id":"%s","tenant_id":"%s","edition":"apotek-uji","valid_until":"%s"}' "$2" "$TENANT_ID" "$3" > "$1"
-    jq -cn --rawfile l "$1" --arg t "$(openssl dgst -sha256 -sign "$4" "$1" | base64 -w0)" \
+    local berkas="$1" situs="$2" berlaku="$3" kunci="$4" versi="${5:-2}" apps="${6:-$APPS_LISENSI}" bidang_situs=''
+
+    [ -z "$situs" ] || bidang_situs="\"site_id\":\"$situs\","
+
+    printf '{"version":%s,"tenant_id":"%s",%s"apps":%s,"valid_until":"%s","issued_at":"2026-09-15T08:00:00Z"}' \
+        "$versi" "$TENANT_ID" "$bidang_situs" "$apps" "$berlaku" > "$berkas"
+    jq -cn --rawfile l "$berkas" --arg t "$(openssl dgst -sha256 -sign "$kunci" "$berkas" | base64 -w0)" \
         '{license: $l, signature: $t}'
 }
 
@@ -372,6 +384,9 @@ uji_templat_dan_compose() {
     # Bawaan compose menjaga pemasangan beli-putus; on-prem dikelola mengikat ke loopback lewat templatnya.
     sama 'env.template mengikat port aplikasi ke loopback' "$(grep '^CORE_APP_BIND=' "$TEMPLAT_ENV")" 'CORE_APP_BIND=127.0.0.1'
 
+    # On-prem dikelola mengunci; bawaan compose tidak, supaya beli-putus dan SaaS tidak pernah terkunci.
+    sama 'env.template mewajibkan lisensi' "$(grep 'COREERP_LICENSE_REQUIRED' "$TEMPLAT_ENV" | grep -v '^#')" 'COREERP_LICENSE_REQUIRED=true'
+
     # shellcheck disable=SC2016 # ${COREERP_LICENSE_DIR:-...} dan ${CORE_APP_BIND:-...} adalah teks harfiah yang dicari di compose
     python3 -c '
 import sys, yaml
@@ -380,9 +395,24 @@ with open(sys.argv[1]) as f:
 lingkungan = compose["x-edition-environment"]
 assert lingkungan["COREERP_LICENSE_PATH"] == "/run/coreerp-license/license.json", "COREERP_LICENSE_PATH"
 assert lingkungan["COREERP_LICENSE_PUBLIC_KEY_PATH"] == "/run/coreerp-license/license-public.pem", "COREERP_LICENSE_PUBLIC_KEY_PATH"
+wajib = "${COREERP_LICENSE_REQUIRED:-false}"
+assert lingkungan["COREERP_LICENSE_REQUIRED"] == wajib, "COREERP_LICENSE_REQUIRED di anchor: %r" % lingkungan.get("COREERP_LICENSE_REQUIRED")
 mount = "${COREERP_LICENSE_DIR:-/opt/coreerp/agent/license}:/run/coreerp-license:ro"
 for layanan in ("core-app", "core-worker", "core-scheduler"):
     assert mount in compose["services"][layanan]["volumes"], layanan + " tidak me-mount folder lisensi"
+# Setiap layanan yang membaca setelan lisensi: yang me-mount foldernya meneruskan nilai dari .env; yang tidak
+# me-mount-nya tidak boleh mewajibkan lisensi, karena lisensi yang tidak terlihat terbaca hilang dan mengunci.
+tanpa_mount = []
+for nama, layanan in compose["services"].items():
+    env = layanan.get("environment") or {}
+    if "COREERP_LICENSE_PATH" not in env:
+        continue
+    if mount in (layanan.get("volumes") or []):
+        assert env["COREERP_LICENSE_REQUIRED"] == wajib, "%s: COREERP_LICENSE_REQUIRED %r" % (nama, env["COREERP_LICENSE_REQUIRED"])
+    else:
+        assert env["COREERP_LICENSE_REQUIRED"] == "false", "%s tanpa folder lisensi: COREERP_LICENSE_REQUIRED %r" % (nama, env["COREERP_LICENSE_REQUIRED"])
+        tanpa_mount.append(nama)
+assert tanpa_mount == ["core-migrate"], "layanan tanpa folder lisensi: %r" % tanpa_mount
 port = compose["services"]["core-app"]["ports"]
 assert port == ["${CORE_APP_BIND:-0.0.0.0}:${CORE_APP_PORT:-8000}:80"], "port core-app: %r" % port
 # Layanan lain yang menerbitkan port lolos dari CORE_APP_BIND dan terbuka ke semua alamat.
@@ -699,6 +729,15 @@ uji_09_lisensi_operasi() {
     memuat 'sebabnya situs' "$(jq -r .failure_message <<< "$op")" 'bukan situs ini'
     pastikan 'lisensi situs lain tidak dipasang' test ! -e "$berkas_lisensi"
 
+    # Operasi dan jawaban laporan memakai pemeriksaan yang sama; format lama tidak lolos lewat jalur operasi.
+    parameter="$(buat_lisensi "$KERJA/lisensi-versi-1.json" "$s" 2027-09-30 "$KERJA/kunci/lisensi.key" 1)"
+    id="$(antre "$(jq -cn --arg s "$s" --argjson p "$parameter" '{site_id: $s, operation: "install_license", parameters: $p}')")"
+    agen run --now
+    op="$(operasi "$id")"
+    sama 'lisensi versi 1 gagal' "$(jq -r .status <<< "$op")" failed
+    memuat 'sebabnya versi' "$(jq -r .failure_message <<< "$op")" 'bukan format versi 2'
+    pastikan 'lisensi versi 1 tidak dipasang' test ! -e "$berkas_lisensi"
+
     parameter="$(buat_lisensi "$KERJA/lisensi-baik.json" "$s" 2027-09-30 "$KERJA/kunci/lisensi.key")"
     id="$(antre "$(jq -cn --arg s "$s" --argjson p "$parameter" '{site_id: $s, operation: "install_license", parameters: $p}')")"
     agen run --now
@@ -711,6 +750,161 @@ uji_09_lisensi_operasi() {
         openssl dgst -sha256 -verify "$KERJA/kunci/lisensi.pub" -signature "$KERJA/lisensi-terpasang.sig" "$berkas_lisensi"
     sama 'lisensi dapat dibaca container Core' "$(stat -c %a "$berkas_lisensi")" 644
     sama 'laporan menyebut habis lisensi' "$(laporan_terakhir | jq -r .license_expires_at)" 2027-09-30
+}
+
+uji_09b_lisensi_laporan() {
+    local s folder="$COREERP_HOME/agent/license" sidik_awal sebelum log lisensi
+
+    s="$(situs)"
+
+    sidik() {
+        cat "$folder/license.json" "$folder/license.json.sig" | sha256sum
+    }
+
+    # putaran NAMA — satu `run --now` tanpa operasi; keluarannya di $log. Interval di site.json dikacaukan
+    # lebih dulu: interval dari jawaban laporan tetap harus tersimpan, apa pun nasib lisensinya.
+    putaran() {
+        log="$KERJA/log/lisensi-laporan-$1.log"
+        jq -c '.interval_seconds = 999' "$COREERP_HOME/agent/site.json" > "$KERJA/site-kacau.json"
+        cat "$KERJA/site-kacau.json" > "$COREERP_HOME/agent/site.json"
+        sebelum="$(jumlah_permintaan)"
+
+        if ! agen run --now > "$log" 2>&1; then
+            cat "$log"
+            printf '%s: putaran gagal, padahal lisensi di jawaban laporan tidak boleh menggagalkannya\n' "$1"
+            return 1
+        fi
+
+        sama "$1: interval dari jawaban laporan tersimpan" "$(jq -r .interval_seconds "$COREERP_HOME/agent/site.json")" 60
+        sama "$1: putaran berlanjut menanyakan operasi" "$(status_sejak "$sebelum" /api/agent/v1/operations/claim)" 204
+    }
+
+    # titip ISI — {license, signature} yang disertakan admin.erp tiruan di jawaban laporan berikutnya.
+    titip() {
+        admin_post "/_test/sites/$s/lisensi-laporan" "$1" >/dev/null
+    }
+
+    dijawab() {
+        sama "$1: jawaban laporan membawa lisensi" "$(admin_keadaan | jq -r '.reports[-1].lisensi_dijawab')" "$2"
+    }
+
+    # tolak_laporan KETERANGAN POTONGAN_ALASAN SITUS BERLAKU_SAMPAI KUNCI [VERSI] [APPS]
+    tolak_laporan() {
+        local keterangan="$1" potongan="$2"
+        shift 2
+
+        titip "$(buat_lisensi "$KERJA/lisensi-laporan.json" "$@")"
+        putaran "$keterangan"
+        dijawab "$keterangan" true
+        memuat "$keterangan: penolakan dicatat" "$(cat "$log")" 'Lisensi dari admin.erp DITOLAK dan tidak dipasang'
+        memuat "$keterangan: sebabnya" "$(cat "$log")" "$potongan"
+        sama "$keterangan: lisensi terpasang tidak berubah" "$(sidik)" "$sidik_awal"
+        sama "$keterangan: tidak ada berkas setengah jadi" "$(find "$folder" -name '.*' | wc -l)" 0
+    }
+
+    pastikan 'lisensi dari pengujian 09 terpasang' test -f "$folder/license.json"
+    sidik_awal="$(sidik)"
+
+    # Jawaban tanpa lisensi: tidak ada yang disentuh, tidak ada yang dicatat.
+    putaran 'tanpa lisensi'
+    dijawab 'tanpa lisensi' false
+    sama 'tanpa lisensi: lisensi terpasang tidak berubah' "$(sidik)" "$sidik_awal"
+    harus_gagal 'tanpa lisensi: tidak ada catatan lisensi' grep -q 'Lisensi dari admin.erp' "$log"
+
+    local kunci="$KERJA/kunci/lisensi.key"
+
+    tolak_laporan 'tanda tangan kunci lain' 'tanda tangan lisensi TIDAK sah' "$s" 2027-10-15 "$KERJA/kunci/lisensi-palsu.key"
+    tolak_laporan 'situs lain' 'untuk situs 01JSITUSLAIN00000000000000, bukan situs ini' 01JSITUSLAIN00000000000000 2027-10-15 "$kunci"
+    tolak_laporan 'tanpa site_id' 'tidak menyebut situs' '' 2027-10-15 "$kunci"
+    tolak_laporan 'versi 1' 'bukan format versi 2' "$s" 2027-10-15 "$kunci" 1
+    tolak_laporan 'versi berupa teks' 'bukan format versi 2' "$s" 2027-10-15 "$kunci" '"2"'
+    tolak_laporan 'apps bukan larik' 'bukan larik id app' "$s" 2027-10-15 "$kunci" 2 '"human-resources"'
+    tolak_laporan 'apps null' 'bukan larik id app' "$s" 2027-10-15 "$kunci" 2 null
+    # Objek lolos `all(.apps[]; ...)` — jq menjelajahi nilai-nilainya — jadi hanya pemeriksaan tipe yang menolaknya.
+    tolak_laporan 'apps berupa objek' 'bukan larik id app' "$s" 2027-10-15 "$kunci" 2 '{"hr":"human-resources"}'
+    tolak_laporan 'id app bukan teks' 'bukan larik id app' "$s" 2027-10-15 "$kunci" 2 '["human-resources",7]'
+    tolak_laporan 'id app berhuruf besar' 'bukan larik id app' "$s" 2027-10-15 "$kunci" 2 '["Human-Resources"]'
+    tolak_laporan 'id app diawali minus' 'bukan larik id app' "$s" 2027-10-15 "$kunci" 2 '["-hr"]'
+    tolak_laporan 'id app berakhir baris baru' 'bukan larik id app' "$s" 2027-10-15 "$kunci" 2 '["human-resources\n"]'
+    tolak_laporan 'valid_until berjam' 'bukan tanggal berbentuk YYYY-MM-DD' "$s" 2027-10-15T00:00:00Z "$kunci"
+    tolak_laporan 'valid_until berakhir baris baru' 'bukan tanggal berbentuk YYYY-MM-DD' "$s" '2027-10-15\n' "$kunci"
+    tolak_laporan 'valid_until tidak ada di kalender' 'bukan tanggal kalender: 2027-02-30' "$s" 2027-02-30 "$kunci"
+
+    # apps kosong sah: tenant yang hanya memakai Core.
+    lisensi="$(buat_lisensi "$KERJA/lisensi-hanya-core.json" "$s" 2027-10-01 "$kunci" 2 '[]')"
+    titip "$lisensi"
+    putaran 'apps kosong'
+    dijawab 'apps kosong' true
+    memuat 'apps kosong: terpasang' "$(cat "$log")" 'Lisensi dari admin.erp terpasang, berlaku sampai 2027-10-01.'
+    pastikan 'apps kosong: license.json persis' cmp -s "$folder/license.json" "$KERJA/lisensi-hanya-core.json"
+
+    lisensi="$(buat_lisensi "$KERJA/lisensi-perpanjangan.json" "$s" 2027-10-15 "$kunci")"
+    titip "$lisensi"
+    putaran 'perpanjangan'
+    dijawab 'perpanjangan' true
+    memuat 'perpanjangan: terpasang' "$(cat "$log")" 'Lisensi dari admin.erp terpasang, berlaku sampai 2027-10-15.'
+    pastikan 'license.json persis byte yang ditandatangani' cmp -s "$folder/license.json" "$KERJA/lisensi-perpanjangan.json"
+    sama 'license.json.sig persis signature dari jawaban laporan' "$(cat "$folder/license.json.sig")" "$(jq -r .signature <<< "$lisensi")"
+    sama 'license.json.sig satu baris tanpa akhir baris' "$(wc -l < "$folder/license.json.sig")" 0
+    base64 -d "$folder/license.json.sig" > "$KERJA/lisensi-perpanjangan.sig"
+    pastikan 'tanda tangan terpasang sah' \
+        openssl dgst -sha256 -verify "$KERJA/kunci/lisensi.pub" -signature "$KERJA/lisensi-perpanjangan.sig" "$folder/license.json"
+    sama 'mode berkas lisensi' "$(stat -c %a "$folder/license.json" "$folder/license.json.sig" | paste -sd' ')" '644 644'
+    sama 'tidak ada berkas sementara di folder lisensi' "$(find "$folder" -name '.*' | wc -l)" 0
+
+    # Laporan berikutnya menyebut tanggal baru — itu yang membuat admin.erp berhenti menyertakan lisensi.
+    putaran 'sesudah perpanjangan'
+    dijawab 'sesudah perpanjangan' false
+    sama 'laporan sesudahnya menyebut tanggal lisensi baru' "$(laporan_terakhir | jq -r .license_expires_at)" 2027-10-15
+}
+
+uji_09c_lisensi_diwajibkan() {
+    local berkas_env="$COREERP_HOME/.env" baris
+
+    # wajib KETERANGAN DIHARAPKAN — license_required di laporan yang diterima admin.erp tiruan sesudah
+    # satu putaran. `jq -c`, bukan `-r`: null dan false harus dapat dibedakan.
+    wajib() {
+        agen run --now
+        sama "$1" "$(laporan_terakhir | jq -c .license_required)" "$2"
+    }
+
+    rm -rf "$berkas_env"
+    wajib '.env tidak ada: null' null
+
+    mkdir "$berkas_env"
+    wajib '.env yang tidak dapat dibaca sebagai berkas: null' null
+    rmdir "$berkas_env"
+
+    # .env hasil pasang.sh dari env.template.
+    cp "$TEMPLAT_ENV" "$berkas_env"
+    wajib '.env dari env.template: true' true
+
+    printf 'APP_ENV=production\n' > "$berkas_env"
+    wajib 'kunci tidak disebut: false' false
+
+    printf 'COREERP_LICENSE_REQUIRED=false\n' > "$berkas_env"
+    wajib 'false tertulis: false' false
+
+    printf 'APP_ENV=production\nCOREERP_LICENSE_REQUIRED=true\n' > "$berkas_env"
+    wajib 'true persis: true' true
+
+    # Compose memakai baris terakhir. `=false` yang ditambahkan di bawah `=true` mematikan kuncinya, dalam
+    # bentuk apa pun barisnya ditulis.
+    printf 'COREERP_LICENSE_REQUIRED=true\nAPP_ENV=production\nCOREERP_LICENSE_REQUIRED=false\n' > "$berkas_env"
+    wajib 'false di bawah true: false' false
+    printf 'COREERP_LICENSE_REQUIRED=true\n  export COREERP_LICENSE_REQUIRED = false\n' > "$berkas_env"
+    wajib 'export false di bawah true: false' false
+    printf 'COREERP_LICENSE_REQUIRED=false\nCOREERP_LICENSE_REQUIRED=true\n' > "$berkas_env"
+    wajib 'true di bawah false: true' true
+
+    for baris in 'COREERP_LICENSE_REQUIRED="true"' 'COREERP_LICENSE_REQUIRED=true # wajib' 'COREERP_LICENSE_REQUIRED=TRUE' \
+        'COREERP_LICENSE_REQUIRED=1' ' COREERP_LICENSE_REQUIRED=true' $'COREERP_LICENSE_REQUIRED=true\r' \
+        '#COREERP_LICENSE_REQUIRED=true' 'COREERP_LICENSE_REQUIRED_LAMA=true'; do
+        printf '%s\n' "$baris" > "$berkas_env"
+        wajib "bukan bentuk persis ($(printf '%q' "$baris")): false" false
+    done
+
+    rm -f "$berkas_env"
 }
 
 uji_10_putar_kunci() {
@@ -1249,7 +1443,9 @@ uji '05 upgrade dengan tanda tangan atau checksum salah ditolak sebelum update.s
 uji '06 upgrade ke rilis yang sama, lebih rendah, atau edisi lain ditolak' uji_06_tolak_mundur
 uji '07 update.sh gagal: failed dengan failure_message' uji_07_update_gagal
 uji '08 409 menghentikan laporan langkah tanpa membunuh update.sh' uji_08_409
-uji '09 install_license: tanda tangan salah ditolak, yang sah terpasang' uji_09_lisensi_operasi
+uji '09 install_license: tanda tangan salah, situs lain, dan versi 1 ditolak; versi 2 yang sah terpasang' uji_09_lisensi_operasi
+uji '09b lisensi di jawaban laporan: dipasang lewat pemeriksaan yang sama; yang ditolak tidak mengubah apa pun' uji_09b_lisensi_laporan
+uji '09c license_required dari .env: true hanya bentuk persis di baris terakhir, null bila tidak terbaca' uji_09c_lisensi_diwajibkan
 uji '10 rotate_key: kunci lama ditolak, kunci baru diterima' uji_10_putar_kunci
 uji '10b rotate_key yang jawabannya hilang dipulihkan dengan kunci tertunda' uji_10b_rotasi_jawaban_hilang
 uji '12 dua run bersamaan: yang kedua keluar tanpa bekerja; lease diperpanjang' uji_12_flock

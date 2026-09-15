@@ -35,6 +35,9 @@ use Illuminate\Support\Carbon;
  * @property ?string $reported_digest
  * @property ?Carbon $last_seen_at
  * @property ?array<string, mixed> $last_report
+ * @property ?Carbon $license_issued_at
+ * @property ?Carbon $license_valid_until
+ * @property ?Carbon $license_suspended_at
  * @property ?int $created_by
  * @property ?Carbon $created_at
  */
@@ -64,6 +67,9 @@ class Site extends Model
         'last_seen_at',
         'last_report',
         'created_by',
+        // Kolom lisensi sengaja tidak ada di sini. Yang boleh menulisnya hanya penerbit lisensi dan
+        // tombol henti/lanjut perpanjangan, masing-masing dengan jejak auditnya; isian formulir yang
+        // kebetulan membawa `license_suspended_at` tidak boleh ikut tersimpan lewat `create()`.
     ];
 
     protected function casts(): array
@@ -73,6 +79,9 @@ class Site extends Model
             'revoked_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'last_report' => 'array',
+            'license_issued_at' => 'datetime',
+            'license_valid_until' => 'date',
+            'license_suspended_at' => 'datetime',
         ];
     }
 
@@ -96,6 +105,11 @@ class Site extends Model
     public function revoked(): bool
     {
         return $this->revoked_at !== null;
+    }
+
+    public function licenseRenewalSuspended(): bool
+    {
+        return $this->license_suspended_at !== null;
     }
 
     /**

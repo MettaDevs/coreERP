@@ -101,18 +101,26 @@ x-edition-environment: &edition-environment
   # Lisensi bertanda tangan yang dipasang agen situs, beserta kunci publik pemeriksanya. Keduanya
   # datang lewat bind mount `x-license-mount` di bawah, bukan dari image: lisensi berganti tanpa rilis.
   #
-  # Core membacanya **hanya untuk menampilkan peringatan** ketika masa sewa mendekat atau lewat, dan
-  # tidak pernah untuk mengunci. Klien kita fasilitas kesehatan; aplikasi yang berhenti karena tagihan
-  # berarti pelayanan pasien yang berhenti. Pemasangan tanpa agen — on-prem beli putus — tidak punya
-  # berkas ini sama sekali, dan Core harus tetap berjalan tanpa peringatan apa pun.
+  # Image membawa kode seluruh modul, jadi lisensilah yang menentukan app mana yang boleh dibuka, dan
+  # lisensi yang habis, hilang, atau salah tanda tangan mengunci pengguna tenant. Kunci itu hanya
+  # berlaku bila COREERP_LICENSE_REQUIRED bernilai true.
+  #
+  # Bawaannya **false**, dan itu disengaja. Pemasangan beli-putus dan SaaS tidak punya agen maupun
+  # berkas lisensi; bawaan true akan mengunci mereka pada pembaruan compose berikutnya tanpa ada yang
+  # berubah di sisi mereka. On-prem dikelola menyetelnya true lewat `deploy/agent/env.template`.
+  #
+  # Nilainya tinggal di `.env` server klien, jadi root di sana dapat mematikannya, dan berkas ini tidak
+  # dapat mencegahnya. Yang mengetahuinya laporan agen: `license_required` membawa nilai yang dibaca
+  # agen dari `.env` yang sama, dan admin.erp memperingatkan situs on-prem dikelola yang melaporkan false.
+  COREERP_LICENSE_REQUIRED: ${COREERP_LICENSE_REQUIRED:-false}
   COREERP_LICENSE_PATH: /run/coreerp-license/license.json
   COREERP_LICENSE_PUBLIC_KEY_PATH: /run/coreerp-license/license-public.pem
 
-# Hanya-baca: yang menulis lisensi hanya agen di host, setelah tanda tangannya diperiksa. Container
-# yang dapat menulis ke sini dapat memadamkan peringatannya sendiri.
+# Hanya-baca: yang menulis lisensi hanya agen di host, setelah tanda tangan, situs, dan formatnya
+# diperiksa. Container yang dapat menulis ke sini dapat mengganti lisensinya sendiri.
 #
 # Bila foldernya tidak ada, Docker membuatnya kosong; itu keadaan yang benar untuk pemasangan tanpa
-# agen.
+# agen, yang lisensinya tidak wajib.
 x-license-mount: &license-mount ${COREERP_LICENSE_DIR:-/opt/coreerp/agent/license}:/run/coreerp-license:ro
 
 services:
@@ -163,6 +171,10 @@ services:
       # Migrasi bukan lalu lintas yang perlu dilihat sebagai trace, dan ia berjalan justru pada
       # saat kolektor belum tentu sudah siap. Dimatikan di sini saja, bukan di anchor.
       OTEL_PHP_AUTOLOAD_ENABLED: 'false'
+      # Layanan ini tidak me-mount folder lisensi, jadi lisensi yang wajib terbaca "hilang" di sini.
+      # Migrasi adalah pekerjaan vendor, bukan pengguna tenant: situs yang terkunci justru harus tetap
+      # dapat menerima rilis yang memperbaikinya.
+      COREERP_LICENSE_REQUIRED: 'false'
     entrypoint: ['sh', '-c']
     command:
       - >-

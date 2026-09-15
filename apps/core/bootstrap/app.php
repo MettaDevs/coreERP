@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AuthenticateAppService;
 use App\Http\Middleware\ControlPlaneOnly;
+use App\Http\Middleware\EnforceSiteLicense;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LampirkanKonteksJejak;
@@ -82,6 +83,12 @@ return Application::configure(basePath: dirname(__DIR__))
             // dilihat orang lain membuat **seluruh** sesi itu meragukan, bukan sebagian. Akun
             // tanpa penandanya tidak tersentuh — kolomnya berbawaan `false`.
             WajibGantiSandi::class,
+            // Paling akhir. Sesudah Inertia, karena yang dikembalikannya halaman Inertia yang
+            // membutuhkan prop bersama. Sesudah `WajibGantiSandi`, dan keduanya tidak dapat saling
+            // melempar: pengalihan ke layar ganti kata sandi tetap terjadi, lalu layar itu sendiri
+            // dijawab halaman kunci yang dirender di tempat — tidak ada pengalihan balik, jadi tidak
+            // ada putaran. Pemasangan yang tidak mewajibkan lisensi tidak pernah tertahan di sini.
+            EnforceSiteLicense::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

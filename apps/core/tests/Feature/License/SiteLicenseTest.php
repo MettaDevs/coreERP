@@ -10,32 +10,25 @@ use App\Support\License\SiteLicenseState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
-use OpenSSLAsymmetricKey;
+use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Concerns\WritesSiteLicenses;
 use Tests\TestCase;
 
 /**
- * Lisensi situs: tanda, bukan kunci.
+ * Pembaca lisensi situs versi 2: keadaan, daftar app, dan dua jawaban yang diturunkan darinya.
  *
- * Dua hal dibuktikan bersama, dan tidak satu pun cukup sendirian. Pertama, setiap keadaan terbaca
- * dengan benar — termasuk berkas yang disunting satu byte dan tanda tangan dari kunci yang bukan
- * kunci rilis, dua cara paling murah untuk memalsukan lisensi. Kedua, keadaan yang paling buruk
- * sekalipun tidak mengunci apa pun: halaman tetap dilayani 200. Test pertama tanpa yang kedua
- * membiarkan seseorang kelak "menegakkan" lisensi dengan niat baik.
- *
- * Kuncinya dibuat di dalam test, bukan diambil dari berkas di repo. Kunci privat yang ikut
- * di-commit — sekalipun "hanya untuk test" — adalah kunci yang suatu hari disalin ke tempat lain.
+ * Tiga hal dibuktikan bersama, dan tidak satu pun cukup sendirian. Pertama, setiap keadaan terbaca
+ * dengan benar — termasuk berkas yang disunting satu byte, tanda tangan dari kunci yang bukan kunci
+ * rilis, dan daftar app yang bentuknya keliru. Kedua, **terkunci** hanya berarti wajib dan tidak
+ * berlaku. Ketiga, pemasangan yang tidak mewajibkan lisensi tidak pernah terkunci dan tidak pernah
+ * kehilangan app, apa pun isi berkasnya — test yang membuat SaaS dan beli-putus aman dari fitur ini.
  */
 final class SiteLicenseTest extends TestCase
 {
     use RefreshDatabase;
-
-    /** @var array{release: OpenSSLAsymmetricKey, foreign: OpenSSLAsymmetricKey}|null */
-    private static ?array $keys = null;
-
-    private string $directory;
+    use WritesSiteLicenses;
 
     protected function setUp(): void
     {
@@ -43,21 +36,13 @@ final class SiteLicenseTest extends TestCase
 
         // Dibekukan supaya "hari ini" tidak berganti di antara menulis tanggal dan membacanya.
         $this->freezeTime();
-
-        $this->directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'coreerp-lisensi-'.Str::lower(Str::random(12));
-        File::ensureDirectoryExists($this->directory);
-
-        config()->set('coreerp.license.path', $this->licensePath());
-        config()->set('coreerp.license.public_key_path', $this->directory.DIRECTORY_SEPARATOR.'release.pub.pem');
-        config()->set('coreerp.license.warn_days', 30);
-
-        File::put($this->directory.DIRECTORY_SEPARATOR.'release.pub.pem', $this->publicPem('release'));
+        $this->prepareSiteLicenseDirectory();
     }
 
     protected function tearDown(): void
     {
         try {
-            File::deleteDirectory($this->directory);
+            $this->removeSiteLicenseDirectory();
         } finally {
             parent::tearDown();
         }
@@ -74,7 +59,22 @@ final class SiteLicenseTest extends TestCase
 
         $this->assertSame(SiteLicenseState::NOT_REQUIRED, $state->status);
         $this->assertNull($state->validUntil);
+        $this->assertFalse($state->isLocked());
         $log->shouldNotHaveReceived('warning');
+    }
+
+    /** Mengosongkan satu baris `.env` tidak boleh lebih murah daripada menghapus berkasnya. */
+    public function test_a_required_license_without_a_path_is_missing_and_locked(): void
+    {
+        config()->set('coreerp.license.required', true);
+        config()->set('coreerp.license.path', '');
+        Log::shouldReceive('warning')->once();
+
+        $state = $this->freshState();
+
+        $this->assertSame(SiteLicenseState::MISSING, $state->status);
+        $this->assertTrue($state->required);
+        $this->assertTrue($state->isLocked());
     }
 
     // ------------------------------------------------------------------ hilang
@@ -84,7 +84,7 @@ final class SiteLicenseTest extends TestCase
         // Mock ketat, bukan spy: panggilan log selain satu `warning` — termasuk `error` — menggagalkan test.
         Log::shouldReceive('warning')->once();
 
-        // Dua pembaca dalam satu permintaan — misalnya prop bersama dan sesuatu yang lain kelak.
+        // Dua pembaca dalam satu permintaan — prop bersama dan middleware kunci, misalnya.
         $first = app(SiteLicense::class)->state();
         $second = app(SiteLicense::class)->state();
 
@@ -107,26 +107,39 @@ final class SiteLicenseTest extends TestCase
         config()->set('coreerp.license.public_key_path', null);
         $this->assertSame(SiteLicenseState::MISSING, $this->freshState()->status);
 
-        config()->set('coreerp.license.public_key_path', $this->directory.DIRECTORY_SEPARATOR.'tidak-ada.pem');
+        config()->set('coreerp.license.public_key_path', $this->licensePath().'.tidak-ada.pem');
         $this->assertSame(SiteLicenseState::MISSING, $this->freshState()->status);
     }
 
     // ------------------------------------------------------------------ bertanda tangan sah
 
-    public function test_a_signed_license_far_from_its_end_date_is_valid(): void
+    public function test_a_signed_version_2_license_far_from_its_end_date_is_valid_and_carries_its_apps(): void
     {
-        $validUntil = now()->addDays(31)->toDateString();
-        $this->installSignedLicense($this->licenseJson($validUntil));
+        $validUntil = now()->addDays(8)->toDateString();
+        $this->installSignedLicense($this->licenseJson($validUntil, ['human-resources', 'management-aset']));
         $log = Log::spy();
 
         $state = $this->freshState();
 
         $this->assertSame(SiteLicenseState::VALID, $state->status);
         $this->assertSame($validUntil, $state->validUntil);
+        $this->assertSame(8, $state->daysLeft);
+        $this->assertSame(['human-resources', 'management-aset'], $state->apps);
         $log->shouldNotHaveReceived('warning');
     }
 
-    /** Batas jendela peringatan dua-duanya termasuk: hari ke-30 dan hari ini sendiri. */
+    /** Kontrak mengizinkan daftar kosong: tenant yang hanya memakai Core. */
+    public function test_an_empty_app_list_is_a_valid_license(): void
+    {
+        $this->installSignedLicense($this->licenseJson(now()->addMonth()->toDateString(), []));
+
+        $state = $this->freshState();
+
+        $this->assertSame(SiteLicenseState::VALID, $state->status);
+        $this->assertSame([], $state->apps);
+    }
+
+    /** Batas jendela peringatan dua-duanya termasuk: hari ke-7 dan hari ini sendiri. */
     #[DataProvider('daysInsideTheWarningWindow')]
     public function test_a_license_ending_inside_the_warning_window_is_expiring(int $daysLeft): void
     {
@@ -137,13 +150,14 @@ final class SiteLicenseTest extends TestCase
 
         $this->assertSame(SiteLicenseState::EXPIRING, $state->status);
         $this->assertSame($validUntil, $state->validUntil);
+        $this->assertSame($daysLeft, $state->daysLeft);
     }
 
     /** @return array<string, array{int}> */
     public static function daysInsideTheWarningWindow(): array
     {
         return [
-            'hari terakhir jendela' => [30],
+            'hari terakhir jendela' => [7],
             'berakhir hari ini' => [0],
         ];
     }
@@ -157,19 +171,20 @@ final class SiteLicenseTest extends TestCase
 
         $this->assertSame(SiteLicenseState::EXPIRED, $state->status);
         $this->assertSame($validUntil, $state->validUntil);
+        $this->assertSame(-1, $state->daysLeft);
     }
 
     // ------------------------------------------------------------------ tidak sah
 
-    public function test_a_single_tampered_byte_makes_the_license_invalid(): void
+    public function test_a_single_tampered_byte_makes_the_license_invalid_and_hides_its_apps(): void
     {
-        $bytes = $this->licenseJson(now()->addYear()->toDateString());
+        $bytes = $this->licenseJson(now()->addYear()->toDateString(), ['contoh-a']);
         $this->installSignedLicense($bytes);
 
-        // Satu byte, dan byte yang paling menggoda untuk diubah: nama edisinya.
-        $position = strpos($bytes, 'apotek');
+        // Satu byte, dan byte yang paling menggoda untuk diubah: daftar app-nya.
+        $position = strpos($bytes, 'contoh-a');
         $this->assertNotFalse($position);
-        $bytes[$position] = 'A';
+        $bytes[$position + 7] = 'b';
         File::put($this->licensePath(), $bytes);
         Log::shouldReceive('warning')->once();
 
@@ -177,6 +192,35 @@ final class SiteLicenseTest extends TestCase
 
         $this->assertSame(SiteLicenseState::INVALID, $state->status);
         $this->assertNull($state->validUntil, 'Tanggal dari berkas yang tidak terbukti tidak boleh ikut dipulangkan.');
+        $this->assertSame([], $state->apps, 'Daftar app dari berkas yang tidak terbukti tidak boleh ikut dipulangkan.');
+    }
+
+    /**
+     * Lisensi klien lain yang disalin ke server ini ditolak, walaupun tanda tangannya sah.
+     *
+     * Semua lisensi ditandatangani kunci vendor yang sama. Tanpa pemeriksaan tenant, berkas dari klien
+     * yang membeli lebih banyak app — beserta tanda tangannya — membuka seluruh app-nya di sini.
+     */
+    public function test_a_validly_signed_license_for_a_tenant_that_does_not_live_here_is_invalid_and_locks(): void
+    {
+        config()->set('coreerp.license.required', true);
+
+        $bytes = str_replace(
+            '"tenant_id":"01j9zq3v6n8m2k4h7g5f3d1c0b"',
+            '"tenant_id":"01j9zq3v6n8m2k4h7g5f3d1c0z"',
+            $this->licenseJson(now()->addYear()->toDateString(), ['human-resources', 'management-aset']),
+        );
+        $this->assertStringContainsString('01j9zq3v6n8m2k4h7g5f3d1c0z', $bytes);
+        $this->installSignedLicense($bytes);
+        Log::shouldReceive('warning')->once()->withArgs(fn (string $message): bool => str_contains($message, 'tenant'));
+
+        $license = app(SiteLicense::class);
+        $state = $license->state();
+
+        $this->assertSame(SiteLicenseState::INVALID, $state->status);
+        $this->assertSame([], $state->apps);
+        $this->assertTrue($license->isLocked());
+        $this->assertFalse($license->allowsApp('human-resources'));
     }
 
     public function test_a_signature_made_with_another_key_makes_the_license_invalid(): void
@@ -204,32 +248,293 @@ final class SiteLicenseTest extends TestCase
 
         $this->assertSame(SiteLicenseState::INVALID, $state->status);
         $this->assertNull($state->validUntil);
+        $this->assertSame([], $state->apps);
     }
 
     /** @return array<string, array{string}> */
     public static function signedButMalformedLicenses(): array
     {
         return [
-            'JSON rusak' => ['{"version":1,"valid_until":"2099-01-01"'],
+            'JSON rusak' => ['{"version":2,"apps":[],"valid_until":"2099-01-01"'],
             'bukan objek' => ['"2099-01-01"'],
-            'versi 2' => ['{"version":2,"valid_until":"2099-01-01"}'],
-            'versi berupa teks' => ['{"version":"1","valid_until":"2099-01-01"}'],
-            'tanpa tanggal berakhir' => ['{"version":1}'],
-            'tanggal yang tidak ada' => ['{"version":1,"valid_until":"2099-02-30"}'],
-            'tanggal urutan lain' => ['{"version":1,"valid_until":"01-01-2099"}'],
-            'tanggal beserta jam' => ['{"version":1,"valid_until":"2099-01-01T00:00:00Z"}'],
+            'array di puncak' => ['[{"version":2,"apps":[],"valid_until":"2099-01-01"}]'],
+            'versi 1 tanpa daftar app' => ['{"version":1,"valid_until":"2099-01-01"}'],
+            'versi 1 walau membawa daftar app' => ['{"version":1,"apps":["contoh-a"],"valid_until":"2099-01-01"}'],
+            'versi 3' => ['{"version":3,"apps":[],"valid_until":"2099-01-01"}'],
+            'versi berupa teks' => ['{"version":"2","apps":[],"valid_until":"2099-01-01"}'],
+            'versi pecahan' => ['{"version":2.0,"apps":[],"valid_until":"2099-01-01"}'],
+            'tanpa tanggal berakhir' => ['{"version":2,"apps":[]}'],
+            'tanggal yang tidak ada' => ['{"version":2,"apps":[],"valid_until":"2099-02-30"}'],
+            'tanggal urutan lain' => ['{"version":2,"apps":[],"valid_until":"01-01-2099"}'],
+            'tanggal beserta jam' => ['{"version":2,"apps":[],"valid_until":"2099-01-01T00:00:00Z"}'],
         ];
     }
 
-    // ------------------------------------------------------------------ tidak pernah mengunci
+    /**
+     * Daftar app yang bentuknya keliru menolak **seluruh** lisensi, bukan hanya id yang cacat.
+     * Membuang id itu diam-diam menutup app yang dibeli tanpa satu catatan pun yang menyebut sebabnya.
+     */
+    #[DataProvider('malformedAppLists')]
+    public function test_a_signed_license_with_a_malformed_app_list_is_invalid(string $apps): void
+    {
+        $this->installSignedLicense('{"version":2,"apps":'.$apps.',"valid_until":"2099-01-01"}');
+
+        // Sebabnya disebut di log. Tanpa pemeriksaan daftar app, jaring terakhir tetap menghasilkan
+        // `invalid` — tetapi dengan pesan "kesalahan tak terduga" yang tidak memberi tahu vendor apa
+        // pun tentang penerbit yang keliru.
+        Log::shouldReceive('warning')->once()->with('Daftar app lisensi situs bukan daftar id app yang unik.', Mockery::any());
+
+        $state = $this->freshState();
+
+        $this->assertSame(SiteLicenseState::INVALID, $state->status);
+        $this->assertSame([], $state->apps);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function malformedAppLists(): array
+    {
+        return [
+            'tanpa daftar app' => ['null'],
+            'teks, bukan daftar' => ['"contoh-a"'],
+            'objek kosong' => ['{}'],
+            'objek berindeks' => ['{"0":"contoh-a"}'],
+            'id bukan teks' => ['[1]'],
+            'id bersarang' => ['[["contoh-a"]]'],
+            'id kosong' => ['[""]'],
+            'huruf besar' => ['["Contoh-A"]'],
+            'diawali tanda hubung' => ['["-contoh"]'],
+            'garis bawah' => ['["contoh_a"]'],
+            'spasi' => ['["contoh a"]'],
+            'baris baru di ujung' => ['["contoh-a\n"]'],
+            'id berulang' => ['["contoh-a","contoh-a"]'],
+        ];
+    }
+
+    public function test_a_license_without_an_apps_key_is_invalid(): void
+    {
+        $this->installSignedLicense('{"version":2,"valid_until":"2099-01-01"}');
+
+        $this->assertSame(SiteLicenseState::INVALID, $this->freshState()->status);
+    }
+
+    // ------------------------------------------------------------------ terkunci dan app yang diizinkan
 
     /**
-     * Test yang membuat fitur ini boleh ada.
+     * Terkunci = wajib **dan** hilang, tidak sah, atau habis. Sisanya tidak pernah terkunci.
      *
-     * Lisensi yang sudah habis tetap melayani halaman biasa dengan 200, dan halamannya menerima
-     * keadaan lisensinya sebagai prop — bukan dialihkan, bukan ditolak, bukan dikosongkan.
+     * @param  SiteLicenseState::*  $status
      */
-    public function test_an_expired_license_still_serves_an_authenticated_page_and_shares_its_state(): void
+    #[DataProvider('lockMatrix')]
+    public function test_locked_means_required_and_not_in_force(string $status, bool $required, bool $locked): void
+    {
+        $state = new SiteLicenseState($status, apps: ['contoh-a'], required: $required);
+
+        $this->assertSame($locked, $state->isLocked());
+    }
+
+    /** @return array<string, array{string, bool, bool}> */
+    public static function lockMatrix(): array
+    {
+        return [
+            'wajib, hilang' => [SiteLicenseState::MISSING, true, true],
+            'wajib, tidak sah' => [SiteLicenseState::INVALID, true, true],
+            'wajib, habis' => [SiteLicenseState::EXPIRED, true, true],
+            'wajib, berlaku' => [SiteLicenseState::VALID, true, false],
+            'wajib, segera habis' => [SiteLicenseState::EXPIRING, true, false],
+            'tidak wajib, hilang' => [SiteLicenseState::MISSING, false, false],
+            'tidak wajib, tidak sah' => [SiteLicenseState::INVALID, false, false],
+            'tidak wajib, habis' => [SiteLicenseState::EXPIRED, false, false],
+            'tidak wajib, tidak disetel' => [SiteLicenseState::NOT_REQUIRED, false, false],
+        ];
+    }
+
+    /**
+     * Aturan app yang diizinkan pada keadaan itu sendiri, tanpa jalan pintas `SiteLicense`.
+     *
+     * `SiteLicense::allowsApp()` menjawab "tidak wajib" tanpa membaca keadaan, jadi test lewat kelas
+     * itu tidak pernah menyentuh cabang yang sama di sini. Keadaan tetap harus benar sendirian:
+     * ia yang dibawa ke mana-mana, dan pembaca berikutnya belum tentu lewat jalan pintas itu.
+     *
+     * @param  list<string>  $apps
+     */
+    #[DataProvider('appMatrix')]
+    public function test_the_state_decides_which_apps_are_allowed(string $status, bool $required, array $apps, string $appId, bool $allowed): void
+    {
+        $state = new SiteLicenseState($status, apps: $apps, required: $required);
+
+        $this->assertSame($allowed, $state->allowsApp($appId));
+    }
+
+    /** @return array<string, array{string, bool, list<string>, string, bool}> */
+    public static function appMatrix(): array
+    {
+        return [
+            'tidak wajib, habis, daftar kosong' => [SiteLicenseState::EXPIRED, false, [], 'contoh-a', true],
+            'tidak wajib, berlaku, app lain' => [SiteLicenseState::VALID, false, ['human-resources'], 'contoh-a', true],
+            'tidak wajib, tidak disetel' => [SiteLicenseState::NOT_REQUIRED, false, [], 'contoh-a', true],
+            'wajib, berlaku, tercantum' => [SiteLicenseState::VALID, true, ['contoh-a'], 'contoh-a', true],
+            'wajib, berlaku, tidak tercantum' => [SiteLicenseState::VALID, true, ['human-resources'], 'contoh-a', false],
+            'wajib, segera habis, tercantum' => [SiteLicenseState::EXPIRING, true, ['contoh-a'], 'contoh-a', true],
+            'wajib, habis, tercantum' => [SiteLicenseState::EXPIRED, true, ['contoh-a'], 'contoh-a', false],
+            'wajib, tidak sah' => [SiteLicenseState::INVALID, true, [], 'contoh-a', false],
+        ];
+    }
+
+    public function test_a_required_valid_license_allows_only_the_apps_it_lists(): void
+    {
+        config()->set('coreerp.license.required', true);
+        $this->installSignedLicense($this->licenseJson(now()->addMonth()->toDateString(), ['human-resources']));
+
+        $license = new SiteLicense;
+
+        $this->assertFalse($license->isLocked());
+        $this->assertTrue($license->allowsApp('human-resources'));
+        $this->assertFalse($license->allowsApp('management-aset'));
+        // Pencocokan persis, bukan awalan atau huruf besar-kecil.
+        $this->assertFalse($license->allowsApp('human'));
+        $this->assertFalse($license->allowsApp('Human-Resources'));
+    }
+
+    /** Lisensi yang masih mencantumkan app tidak boleh tetap membukanya setelah habis. */
+    public function test_a_required_expired_license_is_locked_and_allows_no_app_even_the_ones_it_lists(): void
+    {
+        config()->set('coreerp.license.required', true);
+        $this->installSignedLicense($this->licenseJson(now()->subDay()->toDateString(), ['human-resources']));
+
+        $license = new SiteLicense;
+
+        $this->assertTrue($license->isLocked());
+        $this->assertFalse($license->allowsApp('human-resources'));
+    }
+
+    public function test_an_expiring_required_license_still_allows_its_apps(): void
+    {
+        config()->set('coreerp.license.required', true);
+        $this->installSignedLicense($this->licenseJson(now()->toDateString(), ['human-resources']));
+
+        $license = new SiteLicense;
+
+        $this->assertSame(SiteLicenseState::EXPIRING, $license->state()->status);
+        $this->assertFalse($license->isLocked());
+        $this->assertTrue($license->allowsApp('human-resources'));
+    }
+
+    /**
+     * Pemasangan yang tidak mewajibkan lisensi tidak pernah kehilangan app — termasuk ketika sebuah
+     * lisensi yang tidak mencantumkannya kebetulan tersisa di disk, dan ketika lisensinya habis.
+     */
+    public function test_a_license_that_is_not_required_never_locks_and_allows_every_app(): void
+    {
+        $this->installSignedLicense($this->licenseJson(now()->subYear()->toDateString(), []));
+
+        $license = new SiteLicense;
+
+        $this->assertSame(SiteLicenseState::EXPIRED, $license->state()->status);
+        $this->assertFalse($license->isLocked());
+        $this->assertTrue($license->allowsApp('human-resources'));
+    }
+
+    /**
+     * Config dapat berisi teks, bukan boolean — misalnya dari cache config yang disusun dari `.env`
+     * tanpa penguraian. Teks `"false"` yang dibaca sebagai benar akan mengunci server yang tidak
+     * pernah diminta terkunci.
+     */
+    #[DataProvider('requiredSettings')]
+    public function test_the_required_setting_is_parsed_as_a_boolean(mixed $setting, bool $required): void
+    {
+        config()->set('coreerp.license.required', $setting);
+
+        $this->assertSame($required, (new SiteLicense)->required());
+    }
+
+    /** @return array<string, array{mixed, bool}> */
+    public static function requiredSettings(): array
+    {
+        return [
+            'true' => [true, true],
+            'teks true' => ['true', true],
+            'teks 1' => ['1', true],
+            'false' => [false, false],
+            'teks false' => ['false', false],
+            'teks kosong' => ['', false],
+            'null' => [null, false],
+        ];
+    }
+
+    /**
+     * `COREERP_LICENSE_REQUIRED` diurai di berkas config, bukan diteruskan apa adanya.
+     *
+     * `env()` Laravel hanya mengenali `true` dan `false`; `1` dan `on` — cara lain yang wajar untuk
+     * menulis "nyala" di `.env` — tiba sebagai teks. Config yang menyimpan teks membuat setiap
+     * pembacanya harus ingat menguraikannya lagi.
+     */
+    #[DataProvider('requiredEnvironmentValues')]
+    public function test_the_config_parses_the_required_environment_variable_as_a_boolean(?string $value, bool $required): void
+    {
+        $key = 'COREERP_LICENSE_REQUIRED';
+        $before = ['env' => getenv($key), '_ENV' => $_ENV[$key] ?? null, '_SERVER' => $_SERVER[$key] ?? null];
+
+        try {
+            // `$_SERVER` juga, bukan hanya `putenv()`: repository env Laravel membacanya lebih dulu.
+            if ($value === null) {
+                putenv($key);
+                unset($_ENV[$key], $_SERVER[$key]);
+            } else {
+                putenv($key.'='.$value);
+                $_ENV[$key] = $value;
+                $_SERVER[$key] = $value;
+            }
+
+            $config = require config_path('coreerp.php');
+
+            $this->assertSame($required, $config['license']['required']);
+        } finally {
+            $before['env'] === false ? putenv($key) : putenv($key.'='.$before['env']);
+
+            foreach (['_ENV', '_SERVER'] as $global) {
+                if ($before[$global] === null) {
+                    unset($GLOBALS[$global][$key]);
+                } else {
+                    $GLOBALS[$global][$key] = $before[$global];
+                }
+            }
+        }
+    }
+
+    /** @return array<string, array{string|null, bool}> */
+    public static function requiredEnvironmentValues(): array
+    {
+        return [
+            'teks true' => ['true', true],
+            'teks 1' => ['1', true],
+            'teks on' => ['on', true],
+            'teks false' => ['false', false],
+            'teks 0' => ['0', false],
+            'teks no' => ['no', false],
+            'kosong' => ['', false],
+            'tidak disetel' => [null, false],
+        ];
+    }
+
+    /** SaaS tidak membayar apa pun: lisensi yang tidak wajib tidak membaca berkas demi menjawab dua pertanyaan ini. */
+    public function test_an_installation_that_does_not_require_a_license_does_not_read_it_to_answer(): void
+    {
+        // Disetel tetapi tidak ada: seandainya pertanyaan ini memicu pembacaan, peringatannya tercatat.
+        $log = Log::spy();
+        $license = new SiteLicense;
+
+        $this->assertFalse($license->isLocked());
+        $this->assertTrue($license->allowsApp('contoh-a'));
+        $log->shouldNotHaveReceived('warning');
+    }
+
+    // ------------------------------------------------------------------ prop bersama
+
+    /**
+     * Lisensi yang sudah habis pada pemasangan yang tidak mewajibkannya tetap melayani halaman biasa
+     * dengan 200, dan halamannya menerima keadaan lisensinya sebagai prop untuk spanduk.
+     */
+    public function test_an_expired_license_that_is_not_required_still_serves_a_page_and_shares_its_state(): void
     {
         $validUntil = now()->subDays(10)->toDateString();
         $this->installSignedLicense($this->licenseJson($validUntil));
@@ -240,15 +545,20 @@ final class SiteLicenseTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('dashboard')
                 ->where('siteLicense.status', SiteLicenseState::EXPIRED)
-                ->where('siteLicense.validUntil', $validUntil));
+                ->where('siteLicense.validUntil', $validUntil)
+                ->where('siteLicense.daysLeft', -10)
+                ->where('siteLicense.required', false)
+                // Daftar app tidak dikirim ke peramban; yang menyaring server.
+                ->missing('siteLicense.apps'));
     }
 
     public function test_a_guest_receives_no_license_state_and_nothing_is_read(): void
     {
+        config()->set('coreerp.license.required', true);
         $log = Log::spy();
 
-        // Lisensi yang disetel tetapi tidak ada: seandainya tamu memicu pembacaan, peringatannya
-        // akan tercatat.
+        // Lisensi yang wajib, disetel, tetapi tidak ada: seandainya tamu memicu pembacaan — lewat
+        // prop bersama atau lewat middleware kunci — peringatannya akan tercatat.
         $this->get(route('login'))
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->where('siteLicense', null));
@@ -262,80 +572,5 @@ final class SiteLicenseTest extends TestCase
     private function freshState(): SiteLicenseState
     {
         return (new SiteLicense)->state();
-    }
-
-    private function licensePath(): string
-    {
-        return $this->directory.DIRECTORY_SEPARATOR.'license.json';
-    }
-
-    private function licenseJson(string $validUntil): string
-    {
-        return json_encode([
-            'version' => 1,
-            'tenant_id' => '01j9zq3v6n8m2k4h7g5f3d1c0b',
-            'site_id' => '01j9zq3v6n8m2k4h7g5f3d1c0c',
-            'edition' => 'apotek-sejahtera',
-            'valid_until' => $validUntil,
-            'issued_at' => '2026-09-14T00:00:00Z',
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-    }
-
-    /**
-     * Menulis `license.json` beserta `.sig`-nya, persis bentuk yang dipasang agen.
-     *
-     * Tanda tangannya diakhiri baris baru, karena begitulah berkas satu baris biasanya ditulis —
-     * sehingga setiap test hijau di sini sekaligus membuktikan baris baru itu diterima.
-     *
-     * @param  'release'|'foreign'  $signer
-     */
-    private function installSignedLicense(string $bytes, string $signer = 'release'): void
-    {
-        $signed = openssl_sign($bytes, $signature, $this->keys()[$signer], OPENSSL_ALGO_SHA256);
-        $this->assertTrue($signed, 'Lisensi uji tidak dapat ditandatangani.');
-
-        File::put($this->licensePath(), $bytes);
-        File::put($this->licensePath().'.sig', base64_encode((string) $signature)."\n");
-    }
-
-    /** @param  'release'|'foreign'  $which */
-    private function publicPem(string $which): string
-    {
-        $details = openssl_pkey_get_details($this->keys()[$which]);
-        $this->assertIsArray($details);
-
-        return (string) $details['key'];
-    }
-
-    /**
-     * Dua pasang kunci RSA, dibuat sekali untuk seluruh kelas — membuat kunci 2048 bit per test
-     * hanya memperlambat suite tanpa membuktikan apa pun tambahan.
-     *
-     * @return array{release: OpenSSLAsymmetricKey, foreign: OpenSSLAsymmetricKey}
-     */
-    private function keys(): array
-    {
-        return self::$keys ??= [
-            'release' => $this->makeKeyPair(),
-            'foreign' => $this->makeKeyPair(),
-        ];
-    }
-
-    private function makeKeyPair(): OpenSSLAsymmetricKey
-    {
-        $options = ['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA];
-        $key = openssl_pkey_new($options);
-
-        // PHP untuk Windows tidak menemukan `openssl.cnf`-nya sendiri, dan `openssl_pkey_new()` gagal
-        // dengan "configuration file routines::no such file". Berkasnya ikut terpasang di samping
-        // binary PHP; di Linux cabang ini tidak pernah diambil.
-        $bundledConfig = dirname(PHP_BINARY).'/extras/ssl/openssl.cnf';
-        if ($key === false && is_file($bundledConfig)) {
-            $key = openssl_pkey_new($options + ['config' => $bundledConfig]);
-        }
-
-        $this->assertNotFalse($key, 'Kunci RSA untuk lisensi uji tidak dapat dibuat.');
-
-        return $key;
     }
 }

@@ -782,6 +782,70 @@ paths:
               schema: { $ref: '#/components/schemas/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /tenants/{tenant}/entitlements:
+    get:
+      tags: [Pusat admin]
+      operationId: internal.tenants.entitlements.show
+      summary: App yang sedang berhak dipakai sebuah tenant
+      description: |
+        Dibaca pusat admin saat menerbitkan **lisensi situs versi 2**: daftar `apps` di lisensi
+        disalin dari jawaban ini. `tenant_app_entitlements` milik Core, jadi pusat admin bertanya
+        ke sini alih-alih menyimpan salinannya sendiri — salinan yang menyimpang pada hari pertama
+        seseorang menambah app lewat Core. Rencananya di `docs/todo/lisensi-mengunci`.
+
+        **Sedang berhak** berarti ketiganya sekaligus: `status` `active`, `starts_at` kosong atau
+        tidak di masa depan, dan `ends_at` kosong atau di masa depan. Status saja tidak cukup: hak
+        yang berakhir kemarin masih berstatus `active` sampai ada yang mengubahnya.
+
+        `tenant` di URL tidak melanggar aturan "`tenant_id` tidak pernah dari URL" di kepala berkas
+        ini: aturan itu milik permukaan app-ke-Core, dan pemanggil ini pusat admin yang memang
+        bekerja pada banyak tenant. Balasannya tanpa envelope `data`, dengan alasan yang sama
+        seperti `/tenants`.
+
+        **Kegagalan endpoint ini tidak boleh menggagalkan laporan agen** di sisi pusat admin:
+        laporan tetap diterima dan penerbitan lisensi dicoba lagi setelah jeda.
+      security:
+        - controlPlaneToken: []
+      parameters:
+        - name: tenant
+          in: path
+          required: true
+          schema: { type: string, format: ulid }
+          description: Id baris `tenants`.
+      responses:
+        '200':
+          description: Hak app tenant itu saat ini. Daftar kosong sah — tenant yang hanya memakai Core.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tenant_id, apps]
+                properties:
+                  tenant_id: { type: string, format: ulid }
+                  apps:
+                    type: array
+                    uniqueItems: true
+                    items:
+                      type: string
+                      pattern: '^[a-z0-9][a-z0-9-]*$'
+                    description: |
+                      Id app, unik dan terurut naik. Bentuknya sama dengan yang diterima pembaca
+                      lisensi di Core; id lain membuat lisensi yang memuatnya ditolak seluruhnya.
+              example:
+                tenant_id: 01j9zq3v6n8m2k4h7g5f3d1c0b
+                apps: [human-resources, management-aset]
+        '401':
+          description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Tenant itu tidak ada di Core.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /environments/{environment}/provision:
     post:
       tags: [Pusat admin]

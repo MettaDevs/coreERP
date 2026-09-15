@@ -47,14 +47,18 @@ final class SiteOperations
             throw new SiteRejected('site_not_enrolled', 'Situs ini belum terdaftar; agen belum pernah menyambung.');
         }
 
-        $parameters = match ($operation) {
-            'upgrade' => $this->upgradeParameters($site, $input),
-            'install_license' => $this->licenseParameters($site, $input),
-            default => [],
-        };
-
         try {
-            return DB::transaction(function () use ($request, $site, $operation, $parameters): SiteOperation {
+            return DB::transaction(function () use ($request, $site, $operation, $input): SiteOperation {
+                // Di dalam transaksi, karena menerbitkan lisensi menulis `sites.license_*` dan jejak
+                // auditnya sendiri. Permintaan yang kemudian ditolak indeks satu-permintaan-per-jenis
+                // tidak boleh meninggalkan catatan "lisensi diterbitkan" untuk lisensi yang tidak pernah
+                // diantar ke mana pun.
+                $parameters = match ($operation) {
+                    'upgrade' => $this->upgradeParameters($site, $input),
+                    'install_license' => $this->licenseParameters($request, $site, $input),
+                    default => [],
+                };
+
                 $created = SiteOperation::query()->create([
                     'site_id' => $site->id,
                     'operation' => $operation,
@@ -256,17 +260,41 @@ final class SiteOperations
     }
 
     /**
+     * Tanggal kosong berarti masa bawaan penerbit (`sites.license_valid_days`). Tanggal yang diisi
+     * tetap diperiksa di sini.
+     *
      * @param  array<string, mixed>  $input
      * @return array{license: string, signature: string}
      */
-    private function licenseParameters(Site $site, array $input): array
+    private function licenseParameters(Request $request, Site $site, array $input): array
     {
-        $validUntil = is_string($input['valid_until'] ?? null) ? $input['valid_until'] : '';
+        $raw = $input['valid_until'] ?? null;
+        $validUntil = null;
 
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $validUntil) !== 1 || CarbonImmutable::createFromFormat('Y-m-d', $validUntil) === null) {
-            throw new SiteRejected('license_date_invalid', 'Tanggal berakhir lisensi harus berbentuk tahun-bulan-tanggal.');
+        if ($raw !== null && $raw !== '') {
+            $validUntil = is_string($raw) ? $raw : '';
+            $parsed = preg_match('/^\d{4}-\d{2}-\d{2}$/', $validUntil) === 1
+                ? CarbonImmutable::createFromFormat('!Y-m-d', $validUntil, $site->timezone)
+                : null;
+
+            // Dibandingkan bolak-balik: `2027-02-31` lolos pola dan diterima Carbon sebagai 3 Maret.
+            // Lisensi yang ditandatangani dengan tanggal yang tidak ada di kalender dibaca Core sebagai
+            // lisensi rusak — dan lisensi rusak mengunci.
+            if (! $parsed instanceof CarbonImmutable || $parsed->format('Y-m-d') !== $validUntil) {
+                throw new SiteRejected('license_date_invalid', 'Tanggal berakhir lisensi harus berbentuk tahun-bulan-tanggal.');
+            }
+
+            // Lisensi yang sudah habis saat diterbitkan mengunci klinik begitu terpasang. Menghentikan
+            // sewa punya tombolnya sendiri, dan tombol itu membiarkan lisensi yang berjalan habis.
+            if ($validUntil < CarbonImmutable::now($site->timezone)->toDateString()) {
+                throw new SiteRejected('license_date_past', 'Tanggal berakhir lisensi sudah lewat; lisensi itu akan langsung mengunci server klien.');
+            }
         }
 
-        return $this->licenses->issue($site, $validUntil);
+        try {
+            return $this->licenses->issueForOperator($request, $site, $validUntil);
+        } catch (EntitlementsUnavailable $e) {
+            throw new SiteRejected('entitlements_unavailable', 'Daftar app tenant tidak terbaca dari Core, jadi lisensi tidak diterbitkan. '.$e->getMessage());
+        }
     }
 }

@@ -113,6 +113,59 @@ final class SiteActions extends Controller
         return redirect('/situs/'.$row->id)->with('message', 'Situs dicabut. Aplikasinya di server klien tetap berjalan; pengelolaannya yang berhenti.');
     }
 
+    /**
+     * Menghentikan sewa: lisensi berhenti diperpanjang, dan yang sedang berjalan habis dengan sendirinya.
+     *
+     * Permintaan `install_license` yang belum diambil agen ikut dibatalkan. Lisensi di dalamnya
+     * diterbitkan sebelum sewa dihentikan, dan membiarkannya diambil berarti sewa yang baru saja
+     * dihentikan diperpanjang oleh antrean.
+     */
+    public function suspendLicense(Request $request, string $site): RedirectResponse
+    {
+        $row = $this->confirmedSite($request, $site);
+
+        if ($row->licenseRenewalSuspended()) {
+            return redirect('/situs/'.$row->id);
+        }
+
+        DB::transaction(function () use ($request, $row): void {
+            $row->forceFill(['license_suspended_at' => now()])->save();
+
+            $cancelled = SiteOperation::query()
+                ->where('site_id', $row->id)
+                ->where('operation', 'install_license')
+                ->where('status', 'requested')
+                ->update(['status' => 'cancelled', 'finished_at' => now(), 'updated_at' => now()]);
+
+            OperatorAudit::record($request, 'site.license.renewal_suspended', 'site', $row->id, [
+                'license_valid_until' => $row->license_valid_until?->toDateString(),
+                'cancelled_operations' => $cancelled,
+            ]);
+        });
+
+        return redirect('/situs/'.$row->id)->with('message', 'Perpanjangan lisensi dihentikan. Lisensi yang terpasang tetap berlaku sampai tanggal berakhirnya.');
+    }
+
+    public function resumeLicense(Request $request, string $site): RedirectResponse
+    {
+        $row = $this->confirmedSite($request, $site);
+
+        if (! $row->licenseRenewalSuspended()) {
+            return redirect('/situs/'.$row->id);
+        }
+
+        DB::transaction(function () use ($request, $row): void {
+            $suspendedAt = $row->license_suspended_at?->toIso8601String();
+            $row->forceFill(['license_suspended_at' => null])->save();
+
+            OperatorAudit::record($request, 'site.license.renewal_resumed', 'site', $row->id, [
+                'suspended_at' => $suspendedAt,
+            ]);
+        });
+
+        return redirect('/situs/'.$row->id)->with('message', 'Perpanjangan lisensi dilanjutkan. Lisensi baru ikut di laporan agen berikutnya bila sudah jatuh tempo.');
+    }
+
     private function confirmedSite(Request $request, string $site): Site
     {
         $row = Site::query()->whereKey($site)->firstOrFail();

@@ -64,9 +64,10 @@ class AppServiceProvider extends ServiceProvider
          */
         $this->app->scoped(ActiveEnvironment::class);
 
-        // Berkas lisensi dibaca sekali per permintaan, bukan sekali per pembaca — dan scoped, bukan
-        // singleton, supaya berkas baru yang dipasang agen terbaca pada permintaan berikutnya tanpa
-        // menunggu pekerja PHP diganti. Alasan lengkapnya di kelas itu.
+        // Berkas lisensi dibaca sekali per permintaan, bukan sekali per pembaca — ada empat pintu app
+        // dan satu middleware kunci yang menanyakannya. Scoped, bukan singleton, supaya lisensi baru
+        // yang dipasang agen membuka kunci pada permintaan berikutnya tanpa menunggu pekerja PHP
+        // diganti. Alasan lengkapnya di kelas itu.
         $this->app->scoped(SiteLicense::class);
     }
 
