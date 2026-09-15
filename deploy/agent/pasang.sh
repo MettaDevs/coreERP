@@ -8,6 +8,13 @@
 #   Pilihan:
 #     --app-port PORT          port host aplikasi, ditulis ke .env (bawaan dari env.template)
 #     --app-bind ALAMAT        alamat IPv4 tempat port itu diikat, ditulis ke .env (bawaan dari env.template)
+#     --proxy-luar             tanpa proxy HTTPS agen, untuk server yang sudah punya reverse proxy sendiri
+#
+#   Bawaannya, agen memasang proxy HTTPS sendiri (core-proxy, profil `proxy` di compose.edition.yaml) di port
+#   80 dan 443, dengan sertifikat Let's Encrypt untuk alamat tenant dari admin.erp. Port itu diperiksa bebas
+#   pada pemasangan pertama. --proxy-luar melewati pemeriksaan itu dan tidak menyalakan profilnya; reverse
+#   proxy server itu yang diarahkan ke port aplikasi. Keduanya tersimpan di .env, jadi berlaku juga untuk
+#   setiap pembaruan sesudahnya.
 #
 #   COREERP_PROYEK dan COREERP_FOLDER_CADANGAN yang disebut saat memasang ditulis ke agent/agent.env,
 #   supaya timer dan perintah yang dijalankan tangan sesudahnya memakai nilai yang sama.
@@ -73,7 +80,7 @@ pemakaian() {
         '' \
         'Pemakaian:' \
         '  curl -fsSL <alamat admin.erp>/pasang.sh | sudo bash -s -- --token TOKEN' \
-        'Pilihan: --app-port PORT  --app-bind ALAMAT'
+        'Pilihan: --app-port PORT  --app-bind ALAMAT  --proxy-luar'
 }
 
 port_sah() {
@@ -306,6 +313,7 @@ utama() {
     token=''
     port_aplikasi=''
     alamat_ikat=''
+    proxy_luar=0
 
     # Diperiksa sebelum argumen: salinan dari repo yang dijalankan dengan pilihan lama (`--admin-url`) lebih
     # tertolong oleh kalimat ini daripada oleh "argumen tidak dikenal".
@@ -329,6 +337,7 @@ utama() {
                 esac
                 shift 2
                 ;;
+            --proxy-luar) proxy_luar=1; shift ;;
             *) pemakaian "Argumen tidak dikenal: $1" ;;
         esac
     done
@@ -473,6 +482,38 @@ utama() {
                 '' \
                 'Reverse proxy di depan CoreERP kemudian diarahkan ke port itu.'
         fi
+
+        # Proxy HTTPS agen mendengar 80 dan 443 di semua alamat. Server yang sudah memakai salah satunya hampir
+        # selalu punya reverse proxy sendiri — Dokploy, Traefik, nginx — dan tanpa pemeriksaan ini tabrakannya
+        # baru ketahuan di langkah terakhir pemasangan: sesudah rilis ditarik dan database bermigrasi, saat
+        # update.sh menyalakan proxy, dan pemasangan pertama yang gagal di sana tidak punya versi untuk dituju.
+        if [ "$proxy_luar" -eq 0 ]; then
+            terpakai=()
+            for satu in 80 443; do
+                if port_didengar "$satu"; then
+                    terpakai+=("$satu")
+                fi
+            done
+
+            if [ "${#terpakai[@]}" -gt 0 ]; then
+                ikat_efektif="${alamat_ikat:-$(sed -n 's/^CORE_APP_BIND=//p' "$bahan/env.template" | tail -n 1)}"
+                daftar_terpakai="${terpakai[*]}"
+
+                gagal \
+                    "Port ${daftar_terpakai/ / dan } sudah didengar layanan lain di server ini." \
+                    '' \
+                    'Proxy HTTPS yang dipasang agen membutuhkan port 80 dan 443: peramban datang lewat keduanya, dan' \
+                    "sertifikat Let's Encrypt untuk alamat tenant diambil lewat keduanya." \
+                    '' \
+                    'Bila server ini sudah punya reverse proxy (misalnya Dokploy, Traefik, atau nginx), jalankan lagi' \
+                    'dengan pilihan yang sama ditambah --proxy-luar:' \
+                    '  ... | sudo bash -s -- --token TOKEN --proxy-luar' \
+                    '' \
+                    "Sesudah itu arahkan host tenant di reverse proxy itu ke ${ikat_efektif:-127.0.0.1}:$port_efektif. Reverse proxy yang" \
+                    'berjalan di dalam Docker tidak menjangkau loopback host: sebut alamat gateway bridge Docker lewat' \
+                    '--app-bind (lihat: docker network inspect bridge), lalu arahkan ke alamat itu.'
+            fi
+        fi
     fi
 
     # Folder dan proyek compose milik stack lain. Diperiksa sebelum satu berkas pun ditulis, dan hanya bila folder
@@ -576,13 +617,23 @@ utama() {
         # Tidak pernah ditimpa. APP_KEY baru membuat seluruh data terenkripsi tidak terbaca lagi, dan kata
         # sandi database baru tidak cocok dengan database yang sudah dibuat dengan yang lama.
         printf '    %s sudah ada; tidak ditimpa\n' "$BERKAS_ENV"
-        [ -z "$port_aplikasi$alamat_ikat" ] \
-            || printf '    --app-port dan --app-bind hanya berlaku pada pemasangan pertama; ubah .env itu dengan tangan\n'
+        if [ -n "$port_aplikasi$alamat_ikat" ] || [ "$proxy_luar" -eq 1 ]; then
+            printf '    --app-port, --app-bind, dan --proxy-luar hanya berlaku pada pemasangan pertama; ubah .env itu dengan tangan\n'
+        fi
     else
+        # Sementara. Operasi install dari admin.erp menulis alamat tenant (`app_url`) ke APP_URL dan
+        # COREERP_APP_HOST sebelum rilis pertama menyala. Nama mesin bukan alamat yang dibuka pengguna — di server
+        # uji ia domain pribadi pemilik mesin — dan admin.erp lama yang tidak mengirim `app_url` meninggalkan nilai
+        # ini apa adanya.
         app_url="https://$(hostname -f 2>/dev/null || cat /proc/sys/kernel/hostname)"
         kunci_aplikasi="base64:$(openssl rand -base64 32)"
         kata_sandi_db="$(acak_alfanumerik 32)"
         kata_sandi_provider="$(acak_alfanumerik 24)"
+
+        # Profil compose disimpan di .env, bukan diingat skrip ini: update.sh dan agen menjalankan compose dengan
+        # --env-file yang sama pada setiap pembaruan, dan Compose membaca COMPOSE_PROFILES dari sana.
+        profil_compose=proxy
+        [ "$proxy_luar" -eq 0 ] || profil_compose=''
 
         (
             umask 077
@@ -593,6 +644,7 @@ utama() {
                 baris="${baris//@@COREERP_PROVIDER_EMAIL@@/"$email_provider"}"
                 baris="${baris//@@COREERP_PROVIDER_PASSWORD@@/"$kata_sandi_provider"}"
                 baris="${baris//@@COREERP_LICENSE_DIR@@/"$RUMAH/agent/license"}"
+                baris="${baris//@@COMPOSE_PROFILES@@/"$profil_compose"}"
 
                 # Port dan alamat ikat punya nilai sungguhan di env.template, bukan isian: berkas itu yang
                 # menyebut bawaannya. Pilihan yang disebut menggantikan barisnya.
@@ -611,8 +663,10 @@ utama() {
         fi
 
         # Pilihan yang tidak menemukan barisnya di env.template tidak boleh hilang tanpa suara: port yang
-        # diperiksa bebas di atas harus port yang benar-benar ditulis.
-        for satu in "CORE_APP_PORT=$port_efektif" ${alamat_ikat:+"CORE_APP_BIND=$alamat_ikat"}; do
+        # diperiksa bebas di atas harus port yang benar-benar ditulis, dan server yang tidak dipasang dengan
+        # --proxy-luar harus benar-benar mendapat proxy.
+        for satu in "CORE_APP_PORT=$port_efektif" ${alamat_ikat:+"CORE_APP_BIND=$alamat_ikat"} \
+            ${profil_compose:+"COMPOSE_PROFILES=$profil_compose"}; do
             if ! grep -qxF "$satu" "$BERKAS_ENV.baru"; then
                 rm -f "$BERKAS_ENV.baru"
                 gagal "env.template tidak memuat baris ${satu%%=*}; .env tidak dibuat."
@@ -623,6 +677,12 @@ utama() {
         mv -f "$BERKAS_ENV.baru" "$BERKAS_ENV"
         printf '    %s dibuat (hanya dapat dibaca root)\n' "$BERKAS_ENV"
         printf '    aplikasi didengar di %s:%s\n' "$(sed -n 's/^CORE_APP_BIND=//p' "$BERKAS_ENV" | tail -n 1)" "$port_efektif"
+
+        if [ "$proxy_luar" -eq 1 ]; then
+            printf '    tanpa proxy HTTPS agen (--proxy-luar): arahkan reverse proxy server ini ke alamat di atas\n'
+        else
+            printf '    proxy HTTPS agen di port 80 dan 443; alamatnya diberikan admin.erp saat pemasangan\n'
+        fi
     fi
 
     # --- 5. systemd ------------------------------------------------------------------------------------

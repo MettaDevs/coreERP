@@ -1550,6 +1550,83 @@ periksa_parameter_pasang() {
         and (.parameters.admin_password_hash | test("\\A\\$2y\\$(0[4-9]|[12][0-9]|3[01])\\$[./A-Za-z0-9]{53}\\z"))' \
         "$berkas" >/dev/null 2>&1 \
         || { tolak 'admin_password_hash bukan hash bcrypt berawalan 2y (isinya tidak dicetak)'; return 1; }
+
+    # `app_url` hanya dikirim admin.erp yang memberi alamat otomatis. Tanpanya operasi berjalan seperti sebelum
+    # kunci itu ada, dan .env dibiarkan seperti yang ditulis pasang.sh. Yang disebut — termasuk null — wajib sah.
+    #
+    # Nilainya menjadi baris .env dan argumen `--from` Caddy di compose, jadi bentuknya dibatasi pada asal HTTPS
+    # polos: tanpa port (proxy mendengar 443), tanpa jalur (Core dilayani di akar), tanpa pengguna, dan host
+    # huruf kecil yang label-labelnya sah menurut DNS — Caddy meminta sertifikat untuk host itu apa adanya.
+    # Paling sedikit dua label, dan paling panjang 253 huruf untuk host-nya.
+    if jq -e '.parameters | has("app_url")' "$berkas" >/dev/null 2>&1; then
+        jq -e '(.parameters.app_url | type) == "string"
+            and (.parameters.app_url | length) <= 261
+            and (.parameters.app_url
+                | test("\\Ahttps://[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+\\z"))' \
+            "$berkas" >/dev/null 2>&1 \
+            || { tolak 'app_url bukan alamat https://<host> tanpa port, jalur, atau garis miring di ujung, dengan host huruf kecil paling sedikit dua label'; return 1; }
+    fi
+}
+
+# tulis_alamat_aplikasi APP_URL — mengganti APP_URL dan COREERP_APP_HOST di .env; pulang 1 dengan ALASAN.
+#
+# .env memuat rahasia yang lahir di server ini — APP_KEY, kata sandi database — dan tidak pernah ditulis ulang
+# dari templat. Hanya baris yang mendefinisikan kedua kunci itu yang diganti, di tempatnya; kunci yang belum
+# disebut ditambahkan di ujung. Setiap baris definisinya diganti, bukan hanya yang pertama: Compose memakai
+# yang terakhir.
+#
+# Ditulis ke berkas sementara di folder yang sama, dengan pemilik yang sama dan 0600, lalu diganti namanya:
+# .env yang terpotong karena disk penuh atau listrik padam kehilangan APP_KEY, dan tanpa APP_KEY seluruh data
+# terenkripsi tidak terbaca lagi. Isi yang tidak berubah tidak ditulis sama sekali.
+#
+# Seluruh berkas dibaca lebih dulu, dalam satu perintah yang kegagalannya terlihat. Membacanya baris demi baris
+# sambil menulis menyembunyikan .env yang tidak terbaca: salinannya lalu hanya berisi dua baris baru, dan salinan
+# itu yang menggantikan .env. Jumlah baris salinan diperiksa sebelum menggantikan aslinya, untuk tulisan yang
+# terpotong. Fungsi ini dipanggil dari dalam `if`, tempat `set -e` tidak menghentikan apa pun, jadi setiap
+# langkahnya diperiksa sendiri.
+tulis_alamat_aplikasi() {
+    local alamat="$1" host baru satu ada_url=0 ada_host=0
+    local -a lama=() isi=()
+
+    host="${alamat#https://}"
+    baru="$BERKAS_ENV.baru.$BASHPID"
+
+    if [ ! -f "$BERKAS_ENV" ] || ! mapfile -t lama < "$BERKAS_ENV"; then
+        tolak "$BERKAS_ENV tidak ada atau tidak terbaca; alamat aplikasi tidak dapat ditulis"
+        return 1
+    fi
+
+    for satu in "${lama[@]}"; do
+        # Bentuk yang dibaca Compose sebagai definisi kunci: spasi di depan dan `export` diterimanya.
+        if [[ "$satu" =~ ^[[:space:]]*(export[[:space:]]+)?(APP_URL|COREERP_APP_HOST)[[:space:]]*= ]]; then
+            case "${BASH_REMATCH[2]}" in
+                APP_URL) satu="APP_URL=$alamat"; ada_url=1 ;;
+                *) satu="COREERP_APP_HOST=$host"; ada_host=1 ;;
+            esac
+        fi
+        isi+=("$satu")
+    done
+
+    [ "$ada_url" -eq 1 ] || isi+=("APP_URL=$alamat")
+    [ "$ada_host" -eq 1 ] || isi+=("COREERP_APP_HOST=$host")
+
+    if ! printf '%s\n' "${isi[@]}" > "$baru" \
+        || [ "$(wc -l < "$baru" 2>/dev/null || true)" != "${#isi[@]}" ]; then
+        rm -f "$baru"
+        tolak "salinan $BERKAS_ENV tidak dapat ditulis utuh; .env tidak diubah"
+        return 1
+    fi
+
+    if cmp -s "$baru" "$BERKAS_ENV"; then
+        rm -f "$baru"
+        return 0
+    fi
+
+    if ! chown --reference="$BERKAS_ENV" "$baru" || ! chmod 0600 "$baru" || ! mv -f "$baru" "$BERKAS_ENV"; then
+        rm -f "$baru"
+        tolak "alamat aplikasi tidak dapat ditulis ke $BERKAS_ENV"
+        return 1
+    fi
 }
 
 # Operasi `install`: rilis pertama, lalu tenant dengan id yang sama dengan admin.erp beserta admin pertamanya.
@@ -1567,7 +1644,7 @@ periksa_parameter_pasang() {
 #
 # Jendela pembaruan tidak diperiksa di sini: admin.erp yang memutuskan kapan `install` boleh diklaim.
 operasi_pasang() {
-    local id="$1" berkas="$2" edisi rilis tenant_id tenant_nama nama_admin email_admin hash
+    local id="$1" berkas="$2" edisi rilis tenant_id tenant_nama nama_admin email_admin hash alamat_aplikasi
     local compose_sehat versi_sehat image_sehat log baris_awal hasil satu
     local -a app=() perintah_core=() status_pipa=()
 
@@ -1584,8 +1661,23 @@ operasi_pasang() {
     email_admin="$(jq -r '.parameters.admin_email' "$berkas")"
     mapfile -t app < <(jq -r '.parameters.app_ids[]' "$berkas")
     hash="$(jq -r '.parameters.admin_password_hash' "$berkas")"
+    alamat_aplikasi="$(jq -r 'if (.parameters.app_url | type) == "string" then .parameters.app_url else "" end' "$berkas")"
 
     catat_rilis_berjalan "$rilis"
+
+    # Sebelum rilis dipasang: update.sh menyalakan compose — dan proxy HTTPS yang meminta sertifikat untuk
+    # COREERP_APP_HOST — dengan .env ini. Alamat yang baru ditulis sesudah stack menyala tidak dipakai siapa pun
+    # sampai pembaruan berikutnya, sementara Core sudah menerbitkan tautan dengan alamat sementara dari pasang.sh.
+    if [ -n "$alamat_aplikasi" ]; then
+        hasil=0
+        lapor_langkah "$id" running "Menyetel alamat aplikasi $alamat_aplikasi" || hasil=$?
+        [ "$hasil" -ne 3 ] || return 3
+
+        if ! tulis_alamat_aplikasi "$alamat_aplikasi"; then
+            tutup_operasi "$id" failed 'Menyetel alamat aplikasi' "$ALASAN"
+            return
+        fi
+    fi
 
     if [ "$(jq -r '.edition // "" | tostring' "$BERKAS_KEADAAN")" = "$edisi" ] \
         && [ "$(normalkan_rilis "$(jq -r '.release // "" | tostring' "$BERKAS_KEADAAN")")" = "$(normalkan_rilis "$rilis")" ]; then

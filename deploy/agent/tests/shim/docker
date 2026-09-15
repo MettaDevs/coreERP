@@ -29,7 +29,13 @@
 #   FAKE_DOCKER_PULL_401_SEKALI  berkas penanda; pull pertama sesudah berkas itu tidak ada ditolak unauthorized
 #   FAKE_DOCKER_PULL_JEDA     detik tidur sebelum pull menjawab
 #   FAKE_DOCKER_PGDUMP_GAGAL  1 membuat pg_dump gagal
+#   FAKE_DOCKER_CONFIG_GAGAL  1 membuat `compose config` gagal, seperti compose yang tidak terbaca
+#   FAKE_DOCKER_UP_GAGAL      pola glob atas seluruh argumen; `compose up` yang cocok gagal seperti port yang terpakai
 #   FAKE_KATA_SANDI           kata sandi sementara yang dicetak tenant:bootstrap-site tiruan
+#
+# `compose config --services` menjawab layanan compose.edition.yaml yang menyala. core-proxy hanya bila profil
+# `proxy` menyala: COMPOSE_PROFILES di lingkungan proses bila disetel, selain itu baris terakhirnya di --env-file —
+# urutan yang sama dengan Compose. Isi berkas compose-nya tidak dibaca.
 #
 # tenant:bootstrap-site dengan --admin-password-hash-stdin membaca stdin seperti Core:
 #
@@ -40,7 +46,8 @@
 set -euo pipefail
 
 log="${FAKE_DOCKER_LOG:-/dev/null}"
-printf '%s\n' "$*" >> "$log"
+semua="$*"
+printf '%s\n' "$semua" >> "$log"
 
 # Salinan yang tidak pernah dikosongkan pengujian, untuk memeriksa sesuatu yang tidak pernah dipanggil
 # sepanjang seluruh putaran uji.
@@ -240,9 +247,11 @@ case "${1:-}" in
         ;;
     compose)
         shift
+        berkas_env=''
         while [ "$#" -gt 0 ]; do
             case "$1" in
-                --project-name | -p | --env-file | -f) shift 2 ;;
+                --env-file) berkas_env="$2"; shift 2 ;;
+                --project-name | -p | -f) shift 2 ;;
                 *) break ;;
             esac
         done
@@ -250,6 +259,30 @@ case "${1:-}" in
         case "${1:-}" in
             version)
                 printf 'Docker Compose version v2.0.0-tiruan\n'
+                ;;
+            config)
+                if [ "${FAKE_DOCKER_CONFIG_GAGAL:-0}" = 1 ]; then
+                    printf 'yaml: line 7: mapping values are not allowed in this context (tiruan)\n' >&2
+                    exit 15
+                fi
+                if [ -n "${COMPOSE_PROFILES+disetel}" ]; then
+                    profil="$COMPOSE_PROFILES"
+                elif [ -n "$berkas_env" ] && [ -f "$berkas_env" ]; then
+                    profil="$(sed -n 's/^COMPOSE_PROFILES=//p' "$berkas_env" | tail -n 1)"
+                else
+                    profil=''
+                fi
+                printf '%s\n' core-db core-migrate core-app core-worker core-scheduler core-renderer
+                case ",$profil," in
+                    *,proxy,*) printf 'core-proxy\n' ;;
+                esac
+                ;;
+            up)
+                # shellcheck disable=SC2053 # sisi kanan memang pola glob
+                if [ -n "${FAKE_DOCKER_UP_GAGAL:-}" ] && [[ "$semua" == $FAKE_DOCKER_UP_GAGAL ]]; then
+                    printf 'Error response from daemon: Bind for 0.0.0.0:443 failed: port is already allocated (tiruan)\n' >&2
+                    exit 1
+                fi
                 ;;
             ls)
                 # Proyek compose yang sudah ada di server, dalam bentuk `compose ls --format json`.
