@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('working_time_calendars', function (Blueprint $table): void {
             $table->ulid('id')->primary();
-            $table->foreignUlid('tenant_id')->constrained()->cascadeOnDelete();
+            $table->ulid('tenant_id')->index();
             $table->foreignUlid('legal_entity_id')->nullable()->constrained('organizations')->nullOnDelete();
             $table->string('code', 50);
             $table->string('name', 150);
@@ -30,7 +30,7 @@ return new class extends Migration
 
         Schema::create('working_time_calendar_days', function (Blueprint $table): void {
             $table->ulid('id')->primary();
-            $table->foreignUlid('tenant_id')->constrained()->cascadeOnDelete();
+            $table->ulid('tenant_id');
             $table->foreignUlid('working_time_calendar_id')->constrained('working_time_calendars')->cascadeOnDelete();
             $table->date('date');
             $table->unsignedTinyInteger('day_of_week'); // 0=Senin, 1=Selasa, 2=Rabu, 3=Kamis, 4=Jumat, 5=Sabtu, 6=Minggu
@@ -44,7 +44,7 @@ return new class extends Migration
 
         Schema::create('working_time_calendar_lines', function (Blueprint $table): void {
             $table->ulid('id')->primary();
-            $table->foreignUlid('tenant_id')->constrained()->cascadeOnDelete();
+            $table->ulid('tenant_id')->index();
             $table->foreignUlid('working_time_calendar_day_id')->constrained('working_time_calendar_days')->cascadeOnDelete();
             $table->time('from_time')->nullable();
             $table->time('to_time')->nullable();
