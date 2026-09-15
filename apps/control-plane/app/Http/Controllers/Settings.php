@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace ControlPlane\Http\Controllers;
 
+use ControlPlane\Registry\HarborClient;
+use ControlPlane\Registry\RegistrySettings;
+use ControlPlane\Registry\RegistryUnavailable;
 use ControlPlane\Sites\KeyInspection;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -23,13 +26,26 @@ use Inertia\Response as InertiaResponse;
  *
  * ## Bagian Harbor
  *
- * Status registry (CP-06 di `docs/todo/registry-harbor`) milik tim registry. Halaman ini hanya
- * menyediakan tempatnya di layar; datanya belum dikirim dari sini.
+ * Status registry (CP-06 di `docs/todo/registry-harbor`): alamat yang diberikan ke agen, nama robot
+ * sistem, dan apakah Harbor menerimanya. Pemeriksaannya satu permintaan ke Harbor setiap halaman dibuka,
+ * dibatasi beberapa detik — halaman ini dibuka operator sesekali, dan jawaban basi dari cache justru
+ * menyembunyikan robot yang baru saja dicabut. Pemakaian disk menunggu metrik Harbor dikumpulkan (REG-09).
  */
 final class Settings extends Controller
 {
-    public function __invoke(): InertiaResponse
+    public function __invoke(RegistrySettings $registry, HarborClient $harbor): InertiaResponse
     {
+        $robot = $registry->robotName();
+        $check = ['ok' => true];
+
+        if ($robot !== null) {
+            try {
+                $harbor->verifyRobot();
+            } catch (RegistryUnavailable $e) {
+                $check = ['ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+
         $licensePrivate = KeyInspection::privateKey(config('sites.license_private_key_path'), 'CONSOLE_LICENSE_PRIVATE_KEY_PATH');
         $licensePublic = KeyInspection::publicKey(config('sites.license_public_key_path'), 'CONSOLE_LICENSE_PUBLIC_KEY_PATH');
 
@@ -49,6 +65,11 @@ final class Settings extends Controller
                 'pairMatches' => $licensePrivate['ok'] && $licensePublic['ok']
                     ? hash_equals($licensePrivate['fingerprint'], $licensePublic['fingerprint'])
                     : null,
+            ],
+            'registry' => [
+                'host' => $registry->host(),
+                'robot' => $robot,
+                'check' => $check,
             ],
         ]);
     }

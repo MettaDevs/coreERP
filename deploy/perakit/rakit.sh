@@ -4,11 +4,13 @@
 # bersama image pendamping, lalu menulis dan menandatangani manifest rilis v2. Dijalankan sebagai root di
 # server pertama:
 #
-#   sudo bash deploy/perakit/rakit.sh --rilis 0.2.0 [--ref origin/main]
+#   sudo bash deploy/perakit/rakit.sh --rilis 0.2.1 [--ref origin/main] [--tanpa-daftar]
+#   sudo bash deploy/perakit/rakit.sh --daftar 0.2.1      # mendaftarkan ulang rilis yang sudah dirakit
 #
 # Hasilnya di /var/lib/coreerp-perakit/rilis/<rilis>/: manifest.json, compose.yaml, update.sh, SHA256SUMS,
 # dan SHA256SUMS.sig — bentuk berkas rilis yang sama dengan v1, sehingga pemeriksaan tanda tangan di
-# admin.erp dan agen tidak berubah. Mendaftarkannya ke admin.erp adalah langkah terpisah (CP-04).
+# admin.erp dan agen tidak berubah. Sesudah itu rilis didaftarkan ke admin.erp dengan token rilis dari
+# /etc/coreerp/perakit/konsol.env (`KONSOL_URL='…'`, `KONSOL_TOKEN_RILIS='…'`), kecuali --tanpa-daftar.
 #
 # Urutannya mengikuti PRD registry Harbor:
 #
@@ -43,6 +45,7 @@ FOLDER_RILIS="$RUMAH/rilis"
 BERKAS_ROBOT='/etc/coreerp/perakit/registry-robot.env'
 KUNCI_PRIVAT='/etc/coreerp/perakit/kunci-rilis-privat.pem'
 KUNCI_PUBLIK='/etc/coreerp/kunci/rilis-publik.pem'
+BERKAS_KONSOL='/etc/coreerp/perakit/konsol.env'
 # Harus sama dengan CRON_GC di deploy/registry/atur-harbor.sh: Sabtu 20.00 UTC.
 GC_HARI_UTC=6
 GC_JAM_UTC=20
@@ -60,19 +63,67 @@ langkah() {
 
 rilis=''
 ref='origin/main'
+tanpa_daftar=0
+hanya_daftar=''
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --rilis) [ "$#" -ge 2 ] || gagal '--rilis butuh nilai'; rilis="$2"; shift 2 ;;
         --ref) [ "$#" -ge 2 ] || gagal '--ref butuh nilai'; ref="$2"; shift 2 ;;
-        *) gagal "pilihan tidak dikenal: $1" 'Pemakaian: sudo bash deploy/perakit/rakit.sh --rilis 0.2.0 [--ref origin/main]' ;;
+        --tanpa-daftar) tanpa_daftar=1; shift ;;
+        --daftar) [ "$#" -ge 2 ] || gagal '--daftar butuh nomor rilis'; hanya_daftar="$2"; shift 2 ;;
+        *) gagal "pilihan tidak dikenal: $1" 'Pemakaian: sudo bash deploy/perakit/rakit.sh --rilis 0.2.1 [--ref origin/main] [--tanpa-daftar] | --daftar 0.2.1' ;;
     esac
 done
 
+nilai_konsol() {
+    sed -n "s/^$1='\(.*\)'\$/\1/p" "$BERKAS_KONSOL" | tail -n 1
+}
+
+periksa_konsol() {
+    [ -f "$BERKAS_KONSOL" ] || gagal "Berkas $BERKAS_KONSOL tidak ada." \
+        "Isinya KONSOL_URL='https://admin.erp.contoh' dan KONSOL_TOKEN_RILIS='<CONSOLE_RELEASE_TOKEN konsol>', root 0600." \
+        'Atau rakit dengan --tanpa-daftar lalu daftarkan belakangan dengan --daftar.'
+    [ "$(stat -c '%a %U' "$BERKAS_KONSOL")" = '600 root' ] || gagal "$BERKAS_KONSOL harus 0600 milik root: ia memuat token rilis."
+    [[ $(nilai_konsol KONSOL_URL) =~ ^https?://[^[:space:]\'\"]+$ ]] && [ -n "$(nilai_konsol KONSOL_TOKEN_RILIS)" ] \
+        || gagal "$BERKAS_KONSOL harus memuat KONSOL_URL dan KONSOL_TOKEN_RILIS."
+}
+
+# daftarkan FOLDER — mengirim kelima berkas rilis ke admin.erp. admin.erp memeriksa ulang tanda tangan dan
+# checksum dengan kunci publik rilisnya sendiri; token hanya membuktikan pengirimnya perakit.
+daftarkan() {
+    local folder="$1" alamat kode jawaban
+    alamat="$(nilai_konsol KONSOL_URL)"
+    jawaban="$(mktemp)"
+    langkah "Mendaftarkan rilis $(basename "$folder") ke $alamat"
+    # Token lewat konfigurasi curl di stdin, bukan argumen: argumen terlihat di daftar proses.
+    kode="$(printf 'header = "Authorization: Bearer %s"\n' "$(nilai_konsol KONSOL_TOKEN_RILIS)" \
+        | curl -sS -K - -o "$jawaban" -w '%{http_code}' -H 'Accept: application/json' \
+            -F "manifest=@$folder/manifest.json" -F "compose=@$folder/compose.yaml" -F "update_script=@$folder/update.sh" \
+            -F "checksums=@$folder/SHA256SUMS" -F "signature=@$folder/SHA256SUMS.sig" \
+            "${alamat%/}/api/releases/v1")" || { rm -f "$jawaban"; gagal "admin.erp di $alamat tidak dapat dihubungi."; }
+    case "$kode" in
+        201) printf '    terdaftar\n' ;;
+        200) printf '    sudah terdaftar dengan isi yang sama\n' ;;
+        409) rm -f "$jawaban"; gagal "admin.erp sudah punya rilis $(basename "$folder") dengan isi berbeda." 'Rakit dengan nomor rilis berikutnya.' ;;
+        *) local isi; isi="$(head -c 2000 "$jawaban")"; rm -f "$jawaban"; gagal "admin.erp menjawab HTTP $kode." "$isi" ;;
+    esac
+    rm -f "$jawaban"
+}
+
 langkah 'Memeriksa mesin dan masukan'
 [ "$(id -u)" -eq 0 ] || gagal 'Jalankan sebagai root: kunci rilis dan kredensial robot hanya terbaca root.'
-for perintah in docker git jq openssl sha256sum; do
+for perintah in docker git jq openssl sha256sum curl; do
     command -v "$perintah" >/dev/null || gagal "Perintah $perintah tidak ada."
 done
+
+if [ -n "$hanya_daftar" ]; then
+    [[ $hanya_daftar =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || gagal "Nomor rilis tidak sah: '$hanya_daftar'"
+    [ -f "$FOLDER_RILIS/$hanya_daftar/SHA256SUMS.sig" ] || gagal "Rilis $hanya_daftar belum dirakit di $FOLDER_RILIS."
+    periksa_konsol
+    daftarkan "$FOLDER_RILIS/$hanya_daftar"
+    exit 0
+fi
+[ "$tanpa_daftar" -eq 1 ] || periksa_konsol
 # Pola yang sama dengan ReleaseRegistry di admin.erp. Tag rilis diawali angka, jadi aturan immutability
 # Harbor (`[0-9]*`) selalu melindunginya.
 [[ $rilis =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || gagal "Nomor rilis tidak sah: '$rilis'" 'Bentuknya angka bertitik, misalnya 0.2.0.'
@@ -153,6 +204,15 @@ git -C "$FOLDER_SUMBER" checkout --quiet --force --detach "$commit"
 git -C "$FOLDER_SUMBER" clean --quiet -ffdx
 printf '    commit %s\n' "$commit"
 
+# Diperiksa sebelum apa pun didorong, karena tag rilis immutable: rilis dari commit yang compose-nya belum siap
+# untuk registry sendiri tidak dapat diperbaiki dengan merakit ulang nomor yang sama. Setiap service harus menolak
+# menarik — compose tanpa `pull_policy: never` menarik `docker.io/...` diam-diam saat nama lokal tidak ada.
+jumlah_image="$(grep -cE '^[[:space:]]*image:' "$FOLDER_SUMBER/deploy/compose.edition.yaml" || true)"
+jumlah_tanpa_tarik="$(grep -cE '^[[:space:]]*pull_policy:[[:space:]]*never[[:space:]]*$' "$FOLDER_SUMBER/deploy/compose.edition.yaml" || true)"
+[ "$jumlah_image" -gt 0 ] && [ "$jumlah_tanpa_tarik" -ge "$jumlah_image" ] \
+    || gagal "deploy/compose.edition.yaml pada commit ini punya $jumlah_image image tetapi $jumlah_tanpa_tarik pull_policy: never." \
+        'Commit ini belum membawa compose untuk registry sendiri (AG-02); rakit dari commit yang sudah membawanya.'
+
 tujuan="$HOST_REGISTRY/$REPO_IMAGE:$rilis"
 image_lokal="coreerp-perakit/core:$rilis"
 ada_tag="$(keadaan_tag "$tujuan")"
@@ -204,6 +264,7 @@ compose_rilis="$FOLDER_SUMBER/deploy/compose.edition.yaml"
 mapfile -t sumber_pendamping < <(sed -n 's/^[[:space:]]*image:[[:space:]]*\([^$[:space:]][^[:space:]]*\)[[:space:]]*$/\1/p' "$compose_rilis" | tr -d "'\"" | sort -u)
 [ "${#sumber_pendamping[@]}" -gt 0 ] || gagal "Tidak ada image pendamping terbaca di $compose_rilis."
 pendamping_json='[]'
+declare -A tag_lokal_pendamping=()
 for sumber in "${sumber_pendamping[@]}"; do
     nama="${sumber%%[:@]*}"
     nama="${nama##*/}"
@@ -228,6 +289,9 @@ for sumber in "${sumber_pendamping[@]}"; do
     fi
     pendamping_json="$(jq -c --arg nama "$nama" --arg image "$REPO_PENDAMPING/$nama" --arg digest "$digest_pendamping" \
         '. + [{nama: $nama, image: $image, digest: $digest}]' <<< "$pendamping_json")"
+    # Nama lokal di server klien, aturan yang sama dengan agen: diturunkan dari digest, bukan dari nomor rilis,
+    # supaya postgres tidak dibuat ulang di setiap pembaruan yang tidak mengubah digestnya.
+    tag_lokal_pendamping["$sumber"]="coreerp.local/pendamping/$nama:${digest_pendamping:7:20}"
     printf '    %s ← %s (%s)\n' "$REPO_PENDAMPING/$nama" "$sumber" "$digest_pendamping"
 done
 
@@ -241,7 +305,21 @@ jq -n --arg rilis "$rilis" --arg commit "$commit" --arg image "$REPO_IMAGE" \
     --arg dibangun_pada "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     '{versi: 2, rilis: $rilis, commit: $commit, image: $image, digest: $digest, config_digest: $config_digest,
       pendamping: $pendamping, dibangun_pada: $dibangun_pada}' > "$folder_baru/manifest.json"
-cp "$compose_rilis" "$folder_baru/compose.yaml"
+# compose rilis: setiap image pendamping diganti nama lokalnya. Server klien tidak pernah menyimpan host registry
+# dan tidak pernah menarik dari Docker Hub — agen menarik lewat digest lalu memberi nama lokal ini, dan compose
+# hanya mengenal nama lokal.
+while IFS= read -r baris || [ -n "$baris" ]; do
+    if [[ $baris =~ ^([[:space:]]*image:[[:space:]]*)[\'\"]?([^\'\"[:space:]]+)[\'\"]?[[:space:]]*$ ]] \
+        && [ -n "${tag_lokal_pendamping[${BASH_REMATCH[2]}]:-}" ]; then
+        printf '%s%s\n' "${BASH_REMATCH[1]}" "${tag_lokal_pendamping[${BASH_REMATCH[2]}]}"
+    else
+        printf '%s\n' "$baris"
+    fi
+done < "$compose_rilis" > "$folder_baru/compose.yaml"
+# Setiap `image:` di compose rilis harus image aplikasi atau nama lokal, dan setiap service harus menolak menarik.
+# Compose tanpa `pull_policy: never` akan menarik `docker.io/...` diam-diam saat nama lokal tidak ada.
+image_asing="$(grep -E '^[[:space:]]*image:' "$folder_baru/compose.yaml" | grep -vE 'image:[[:space:]]*(\$\{EDITION_IMAGE\}|coreerp\.local/)' || true)"
+[ -z "$image_asing" ] || gagal 'compose rilis masih menyebut image di luar image aplikasi dan nama lokal:' "$image_asing"
 cp "$FOLDER_SUMBER/scripts/update.sh" "$folder_baru/update.sh"
 (cd "$folder_baru" && sha256sum compose.yaml manifest.json update.sh > SHA256SUMS)
 openssl dgst -sha256 -sign "$KUNCI_PRIVAT" -out "$folder_baru/SHA256SUMS.sig" "$folder_baru/SHA256SUMS"
@@ -254,6 +332,12 @@ chmod 0644 "$folder_baru"/*
 chmod 0755 "$folder_baru"
 mv "$folder_baru" "$FOLDER_RILIS/$rilis"
 docker rmi "$image_lokal" >/dev/null 2>&1 || true
+
+if [ "$tanpa_daftar" -eq 0 ]; then
+    daftarkan "$FOLDER_RILIS/$rilis"
+else
+    printf '\n    tidak didaftarkan (--tanpa-daftar); daftarkan dengan: sudo bash deploy/perakit/rakit.sh --daftar %s\n' "$rilis"
+fi
 
 printf '\nRilis %s dirakit.\n' "$rilis"
 printf '  image     %s/%s@%s\n' "$HOST_REGISTRY" "$REPO_IMAGE" "$digest"

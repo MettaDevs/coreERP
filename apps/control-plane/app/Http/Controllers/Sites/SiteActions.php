@@ -8,6 +8,7 @@ use ControlPlane\Audit\OperatorAudit;
 use ControlPlane\Http\Controllers\Controller;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
+use ControlPlane\Registry\RegistryCredentials;
 use ControlPlane\Sites\EnrollmentTokens;
 use ControlPlane\Sites\SiteOperations;
 use ControlPlane\Sites\SiteRejected;
@@ -81,7 +82,7 @@ final class SiteActions extends Controller
         return redirect('/situs/'.$row->id)->with('message', 'Permintaan operasi dibatalkan.');
     }
 
-    public function revoke(Request $request, string $site): RedirectResponse
+    public function revoke(Request $request, string $site, RegistryCredentials $credentials): RedirectResponse
     {
         $row = $this->confirmedSite($request, $site);
 
@@ -99,6 +100,11 @@ final class SiteActions extends Controller
 
             OperatorAudit::record($request, 'site.revoked', 'site', $row->id, ['cancelled_operations' => $cancelled]);
         });
+
+        // Sesudah pencabutan tersimpan, di luar transaksinya: Harbor yang tidak menjawab tidak boleh
+        // membatalkan pencabutan. Operasi yang masih `running` ikut, karena agennya tidak akan pernah
+        // dilayani lagi — situs yang dicabut tidak dapat menarik apa pun lagi (E2E-01).
+        $credentials->releaseClosed($row, $request->ip(), includeRunning: true);
 
         return redirect('/situs/'.$row->id)->with('message', 'Situs dicabut. Aplikasinya di server klien tetap berjalan; pengelolaannya yang berhenti.');
     }

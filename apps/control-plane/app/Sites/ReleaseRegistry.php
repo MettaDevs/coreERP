@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ControlPlane\Sites;
 
+use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteRelease;
 use Illuminate\Database\UniqueConstraintViolationException;
 
@@ -24,6 +25,10 @@ use Illuminate\Database\UniqueConstraintViolationException;
  */
 final class ReleaseRegistry
 {
+    private const RELEASE = '/^\d+(\.\d+){1,3}$/';
+
+    private const DIGEST = '/^sha256:[a-f0-9]{64}$/';
+
     private const CHECKSUMMED = [
         'manifest.json' => 'manifest',
         'compose.yaml' => 'compose',
@@ -45,19 +50,9 @@ final class ReleaseRegistry
             throw new SiteRejected('manifest_invalid', 'manifest.json bukan JSON.');
         }
 
-        $edition = is_string($manifest['edisi'] ?? null) ? $manifest['edisi'] : '';
-        $release = is_string($manifest['rilis'] ?? null) ? $manifest['rilis'] : '';
-        $image = is_string($manifest['image'] ?? null) ? $manifest['image'] : '';
-        $digest = is_string($manifest['digest'] ?? null) ? $manifest['digest'] : '';
-
-        if (preg_match('/^[a-z0-9][a-z0-9-]{0,79}$/', $edition) !== 1
-            || preg_match('/^\d+(\.\d+){1,3}$/', $release) !== 1) {
-            throw new SiteRejected('manifest_invalid', 'manifest.json harus menyebut edisi dan nomor rilis bertitik.');
-        }
-
-        if (preg_match('/@sha256:[a-f0-9]{64}$/', $image) !== 1 || preg_match('/^sha256:[a-f0-9]{64}$/', $digest) !== 1) {
-            throw new SiteRejected('manifest_invalid', 'manifest.json harus menyebut image lewat digest registry dan id image-nya.');
-        }
+        ['edition' => $edition, 'release' => $release, 'image' => $image, 'digest' => $digest] = ($manifest['versi'] ?? null) === 2
+            ? $this->fromManifestV2($manifest)
+            : $this->fromManifestV1($manifest);
 
         $attributes = [
             'edition' => $edition,
@@ -85,6 +80,98 @@ final class ReleaseRegistry
 
             return ['release' => $this->sameOrConflict($winner, $attributes), 'created' => false];
         }
+    }
+
+    /**
+     * Manifest per edisi dari alur rilis GHCR, yang dibuang PK-05.
+     *
+     * @param  array<mixed>  $manifest
+     * @return array{edition: string, release: string, image: string, digest: string}
+     */
+    private function fromManifestV1(array $manifest): array
+    {
+        $edition = is_string($manifest['edisi'] ?? null) ? $manifest['edisi'] : '';
+        $release = is_string($manifest['rilis'] ?? null) ? $manifest['rilis'] : '';
+        $image = is_string($manifest['image'] ?? null) ? $manifest['image'] : '';
+        $digest = is_string($manifest['digest'] ?? null) ? $manifest['digest'] : '';
+
+        if (preg_match('/^[a-z0-9][a-z0-9-]{0,79}$/', $edition) !== 1
+            || preg_match(self::RELEASE, $release) !== 1) {
+            throw new SiteRejected('manifest_invalid', 'manifest.json harus menyebut edisi dan nomor rilis bertitik.');
+        }
+
+        if (preg_match('/@sha256:[a-f0-9]{64}$/', $image) !== 1 || preg_match(self::DIGEST, $digest) !== 1) {
+            throw new SiteRejected('manifest_invalid', 'manifest.json harus menyebut image lewat digest registry dan id image-nya.');
+        }
+
+        return ['edition' => $edition, 'release' => $release, 'image' => $image, 'digest' => $digest];
+    }
+
+    /**
+     * Manifest v2 dari `deploy/perakit/rakit.sh`: satu image untuk semua klien, di registry sendiri.
+     *
+     * Tanpa edisi dan tanpa host registry, keduanya disengaja (`docs/todo/registry-harbor`, "Manifest rilis
+     * v2"). Rilis v2 disimpan di bawah edisi tunggal {@see Site::SINGLE_IMAGE_EDITION} karena kolom edisi dan
+     * jalur unduhan agen masih memakainya; nilainya bukan pilihan siapa pun.
+     *
+     * Setiap image wajib tinggal di project registry konsol ini. Manifest yang menunjuk project lain — atau
+     * host lain — tidak dapat ditarik dengan kredensial yang diterbitkan konsol, dan lebih baik ditolak di
+     * sini daripada gagal di server klien.
+     *
+     * @param  array<mixed>  $manifest
+     * @return array{edition: string, release: string, image: string, digest: string}
+     */
+    private function fromManifestV2(array $manifest): array
+    {
+        $project = (string) config('sites.registry_project');
+        $release = is_string($manifest['rilis'] ?? null) ? $manifest['rilis'] : '';
+        $commit = is_string($manifest['commit'] ?? null) ? $manifest['commit'] : '';
+        $image = is_string($manifest['image'] ?? null) ? $manifest['image'] : '';
+        $digest = is_string($manifest['digest'] ?? null) ? $manifest['digest'] : '';
+        $configDigest = is_string($manifest['config_digest'] ?? null) ? $manifest['config_digest'] : '';
+        $companions = $manifest['pendamping'] ?? null;
+
+        if (preg_match(self::RELEASE, $release) !== 1 || preg_match('/^[a-f0-9]{40}$/', $commit) !== 1) {
+            throw new SiteRejected('manifest_invalid', 'manifest v2 harus menyebut nomor rilis bertitik dan SHA commit sumbernya.');
+        }
+
+        if (! $this->inProject($image, $project) || preg_match(self::DIGEST, $digest) !== 1 || preg_match(self::DIGEST, $configDigest) !== 1) {
+            throw new SiteRejected('manifest_invalid', sprintf('manifest v2 harus menyebut image di project %s tanpa host, beserta digest manifest dan digest config-nya.', $project));
+        }
+
+        if (! is_array($companions) || ! array_is_list($companions)) {
+            throw new SiteRejected('manifest_invalid', 'manifest v2 harus menyebut daftar pendamping.');
+        }
+
+        $names = [];
+
+        foreach ($companions as $companion) {
+            $name = is_array($companion) && is_string($companion['nama'] ?? null) ? $companion['nama'] : '';
+
+            if (preg_match('/^[a-z0-9][a-z0-9._-]{0,62}$/', $name) !== 1
+                || ($companion['image'] ?? null) !== $project.'/pendamping/'.$name
+                || ! is_string($companion['digest'] ?? null) || preg_match(self::DIGEST, $companion['digest']) !== 1
+                || in_array($name, $names, true)) {
+                throw new SiteRejected('manifest_invalid', sprintf('Pendamping di manifest v2 harus bernama unik, tinggal di %s/pendamping/<nama>, dan disebut lewat digest.', $project));
+            }
+
+            $names[] = $name;
+        }
+
+        return [
+            'edition' => Site::SINGLE_IMAGE_EDITION,
+            'release' => $release,
+            'image' => $image.'@'.$digest,
+            'digest' => $digest,
+        ];
+    }
+
+    private function inProject(string $image, string $project): bool
+    {
+        // Jalur repositori tanpa host: segmen huruf kecil, dan segmen pertama adalah project itu sendiri —
+        // `registry.contoh/coreerp/core` gagal di sini karena segmen pertamanya bukan `coreerp`.
+        return str_starts_with($image, $project.'/')
+            && preg_match('/^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+$/', $image) === 1;
     }
 
     private function verifySignature(string $checksums, string $signature): void
@@ -139,7 +226,7 @@ final class ReleaseRegistry
             if ($existing->getAttribute($field) !== $attributes[$field]) {
                 throw new SiteRejected(
                     'release_conflict',
-                    sprintf('Edisi %s rilis %s sudah terdaftar dengan isi berbeda. Naikkan nomor rilis di manifest edisi.', $attributes['edition'], $attributes['release']),
+                    sprintf('Edisi %s rilis %s sudah terdaftar dengan isi berbeda. Rakit ulang dengan nomor rilis berikutnya.', $attributes['edition'], $attributes['release']),
                 );
             }
         }

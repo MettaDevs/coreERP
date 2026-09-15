@@ -17,15 +17,24 @@ module, didorong ke Harbor, beserta manifest rilis v2 yang ditandatangani. Ranca
 Di server pertama:
 
 ```bash
-sudo bash deploy/perakit/rakit.sh --rilis 0.2.0 --ref origin/main
+sudo bash deploy/perakit/rakit.sh --rilis 0.2.1 --ref origin/main
 ```
+
+Rilis langsung didaftarkan ke admin.erp dengan token dari `/etc/coreerp/perakit/konsol.env` (root 0600):
+
+```text
+KONSOL_URL='https://admin.erp.grenery.xyz'
+KONSOL_TOKEN_RILIS='<nilai CONSOLE_RELEASE_TOKEN konsol>'
+```
+
+`--tanpa-daftar` melewati pendaftaran; `--daftar 0.2.1` mendaftarkan rilis yang sudah dirakit.
 
 Hasilnya di `/var/lib/coreerp-perakit/rilis/<rilis>/`:
 
 | Berkas | Isi |
 | --- | --- |
 | `manifest.json` | Manifest v2: `versi`, `rilis`, `commit`, `image`, `digest`, `config_digest`, `pendamping[]`, `dibangun_pada` |
-| `compose.yaml` | Salinan `deploy/compose.edition.yaml` pada commit itu |
+| `compose.yaml` | `deploy/compose.edition.yaml` pada commit itu, dengan setiap image pendamping diganti nama lokalnya `coreerp.local/pendamping/<nama>:<20 heksa pertama digest>` |
 | `update.sh` | Salinan `scripts/update.sh` pada commit itu |
 | `SHA256SUMS`, `SHA256SUMS.sig` | Sidik ketiga berkas di atas, ditandatangani RSA SHA-256 dengan kunci rilis |
 
@@ -45,6 +54,9 @@ containerd.
   server klien tidak pernah menarik dari Docker Hub. Daftarnya dibaca dari baris `image:` harfiah di
   `deploy/compose.edition.yaml`.
 - **Perakit tidak push di sekitar GC Harbor**, Sabtu 19.00–21.59 UTC.
+- **Commit yang compose-nya belum menolak menarik ditolak sebelum push.** Setiap service di
+  `deploy/compose.edition.yaml` harus `pull_policy: never`; tag rilis immutable, jadi rilis dari commit yang
+  belum siap tidak dapat diperbaiki dengan merakit ulang nomor yang sama.
 
 ## Yang dibutuhkan di server
 
@@ -57,8 +69,6 @@ containerd.
 
 ## Belum
 
-- **Pendaftaran ke admin.erp.** `ReleaseRegistry` hari ini menuntut edisi dan image bertag host; menerima
-  manifest v2 adalah CP-04.
-- **`compose.yaml` dan `update.sh` di dalam rilis masih bentuk v1**, yang menarik image penuh dari
-  manifest. Agen yang menarik lewat digest dan compose bertag lokal adalah AG-01 dan AG-02.
+- **Rilis 0.2.0 tidak didaftarkan.** Ia dirakit sebelum compose dan agen siap untuk registry sendiri; rilis
+  pertama yang dapat dipasang dirakit dari commit sesudah AG-01 dan AG-02.
 - **Penandatanganan di mesin terpisah** sebelum klien produksi pertama (Tahap 7).

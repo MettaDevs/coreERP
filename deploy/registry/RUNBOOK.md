@@ -64,9 +64,20 @@ registry tidak melayani.
 Bila skrip berhenti dengan `rahasia.env.baru` tertinggal, kata sandi yang berlaku ada di berkas itu:
 coba masuk dengannya, lalu pindahkan ke `rahasia.env`.
 
-## Memutar rahasia robot sistem admin.erp — belum ada
+## Memasang dan memutar robot sistem admin.erp — teruji sebagian
 
-Robot sistem dibuat bersama CP-01. Bagian ini ditulis saat itu.
+admin.erp memakai robot sistem `robot$konsol` untuk membuat dan menghapus robot pull-only per operasi situs.
+`atur-harbor.sh` membuatnya dan menulis rahasianya ke `/etc/coreerp/registry/robot-konsol.env`; konsol
+menyimpannya terenkripsi sesudah memeriksanya ke Harbor:
+
+```bash
+sudo bash deploy/registry/atur-harbor.sh
+sudo cat /etc/coreerp/registry/robot-konsol.env     | docker exec -i coreerp-saas-core-console-1 php artisan registry:robot-sistem
+```
+
+Memutar rahasianya: hapus berkas itu, jalankan kedua perintah lagi. Robot situs yang sedang dipakai tidak
+terpengaruh; yang terhenti hanya penerbitan robot baru di antara kedua perintah. Halaman Pengaturan konsol
+menampilkan apakah Harbor menerima robot yang tersimpan.
 
 ## Mengubah daftar alamat yang boleh membuka UI — teruji
 

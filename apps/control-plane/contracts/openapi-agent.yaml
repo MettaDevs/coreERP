@@ -282,6 +282,62 @@ paths:
         '404':
           description: Rilis atau berkas tidak ada untuk edisi situs ini.
 
+  /agent/v1/registry-credential:
+    post:
+      tags: [agent]
+      operationId: issueRegistryCredential
+      summary: Meminta kredensial registry untuk operasi yang sedang dipegang
+      description: |
+        Kredensial pull-only ke project `coreerp` di registry image, untuk menarik image rilis dan image
+        pendamping lewat digest yang disebut manifest v2. Hanya dijawab bila situs ini memegang operasi
+        `install` atau `upgrade` yang disebut `operation_id` — `running` dan lease-nya belum habis.
+
+        Satu robot per operasi, bukan per situs. Memanggil ulang selama operasi yang sama memutar rahasia
+        robot yang sama, tidak membuat robot kedua; agen memanggil ulang ketika pull dijawab `401` di tengah
+        jalan. Robot berumur paling lama satu hari dan dihapus admin.erp begitu operasinya ditutup, apa pun
+        cara penutupannya. Token yang sudah diterbitkan registry untuk robot itu tetap berlaku sampai umur
+        tokennya habis.
+
+        `registry` adalah host, bukan URL. Agen tidak pernah menyimpan kredensial ini di luar
+        `DOCKER_CONFIG` sementara milik operasinya.
+      security:
+        - siteSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [operation_id]
+              properties:
+                operation_id:
+                  type: string
+                  maxLength: 26
+      responses:
+        '200':
+          description: Kredensial untuk operasi itu.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistryCredential'
+        '401':
+          $ref: '#/components/responses/SignatureInvalid'
+        '409':
+          description: Situs ini tidak memegang operasi `install` atau `upgrade` dengan id itu.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/Invalid'
+        '503':
+          description: Registry belum disetel di admin.erp atau tidak menjawab. Operasi tetap dipegang agen.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /agent/v1/key:
     post:
       tags: [agent]
@@ -389,6 +445,21 @@ components:
             $ref: '#/components/schemas/Error'
 
   schemas:
+    RegistryCredential:
+      type: object
+      additionalProperties: false
+      required: [registry, username, password, expires_at]
+      properties:
+        registry:
+          type: string
+          description: Host registry, misalnya `registry.erp.grenery.xyz`.
+        username:
+          type: string
+        password:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
     Error:
       type: object
       additionalProperties: false
