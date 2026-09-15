@@ -9,6 +9,11 @@
 #     --release-key BERKAS     kunci publik rilis dari berkas ini, bukan dari jalur bawaannya
 #     --app-url URL            alamat CoreERP yang dibuka pengguna (bawaan https://<nama host>)
 #     --provider-email EMAIL   akun admin provider di Core (bawaan provider@coreerp.local)
+#     --app-port PORT          port host aplikasi, ditulis ke .env (bawaan dari env.template)
+#     --app-bind ALAMAT        alamat IPv4 tempat port itu diikat, ditulis ke .env (bawaan dari env.template)
+#
+#   COREERP_PROYEK dan COREERP_FOLDER_CADANGAN yang disebut saat memasang ditulis ke agent/agent.env,
+#   supaya timer dan perintah yang dijalankan tangan sesudahnya memakai nilai yang sama.
 #
 # Yang dikerjakan, berurutan: memeriksa mesin → memasang paket yang belum ada → menyiapkan folder →
 # menaruh agen, update.sh, dan kunci publik rilis → membuat .env dengan rahasia yang lahir di sini →
@@ -37,6 +42,7 @@ RUMAH="${COREERP_HOME:-/opt/coreerp}"
 FOLDER_SYSTEMD="${COREERP_SYSTEMD_DIR:-/etc/systemd/system}"
 FOLDER_PERINTAH="${COREERP_BIN_DIR:-/usr/local/bin}"
 BERKAS_ENV="$RUMAH/.env"
+BERKAS_SETELAN_AGEN="$RUMAH/agent/agent.env"
 REPO_MENTAH='https://raw.githubusercontent.com/MettaDevs/coreERP'
 
 folder_skrip="$(cd "$(dirname "${BASH_SOURCE[0]:-.}")" && pwd)"
@@ -59,7 +65,7 @@ pemakaian() {
         'Pemakaian:' \
         '  bash pasang.sh --admin-url URL --token TOKEN [--ref REF]' \
         '  bash pasang.sh --paket FOLDER --bundle FOLDER' \
-        'Pilihan: --release-key BERKAS  --app-url URL  --provider-email EMAIL'
+        'Pilihan: --release-key BERKAS  --app-url URL  --provider-email EMAIL  --app-port PORT  --app-bind ALAMAT'
 }
 
 alamat_admin=''
@@ -70,10 +76,12 @@ bundle=''
 kunci_rilis_sumber=''
 app_url=''
 email_provider='provider@coreerp.local'
+port_aplikasi=''
+alamat_ikat=''
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --admin-url | --token | --ref | --paket | --bundle | --release-key | --app-url | --provider-email)
+        --admin-url | --token | --ref | --paket | --bundle | --release-key | --app-url | --provider-email | --app-port | --app-bind)
             [ "$#" -ge 2 ] || pemakaian "$1 menuntut satu nilai."
             case "$1" in
                 --admin-url) alamat_admin="$2" ;;
@@ -84,6 +92,8 @@ while [ "$#" -gt 0 ]; do
                 --release-key) kunci_rilis_sumber="$2" ;;
                 --app-url) app_url="$2" ;;
                 --provider-email) email_provider="$2" ;;
+                --app-port) port_aplikasi="$2" ;;
+                --app-bind) alamat_ikat="$2" ;;
             esac
             shift 2
             ;;
@@ -109,6 +119,48 @@ cocok_ref() {
     [[ "$1" =~ ^[A-Za-z0-9._/-]{1,100}$ ]] && [[ "$1" != *..* ]]
 }
 
+port_sah() {
+    [[ "$1" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$1" -le 65535 ]
+}
+
+# Hanya IPv4: alamat ini disisipkan ke bentuk pendek `ALAMAT:PORT:80` di compose, tempat titik dua IPv6
+# bertabrakan dengan pemisahnya. Tanpa nol di depan, yang dibaca sebagian pengurai sebagai oktal.
+ipv4_sah() {
+    local oktet='(0|[1-9][0-9]{0,2})' satu
+
+    [[ "$1" =~ ^$oktet\.$oktet\.$oktet\.$oktet$ ]] || return 1
+
+    for satu in "${BASH_REMATCH[@]:1}"; do
+        [ "$satu" -le 255 ] || return 1
+    done
+}
+
+# Nilai yang ditulis ke agent.env dibatasi pada huruf yang diterima agen saat membacanya; lihat
+# `muat_setelan` di coreerp-agent.
+nilai_setelan_sah() {
+    [[ "$1" =~ ^[A-Za-z0-9_./:@+-]+$ ]]
+}
+
+# port_didengar PORT — pulang 0 bila ada soket TCP yang mendengarkan port itu di alamat mana pun.
+#
+# Dibaca langsung dari /proc, bukan lewat `ss`: iproute2 tidak dijamin terpasang, dan skrip ini tidak
+# memasang paket hanya untuk memeriksa satu port. Keadaan 0A di sana adalah LISTEN.
+port_didengar() {
+    local heks berkas ada=()
+
+    heks="$(printf '%04X' "$1")"
+
+    for berkas in /proc/net/tcp /proc/net/tcp6; do
+        [ ! -r "$berkas" ] || ada+=("$berkas")
+    done
+
+    [ "${#ada[@]}" -gt 0 ] || return 1
+
+    awk -v port="$heks" '
+        FNR > 1 && $4 == "0A" { n = split($2, bagian, ":"); if (bagian[n] == port) ketemu = 1 }
+        END { exit !ketemu }' "${ada[@]}"
+}
+
 # --- 1. Mesin ------------------------------------------------------------------------------------------
 
 langkah 'Memeriksa mesin'
@@ -132,6 +184,23 @@ else
     paket="$(cd "$paket" && pwd)"
     bundle="$(cd "$bundle" && pwd)"
 fi
+
+[ -z "$port_aplikasi" ] || port_sah "$port_aplikasi" \
+    || gagal "--app-port tidak sah: $port_aplikasi" 'Sebut satu nomor port 1-65535.'
+
+[ -z "$alamat_ikat" ] || ipv4_sah "$alamat_ikat" \
+    || gagal "--app-bind tidak sah: $alamat_ikat" \
+        'Sebut satu alamat IPv4: 127.0.0.1, atau alamat gateway bridge Docker bila reverse proxy-nya' \
+        'berjalan di dalam Docker.'
+
+# Nilai yang tidak diterima agen tidak ditulis ke agent.env: agen yang menolak berkasnya berhenti di setiap
+# putaran, dan pasang.sh sendiri memanggil agen beberapa baris di bawah.
+for kunci in COREERP_PROYEK COREERP_FOLDER_CADANGAN; do
+    if [ -n "${!kunci:-}" ] && ! nilai_setelan_sah "${!kunci}"; then
+        gagal "$kunci tidak dapat ditulis ke agent.env: ${!kunci}" \
+            'Nilainya hanya boleh memuat huruf, angka, dan . _ / : @ + - — tanpa kutip atau spasi.'
+    fi
+done
 
 # --- 2. Paket ------------------------------------------------------------------------------------------
 #
@@ -243,6 +312,50 @@ if [ -f "$RUMAH/kunci-rilis.pub" ] && ! cmp -s "$RUMAH/kunci-rilis.pub" "$bahan/
         'yang lama dengan sadar lalu jalankan lagi.'
 fi
 
+# Port aplikasi diperiksa sebelum satu berkas pun ditulis, dan hanya pada pemasangan pertama: sesudahnya
+# port itu memang didengar CoreERP sendiri.
+#
+# Server klien lazim sudah melayani situs lain. Tanpa pemeriksaan ini tabrakannya baru ketahuan saat
+# container pertama dinyalakan — pada jalur online lewat admin.erp, di dalam jendela pembaruan, jauh dari
+# orang yang sedang memasang dan dapat memilih port lain dalam sepuluh detik.
+port_efektif="${port_aplikasi:-$(sed -n 's/^CORE_APP_PORT=//p' "$bahan/env.template" | tail -n 1)}"
+
+if [ ! -e "$BERKAS_ENV" ]; then
+    port_sah "$port_efektif" || gagal "env.template menyebut CORE_APP_PORT yang tidak sah: ${port_efektif:-(kosong)}"
+
+    if port_didengar "$port_efektif"; then
+        gagal \
+            "Port $port_efektif sudah didengar layanan lain di server ini." \
+            '' \
+            'CoreERP tidak dapat menyala di port yang sama. Pilih port yang bebas, lalu jalankan lagi dengan' \
+            'pilihan yang sama ditambah --app-port:' \
+            '  bash pasang.sh ... --app-port PORT' \
+            '' \
+            'Reverse proxy di depan CoreERP kemudian diarahkan ke port itu.'
+    fi
+fi
+
+# agent.env yang sudah ada tidak diubah. Bila isinya berbeda dari yang disebut sekarang, perintah di dalam
+# skrip ini — yang membawa nilai dari lingkungannya — akan memakai nilai yang baru, sementara timer
+# memakai nilai di berkas: dua proyek compose atau dua folder cadangan untuk satu server.
+setelan_agen=()
+[ -z "${COREERP_PROYEK:-}" ] || setelan_agen+=(COREERP_PROYEK)
+[ -z "${COREERP_FOLDER_CADANGAN:-}" ] || setelan_agen+=(COREERP_FOLDER_CADANGAN)
+
+if [ -e "$BERKAS_SETELAN_AGEN" ]; then
+    for kunci in "${setelan_agen[@]}"; do
+        tertulis="$(sed -n "s/^$kunci=//p" "$BERKAS_SETELAN_AGEN" | tail -n 1)"
+
+        [ "$tertulis" = "${!kunci}" ] || gagal \
+            "$BERKAS_SETELAN_AGEN sudah ada dan menyebut $kunci yang berbeda." \
+            "  di berkas: ${tertulis:-(tidak disebut)}" \
+            "  diminta  : ${!kunci}" \
+            '' \
+            'Skrip ini tidak mengubah agent.env yang sudah ada. Samakan nilai yang disebut dengan isi' \
+            'berkasnya, atau ubah berkasnya dengan sadar lalu jalankan lagi.'
+    done
+fi
+
 install -d -m 0755 "$RUMAH" "$RUMAH/bin"
 install -d -m 0700 "$RUMAH/agent" "$RUMAH/agent/releases" "$RUMAH/agent/outbox" "$RUMAH/agent/log" "$RUMAH/keadaan"
 install -d -m 0755 "$RUMAH/agent/license"
@@ -261,6 +374,24 @@ printf '#!/bin/sh\nexport COREERP_HOME="${COREERP_HOME:-%s}"\nexec "%s" "$@"\n' 
 chmod 0755 "$FOLDER_PERINTAH/coreerp-agent"
 
 printf '    %s\n' "$RUMAH/bin/coreerp-agent" "$RUMAH/update.sh" "$RUMAH/kunci-rilis.pub"
+
+# Nilai yang disebut saat memasang hanya hidup selama skrip ini berjalan. Tanpa berkas ini, timer dan
+# perintah yang dijalankan tangan besok memakai bawaan lagi.
+if [ "${#setelan_agen[@]}" -gt 0 ] && [ ! -e "$BERKAS_SETELAN_AGEN" ]; then
+    (
+        umask 077
+        {
+            printf '# Setelan server CoreERP, dibaca unit systemd dan agen. Ditulis pasang.sh; aturan isinya di coreerp-agent.\n'
+            for kunci in "${setelan_agen[@]}"; do
+                printf '%s=%s\n' "$kunci" "${!kunci}"
+            done
+        } > "$BERKAS_SETELAN_AGEN.baru"
+    )
+
+    chmod 0600 "$BERKAS_SETELAN_AGEN.baru"
+    mv -f "$BERKAS_SETELAN_AGEN.baru" "$BERKAS_SETELAN_AGEN"
+    printf '    %s\n' "$BERKAS_SETELAN_AGEN"
+fi
 
 # --- 4. Setelan aplikasi -------------------------------------------------------------------------------
 
@@ -285,6 +416,8 @@ if [ -e "$BERKAS_ENV" ]; then
     # Tidak pernah ditimpa. APP_KEY baru membuat seluruh data terenkripsi tidak terbaca lagi, dan kata
     # sandi database baru tidak cocok dengan database yang sudah dibuat dengan yang lama.
     printf '    %s sudah ada; tidak ditimpa\n' "$BERKAS_ENV"
+    [ -z "$port_aplikasi$alamat_ikat" ] \
+        || printf '    --app-port dan --app-bind hanya berlaku pada pemasangan pertama; ubah .env itu dengan tangan\n'
 else
     [ -n "$app_url" ] || app_url="https://$(hostname -f 2>/dev/null || cat /proc/sys/kernel/hostname)"
 
@@ -301,6 +434,14 @@ else
             baris="${baris//@@COREERP_PROVIDER_EMAIL@@/"$email_provider"}"
             baris="${baris//@@COREERP_PROVIDER_PASSWORD@@/"$kata_sandi_provider"}"
             baris="${baris//@@COREERP_LICENSE_DIR@@/"$RUMAH/agent/license"}"
+
+            # Port dan alamat ikat punya nilai sungguhan di env.template, bukan isian: berkas itu yang
+            # menyebut bawaannya. Pilihan yang disebut menggantikan barisnya.
+            case "$baris" in
+                CORE_APP_PORT=*) [ -z "$port_aplikasi" ] || baris="CORE_APP_PORT=$port_aplikasi" ;;
+                CORE_APP_BIND=*) [ -z "$alamat_ikat" ] || baris="CORE_APP_BIND=$alamat_ikat" ;;
+            esac
+
             printf '%s\n' "$baris"
         done < "$bahan/env.template" > "$BERKAS_ENV.baru"
     )
@@ -310,9 +451,19 @@ else
         gagal 'env.template memuat isian yang tidak dikenal skrip pasang; .env tidak dibuat.'
     fi
 
+    # Pilihan yang tidak menemukan barisnya di env.template tidak boleh hilang tanpa suara: port yang
+    # diperiksa bebas di atas harus port yang benar-benar ditulis.
+    for satu in "CORE_APP_PORT=$port_efektif" ${alamat_ikat:+"CORE_APP_BIND=$alamat_ikat"}; do
+        if ! grep -qxF "$satu" "$BERKAS_ENV.baru"; then
+            rm -f "$BERKAS_ENV.baru"
+            gagal "env.template tidak memuat baris ${satu%%=*}; .env tidak dibuat."
+        fi
+    done
+
     chmod 0600 "$BERKAS_ENV.baru"
     mv -f "$BERKAS_ENV.baru" "$BERKAS_ENV"
     printf '    %s dibuat (hanya dapat dibaca root)\n' "$BERKAS_ENV"
+    printf '    aplikasi didengar di %s:%s\n' "$(sed -n 's/^CORE_APP_BIND=//p' "$BERKAS_ENV" | tail -n 1)" "$port_efektif"
 fi
 
 # --- 5. systemd ----------------------------------------------------------------------------------------

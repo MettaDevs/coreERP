@@ -9,6 +9,8 @@
 #   FAKE_UPDATE_BARIS   jumlah baris keluaran migrasi. Pengujian 409 memakai angka besar supaya
 #                       keluarannya melebihi penyangga pipa: agen yang berhenti membaca akan membuat
 #                       skrip ini mati kena SIGPIPE, dan "selesai" tidak pernah tercatat.
+#   FAKE_UPDATE_LINGKUNGAN  berkas tempat setelan COREERP_* yang sampai ke skrip ini dicatat, untuk
+#                       membuktikan setelan dari agent.env diteruskan agen ke update.sh
 
 set -euo pipefail
 
@@ -19,6 +21,11 @@ catat() {
 }
 
 catat mulai
+
+if [ -n "${FAKE_UPDATE_LINGKUNGAN:-}" ]; then
+    printf 'COREERP_PROYEK=%s\nCOREERP_FOLDER_CADANGAN=%s\n' \
+        "${COREERP_PROYEK:-}" "${COREERP_FOLDER_CADANGAN:-}" > "$FAKE_UPDATE_LINGKUNGAN"
+fi
 
 [ -f "$folder/manifest.json" ] || { printf 'manifest.json tidak ada di %s\n' "$folder" >&2; exit 9; }
 

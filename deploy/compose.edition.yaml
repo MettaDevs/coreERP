@@ -195,7 +195,15 @@ services:
       - core-logs:/repo/apps/core/storage/logs
       - *license-mount
     ports:
-      - '${CORE_APP_PORT:-8000}:80'
+      # Bawaan 0.0.0.0 menjaga pemasangan beli-putus yang sudah berjalan: port aplikasinya mungkin
+      # dijangkau langsung dari jaringan klinik, dan pembaruan tidak boleh memutusnya. On-prem dikelola
+      # mengikatnya ke 127.0.0.1 lewat `deploy/agent/env.template`, karena ia berdiri di belakang reverse
+      # proxy klien dan port yang diterbitkan Docker melewati firewall host.
+      #
+      # Satu beda dengan bentuk tanpa alamat yang dipakai sebelumnya: bentuk itu juga menerbitkan port di
+      # IPv6 (`::`), sedangkan 0.0.0.0 hanya IPv4 — terlihat di `docker inspect` pada Docker Engine 29.
+      # Pemasangan yang menjangkau port ini lewat IPv6 kehilangan jalur itu pada bawaan ini.
+      - '${CORE_APP_BIND:-0.0.0.0}:${CORE_APP_PORT:-8000}:80'
     healthcheck:
       test: ['CMD', 'php', '-r', "exit(@file_get_contents('http://127.0.0.1/up') === false);"]
       interval: 10s

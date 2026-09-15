@@ -48,8 +48,18 @@ shopt -s inherit_errexit
 
 AGEN_VERSI='0.1.0'
 
+# Didefinisikan sebelum setelan: pembacaan agent.env di bawah sudah dapat menolak.
+gagal() {
+    printf '\n' >&2
+    printf 'GAGAL: %s\n' "$1" >&2
+    shift
+    [ "$#" -eq 0 ] || printf '%s\n' "$@" >&2
+    exit 1
+}
+
 RUMAH="${COREERP_HOME:-/opt/coreerp}"
 FOLDER_AGEN="$RUMAH/agent"
+BERKAS_SETELAN="$FOLDER_AGEN/agent.env"
 BERKAS_SITUS="$FOLDER_AGEN/site.json"
 KUNCI_SITUS="$FOLDER_AGEN/site-key.pem"
 KUNCI_SITUS_PUBLIK="$FOLDER_AGEN/site-public.pem"
@@ -60,6 +70,85 @@ FOLDER_KOTAK_KELUAR="$FOLDER_AGEN/outbox"
 FOLDER_LOG="$FOLDER_AGEN/log"
 BERKAS_KEADAAN="$FOLDER_AGEN/state.json"
 BERKAS_KUNCI_PUTARAN="$FOLDER_AGEN/run.lock"
+
+# --- Setelan server: lingkungan proses, lalu agent.env, lalu bawaan ------------------------------------
+#
+# agent.env dulu hanya dibaca unit systemd lewat `EnvironmentFile=`. Perintah yang dijalankan tangan lewat
+# /usr/local/bin/coreerp-agent — install-bundle, bootstrap-tenant — tidak pernah melihatnya dan diam-diam
+# memakai bawaan: bootstrap-tenant masuk ke proyek compose `coreerp` walaupun situs ini berjalan di proyek
+# lain, dan install-bundle menjalankan update.sh dengan folder cadangan bawaan, bukan disk kedua yang
+# disebut agent.env. Agen karena itu membacanya sendiri, supaya timer dan terminal memakai setelan yang sama.
+#
+# Berkasnya TIDAK di-`source`. Ia ditulis tangan di server klien dan dibaca proses root; baris `$(...)` di
+# sana tidak boleh menjadi perintah. Hanya `KUNCI=nilai` yang diterima, dan hanya kunci di daftar di bawah —
+# yang benar-benar dibaca agen atau update.sh. Nilainya dibatasi pada huruf yang dibaca sama persis oleh
+# systemd dan oleh pembacaan ini: kutip, spasi, `$`, dan garis miring terbalik masing-masing diurai systemd
+# dengan aturannya sendiri, dan nilai yang dibaca berbeda di dua tempat adalah cacat yang sama dengan yang
+# diperbaiki di sini.
+#
+# Yang sengaja tidak ada di daftar: COREERP_HOME (berkas ini tinggal di bawahnya), COREERP_UPDATE_SCRIPT
+# (seam pengujian, bukan setelan), dan COREERP_LEWATI_PERIKSA_CADANGAN (melewati pemeriksaan adalah
+# keputusan satu kali jalan; di berkas ia diam-diam berlaku untuk setiap pembaruan sesudahnya).
+SETELAN_DIIZINKAN=(
+    COREERP_PROYEK
+    COREERP_FOLDER_CADANGAN
+    COREERP_ENV
+    COREERP_KUNCI_PUBLIK
+    COREERP_TITIK_DATA_DB
+    COREERP_BATAS_SEHAT_DETIK
+    COREERP_AGENT_DETAK_DETIK
+)
+
+muat_setelan() {
+    local berkas="$1" baris sisa nomor=0 kunci nilai satu diizinkan
+    local -A dari_berkas=()
+
+    [ -f "$berkas" ] || return 0
+
+    while IFS= read -r baris || [ -n "$baris" ]; do
+        nomor=$((nomor + 1))
+        sisa="${baris#"${baris%%[![:space:]]*}"}"
+
+        case "$sisa" in
+            '' | '#'* | ';'*) continue ;;
+        esac
+
+        # Baris yang ditolak disebut nomornya saja, bukan isinya: keluaran agen masuk journald, dan
+        # rahasia yang keliru ditaruh di sini tidak boleh ikut tercetak.
+        [[ "$baris" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]] || gagal \
+            "$berkas baris $nomor bukan KUNCI=nilai." \
+            'Berkas ini tidak dijalankan sebagai skrip. Yang diterima hanya baris KUNCI=nilai, komentar' \
+            'yang diawali # atau ;, dan baris kosong.'
+
+        kunci="${BASH_REMATCH[1]}"
+        nilai="${BASH_REMATCH[2]}"
+        diizinkan=0
+
+        for satu in "${SETELAN_DIIZINKAN[@]}"; do
+            [ "$satu" != "$kunci" ] || diizinkan=1
+        done
+
+        [ "$diizinkan" -eq 1 ] || gagal \
+            "$berkas baris $nomor: $kunci bukan setelan yang dibaca agen." \
+            "Yang diterima: ${SETELAN_DIIZINKAN[*]}"
+
+        [[ "$nilai" =~ ^[A-Za-z0-9_./:@+-]*$ ]] || gagal \
+            "$berkas baris $nomor: nilai $kunci memuat huruf yang tidak diterima." \
+            'Hanya huruf, angka, dan . _ / : @ + - — tanpa kutip, spasi, $, atau garis miring terbalik.'
+
+        # Kunci yang disebut dua kali: yang terakhir berlaku, sama dengan systemd.
+        dari_berkas["$kunci"]="$nilai"
+    done < "$berkas"
+
+    # Nilai yang disebut di lingkungan proses menang: itu keputusan orang yang menjalankan perintah saat
+    # itu. Di bawah systemd nilainya datang dari berkas yang sama, jadi keduanya tidak berbeda. Diekspor,
+    # bukan hanya disetel, karena update.sh yang dijalankan agen membaca variabel yang sama.
+    for kunci in "${!dari_berkas[@]}"; do
+        [ -n "${!kunci:-}" ] || export "$kunci=${dari_berkas[$kunci]}"
+    done
+}
+
+muat_setelan "$BERKAS_SETELAN"
 
 # Nama variabel dan jalur bawaannya sama dengan `update.sh`, supaya keduanya tidak pernah memeriksa
 # dengan kunci yang berbeda.
@@ -77,14 +166,6 @@ DETAK_DETIK="${COREERP_AGENT_DETAK_DETIK:-300}"
 
 SEMENTARA=''
 ALASAN=''
-
-gagal() {
-    printf '\n' >&2
-    printf 'GAGAL: %s\n' "$1" >&2
-    shift
-    [ "$#" -eq 0 ] || printf '%s\n' "$@" >&2
-    exit 1
-}
 
 langkah() {
     printf '\n==> %s\n' "$*"
@@ -122,7 +203,8 @@ Agen situs CoreERP.
                                                         melahirkan tenant dan admin pertamanya (sekali,
                                                         dari terminal, sesudah rilis pertama terpasang)
 
-Seluruh jalur berada di bawah COREERP_HOME (bawaan /opt/coreerp).
+Seluruh jalur berada di bawah COREERP_HOME (bawaan /opt/coreerp). Setelan server dibaca dari
+COREERP_HOME/agent/agent.env; variabel yang disebut di lingkungan perintah menang atas berkas itu.
 TEKS
 }
 

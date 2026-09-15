@@ -29,7 +29,7 @@ hasilnya. Rancangannya di `docs/todo/on-prem-dikelola/README.md`; bentuk HTTP-ny
     site-key.pem                   kunci privat situs, RSA 3072, 0600
     site-public.pem
     state.json                     edition, release, image, digest, last_backup, last_operation
-    agent.env                      opsional, dibaca unit systemd (misalnya COREERP_FOLDER_CADANGAN)
+    agent.env                      opsional, 0600: setelan server, dibaca unit systemd dan agen (lihat di bawah)
     license/                       0755, di-mount hanya-baca ke Core di /run/coreerp-license
       license.json, license.json.sig, license-public.pem
     releases/<edisi>-<rilis>/      berkas rilis yang sudah lolos tanda tangan dan checksum
@@ -57,6 +57,52 @@ Operasi dari admin.erp — daftar tertutup, yang lain dilaporkan `failed` dengan
 edisinya berbeda dari yang terpasang, atau nomornya tidak lebih besar dari yang terpasang. Nomor yang
 dibandingkan adalah nomor di `manifest.json` yang ditandatangani, dan untuk `upgrade` nomor itu juga
 harus sama dengan yang diminta admin.erp.
+
+## Memasang
+
+Selain jalur online (`--admin-url`, `--token`, `--ref`) atau offline (`--paket`, `--bundle`), `pasang.sh`
+menerima:
+
+| Pilihan | Isi |
+| --- | --- |
+| `--release-key BERKAS` | kunci publik rilis dari berkas ini, bukan dari jalur bawaannya |
+| `--app-url URL` | alamat CoreERP yang dibuka pengguna; bawaan `https://<nama host>` |
+| `--provider-email EMAIL` | akun admin provider di Core |
+| `--app-port PORT` | port host aplikasi; bawaan `CORE_APP_PORT` di `env.template` |
+| `--app-bind ALAMAT` | alamat IPv4 tempat port itu diikat; bawaan `CORE_APP_BIND` di `env.template`, yaitu `127.0.0.1` |
+
+`--app-port` dan `--app-bind` hanya berlaku pada pemasangan pertama, karena `.env` yang sudah ada tidak
+pernah ditimpa. Pada pemasangan pertama itu juga `pasang.sh` menolak, sebelum menulis apa pun, bila port
+yang dipilih sudah didengar layanan lain: server klien lazim sudah melayani situs lain, dan tabrakannya
+lebih murah ditemukan oleh orang yang sedang memasang daripada oleh rilis pertama di jendela pembaruan.
+
+Port aplikasi diikat ke loopback karena CoreERP dilayani lewat reverse proxy klien, dan port yang
+diterbitkan Docker melewati firewall host — aturan UFW tidak berlaku untuknya. Reverse proxy yang berjalan
+di dalam Docker tidak menjangkau loopback host; untuk bentuk itu sebut alamat gateway bridge Docker lewat
+`--app-bind`. `compose.edition.yaml` sendiri berbawaan `0.0.0.0`, supaya pemasangan beli-putus yang
+menjangkau port itu langsung tidak terputus saat diperbarui.
+
+## Setelan server: agent.env
+
+`agent/agent.env` memuat setelan yang tidak dibawa rilis, misalnya `COREERP_PROYEK` atau
+`COREERP_FOLDER_CADANGAN` ke disk kedua. Unit systemd membacanya lewat `EnvironmentFile=`, dan agen
+membacanya sendiri, supaya perintah yang dijalankan tangan — `install-bundle`, `bootstrap-tenant` —
+memakai setelan yang sama dengan timer. Agen meneruskannya ke `update.sh`.
+
+Yang menang, berurutan: variabel yang disebut di lingkungan perintah, lalu `agent.env`, lalu bawaan.
+
+Berkasnya tidak dijalankan sebagai skrip. Yang diterima hanya baris kosong, komentar yang diawali `#` atau
+`;`, dan `KUNCI=nilai` untuk kunci yang benar-benar dibaca agen atau `update.sh`; daftarnya
+`SETELAN_DIIZINKAN` di `coreerp-agent`, beserta alasan kunci yang sengaja tidak ada di sana. Nilai hanya
+huruf, angka, dan `. _ / : @ + -`, tanpa kutip atau spasi, supaya systemd dan agen membacanya sama. Baris
+lain membuat agen berhenti dengan menyebut nomor barisnya.
+
+`COREERP_PROYEK` dan `COREERP_FOLDER_CADANGAN` yang disebut saat menjalankan `pasang.sh` ditulis ke berkas
+ini bila ia belum ada. Bila sudah ada dan nilainya berbeda, `pasang.sh` menolak alih-alih menimpanya:
+
+```sh
+COREERP_FOLDER_CADANGAN=/mnt/cadangan/coreerp bash pasang.sh --admin-url https://admin.erp.contoh --token <token>
+```
 
 ## Berkas offline
 
@@ -102,7 +148,8 @@ tiruan, yang menolak kunci di luar skema dengan 422.
 - **Pemasangan pertama di server bersih** tidak membandingkan lokasi cadangan dengan data database:
   volumenya belum ada, dan belum ada data yang dapat hilang. `update.sh` menunda pemeriksaan itu ke
   pembaruan berikutnya, yang pertama kali benar-benar mencadangkan. Arahkan `COREERP_FOLDER_CADANGAN`
-  ke disk lain sejak awal supaya pembaruan itu tidak ditolak.
+  ke disk lain sejak awal supaya pembaruan itu tidak ditolak. Disebut saat menjalankan `pasang.sh`,
+  nilainya tersimpan di `agent.env`.
 
 ## Pengujian
 
