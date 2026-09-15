@@ -456,6 +456,18 @@ ia ditulis ulang, bukan dilanjutkan apa adanya.
 
 `apps/core/Dockerfile` dipakai SaaS juga. Perubahannya diuji di kedua jalur sebelum digabung.
 
+**Keadaan IMG-01, 15 September 2026.** Pemilik produk memutuskan image rilis dipisah dulu dari SaaS:
+`deploy/perakit/Dockerfile`, diuji `deploy/perakit/uji-image.sh`. Dua kriteria di atas berubah:
+
+- **112 MB terkompres di Harbor, bukan ≤ 100 MB.** `apache2-bin` Debian menuntut `perl:any`, jadi
+  Perl (±14 MB) hanya dapat dibuang dengan mencabut paksa — yang dilarang butir ini, dan yang
+  dibuktikan `uji-image.sh` merah lewat `dpkg --audit`. Selisihnya di lapisan basis dan dibayar sekali
+  per klien; lapisan kode app tetap 10,6 MB per rilis.
+- **`scripts/verify-edition.sh` tidak berlaku.** Satu image membawa seluruh module, sehingga ketiga
+  jalur module-nya selalu merah terhadap edisi mana pun. Jalur pertama — hanya `apps/core` di image —
+  diperiksa `uji-image.sh`. "Deploy dev menyala" diganti migration dan `/login` 200 terhadap
+  PostgreSQL 16 kosong di container sekali pakai.
+
 ### Uji ujung-ke-ujung — server kedua
 
 | ID | Skenario | Selesai bila |
