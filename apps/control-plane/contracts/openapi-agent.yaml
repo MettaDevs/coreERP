@@ -158,7 +158,8 @@ paths:
       description: |
         Operasi `running` yang lease-nya habis ditandai `failed` lebih dulu, lalu yang `requested`
         diambil paling tua lebih dulu. `upgrade` hanya diberikan di dalam jendela pembaruan situs;
-        operasi lain kapan saja. Satu situs hanya punya satu operasi `running`.
+        `install` kapan saja tetapi hanya bila rilisnya sudah ditentukan; operasi lain kapan saja. Satu
+        situs hanya punya satu operasi `running`.
       security:
         - siteSignature: []
       requestBody:
@@ -246,8 +247,9 @@ paths:
       summary: Mengambil satu berkas rilis
       description: |
         Isi berkas persis seperti yang didaftarkan alur rilis. Agen memverifikasi tanda tangannya
-        sendiri dengan kunci publik rilis yang dipasang saat pendaftaran — **bukan** dengan kunci apa
-        pun dari admin.erp. Hanya rilis dari edisi situs ini yang dapat diambil.
+        sendiri dengan kunci publik rilis yang dipaku `pasang.sh` saat pemasangan pertama — **bukan**
+        dengan kunci yang datang bersama rilis atau lewat API ini. Hanya rilis dari edisi situs ini yang
+        dapat diambil.
       security:
         - siteSignature: []
       parameters:
@@ -447,12 +449,30 @@ components:
           type: string
         operation:
           type: string
-          enum: [upgrade, backup, install_license, rotate_key, send_diagnostics]
+          enum: [upgrade, install, backup, install_license, rotate_key, send_diagnostics]
         parameters:
           description: |
             `upgrade`: `{edition, release}`. `install_license`: `{license, signature}` berbentuk
             `SignedLicense` — lisensi format versi 2, diperiksa agen persis seperti lisensi di jawaban
             laporan. Operasi lain: objek kosong.
+
+            `install`: `{edition, release, tenant_id, tenant_name, app_ids, admin_name, admin_email,
+            admin_password_hash}` — rilis pertama lewat jalur yang sama dengan `upgrade`, lalu
+            `tenant:bootstrap-site` di Core. Agen menolak seluruh operasi, sebelum mengunduh apa pun,
+            bila satu bidang tidak memenuhi aturannya:
+
+            | Bidang | Aturan |
+            | --- | --- |
+            | `edition`, `release` | sama dengan `upgrade`; `edition` ada selama berkas rilis diambil per edisi |
+            | `tenant_id` | ULID tenant di admin.erp: 26 huruf Crockford base32, huruf pertama `0`–`7`, huruf besar atau kecil |
+            | `tenant_name`, `admin_name` | teks tidak kosong, paling panjang 255, tanpa huruf kendali |
+            | `admin_email` | `lokal@domain` tanpa spasi dan huruf kendali, paling panjang 255 |
+            | `app_ids` | larik id app `^[a-z0-9][a-z0-9-]*$`, boleh kosong; satu `--app` per id |
+            | `admin_password_hash` | hash bcrypt `$2y$`, biaya `04`–`31`, 53 karakter `[./A-Za-z0-9]` |
+
+            Hash hanya sampai ke Core lewat stdin; agen tidak pernah menaruhnya di argumen proses, log, atau
+            `failure_message`. Rilis yang sama yang sudah terpasang tidak dipasang ulang, dan Core menjawab
+            tenant dengan owner yang sama "sudah ada", jadi operasi ini aman diulang.
           type: object
         lease_until:
           type: string

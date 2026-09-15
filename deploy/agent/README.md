@@ -8,7 +8,7 @@ hasilnya. Rancangannya di `docs/todo/on-prem-dikelola/README.md`; bentuk HTTP-ny
 | Berkas | Isi |
 | --- | --- |
 | `coreerp-agent` | agen (bash, `curl`, `jq`, `openssl`) |
-| `pasang.sh` | skrip pasang sekali jalan |
+| `pasang.sh` | skrip pasang sekali jalan, disajikan admin.erp di `/pasang.sh` |
 | `coreerp-agent.service`, `.timer` | satu putaran tiap menit lewat systemd |
 | `env.template` | contoh `.env` yang diisi `pasang.sh` dengan rahasia yang lahir di server |
 | `tests/` | pengujian di container Ubuntu bersih |
@@ -18,7 +18,7 @@ hasilnya. Rancangannya di `docs/todo/on-prem-dikelola/README.md`; bentuk HTTP-ny
 ```
 /opt/coreerp/                      COREERP_HOME, sama dengan update.sh
   .env                             setelan compose; dibuat sekali, tidak pernah ditimpa
-  kunci-rilis.pub                  kunci publik rilis — TIDAK PERNAH diambil dari admin.erp
+  kunci-rilis.pub                  kunci publik rilis — diambil sekali oleh pasang.sh, lalu dipaku
   update.sh                        salinan untuk dijalankan tangan
   bin/coreerp-agent
   keadaan/                         milik update.sh: versi-sehat, compose-sehat.yaml
@@ -27,12 +27,14 @@ hasilnya. Rancangannya di `docs/todo/on-prem-dikelola/README.md`; bentuk HTTP-ny
     site.json                      {site_id, tenant_id, tenant_name, admin_url, interval_seconds, update_window}
     site-key.pem                   kunci privat situs, RSA 3072, 0600
     site-public.pem
-    state.json                     edition, release, image, digest, last_backup, last_operation
+    state.json                     edition, release, image, digest, last_backup, last_operation, last_install,
+                                   current_operation (selama operasi berjalan; dibaca pasang.sh)
     agent.env                      opsional, 0600: setelan server, dibaca unit systemd dan agen (lihat di bawah)
     license/                       0755, di-mount hanya-baca ke Core di /run/coreerp-license
       license.json, license.json.sig, license-public.pem
     releases/<edisi>-<rilis>/      berkas rilis yang sudah lolos tanda tangan dan checksum
-    log/operasi-<id>.log           keluaran update.sh per operasi
+    log/operasi-<id>.log           keluaran update.sh dan Core per operasi
+    log/pasang.log                 keluaran putaran agen yang dijalankan pasang.sh
 ```
 
 ## Perintah
@@ -41,14 +43,21 @@ hasilnya. Rancangannya di `docs/todo/on-prem-dikelola/README.md`; bentuk HTTP-ny
 | --- | --- |
 | `enroll --admin-url URL --token TOKEN` | `pasang.sh`. Menolak bila `site.json` atau `site-key.pem` sudah ada |
 | `run [--now]` | timer systemd. Tanpa `--now`, putaran yang datang sebelum `interval_seconds` habis keluar tanpa bekerja |
-| `bootstrap-tenant --admin-name NAMA --admin-email EMAIL` | manusia di terminal, sekali, sesudah rilis pertama terpasang. Tidak pernah dari timer: keluarannya memuat kata sandi sementara |
+| `bootstrap-tenant --admin-name NAMA --admin-email EMAIL` | manusia di terminal, sekali, sesudah rilis pertama terpasang. Tidak pernah dari timer: keluarannya memuat kata sandi sementara. Digantikan operasi `install`; dibuang sesudah `install` lulus uji di server kedua (PA-04) |
 
 Operasi dari admin.erp — daftar tertutup, yang lain dilaporkan `failed` dengan "operasi tidak dikenal":
-`upgrade`, `backup`, `install_license`, `rotate_key`, `send_diagnostics`.
+`upgrade`, `install`, `backup`, `install_license`, `rotate_key`, `send_diagnostics`.
 
 `upgrade` menolak rilis yang tanda tangannya salah, checksum-nya tidak cocok, edisinya berbeda dari yang
 terpasang, atau nomornya tidak lebih besar dari yang terpasang. Nomor yang dibandingkan adalah nomor di
 `manifest.json` yang ditandatangani, dan nomor itu juga harus sama dengan yang diminta admin.erp.
+
+`install` memasang rilis pertama lewat jalur yang sama dengan `upgrade` (`pasang_rilis`), lalu menjalankan
+`tenant:bootstrap-site` di container Core dengan satu `--app` per app. Seluruh parameternya diperiksa
+sebelum apa pun diunduh; aturannya di skema `ClaimedOperation` pada kontrak. Hash kata sandi admin pertama
+hanya dialirkan lewat stdin, tidak pernah menjadi argumen proses, dan keluaran Core disaring darinya
+sebelum ditulis ke log. Rilis yang sama yang sudah terpasang tidak dipasang ulang, jadi `install` yang
+diulang — "Coba lagi" sesudah langkah tenant gagal — langsung mengulang langkah tenant.
 
 ## Lisensi
 
@@ -67,13 +76,25 @@ persis `COREERP_LICENSE_REQUIRED=true`, `false` untuk bentuk lain, `null` bila `
 
 ## Memasang
 
-Selain `--admin-url`, `--token`, dan `--ref`, `pasang.sh` menerima:
+Perintahnya disalin dari halaman lingkungan di admin.erp:
+
+```sh
+curl -fsSL https://admin.erp.contoh/pasang.sh | sudo bash -s -- --token <token>
+```
+
+admin.erp menanam alamatnya sendiri ke `pasang.sh` saat menyajikannya, dan `pasang.sh` mengambil agen,
+unit systemd, `env.template`, `update.sh`, dan kunci publik rilis dari `<admin.erp>/agen/`. Salinan
+`pasang.sh` dari repo menolak berjalan. Kunci rilis yang memuat kunci privat, yang bukan kunci publik PEM, atau
+yang berbeda dari kunci yang sudah terpasang ditolak.
+
+Sesudah mendaftar, `pasang.sh` menjalankan putaran agen dan mencetak progres operasi `install` dari
+`state.json` sampai operasi itu selesai, gagal, atau 90 menit lewat, lalu menyalakan timer. Keluaran agen
+masuk ke `agent/log/pasang.log`, bukan ke terminal.
+
+Selain `--token`, `pasang.sh` hanya menerima:
 
 | Pilihan | Isi |
 | --- | --- |
-| `--release-key BERKAS` | kunci publik rilis dari berkas ini, bukan dari jalur bawaannya |
-| `--app-url URL` | alamat CoreERP yang dibuka pengguna; bawaan `https://<nama host>` |
-| `--provider-email EMAIL` | akun admin provider di Core |
 | `--app-port PORT` | port host aplikasi; bawaan `CORE_APP_PORT` di `env.template` |
 | `--app-bind ALAMAT` | alamat IPv4 tempat port itu diikat; bawaan `CORE_APP_BIND` di `env.template`, yaitu `127.0.0.1` |
 
@@ -107,7 +128,7 @@ lain membuat agen berhenti dengan menyebut nomor barisnya.
 ini bila ia belum ada. Bila sudah ada dan nilainya berbeda, `pasang.sh` menolak alih-alih menimpanya:
 
 ```sh
-COREERP_FOLDER_CADANGAN=/mnt/cadangan/coreerp bash pasang.sh --admin-url https://admin.erp.contoh --token <token>
+curl -fsSL https://admin.erp.contoh/pasang.sh | sudo COREERP_FOLDER_CADANGAN=/mnt/cadangan/coreerp bash -s -- --token <token>
 ```
 
 ## Data yang keluar dari server
@@ -119,8 +140,8 @@ tiruan, yang menolak kunci di luar skema dengan 422.
 
 ## Yang perlu diketahui sebelum dipakai
 
-- **`deploy/agent/kunci-rilis.pub` belum ada di repo.** `pasang.sh` mengambilnya dari GitHub pada
-  `--ref` yang disebut; sampai kunci publik rilis di-commit, gunakan `--release-key`.
+- **Kunci publik rilis dipercaya pada pemasangan pertama.** Setelah repo privat tidak ada jalur kedua
+  yang independen untuk mengantarkannya; ia diambil dari admin.erp saat teknisi di lokasi, lalu dipaku.
 - **Pemasangan pertama di server bersih** tidak membandingkan lokasi cadangan dengan data database:
   volumenya belum ada, dan belum ada data yang dapat hilang. `update.sh` menunda pemeriksaan itu ke
   pembaruan berikutnya, yang pertama kali benar-benar mencadangkan. Arahkan `COREERP_FOLDER_CADANGAN`
@@ -137,11 +158,14 @@ Dari Git Bash di Windows, awali dengan `MSYS_NO_PATHCONV=1` dan sebut jalurnya `
 
 Tanpa Docker sungguhan, tanpa admin.erp sungguhan, dan tanpa GitHub: `docker` diganti `tests/shim/docker`,
 update.sh diganti `tests/fake-update.sh`, admin.erp diganti `tests/fake-admin.py`, yang membangun ulang
-signature base RFC 9421 dan memeriksanya dengan `openssl` serta membaca skemanya dari kontrak, dan
-`pasang.sh` mengambil berkas agen dari repo ini lewat `COREERP_REPO_DIR`.
+signature base RFC 9421 dan memeriksanya dengan `openssl` serta membaca skemanya dari kontrak. admin.erp
+tiruan juga menyajikan `/pasang.sh` dan `/agen/*` dari berkas yang diuji, dan pengujian `pasang.sh`
+mengambilnya lewat `curl ... | bash -s` persis seperti di server klien.
 `tests/klien-bertanda.py` menandatangani permintaan terpisah dari agen, supaya agen dan server tiruan
 tidak dapat lulus bersama karena salah dengan cara yang sama. Kunci rilis dan lisensi dibuat baru di
 setiap putaran.
 
 `COREERP_AGENT_BIN`, `COREERP_UPDATE_SH_BIN`, dan `COREERP_PASANG_BIN` menunjuk salinan lain untuk
-diuji — dipakai untuk membuktikan setiap pengujian merah ketika penjaga yang diujinya dicabut.
+diuji — dipakai untuk membuktikan setiap pengujian merah ketika penjaga yang diujinya dicabut. Salinan
+itu pula yang disajikan admin.erp tiruan. `COREERP_UJI_SARING` menjalankan hanya pengujian yang nama
+fungsinya cocok dengan polanya.
