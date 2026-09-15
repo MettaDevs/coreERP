@@ -77,6 +77,8 @@ Route::middleware(['auth', 'operator'])->group(function (): void {
     Route::post('/situs/{situs}/operasi', [SiteActions::class, 'requestOperation'])->middleware('throttle:30,1')->name('sites.operations.request');
     Route::post('/situs/{situs}/operasi/{operasi}/batal', [SiteActions::class, 'cancelOperation'])->name('sites.operations.cancel');
     Route::post('/situs/{situs}/cabut', [SiteActions::class, 'revoke'])->name('sites.revoke');
+    Route::post('/situs/{situs}/lisensi/hentikan', [SiteActions::class, 'suspendLicense'])->name('sites.license.suspend');
+    Route::post('/situs/{situs}/lisensi/lanjutkan', [SiteActions::class, 'resumeLicense'])->name('sites.license.resume');
 
     Route::get('/akun', [Account::class, 'show'])->name('account.show');
     Route::post('/akun/sso', [Account::class, 'connect'])->middleware('throttle:10,1')->name('account.sso.connect');

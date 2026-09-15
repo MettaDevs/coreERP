@@ -23,7 +23,7 @@ use Inertia\Response as InertiaResponse;
 /**
  * Layar Situs: daftar, pembuatan, dan rincian.
  *
- * Tindakan yang mengubah server klien — operasi, token pendaftaran, pencabutan — ada di
+ * Tindakan yang mengubah server klien — operasi, token pendaftaran, pencabutan, perpanjangan lisensi — ada di
  * `SiteActions`, terpisah dari yang hanya membaca, supaya setiap method yang menulis jejak audit
  * terkumpul di satu tempat yang mudah diperiksa.
  */
@@ -141,12 +141,24 @@ final class SiteScreens extends Controller
                 'enrolledAt' => $row->enrolled_at?->toDateTimeString(),
                 'reportedDigest' => $row->reported_digest,
                 'lastReport' => $row->last_report,
+                'license' => [
+                    'validUntil' => $row->license_valid_until?->toDateString(),
+                    'issuedAt' => $row->license_issued_at?->toDateTimeString(),
+                    'suspendedAt' => $row->license_suspended_at?->toDateTimeString(),
+                    /*
+                     * Hanya `false` yang dilaporkan agen yang memicu peringatan. Kosong berarti agen
+                     * lama yang belum mengenal bidangnya, atau situs yang belum pernah melapor —
+                     * keduanya bukan bukti bahwa kewajiban lisensi dimatikan.
+                     */
+                    'notRequiredOnServer' => ($row->last_report['license_required'] ?? null) === false,
+                ],
             ],
             'history' => $history,
             'releases' => $releases,
             'audit' => $audit,
             'licenseKeyConfigured' => config('sites.license_private_key_path') !== null
                 && is_readable((string) config('sites.license_private_key_path')),
+            'licenseValidDays' => (int) config('sites.license_valid_days'),
             'enrollment' => session('enrollment'),
         ]);
     }

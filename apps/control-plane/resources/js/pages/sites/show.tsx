@@ -36,9 +36,17 @@ type Report = {
         step?: string | null;
     } | null;
     license_expires_at?: string | null;
+    license_required?: boolean | null;
     certificate_expires_at?: string | null;
     server_time?: string;
     agent_version?: string;
+};
+
+type License = {
+    validUntil: string | null;
+    issuedAt: string | null;
+    suspendedAt: string | null;
+    notRequiredOnServer: boolean;
 };
 
 type Site = {
@@ -54,6 +62,7 @@ type Site = {
     updateWindow: { start: string; end: string; timezone: string } | null;
     enrolledAt: string | null;
     lastReport: Report | null;
+    license: License;
 };
 
 type Operation = {
@@ -200,10 +209,12 @@ function RequestOperation({
     site,
     releases,
     licenseKeyConfigured,
+    licenseValidDays,
 }: {
     site: Site;
     releases: string[];
     licenseKeyConfigured: boolean;
+    licenseValidDays: number;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         operation: 'backup',
@@ -261,15 +272,21 @@ function RequestOperation({
 
                 {data.operation === 'install_license' && (
                     <>
-                        <Input
-                            label="Lisensi berlaku sampai"
-                            type="date"
-                            required
-                            value={data.valid_until}
-                            onChange={(e) =>
-                                setData('valid_until', e.target.value)
-                            }
-                        />
+                        <div className="space-y-1">
+                            <Input
+                                label="Lisensi berlaku sampai"
+                                type="date"
+                                value={data.valid_until}
+                                onChange={(e) =>
+                                    setData('valid_until', e.target.value)
+                                }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Kosongkan untuk {licenseValidDays} hari sejak
+                                hari ini. Daftar app diambil dari app yang aktif
+                                untuk tenant ini.
+                            </p>
+                        </div>
                         {!licenseKeyConfigured && (
                             <p className="text-sm text-destructive">
                                 Kunci lisensi belum disetel di konsol ini, jadi
@@ -335,6 +352,71 @@ function Revoke({ site }: { site: Site }) {
 }
 
 /**
+ * Lisensi yang diterbitkan konsol ini, dan tombol yang menghentikan atau melanjutkan perpanjangannya.
+ *
+ * Yang ditampilkan di sini lisensi yang *dikirim*. Yang *terpasang* di server klien ada di "Laporan
+ * terakhir"; selisih keduanya berarti agen gagal memasangnya.
+ */
+function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
+    const { license } = site;
+    const suspended = license.suspendedAt !== null;
+    const { data, setData, post, processing, errors, reset } = useForm({
+        confirm_name: '',
+    });
+
+    return (
+        <Section
+            title="Lisensi"
+            description="Diperpanjang otomatis lewat laporan agen. Menghentikan perpanjangan tidak menyentuh server klien: lisensi yang terpasang tetap berlaku sampai tanggal berakhirnya, lalu aplikasinya terkunci."
+        >
+            <dl>
+                <Row label="Berlaku sampai">{license.validUntil ?? '—'}</Row>
+                <Row label="Terakhir diterbitkan">
+                    {license.issuedAt ?? 'Belum pernah'}
+                </Row>
+                <Row label="Perpanjangan otomatis">
+                    {suspended
+                        ? `Perpanjangan dihentikan sejak ${license.suspendedAt}`
+                        : 'Berjalan'}
+                </Row>
+            </dl>
+
+            {!revoked && (
+                <form
+                    className="space-y-3"
+                    onSubmit={(e: FormEvent) => {
+                        e.preventDefault();
+                        post(
+                            `/situs/${site.id}/lisensi/${suspended ? 'lanjutkan' : 'hentikan'}`,
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => reset('confirm_name'),
+                            },
+                        );
+                    }}
+                >
+                    <ConfirmName
+                        site={site}
+                        value={data.confirm_name}
+                        onChange={(v) => setData('confirm_name', v)}
+                        error={errors.confirm_name}
+                    />
+                    <Button
+                        type="submit"
+                        variant={suspended ? 'default' : 'destructive'}
+                        disabled={processing}
+                    >
+                        {suspended
+                            ? 'Lanjutkan perpanjangan lisensi'
+                            : 'Hentikan perpanjangan lisensi'}
+                    </Button>
+                </form>
+            )}
+        </Section>
+    );
+}
+
+/**
  * Rincian satu situs: keadaan terakhir, tindakan, riwayat operasi, dan jejak audit.
  *
  * Tindakan yang tersedia mengikuti keadaan situsnya, bukan disembunyikan setelah ditekan. Situs yang
@@ -346,12 +428,14 @@ export default function Show({
     releases,
     audit,
     licenseKeyConfigured,
+    licenseValidDays,
 }: {
     site: Site;
     history: Operation[];
     releases: string[];
     audit: AuditEvent[];
     licenseKeyConfigured: boolean;
+    licenseValidDays: number;
 }) {
     const report = site.lastReport;
     const revoked = site.state === 'revoked';
@@ -367,6 +451,16 @@ export default function Show({
                     className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm text-destructive dark:bg-red-950/40 dark:text-red-200"
                 >
                     {operationError}
+                </div>
+            )}
+
+            {site.license.notRequiredOnServer && (
+                <div
+                    role="alert"
+                    className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                >
+                    Server ini tidak mewajibkan lisensi — periksa berkas .env di
+                    server klien.
                 </div>
             )}
 
@@ -447,20 +541,20 @@ export default function Show({
                 </Section>
             </div>
 
-            {!revoked && (
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {site.state === 'not_enrolled' && (
-                        <Enrollment site={site} />
-                    )}
-                    {site.state !== 'not_enrolled' && (
-                        <RequestOperation
-                            site={site}
-                            releases={releases}
-                            licenseKeyConfigured={licenseKeyConfigured}
-                        />
-                    )}
-                </div>
-            )}
+            <div className="grid gap-6 lg:grid-cols-2">
+                {!revoked && site.state === 'not_enrolled' && (
+                    <Enrollment site={site} />
+                )}
+                {!revoked && site.state !== 'not_enrolled' && (
+                    <RequestOperation
+                        site={site}
+                        releases={releases}
+                        licenseKeyConfigured={licenseKeyConfigured}
+                        licenseValidDays={licenseValidDays}
+                    />
+                )}
+                <LicenseRenewal site={site} revoked={revoked} />
+            </div>
 
             <Section title="Riwayat operasi">
                 <div className="overflow-x-auto">

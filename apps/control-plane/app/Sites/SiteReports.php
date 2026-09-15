@@ -31,6 +31,7 @@ final class SiteReports
     private const TOP_LEVEL = [
         'site_id', 'agent_version', 'created_at', 'server_time', 'edition', 'release', 'image', 'digest',
         'containers', 'disk', 'last_backup', 'last_operation', 'certificate_expires_at', 'license_expires_at',
+        'license_required',
     ];
 
     /** Kunci yang berubah tanpa ada yang terjadi; tidak ikut menentukan apakah laporan "berubah". */
@@ -70,6 +71,10 @@ final class SiteReports
             'report.last_operation.step' => ['nullable', 'string', 'max:120'],
             'report.certificate_expires_at' => ['nullable', 'date'],
             'report.license_expires_at' => ['nullable', 'date_format:Y-m-d'],
+            // Boolean JSON sungguhan, bukan `1` atau `"true"`. Nilai ini memicu peringatan "server tidak
+            // mewajibkan lisensi"; agen yang mengirim teks sedang membaca `.env` dengan cara yang salah,
+            // dan menerimanya berarti peringatan itu diam-diam bergantung pada tafsiran PHP.
+            'report.license_required' => ['nullable', 'boolean:strict'],
         ]);
 
         if ($validator->fails()) {
