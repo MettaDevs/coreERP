@@ -8,7 +8,6 @@ use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Models\WorkingTimeCalendar;
-use App\Models\WorkingTimeCalendarDay;
 use App\Models\WorkingTimeTemplate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
