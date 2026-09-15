@@ -14,7 +14,6 @@ import {
     ArrowLeft,
     CalendarCheck,
     CalendarDays,
-    CheckCircle2,
     Clock,
     Info,
     Play,
@@ -105,7 +104,9 @@ export default function ComposeWorkingTimesPage({
 
     // Group lines of the selected template by day of week (0 = Senin .. 6 = Minggu)
     const templatePreviewByDay = useMemo(() => {
-        if (!selectedTemplate) return [];
+        if (!selectedTemplate) {
+            return [];
+        }
 
         return DAY_NAMES.map((name, dayIndex) => {
             const dayLines = selectedTemplate.lines.filter(
@@ -132,6 +133,7 @@ export default function ComposeWorkingTimesPage({
         const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth(), 1);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
         setFromDate(start.toISOString().slice(0, 10));
         setToDate(end.toISOString().slice(0, 10));
     };
@@ -140,12 +142,14 @@ export default function ComposeWorkingTimesPage({
         const now = new Date();
         const start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+
         setFromDate(start.toISOString().slice(0, 10));
         setToDate(end.toISOString().slice(0, 10));
     };
 
     const handleSetRangeCurrentYear = () => {
         const year = new Date().getFullYear();
+
         setFromDate(`${year}-01-01`);
         setToDate(`${year}-12-31`);
     };
@@ -157,6 +161,7 @@ export default function ComposeWorkingTimesPage({
             setErrors({
                 calendar_id: 'Pilih kalender kerja sasaran terlebih dahulu.',
             });
+
             return;
         }
 
@@ -164,16 +169,19 @@ export default function ComposeWorkingTimesPage({
             setErrors({
                 template_id: 'Pilih pola jam kerja acuan terlebih dahulu.',
             });
+
             return;
         }
 
         if (!fromDate) {
             setErrors({ from_date: 'Tanggal mulai wajib diisi.' });
+
             return;
         }
 
         if (!toDate) {
             setErrors({ to_date: 'Tanggal selesai wajib diisi.' });
+
             return;
         }
 
@@ -182,6 +190,7 @@ export default function ComposeWorkingTimesPage({
                 to_date:
                     'Tanggal selesai tidak boleh lebih awal dari tanggal mulai.',
             });
+
             return;
         }
 

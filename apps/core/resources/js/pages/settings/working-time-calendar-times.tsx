@@ -1,5 +1,3 @@
-import { ActionButton } from '@apperp/ui/action-button';
-import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import {
@@ -23,18 +21,9 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    CalendarDays,
-    Check,
-    Clock,
-    Play,
-    RotateCcw,
-    X,
-} from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import type { BreadcrumbItem } from '@/types/navigation';
 
 export type CalendarLine = {
     id: string;
@@ -105,12 +94,17 @@ const MONTH_NAMES = [
 function getWeekNumber(d: Date): number {
     const target = new Date(d.valueOf());
     const dayNr = (d.getDay() + 6) % 7;
+
     target.setDate(target.getDate() - dayNr + 3);
+
     const firstThursday = target.valueOf();
+
     target.setMonth(0, 1);
+
     if (target.getDay() !== 4) {
         target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
     }
+
     return 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
 }
 
@@ -154,7 +148,10 @@ export default function WorkingTimeCalendarTimes({
     );
 
     const handleApplyFilter = () => {
-        if (!calendar) return;
+        if (!calendar) {
+            return;
+        }
+
         router.get(
             `/settings/working-time-calendar-times/${calendar.id}`,
             { from: filterFrom, to: filterTo },
@@ -163,7 +160,9 @@ export default function WorkingTimeCalendarTimes({
     };
 
     const handleExecuteCompose = () => {
-        if (!calendar || !composeTemplateId) return;
+        if (!calendar || !composeTemplateId) {
+            return;
+        }
 
         setIsComposing(true);
         setComposeErrors({});
@@ -189,7 +188,9 @@ export default function WorkingTimeCalendarTimes({
     };
 
     const handleToggleDayControl = (day: CalendarDay) => {
-        if (!calendar || !canManage) return;
+        if (!calendar || !canManage) {
+            return;
+        }
 
         const newControl = day.control === 'open' ? 'closed' : 'open';
         setIsUpdatingDay(true);

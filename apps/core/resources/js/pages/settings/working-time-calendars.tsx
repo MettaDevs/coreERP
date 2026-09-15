@@ -22,18 +22,9 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import {
-    CalendarCheck,
-    CalendarDays,
-    Clock,
-    Copy,
-    Plus,
-    Trash2,
-    ArrowLeft,
-} from 'lucide-react';
+import { CalendarCheck, Clock, Copy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import type { BreadcrumbItem } from '@/types/navigation';
 
 export type CalendarItem = {
     id: string;
@@ -103,7 +94,10 @@ export default function WorkingTimeCalendars({
     };
 
     const handleOpenEdit = () => {
-        if (!selectedCalendar) return;
+        if (!selectedCalendar) {
+            return;
+        }
+
         setFormCode(selectedCalendar.code);
         setFormName(selectedCalendar.name);
         setFormDesc(selectedCalendar.description || '');
@@ -114,7 +108,10 @@ export default function WorkingTimeCalendars({
     };
 
     const handleOpenCopy = () => {
-        if (!selectedCalendar) return;
+        if (!selectedCalendar) {
+            return;
+        }
+
         setCopyTargetCode(`${selectedCalendar.code}-COPY`);
         setCopyTargetName(`${selectedCalendar.name} (Salinan)`);
         setFormErrors({});
@@ -147,7 +144,10 @@ export default function WorkingTimeCalendars({
     };
 
     const handleUpdate = () => {
-        if (!selectedCalendar) return;
+        if (!selectedCalendar) {
+            return;
+        }
+
         setIsSubmitting(true);
         setFormErrors({});
         router.put(
@@ -173,7 +173,10 @@ export default function WorkingTimeCalendars({
     };
 
     const handleDelete = () => {
-        if (!selectedCalendar) return;
+        if (!selectedCalendar) {
+            return;
+        }
+
         if (
             !confirm(
                 `Apakah Anda yakin ingin mengarsipkan kalender kerja "${selectedCalendar.name}"?`,
@@ -196,7 +199,10 @@ export default function WorkingTimeCalendars({
     };
 
     const handleExecuteCopy = () => {
-        if (!selectedCalendar) return;
+        if (!selectedCalendar) {
+            return;
+        }
+
         setIsSubmitting(true);
         setFormErrors({});
         router.post(
@@ -219,7 +225,10 @@ export default function WorkingTimeCalendars({
     };
 
     const handleNavigateToTimes = () => {
-        if (!selectedCalendar) return;
+        if (!selectedCalendar) {
+            return;
+        }
+
         router.visit(
             `/settings/working-time-calendars/${selectedCalendar.id}/times`,
         );
@@ -365,6 +374,7 @@ export default function WorkingTimeCalendars({
                                     calendars.map((calendar) => {
                                         const isSelected =
                                             calendar.id === selectedCalendarId;
+
                                         return (
                                             <TableRow
                                                 key={calendar.id}
