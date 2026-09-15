@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Support\CurrentWorkspace;
 use App\Support\DataPolicyAccessResolver;
 use App\Support\LaunchableAppCatalog;
+use App\Support\License\SiteLicense;
 use App\Support\Modules\ModuleRequestContext;
 use App\Support\Modules\TenantScope;
 use App\Support\Observabilitas\LaporanKesalahan;
@@ -50,6 +51,7 @@ final class ResolveModuleContext
         private readonly CurrentWorkspace $workspace,
         private readonly LaunchableAppCatalog $katalog,
         private readonly DataPolicyAccessResolver $kebijakan,
+        private readonly SiteLicense $lisensi,
     ) {}
 
     public function handle(Request $request, Closure $next, string $moduleId): Response
@@ -60,6 +62,14 @@ final class ResolveModuleContext
         // depan; kalau sampai di sini tanpa keanggotaan tenant yang aktif, pengguna memang
         // ada tetapi tidak berada di tenant mana pun — itu soal wewenang, bukan identitas.
         abort_if($membership === null, 403, 'Tidak ada tenant aktif untuk permintaan ini.');
+
+        // Lisensi situs sebelum izin, dan di sini — bukan di peluncur saja. Peluncur hanya
+        // menyembunyikan tautan; alamat module yang diketik langsung, atau baris
+        // `tenant_app_entitlements` yang diubah di database server klien, sampai ke sini tanpa
+        // melewati peluncur. Setiap halaman dan setiap rute JSON module melewati middleware ini,
+        // jadi satu pemeriksaan di sini menutup semuanya. Pemasangan tanpa lisensi wajib tidak
+        // membaca apa pun dan selalu lolos.
+        abort_unless($this->lisensi->allowsApp($moduleId), 403, 'Lisensi server ini tidak mencakup aplikasi ini.');
 
         $izin = $this->katalog->permissionsFor($membership, $moduleId);
 

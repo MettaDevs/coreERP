@@ -37,8 +37,9 @@ export default function AppSidebarLayout({ children }: AppLayoutProps) {
                         */}
                         <EnvironmentBanner />
                         {/*
-                            Peringatan lisensi, bila ada. Hanya memberi tahu: isi halaman di
-                            bawahnya tetap dirender dan dapat dipakai penuh.
+                            Peringatan lisensi, bila ada. Spanduk ini sendiri tidak menghalangi
+                            apa pun — yang mengunci server, dan pengguna yang terkunci tidak pernah
+                            sampai ke kerangka ini.
                         */}
                         <SiteLicenseBanner />
                         <div className="min-w-0 flex-1 bg-muted/30">

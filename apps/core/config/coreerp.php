@@ -152,26 +152,33 @@ return [
     ],
 
     /*
-     * Lisensi situs on-prem — sebuah tanda, bukan kunci.
+     * Lisensi situs on-prem dikelola — sebuah kunci, bila diwajibkan.
      *
      * Berkasnya diterbitkan admin.erp, ditandatangani kunci rilis, lalu dipasang agen di server
-     * pelanggan. Core membacanya **hanya untuk menampilkan peringatan**: ketika masa berlakunya
-     * mendekat, sudah lewat, atau berkasnya tidak dapat dipercaya. Tidak ada permintaan yang
-     * ditolak dan tidak ada fitur yang disembunyikan karenanya. Pelanggan kita fasilitas kesehatan;
-     * aplikasi yang berhenti berarti pelayanan pasien berhenti. Pembayaran ditegakkan lewat kontrak,
-     * bukan lewat kode. Pembacanya App\Support\License\SiteLicense.
+     * pelanggan. Isinya menyebut app mana yang dibeli dan sampai kapan. Bila `required` menyala,
+     * lisensi yang habis, hilang, atau bertanda tangan salah mengunci pengguna tenant, dan app yang
+     * tidak tercantum tidak dapat dibuka. Alasan kenapa ia berubah dari tanda menjadi kunci, beserta
+     * apa yang tetap terbuka, ada di App\Support\License\SiteLicense dan `docs/todo/lisensi-mengunci`.
      *
-     * `path` kosong berarti fitur ini mati, dan itu bawaannya: SaaS dan lingkungan lokal memang
-     * tidak punya lisensi situs, jadi tidak ada yang perlu diperingatkan. Tanda tangannya dibaca
-     * dari `<path>.sig` di sebelahnya — satu jalur yang disetel, bukan dua yang dapat menunjuk
-     * pasangan yang berbeda.
+     * `required` berbawaan mati, dan itu disengaja: SaaS dan pemasangan beli-putus tidak pernah
+     * terkunci. Yang menyalakannya `.env` server on-prem dikelola, ditulis agen saat pemasangan.
+     * Diurai dengan `FILTER_VALIDATE_BOOLEAN` supaya `true`, `1`, dan `on` menyala, sedangkan kosong
+     * dan `false` tidak — string `"false"` yang dibaca sebagai benar akan mengunci server yang tidak
+     * pernah diminta terkunci.
+     *
+     * `path` kosong tanpa `required` berarti fitur ini mati. `path` kosong **dengan** `required`
+     * berarti terkunci. Tanda tangannya dibaca dari `<path>.sig` di sebelahnya — satu jalur yang
+     * disetel, bukan dua yang dapat menunjuk pasangan yang berbeda.
      */
     'license' => [
+        'required' => filter_var(env('COREERP_LICENSE_REQUIRED', false), FILTER_VALIDATE_BOOLEAN),
         'path' => env('COREERP_LICENSE_PATH'),
         'public_key_path' => env('COREERP_LICENSE_PUBLIC_KEY_PATH'),
-        // Berapa hari sebelum tanggal berakhir peringatannya mulai tampil. Tiga puluh hari cukup
-        // untuk satu siklus penagihan dan pemasangan lisensi baru.
-        'warn_days' => 30,
+        // Berapa hari sebelum tanggal berakhir peringatannya mulai tampil. Lisensi berlaku 30 hari
+        // dan diperpanjang otomatis ketika sisanya 10 hari, jadi dalam keadaan sehat peringatan ini
+        // tidak pernah terlihat. Begitu ia tampil, perpanjangannya sudah gagal beberapa hari berturut-
+        // turut — dan tujuh hari adalah waktu untuk memperbaikinya sebelum pelayanan terkunci.
+        'warn_days' => 7,
     ],
 
 ];
