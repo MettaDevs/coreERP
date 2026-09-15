@@ -517,7 +517,7 @@ volume databasenya dihapus oleh pemilik produk sendiri.
 | `main` | Registry situs, API agen bertanda tangan, agen bash, dan alur rilis ke GHCR dari PR #118 |
 | PR #119 | Agen membaca `agent.env` sendiri; port aplikasi on-prem diikat ke loopback |
 | PR #120 | PRD opt-in yang kini diputuskan di halaman ini |
-| Cabang lokal `chore/buang-jalur-offline` | Jalur klien tanpa internet dibuang dan teruji; belum di-push |
+| Cabang `chore/buang-jalur-offline` | Jalur klien tanpa internet dibuang dari agen, admin.erp, kontrak, dan database; route pendaftaran menjadi `/situs/{situs}/pendaftaran` |
 | Cabang lokal `feat/pasang-inti` | WIP: hosting `client_server`, tabel antrean build per edisi — antrean itu diganti build per rilis |
 | Cabang lokal `feat/perakit` | WIP rancangan tarball — ditulis ulang oleh PK-01..05 |
 | Server pertama | Kunci privat rilis di `/etc/coreerp/perakit/kunci-rilis-privat.pem` (root, 0600), kunci publiknya di `/etc/coreerp/kunci/rilis-publik.pem`; Harbor v2.15.2 terpasang, project `coreerp` dan robot perakit ada, retensi belum dijadwalkan |

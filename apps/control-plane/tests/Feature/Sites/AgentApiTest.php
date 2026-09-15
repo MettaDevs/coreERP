@@ -23,7 +23,7 @@ class AgentApiTest extends SiteTestCase
 {
     // ------------------------------------------------------------------ pendaftaran
 
-    public function test_a_valid_online_token_enrolls_the_site_once(): void
+    public function test_a_valid_token_enrolls_the_site_once(): void
     {
         $site = $this->site();
         $token = $this->enrollmentToken($site);
@@ -43,17 +43,15 @@ class AgentApiTest extends SiteTestCase
         $this->postJson('/api/agent/v1/enroll', $body)->assertUnauthorized()->assertJsonPath('error', 'enrollment_rejected');
     }
 
-    public function test_expired_offline_and_revoked_tokens_are_refused_with_the_same_answer(): void
+    public function test_expired_and_revoked_tokens_are_refused_with_the_same_answer(): void
     {
         $key = $this->rsaKey()['public'];
 
         $expired = $this->site(['name' => 'Kedaluwarsa']);
-        $offline = $this->site(['name' => 'Offline', 'connectivity' => 'offline']);
         $revoked = $this->site(['name' => 'Dicabut', 'revoked_at' => now()]);
 
         foreach ([
-            $this->enrollmentToken($expired, 'online', now()->subMinute()),
-            $this->enrollmentToken($offline, 'offline'),
+            $this->enrollmentToken($expired, now()->subMinute()),
             $this->enrollmentToken($revoked),
             str_repeat('x', 48),
         ] as $token) {
@@ -90,7 +88,7 @@ class AgentApiTest extends SiteTestCase
             ->assertExactJson(['interval_seconds' => 60]);
 
         $site->refresh();
-        $this->assertSame('heartbeat', $site->last_seen_via);
+        $this->assertNotNull($site->last_seen_at);
         $this->assertSame('0.1.0', $site->reported_release);
         $this->assertSame(1, SiteReport::query()->count());
     }

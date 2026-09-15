@@ -76,11 +76,6 @@ export const siteStateLabels: Record<string, string> = {
     revoked: 'Dicabut',
 };
 
-export const connectivityLabels: Record<string, string> = {
-    online: 'Online',
-    offline: 'Offline',
-};
-
 export const siteOperationLabels: Record<string, string> = {
     upgrade: 'Perbarui',
     backup: 'Cadangkan',

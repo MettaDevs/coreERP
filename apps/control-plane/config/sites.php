@@ -52,15 +52,9 @@ return [
     /* Permintaan yang tidak pernah diambil agen berhenti menunggu sesudah ini. */
     'request_expiry_days' => 7,
 
-    /*
-     * Umur token pendaftaran. Online cukup satu jam: perintahnya dijalankan saat itu juga. Offline
-     * tiga puluh hari, karena paketnya dibawa dengan flashdisk ke lokasi klien.
-     */
-    'enrollment_token_minutes' => [
-        'online' => 60,
-        'offline' => 60 * 24 * 30,
-    ],
+    /* Umur token pendaftaran. Satu jam cukup: perintah pasangnya dijalankan saat itu juga. */
+    'enrollment_token_minutes' => 60,
 
-    /* Situs online yang tidak melapor selama ini ditampilkan tertinggal, bukan sehat. */
+    /* Situs yang tidak melapor selama ini ditampilkan tertinggal, bukan sehat. */
     'stale_after_seconds' => 180,
 ];

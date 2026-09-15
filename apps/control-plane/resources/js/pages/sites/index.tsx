@@ -23,18 +23,15 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { SiteStateBadge } from '@/components/badges';
 import Shell from '@/components/shell';
-import { connectivityLabels, labelFor } from '@/lib/display';
 
 type SiteRow = {
     id: string;
     name: string;
     tenant: string;
     edition: string;
-    connectivity: string;
     state: string;
     reportedRelease: string | null;
     lastSeenAt: string | null;
-    lastSeenVia: string | null;
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -54,7 +51,6 @@ function CreateDialog({
         name: '',
         edition: '',
         address: '',
-        connectivity: 'online',
         update_window_start: '',
         update_window_end: '',
     });
@@ -135,25 +131,6 @@ function CreateDialog({
                         </div>
 
                         <div className="space-y-2">
-                            <NativeSelect
-                                id="connectivity"
-                                label="Internet keluar"
-                                value={data.connectivity}
-                                onChange={(e) =>
-                                    setData('connectivity', e.target.value)
-                                }
-                            >
-                                <option value="online">
-                                    Online — agen menarik perintah sendiri
-                                </option>
-                                <option value="offline">
-                                    Offline — paket dibawa dengan flashdisk
-                                </option>
-                            </NativeSelect>
-                            <FieldError message={errors.connectivity} />
-                        </div>
-
-                        <div className="space-y-2">
                             <Input
                                 id="address"
                                 label="Alamat aplikasi (boleh kosong)"
@@ -222,10 +199,6 @@ function CreateDialog({
 
 /**
  * Daftar server milik klien on-prem yang dikelola dari konsol ini.
- *
- * Kolom "Terakhir terlihat" menyebut asalnya. Situs offline hanya dikenal lewat file laporan yang
- * dibawa pulang, dan tanggal itu bisa berhari-hari lalu tanpa ada yang salah — layar yang
- * menyamakannya dengan heartbeat akan membuat setiap situs offline tampak rusak.
  */
 export default function Index({
     sites,
@@ -249,7 +222,6 @@ export default function Index({
                             <TableHead>Nama</TableHead>
                             <TableHead>Tenant</TableHead>
                             <TableHead>Edisi</TableHead>
-                            <TableHead>Internet</TableHead>
                             <TableHead>Keadaan</TableHead>
                             <TableHead>Rilis terpasang</TableHead>
                             <TableHead>Terakhir terlihat</TableHead>
@@ -260,7 +232,7 @@ export default function Index({
                         {sites.length === 0 && (
                             <TableRow>
                                 <TableCell
-                                    colSpan={8}
+                                    colSpan={7}
                                     className="py-10 text-center text-sm text-muted-foreground"
                                 >
                                     Belum ada situs yang tercatat.
@@ -277,21 +249,13 @@ export default function Index({
                                     {row.edition}
                                 </TableCell>
                                 <TableCell>
-                                    {labelFor(
-                                        connectivityLabels,
-                                        row.connectivity,
-                                    )}
-                                </TableCell>
-                                <TableCell>
                                     <SiteStateBadge state={row.state} />
                                 </TableCell>
                                 <TableCell className="font-mono text-xs">
                                     {row.reportedRelease ?? '—'}
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
-                                    {row.lastSeenAt
-                                        ? `${row.lastSeenAt} (${row.lastSeenVia === 'file' ? 'file laporan' : 'heartbeat'})`
-                                        : 'Belum pernah'}
+                                    {row.lastSeenAt ?? 'Belum pernah'}
                                 </TableCell>
                                 <TableCell className="text-end">
                                     <Button asChild size="sm" variant="ghost">

@@ -10,12 +10,10 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { SiteStateBadge } from '@/components/badges';
 import Shell from '@/components/shell';
 import {
-    connectivityLabels,
     labelFor,
     siteOperationLabels,
     siteOperationStatusLabels,
@@ -48,12 +46,10 @@ type Site = {
     name: string;
     tenant: string;
     edition: string;
-    connectivity: string;
     state: string;
     reportedRelease: string | null;
     reportedDigest: string | null;
     lastSeenAt: string | null;
-    lastSeenVia: string | null;
     address: string | null;
     updateWindow: { start: string; end: string; timezone: string } | null;
     enrolledAt: string | null;
@@ -130,52 +126,6 @@ function bytes(value?: number | null): string {
     return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
-/**
- * Mengunduh berkas dari POST yang meminta konfirmasi.
- *
- * Paket pendaftaran dan lisensi offline tidak boleh lahir dari tautan GET — tautan dapat dibuka ulang
- * dari riwayat peramban dan setiap pembukaan menerbitkan token atau lisensi baru. Karena itu ia POST
- * bertoken CSRF, dan hasilnya disimpan sebagai berkas lewat blob.
- */
-async function postForDownload(
-    url: string,
-    body: Record<string, string>,
-    filename: string,
-): Promise<string | null> {
-    const xsrf = document.cookie
-        .split('; ')
-        .find((part) => part.startsWith('XSRF-TOKEN='))
-        ?.split('=')[1];
-
-    const response = await fetch(url, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': xsrf ? decodeURIComponent(xsrf) : '',
-        },
-        body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        const errors = payload?.errors as Record<string, string[]> | undefined;
-
-        return errors ? Object.values(errors).flat()[0] : 'Permintaan ditolak.';
-    }
-
-    const blob = await response.blob();
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(link.href);
-
-    return null;
-}
-
 function ConfirmName({
     site,
     value,
@@ -204,76 +154,43 @@ function Enrollment({ site }: { site: Site }) {
     const { enrollment } = usePage<{
         enrollment: { command: string; expiresAt: string } | null;
     }>().props;
-    const online = useForm({ confirm_name: '' });
-    const [confirmName, setConfirmName] = useState('');
-    const [downloadError, setDownloadError] = useState<string | null>(null);
-
-    if (site.connectivity === 'online') {
-        return (
-            <Section
-                title="Pendaftaran"
-                description="Perintah pasang dijalankan sekali di server klien sebagai root. Tokennya sekali pakai dan kedaluwarsa dalam satu jam; perintahnya hanya tampil sekali."
-            >
-                {enrollment && (
-                    <div className="space-y-2">
-                        <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs break-all whitespace-pre-wrap">
-                            {enrollment.command}
-                        </pre>
-                        <p className="text-xs text-muted-foreground">
-                            Berlaku sampai {enrollment.expiresAt}. Menutup
-                            halaman ini menghilangkannya.
-                        </p>
-                    </div>
-                )}
-                <form
-                    className="space-y-3"
-                    onSubmit={(e: FormEvent) => {
-                        e.preventDefault();
-                        online.post(`/situs/${site.id}/pendaftaran-online`, {
-                            preserveScroll: true,
-                            onSuccess: () => online.reset(),
-                        });
-                    }}
-                >
-                    <ConfirmName
-                        site={site}
-                        value={online.data.confirm_name}
-                        onChange={(v) => online.setData('confirm_name', v)}
-                        error={online.errors.confirm_name}
-                    />
-                    <Button type="submit" disabled={online.processing}>
-                        Buat perintah pasang
-                    </Button>
-                </form>
-            </Section>
-        );
-    }
+    const form = useForm({ confirm_name: '' });
 
     return (
         <Section
-            title="Pendaftaran offline"
-            description="Paket berisi id situs dan token pendaftaran yang berlaku 30 hari. Simpan sebagai site.json di flashdisk, bawa bersama bundle rilis pertama, lalu jalankan pasang.sh --paket di server klien. Kunci situs terikat ketika file laporan pertamanya diunggah di bawah."
+            title="Pendaftaran"
+            description="Perintah pasang dijalankan sekali di server klien sebagai root. Tokennya sekali pakai dan kedaluwarsa dalam satu jam; perintahnya hanya tampil sekali."
         >
+            {enrollment && (
+                <div className="space-y-2">
+                    <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs break-all whitespace-pre-wrap">
+                        {enrollment.command}
+                    </pre>
+                    <p className="text-xs text-muted-foreground">
+                        Berlaku sampai {enrollment.expiresAt}. Menutup halaman
+                        ini menghilangkannya.
+                    </p>
+                </div>
+            )}
             <form
                 className="space-y-3"
-                onSubmit={async (e: FormEvent) => {
+                onSubmit={(e: FormEvent) => {
                     e.preventDefault();
-                    setDownloadError(
-                        await postForDownload(
-                            `/situs/${site.id}/paket-pendaftaran`,
-                            { confirm_name: confirmName },
-                            'site.json',
-                        ),
-                    );
+                    form.post(`/situs/${site.id}/pendaftaran`, {
+                        preserveScroll: true,
+                        onSuccess: () => form.reset(),
+                    });
                 }}
             >
                 <ConfirmName
                     site={site}
-                    value={confirmName}
-                    onChange={setConfirmName}
-                    error={downloadError ?? undefined}
+                    value={form.data.confirm_name}
+                    onChange={(v) => form.setData('confirm_name', v)}
+                    error={form.errors.confirm_name}
                 />
-                <Button type="submit">Unduh paket pendaftaran</Button>
+                <Button type="submit" disabled={form.processing}>
+                    Buat perintah pasang
+                </Button>
             </form>
         </Section>
     );
@@ -382,93 +299,6 @@ function RequestOperation({
     );
 }
 
-function OfflineTools({ site }: { site: Site }) {
-    const upload = useForm<{ report: File | null }>({ report: null });
-    const [validUntil, setValidUntil] = useState('');
-    const [confirmName, setConfirmName] = useState('');
-    const [licenseError, setLicenseError] = useState<string | null>(null);
-
-    return (
-        <>
-            <Section
-                title="Unggah file laporan"
-                description="File laporan ditulis agen dengan coreerp-agent write-report dan dibawa pulang. File pertama situs yang belum terdaftar sekaligus mengikat kunci situsnya."
-            >
-                <form
-                    className="space-y-3"
-                    onSubmit={(e: FormEvent) => {
-                        e.preventDefault();
-                        upload.post(`/situs/${site.id}/laporan`, {
-                            preserveScroll: true,
-                            forceFormData: true,
-                            onSuccess: () => upload.reset(),
-                        });
-                    }}
-                >
-                    <Input
-                        type="file"
-                        accept="application/json,.json"
-                        onChange={(e) =>
-                            upload.setData(
-                                'report',
-                                e.target.files?.[0] ?? null,
-                            )
-                        }
-                    />
-                    <FieldError message={upload.errors.report} />
-                    <Button
-                        type="submit"
-                        disabled={
-                            upload.processing || upload.data.report === null
-                        }
-                    >
-                        Unggah
-                    </Button>
-                </form>
-            </Section>
-
-            {site.state !== 'not_enrolled' && (
-                <Section
-                    title="Lisensi offline"
-                    description="Lisensi bertanda tangan untuk dibawa ke server dan dipasang dengan coreerp-agent install-license. Lisensi yang habis hanya memunculkan peringatan; aplikasinya tidak dikunci."
-                >
-                    <form
-                        className="space-y-3"
-                        onSubmit={async (e: FormEvent) => {
-                            e.preventDefault();
-                            setLicenseError(
-                                await postForDownload(
-                                    `/situs/${site.id}/lisensi-offline`,
-                                    {
-                                        valid_until: validUntil,
-                                        confirm_name: confirmName,
-                                    },
-                                    `lisensi-${site.id}.json`,
-                                ),
-                            );
-                        }}
-                    >
-                        <Input
-                            label="Berlaku sampai"
-                            type="date"
-                            required
-                            value={validUntil}
-                            onChange={(e) => setValidUntil(e.target.value)}
-                        />
-                        <ConfirmName
-                            site={site}
-                            value={confirmName}
-                            onChange={setConfirmName}
-                            error={licenseError ?? undefined}
-                        />
-                        <Button type="submit">Unduh lisensi</Button>
-                    </form>
-                </Section>
-            )}
-        </>
-    );
-}
-
 function Revoke({ site }: { site: Site }) {
     const { data, setData, post, processing, errors } = useForm({
         confirm_name: '',
@@ -508,8 +338,7 @@ function Revoke({ site }: { site: Site }) {
  * Rincian satu situs: keadaan terakhir, tindakan, riwayat operasi, dan jejak audit.
  *
  * Tindakan yang tersedia mengikuti keadaan situsnya, bukan disembunyikan setelah ditekan. Situs yang
- * belum terdaftar hanya menawarkan pendaftaran; situs offline tidak menawarkan operasi, karena agennya
- * tidak pernah menarik apa pun — ia menerima paket lewat flashdisk.
+ * belum terdaftar hanya menawarkan pendaftaran.
  */
 export default function Show({
     site,
@@ -548,16 +377,11 @@ export default function Show({
                             <SiteStateBadge state={site.state} />
                         </Row>
                         <Row label="Edisi">{site.edition}</Row>
-                        <Row label="Internet keluar">
-                            {labelFor(connectivityLabels, site.connectivity)}
-                        </Row>
                         <Row label="Rilis terpasang">
                             {site.reportedRelease ?? '—'}
                         </Row>
                         <Row label="Terakhir terlihat">
-                            {site.lastSeenAt
-                                ? `${site.lastSeenAt} lewat ${site.lastSeenVia === 'file' ? 'file laporan' : 'heartbeat'}`
-                                : 'Belum pernah'}
+                            {site.lastSeenAt ?? 'Belum pernah'}
                         </Row>
                         <Row label="Jendela pembaruan">
                             {site.updateWindow
@@ -628,16 +452,12 @@ export default function Show({
                     {site.state === 'not_enrolled' && (
                         <Enrollment site={site} />
                     )}
-                    {site.connectivity === 'online' &&
-                        site.state !== 'not_enrolled' && (
-                            <RequestOperation
-                                site={site}
-                                releases={releases}
-                                licenseKeyConfigured={licenseKeyConfigured}
-                            />
-                        )}
-                    {site.connectivity === 'offline' && (
-                        <OfflineTools site={site} />
+                    {site.state !== 'not_enrolled' && (
+                        <RequestOperation
+                            site={site}
+                            releases={releases}
+                            licenseKeyConfigured={licenseKeyConfigured}
+                        />
                     )}
                 </div>
             )}

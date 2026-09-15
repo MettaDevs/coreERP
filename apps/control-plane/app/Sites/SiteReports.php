@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
- * Menerima laporan situs — dari heartbeat maupun dari file yang dibawa pulang.
+ * Menerima laporan heartbeat situs.
  *
  * ## Daftar tertutup ditegakkan di sini
  *
@@ -83,7 +83,7 @@ final class SiteReports
     }
 
     /** @param  array<string, mixed>  $report laporan yang sudah lolos `validate()` */
-    public function record(Site $site, array $report, string $via): void
+    public function record(Site $site, array $report): void
     {
         $comparable = array_diff_key($report, array_flip(self::VOLATILE));
         ksort($comparable);
@@ -91,22 +91,14 @@ final class SiteReports
 
         $reportedAt = Carbon::parse((string) $report['created_at']);
 
-        DB::transaction(function () use ($site, $report, $via, $hash, $reportedAt): void {
-            // File laporan dapat diunggah berhari-hari sesudah ditulis, dan file lama dapat diunggah
-            // sesudah file yang lebih baru. Keadaan situs hanya maju: laporan yang lebih tua dari yang
-            // sudah dipegang tetap menjadi riwayat, tetapi tidak menimpa keadaan terakhir.
-            $seenAt = $via === 'file' ? $reportedAt : now();
-
-            if ($site->last_seen_at === null || $seenAt->gte($site->last_seen_at)) {
-                $site->forceFill([
-                    'reported_edition' => $report['edition'] ?? null,
-                    'reported_release' => $report['release'] ?? null,
-                    'reported_digest' => $report['digest'] ?? null,
-                    'last_seen_at' => $seenAt,
-                    'last_seen_via' => $via,
-                    'last_report' => $report,
-                ])->save();
-            }
+        DB::transaction(function () use ($site, $report, $hash, $reportedAt): void {
+            $site->forceFill([
+                'reported_edition' => $report['edition'] ?? null,
+                'reported_release' => $report['release'] ?? null,
+                'reported_digest' => $report['digest'] ?? null,
+                'last_seen_at' => now(),
+                'last_report' => $report,
+            ])->save();
 
             $previous = SiteReport::query()
                 ->where('site_id', $site->id)
@@ -119,7 +111,6 @@ final class SiteReports
 
             SiteReport::query()->create([
                 'site_id' => $site->id,
-                'via' => $via,
                 'payload' => $report,
                 'payload_hash' => $hash,
                 'reported_at' => $reportedAt,

@@ -2,10 +2,9 @@
 #
 # Memasang agen situs CoreERP di server Ubuntu milik klien. Dijalankan sekali, sebagai root.
 #
-#   Online : bash pasang.sh --admin-url https://admin.erp.contoh --token <token> [--ref <commit>]
-#   Offline: bash pasang.sh --paket /media/usb/paket-situs --bundle /media/usb/coreerp-apotek-0.2.0
+#   bash pasang.sh --admin-url https://admin.erp.contoh --token <token> [--ref <commit>]
 #
-#   Pilihan untuk keduanya:
+#   Pilihan:
 #     --release-key BERKAS     kunci publik rilis dari berkas ini, bukan dari jalur bawaannya
 #     --app-url URL            alamat CoreERP yang dibuka pengguna (bawaan https://<nama host>)
 #     --provider-email EMAIL   akun admin provider di Core (bawaan provider@coreerp.local)
@@ -24,14 +23,13 @@
 # 1. **Rahasia aplikasi lahir di server ini** — APP_KEY, kata sandi database, kata sandi admin provider
 #    — dan tidak pernah dikirim ke admin.erp. Kata sandi admin provider dicetak sekali di terminal ini.
 #
-# 2. **Kunci publik rilis datang lewat jalur yang berbeda dari admin.erp.** Pada jalur online ia diambil
-#    dari repo GitHub pada ref yang disebut, bukan dari admin.erp. Kunci inilah yang memeriksa setiap
-#    rilis; bila ia datang dari admin.erp, admin.erp yang dibobol cukup mengganti kuncinya lalu
-#    menandatangani rilisnya sendiri, dan seluruh pemeriksaan tanda tangan di agen menjadi hiasan.
-#    Menyebut --ref sebagai SHA commit, bukan nama cabang, membuat isi yang diambil tidak dapat berubah
-#    di bawah nama yang sama.
+# 2. **Kunci publik rilis datang lewat jalur yang berbeda dari admin.erp.** Ia diambil dari repo GitHub
+#    pada ref yang disebut, bukan dari admin.erp. Kunci inilah yang memeriksa setiap rilis; bila ia datang
+#    dari admin.erp, admin.erp yang dibobol cukup mengganti kuncinya lalu menandatangani rilisnya sendiri,
+#    dan seluruh pemeriksaan tanda tangan di agen menjadi hiasan. Menyebut --ref sebagai SHA commit, bukan
+#    nama cabang, membuat isi yang diambil tidak dapat berubah di bawah nama yang sama.
 #
-# 3. **Jalur online tidak memasang rilis pertama.** Operator memintanya dari halaman situs di admin.erp,
+# 3. **Skrip ini tidak memasang rilis pertama.** Operator memintanya dari halaman situs di admin.erp,
 #    supaya pemasangan pertama pun tercatat sebagai operasi — dengan langkah, hasil, dan jejak audit —
 #    dan berjalan di dalam jendela pembaruan yang disepakati klien.
 
@@ -45,7 +43,9 @@ BERKAS_ENV="$RUMAH/.env"
 BERKAS_SETELAN_AGEN="$RUMAH/agent/agent.env"
 REPO_MENTAH='https://raw.githubusercontent.com/MettaDevs/coreERP'
 
-folder_skrip="$(cd "$(dirname "${BASH_SOURCE[0]:-.}")" && pwd)"
+# Seam pengujian: salinan repo di mesin ini yang menggantikan GitHub. Pengujian tidak boleh bergantung
+# pada GitHub, dan yang diuji harus berkas di cabang yang sedang diuji, bukan yang kebetulan ada di `main`.
+REPO_LOKAL="${COREERP_REPO_DIR:-}"
 
 gagal() {
     printf '\n' >&2
@@ -64,15 +64,12 @@ pemakaian() {
         '' \
         'Pemakaian:' \
         '  bash pasang.sh --admin-url URL --token TOKEN [--ref REF]' \
-        '  bash pasang.sh --paket FOLDER --bundle FOLDER' \
         'Pilihan: --release-key BERKAS  --app-url URL  --provider-email EMAIL  --app-port PORT  --app-bind ALAMAT'
 }
 
 alamat_admin=''
 token=''
 ref='main'
-paket=''
-bundle=''
 kunci_rilis_sumber=''
 app_url=''
 email_provider='provider@coreerp.local'
@@ -81,14 +78,12 @@ alamat_ikat=''
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --admin-url | --token | --ref | --paket | --bundle | --release-key | --app-url | --provider-email | --app-port | --app-bind)
+        --admin-url | --token | --ref | --release-key | --app-url | --provider-email | --app-port | --app-bind)
             [ "$#" -ge 2 ] || pemakaian "$1 menuntut satu nilai."
             case "$1" in
                 --admin-url) alamat_admin="$2" ;;
                 --token) token="$2" ;;
                 --ref) ref="$2" ;;
-                --paket) paket="$2" ;;
-                --bundle) bundle="$2" ;;
                 --release-key) kunci_rilis_sumber="$2" ;;
                 --app-url) app_url="$2" ;;
                 --provider-email) email_provider="$2" ;;
@@ -101,18 +96,8 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-if [ -n "$alamat_admin$token" ] && [ -z "$paket$bundle" ]; then
-    moda=online
-    if [ -z "$alamat_admin" ] || [ -z "$token" ]; then
-        pemakaian 'Jalur online menuntut --admin-url dan --token.'
-    fi
-elif [ -n "$paket$bundle" ] && [ -z "$alamat_admin$token" ]; then
-    moda=offline
-    if [ -z "$paket" ] || [ -z "$bundle" ]; then
-        pemakaian 'Jalur offline menuntut --paket dan --bundle.'
-    fi
-else
-    pemakaian 'Pilih satu jalur: online (--admin-url, --token) atau offline (--paket, --bundle).'
+if [ -z "$alamat_admin" ] || [ -z "$token" ]; then
+    pemakaian 'Skrip pasang menuntut --admin-url dan --token.'
 fi
 
 cocok_ref() {
@@ -176,14 +161,7 @@ langkah 'Memeriksa mesin'
 
 printf '    %s, root\n' "${PRETTY_NAME:-Ubuntu}"
 
-if [ "$moda" = online ]; then
-    cocok_ref "$ref" || gagal "--ref tidak sah: $ref"
-else
-    [ -f "$paket/site.json" ] || gagal "Paket pendaftaran tidak lengkap: $paket/site.json tidak ada."
-    [ -d "$bundle" ] || gagal "Folder bundle tidak ditemukan: $bundle"
-    paket="$(cd "$paket" && pwd)"
-    bundle="$(cd "$bundle" && pwd)"
-fi
+cocok_ref "$ref" || gagal "--ref tidak sah: $ref"
 
 [ -z "$port_aplikasi" ] || port_sah "$port_aplikasi" \
     || gagal "--app-port tidak sah: $port_aplikasi" 'Sebut satu nomor port 1-65535.'
@@ -234,14 +212,6 @@ command -v openssl >/dev/null 2>&1 || kurang+=(openssl)
 command -v flock >/dev/null 2>&1 || kurang+=(util-linux)
 
 if [ "${#kurang[@]}" -gt 0 ]; then
-    if [ "$moda" = offline ]; then
-        gagal \
-            "Paket berikut belum terpasang: ${kurang[*]}" \
-            '' \
-            'Jalur offline tidak dapat mengunduhnya. Pasang dari cermin apt lokal atau berkas .deb yang' \
-            'dibawa bersama paket, lalu jalankan lagi.'
-    fi
-
     printf '    memasang: %s\n' "${kurang[*]}"
     apt-get update -qq
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${kurang[@]}" >/dev/null
@@ -266,18 +236,14 @@ trap 'rm -rf "$bahan"' EXIT
 
 # ambil JALUR_DI_REPO — menaruh berkasnya di $bahan dengan nama dasarnya.
 ambil() {
-    local jalur="$1" nama sumber
+    local jalur="$1" nama
 
     nama="$(basename "$jalur")"
 
-    if [ "$moda" = offline ]; then
-        for sumber in "$paket/$nama" "$folder_skrip/$nama" "$bundle/$nama"; do
-            if [ -f "$sumber" ]; then
-                cp "$sumber" "$bahan/$nama"
-                return 0
-            fi
-        done
-        gagal "Berkas $nama tidak ada di paket ($paket), di samping pasang.sh, maupun di bundle."
+    if [ -n "$REPO_LOKAL" ]; then
+        [ -f "$REPO_LOKAL/$jalur" ] || gagal "Berkas $jalur tidak ada di $REPO_LOKAL."
+        cp "$REPO_LOKAL/$jalur" "$bahan/$nama"
+        return 0
     fi
 
     curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --tlsv1.2 \
@@ -316,8 +282,8 @@ fi
 # port itu memang didengar CoreERP sendiri.
 #
 # Server klien lazim sudah melayani situs lain. Tanpa pemeriksaan ini tabrakannya baru ketahuan saat
-# container pertama dinyalakan — pada jalur online lewat admin.erp, di dalam jendela pembaruan, jauh dari
-# orang yang sedang memasang dan dapat memilih port lain dalam sepuluh detik.
+# container pertama dinyalakan — lewat admin.erp, di dalam jendela pembaruan, jauh dari orang yang sedang
+# memasang dan dapat memilih port lain dalam sepuluh detik.
 port_efektif="${port_aplikasi:-$(sed -n 's/^CORE_APP_PORT=//p' "$bahan/env.template" | tail -n 1)}"
 
 if [ ! -e "$BERKAS_ENV" ]; then
@@ -357,7 +323,7 @@ if [ -e "$BERKAS_SETELAN_AGEN" ]; then
 fi
 
 install -d -m 0755 "$RUMAH" "$RUMAH/bin"
-install -d -m 0700 "$RUMAH/agent" "$RUMAH/agent/releases" "$RUMAH/agent/outbox" "$RUMAH/agent/log" "$RUMAH/keadaan"
+install -d -m 0700 "$RUMAH/agent" "$RUMAH/agent/releases" "$RUMAH/agent/log" "$RUMAH/keadaan"
 install -d -m 0755 "$RUMAH/agent/license"
 install -d -m 0700 "${COREERP_FOLDER_CADANGAN:-$RUMAH/cadangan}"
 
@@ -496,27 +462,13 @@ export COREERP_HOME="$RUMAH"
 
 if [ -f "$RUMAH/agent/site.json" ]; then
     langkah 'Situs sudah terdaftar di server ini; pendaftaran dilewati'
-elif [ "$moda" = online ]; then
-    "$agen" enroll --admin-url "$alamat_admin" --token "$token"
 else
-    langkah 'Mendaftarkan situs dari paket pendaftaran'
-    "$agen" import-package "$paket"
+    "$agen" enroll --admin-url "$alamat_admin" --token "$token"
 fi
 
-if [ "$moda" = online ]; then
-    if [ "$ada_systemd" -eq 1 ]; then
-        systemctl enable --now coreerp-agent.timer >/dev/null
-        printf '    timer agen menyala\n'
-    fi
-else
-    rilis_bundle="$(jq -r '.rilis // ""' "$bundle/manifest.json" 2>/dev/null || true)"
-    rilis_terpasang="$(jq -r '.release // ""' "$RUMAH/agent/state.json" 2>/dev/null || true)"
-
-    if [ -n "$rilis_bundle" ] && [ "$rilis_bundle" = "$rilis_terpasang" ]; then
-        langkah "Rilis $rilis_bundle sudah terpasang; bundle tidak dipasang ulang"
-    else
-        "$agen" install-bundle "$bundle"
-    fi
+if [ "$ada_systemd" -eq 1 ]; then
+    systemctl enable --now coreerp-agent.timer >/dev/null
+    printf '    timer agen menyala\n'
 fi
 
 # --- Selesai -------------------------------------------------------------------------------------------
@@ -535,15 +487,7 @@ if [ -n "$kata_sandi_provider" ]; then
 fi
 
 printf '\nLangkah berikutnya:\n'
-
-if [ "$moda" = online ]; then
-    printf '  1. Di admin.erp, buka halaman situs ini dan minta "Perbarui" ke rilis pertama. Agen\n'
-    printf '     mengambilnya pada kunjungan berikutnya di dalam jendela pembaruan.\n'
-    printf '  2. Sesudah rilis pertama terpasang, jalankan di terminal server ini:\n'
-    printf '       coreerp-agent bootstrap-tenant --admin-name "NAMA ADMIN" --admin-email EMAIL\n'
-else
-    printf '  1. Jalankan di terminal server ini:\n'
-    printf '       coreerp-agent bootstrap-tenant --admin-name "NAMA ADMIN" --admin-email EMAIL\n'
-    printf '  2. coreerp-agent write-report, lalu bawa berkas laporannya ke admin.erp.\n'
-    printf '  3. Sesudah admin.erp menerimanya: coreerp-agent confirm-enrollment\n'
-fi
+printf '  1. Di admin.erp, buka halaman situs ini dan minta "Perbarui" ke rilis pertama. Agen\n'
+printf '     mengambilnya pada kunjungan berikutnya di dalam jendela pembaruan.\n'
+printf '  2. Sesudah rilis pertama terpasang, jalankan di terminal server ini:\n'
+printf '       coreerp-agent bootstrap-tenant --admin-name "NAMA ADMIN" --admin-email EMAIL\n'

@@ -83,7 +83,6 @@ abstract class SiteTestCase extends TestCase
             'name' => 'Situs Uji',
             'profile' => 'managed_on_prem',
             'edition' => 'apotek-sejahtera',
-            'connectivity' => 'online',
             'timezone' => 'Asia/Jakarta',
             ...$attributes,
         ]);
@@ -126,14 +125,13 @@ abstract class SiteTestCase extends TestCase
         ]);
     }
 
-    protected function enrollmentToken(Site $site, string $channel = 'online', ?\DateTimeInterface $expiresAt = null): string
+    protected function enrollmentToken(Site $site, ?\DateTimeInterface $expiresAt = null): string
     {
         $token = Str::random(48);
 
         SiteEnrollmentToken::query()->create([
             'site_id' => $site->id,
             'token_hash' => hash('sha256', $token),
-            'channel' => $channel,
             'expires_at' => $expiresAt ?? now()->addHour(),
         ]);
 

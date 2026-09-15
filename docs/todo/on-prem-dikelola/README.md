@@ -3,14 +3,20 @@
 Rencana kerja, bukan desain kanonik. Ditulis 14 September 2026 setelah seorang calon klien meminta
 aplikasi **disewa**, **dipasang di server miliknya sendiri**, tetapi **tetap kita yang mengelola**.
 
+::: warning Bagian image dan distribusi rilis sudah digantikan
+Sejak 15 September 2026 image untuk server klien ditarik dari **Harbor milik kita sendiri**, satu image
+untuk semua klien, dan lisensi **mengunci**. Semua yang di halaman ini menyebut GHCR, image per edisi,
+`RELEASE_SIGNING_KEY` di GitHub, atau lisensi yang hanya memperingatkan berlaku dari
+[Registry image sendiri dengan Harbor](/todo/registry-harbor/), bukan dari sini. Sisanya — agen yang
+menarik, daftar operasi tertutup, kunci situs, dan tanda tangan permintaan — tetap berlaku.
+:::
+
 ## Pertanyaan yang harus dijawab halaman ini
 
 - Bagaimana admin provider mengelola server milik klien **hanya dari admin.erp**, tanpa SSH ke
   setiap server satu per satu?
 - Bagaimana server yang berada di belakang router klinik — tanpa IP publik, tanpa port masuk —
   tetap dapat diperbarui?
-- Bagaimana klien yang **tidak punya internet keluar** tetap dapat dipasang, diperbarui, dan
-  dipantau?
 - Apa yang boleh diminta admin.erp dari server klien, dan apa yang **tidak boleh** — termasuk ketika
   admin.erp sendiri dibobol?
 - Data apa yang boleh keluar dari server fasilitas kesehatan?
@@ -27,7 +33,6 @@ Jalur yang ada di repo dibangun untuk dua keadaan yang berseberangan:
 | Pembayaran | langganan | sekali | **langganan** |
 | Yang menjalankan pembaruan | kita | admin klien | **kita, dari jauh** |
 | Jangkauan admin.erp | penuh | tidak ada | **lewat agen di server klien** |
-| Internet keluar | ada | tidak dijamin | **biasanya ada, tidak dijamin** |
 
 Kolom terakhir adalah gabungan yang belum ada. Ia mengambil server dari on-prem, pembayaran dari
 SaaS, dan menuntut sesuatu yang tidak dimiliki keduanya: **cara memerintah server yang bukan milik
@@ -59,7 +64,6 @@ dev kedua adalah mesin itu — pengujian di halaman ini sekaligus menutupnya.
 - **API agen** di admin.erp dan kontraknya.
 - Antrean operasi yang **menunggu diambil** — `environment_operations` hanya mengenal operasi yang
   dijalankan saat itu juga.
-- **Paket offline**: paket pendaftaran, dan file laporan yang dibawa pulang.
 - **Jejak audit tindakan operator.** Hari ini admin.erp tidak mencatat satu pun.
 - **Lisensi bertanda tangan** yang dibaca Core.
 - **Cadangan luar lokasi** yang dijadwalkan dan dilaporkan.
@@ -87,30 +91,29 @@ pelanggannya. Tautannya di [Sumber](#sumber).
 | Azure Arc | Skrip pasang dibuat dari portal; agen berbicara keluar lewat 443; **daftar ekstensi yang boleh dipasang disetel di server itu sendiri dan tidak dapat diubah dari Azure** — padanan daftar tertutup di bawah |
 | AWS Systems Manager, *hybrid activation* | Kode dan id aktivasi yang umurnya dibatasi — bawaan 24 jam, paling lama 30 hari — padanan token pendaftaran |
 | Rancher | Perintah daftar dibuat dari layar; agen di sisi pelanggan yang membuka terowongan ke server |
-| K3s, pemasangan *air-gap* | Arsip image dipindahkan ke mesin tanpa internet lalu dimuat di sana — padanan bundle |
 
 Satu catatan dari Azure yang berlaku sama di sini: siapa pun yang memegang root di server dapat
 mengubah konfigurasi agennya. Daftar tertutup menjaga server klien dari admin.erp yang dibobol,
 **bukan** dari orang yang sudah menguasai server klien itu sendiri.
 
-### Satu paket, dua jalan antar
+### Satu jalan antar
 
 Yang dikerjakan agen selalu **paket bertanda tangan**: rilis yang dipasang, lisensi yang berlaku,
-atau perintah yang diminta. Cara paket itu sampai ke server yang berbeda:
+atau perintah yang diminta. Semuanya sampai lewat jalan yang sama — agen menyambung keluar ke
+admin.erp lewat HTTPS:
 
-| | Klien dengan internet keluar | Klien tanpa internet |
-| --- | --- | --- |
-| Pendaftaran pertama | Perintah satu baris dari admin.erp | admin.erp membuat **paket pendaftaran**, dibawa dengan flashdisk |
-| Pembaruan | Agen menarik perintah dan image sendiri | admin.erp menyiapkan **bundle** dari `build-bundle.sh`, dibawa dengan flashdisk |
-| Laporan balik | Heartbeat berkala | Agen menulis **file laporan bertanda tangan**, dibawa pulang dan diunggah ke admin.erp |
-| Lisensi | Diperbarui otomatis | File lisensi baru ikut di flashdisk |
+| | |
+| --- | --- |
+| Pendaftaran pertama | Perintah satu baris dari admin.erp |
+| Pembaruan | Agen menarik perintah dan berkas rilis sendiri; image ditarik lewat digest |
+| Laporan balik | Heartbeat berkala |
+| Lisensi | Operasi `install_license` yang diminta dari admin.erp |
 
-Agen **tidak membedakan** dari mana paketnya datang. Ia memeriksa tanda tangannya, lalu
-mengerjakannya atau menolaknya. Dua jalan antar, satu jalur kode — itu yang mencegah jalur offline
-menjadi jalur kedua yang tertinggal dan hanya ketahuan rusak di tempat klien.
+Agen memeriksa tanda tangannya, lalu mengerjakannya atau menolaknya.
 
-Klien yang internetnya putus-sambung tidak memerlukan keputusan tersendiri: laporannya menumpuk di
-server, lalu terkirim ketika sambungannya kembali.
+Klien yang internetnya putus-sambung tidak memerlukan keputusan tersendiri: selama sambungannya
+putus situsnya tampil tidak melapor, dan putaran pertama sesudah sambungannya kembali mengirim
+keadaan terbaru lalu mengambil operasi yang masih menunggu.
 
 ### Daftar tertutup: yang boleh diminta dari agen
 
@@ -144,7 +147,7 @@ Yang **sengaja tidak ada**, dan alasannya:
 | --- | --- | --- | --- |
 | **Kunci rilis** | bundle dan berkas rilis | di luar admin.erp: rahasia alur rilis (`RELEASE_SIGNING_KEY`) | Rilis palsu dapat dibuat — kunci ini yang paling dijaga |
 | **Kunci lisensi** | lisensi | admin.erp | Lisensi palsu dapat dibuat — akibatnya hanya peringatan yang tidak muncul, karena lisensi tidak mengunci apa pun |
-| **Kunci situs** (RSA) | permintaan agen ke admin.erp, file laporan | kunci privat di server klien; admin.erp hanya menyimpan **kunci publik**-nya | Hanya situs itu yang dapat ditiru; kuncinya diputar |
+| **Kunci situs** (RSA) | permintaan agen ke admin.erp | kunci privat di server klien; admin.erp hanya menyimpan **kunci publik**-nya | Hanya situs itu yang dapat ditiru; kuncinya diputar |
 
 Kunci situs asimetris, bukan rahasia bersama. Rahasia bersama menuntut admin.erp menyimpan salinan
 yang dapat dipakai; database admin.erp yang bocor lalu berarti setiap agen dapat ditiru. Dengan
@@ -193,7 +196,7 @@ setelan rahasia. Log dan trace mungkin memuat data pasien; mereka tetap di serve
 
 ## Alurnya
 
-### Mendaftarkan situs — dengan internet
+### Mendaftarkan situs
 
 1. Operator membuat **situs baru** di admin.erp: tenant, profil `on-prem-dikelola`, edisi, alamat,
    dan jendela pembaruan yang disepakati dengan klien.
@@ -213,24 +216,6 @@ setelan rahasia. Log dan trace mungkin memuat data pasien; mereka tetap di serve
    **sekali di terminal itu**. Langkah ini sengaja tidak dijalankan agen dari timer: keluarannya
    memuat kata sandi, dan keluaran timer masuk ke journal sistem.
 
-### Mendaftarkan situs — tanpa internet
-
-Langkah 1 sama. Pada langkah 2, admin.erp membuat **paket pendaftaran** `site.json` berisi id situs,
-id dan nama tenant, token pendaftaran, dan kunci publik lisensi. Kunci publik **rilis** tidak ikut —
-ia tiba lewat jalur lain, bersama skrip pasang. Paket dan bundle rilis pertama dibawa ke server
-dengan flashdisk, lalu skrip pasang dijalankan dengan keduanya sebagai sumber: ia memasang bundle,
-dan orang yang memasang menjalankan `coreerp-agent bootstrap-tenant` sesudahnya. Kunci situs dan
-rahasia aplikasi tetap dibuat di server, sama seperti jalur online.
-
-Karena agen tidak dapat menghubungi admin.erp, kunci publik situs sampai ke admin.erp lewat **file
-laporan pertama**: laporan itu memuat kunci publiknya dan bukti token pendaftaran, dan admin.erp
-mengikat kunci itu ke situs saat file diunggah. Token pendaftaran offline berlaku 30 hari, bukan satu
-jam — perjalanan flashdisk ke lokasi klien memang lebih lama dari satu jam.
-
-Situs offline tampil di admin.erp sebagai **terakhir terlihat lewat laporan**, dengan tanggal file
-laporan terakhir yang diunggah — bukan sebagai "hidup", karena admin.erp memang tidak tahu keadaan
-sesudah tanggal itu.
-
 ### Memperbarui
 
 Operator menekan **Perbarui ke rilis X** di rincian situs. Operasinya tercatat `requested`. Agen
@@ -242,11 +227,6 @@ langkah tempat ia berhenti dan sebabnya. Setiap laporan langkah memperpanjang *l
 situs dibuka — bukan oleh penjadwal. admin.erp sengaja tidak punya antrean maupun penjadwal, dan
 satu pekerjaan kecil tidak cukup alasan untuk menambahkannya.
 
-Situs offline tidak menarik operasi. Pembaruannya bundle dari `scripts/build-bundle.sh` yang
-dipasang dengan `coreerp-agent install-bundle`, dan lisensinya file dari admin.erp yang dipasang
-dengan `coreerp-agent install-license`. Hasil keduanya tercatat di admin.erp ketika file laporan
-sesudahnya diunggah.
-
 ### Mencabut situs
 
 Operator mencabut situs di admin.erp: tanda tangan kunci situsnya berhenti diterima dan operasi yang tertunda
@@ -255,7 +235,7 @@ bukan pelayanan pasien.
 
 ### Rilis yang dapat dipilih
 
-Jalur online tidak membawa `images.tar.gz`. Yang diterbitkan per rilis adalah **berkas rilis**:
+Yang ditarik agen tidak membawa `images.tar.gz`. Yang diterbitkan per rilis adalah **berkas rilis**:
 `manifest.json`, `compose.yaml`, `update.sh`, `SHA256SUMS`, dan `SHA256SUMS.sig` — bentuk yang sama
 dengan bundle, dikurangi arsip image-nya.
 
@@ -274,8 +254,8 @@ dengan bundle, dikurangi arsip image-nya.
   `rilis:` di manifest edisi dinaikkan. Itu yang membuat penolakan mundur di agen bermakna.
 
 Image pendamping — PostgreSQL dan perender PDF — hari ini masih disebut lewat tag di
-`deploy/compose.edition.yaml`. Untuk jalur online itu berarti isinya dapat berubah tanpa rilis kita
-berubah. Menyematkan keduanya lewat digest dicatat sebagai pekerjaan lanjutan.
+`deploy/compose.edition.yaml`. Untuk situs yang menarik image dari registry, itu berarti isinya dapat
+berubah tanpa rilis kita berubah. Menyematkan keduanya lewat digest dicatat sebagai pekerjaan lanjutan.
 
 ## Tenant: satu identitas di dua tempat
 
@@ -309,7 +289,6 @@ Dua cadangan yang berbeda, mengikuti
 | --- | --- | --- |
 | Siapa membuat | `update.sh`, sebelum migrasi | agen, terjadwal |
 | Tempat | disk kedua di server klien | **di luar server klien** — penyimpanan kita, terenkripsi |
-| Syarat | tanpa internet | internet keluar, atau dibawa pulang untuk klien offline |
 
 Cadangan bencana dienkripsi di server klien **sebelum** dikirim, dengan kunci yang tidak disimpan
 di penyimpanan yang sama. Penyimpanan kita yang dibobol tidak boleh berarti data pasien terbuka.
@@ -358,7 +337,7 @@ bukan diam-diam oleh skrip pasang.
 | Jejak audit operator | `apps/control-plane/app/Audit/OperatorAudit.php` |
 | Agen, skrip pasang, unit systemd | `deploy/agent/` |
 | Pembaruan dari registry lewat digest | `scripts/update.sh` |
-| Berkas rilis jalur online | `scripts/build-release-files.sh`, dipanggil `.github/workflows/release.yml` |
+| Berkas rilis yang ditarik agen | `scripts/build-release-files.sh`, dipanggil `.github/workflows/release.yml` |
 | Lisensi di Core | `apps/core/app/Support/License/`, banner di layout aplikasi |
 | Tenant dengan id tertentu | `apps/core/app/Console/Commands/BootstrapSiteTenant.php` |
 
@@ -371,12 +350,12 @@ sudah puluhan.
 
 Semuanya di satu migration. Aturan yang tidak boleh dapat dilanggar ditulis sebagai constraint.
 
-**`sites`** — satu server klien: tenant, profil `managed_on_prem`, edisi, konektivitas, jendela
-pembaruan, kunci publik, rilis yang dilaporkan, dan laporan terakhirnya. Kunci publik dan waktu
-pendaftaran berpasangan; jam mulai dan jam selesai jendela pembaruan berpasangan.
+**`sites`** — satu server klien: tenant, profil `managed_on_prem`, edisi, jendela pembaruan, kunci
+publik, rilis yang dilaporkan, dan laporan terakhirnya. Kunci publik dan waktu pendaftaran
+berpasangan; jam mulai dan jam selesai jendela pembaruan berpasangan.
 
-**`site_enrollment_tokens`** — hash token pendaftaran, kanalnya (`online` atau `offline`), dan waktu
-pakainya. Sekali pakai diputuskan UPDATE bersyarat `used_at IS NULL`, bukan pembacaan sebelumnya.
+**`site_enrollment_tokens`** — hash token pendaftaran, masa berlakunya, dan waktu pakainya. Sekali
+pakai diputuskan UPDATE bersyarat `used_at IS NULL`, bukan pembacaan sebelumnya.
 
 **`site_operations`** — antrean. Berbeda dari `environment_operations` pada satu hal yang
 menentukan: ia punya keadaan `requested`, karena operasinya **menunggu diambil** agen yang
@@ -388,10 +367,10 @@ berkunjung kemudian.
 - satu operasi `running` per situs, dan satu permintaan per jenis per situs — keduanya partial
   unique index
 
-**`site_reports`** — laporan yang isinya **berubah**, beserta asalnya: heartbeat atau file yang
-diunggah. Laporan terakhir selalu tersimpan di `sites.last_report`; riwayatnya hanya menambah baris
-ketika isinya berbeda, dengan mengabaikan jam laporan dan sisa disk. Heartbeat per menit akan
-menjadi setengah juta baris per situs per tahun, dan baris di repo ini tidak dihapus.
+**`site_reports`** — laporan heartbeat yang isinya **berubah**. Laporan terakhir selalu tersimpan di
+`sites.last_report`; riwayatnya hanya menambah baris ketika isinya berbeda, dengan mengabaikan jam
+laporan dan sisa disk. Heartbeat per menit akan menjadi setengah juta baris per situs per tahun, dan
+baris di repo ini tidak dihapus.
 
 **`site_releases`** — berkas rilis bertanda tangan apa adanya, unik per edisi dan nomor rilis.
 
@@ -402,7 +381,7 @@ ditolak database, bukan hanya tidak dipanggil aplikasi.
 
 - **Situs** — daftar situs: tenant, profil, rilis terpasang, keadaan, terakhir terlihat. Situs yang
   laporannya tertinggal ditandai; heartbeat yang berhenti tidak boleh terlihat sama dengan "sehat".
-- **Situs baru** — isian, lalu perintah pasang atau paket pendaftaran.
+- **Situs baru** — isian, lalu perintah pasang.
 - **Rincian situs** — keadaan terakhir, riwayat operasi beserta langkahnya, cadangan terakhir,
   lisensi, dan tombol operasi dari [daftar tertutup](#daftar-tertutup-yang-boleh-diminta-dari-agen).
 
@@ -453,8 +432,6 @@ keadaan sungguhan:
   reservasi. CoreERP harus dipasang di belakangnya, bukan mengambil alih portnya.
 - **Firewall masuk hanya 22, 80, dan 443.** Tidak ada port khusus CoreERP.
 - **SSH hanya dengan kunci.**
-- **Mode tanpa internet**: aturan firewall keluar yang menolak semua kecuali SSH, dinyalakan hanya
-  saat menguji jalur offline.
 
 ### Tahap dan kriteria selesai
 
@@ -489,14 +466,7 @@ dibuktikan merah lebih dulu.
 - Agen yang dimatikan di tengah operasi: *lease*-nya habis, operasinya tidak menggantung selamanya.
 - Setiap operasi punya baris jejak audit yang menyebut operatornya.
 
-**Tahap 3 — offline.**
-
-- Dengan firewall keluar menutup semua, situs didaftarkan dari paket pendaftaran, diperbarui dari
-  bundle, dan file laporannya diunggah ke admin.erp.
-- File laporan yang diubah setelah ditandatangani **ditolak** admin.erp.
-- Situs offline tampil "terakhir terlihat lewat laporan", bukan hidup.
-
-**Tahap 4 — lengkap.**
+**Tahap 3 — lengkap.**
 
 - Cadangan bencana terkirim terenkripsi, dan **dipulihkan ke server lain** sampai aplikasinya
   menyala. Cadangan yang tidak pernah dicoba dipulihkan belum terbukti ada.
@@ -505,7 +475,7 @@ dibuktikan merah lebih dulu.
 
 ## Keadaan 14 September 2026
 
-Kode Tahap 1 sampai 3 berdiri di cabang `feat/on-prem-dikelola`, dan sebagian Tahap 4 — lisensi dan
+Kode Tahap 1 dan 2 berdiri di cabang `feat/on-prem-dikelola`, dan sebagian Tahap 3 — lisensi dan
 mencabut situs. **Belum satu pun dijalankan di server sungguhan**: server dev kedua belum diserahkan,
 jadi Tahap 0 belum dimulai dan kriteria yang menyebut server belum terbukti.
 
@@ -513,9 +483,9 @@ Yang sudah dibuktikan, dan caranya:
 
 | Yang dibuktikan | Cara |
 | --- | --- |
-| API agen, antrean, pendaftaran rilis, layar, jalur offline | Suite konsol, PostgreSQL sungguhan, termasuk setiap bentuk tanda tangan yang diubah dan laporan yang membawa kunci di luar kontrak |
-| Agen, `update.sh` jalur registry, `pasang.sh` offline | Suite agen di container Ubuntu bersih melawan server tiruan yang memeriksa tanda tangan dan skema dari kontrak yang sama. Setiap penjaganya dicabut satu per satu dan test yang sesuai merah |
-| **Agen bash sungguhan melawan admin.erp PHP sungguhan** | Database terpisah, `php -S`, agen di container: pendaftaran, laporan, `upgrade` sampai `succeeded`, rilis yang isinya diubah langsung di database **ditolak agen** dengan checksum yang tidak cocok, dan file laporan offline yang ditandatangani bash diterima PHP lalu mengikat kunci situs |
+| API agen, antrean, pendaftaran rilis, layar | Suite konsol, PostgreSQL sungguhan, termasuk setiap bentuk tanda tangan yang diubah dan laporan yang membawa kunci di luar kontrak |
+| Agen, `update.sh` jalur registry, `pasang.sh` | Suite agen di container Ubuntu bersih melawan server tiruan yang memeriksa tanda tangan dan skema dari kontrak yang sama. Setiap penjaganya dicabut satu per satu dan test yang sesuai merah |
+| **Agen bash sungguhan melawan admin.erp PHP sungguhan** | Database terpisah, `php -S`, agen di container: pendaftaran, laporan, `upgrade` sampai `succeeded`, dan rilis yang isinya diubah langsung di database **ditolak agen** dengan checksum yang tidak cocok |
 | Jejak audit hanya-tambah | UPDATE dan DELETE ditolak trigger, dibuktikan test |
 
 Ditemukan saat dijalankan, bukan saat dibaca: `update.sh` menolak pemasangan pertama di server
@@ -542,15 +512,15 @@ pelaksana; alasannya ditulis supaya dapat dibuka lagi dengan sadar, bukan diteba
 | --- | --- | --- | --- |
 | Bahasa agen | bash, dengan `curl`, `jq`, dan `openssl` | tim dapat membacanya; `update.sh` dipakai apa adanya | penanganan galat lebih kasar daripada Go; `jq` dipasang skrip pasang |
 | Tempat tabel situs | migration Core, seperti registry lingkungan | satu jalur migrasi yang sudah terbukti | kopling database admin.erp–Core bertambah satu kelompok tabel |
-| Kunci situs | RSA, kunci privat di server klien, admin.erp menyimpan kunci publik | database admin.erp yang bocor tidak dapat meniru agen | pendaftaran offline butuh file laporan pertama untuk mengantar kunci publik |
+| Kunci situs | RSA, kunci privat di server klien, admin.erp menyimpan kunci publik | database admin.erp yang bocor tidak dapat meniru agen | kunci privat yang hilang bersama servernya tidak dapat dipulihkan dari admin.erp |
 | Tanda tangan permintaan | RFC 9421, `rsa-v1_5-sha256`, komponen `@method` `@path` `content-digest` | bentuk standar, dihitung `openssl` dan PHP tanpa ekstensi | hanya sebagian standar yang dipakai, dan itu harus ditulis di kontrak |
 | Memulihkan cadangan dari jauh | tidak ada di versi pertama | satu tombol yang dapat menimpa data pasien tidak ada | pemulihan menuntut kehadiran atau VPN dukungan |
 | Lisensi habis | peringatan, tanpa mengunci | pelayanan pasien tidak pernah berhenti karena tagihan | penagihan bergantung kontrak |
 | Id tenant | sama di admin.erp dan server klien | tanpa tabel penerjemah | butuh perintah pembuat tenant dengan id tertentu |
-| Image jalur online | GHCR, disebut lewat digest | tanpa registry sendiri; isi image terkunci | server klien bergantung pada GHCR; token baca per situs bila paketnya privat |
+| Image yang ditarik agen | GHCR, disebut lewat digest | tanpa registry sendiri; isi image terkunci | server klien bergantung pada GHCR; token baca per situs bila paketnya privat |
 | Pendaftaran rilis | alur rilis menandatangani dan mendaftarkan ke admin.erp; nomor rilis unik per edisi | admin.erp tidak pernah memegang kunci rilis | rilis baru menuntut nomor `rilis:` dinaikkan |
 | *Lease* operasi | 15 menit, diperpanjang tiap laporan langkah, dibaca saat diminta | tanpa penjadwal di admin.erp | operasi yang mati terlihat gagal sesudah permintaan berikutnya, bukan tepat pada menitnya |
-| Token pendaftaran | 1 jam online, 30 hari offline, sekali pakai | token yang bocor cepat tidak berguna; perjalanan flashdisk tetap muat | token offline berumur panjang harus dijaga seperti kunci |
+| Token pendaftaran | 1 jam, sekali pakai | token yang bocor cepat tidak berguna | perintah pasang harus dijalankan dalam satu jam sesudah dibuat |
 | Izin pembaruan dari vendor | tertulis di kontrak sewa, dengan jendela pembaruan | dasar untuk menjalankan pembaruan tanpa bertanya setiap kali | kontrak on-prem dikelola berbeda dari beli putus |
 
 ## Perkiraan ukuran
@@ -563,8 +533,7 @@ yang belum pernah dilihat.
 | 0 — pasang dengan tangan, termasuk di belakang reverse proxy | 2–4 hari |
 | 1 — situs, perintah pasang, heartbeat | sekitar 1 minggu |
 | 2 — tombol perbarui, antrean, jejak audit | 1–2 minggu |
-| 3 — jalur offline | sekitar 1 minggu |
-| 4 — cadangan bencana, lisensi, mencabut situs | 1–2 minggu |
+| 3 — cadangan bencana, lisensi, mencabut situs | 1–2 minggu |
 
 ## Sumber
 
@@ -588,8 +557,6 @@ tertera di halaman itu; yang tanpa tanggal memang tidak mencantumkannya.
   dan [komunikasi dengan kluster hilir](https://ranchermanager.docs.rancher.com/reference-guides/rancher-manager-architecture/communicating-with-downstream-user-clusters)
   — perintah daftar dari layar, agen kluster yang membuka terowongan ke server. Halamannya tidak
   menulis "tanpa port masuk" secara harfiah; tabel port-nya yang menyiratkannya.
-- [K3s — Air-Gap Install](https://docs.k3s.io/installation/airgap) (14 Agustus 2026) — arsip image
-  yang dipindahkan ke mesin tanpa internet.
 - [RFC 9421 — HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421) (Februari 2024) —
   standar IETF untuk menandatangani pesan HTTP.
 - [Docker — Packet filtering and firewalls, bagian "Docker and ufw"](https://docs.docker.com/engine/network/packet-filtering-firewalls/)

@@ -15,8 +15,8 @@ use Illuminate\Support\Carbon;
  * Satu server milik klien yang dikelola dari konsol ini — tabel `sites` milik Core.
  *
  * Layarnya berbunyi "Situs". Aturan kerasnya — kunci dan waktu pendaftaran berpasangan, jendela
- * pembaruan berpasangan, konektivitas dan profil yang dikenal — ditegakkan CHECK constraint di
- * migration `create_site_registry_tables`, bukan di kelas ini.
+ * pembaruan berpasangan, profil yang dikenal — ditegakkan CHECK constraint di migration
+ * `create_site_registry_tables`, bukan di kelas ini.
  *
  * @property string $id
  * @property string $tenant_id
@@ -24,7 +24,6 @@ use Illuminate\Support\Carbon;
  * @property string $profile
  * @property string $edition
  * @property ?string $address
- * @property string $connectivity
  * @property ?string $update_window_start
  * @property ?string $update_window_end
  * @property string $timezone
@@ -35,7 +34,6 @@ use Illuminate\Support\Carbon;
  * @property ?string $reported_release
  * @property ?string $reported_digest
  * @property ?Carbon $last_seen_at
- * @property ?string $last_seen_via
  * @property ?array<string, mixed> $last_report
  * @property ?int $created_by
  * @property ?Carbon $created_at
@@ -46,8 +44,6 @@ class Site extends Model
 
     public const PROFILES = ['managed_on_prem'];
 
-    public const CONNECTIVITIES = ['online', 'offline'];
-
     protected $table = 'sites';
 
     protected $fillable = [
@@ -56,7 +52,6 @@ class Site extends Model
         'profile',
         'edition',
         'address',
-        'connectivity',
         'update_window_start',
         'update_window_end',
         'timezone',
@@ -67,7 +62,6 @@ class Site extends Model
         'reported_release',
         'reported_digest',
         'last_seen_at',
-        'last_seen_via',
         'last_report',
         'created_by',
     ];
@@ -126,13 +120,10 @@ class Site extends Model
             : $local >= $start || $local <= $end;
     }
 
-    /**
-     * Situs online yang laporannya berhenti datang. Situs offline tidak pernah "tertinggal": konsol
-     * ini memang tidak tahu keadaannya sesudah file laporan terakhir.
-     */
+    /** Situs terdaftar yang laporannya berhenti datang. */
     public function stale(): bool
     {
-        if ($this->connectivity !== 'online' || ! $this->enrolled()) {
+        if (! $this->enrolled()) {
             return false;
         }
 

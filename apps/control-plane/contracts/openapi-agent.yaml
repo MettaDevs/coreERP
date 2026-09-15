@@ -70,12 +70,11 @@ paths:
     post:
       tags: [agent]
       operationId: enrollSite
-      summary: Mendaftarkan agen dengan token pendaftaran online
+      summary: Mendaftarkan agen dengan token pendaftaran
       description: |
         Satu-satunya endpoint agen tanpa tanda tangan: kunci situs baru lahir di sini. Token hanya
-        berlaku sekali dan hanya untuk kanal `online`; token offline diikat lewat file laporan pertama
-        yang diunggah operator. Token yang sudah dipakai, kedaluwarsa, atau milik situs yang dicabut
-        ditolak dengan jawaban yang sama.
+        berlaku sekali. Token yang sudah dipakai, kedaluwarsa, atau milik situs yang dicabut ditolak
+        dengan jawaban yang sama.
       security: []
       requestBody:
         required: true
@@ -446,85 +445,6 @@ components:
         lease_until:
           type: string
           format: date-time
-
-    OfflineEnrollmentPackage:
-      description: |
-        `site.json` yang diunduh operator dari admin.erp untuk situs tanpa internet, dibawa ke server
-        dengan flashdisk dan dibaca `coreerp-agent import-package`. Bukan jawaban HTTP agen; ditulis di
-        sini karena ia janji antara admin.erp dan agen yang sama mengikatnya dengan endpoint di atas.
-        Kunci publik **rilis** tidak pernah ada di dalamnya.
-      type: object
-      additionalProperties: false
-      required: [site_id, tenant_id, tenant_name, admin_url, channel, enrollment_token, update_window, license_public_key, license]
-      properties:
-        site_id:
-          type: string
-        tenant_id:
-          type: string
-        tenant_name:
-          type: string
-        admin_url:
-          type: string
-        channel:
-          type: string
-          enum: [offline]
-        enrollment_token:
-          type: string
-          description: Sekali pakai, berlaku 30 hari. Diikat ke kunci situs lewat file laporan pertama.
-        update_window:
-          $ref: '#/components/schemas/UpdateWindow'
-        license_public_key:
-          type: [string, 'null']
-        license:
-          type: [object, 'null']
-          additionalProperties: false
-          required: [license, signature]
-          properties:
-            license:
-              type: string
-            signature:
-              type: string
-
-    OfflineReportFile:
-      description: |
-        File laporan yang ditulis `coreerp-agent write-report` di situs tanpa internet dan diunggah
-        operator di rincian situs. `signature` adalah base64 RSA SHA-256 atas byte `content` yang
-        sudah didekode, dengan kunci situs. File pertama situs yang belum terikat membawa `enrollment`;
-        admin.erp memeriksa tanda tangannya dengan kunci yang dibawa file itu, lalu memakai tokennya —
-        tanpa token, siapa pun dapat mengikat kunci buatannya sendiri ke situs mana saja.
-      type: object
-      additionalProperties: false
-      required: [format, content, signature]
-      properties:
-        format:
-          type: string
-          enum: [coreerp-site-report-v1]
-        content:
-          type: string
-          contentEncoding: base64
-          contentMediaType: application/json
-          contentSchema:
-            $ref: '#/components/schemas/OfflineReportContent'
-        signature:
-          type: string
-          contentEncoding: base64
-
-    OfflineReportContent:
-      type: object
-      additionalProperties: false
-      required: [report, enrollment]
-      properties:
-        report:
-          $ref: '#/components/schemas/Report'
-        enrollment:
-          type: [object, 'null']
-          additionalProperties: false
-          required: [token, public_key]
-          properties:
-            token:
-              type: string
-            public_key:
-              type: string
 
     Report:
       type: object
