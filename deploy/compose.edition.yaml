@@ -14,6 +14,18 @@ name: coreerp
 #
 # `docs` sengaja tidak ada di sini. Ia satu image lagi yang harus ikut menyeberang, dan dokumentasi
 # bukan bagian yang membuat aplikasi berjalan; pelanggan yang memintanya mendapat bundle terpisah.
+#
+# **Setiap layanan `pull_policy: never`.** Compose tidak pernah menarik image; yang menyiapkannya adalah
+# update.sh (bundle) atau agen situs (rilis v2: ditarik lewat digest dari registry kita, lalu diberi tag
+# lokal `coreerp.local/*` yang ditulis perakit ke `compose.yaml` rilis). Dua alasan yang sama beratnya:
+#
+# - tag lokal yang terhapus harus membuat Compose **gagal**, bukan diam-diam menarik `docker.io/...` — nama
+#   yang dapat didaftarkan siapa pun di Docker Hub, dan yang tidak pernah diperiksa tanda tangannya;
+# - host registry tidak pernah tertulis di server klien. Registry dapat pindah tanpa menyentuh klien, dan
+#   berkas compose yang menyebut host itu justru mengundang Compose menariknya sendiri.
+#
+# Dua image pendamping di bawah tetap ditulis dengan nama sumbernya, karena perakit membacanya dari sini;
+# `compose.yaml` rilis v2 menggantinya dengan tag lokal.
 
 x-edition-environment: &edition-environment
   APP_ENV: ${APP_ENV:-production}
@@ -126,6 +138,7 @@ x-license-mount: &license-mount ${COREERP_LICENSE_DIR:-/opt/coreerp/agent/licens
 services:
   core-db:
     image: postgres:16-alpine
+    pull_policy: never
     restart: unless-stopped
     environment:
       POSTGRES_DB: core_erp
@@ -162,6 +175,7 @@ services:
   # sini khusus untuk rilis, di mana menahan justru yang benar.
   core-migrate:
     image: ${EDITION_IMAGE}
+    pull_policy: never
     restart: 'no'
     depends_on:
       core-db:
@@ -185,6 +199,7 @@ services:
 
   core-app:
     image: ${EDITION_IMAGE}
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       core-db:
@@ -224,6 +239,7 @@ services:
 
   core-worker:
     image: ${EDITION_IMAGE}
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       core-db:
@@ -248,6 +264,7 @@ services:
   # reservasi nomor berkelanjutan yang kedaluwarsa tidak pernah dilepas.
   core-scheduler:
     image: ${EDITION_IMAGE}
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       core-db:
@@ -269,6 +286,7 @@ services:
   # di bawah. Ia hanya mengubah dokumen yang sudah diisi menjadi PDF.
   core-renderer:
     image: gotenberg/gotenberg:8
+    pull_policy: never
     restart: unless-stopped
     command:
       - gotenberg

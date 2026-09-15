@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Menguji agen situs, pasang.sh, dan jalur tanpa images.tar.gz di update.sh, di container Ubuntu bersih.
+# Menguji agen situs, pasang.sh, jalur tanpa images.tar.gz di update.sh, dan rilis v2 yang ditarik agen dari
+# registry lewat digest, di container Ubuntu bersih.
 #
 #   docker run --rm -v "$PWD":/repo -w /repo ubuntu:24.04 bash deploy/agent/tests/run-tests.sh
 #
@@ -93,8 +94,13 @@ export FAKE_DOCKER_LOG_LENGKAP="$KERJA/docker-lengkap.log"
 export FAKE_DOCKER_JSON_LOG="$KERJA/docker.jsonl"
 export FAKE_DOCKER_ROOT="$KERJA"
 export FAKE_UPDATE_JEJAK="$KERJA/update.jejak"
+export FAKE_DOCKER_LOGIN_LOG="$KERJA/docker-login.jsonl"
+# Host yang dijawab kredensial admin.erp tiruan (REGISTRY_UJI di fake-admin.py). Pull dari host ini menuntut login.
+REGISTRY_UJI='registry.uji.test'
+export FAKE_DOCKER_REGISTRY_PRIVAT="$REGISTRY_UJI"
 : > "$FAKE_DOCKER_LOG"
 : > "$FAKE_DOCKER_JSON_LOG"
+: > "$FAKE_DOCKER_LOGIN_LOG"
 
 buat_kunci_uji() {
     openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$KERJA/kunci/$1.key" 2>/dev/null
@@ -333,6 +339,56 @@ buat_rilis() {
     tulis_berkas_rilis "$KERJA/rilis/$1/$2" "$1" "${3:-$2}" "${4:-$KERJA/kunci/rilis.key}"
 }
 
+# Digest tiruan manifest v2, diturunkan dari teks supaya pengujian dapat menyusunnya ulang. Digest pendamping tidak
+# bergantung pada rilis, seperti PostgreSQL yang tidak berubah di antara dua rilis.
+digest_uji() {
+    printf 'sha256:%s' "$(printf '%s' "$1" | sha256sum | cut -c1-64)"
+}
+
+digest_core() { digest_uji "core-$1"; }
+digest_config() { digest_uji "config-$1"; }
+digest_pendamping() { digest_uji "pendamping-$1"; }
+
+# tulis_berkas_rilis_v2 FOLDER RILIS [FILTER] [KUNCI] — berkas rilis v2 bertanda tangan, dengan bentuk manifest yang
+# ditulis deploy/perakit/rakit.sh. FILTER jq mengubah manifest SEBELUM ditandatangani, supaya bentuk yang salah
+# ditolak karena bentuknya, bukan karena tanda tangannya.
+tulis_berkas_rilis_v2() {
+    local folder="$1" rilis="$2" filter="${3:-.}" kunci="${4:-$KERJA/kunci/rilis.key}"
+
+    mkdir -p "$folder"
+
+    jq -n --arg r "$rilis" --arg commit "$(printf 'commit-%s' "$rilis" | sha256sum | cut -c1-40)" \
+        --arg d "$(digest_core "$rilis")" --arg c "$(digest_config "$rilis")" \
+        --arg g "$(digest_pendamping gotenberg)" --arg p "$(digest_pendamping postgres)" '{
+        versi: 2,
+        rilis: $r,
+        commit: $commit,
+        image: "coreerp/core",
+        digest: $d,
+        config_digest: $c,
+        pendamping: [
+            {nama: "gotenberg", image: "coreerp/pendamping/gotenberg", digest: $g},
+            {nama: "postgres", image: "coreerp/pendamping/postgres", digest: $p}
+        ],
+        dibangun_pada: "2026-09-15T04:43:37Z"
+    }' | jq "$filter" > "$folder/manifest.json"
+
+    printf 'name: coreerp\n' > "$folder/compose.yaml"
+    [ -f "$folder/update.sh" ] || printf '#!/usr/bin/env bash\nexit 0\n' > "$folder/update.sh"
+    (cd "$folder" && sha256sum compose.yaml manifest.json update.sh > SHA256SUMS)
+    openssl dgst -sha256 -sign "$kunci" -out "$folder/SHA256SUMS.sig" "$folder/SHA256SUMS"
+}
+
+# buat_rilis_v2 RILIS [FILTER] — rilis v2 yang disajikan admin.erp tiruan, di bawah edisi tetap image tunggal.
+buat_rilis_v2() {
+    tulis_berkas_rilis_v2 "$KERJA/rilis/$EDISI_PASANG/$1" "$1" "${2:-.}"
+}
+
+# Tag lokal yang wajib diberikan agen dan diperiksa update.sh — ditulis ulang di sini dari aturannya, bukan
+# disalin dari salah satu skrip itu.
+tag_core() { printf 'coreerp.local/core:%s' "$1"; }
+tag_pendamping() { local d; d="$(digest_pendamping "$1")"; printf 'coreerp.local/pendamping/%s:%s' "$1" "${d:7:20}"; }
+
 APPS_LISENSI='["human-resources","management-aset"]'
 
 # buat_lisensi BERKAS SITUS BERLAKU_SAMPAI KUNCI [VERSI] [APPS] — lisensi format versi 2 bertanda tangan
@@ -490,6 +546,16 @@ assert port == ["${CORE_APP_BIND:-0.0.0.0}:${CORE_APP_PORT:-8000}:80"], "port co
 # Layanan lain yang menerbitkan port lolos dari CORE_APP_BIND dan terbuka ke semua alamat.
 penerbit = sorted(nama for nama, layanan in compose["services"].items() if "ports" in layanan)
 assert penerbit == ["core-app"], "layanan yang menerbitkan port: %r" % penerbit
+# AG-02: Compose tidak pernah menarik image. Tag lokal yang hilang harus menggagalkannya, bukan membuatnya menarik
+# nama yang sama dari Docker Hub.
+tanpa_never = sorted(nama for nama, layanan in compose["services"].items() if layanan.get("pull_policy") != "never")
+assert tanpa_never == [], "layanan tanpa pull_policy: never: %r" % tanpa_never
+# Host registry tidak pernah tertulis di compose: komponen pertama yang memuat titik, port, atau localhost dibaca
+# Docker sebagai host. Hanya awalan lokal coreerp.local yang boleh.
+for nama, layanan in compose["services"].items():
+    bagian = layanan["image"].split("/")
+    if len(bagian) > 1 and bagian[0] != "coreerp.local":
+        assert "." not in bagian[0] and ":" not in bagian[0] and bagian[0] != "localhost", "%s menyebut host registry: %r" % (nama, layanan["image"])
 ' "$COMPOSE_EDISI"
 
     # build-bundle.sh membaca image pendamping secara harfiah dari berkas compose; perubahan berkas itu
@@ -1912,13 +1978,533 @@ uji_19_agent_env() {
         "COREERP_PROYEK=coreerp-situs"$'\n'"COREERP_FOLDER_CADANGAN=$KERJA/cadangan-disk-kedua"
 }
 
+# --- Pengujian: rilis v2 lewat registry (AG-01, AG-02) -------------------------------------------------
+#
+# Satu situs untuk seluruh pengujian v2 agen, terpisah dari situs pengujian 01–19, dengan nomor rilis yang naik
+# mengikuti urutan. Agen dijalankan dengan HOME dan TMPDIR miliknya sendiri di folder kerja, supaya ~/.docker yang
+# terlupa dan berkas sementara di luar folder agen dapat dicari kata sandinya.
+
+RUMAH_V2="$KERJA/rumah-v2"
+PENGGUNA_V2="$KERJA/pengguna-v2"
+SEMENTARA_V2="$KERJA/tmp-v2"
+LOG_V2="$KERJA/log/agen-v2.log"
+
+siapkan_rumah_v2() {
+    mkdir -p "$PENGGUNA_V2" "$SEMENTARA_V2"
+    [ ! -f "$RUMAH_V2/agent/site.json" ] || return 0
+
+    mkdir -p "$RUMAH_V2"
+    cp "$KERJA/kunci/rilis.pub" "$RUMAH_V2/kunci-rilis.pub"
+    cp "$TEMPLAT_ENV" "$RUMAH_V2/.env"
+    env COREERP_HOME="$RUMAH_V2" bash "$AGEN" enroll --admin-url "$ADMIN" --token "$(token_baru v2)" >/dev/null
+}
+
+# kredensial_uji ANTREAN_JSON — jawaban permintaan kredensial berikutnya di admin.erp tiruan; '[]' untuk jalur biasa.
+kredensial_uji() {
+    admin_post /_test/registry-credential "{\"jawab\": $1}" >/dev/null
+}
+
+# jalankan_agen_v2 RUMAH LOG [VAR=nilai ...] — satu `run --now` dengan HOME, TMPDIR, dan id image inti tiruan milik
+# pengujian v2; kode keluarnya di $status_putaran.
+jalankan_agen_v2() {
+    local rumah="$1" log="$2"
+    shift 2
+
+    : > "$FAKE_DOCKER_LOG"
+    : > "$FAKE_DOCKER_JSON_LOG"
+    : > "$FAKE_DOCKER_LOGIN_LOG"
+    : > "$FAKE_UPDATE_JEJAK"
+    status_putaran=0
+    env COREERP_HOME="$rumah" HOME="$PENGGUNA_V2" TMPDIR="$SEMENTARA_V2" "$@" bash "$AGEN" run --now > "$log" 2>&1 \
+        || status_putaran=$?
+}
+
+# putaran_v2 RILIS [VAR=nilai ...] — mengantre upgrade image tunggal ke RILIS untuk situs v2 dan menjalankan satu
+# putaran; mengisi $id, $op, $sebelum, dan $kredensial_awal. Id image inti tiruan bawaannya config_digest rilis itu.
+putaran_v2() {
+    local rilis="$1"
+    shift
+
+    sebelum="$(jumlah_permintaan)"
+    kredensial_awal="$(admin_keadaan | jq '.registry_credentials | length')"
+    id="$(antre "$(jq -cn --arg s "$(jq -r .site_id "$RUMAH_V2/agent/site.json")" --arg e "$EDISI_PASANG" --arg r "$rilis" \
+        '{site_id: $s, operation: "upgrade", parameters: {edition: $e, release: $r}}')")"
+
+    jalankan_agen_v2 "$RUMAH_V2" "$LOG_V2" FAKE_DOCKER_IMAGE_ID="$(digest_config "$rilis")" "$@"
+    op="$(operasi "$id")"
+
+    if [ "$status_putaran" -ne 0 ]; then
+        cat "$LOG_V2"
+        tail -n 15 "$KERJA/log/fake-admin.log"
+        printf 'putaran v2 keluar %s untuk rilis %s\n' "$status_putaran" "$rilis"
+        return 1
+    fi
+}
+
+# Permintaan kredensial sejak $kredensial_awal, sebagai "operation_id:status".
+kredensial_sejak() {
+    admin_keadaan | jq -c --argjson n "$kredensial_awal" '[.registry_credentials[$n:][] | "\(.operation_id):\(.status)"]'
+}
+
+langkah_berjalan() {
+    jq -c '[.langkah[] | select(.status == "running") | .step]' <<< "$op"
+}
+
+# panggilan_docker PERINTAH... — argumen setiap pemanggilan docker yang kata pertamanya salah satu PERINTAH, berurutan.
+panggilan_docker() {
+    # shellcheck disable=SC2016 # $daftar adalah variabel jq
+    jq -sc --arg daftar "$*" '($daftar | split(" ")) as $d | [.[] | select(.args[0] as $a | $d | index($a)) | .args]' \
+        "$FAKE_DOCKER_JSON_LOG"
+}
+
+sidik_sandi() {
+    printf 'SandiRobotUji-%s-%s' "$id" "$1" | sha256sum | cut -c1-64
+}
+
+# tanpa_jejak_kredensial KETERANGAN RUMAH LOG — kata sandi robot, polos maupun base64 seperti di config.json, tidak
+# tertinggal di mana pun sesudah putaran; DOCKER_CONFIG yang dipakai sudah dihapus.
+tanpa_jejak_kredensial() {
+    local keterangan="$1" rumah="$2" log="$3" n b64 folder
+
+    harus_gagal "$keterangan: kata sandi robot tidak ada di keluaran agen" grep -qF SandiRobotUji "$log"
+    harus_gagal "$keterangan: kata sandi robot tidak ada di bawah COREERP_HOME" grep -rqF SandiRobotUji "$rumah"
+    harus_gagal "$keterangan: kata sandi robot tidak ada di HOME dan TMPDIR agen" grep -rqF SandiRobotUji "$PENGGUNA_V2" "$SEMENTARA_V2"
+    harus_gagal "$keterangan: kata sandi robot tidak ada di log docker maupun admin.erp tiruan" \
+        grep -qF SandiRobotUji "$FAKE_DOCKER_LOG_LENGKAP" "$FAKE_DOCKER_JSON_LOG" "$FAKE_DOCKER_LOGIN_LOG" "$KERJA/log/fake-admin.log"
+
+    for n in 1 2 3; do
+        # shellcheck disable=SC2016 # `$coreerp` bagian harfiah nama robot Harbor
+        b64="$(printf 'robot$coreerp+%s:SandiRobotUji-%s-%s' "$id" "$id" "$n" | base64 -w0)"
+        harus_gagal "$keterangan: kredensial ke-$n dalam bentuk base64 tidak ada di disk" \
+            grep -rqF -- "$b64" "$rumah" "$PENGGUNA_V2" "$SEMENTARA_V2"
+    done
+
+    pastikan "$keterangan: ~/.docker proses agen tidak pernah ditulis" test ! -e "$PENGGUNA_V2/.docker"
+    sama "$keterangan: folder sementara agen tidak tertinggal" "$(find "$rumah/agent" -maxdepth 1 -name '.sementara.*' | wc -l)" 0
+
+    while IFS= read -r folder; do
+        [ -z "$folder" ] || pastikan "$keterangan: DOCKER_CONFIG $folder dihapus" test ! -e "$folder"
+    done < <(jq -r '.docker_config' "$FAKE_DOCKER_JSON_LOG" | sort -u)
+}
+
+uji_20_v2_tarik_image() {
+    local c g p dc diharapkan laporan
+
+    siapkan_rumah_v2
+    kredensial_uji '[]'
+    buat_rilis_v2 0.2.0
+    rm -f "$KERJA/sisa-docker-config"
+    putaran_v2 0.2.0 FAKE_UPDATE_SISA_DOCKER_CONFIG="$KERJA/sisa-docker-config"
+
+    c="$(digest_core 0.2.0)"
+    g="$(digest_pendamping gotenberg)"
+    p="$(digest_pendamping postgres)"
+
+    sama 'upgrade v2 selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'langkah menarik image dilaporkan sebelum update.sh' "$(langkah_berjalan)" \
+        '["Mengunduh dan memeriksa rilis 0.2.0","Menarik image rilis 0.2.0","Memeriksa tanda tangan","Menjalankan migrasi","Memeriksa kesehatan"]'
+    sama 'kredensial diminta sekali, untuk operasi ini' "$(kredensial_sejak)" "[\"$id:200\"]"
+    sama 'kredensial diminta sesudah langkah menarik image diterima' \
+        "$(admin_keadaan | jq -c --argjson n "$sebelum" '[.requests[$n:][] | .path
+            | select(endswith("/steps") or . == "/api/agent/v1/registry-credential")
+            | if endswith("/steps") then "langkah" else "kredensial" end] | .[0:3]')" \
+        '["langkah","langkah","kredensial"]'
+
+    diharapkan="$(jq -cn --arg r "$REGISTRY_UJI" --arg u "robot\$coreerp+$id" --arg c "$c" --arg g "$g" --arg p "$p" \
+        --arg tc "$(tag_core 0.2.0)" --arg tg "$(tag_pendamping gotenberg)" --arg tp "$(tag_pendamping postgres)" '[
+        ["login", $r, "--username", $u, "--password-stdin"],
+        ["pull", "--quiet", "\($r)/coreerp/core@\($c)"],
+        ["pull", "--quiet", "\($r)/coreerp/pendamping/gotenberg@\($g)"],
+        ["pull", "--quiet", "\($r)/coreerp/pendamping/postgres@\($p)"],
+        ["tag", "\($r)/coreerp/core@\($c)", $tc],
+        ["tag", "\($r)/coreerp/pendamping/gotenberg@\($g)", $tg],
+        ["tag", "\($r)/coreerp/pendamping/postgres@\($p)", $tp],
+        ["logout", $r]
+    ]')"
+    sama 'login, pull lewat digest, tag lokal, logout — persis dan berurutan' "$(panggilan_docker login pull tag logout)" "$diharapkan"
+    sama 'tag lokal pendamping memakai 20 huruf pertama digest' "$(tag_pendamping postgres)" "coreerp.local/pendamping/postgres:${p:7:20}"
+
+    sama 'satu login' "$(wc -l < "$FAKE_DOCKER_LOGIN_LOG")" 1
+    dc="$(jq -r .docker_config "$FAKE_DOCKER_LOGIN_LOG")"
+    memuat 'DOCKER_CONFIG di folder sementara agen' "$dc" "$RUMAH_V2/agent/.sementara."
+    memuat 'DOCKER_CONFIG folder tersendiri' "$dc" '/docker-config.'
+    sama 'login, pull, dan logout memakai DOCKER_CONFIG yang sama' \
+        "$(jq -sc '[.[] | select(.args[0] | IN("login", "pull", "logout")) | .docker_config] | unique' "$FAKE_DOCKER_JSON_LOG")" "[\"$dc\"]"
+    sama 'DOCKER_CONFIG 0700 saat login' "$(jq -r .mode_config "$FAKE_DOCKER_LOGIN_LOG")" 700
+    sama 'kata sandi sampai lewat stdin, persis' "$(jq -r .stdin_sha256 "$FAKE_DOCKER_LOGIN_LOG")" "$(sidik_sandi 1)"
+    sama 'jawaban kredensial sudah dihapus dari disk saat login' "$(jq -r .sandi_tertulis "$FAKE_DOCKER_LOGIN_LOG")" 0
+    sama 'DOCKER_CONFIG sudah dihapus sebelum update.sh mulai' "$(cat "$KERJA/sisa-docker-config")" 0
+    tanpa_jejak_kredensial 'berhasil' "$RUMAH_V2" "$LOG_V2"
+
+    sama 'update.sh dijalankan atas rilis v2 yang terverifikasi' "$(cat "$FAKE_UPDATE_JEJAK")" \
+        "mulai $RUMAH_V2/agent/releases/coreerp-0.2.0"$'\n'"selesai $RUMAH_V2/agent/releases/coreerp-0.2.0"
+    sama 'state.json: edisi operasi, rilis, tag lokal, digest manifest' \
+        "$(jq -c '[.edition, .release, .image, .digest]' "$RUMAH_V2/agent/state.json")" \
+        "$(jq -cn --arg t "$(tag_core 0.2.0)" --arg c "$c" '["coreerp", "0.2.0", $t, $c]')"
+
+    laporan="$(admin_keadaan | jq -c --arg s "$(jq -r .site_id "$RUMAH_V2/agent/site.json")" '[.reports[] | select(.site_id == $s)][-1].isi')"
+    sama 'laporan menyebut tag lokal dan digest manifest' "$(jq -c '[.image, .digest]' <<< "$laporan")" \
+        "$(jq -cn --arg t "$(tag_core 0.2.0)" --arg c "$c" '[$t, $c]')"
+    sama 'laporan sesuai skema Report' "$(validasi Report "$laporan")" '[]'
+}
+
+uji_20b_v2_detak() {
+    siapkan_rumah_v2
+
+    # Setiap pull diam lebih lama dari detak: langkahnya dilaporkan ulang selama pull berjalan, bukan hanya sekali.
+    # Tanpa detak di dalam pull, laporannya paling banyak empat — satu di awal dan satu sebelum setiap pull — jadi
+    # batas enam hanya terpenuhi oleh detak selama pull yang diam tiga detik.
+    buat_rilis_v2 0.2.1
+    putaran_v2 0.2.1 COREERP_AGENT_DETAK_DETIK=1 FAKE_DOCKER_PULL_JEDA=3
+    sama 'pull yang lama selesai' "$(jq -r .status <<< "$op")" succeeded
+    pastikan 'langkah menarik image dilaporkan ulang selama pull yang diam' \
+        test "$(jq '[.langkah[] | select(.step == "Menarik image rilis 0.2.1")] | length' <<< "$op")" -ge 6
+
+    # Setiap pull lebih pendek dari detak, jumlahnya lebih panjang: jam detak tidak mulai dari nol di setiap pull.
+    buat_rilis_v2 0.2.2
+    putaran_v2 0.2.2 COREERP_AGENT_DETAK_DETIK=2 FAKE_DOCKER_PULL_JEDA=1.2
+    sama 'pull pendek beruntun selesai' "$(jq -r .status <<< "$op")" succeeded
+    pastikan 'langkah menarik image dilaporkan ulang di antara pull' \
+        test "$(jq '[.langkah[] | select(.step == "Menarik image rilis 0.2.2")] | length' <<< "$op")" -ge 2
+}
+
+uji_20c_v2_install() {
+    local rumah="$KERJA/rumah-v2-install" log="$KERJA/log/agen-v2-install.log" s
+
+    siapkan_rumah_v2
+    rm -rf "$rumah"
+    mkdir -p "$rumah"
+    cp "$KERJA/kunci/rilis.pub" "$rumah/kunci-rilis.pub"
+    cp "$TEMPLAT_ENV" "$rumah/.env"
+    env COREERP_HOME="$rumah" bash "$AGEN" enroll --admin-url "$ADMIN" --token "$(token_baru v2-install)" >/dev/null
+    s="$(jq -r .site_id "$rumah/agent/site.json")"
+
+    kredensial_uji '[]'
+    buat_rilis_v2 0.2.0
+    kredensial_awal="$(admin_keadaan | jq '.registry_credentials | length')"
+    id="$(antre "$(jq -cn --arg s "$s" --argjson p "$(parameter_pasang 0.2.0)" '{site_id: $s, operation: "install", parameters: $p}')")"
+
+    jalankan_agen_v2 "$rumah" "$log" FAKE_DOCKER_IMAGE_ID="$(digest_config 0.2.0)"
+    op="$(operasi "$id")"
+
+    sama 'install v2 keluar nol' "$status_putaran" 0
+    sama 'install v2 selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'install menarik image lewat jalur yang sama dengan upgrade' "$(langkah_berjalan)" \
+        '["Mengunduh dan memeriksa rilis 0.2.0","Menarik image rilis 0.2.0","Memeriksa tanda tangan","Menjalankan migrasi","Memeriksa kesehatan","Melahirkan tenant dan admin pertama"]'
+    sama 'kredensial untuk operasi install' "$(kredensial_sejak)" "[\"$id:200\"]"
+    sama 'tenant dilahirkan pada tag lokal yang dicatat update.sh' \
+        "$(jq -r 'select(.args | index("tenant:bootstrap-site")) | .edition_image' "$FAKE_DOCKER_JSON_LOG")" "$(tag_core 0.2.0)"
+    tanpa_jejak_kredensial 'install' "$rumah" "$log"
+}
+
+uji_21_v2_digest_tidak_cocok() {
+    local terpasang
+
+    siapkan_rumah_v2
+    kredensial_uji '[]'
+    buat_rilis_v2 0.3.0
+    terpasang="$(jq -r '.release // ""' "$RUMAH_V2/agent/state.json")"
+
+    # ditolak KETERANGAN POTONGAN [VAR=nilai ...]
+    ditolak() {
+        local keterangan="$1" potongan="$2"
+        shift 2
+
+        putaran_v2 0.3.0 "$@"
+
+        sama "$keterangan: gagal di langkah menarik image" "$(jq -c '[.status, .langkah[-1].step]' <<< "$op")" '["failed","Menarik image rilis 0.3.0"]'
+        memuat "$keterangan: sebabnya" "$(jq -r .failure_message <<< "$op")" "$potongan"
+        sama "$keterangan: update.sh tidak dijalankan" "$(cat "$FAKE_UPDATE_JEJAK")" ''
+        sama "$keterangan: tidak satu pun tag lokal diberikan" "$(panggilan_docker tag)" '[]'
+        sama "$keterangan: logout tetap dijalankan" "$(panggilan_docker logout)" "[[\"logout\",\"$REGISTRY_UJI\"]]"
+        sama "$keterangan: rilis terpasang tidak berubah" "$(jq -r '.release // ""' "$RUMAH_V2/agent/state.json")" "$terpasang"
+        tanpa_jejak_kredensial "$keterangan" "$RUMAH_V2" "$LOG_V2"
+    }
+
+    # Pendamping terakhir: tanpa pemeriksaan sebelum tag, image inti dan gotenberg sudah diberi tag lebih dulu.
+    ditolak 'RepoDigests pendamping terakhir' "RepoDigests-nya tidak memuat $REGISTRY_UJI/coreerp/pendamping/postgres@" \
+        FAKE_DOCKER_REPO_DIGEST_PALSU=pendamping/postgres
+    ditolak 'RepoDigests image inti' "RepoDigests-nya tidak memuat $REGISTRY_UJI/coreerp/core@" \
+        FAKE_DOCKER_REPO_DIGEST_PALSU=coreerp/core@
+    ditolak 'id image inti bukan config_digest maupun digest' 'bukan config_digest maupun digest di manifest' \
+        FAKE_DOCKER_IMAGE_ID=sha256:lain
+
+    # Store containerd: `.Id` adalah digest manifest, bukan digest config.
+    putaran_v2 0.3.0 FAKE_DOCKER_IMAGE_ID="$(digest_core 0.3.0)"
+    sama 'id image sama dengan digest manifest diterima' "$(jq -r .status <<< "$op")" succeeded
+}
+
+uji_22_v2_kredensial_ditolak() {
+    siapkan_rumah_v2
+    buat_rilis_v2 0.4.0
+
+    # ditolak KETERANGAN ANTREAN POTONGAN JUMLAH_LOGIN [VAR=nilai ...]
+    ditolak() {
+        local keterangan="$1" antrean="$2" potongan="$3" login="$4"
+        shift 4
+
+        kredensial_uji "$antrean"
+        putaran_v2 0.4.0 "$@"
+        kredensial_uji '[]'
+
+        sama "$keterangan: gagal di langkah menarik image" "$(jq -c '[.status, .langkah[-1].step]' <<< "$op")" '["failed","Menarik image rilis 0.4.0"]'
+        memuat "$keterangan: sebabnya" "$(jq -r .failure_message <<< "$op")" "$potongan"
+        sama "$keterangan: kredensial diminta sekali" "$(kredensial_sejak | jq length)" 1
+        sama "$keterangan: jumlah login" "$(panggilan_docker login | jq length)" "$login"
+        sama "$keterangan: tidak ada yang ditarik" "$(panggilan_docker pull)" '[]'
+        sama "$keterangan: update.sh tidak dijalankan" "$(cat "$FAKE_UPDATE_JEJAK")" ''
+        tanpa_jejak_kredensial "$keterangan" "$RUMAH_V2" "$LOG_V2"
+    }
+
+    ditolak '409' '[409]' 'HTTP 409' 0
+    ditolak '503' '[503]' 'HTTP 503' 0
+    ditolak 'registry dengan skema' '[{"registry": "https://registry.uji.test"}]' 'bukan host polos' 0
+    ditolak 'registry dengan path' '[{"registry": "registry.uji.test/coreerp"}]' 'bukan host polos' 0
+    ditolak 'registry tanpa titik atau port' '[{"registry": "coreerp"}]' 'bukan host polos' 0
+    ditolak 'registry berhuruf besar' '[{"registry": "Registry.uji.test"}]' 'bukan host polos' 0
+    ditolak 'registry berakhir baris baru' '[{"registry": "registry.uji.test\n"}]' 'bukan host polos' 0
+    ditolak 'nama pengguna kosong' '[{"username": ""}]' 'tidak berbentuk' 0
+    ditolak 'nama pengguna berawalan minus' '[{"username": "--password=x"}]' 'tidak berbentuk' 0
+    ditolak 'kata sandi kosong' '[{"password": ""}]' 'tidak berbentuk' 0
+    ditolak 'kata sandi berakhir baris baru' '[{"password": "SandiRobotUji-baris\n"}]' 'tidak berbentuk' 0
+    ditolak 'login ditolak registry' '[]' "login ke registry $REGISTRY_UJI gagal" 1 FAKE_DOCKER_LOGIN_GAGAL=1
+}
+
+uji_23_v2_401() {
+    siapkan_rumah_v2
+    kredensial_uji '[]'
+
+    # Robot yang tokennya habis di tengah pull: kredensial kedua, login ulang, pull yang sama diulang sekali.
+    buat_rilis_v2 0.4.0
+    rm -f "$KERJA/401-sekali"
+    putaran_v2 0.4.0 FAKE_DOCKER_PULL_401_SEKALI="$KERJA/401-sekali"
+
+    sama '401 sekali: selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama '401 sekali: kredensial diminta dua kali' "$(kredensial_sejak)" "[\"$id:200\",\"$id:200\"]"
+    sama '401 sekali: login kedua dengan rahasia yang diputar' "$(jq -sc '[.[].stdin_sha256]' "$FAKE_DOCKER_LOGIN_LOG")" \
+        "$(jq -cn --arg a "$(sidik_sandi 1)" --arg b "$(sidik_sandi 2)" '[$a, $b]')"
+    sama '401 sekali: pull inti diulang sekali, lalu pendamping' \
+        "$(panggilan_docker pull | jq -c 'map(.[2] | split("@")[0])')" \
+        "[\"$REGISTRY_UJI/coreerp/core\",\"$REGISTRY_UJI/coreerp/core\",\"$REGISTRY_UJI/coreerp/pendamping/gotenberg\",\"$REGISTRY_UJI/coreerp/pendamping/postgres\"]"
+    memuat '401 sekali: agen menjelaskan' "$(cat "$LOG_V2")" 'kredensial baru diminta sekali'
+    tanpa_jejak_kredensial '401 sekali' "$RUMAH_V2" "$LOG_V2"
+
+    # 401 yang tetap datang sesudah kredensial baru bukan kredensial yang basi: operasi gagal, tanpa ulangan ketiga.
+    buat_rilis_v2 0.5.0
+    putaran_v2 0.5.0 FAKE_DOCKER_PULL_401=1
+
+    sama '401 terus: gagal' "$(jq -c '[.status, .langkah[-1].step]' <<< "$op")" '["failed","Menarik image rilis 0.5.0"]'
+    memuat '401 terus: sebabnya' "$(jq -r .failure_message <<< "$op")" 'gagal sesudah kredensial baru'
+    memuat '401 terus: pesan registry ikut' "$(jq -r .failure_message <<< "$op")" 'unauthorized'
+    sama '401 terus: kredensial diminta dua kali saja' "$(kredensial_sejak | jq length)" 2
+    sama '401 terus: pull inti dua kali saja' "$(panggilan_docker pull | jq length)" 2
+    sama '401 terus: tidak ada tag' "$(panggilan_docker tag)" '[]'
+    sama '401 terus: update.sh tidak dijalankan' "$(cat "$FAKE_UPDATE_JEJAK")" ''
+    tanpa_jejak_kredensial '401 terus' "$RUMAH_V2" "$LOG_V2"
+
+    # Kredensial kedua menyebut registry lain: image yang sudah ditarik dari registry pertama tidak dicampur.
+    rm -f "$KERJA/401-sekali"
+    kredensial_uji '[null, {"registry": "registry.lain.test"}]'
+    putaran_v2 0.5.0 FAKE_DOCKER_PULL_401_SEKALI="$KERJA/401-sekali"
+    kredensial_uji '[]'
+
+    sama 'registry berganti: gagal' "$(jq -c '[.status, .langkah[-1].step]' <<< "$op")" '["failed","Menarik image rilis 0.5.0"]'
+    memuat 'registry berganti: sebabnya' "$(jq -r .failure_message <<< "$op")" \
+        "admin.erp menjawab registry registry.lain.test di tengah operasi yang menarik dari $REGISTRY_UJI"
+    sama 'registry berganti: login sekali, logout dari registry pertama' "$(panggilan_docker login logout | jq -c 'map(.[0:2])')" \
+        "[[\"login\",\"$REGISTRY_UJI\"],[\"logout\",\"$REGISTRY_UJI\"]]"
+    tanpa_jejak_kredensial 'registry berganti' "$RUMAH_V2" "$LOG_V2"
+}
+
+uji_24_v2_manifest_ditolak() {
+    local keterangan filter potongan
+
+    siapkan_rumah_v2
+    kredensial_uji '[]'
+
+    # Dipisah `~`, bukan `|`: filter jq memakai `|=`.
+    while IFS='~' read -r keterangan filter potongan; do
+        [ -n "$keterangan" ] || continue
+        pastikan "$keterangan: kasus terbaca utuh" test -n "$filter" -a -n "$potongan"
+
+        buat_rilis_v2 0.6.0 "$filter"
+        putaran_v2 0.6.0
+
+        sama "$keterangan: ditolak" "$(jq -c '[.status, .langkah[-1].step]' <<< "$op")" '["failed","Memeriksa rilis 0.6.0"]'
+        memuat "$keterangan: sebabnya" "$(jq -r .failure_message <<< "$op")" "$potongan"
+        sama "$keterangan: kredensial tidak diminta" "$(kredensial_sejak)" '[]'
+        sama "$keterangan: docker tidak login, menarik, atau memberi tag" "$(panggilan_docker login pull tag)" '[]'
+        sama "$keterangan: update.sh tidak dijalankan" "$(cat "$FAKE_UPDATE_JEJAK")" ''
+    done <<'KASUS'
+image dengan host~.image = "registry.uji.test/coreerp/core"~image di manifest v2 bukan jalur repositori tanpa host
+image dengan host localhost~.image = "localhost/coreerp/core"~image di manifest v2 bukan jalur repositori tanpa host
+image dengan tag~.image = "coreerp/core:0.6.0"~image di manifest v2 bukan jalur repositori tanpa host
+image berhuruf besar~.image = "CoreERP/core"~image di manifest v2 bukan jalur repositori tanpa host
+image berakhir baris baru~.image = "coreerp/core\n"~image di manifest v2 bukan jalur repositori tanpa host
+image kosong~.image = ""~image di manifest v2 bukan jalur repositori tanpa host
+digest tanpa awalan sha256~.digest |= .[7:]~digest atau config_digest di manifest v2 bukan sha256
+digest 63 huruf~.digest |= .[0:70]~digest atau config_digest di manifest v2 bukan sha256
+digest berhuruf besar~.digest |= "sha256:" + (.[7:] | ascii_upcase)~digest atau config_digest di manifest v2 bukan sha256
+digest berakhir baris baru~.digest += "\n"~digest atau config_digest di manifest v2 bukan sha256
+config_digest tidak ada~del(.config_digest)~digest atau config_digest di manifest v2 bukan sha256
+pendamping tidak ada~del(.pendamping)~pendamping di manifest v2 bukan larik
+pendamping berupa objek~.pendamping = {"postgres": .pendamping[1]}~pendamping di manifest v2 bukan larik
+image pendamping dengan host~.pendamping[1].image = "docker.io/library/postgres"~pendamping di manifest v2 bukan larik
+digest pendamping salah bentuk~.pendamping[0].digest = "sha256:abc"~pendamping di manifest v2 bukan larik
+nama pendamping berisi garis miring~.pendamping[0].nama = "../gotenberg"~pendamping di manifest v2 bukan larik
+nama pendamping berhuruf besar~.pendamping[0].nama = "Gotenberg"~pendamping di manifest v2 bukan larik
+nama pendamping ganda~.pendamping[1].nama = "gotenberg"~pendamping di manifest v2 menyebut nama yang sama
+commit 39 huruf~.commit |= .[0:39]~commit di manifest v2 bukan SHA commit
+versi berupa teks~.versi = "2"~manifest menyebut versi yang tidak dikenal
+versi 3~.versi = 3~manifest menyebut versi yang tidak dikenal
+rilis berakhir baris baru~.rilis = "0.6.0\n"~manifest menyebut nomor rilis yang tidak sah
+rilis bukan yang diminta~.rilis = "0.5.9"~manifest yang ditandatangani menyebut coreerp 0.5.9, bukan coreerp 0.6.0
+KASUS
+}
+
+uji_25_v2_sinyal() {
+    local pid kelompok status dc
+
+    siapkan_rumah_v2
+    kredensial_uji '[]'
+    buat_rilis_v2 0.6.0
+    : > "$FAKE_DOCKER_LOG"
+    : > "$FAKE_DOCKER_JSON_LOG"
+    : > "$FAKE_DOCKER_LOGIN_LOG"
+    : > "$FAKE_UPDATE_JEJAK"
+    id="$(antre "$(jq -cn --arg s "$(jq -r .site_id "$RUMAH_V2/agent/site.json")" --arg e "$EDISI_PASANG" \
+        '{site_id: $s, operation: "upgrade", parameters: {edition: $e, release: "0.6.0"}}')")"
+
+    # Kelompok proses sendiri, lalu SIGTERM ke seluruh kelompok — seperti `systemctl stop` pada unit agen.
+    setsid env COREERP_HOME="$RUMAH_V2" HOME="$PENGGUNA_V2" TMPDIR="$SEMENTARA_V2" FAKE_DOCKER_PULL_JEDA=60 \
+        bash "$AGEN" run --now > "$LOG_V2" 2>&1 &
+    pid=$!
+
+    for _ in $(seq 1 150); do
+        ! grep -q '"args":\["pull"' "$FAKE_DOCKER_JSON_LOG" || break
+        sleep 0.1
+    done
+    pastikan 'agen sedang menarik image' grep -q '"args":\["pull"' "$FAKE_DOCKER_JSON_LOG"
+
+    kelompok="$(cut -d' ' -f5 "/proc/$pid/stat")"
+    sama 'agen memimpin kelompok prosesnya sendiri' "$kelompok" "$pid"
+
+    dc="$(jq -r .docker_config "$FAKE_DOCKER_LOGIN_LOG")"
+    pastikan 'DOCKER_CONFIG ada selama pull' test -f "$dc/config.json"
+
+    kill -TERM -- "-$kelompok"
+    status=0
+    wait "$pid" || status=$?
+
+    pastikan 'agen berhenti karena sinyal' test "$status" -ne 0
+    pastikan 'DOCKER_CONFIG dihapus sesudah sinyal' test ! -e "$dc"
+    sama 'update.sh tidak dijalankan' "$(cat "$FAKE_UPDATE_JEJAK")" ''
+    tanpa_jejak_kredensial 'sinyal' "$RUMAH_V2" "$LOG_V2"
+
+    # Operasi yang tidak pernah ditutup dilepas lewat lease-nya, seperti di admin.erp sungguhan.
+    admin_post "/_test/operations/$id/expire" '{}' >/dev/null
+}
+
+uji_26_update_sh_v2() {
+    local rumah="$KERJA/rumah-update-v2" folder="$KERJA/berkas-update-v2" log="$KERJA/log/update-v2.log"
+    local c g p tc tg tp ada benar satu
+
+    rm -rf "$rumah" "$folder"
+    mkdir -p "$rumah" "$folder"
+    cp "$KERJA/kunci/rilis.pub" "$rumah/kunci-rilis.pub"
+    : > "$rumah/.env"
+    cp "$UPDATE_SH" "$folder/update.sh"
+    tulis_berkas_rilis_v2 "$folder" 0.7.0
+
+    c="$(digest_core 0.7.0)"
+    g="$(digest_pendamping gotenberg)"
+    p="$(digest_pendamping postgres)"
+    tc="$(tag_core 0.7.0)"
+    tg="$(tag_pendamping gotenberg)"
+    tp="$(tag_pendamping postgres)"
+    ada="$tc $tg $tp"
+
+    # Host yang tidak dikenal pengujian mana pun: update.sh mencocokkan ujung RepoDigests, tidak pernah hostnya.
+    # repo_digests NAMA_INTI — pasangan TAG=REPO_DIGEST untuk shim, dengan repositori image inti diganti.
+    repo_digests() {
+        printf '%s=registry.lain.test/%s@%s %s=registry.lain.test/coreerp/pendamping/gotenberg@%s %s=registry.lain.test/coreerp/pendamping/postgres@%s' \
+            "$tc" "$1" "$c" "$tg" "$g" "$tp" "$p"
+    }
+    benar="$(repo_digests coreerp/core)"
+
+    # jalankan IMAGE_ADA REPO_DIGESTS [VAR=nilai ...]
+    jalankan() {
+        local ada_="$1" digests="$2"
+        shift 2
+        : > "$FAKE_DOCKER_LOG"
+        : > "$FAKE_DOCKER_JSON_LOG"
+        env COREERP_HOME="$rumah" COREERP_FOLDER_CADANGAN="$rumah/cadangan" COREERP_LEWATI_PERIKSA_CADANGAN=1 \
+            FAKE_DOCKER_IMAGE_ADA="$ada_" FAKE_DOCKER_REPO_DIGESTS="$digests" "$@" bash "$UPDATE_SH" "$folder" > "$log" 2>&1
+    }
+
+    # tolak KETERANGAN POTONGAN IMAGE_ADA REPO_DIGESTS [VAR=nilai ...] — gagal sebelum container mana pun disentuh.
+    tolak() {
+        local keterangan="$1" potongan="$2"
+        shift 2
+
+        if jalankan "$@"; then
+            cat "$log"
+            printf '%s: update.sh berhasil padahal harus menolak\n' "$keterangan"
+            return 1
+        fi
+
+        memuat "$keterangan: sebabnya" "$(cat "$log")" "$potongan"
+        sama "$keterangan: tidak ada pull, load, atau login" "$(grep -cE '^(pull|load|login)' "$FAKE_DOCKER_LOG" || true)" 0
+        sama "$keterangan: container tidak disentuh, termasuk core-db untuk cadangan" \
+            "$(grep -cE '^compose .* (up|exec|stop|run)( |$)' "$FAKE_DOCKER_LOG" || true)" 0
+    }
+
+    harus_gagal 'update.sh tidak menyebut host registry' grep -qE 'registry\.erp|grenery' "$UPDATE_SH"
+
+    jalankan "$ada" "$benar" || { cat "$log"; return 1; }
+
+    memuat 'langkah memeriksa image lokal' "$(cat "$log")" '==> Memeriksa image rilis di mesin ini'
+    sama 'tidak ada pull, load, atau login' "$(grep -cE '^(pull|load|login)' "$FAKE_DOCKER_LOG" || true)" 0
+    sama 'setiap tag lokal diperiksa RepoDigests-nya' \
+        "$(jq -sc '[.[] | select(.args[0:2] == ["image", "inspect"]) | .args[-1]]' "$FAKE_DOCKER_JSON_LOG")" \
+        "$(jq -cn --arg a "$tc" --arg b "$tg" --arg c "$tp" '[$a, $b, $c]')"
+    sama 'compose menyala dengan tag lokal image inti' \
+        "$(jq -sc '[.[] | select(.args[0] == "compose" and (.args | index("up"))) | .edition_image] | unique' "$FAKE_DOCKER_JSON_LOG")" \
+        "[\"$tc\"]"
+    harus_gagal 'host registry tidak sampai ke argumen docker' grep -q 'registry\.' "$FAKE_DOCKER_LOG"
+    sama 'versi sehat dicatat sebagai tag lokal' "$(cat "$rumah/keadaan/versi-sehat")" "$tc"
+
+    # Sesudah ini versi sehat ada, jadi setiap penolakan di bawah juga membuktikan core-db untuk cadangan tidak
+    # dinyalakan sebelum image diperiksa.
+    tolak 'pendamping hilang' "Image $tp tidak ada di mesin ini" "$tc $tg" "$benar"
+    tolak 'image inti hilang' "Image $tc tidak ada di mesin ini" "$tg $tp" "$benar"
+    tolak 'digest pendamping lain' "Image $tp bukan image yang disebut manifest" "$ada" \
+        "${benar/"@$p"/"@$(digest_pendamping lain)"}"
+    tolak 'repositori lain dengan digest yang sama' "Image $tc bukan image yang disebut manifest" "$ada" "$(repo_digests coreerp/lain)"
+    tolak 'repositori yang hanya berakhiran sama' "Image $tc bukan image yang disebut manifest" "$ada" "$(repo_digests xcoreerp/core)"
+    tolak 'tag lokal tanpa RepoDigests' "Image $tc bukan image yang disebut manifest" "$ada" "${benar#* }"
+
+    # jq hanya dituntut untuk manifest v2.
+    mkdir -p "$KERJA/bin-tanpa-jq"
+    for satu in /usr/bin/* "$KERJA/bin/docker"; do
+        [ "$(basename "$satu")" = jq ] || ln -sf "$satu" "$KERJA/bin-tanpa-jq/$(basename "$satu")"
+    done
+    tolak 'tanpa jq' 'jq tidak ada di PATH' "$ada" "$benar" PATH="$KERJA/bin-tanpa-jq"
+
+    tulis_berkas_rilis_v2 "$folder" 0.7.0 '.versi = 3'
+    tolak 'versi manifest tidak dikenal' 'versi manifest yang tidak dikenal' "$ada" "$benar"
+
+    tulis_berkas_rilis_v2 "$folder" 0.7.0 '.pendamping[0].digest = "sha256:abc"'
+    tolak 'digest pendamping salah bentuk' 'tidak berbentuk yang dibaca skrip ini' "$ada" "$benar"
+}
+
 # --- Jalankan ------------------------------------------------------------------------------------------
 
 printf 'Agen yang diuji: %s\n\n' "$AGEN"
 
 uji 'sintaks bash dan Python, tanpa CR' uji_sintaks
 uji 'shellcheck' uji_shellcheck
-uji 'env.template dan compose.edition.yaml' uji_templat_dan_compose
+uji 'env.template dan compose.edition.yaml, termasuk pull_policy: never dan tanpa host registry' uji_templat_dan_compose
 uji '01 enroll menulis site.json dan kunci; admin.erp menyimpan kunci publik' uji_01_enroll
 uji '02 laporan diterima dan hanya memuat kunci kontrak' uji_02_laporan
 uji '03 tanda tangan dengan kunci lain ditolak 401' uji_03_kunci_lain
@@ -1943,6 +2529,15 @@ uji '17b pasang.sh: isian alamat, pilihan lama, kunci rilis, berkas kosong, alam
 uji '17c pasang.sh: putaran berhenti pada install yang gagal dan pada batas waktu' uji_17c_putaran_pasang
 uji '18 pasang.sh: port terpakai ditolak di pemasangan pertama; port, alamat ikat, dan agent.env ditulis' uji_18_pasang_port_dan_setelan
 uji '19 agent.env dibaca agen sendiri: isi di luar daftar ditolak, lingkungan menang, diteruskan ke update.sh' uji_19_agent_env
+uji '20 v2: kredensial per operasi, login lewat stdin, pull lewat digest, tag lokal, logout, tanpa sisa kredensial' uji_20_v2_tarik_image
+uji '20b v2: pull yang diam dan pull beruntun tetap memperpanjang lease' uji_20b_v2_detak
+uji '20c v2: install menarik image lewat jalur yang sama dan melahirkan tenant pada tag lokal' uji_20c_v2_install
+uji '21 v2: RepoDigests atau id image yang tidak cocok menggagalkan operasi tanpa tag dan tanpa update.sh' uji_21_v2_digest_tidak_cocok
+uji '22 v2: kredensial 409, 503, berbentuk salah, atau login ditolak menggagalkan operasi tanpa pull' uji_22_v2_kredensial_ditolak
+uji '23 v2: 401 di tengah pull meminta kredensial sekali lagi; 401 kedua dan registry yang berganti gagal' uji_23_v2_401
+uji '24 v2: manifest dengan host, digest, pendamping, versi, atau rilis yang salah ditolak sebelum kredensial' uji_24_v2_manifest_ditolak
+uji '25 v2: SIGTERM di tengah pull menghapus DOCKER_CONFIG' uji_25_v2_sinyal
+uji '26 update.sh v2: tanpa pull, compose dengan tag lokal; image hilang atau RepoDigests salah gagal sebelum container' uji_26_update_sh_v2
 
 printf '\n%d lulus, %d gagal, %d dilewati\n' "$lulus" "$gagal_uji" "$dilewati"
 

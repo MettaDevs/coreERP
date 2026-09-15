@@ -211,8 +211,9 @@ sebenarnya; setel kedaluwarsa token robot serendah yang tidak memutus pull besar
   (`running`, lease belum habis). Selain itu `409`.
 - Situs yang dicabut: `401`, sama dengan endpoint agen lain.
 - Jawaban: `{registry, username, password, expires_at}`. `registry` adalah host, bukan URL.
-- Dipanggil ulang selama operasi yang sama: robot yang sama boleh diputar rahasianya, bukan robot baru
-  menumpuk.
+- Dipanggil ulang selama operasi yang sama: robot lama dihapus lalu robot baru dibuat, sehingga nama
+  penggunanya ikut berganti. Harbor v2.15.2 tidak mengenal izin `robot:update`, jadi robot sistem tidak dapat
+  memutar rahasia robot lain (diukur 15 September 2026). Satu operasi tetap memegang paling banyak satu robot.
 - Setiap penerbitan dan penghapusan robot dicatat di `operator_audit_events` bersama operasinya.
 
 ### Manifest rilis v2
@@ -458,6 +459,17 @@ dipelajari saat merakitnya:
 | AG-02 | Compose memakai tag lokal dan `pull_policy: never` di setiap service | Test statis di suite agen; compose tidak pernah menyebut host registry | AG-01 |
 | AG-03 | Agen memercayai dua kunci publik rilis | Rilis bertanda tangan kunci cadangan diterima; kunci lain ditolak | — |
 | AG-04 | Buang jalur `images.tar.gz` dan tarik lewat GHCR dari `update.sh` dan agen | Setelah E2E-01 lulus; grep repo bersih | E2E-01 |
+
+**Keadaan AG-01 dan AG-02, 15 September 2026.** Dikerjakan di cabang `feat/harbor-agen` terhadap kontrak CP-03;
+rinciannya di `deploy/agent/README.md`, bagian "Rilis v2". Dua hal yang berbeda dari tulisan di atas:
+
+- **Tag lokal pendamping memakai 20 huruf pertama digestnya**, `coreerp.local/pendamping/<nama>:<20 huruf>`,
+  bukan nomor rilis. PostgreSQL yang digest-nya tidak berubah tetap bertag sama, sehingga Compose tidak membuat
+  ulang container database pada setiap pembaruan. Perakit harus menulis nama yang sama ke `compose.yaml` rilis.
+- **`update.sh` memeriksa tag lokal sebelum pencadangan**, bukan di langkah image: pencadangan sudah menyalakan
+  `core-db` dengan compose rilis baru.
+
+Manifest v1 tetap diterima sampai AG-04. Belum diuji terhadap Harbor sungguhan; itu E2E-01.
 
 ### Image — `apps/core/Dockerfile`
 

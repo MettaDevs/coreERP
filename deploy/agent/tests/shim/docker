@@ -5,15 +5,29 @@
 # Ia tidak menirukan Docker; ia hanya menjawab perintah yang dipanggil kedua skrip itu, dan mencatat
 # setiap pemanggilan supaya pengujian dapat memeriksa apa yang diminta:
 #
-#   FAKE_DOCKER_LOG          satu baris per pemanggilan, argumen digabung spasi
+#   FAKE_DOCKER_LOG          satu baris per pemanggilan, argumen digabung spasi. Image yang ada juga dicatat
+#                            di sini sebagai baris `# ada REF` dan `# tag TUJUAN SUMBER`, supaya mengosongkan
+#                            log sekaligus mengosongkan image yang dianggap ada
 #   FAKE_DOCKER_LOG_LENGKAP  sama, tetapi tidak pernah dikosongkan pengujian
-#   FAKE_DOCKER_JSON_LOG     satu objek JSON per pemanggilan: {"args": [...], "edition_image": "..."}
+#   FAKE_DOCKER_JSON_LOG     satu objek JSON per pemanggilan: {"args": [...], "edition_image": "...", "docker_config": "..."}
+#   FAKE_DOCKER_LOGIN_LOG    satu objek JSON per `docker login`, tanpa kata sandinya: registry, pengguna, sha256
+#                            stdin, DOCKER_CONFIG, mode foldernya, dan jumlah berkas di bawah COREERP_HOME dan TMPDIR
+#                            yang memuat kata sandi itu saat login
 #
 # Setelan perilaku:
 #
 #   FAKE_DOCKER_ROOT          jawaban `docker info --format {{.DockerRootDir}}`
 #   FAKE_DOCKER_IMAGE_ADA     image yang dianggap sudah ada sebelum ditarik, dipisah spasi
-#   FAKE_DOCKER_IMAGE_ID      id image yang dijawab `docker image inspect`
+#   FAKE_DOCKER_IMAGE_ID      id image yang dijawab `docker image inspect` (bawaan, atau --format berisi .Id)
+#   FAKE_DOCKER_REPO_DIGESTS  pasangan REF=REPO_DIGEST dipisah spasi, dijawab `--format` berisi RepoDigests untuk
+#                             REF itu. Tanpa pasangan, image yang ditarik lewat digest menjawab rujukannya sendiri,
+#                             dan tag menjawab RepoDigests sumbernya — seperti Docker
+#   FAKE_DOCKER_REPO_DIGEST_PALSU  potongan teks; RepoDigests yang memuatnya dijawab dengan digest lain
+#   FAKE_DOCKER_REGISTRY_PRIVAT    host yang menuntut `docker login` di DOCKER_CONFIG sebelum pull
+#   FAKE_DOCKER_LOGIN_GAGAL   1 membuat login ditolak
+#   FAKE_DOCKER_PULL_401      1 membuat setiap pull ditolak unauthorized
+#   FAKE_DOCKER_PULL_401_SEKALI  berkas penanda; pull pertama sesudah berkas itu tidak ada ditolak unauthorized
+#   FAKE_DOCKER_PULL_JEDA     detik tidur sebelum pull menjawab
 #   FAKE_DOCKER_PGDUMP_GAGAL  1 membuat pg_dump gagal
 #   FAKE_KATA_SANDI           kata sandi sementara yang dicetak tenant:bootstrap-site tiruan
 #
@@ -51,20 +65,62 @@ if [ -n "${FAKE_DOCKER_JSON_LOG:-}" ]; then
             printf '%s%s' "$pemisah" "$(teks_json "$satu")"
             pemisah=','
         done
-        printf '],"edition_image":%s}\n' "$(teks_json "${EDITION_IMAGE:-}")"
+        printf '],"edition_image":%s,"docker_config":%s}\n' "$(teks_json "${EDITION_IMAGE:-}")" "$(teks_json "${DOCKER_CONFIG:-}")"
     } >> "$FAKE_DOCKER_JSON_LOG"
 fi
 
+# Folder config yang dipakai Docker sungguhan: DOCKER_CONFIG, atau ~/.docker bila tidak disetel.
+folder_config() {
+    printf '%s' "${DOCKER_CONFIG:-$HOME/.docker}"
+}
+
+# Sumber tag TUJUAN yang terakhir dicatat, atau kosong.
+sumber_tag() {
+    awk -v r="$1" '$1 == "#" && $2 == "tag" && $3 == r { s = $4 } END { print s }' "$log" 2>/dev/null || true
+}
+
 ada_image() {
-    local ref="$1" satu
+    local ref="$1" satu sumber
 
     for satu in ${FAKE_DOCKER_IMAGE_ADA:-}; do
         [ "$satu" != "$ref" ] || return 0
     done
 
-    grep -qxF -e "pull $ref" -e "pull --quiet $ref" "$log" 2>/dev/null && return 0
+    grep -qxF "# ada $ref" "$log" 2>/dev/null && return 0
     grep -qx 'load' "$log" 2>/dev/null && return 0
+
+    sumber="$(sumber_tag "$ref")"
+    [ -n "$sumber" ] && ada_image "$sumber" && return 0
     return 1
+}
+
+repo_digests() {
+    local ref="$1" satu keluaran='' sumber
+
+    for satu in ${FAKE_DOCKER_REPO_DIGESTS:-}; do
+        [ "${satu%%=*}" != "$ref" ] || keluaran="$keluaran${satu#*=}"$'\n'
+    done
+
+    if [ -z "$keluaran" ]; then
+        sumber="$(sumber_tag "$ref")"
+        if [ -n "$sumber" ]; then
+            keluaran="$(repo_digests "$sumber")"$'\n'
+        elif [[ "$ref" == *@sha256:* ]]; then
+            keluaran="$ref"$'\n'
+        fi
+    fi
+
+    if [ -n "${FAKE_DOCKER_REPO_DIGEST_PALSU:-}" ] && [[ "$keluaran" == *"$FAKE_DOCKER_REPO_DIGEST_PALSU"* ]]; then
+        keluaran="$(printf '%s' "$keluaran" | sed -E 's/@sha256:[0-9a-f]{64}/@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee/')"$'\n'
+    fi
+
+    printf '%s' "$keluaran" | sed '/^$/d'
+}
+
+tolak_unauthorized() {
+    printf 'Error response from daemon: Head "https://%s/v2/": unauthorized: unauthorized to access repository: %s, action: pull\n' \
+        "$1" "$2" >&2
+    exit 1
 }
 
 case "${1:-}" in
@@ -77,16 +133,101 @@ case "${1:-}" in
     load)
         cat > /dev/null
         ;;
+    login)
+        shift
+        registry='' pengguna='' dari_stdin=0
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --username | -u) pengguna="$2"; shift 2 ;;
+                --password-stdin) dari_stdin=1; shift ;;
+                --password | -p) printf 'tiruan: kata sandi di argumen ditolak\n' >&2; exit 2 ;;
+                *) registry="$1"; shift ;;
+            esac
+        done
+        [ "$dari_stdin" -eq 1 ] || { printf 'tiruan: login tanpa --password-stdin ditolak\n' >&2; exit 2; }
+
+        # Dibaca utuh, termasuk baris baru di ujung: sidik stdin harus membuktikan kata sandi dikirim persis.
+        IFS= read -r -d '' sandi || true
+        folder="$(folder_config)"
+
+        if [ -n "${FAKE_DOCKER_LOGIN_LOG:-}" ]; then
+            tertulis=0
+            for tempat in "${COREERP_HOME:-}" "${TMPDIR:-}"; do
+                if [ -z "$sandi" ] || [ -z "$tempat" ] || [ ! -d "$tempat" ]; then
+                    continue
+                fi
+                # Pola lewat process substitution, bukan argumen: tiruan ini pun tidak menaruh kata sandi di
+                # daftar proses atau di berkas.
+                jumlah="$(grep -rlF -f <(printf '%s\n' "$sandi") "$tempat" 2>/dev/null | wc -l || true)"
+                tertulis=$((tertulis + jumlah))
+            done
+            printf '{"registry":%s,"username":%s,"stdin_sha256":%s,"docker_config":%s,"mode_config":%s,"sandi_tertulis":%s}\n' \
+                "$(teks_json "$registry")" "$(teks_json "$pengguna")" \
+                "$(teks_json "$(printf '%s' "$sandi" | sha256sum | cut -c1-64)")" \
+                "$(teks_json "${DOCKER_CONFIG:-}")" "$(teks_json "$(stat -c %a "$folder" 2>/dev/null || true)")" \
+                "$tertulis" >> "$FAKE_DOCKER_LOGIN_LOG"
+        fi
+
+        if [ "${FAKE_DOCKER_LOGIN_GAGAL:-0}" = 1 ]; then
+            printf 'Error response from daemon: login attempt to https://%s/v2/ failed with status: 401 Unauthorized\n' "$registry" >&2
+            exit 1
+        fi
+
+        # Seperti Docker tanpa credential helper: kredensial ditulis base64 ke config.json.
+        mkdir -p "$folder"
+        printf '{"auths":{"%s":{"auth":"%s"}}}\n' "$registry" "$(printf '%s:%s' "$pengguna" "$sandi" | base64 -w0)" \
+            > "$folder/config.json"
+        printf 'Login Succeeded\n'
+        ;;
+    logout)
+        folder="$(folder_config)"
+        [ ! -f "$folder/config.json" ] || printf '{"auths":{}}\n' > "$folder/config.json"
+        printf 'Removing login credentials for %s\n' "${2:-}"
+        ;;
     pull)
-        :
+        ref="${!#}"
+        host="${ref%%/*}"
+
+        [ -z "${FAKE_DOCKER_PULL_JEDA:-}" ] || sleep "$FAKE_DOCKER_PULL_JEDA"
+
+        if [ -n "${FAKE_DOCKER_REGISTRY_PRIVAT:-}" ] && [ "$host" = "$FAKE_DOCKER_REGISTRY_PRIVAT" ]; then
+            grep -qF "\"$host\":{\"auth\"" "$(folder_config)/config.json" 2>/dev/null || tolak_unauthorized "$host" "${ref#*/}"
+            [ "${FAKE_DOCKER_PULL_401:-0}" != 1 ] || tolak_unauthorized "$host" "${ref#*/}"
+            if [ -n "${FAKE_DOCKER_PULL_401_SEKALI:-}" ] && [ ! -e "$FAKE_DOCKER_PULL_401_SEKALI" ]; then
+                : > "$FAKE_DOCKER_PULL_401_SEKALI"
+                tolak_unauthorized "$host" "${ref#*/}"
+            fi
+        fi
+
+        printf '# ada %s\n' "$ref" >> "$log"
+        printf '%s\n' "$ref"
+        ;;
+    tag)
+        if ! ada_image "${2:-}"; then
+            printf 'Error response from daemon: No such image: %s\n' "${2:-}" >&2
+            exit 1
+        fi
+        printf '# tag %s %s\n' "${3:-}" "${2:-}" >> "$log"
         ;;
     image)
         [ "${2:-}" = inspect ] || exit 1
-        if ! ada_image "${3:-}"; then
-            printf 'Error: No such image: %s\n' "${3:-}" >&2
+        shift 2
+        format='' ref=''
+        while [ "$#" -gt 0 ]; do
+            case "$1" in
+                --format | -f) format="$2"; shift 2 ;;
+                --format=*) format="${1#--format=}"; shift ;;
+                *) ref="$1"; shift ;;
+            esac
+        done
+        if ! ada_image "$ref"; then
+            printf 'Error: No such image: %s\n' "$ref" >&2
             exit 1
         fi
-        printf '%s\n' "${FAKE_DOCKER_IMAGE_ID:-sha256:tiruan}"
+        case "$format" in
+            *RepoDigests*) repo_digests "$ref" ;;
+            *) printf '%s\n' "${FAKE_DOCKER_IMAGE_ID:-sha256:tiruan}" ;;
+        esac
         ;;
     inspect)
         printf 'healthy\n'

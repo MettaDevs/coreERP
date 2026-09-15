@@ -687,6 +687,9 @@ kirim_laporan() {
 
 # --- Laporan langkah operasi ----------------------------------------------------------------------------
 
+# Detik Unix laporan langkah terakhir yang diterima admin.erp, dari shell ini. Dibaca detak_bila_perlu.
+LAPOR_TERAKHIR=0
+
 # lapor_langkah ID STATUS LANGKAH [PESAN_GAGAL]
 # Pulang 0 bila dicatat, 3 bila admin.erp menjawab 409 (operasi bukan milik agen ini lagi), 1 selain itu.
 lapor_langkah() {
@@ -706,7 +709,10 @@ lapor_langkah() {
     kode="$(panggil POST "/api/agent/v1/operations/$id/steps" "$isi" "$jawaban")"
 
     case "$kode" in
-        200) return 0 ;;
+        200)
+            LAPOR_TERAKHIR="$(date +%s)"
+            return 0
+            ;;
         409)
             catat "admin.erp menjawab 409 untuk operasi $id: operasi ini tidak lagi dipegang agen ini."
             return 3
@@ -742,10 +748,15 @@ tutup_operasi() {
 
 # --- Rilis: unduh, periksa, jaga ------------------------------------------------------------------------
 
+MANIFEST_VERSI=''
 MANIFEST_EDISI=''
 MANIFEST_RILIS=''
 MANIFEST_IMAGE=''
 MANIFEST_DIGEST=''
+MANIFEST_CONFIG_DIGEST=''
+PENDAMPING_NAMA=()
+PENDAMPING_IMAGE=()
+PENDAMPING_DIGEST=()
 
 berkas_tercantum() {
     awk -v nama="$2" '{ n = $2; sub(/^\*/, "", n); if (n == nama) ada = 1 } END { exit !ada }' "$1"
@@ -787,6 +798,16 @@ periksa_berkas_rilis() {
     jq -e 'type == "object"' "$folder/manifest.json" >/dev/null 2>&1 \
         || { tolak 'manifest.json bukan objek JSON'; return 1; }
 
+    # Manifest v1 tidak pernah menyebut `versi`. Versi yang disebut tetapi tidak dikenal ditolak, bukan dibaca
+    # sebagai v1: bentuk yang lebih baru boleh saja kebetulan memuat `edisi` dan `image`.
+    if jq -e 'has("versi")' "$folder/manifest.json" >/dev/null 2>&1; then
+        jq -e '.versi == 2' "$folder/manifest.json" >/dev/null 2>&1 \
+            || { tolak 'manifest menyebut versi yang tidak dikenal agen ini'; return 1; }
+        periksa_manifest_v2 "$folder/manifest.json" || return 1
+        return 0
+    fi
+
+    MANIFEST_VERSI=1
     MANIFEST_EDISI="$(jq -r '.edisi // "" | tostring' "$folder/manifest.json")"
     MANIFEST_RILIS="$(jq -r '.rilis // "" | tostring' "$folder/manifest.json")"
     MANIFEST_IMAGE="$(jq -r '.image // "" | tostring' "$folder/manifest.json")"
@@ -795,6 +816,90 @@ periksa_berkas_rilis() {
     edisi_sah "$MANIFEST_EDISI" || { tolak 'manifest menyebut edisi yang tidak sah'; return 1; }
     rilis_sah "$MANIFEST_RILIS" || { tolak 'manifest menyebut nomor rilis yang tidak sah'; return 1; }
     [ -n "$MANIFEST_IMAGE" ] || { tolak 'manifest tidak menyebut image'; return 1; }
+}
+
+# Bentuk nilai manifest v2, dalam jq. Pola memakai `\A` dan `\z` dengan alasan yang sama dengan
+# periksa_parameter_pasang: `$` Oniguruma juga cocok sebelum baris baru di ujung.
+#
+# `repositori` tanpa host dan tanpa tag. Host datang dari admin.erp bersama kredensialnya, pada setiap operasi;
+# image yang menyebut host sendiri akan ditarik dari registry yang tidak pernah dipilih siapa pun di sini. Docker
+# membaca komponen pertama sebagai host bila ia memuat titik atau berbunyi `localhost` — dan pola huruf di bawah
+# sendiri tidak menolak titik — jadi komponen pertama diperiksa tersendiri.
+# shellcheck disable=SC2016 # $b adalah variabel jq
+JQ_BENTUK_V2='
+    def repositori: type == "string"
+        and test("\\A[a-z0-9]+([._/-][a-z0-9]+)*\\z")
+        and (split("/") as $b | ($b | length) == 1 or (($b[0] | contains(".") | not) and $b[0] != "localhost"));
+    def digest: type == "string" and test("\\Asha256:[a-f0-9]{64}\\z");
+'
+
+# periksa_manifest_v2 BERKAS — manifest rilis v2 dari perakit; pulang 1 dengan ALASAN, mengisi MANIFEST_* dan
+# PENDAMPING_* bila lulus.
+#
+# Setiap nilainya menjadi rujukan `docker pull` atau nama tag, jadi bentuknya dibatasi sebelum satu permintaan
+# pun sampai ke registry. Digest wajib lengkap: rujukan lewat digest itulah yang mengikat isi image pada tanda
+# tangan, sedangkan tag dapat dipindahkan. Nama pendamping wajib unik, karena nama itu menjadi tag lokal dan dua
+# pendamping bernama sama menimpa satu tag.
+#
+# Manifest v2 tidak menyebut edisi; pemanggil yang mengisi MANIFEST_EDISI dari operasi.
+periksa_manifest_v2() {
+    local berkas="$1" nama image digest
+
+    MANIFEST_VERSI=2
+    MANIFEST_EDISI=''
+
+    jq -e '(.rilis | type) == "string" and (.rilis | test("\\A(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,5}\\z"))' \
+        "$berkas" >/dev/null 2>&1 || { tolak 'manifest menyebut nomor rilis yang tidak sah'; return 1; }
+    MANIFEST_RILIS="$(jq -r '.rilis' "$berkas")"
+    rilis_sah "$MANIFEST_RILIS" || { tolak 'manifest menyebut nomor rilis yang tidak sah'; return 1; }
+
+    jq -e '(.commit | type) == "string" and (.commit | test("\\A[0-9a-f]{40}\\z"))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'commit di manifest v2 bukan SHA commit 40 huruf heksadesimal'; return 1; }
+
+    jq -e "$JQ_BENTUK_V2"' .image | repositori' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'image di manifest v2 bukan jalur repositori tanpa host dan tanpa tag'; return 1; }
+
+    jq -e "$JQ_BENTUK_V2"' (.digest | digest) and (.config_digest | digest)' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'digest atau config_digest di manifest v2 bukan sha256: dengan 64 huruf heksadesimal kecil'; return 1; }
+
+    jq -e "$JQ_BENTUK_V2"' (.pendamping | type) == "array"
+        and all(.pendamping[]; type == "object"
+            and (.nama | type == "string" and test("\\A[a-z0-9][a-z0-9._-]*\\z"))
+            and (.image | repositori) and (.digest | digest))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'pendamping di manifest v2 bukan larik {nama, image tanpa host, digest sha256}'; return 1; }
+
+    jq -e '[.pendamping[].nama] | length == (unique | length)' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'pendamping di manifest v2 menyebut nama yang sama lebih dari sekali'; return 1; }
+
+    MANIFEST_IMAGE="$(jq -r '.image' "$berkas")"
+    MANIFEST_DIGEST="$(jq -r '.digest' "$berkas")"
+    MANIFEST_CONFIG_DIGEST="$(jq -r '.config_digest' "$berkas")"
+    PENDAMPING_NAMA=()
+    PENDAMPING_IMAGE=()
+    PENDAMPING_DIGEST=()
+
+    # Pola di atas tidak mengizinkan tab maupun baris baru, jadi @tsv aman dipecah di sini.
+    while IFS=$'\t' read -r nama image digest; do
+        PENDAMPING_NAMA+=("$nama")
+        PENDAMPING_IMAGE+=("$image")
+        PENDAMPING_DIGEST+=("$digest")
+    done < <(jq -r '.pendamping[] | [.nama, .image, .digest] | @tsv' "$berkas")
+}
+
+# Nama lokal image rilis v2. Aturan yang sama ditulis di `update.sh`, yang memeriksa tag ini sebelum compose
+# menyala, dan di `compose.yaml` rilis yang dirakit perakit. Ketiganya harus sama persis.
+#
+# Core bernomor rilis: satu image per rilis. Pendamping memakai 20 huruf pertama digestnya, bukan nomor rilis:
+# PostgreSQL yang digest-nya tidak berubah tetap bertag sama, sehingga Compose tidak membuat ulang container
+# database pada setiap pembaruan. `coreerp.local` tidak pernah di-resolve ke Docker Hub.
+tag_lokal_core() {
+    printf 'coreerp.local/core:%s' "$1"
+}
+
+tag_lokal_pendamping() {
+    local digest="${2#sha256:}"
+
+    printf 'coreerp.local/pendamping/%s:%s' "$1" "${digest:0:20}"
 }
 
 # izinkan_rilis EDISI RILIS — pulang 1 dengan ALASAN bila rilis ini tidak boleh dipasang di sini.
@@ -816,18 +921,28 @@ izinkan_rilis() {
 }
 
 catat_rilis_terpasang() {
+    local image="$MANIFEST_IMAGE"
+
+    # Image v2 yang berjalan adalah tag lokalnya — nama yang dijalankan compose. `coreerp/core` tanpa host
+    # bukan nama yang dapat ditemukan siapa pun di server ini.
+    [ "$MANIFEST_VERSI" != 2 ] || image="$(tag_lokal_core "$MANIFEST_RILIS")"
+
     # shellcheck disable=SC2016 # variabel jq
     ubah_keadaan \
-        --arg e "$MANIFEST_EDISI" --arg r "$MANIFEST_RILIS" --arg i "$MANIFEST_IMAGE" --arg d "$MANIFEST_DIGEST" \
+        --arg e "$MANIFEST_EDISI" --arg r "$MANIFEST_RILIS" --arg i "$image" --arg d "$MANIFEST_DIGEST" \
         '.edition = $e | .release = $r
          | .image = (if $i == "" then null else $i end)
          | .digest = (if $d == "" then null else $d end)'
 }
 
-# ikuti_keluaran ID_OPERASI BERKAS_LOG BERKAS_PENANDA_LEPAS
+# ikuti_keluaran ID_OPERASI BERKAS_LOG BERKAS_PENANDA_LEPAS [LANGKAH_BERJALAN]
 #
 # Membaca keluaran update.sh baris demi baris: menyalinnya ke log dan ke keluaran agen, dan melaporkan
 # setiap baris `==> ` sebagai langkah. Berjalan di ujung pipa, jadi keadaannya dititipkan ke berkas.
+#
+# LANGKAH_BERJALAN adalah langkah yang sudah dilaporkan pemanggil sebelum keluarannya dimulai. Detak hanya
+# berlaku untuk langkah yang sedang berjalan; tanpanya perintah yang diam sampai selesai — `docker pull --quiet`
+# yang menarik ratusan megabyte — tidak pernah memperpanjang lease.
 #
 # Sesudah admin.erp menjawab 409, pelaporan berhenti tetapi **pembacaan tidak**, dan update.sh tidak
 # dibunuh. Berhenti membaca membuat update.sh mati kena SIGPIPE pada tulisan berikutnya — sama saja
@@ -835,7 +950,7 @@ catat_rilis_terpasang() {
 # ada yang menjalankan jalur mundurnya. update.sh sendiri yang tahu cara mundur dengan selamat; operasi
 # yang sudah bukan milik kita lebih baik dibiarkan selesai daripada dihentikan di titik paling berbahaya.
 ikuti_keluaran() {
-    local id="$1" log="$2" penanda="$3" baris sisa='' kode_baca langkah_kini='' terakhir_lapor hasil batas_baca=30
+    local id="$1" log="$2" penanda="$3" baris sisa='' kode_baca langkah_kini="${4:-}" terakhir_lapor hasil batas_baca=30
 
     terakhir_lapor="$(date +%s)"
     [ "$DETAK_DETIK" -ge "$batas_baca" ] || batas_baca="$DETAK_DETIK"
@@ -952,12 +1067,298 @@ baca_parameter_rilis() {
     fi
 }
 
+# --- Rilis v2: image dari registry lewat digest (AG-01 di docs/todo/registry-harbor) ---------------------
+#
+# Server klien tidak menyimpan alamat registry maupun kredensialnya. Keduanya datang dari admin.erp pada setiap
+# operasi `install` atau `upgrade`, untuk robot pull-only yang lahir dan mati bersama operasi itu, dan hanya hidup
+# di variabel shell ini dan di DOCKER_CONFIG sementara milik putaran ini. Yang dijalankan compose hanya tag lokal
+# `coreerp.local/*`, diberikan sesudah RepoDigests image yang ditarik terbukti sama dengan digest yang
+# ditandatangani.
+
+REGISTRY_HOST=''
+REGISTRY_PENGGUNA=''
+REGISTRY_SANDI=''
+FOLDER_DOCKER=''
+HASIL_TARIK=''
+
+# minta_kredensial ID_OPERASI — mengisi REGISTRY_*; pulang 1 dengan ALASAN.
+#
+# Jawabannya memuat kata sandi robot. Berkas jawabannya ada di folder sementara agen (0700, umask 077) hanya
+# selama dibaca, dan dihapus sebelum fungsi ini pulang, apa pun hasilnya. Nilainya dibaca jq langsung dari berkas,
+# tidak pernah lewat argumen proses, dan tidak ada ALASAN yang menyebutnya.
+#
+# Bentuknya diperiksa di jq, bukan sesudah dibaca shell: substitusi perintah membuang baris baru di ujung, dan
+# host "registry.contoh\n" lalu terbaca sah. Host wajib memuat titik atau port — tanpa keduanya Docker membaca
+# komponen pertama rujukan sebagai namespace Docker Hub, dan `coreerp/coreerp/core` ditarik dari docker.io.
+minta_kredensial() {
+    local id="$1" isi="$SEMENTARA/kredensial.json" jawaban="$SEMENTARA/kredensial-jawaban.json" kode
+
+    REGISTRY_PENGGUNA=''
+    REGISTRY_SANDI=''
+
+    jq -c -n --arg id "$id" '{operation_id: $id}' > "$isi"
+    kode="$(panggil POST /api/agent/v1/registry-credential "$isi" "$jawaban")"
+
+    if [ "$kode" != 200 ]; then
+        rm -f "$jawaban"
+        case "$kode" in
+            409) tolak 'admin.erp tidak memberi kredensial registry (HTTP 409): situs ini tidak lagi memegang operasi ini' ;;
+            503) tolak 'admin.erp tidak dapat memberi kredensial registry (HTTP 503): registry belum disetel di admin.erp atau tidak menjawab' ;;
+            000) tolak 'admin.erp tidak dapat dihubungi untuk meminta kredensial registry' ;;
+            *) tolak "admin.erp tidak memberi kredensial registry (HTTP $kode)" ;;
+        esac
+        return 1
+    fi
+
+    if ! jq -e '.registry | type == "string" and length <= 261
+        and test("\\A[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*(:[0-9]{1,5})?\\z")
+        and test("[.:]")' "$jawaban" >/dev/null 2>&1; then
+        rm -f "$jawaban"
+        tolak 'admin.erp menjawab registry yang bukan host polos (host atau host:port, tanpa skema, path, atau pengguna)'
+        return 1
+    fi
+
+    if ! jq -e '(.username | type == "string" and length > 0 and length <= 255
+            and (test("[[:cntrl:][:space:]]") | not) and (startswith("-") | not))
+        and (.password | type == "string" and length > 0 and (test("[[:cntrl:]]") | not))' "$jawaban" >/dev/null 2>&1; then
+        rm -f "$jawaban"
+        tolak 'admin.erp menjawab kredensial registry yang tidak berbentuk: nama pengguna atau kata sandi kosong atau memuat huruf kendali (isinya tidak dicetak)'
+        return 1
+    fi
+
+    REGISTRY_HOST="$(jq -r '.registry' "$jawaban")"
+    REGISTRY_PENGGUNA="$(jq -r '.username' "$jawaban")"
+    REGISTRY_SANDI="$(jq -r '.password' "$jawaban")"
+    rm -f "$jawaban"
+}
+
+# masuk_registry — docker login ke DOCKER_CONFIG sementara, kata sandi lewat stdin; pulang 1 dengan ALASAN.
+#
+# Kata sandi dikosongkan sesudahnya, berhasil atau tidak. Kredensial berikutnya selalu diminta ulang ke admin.erp,
+# jadi tidak ada alasan menyimpannya lebih lama dari satu login.
+masuk_registry() {
+    local keluaran="$SEMENTARA/login-keluaran" status=0
+
+    # `printf` bawaan bash, bukan program: kata sandi tidak muncul di argumen proses mana pun.
+    printf '%s' "$REGISTRY_SANDI" \
+        | DOCKER_CONFIG="$FOLDER_DOCKER" docker login "$REGISTRY_HOST" --username "$REGISTRY_PENGGUNA" --password-stdin \
+            > "$keluaran" 2>&1 9>&- || status=$?
+    REGISTRY_SANDI=''
+
+    if [ "$status" -ne 0 ]; then
+        tolak "login ke registry $REGISTRY_HOST gagal: $(tail -n 3 "$keluaran" | tr -d '\r' | paste -sd ' ' || true)"
+        return 1
+    fi
+}
+
+# lepas_registry — docker logout, lalu DOCKER_CONFIG sementara dihapus. Dipanggil pada setiap jalan keluar
+# tarik_image_rilis. Jalan keluar yang terputus di tengah — sinyal, atau agen yang mati — ditangani trap EXIT agen,
+# karena foldernya di dalam SEMENTARA.
+lepas_registry() {
+    REGISTRY_SANDI=''
+
+    if [ -n "$FOLDER_DOCKER" ]; then
+        if [ -n "$REGISTRY_HOST" ]; then
+            DOCKER_CONFIG="$FOLDER_DOCKER" docker logout "$REGISTRY_HOST" >/dev/null 2>&1 9>&- || true
+        fi
+        rm -rf "$FOLDER_DOCKER"
+    fi
+
+    FOLDER_DOCKER=''
+    REGISTRY_HOST=''
+    REGISTRY_PENGGUNA=''
+}
+
+# detak_bila_perlu ID_OPERASI LANGKAH — melaporkan LANGKAH ulang bila laporan terakhir sudah DETAK_DETIK lalu;
+# pulang 3 bila admin.erp melepas operasinya.
+#
+# Detak ikuti_keluaran hanya berjalan selama satu perintah ditunggu, dan jamnya mulai dari nol di setiap
+# perintah. Beberapa pull yang masing-masing sedikit lebih pendek dari DETAK_DETIK akan melewati lease tanpa satu
+# laporan pun, jadi di antara pull jamnya dibaca dari laporan terakhir.
+detak_bila_perlu() {
+    local hasil=0
+
+    [ "$(( $(date +%s) - LAPOR_TERAKHIR ))" -ge "$DETAK_DETIK" ] || return 0
+    lapor_langkah "$1" running "$2" || hasil=$?
+    [ "$hasil" -ne 3 ] || return 3
+}
+
+# tarik_satu ID_OPERASI LANGKAH RUJUKAN — docker pull lewat digest sambil memperpanjang lease. Keluarannya di
+# $SEMENTARA/tarik-keluaran. Pulang 0 bila ditarik, 1 bila gagal, 3 bila admin.erp melepas operasinya.
+#
+# ikuti_keluaran berjalan di shell ini, bukan di ujung pipa, supaya laporan detaknya ikut menggeser
+# LAPOR_TERAKHIR. Kode keluar pull dititipkan ke berkas: substitusi proses tidak membawanya. Pull yang operasinya
+# dilepas di tengah tidak dibunuh, tetapi hasilnya tidak dipakai; robotnya dihapus admin.erp bersama operasinya.
+tarik_satu() {
+    local id="$1" langkah_teks="$2" rujukan="$3" keluaran="$SEMENTARA/tarik-keluaran" status_berkas="$SEMENTARA/tarik-status"
+    local penanda="$SEMENTARA/tarik-lepas"
+
+    rm -f "$penanda" "$status_berkas"
+    : > "$keluaran"
+
+    ikuti_keluaran "$id" "$LOG_OPERASI" "$penanda" "$langkah_teks" < <(
+        kode=0
+        DOCKER_CONFIG="$FOLDER_DOCKER" docker pull --quiet "$rujukan" > "$keluaran" 2>&1 </dev/null 9>&- || kode=$?
+        cat "$keluaran"
+        printf '%s' "$kode" > "$status_berkas"
+    )
+
+    [ ! -e "$penanda" ] || return 3
+    [ "$(cat "$status_berkas" 2>/dev/null || true)" = 0 ]
+}
+
+# periksa_image_ditarik RUJUKAN [inti] — pulang 1 dengan ALASAN bila image yang ditarik bukan yang ditandatangani.
+#
+# Yang dicocokkan RepoDigests, bukan `.Id`: `.Id` adalah digest config pada store image klasik dan digest manifest
+# pada store containerd, jadi `.Id` saja tidak pernah cukup. Image inti tetap diperiksa `.Id`-nya terhadap
+# keduanya — manifest v2 mencatat keduanya supaya pemeriksaan ini tidak bergantung pada store yang dipakai.
+periksa_image_ditarik() {
+    local rujukan="$1" jenis="${2:-}" daftar id_image
+
+    if ! daftar="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$rujukan" 2>/dev/null)"; then
+        tolak "image $rujukan tidak ada sesudah ditarik"
+        return 1
+    fi
+
+    if ! grep -qxF -- "$rujukan" <<< "$daftar"; then
+        tolak "image yang ditarik bukan yang ditandatangani: RepoDigests-nya tidak memuat $rujukan"
+        return 1
+    fi
+
+    [ "$jenis" = inti ] || return 0
+
+    id_image="$(docker image inspect --format '{{.Id}}' "$rujukan" 2>/dev/null || true)"
+
+    if [ "$id_image" != "$MANIFEST_CONFIG_DIGEST" ] && [ "$id_image" != "$MANIFEST_DIGEST" ]; then
+        tolak "id image $rujukan (${id_image:0:80}) bukan config_digest maupun digest di manifest yang ditandatangani"
+        return 1
+    fi
+}
+
+# tarik_image_rilis ID_OPERASI — kredensial → login → pull lewat digest → RepoDigests → tag lokal → logout, untuk
+# manifest v2. Hasilnya di HASIL_TARIK, dengan alasan yang sama dengan HASIL_RILIS tidak memakai kode keluar:
+#
+#   ditarik   seluruh image ditarik, cocok, dan bertag lokal
+#   gagal     ALASAN diisi; operasinya BELUM ditutup
+#   dilepas   admin.erp melepas operasinya; tidak ada yang dilaporkan lagi
+#
+# Tidak ada image yang diberi tag lokal sebelum seluruhnya lolos pemeriksaan: tag lokal yang sudah menunjuk image
+# benar dari rilis sebelumnya tidak boleh ditimpa oleh penarikan yang lalu ditolak.
+tarik_image_rilis() {
+    local id="$1" langkah_teks="Menarik image rilis $MANIFEST_RILIS" hasil i satu host_lama keterangan
+    local -a rujukan=() lokal=()
+
+    HASIL_TARIK=gagal
+
+    hasil=0
+    lapor_langkah "$id" running "$langkah_teks" || hasil=$?
+
+    if [ "$hasil" -eq 3 ]; then
+        HASIL_TARIK=dilepas
+        return
+    fi
+
+    # Di dalam SEMENTARA, bukan di /root/.docker: kredensial robot tidak boleh terbaca `docker` lain di server ini,
+    # dan trap EXIT agen menghapusnya pada jalan keluar yang tidak sampai ke lepas_registry.
+    FOLDER_DOCKER="$(mktemp -d "$SEMENTARA/docker-config.XXXXXX")"
+
+    if ! minta_kredensial "$id" || ! masuk_registry; then
+        lepas_registry
+        return
+    fi
+
+    rujukan=("$REGISTRY_HOST/$MANIFEST_IMAGE@$MANIFEST_DIGEST")
+    lokal=("$(tag_lokal_core "$MANIFEST_RILIS")")
+
+    for i in "${!PENDAMPING_NAMA[@]}"; do
+        rujukan+=("$REGISTRY_HOST/${PENDAMPING_IMAGE[$i]}@${PENDAMPING_DIGEST[$i]}")
+        lokal+=("$(tag_lokal_pendamping "${PENDAMPING_NAMA[$i]}" "${PENDAMPING_DIGEST[$i]}")")
+    done
+
+    for satu in "${rujukan[@]}"; do
+        hasil=0
+        detak_bila_perlu "$id" "$langkah_teks" || hasil=$?
+        [ "$hasil" -ne 3 ] || { HASIL_TARIK=dilepas; lepas_registry; return; }
+
+        keterangan=''
+        hasil=0
+        tarik_satu "$id" "$langkah_teks" "$satu" || hasil=$?
+
+        # Robot yang dihapus atau tokennya habis di tengah pull besar dijawab 401. Kredensial diminta sekali lagi —
+        # admin.erp menghapus robot operasi ini lalu membuat robot baru, jadi nama penggunanya ikut berganti — dan
+        # pull itu diulang sekali. Kegagalan kedua bukan lagi kredensial yang basi.
+        if [ "$hasil" -eq 1 ] \
+            && grep -qiE 'unauthorized|authentication required|(^|[^0-9a-z])401([^0-9a-z]|$)' "$SEMENTARA/tarik-keluaran"; then
+            catat "Registry menolak kredensial saat menarik $satu; kredensial baru diminta sekali."
+            host_lama="$REGISTRY_HOST"
+
+            if ! minta_kredensial "$id"; then
+                lepas_registry
+                return
+            fi
+
+            if [ "$REGISTRY_HOST" != "$host_lama" ]; then
+                ALASAN="admin.erp menjawab registry $REGISTRY_HOST di tengah operasi yang menarik dari $host_lama"
+                REGISTRY_HOST="$host_lama"
+                lepas_registry
+                return
+            fi
+
+            if ! masuk_registry; then
+                lepas_registry
+                return
+            fi
+
+            keterangan=' sesudah kredensial baru'
+            hasil=0
+            tarik_satu "$id" "$langkah_teks" "$satu" || hasil=$?
+        fi
+
+        case "$hasil" in
+            0) ;;
+            3)
+                HASIL_TARIK=dilepas
+                lepas_registry
+                return
+                ;;
+            *)
+                ALASAN="menarik $satu gagal$keterangan: $(tail -n 5 "$SEMENTARA/tarik-keluaran" | tr -d '\r' | paste -sd ' ' || true)"
+                lepas_registry
+                return
+                ;;
+        esac
+    done
+
+    if ! periksa_image_ditarik "${rujukan[0]}" inti; then
+        lepas_registry
+        return
+    fi
+
+    for satu in "${rujukan[@]:1}"; do
+        if ! periksa_image_ditarik "$satu"; then
+            lepas_registry
+            return
+        fi
+    done
+
+    for i in "${!rujukan[@]}"; do
+        if ! docker tag "${rujukan[$i]}" "${lokal[$i]}" > "$SEMENTARA/tag-keluaran" 2>&1 9>&-; then
+            ALASAN="memberi tag ${lokal[$i]} gagal: $(tail -n 3 "$SEMENTARA/tag-keluaran" | tr -d '\r' | paste -sd ' ' || true)"
+            lepas_registry
+            return
+        fi
+    done
+
+    lepas_registry
+    HASIL_TARIK=ditarik
+}
+
 HASIL_RILIS=''
 LOG_OPERASI=''
 
 # pasang_rilis ID EDISI RILIS LANGKAH_TOLAK — mengunduh, memeriksa, lalu menjalankan update.sh atas satu
-# rilis. Satu-satunya jalur rilis masuk ke server ini, dipakai `upgrade` dan `install`: penarikan image dari
-# registry sendiri (AG-01 di docs/todo/registry-harbor) menggantinya di sini, untuk keduanya sekaligus.
+# rilis. Satu-satunya jalur rilis masuk ke server ini, dipakai `upgrade` dan `install`. Untuk manifest v2,
+# image ditarik dari registry kita di sini (tarik_image_rilis), untuk keduanya sekaligus, sebelum update.sh.
 #
 # Hasilnya di HASIL_RILIS, bukan di kode keluar:
 #
@@ -1007,6 +1408,11 @@ pasang_rilis() {
         return
     fi
 
+    # Manifest v2 tidak menyebut edisi: satu image untuk semua klien, dan admin.erp menyimpan rilisnya di bawah
+    # edisi tetap `coreerp`. Tidak ada edisi bertanda tangan untuk dicocokkan, jadi yang dicatat edisi yang diminta.
+    # Nomor rilisnya tetap ditandatangani dan tetap dicocokkan di bawah.
+    [ "$MANIFEST_VERSI" != 2 ] || MANIFEST_EDISI="$edisi"
+
     # Nomor yang diminta dan nomor yang ditandatangani harus sama. Tanpa ini, admin.erp yang dibobol dapat
     # meminta "9.9.9" lalu menyajikan berkas rilis lama yang sah di bawah nama itu.
     if [ "$MANIFEST_EDISI" != "$edisi" ] \
@@ -1028,6 +1434,24 @@ pasang_rilis() {
     mv "$sementara" "$tujuan"
 
     : > "$log"
+
+    # update.sh rilis v2 tidak menarik apa pun; image-nya harus sudah ada di sini dengan tag lokal.
+    if [ "$MANIFEST_VERSI" = 2 ]; then
+        tarik_image_rilis "$id"
+
+        case "$HASIL_TARIK" in
+            ditarik) ;;
+            dilepas)
+                catat 'Operasi dilepas admin.erp saat menarik image; update.sh tidak dijalankan.'
+                HASIL_RILIS=dilepas
+                return
+                ;;
+            *)
+                tutup_operasi "$id" failed "Menarik image rilis $MANIFEST_RILIS" "$ALASAN"
+                return
+                ;;
+        esac
+    fi
 
     jalankan_pembaruan "$tujuan" "$id" "$log"
 

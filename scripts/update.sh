@@ -5,20 +5,29 @@
 #   ./update.sh                     # memakai bundle di folder yang sama dengan skrip ini
 #   ./update.sh /opt/coreerp/agent/releases/apotek-sejahtera-0.2.0
 #
-# Dua bentuk folder diterima, dan keduanya melewati pemeriksaan yang sama:
+# Tiga bentuk folder diterima, dan ketiganya melewati pemeriksaan tanda tangan dan checksum yang sama:
 #
 # - **Bundle** dari `build-bundle.sh`, yang membawa `images.tar.gz`. Image dimuat dari arsip itu, tanpa
 #   menarik apa pun dari registry.
-# - **Berkas rilis**, yang diambil agen situs dari admin.erp: bentuk yang sama dikurangi
+# - **Berkas rilis v1**, yang diambil agen situs dari admin.erp: bentuk yang sama dikurangi
 #   `images.tar.gz`. Image ditarik dari registry. Manifest menyebut image edisi lewat digest registry
 #   (`ghcr.io/…@sha256:…`), dan id image yang ditarik tetap diperiksa terhadap `digest` di manifest —
 #   pemeriksaan yang sama dengan jalur bundle. Rantainya tidak putus: tanda tangan menjamin
 #   `SHA256SUMS`, `SHA256SUMS` menjamin `manifest.json`, manifest menyebut isi image.
+# - **Berkas rilis v2** (`"versi": 2`, dari perakit Harbor). Skrip ini **tidak menarik apa pun** dan tidak
+#   pernah mengenal host registry. Agen situs yang menarik image lewat digest dengan kredensial sekali pakai
+#   dari admin.erp, lalu memberinya tag lokal `coreerp.local/*`; di sini hanya diperiksa bahwa setiap tag
+#   lokal ada dan `RepoDigests`-nya memuat digest yang ditandatangani. Host dicocokkan sebagai awalan apa
+#   pun: registry boleh pindah tanpa rilis berubah, sedangkan digest tidak dapat dipalsukan.
 #
 # Urutannya tetap, dan tidak boleh diacak:
 #
-#   periksa tanda tangan → periksa checksum → periksa lokasi cadangan → cadangkan database →
-#   muat atau tarik image → ganti container → migrasi → periksa kesehatan → mundur bila gagal
+#   periksa tanda tangan → periksa checksum → periksa lokasi cadangan → (v2: periksa image lokal) →
+#   cadangkan database → muat atau tarik image → ganti container → migrasi → periksa kesehatan →
+#   mundur bila gagal
+#
+# Pada v2 image diperiksa **sebelum** pencadangan, karena pencadangan sudah menyalakan `core-db` dengan compose
+# rilis baru: tag pendamping yang hilang atau salah akan mengganti container database sebelum ada yang menolak.
 #
 # Tiga hal yang membedakannya dari skrip pemasangan biasa, dan ketiganya sengaja:
 #
@@ -234,10 +243,59 @@ nilai_manifest() {
     sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$bundle/manifest.json" | head -n 1
 }
 
-edisi="$(nilai_manifest edisi)"
-rilis="$(nilai_manifest rilis)"
-image="$(nilai_manifest image)"
-digest="$(nilai_manifest digest)"
+# Manifest v1 — bundle dan berkas rilis lama — tidak pernah menulis kunci `versi`. Kunci itu dicari sebagai
+# kunci JSON (diikuti titik dua), bukan sebagai kata: nama pelanggan yang kebetulan memuatnya tidak boleh
+# memindahkan bundle ke jalur yang menuntut jq.
+versi_manifest=1
+
+if grep -Eq '"versi"[[:space:]]*:' "$bundle/manifest.json"; then
+    # jq hanya dituntut di sini. Bundle beli-putus tetap dipasang tanpanya; rilis v2 hanya sampai ke server lewat
+    # agen situs, dan agen itu — beserta pasang.sh yang memasangnya — sudah menuntut jq.
+    command -v jq >/dev/null 2>&1 || gagal \
+        'Manifest rilis v2 dibaca dengan jq, dan jq tidak ada di PATH.' \
+        'Agen situs yang menarik image rilis v2 memasangnya; di Ubuntu: apt-get install jq.'
+
+    versi_manifest="$(jq -r 'if .versi == 2 then "2" else "" end' "$bundle/manifest.json" 2>/dev/null || true)"
+
+    [ "$versi_manifest" = 2 ] || gagal \
+        'manifest.json menyebut versi manifest yang tidak dikenal skrip ini.' \
+        'Rilis dengan manifest yang lebih baru membawa update.sh-nya sendiri; jalankan yang itu.'
+fi
+
+if [ "$versi_manifest" = 2 ]; then
+    edisi=''
+    digest=''
+    rilis="$(jq -r 'if (.rilis | type) == "string" and (.rilis | test("\\A(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)){0,5}\\z"))
+        then .rilis else "" end' "$bundle/manifest.json")"
+
+    [ -n "$rilis" ] || gagal 'manifest.json v2 tidak menyebut nomor rilis yang sah.'
+
+    # Satu baris per image: tag lokal, lalu `repositori@digest` tanpa host yang harus menjadi ujung salah satu
+    # RepoDigests-nya. Aturan tag lokal sama persis dengan `tag_lokal_*` di coreerp-agent, yang memberi tag itu:
+    # pendamping memakai 20 huruf pertama digestnya, bukan nomor rilis, supaya PostgreSQL tidak dibuat ulang
+    # pada setiap pembaruan yang tidak mengubah image-nya.
+    #
+    # Bentuk setiap nilai diperiksa, walaupun manifest sudah lolos tanda tangan: nilainya menjadi argumen docker
+    # dan dipisah dengan tab di bawah.
+    daftar_image="$(jq -r '
+        def repositori: type == "string" and test("\\A[a-z0-9]+([._/-][a-z0-9]+)*\\z");
+        def digest: type == "string" and test("\\Asha256:[a-f0-9]{64}\\z");
+        if (.image | repositori) and (.digest | digest) and (.pendamping | type) == "array"
+            and all(.pendamping[]; (.nama | type == "string" and test("\\A[a-z0-9][a-z0-9._-]*\\z"))
+                and (.image | repositori) and (.digest | digest))
+        then
+            "coreerp.local/core:\(.rilis)\t\(.image)@\(.digest)",
+            (.pendamping[] | "coreerp.local/pendamping/\(.nama):\(.digest[7:27])\t\(.image)@\(.digest)")
+        else error("bentuk manifest v2") end' "$bundle/manifest.json" 2>/dev/null)" \
+        || gagal 'manifest.json v2 tidak berbentuk yang dibaca skrip ini: image, digest, atau pendamping tidak sah.'
+
+    image="coreerp.local/core:$rilis"
+else
+    edisi="$(nilai_manifest edisi)"
+    rilis="$(nilai_manifest rilis)"
+    image="$(nilai_manifest image)"
+    digest="$(nilai_manifest digest)"
+fi
 
 [ -n "$image" ] || gagal 'manifest.json tidak menyebut image.'
 
@@ -257,10 +315,54 @@ versi_sehat=''
 [ -f "$BERKAS_VERSI_SEHAT" ] && versi_sehat="$(cat "$BERKAS_VERSI_SEHAT")"
 
 printf '\n'
-printf 'Edisi        : %s\n' "$edisi"
+printf 'Edisi        : %s\n' "${edisi:-(tidak ada; satu image untuk semua klien)}"
 printf 'Rilis        : %s\n' "$rilis"
 printf 'Image        : %s\n' "$image"
 printf 'Versi sehat  : %s\n' "${versi_sehat:-(belum ada; ini pemasangan pertama)}"
+
+# --- 3b. Image rilis v2 di mesin ini ----------------------------------------------------------------
+#
+# Hanya untuk v2, dan sebelum pencadangan: lihat bagian atas berkas ini. Tidak ada `docker pull` di jalur ini.
+# Image yang hilang tidak ditarik dari mana pun — Compose pun tidak, karena setiap layanannya
+# `pull_policy: never`.
+
+# periksa_image_lokal TAG_LOKAL REPOSITORI@DIGEST
+periksa_image_lokal() {
+    local lokal="$1" sumber="$2" daftar baris
+
+    if ! daftar="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$lokal" 2>/dev/null)"; then
+        gagal \
+            "Image $lokal tidak ada di mesin ini." \
+            '' \
+            'Skrip ini tidak menarik image rilis v2. Agen situs menariknya lewat digest, memeriksanya, lalu memberinya' \
+            'tag lokal sebelum menjalankan skrip ini. Minta pembaruan ulang dari admin.erp.'
+    fi
+
+    # Dicocokkan ujungnya, dengan garis miring di depan: host registry sengaja tidak dikenal skrip ini, tetapi
+    # repositori `lain/coreerp/core` yang kebetulan berakhiran sama tetap tidak boleh lolos sebagai `coreerp/core`.
+    while IFS= read -r baris; do
+        if [[ "$baris" == */"$sumber" ]]; then
+            printf '    %s\n' "$lokal"
+            return 0
+        fi
+    done <<< "$daftar"
+
+    gagal \
+        "Image $lokal bukan image yang disebut manifest." \
+        "  manifest: $sumber" \
+        '' \
+        'Tidak ada RepoDigests image itu yang berakhiran digest yang ditandatangani: tag lokalnya menunjuk image' \
+        'lain. Container tidak disentuh. Minta pembaruan ulang dari admin.erp supaya agen menarik dan memberi' \
+        'tag ulang image yang benar.'
+}
+
+if [ "$versi_manifest" = 2 ]; then
+    langkah 'Memeriksa image rilis di mesin ini'
+
+    while IFS=$'\t' read -r lokal sumber; do
+        periksa_image_lokal "$lokal" "$sumber"
+    done <<< "$daftar_image"
+fi
 
 # --- 4. Cadangkan database -----------------------------------------------------------------------
 
@@ -285,8 +387,12 @@ else
 fi
 
 # --- 5. Muat atau tarik image --------------------------------------------------------------------
+#
+# Bukan untuk v2: image-nya sudah diperiksa di 3b, dan skrip ini tidak memuat maupun menariknya.
 
-if [ "$membawa_image" -eq 1 ]; then
+if [ "$versi_manifest" = 2 ]; then
+    :
+elif [ "$membawa_image" -eq 1 ]; then
     langkah 'Memuat image dari bundle'
 
     gzip -dc "$bundle/images.tar.gz" | docker load >/dev/null
@@ -324,20 +430,22 @@ else
     done <<< "$pendamping"
 fi
 
-digest_terpasang="$(docker image inspect "$image" --format '{{.Id}}' 2>/dev/null || true)"
+if [ "$versi_manifest" != 2 ]; then
+    digest_terpasang="$(docker image inspect "$image" --format '{{.Id}}' 2>/dev/null || true)"
 
-[ -n "$digest_terpasang" ] || gagal "Image $image tidak ada sesudah dimuat atau ditarik."
+    [ -n "$digest_terpasang" ] || gagal "Image $image tidak ada sesudah dimuat atau ditarik."
 
-if [ -n "$digest" ] && [ "$digest" != "$digest_terpasang" ]; then
-    gagal \
-        'Image yang dimuat bukan image yang disebut manifest.' \
-        "  manifest : $digest" \
-        "  terpasang: $digest_terpasang" \
-        '' \
-        'Hampir selalu ini berarti sudah ada image lain bertag sama di mesin ini.'
+    if [ -n "$digest" ] && [ "$digest" != "$digest_terpasang" ]; then
+        gagal \
+            'Image yang dimuat bukan image yang disebut manifest.' \
+            "  manifest : $digest" \
+            "  terpasang: $digest_terpasang" \
+            '' \
+            'Hampir selalu ini berarti sudah ada image lain bertag sama di mesin ini.'
+    fi
+
+    printf '    %s\n' "$image"
 fi
-
-printf '    %s\n' "$image"
 
 # --- 6-8. Ganti container, migrasi, periksa kesehatan --------------------------------------------
 
@@ -474,7 +582,11 @@ printf '%s' "$image" > "$BERKAS_VERSI_SEHAT"
 cp "$bundle/compose.yaml" "$BERKAS_COMPOSE_SEHAT"
 
 printf '\n'
-printf 'Pembaruan selesai. Edisi "%s" rilis %s berjalan.\n' "$edisi" "$rilis"
+if [ -n "$edisi" ]; then
+    printf 'Pembaruan selesai. Edisi "%s" rilis %s berjalan.\n' "$edisi" "$rilis"
+else
+    printf 'Pembaruan selesai. Rilis %s berjalan.\n' "$rilis"
+fi
 
 if [ -n "$berkas_cadangan" ]; then
     printf 'Cadangan sebelum pembaruan disimpan: %s\n' "$berkas_cadangan"

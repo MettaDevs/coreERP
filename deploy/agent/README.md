@@ -59,6 +59,39 @@ hanya dialirkan lewat stdin, tidak pernah menjadi argumen proses, dan keluaran C
 sebelum ditulis ke log. Rilis yang sama yang sudah terpasang tidak dipasang ulang, jadi `install` yang
 diulang — "Coba lagi" sesudah langkah tenant gagal — langsung mengulang langkah tenant.
 
+## Rilis v2: image dari registry kita
+
+Manifest v2 (`"versi": 2`, ditulis `deploy/perakit/rakit.sh`) tidak menyebut host registry maupun edisi. Edisi
+yang dicatat adalah `edition` operasi — admin.erp mengirim `coreerp` untuk image tunggal. Sebelum `update.sh`,
+`pasang_rilis` menjalankan `tarik_image_rilis`, untuk `upgrade` dan `install` sekaligus
+(AG-01 di `docs/todo/registry-harbor/README.md`):
+
+1. Langkah `Menarik image rilis <rilis>` dilaporkan, lalu `POST /api/agent/v1/registry-credential` dengan
+   `operation_id` operasi itu. Jawaban selain `200`, `registry` yang bukan host polos (`host` atau `host:port`,
+   wajib memuat titik atau port), atau nama pengguna dan kata sandi yang tidak berbentuk menggagalkan operasi
+   tanpa login.
+2. `docker login <registry> --username <robot> --password-stdin` ke `DOCKER_CONFIG` sementara di dalam folder
+   sementara putaran agen (0700). Tidak pernah ke `/root/.docker`. Kata sandi hanya di variabel shell dan di
+   stdin `docker login`; berkas jawabannya dihapus sebelum login.
+3. `docker pull <registry>/<image>@<digest>` untuk image inti lalu setiap pendamping. Pull yang dijawab
+   `unauthorized` meminta kredensial sekali lagi, login ulang, dan mengulang pull itu sekali. Selama pull,
+   langkahnya dilaporkan ulang setiap `COREERP_AGENT_DETAK_DETIK` supaya lease tidak habis.
+4. `RepoDigests` setiap image wajib memuat persis `<registry>/<image>@<digest>`; `.Id` image inti wajib
+   `config_digest` (store klasik) atau `digest` (store containerd). Satu yang tidak cocok menggagalkan operasi
+   sebelum satu tag pun diberikan.
+5. Tag lokal: `coreerp.local/core:<rilis>` dan `coreerp.local/pendamping/<nama>:<20 huruf pertama digest>`.
+   Pendamping memakai digest, bukan nomor rilis, supaya PostgreSQL yang tidak berubah tidak dibuat ulang.
+6. `docker logout`, folder config dihapus. Jalan keluar yang terputus — sinyal — ditangani trap EXIT agen.
+
+`state.json` mencatat `image` sebagai tag lokal inti dan `digest` sebagai digest manifest. `update.sh` rilis v2
+tidak menarik apa pun: ia memeriksa setiap tag lokal ada dan `RepoDigests`-nya berakhiran
+`/<image>@<digest>` dari manifest yang ditandatanganinya sendiri, sebelum pencadangan menyalakan `core-db`,
+lalu menjalankan compose dengan `EDITION_IMAGE=coreerp.local/core:<rilis>`. Setiap layanan di
+`compose.edition.yaml` `pull_policy: never`, sehingga tag lokal yang hilang menggagalkan Compose alih-alih
+menarik dari Docker Hub.
+
+Manifest v1 (tanpa `versi`) tetap diterima sampai AG-04.
+
 ## Lisensi
 
 Lisensi format versi 2 mengunci Core bila `.env` menyetel `COREERP_LICENSE_REQUIRED=true`, yang ditulis
@@ -163,7 +196,10 @@ tiruan juga menyajikan `/pasang.sh` dan `/agen/*` dari berkas yang diuji, dan pe
 mengambilnya lewat `curl ... | bash -s` persis seperti di server klien.
 `tests/klien-bertanda.py` menandatangani permintaan terpisah dari agen, supaya agen dan server tiruan
 tidak dapat lulus bersama karena salah dengan cara yang sama. Kunci rilis dan lisensi dibuat baru di
-setiap putaran.
+setiap putaran. Untuk rilis v2, shim docker menirukan `login` (menulis `config.json` seperti Docker, lalu
+mencatat sidik stdin tanpa kata sandinya), `pull` yang menuntut login ke registry tiruan, `tag`, `logout`, dan
+`RepoDigests`; pengujian mencari kata sandi robot, polos maupun base64, di seluruh folder agen, HOME, TMPDIR,
+dan log sesudah setiap putaran.
 
 `COREERP_AGENT_BIN`, `COREERP_UPDATE_SH_BIN`, dan `COREERP_PASANG_BIN` menunjuk salinan lain untuk
 diuji — dipakai untuk membuktikan setiap pengujian merah ketika penjaga yang diujinya dicabut. Salinan
