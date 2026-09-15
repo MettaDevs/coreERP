@@ -195,6 +195,34 @@ final class SiteLicenseTest extends TestCase
         $this->assertSame([], $state->apps, 'Daftar app dari berkas yang tidak terbukti tidak boleh ikut dipulangkan.');
     }
 
+    /**
+     * Lisensi klien lain yang disalin ke server ini ditolak, walaupun tanda tangannya sah.
+     *
+     * Semua lisensi ditandatangani kunci vendor yang sama. Tanpa pemeriksaan tenant, berkas dari klien
+     * yang membeli lebih banyak app — beserta tanda tangannya — membuka seluruh app-nya di sini.
+     */
+    public function test_a_validly_signed_license_for_a_tenant_that_does_not_live_here_is_invalid_and_locks(): void
+    {
+        config()->set('coreerp.license.required', true);
+
+        $bytes = str_replace(
+            '"tenant_id":"01j9zq3v6n8m2k4h7g5f3d1c0b"',
+            '"tenant_id":"01j9zq3v6n8m2k4h7g5f3d1c0z"',
+            $this->licenseJson(now()->addYear()->toDateString(), ['human-resources', 'management-aset']),
+        );
+        $this->assertStringContainsString('01j9zq3v6n8m2k4h7g5f3d1c0z', $bytes);
+        $this->installSignedLicense($bytes);
+        Log::shouldReceive('warning')->once()->withArgs(fn (string $message): bool => str_contains($message, 'tenant'));
+
+        $license = app(SiteLicense::class);
+        $state = $license->state();
+
+        $this->assertSame(SiteLicenseState::INVALID, $state->status);
+        $this->assertSame([], $state->apps);
+        $this->assertTrue($license->isLocked());
+        $this->assertFalse($license->allowsApp('human-resources'));
+    }
+
     public function test_a_signature_made_with_another_key_makes_the_license_invalid(): void
     {
         $this->installSignedLicense($this->licenseJson(now()->addYear()->toDateString()), signer: 'foreign');

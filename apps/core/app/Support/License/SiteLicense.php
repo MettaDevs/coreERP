@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\License;
 
+use App\Models\Tenant;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Support\Facades\Log;
@@ -199,6 +200,17 @@ final class SiteLicense
 
         if ($apps === null) {
             return $this->reject(SiteLicenseState::INVALID, 'Daftar app lisensi situs bukan daftar id app yang unik.', ['path' => $licensePath], $required);
+        }
+
+        // Lisensi harus milik tenant yang memang hidup di server ini. Semua lisensi ditandatangani kunci
+        // vendor yang sama, jadi tanpa pemeriksaan ini `license.json` beserta tanda tangannya dari klien
+        // lain — yang membeli lebih banyak app — dapat disalin ke sini dan diterima utuh. Core tidak
+        // mengenal id situsnya sendiri, tetapi mengenal tenantnya: server klien dilahirkan dengan id
+        // tenant yang sama dengan admin.erp.
+        $tenantId = $license->tenant_id ?? null;
+
+        if (! is_string($tenantId) || $tenantId === '' || ! Tenant::query()->whereKey($tenantId)->exists()) {
+            return $this->reject(SiteLicenseState::INVALID, 'Lisensi situs diterbitkan untuk tenant yang tidak ada di server ini.', ['path' => $licensePath], $required);
         }
 
         $validUntil = $license->valid_until ?? null;

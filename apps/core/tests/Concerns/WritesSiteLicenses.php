@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Concerns;
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use OpenSSLAsymmetricKey;
@@ -20,6 +21,8 @@ use OpenSSLAsymmetricKey;
  */
 trait WritesSiteLicenses
 {
+    private const LICENSED_TENANT_ID = '01j9zq3v6n8m2k4h7g5f3d1c0b';
+
     /** @var array{release: OpenSSLAsymmetricKey, foreign: OpenSSLAsymmetricKey}|null */
     private static ?array $licenseKeys = null;
 
@@ -42,6 +45,25 @@ trait WritesSiteLicenses
         config()->set('coreerp.license.warn_days', 7);
 
         File::put($this->licenseDirectory.DIRECTORY_SEPARATOR.'release.pub.pem', $this->publicPem('release'));
+
+        $this->ensureLicensedTenant();
+    }
+
+    /**
+     * Tenant pemilik lisensi uji. Pembaca menolak lisensi untuk tenant yang tidak hidup di server ini,
+     * jadi setiap test yang menulis lisensi sah butuh tenant dengan id yang sama.
+     */
+    protected function ensureLicensedTenant(): void
+    {
+        if (DB::table('tenants')->where('id', self::LICENSED_TENANT_ID)->exists()) {
+            return;
+        }
+
+        $clientId = (string) Str::ulid();
+        $suffix = Str::lower(Str::random(6));
+
+        DB::table('clients')->insert(['id' => $clientId, 'legal_name' => 'Klien Berlisensi', 'slug' => 'klien-berlisensi-'.$suffix, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('tenants')->insert(['id' => self::LICENSED_TENANT_ID, 'client_id' => $clientId, 'name' => 'Tenant Berlisensi', 'slug' => 'tenant-berlisensi-'.$suffix, 'status' => 'active', 'created_at' => now(), 'updated_at' => now()]);
     }
 
     protected function removeSiteLicenseDirectory(): void
@@ -63,7 +85,7 @@ trait WritesSiteLicenses
     {
         return json_encode([
             'version' => 2,
-            'tenant_id' => '01j9zq3v6n8m2k4h7g5f3d1c0b',
+            'tenant_id' => self::LICENSED_TENANT_ID,
             'site_id' => '01j9zq3v6n8m2k4h7g5f3d1c0c',
             'apps' => $apps,
             'valid_until' => $validUntil,

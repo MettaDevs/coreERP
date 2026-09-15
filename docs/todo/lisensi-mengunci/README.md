@@ -59,6 +59,17 @@ Halaman ini **menggantikan** keputusan "Lisensi habis → peringatan, tanpa meng
 | `coreerp.license.warn_days` | — | `7` |
 
 - **Terkunci** berarti `required` dan keadaannya `missing`, `invalid`, atau `expired`.
+- **Lisensi harus milik tenant yang hidup di server ini.** `tenant_id` yang tidak ada di tabel `tenants`
+  membuat lisensi `invalid`. Semua lisensi ditandatangani kunci vendor yang sama; tanpa pemeriksaan ini,
+  berkas lisensi klien lain yang membeli lebih banyak app dapat disalin ke sini dan diterima utuh. Core
+  tidak mengenal id situsnya sendiri — pemeriksaan `site_id` ada di agen.
+- **Tanggal dibandingkan dalam UTC** (zona waktu aplikasi Core). Lisensi "sampai 15 Oktober" terkunci
+  pukul 07.00 WIB tanggal 16 — tujuh jam lebih longgar daripada tengah malam Jakarta, arah yang aman.
+- **Hanya pintu HTTP dan satu job antrean yang membaca lisensi.** Tidak ada perintah artisan yang
+  bergantung padanya, sehingga `core-migrate` — yang berjalan tanpa folder lisensi dan dengan
+  `COREERP_LICENSE_REQUIRED=false` — dapat memasang rilis perbaikan di server yang terkunci. Job ekspor
+  laporan modul (`RunReportExport`) ikut disaring; `core-worker` karena itu wajib mendapat folder lisensi
+  bersama setelan wajibnya, atau tidak keduanya.
 - **App diizinkan** bila lisensi tidak wajib; bila wajib dan tidak terkunci, hanya app di `apps`.
 - Penyaringan app dipasang di satu penentu dan dipakai di setiap pintu:
   - `ResolveModuleContext` — halaman dan API setiap modul;

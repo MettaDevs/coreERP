@@ -209,13 +209,26 @@ class CoreCommandContractTest extends TestCase
         }
     }
 
-    /**
-     * Pemanggil kelima: daftar app untuk lisensi. Diulang dengan alasan yang sama — cacat per pemanggil.
-     *
-     * Alamatnya `/tenants/{tenant}/entitlements` sengaja belum dituntut ada di kontrak dari sini: rute
-     * dan kontraknya lahir di cabang Core yang dikerjakan bersamaan. Begitu keduanya bertemu,
-     * pemeriksaan alamat seperti di atas wajib ditambahkan untuk pemanggil ini.
-     */
+    /** Pemanggil kelima: daftar app yang dibeli, dibaca penerbit lisensi. */
+    public function test_the_entitlements_address_is_in_the_contract(): void
+    {
+        $this->assertContains(
+            '/tenants/{tenant}/entitlements',
+            $this->contract['paths'],
+            'Kontrak Core tidak memuat rute daftar app tenant. Perpanjangan lisensi memanggil alamat yang '
+            .'tidak dijanjikan siapa pun, dan setiap lisensi berhenti diperpanjang tanpa satu test pun merah.'
+        );
+
+        $source = (string) file_get_contents(__DIR__.'/../../app/Sites/EntitlementsFromCore.php');
+
+        $this->assertStringContainsString(
+            "'/api/internal/v1/tenants/'",
+            $source,
+            'EntitlementsFromCore tidak lagi menyusun alamat di bawah /api/internal/v1/tenants/.'
+        );
+    }
+
+    /** Diulang dengan alasan yang sama dengan pemanggil di atas — cacat per pemanggil. */
     public function test_the_entitlements_caller_also_uses_bearer(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../app/Sites/EntitlementsFromCore.php');
