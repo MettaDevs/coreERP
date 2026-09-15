@@ -11,6 +11,8 @@
 #                       skrip ini mati kena SIGPIPE, dan "selesai" tidak pernah tercatat.
 #   FAKE_UPDATE_LINGKUNGAN  berkas tempat setelan COREERP_* yang sampai ke skrip ini dicatat, untuk
 #                       membuktikan setelan dari agent.env diteruskan agen ke update.sh
+#
+# Yang berhasil mencatat versi-sehat dan compose-sehat.yaml di COREERP_HOME/keadaan, seperti update.sh.
 
 set -euo pipefail
 
@@ -49,5 +51,12 @@ fi
 
 printf '\n==> Memeriksa kesehatan\n'
 printf '    core-app sehat\n'
+
+# Seperti update.sh sungguhan: versi dan compose yang terbukti sehat dicatat sesudah sehat. Operasi install
+# melahirkan tenant dengan keduanya.
+rumah="${COREERP_HOME:-/opt/coreerp}"
+mkdir -p "$rumah/keadaan"
+jq -j .image "$folder/manifest.json" > "$rumah/keadaan/versi-sehat"
+cp "$folder/compose.yaml" "$rumah/keadaan/compose-sehat.yaml"
 
 catat selesai

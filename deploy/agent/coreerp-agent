@@ -17,9 +17,11 @@
 #    Daftar tertutup menjaga server klien dari admin.erp yang dibobol — bukan dari orang yang sudah
 #    memegang root di server ini.
 #
-# 2. **Kunci publik rilis tidak pernah diambil dari admin.erp.** Ia dipasang sekali lewat jalur lain
-#    (`pasang.sh`). admin.erp yang dibobol hanya dapat meminta rilis yang memang kami tanda tangani,
-#    bukan membuat rilis baru.
+# 2. **Kunci publik rilis tidak pernah diganti lewat agen.** `pasang.sh` mengambilnya sekali saat
+#    pemasangan pertama dan menolak kunci yang berbeda dari yang sudah terpasang; sesudah itu agen hanya
+#    membacanya dari disk, dan tidak ada operasi maupun jawaban admin.erp yang menyentuhnya. admin.erp
+#    yang dibobol sesudah pemasangan hanya dapat meminta rilis yang memang kami tanda tangani, bukan
+#    membuat rilis baru.
 #
 # 3. **Rilis wajib naik.** Satu celah yang tersisa bila admin.erp dibobol adalah meminta server mundur
 #    ke rilis lama yang sah tetapi bercacat keamanan. Agen menolak rilis yang tidak lebih baru dari yang
@@ -351,6 +353,50 @@ catat_operasi_terakhir() {
         '.last_operation = {id: $id, result: $hasil, step: (if $langkah == "" then null else $langkah[0:120] end)}'
 }
 
+# Jenis operasi yang sedang dikerjakan putaran ini. Diisi `kerjakan_operasi`, dibaca `tutup_operasi`.
+OPERASI_JENIS=''
+
+# Operasi yang sedang berjalan, beserta langkahnya, dicatat di state.json selama ia berjalan.
+#
+# Pembacanya `pasang.sh`, yang menunggu operasi `install` di terminal teknisi. `run --now` baru pulang
+# sesudah operasinya selesai — bisa puluhan menit menarik image lewat sambungan klinik — jadi langkah yang
+# sedang berjalan hanya dapat dibaca dari sini. Laporan ke admin.erp tidak ikut membawanya: `susun_laporan`
+# menyebut kuncinya satu per satu.
+catat_operasi_berjalan() {
+    # shellcheck disable=SC2016 # variabel jq
+    ubah_keadaan --arg id "$1" --arg jenis "$2" '.current_operation = {id: $id, operation: $jenis, release: null, step: null}'
+}
+
+catat_langkah_berjalan() {
+    # shellcheck disable=SC2016 # variabel jq
+    ubah_keadaan --arg langkah "$1" \
+        'if (.current_operation | type) == "object" then .current_operation.step = $langkah[0:120] else . end'
+}
+
+catat_rilis_berjalan() {
+    # shellcheck disable=SC2016 # variabel jq
+    ubah_keadaan --arg rilis "$1" \
+        'if (.current_operation | type) == "object" then .current_operation.release = $rilis else . end'
+}
+
+# Hasil operasi `install` terakhir, terpisah dari last_operation yang ditimpa operasi apa pun sesudahnya.
+# `pasang.sh` yang dijalankan ulang di server yang sudah terpasang membacanya untuk tidak menunggu
+# pemasangan yang sudah lama selesai. Sebab kegagalan ikut dicatat karena teknisi di depan terminal itulah
+# yang paling mungkin memperbaikinya; isinya kalimat agen atau ekor keluaran update.sh dan Core, yang
+# keduanya tidak pernah mencetak rahasia — dan hash kata sandi tidak pernah masuk ke sana (operasi_pasang).
+catat_pemasangan_terakhir() {
+    local id="$1" hasil="$2" langkah_teks="$3" pesan="$4"
+
+    # shellcheck disable=SC2016 # variabel jq
+    ubah_keadaan --arg id "$id" --arg hasil "$hasil" --arg langkah "$langkah_teks" --arg pesan "$pesan" \
+        '.last_install = {
+            id: $id,
+            result: $hasil,
+            step: (if $langkah == "" then null else $langkah[0:120] end),
+            message: (if $hasil == "failed" then $pesan[0:4000] else null end)
+        }'
+}
+
 buat_kunci() {
     local privat="$1" publik="$2"
 
@@ -640,6 +686,10 @@ lapor_langkah() {
     local id="$1" status="$2" langkah_teks="$3" pesan="${4:-}"
     local isi="$SEMENTARA/langkah.json" jawaban="$SEMENTARA/langkah-jawaban.json" kode
 
+    # Dicatat sebelum dikirim: terminal pemasang tetap melihat langkahnya walaupun admin.erp sedang tidak
+    # terjangkau.
+    [ "$status" != running ] || catat_langkah_berjalan "$langkah_teks"
+
     jq -c -n --arg status "$status" --arg step "$langkah_teks" --arg pesan "$pesan" '
         {status: $status, step: $step[0:120]}
         + (if $status == "failed" then
@@ -667,6 +717,7 @@ tutup_operasi() {
     local id="$1" status="$2" langkah_teks="$3" pesan="${4:-}" percobaan hasil
 
     catat_operasi_terakhir "$id" "$status" "$langkah_teks"
+    [ "$OPERASI_JENIS" != install ] || catat_pemasangan_terakhir "$id" "$status" "$langkah_teks" "$pesan"
 
     for percobaan in 1 2 3; do
         hasil=0
@@ -874,27 +925,62 @@ pesan_dari_log() {
     tail -n 20 "$1" 2>/dev/null | tr -d '\r' || true
 }
 
-operasi_upgrade() {
-    local id="$1" berkas="$2" edisi rilis sementara tujuan satu kode hasil log hasil_lokal
+PARAMETER_EDISI=''
+PARAMETER_RILIS=''
 
-    edisi="$(jq -r 'if (.parameters.edition | type) == "string" then .parameters.edition else "" end' "$berkas")"
-    rilis="$(jq -r 'if (.parameters.release | type) == "string" then .parameters.release else "" end' "$berkas")"
+# baca_parameter_rilis BERKAS_OPERASI — mengisi PARAMETER_EDISI dan PARAMETER_RILIS; pulang 1 dengan ALASAN.
+#
+# `upgrade` dan `install` menyebut rilisnya dengan cara yang sama, karena keduanya mengambil rilis lewat
+# jalur yang sama (`pasang_rilis`). `release` yang null atau kosong ditolak di sini: admin.erp tidak pernah
+# memberikan install tanpa rilis, dan agen tidak bergantung pada janji itu.
+baca_parameter_rilis() {
+    local berkas="$1"
 
-    if ! edisi_sah "$edisi" || ! rilis_sah "$rilis"; then
-        tutup_operasi "$id" failed 'Menolak pembaruan' 'parameter upgrade tidak sah: edition dan release wajib ada dan berbentuk benar'
-        return
+    PARAMETER_EDISI="$(jq -r 'if (.parameters.edition | type) == "string" then .parameters.edition else "" end' "$berkas")"
+    PARAMETER_RILIS="$(jq -r 'if (.parameters.release | type) == "string" then .parameters.release else "" end' "$berkas")"
+
+    if ! edisi_sah "$PARAMETER_EDISI" || ! rilis_sah "$PARAMETER_RILIS"; then
+        tolak 'edition dan release wajib ada dan berbentuk benar'
+        return 1
     fi
+}
+
+HASIL_RILIS=''
+LOG_OPERASI=''
+
+# pasang_rilis ID EDISI RILIS LANGKAH_TOLAK — mengunduh, memeriksa, lalu menjalankan update.sh atas satu
+# rilis. Satu-satunya jalur rilis masuk ke server ini, dipakai `upgrade` dan `install`: penarikan image dari
+# registry sendiri (AG-01 di docs/todo/registry-harbor) menggantinya di sini, untuk keduanya sekaligus.
+#
+# Hasilnya di HASIL_RILIS, bukan di kode keluar:
+#
+#   terpasang   update.sh selesai; operasinya BELUM ditutup, pemanggil yang menutupnya
+#   ditutup     gagal, dan kegagalannya sudah dilaporkan
+#   dilepas     admin.erp melepas operasinya; tidak ada yang dilaporkan lagi
+#
+# Kode keluar tidak dipakai karena pemanggil yang menangkapnya dengan `||` diam-diam mematikan `set -e` untuk
+# seluruh isi fungsi ini. LOG_OPERASI menyebut log operasi yang ditulis update.sh.
+pasang_rilis() {
+    local id="$1" edisi="$2" rilis="$3" langkah_tolak="$4" sementara tujuan satu kode hasil log hasil_lokal
+
+    HASIL_RILIS=ditutup
+    log="$FOLDER_LOG/operasi-$id.log"
+    LOG_OPERASI="$log"
 
     # Pemeriksaan pertama memakai nomor yang diminta, supaya penolakan yang jelas tidak perlu mengunduh
     # apa pun. Pemeriksaan yang menentukan ada di bawah, pada manifest yang ditandatangani.
     if ! izinkan_rilis "$edisi" "$rilis"; then
-        tutup_operasi "$id" failed 'Menolak pembaruan' "$ALASAN"
+        tutup_operasi "$id" failed "$langkah_tolak" "$ALASAN"
         return
     fi
 
     hasil=0
     lapor_langkah "$id" running "Mengunduh dan memeriksa rilis $rilis" || hasil=$?
-    [ "$hasil" -ne 3 ] || return 3
+
+    if [ "$hasil" -eq 3 ]; then
+        HASIL_RILIS=dilepas
+        return
+    fi
 
     sementara="$(mktemp -d "$FOLDER_RILIS/.unduh.XXXXXX")"
 
@@ -926,7 +1012,7 @@ operasi_upgrade() {
 
     if ! izinkan_rilis "$MANIFEST_EDISI" "$MANIFEST_RILIS"; then
         rm -rf "$sementara"
-        tutup_operasi "$id" failed 'Menolak pembaruan' "$ALASAN"
+        tutup_operasi "$id" failed "$langkah_tolak" "$ALASAN"
         return
     fi
 
@@ -934,7 +1020,6 @@ operasi_upgrade() {
     rm -rf "$tujuan"
     mv "$sementara" "$tujuan"
 
-    log="$FOLDER_LOG/operasi-$id.log"
     : > "$log"
 
     jalankan_pembaruan "$tujuan" "$id" "$log"
@@ -944,14 +1029,210 @@ operasi_upgrade() {
         [ "$STATUS_PEMBARUAN" -ne 0 ] || hasil_lokal=succeeded
         catat_operasi_terakhir "$id" "$hasil_lokal" "$(langkah_terakhir)"
         catat 'Operasi dilepas admin.erp di tengah pembaruan; update.sh dibiarkan selesai dan hasilnya tidak dilaporkan.'
-        return 3
+        HASIL_RILIS=dilepas
+        return
     fi
 
-    if [ "$STATUS_PEMBARUAN" -eq 0 ]; then
-        tutup_operasi "$id" succeeded "Rilis $MANIFEST_RILIS terpasang"
-    else
+    if [ "$STATUS_PEMBARUAN" -ne 0 ]; then
         tutup_operasi "$id" failed "$(langkah_terakhir)" "$(pesan_dari_log "$log")"
+        return
     fi
+
+    HASIL_RILIS=terpasang
+}
+
+operasi_upgrade() {
+    local id="$1" berkas="$2"
+
+    if ! baca_parameter_rilis "$berkas"; then
+        tutup_operasi "$id" failed 'Menolak pembaruan' "parameter upgrade tidak sah: $ALASAN"
+        return
+    fi
+
+    catat_rilis_berjalan "$PARAMETER_RILIS"
+    pasang_rilis "$id" "$PARAMETER_EDISI" "$PARAMETER_RILIS" 'Menolak pembaruan'
+
+    case "$HASIL_RILIS" in
+        terpasang) tutup_operasi "$id" succeeded "Rilis $MANIFEST_RILIS terpasang" ;;
+        dilepas) return 3 ;;
+    esac
+}
+
+# --- Pemasangan pertama ---------------------------------------------------------------------------------
+
+# periksa_parameter_pasang BERKAS_OPERASI — pulang 1 dengan ALASAN bila satu parameter `install` tidak sah.
+#
+# Semuanya diperiksa sebelum satu berkas pun diunduh: parameter yang baru ditolak Core sesudah rilisnya
+# terpasang meninggalkan server yang menyala tanpa tenant, dan operasi yang gagal di langkah terakhir.
+#
+# Nilainya dibaca jq langsung dari berkas operasi, tidak pernah lewat `--arg`: argumen jq terbaca siapa pun
+# dari daftar proses, dan salah satu nilainya hash kata sandi. Karena alasan yang sama tidak ada ALASAN yang
+# menyebut nilai yang ditolak.
+#
+# Pola memakai `\A` dan `\z`, bukan `^` dan `$`: jq memakai Oniguruma, dan di sana `$` juga cocok sebelum baris
+# baru di ujung.
+periksa_parameter_pasang() {
+    local berkas="$1" bidang
+
+    baca_parameter_rilis "$berkas" || return 1
+
+    # Aturan ULID yang sama dengan validasi `ulid` Laravel di Core: 26 huruf Crockford base32, huruf pertama
+    # 0-7. Huruf kecil diterima; admin.erp menulis ULID dengan huruf kecil, dan Core menyamakannya.
+    jq -e '(.parameters.tenant_id | type) == "string"
+        and (.parameters.tenant_id | test("\\A[0-7][0-9A-HJKMNP-TV-Za-hjkmnp-tv-z]{25}\\z"))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'tenant_id bukan ULID (26 huruf Crockford base32)'; return 1; }
+
+    # Nama sampai ke terminal dan log lewat keluaran Core; huruf kendali di sana dapat menyamarkan isi layar.
+    # Batas 255 sama dengan batas Core, supaya yang ditolak Core ditolak di sini lebih dulu.
+    for bidang in tenant_name admin_name; do
+        # shellcheck disable=SC2016 # $b adalah variabel jq
+        jq -e --arg b "$bidang" '(.parameters[$b] | type) == "string" and (.parameters[$b] | test("[^[:space:]]"))' \
+            "$berkas" >/dev/null 2>&1 \
+            || { tolak "$bidang wajib berupa teks yang tidak kosong"; return 1; }
+        # shellcheck disable=SC2016 # $b adalah variabel jq
+        jq -e --arg b "$bidang" '.parameters[$b] | length <= 255' "$berkas" >/dev/null 2>&1 \
+            || { tolak "$bidang lebih dari 255 huruf"; return 1; }
+        # shellcheck disable=SC2016 # $b adalah variabel jq
+        jq -e --arg b "$bidang" '.parameters[$b] | test("[[:cntrl:]]") | not' "$berkas" >/dev/null 2>&1 \
+            || { tolak "$bidang memuat huruf kendali"; return 1; }
+    done
+
+    jq -e '(.parameters.admin_email | type) == "string"
+        and (.parameters.admin_email | test("\\A[^@[:space:][:cntrl:]]+@[^@[:space:][:cntrl:]]+\\z"))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'admin_email bukan alamat email'; return 1; }
+    jq -e '.parameters.admin_email | length <= 255' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'admin_email lebih dari 255 huruf'; return 1; }
+
+    # Larik kosong sah: tenant yang hanya memakai Core. Setiap id menjadi satu `--app=<id>`; tanpa pola ini id
+    # berawalan minus atau berisi baris baru ikut masuk ke argumen perintah Core.
+    jq -e '(.parameters.app_ids | type) == "array"
+        and all(.parameters.app_ids[]; type == "string" and test("\\A[a-z0-9][a-z0-9-]*\\z"))' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'app_ids bukan larik id app (huruf kecil, angka, dan tanda minus)'; return 1; }
+
+    # admin.erp mengirim id yang unik. Core menolak id ganda — tetapi baru sesudah rilisnya terpasang.
+    jq -e '(.parameters.app_ids | length) == (.parameters.app_ids | unique | length)' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'app_ids menyebut app yang sama lebih dari sekali'; return 1; }
+
+    # Bentuk yang sama persis dengan yang diterima Core. `$2a$` dan `$2b$` tidak dikenali Laravel sebagai hash,
+    # dan di-hash ulang sebagai teks polos: admin pertama tidak pernah dapat masuk.
+    jq -e '(.parameters.admin_password_hash | type) == "string"
+        and (.parameters.admin_password_hash | test("\\A\\$2y\\$(0[4-9]|[12][0-9]|3[01])\\$[./A-Za-z0-9]{53}\\z"))' \
+        "$berkas" >/dev/null 2>&1 \
+        || { tolak 'admin_password_hash bukan hash bcrypt berawalan 2y (isinya tidak dicetak)'; return 1; }
+}
+
+# Operasi `install`: rilis pertama, lalu tenant dengan id yang sama dengan admin.erp beserta admin pertamanya.
+#
+# **Hash kata sandi hanya lewat stdin.** Kata sandi sementara dibuat admin.erp dan ditunjukkan sekali kepada
+# operator; yang sampai ke sini hanya hash bcrypt-nya. Hash itu tidak pernah menjadi argumen proses — terbaca
+# dari daftar proses — dan tidak pernah ditulis ke log agen, log operasi, atau state.json. Keluaran Core
+# disaring sebelum ditulis ke mana pun: Core tidak mencetaknya, tetapi log yang memuat hash tidak dapat
+# ditarik kembali dari journald dan pengumpul log.
+#
+# **Aman diulang.** Rilis yang sama yang sudah terpasang tidak diunduh dan dijalankan ulang — penolakan rilis
+# yang tidak lebih baru akan menggagalkan ulangan itu — dan Core menjawab tenant dengan owner yang sama
+# "sudah ada" dengan kode keluar nol. "Coba lagi" sesudah langkah tenant gagal karena itu langsung mengulang
+# langkah tenant.
+#
+# Jendela pembaruan tidak diperiksa di sini: admin.erp yang memutuskan kapan `install` boleh diklaim.
+operasi_pasang() {
+    local id="$1" berkas="$2" edisi rilis tenant_id tenant_nama nama_admin email_admin hash
+    local compose_sehat versi_sehat image_sehat log baris_awal hasil satu
+    local -a app=() perintah_core=() status_pipa=()
+
+    if ! periksa_parameter_pasang "$berkas"; then
+        tutup_operasi "$id" failed 'Menolak pemasangan' "parameter install tidak sah: $ALASAN"
+        return
+    fi
+
+    edisi="$PARAMETER_EDISI"
+    rilis="$PARAMETER_RILIS"
+    tenant_id="$(jq -r '.parameters.tenant_id' "$berkas")"
+    tenant_nama="$(jq -r '.parameters.tenant_name' "$berkas")"
+    nama_admin="$(jq -r '.parameters.admin_name' "$berkas")"
+    email_admin="$(jq -r '.parameters.admin_email' "$berkas")"
+    mapfile -t app < <(jq -r '.parameters.app_ids[]' "$berkas")
+    hash="$(jq -r '.parameters.admin_password_hash' "$berkas")"
+
+    catat_rilis_berjalan "$rilis"
+
+    if [ "$(jq -r '.edition // "" | tostring' "$BERKAS_KEADAAN")" = "$edisi" ] \
+        && [ "$(normalkan_rilis "$(jq -r '.release // "" | tostring' "$BERKAS_KEADAAN")")" = "$(normalkan_rilis "$rilis")" ]; then
+        log="$FOLDER_LOG/operasi-$id.log"
+        : > "$log"
+
+        hasil=0
+        lapor_langkah "$id" running "Rilis $rilis sudah terpasang; pembaruan dilewati" || hasil=$?
+        [ "$hasil" -ne 3 ] || return 3
+    else
+        pasang_rilis "$id" "$edisi" "$rilis" 'Menolak pemasangan'
+
+        case "$HASIL_RILIS" in
+            terpasang) ;;
+            dilepas) return 3 ;;
+            *) return ;;
+        esac
+
+        log="$LOG_OPERASI"
+    fi
+
+    hasil=0
+    lapor_langkah "$id" running 'Melahirkan tenant dan admin pertama' || hasil=$?
+    [ "$hasil" -ne 3 ] || return 3
+
+    # Compose dan image yang dicatat update.sh sesudah terbukti sehat — yang sama dengan yang dipakai
+    # bootstrap-tenant dan cadangan.
+    compose_sehat="$FOLDER_KEADAAN_UPDATE/compose-sehat.yaml"
+    versi_sehat="$FOLDER_KEADAAN_UPDATE/versi-sehat"
+    image_sehat=''
+    [ ! -f "$versi_sehat" ] || image_sehat="$(cat "$versi_sehat")"
+
+    if [ -z "$image_sehat" ] || [ ! -f "$compose_sehat" ] || [ ! -f "$BERKAS_ENV" ]; then
+        tutup_operasi "$id" failed 'Melahirkan tenant dan admin pertama' \
+            'belum ada versi yang terbukti sehat di server ini, atau .env tidak ada; tenant dilahirkan di dalam aplikasi yang sedang berjalan'
+        return
+    fi
+
+    # Opsi ditulis `--opsi=nilai`, bukan `--opsi nilai`: nama yang kebetulan diawali tanda minus akan dibaca
+    # Symfony Console sebagai opsi lain pada bentuk kedua.
+    perintah_core=(
+        docker compose --project-name "$PROYEK" --env-file "$BERKAS_ENV" -f "$compose_sehat"
+        exec -T core-app php artisan tenant:bootstrap-site
+        "--tenant-id=$tenant_id"
+        "--name=$tenant_nama"
+        "--admin-name=$nama_admin"
+        "--admin-email=$email_admin"
+        --admin-password-hash-stdin
+    )
+
+    for satu in "${app[@]}"; do
+        perintah_core+=("--app=$satu")
+    done
+
+    baris_awal="$(wc -l < "$log")"
+
+    # `printf` bawaan bash, bukan program: hash tidak muncul di argumen proses mana pun. Kode keluar yang
+    # dipakai milik docker, bukan pipa: printf yang terlambat menulis ke Core yang sudah keluar mati kena
+    # SIGPIPE walaupun Core-nya berhasil.
+    set +e
+    printf '%s' "$hash" \
+        | EDITION_IMAGE="$image_sehat" "${perintah_core[@]}" 2>&1 9>&- \
+        | while IFS= read -r satu || [ -n "$satu" ]; do
+            satu="${satu%$'\r'}"
+            satu="${satu//"$hash"/[hash disembunyikan]}"
+            printf '%s\n' "$satu" >> "$log"
+            printf '%s\n' "$satu"
+        done
+    status_pipa=("${PIPESTATUS[@]}")
+    set -e
+
+    if [ "${status_pipa[1]}" -ne 0 ]; then
+        tutup_operasi "$id" failed 'Melahirkan tenant dan admin pertama' \
+            "$(tail -n "+$((baris_awal + 1))" "$log" | tail -n 20 || true)"
+        return
+    fi
+
+    tutup_operasi "$id" succeeded "Pemasangan selesai: rilis $rilis"
 }
 
 # --- Cadangan -------------------------------------------------------------------------------------------
@@ -1200,8 +1481,12 @@ kerjakan_operasi() {
 
     catat "Mengerjakan operasi $id: ${operasi:0:40}"
 
+    OPERASI_JENIS="${operasi:0:40}"
+    catat_operasi_berjalan "$id" "$OPERASI_JENIS"
+
     case "$operasi" in
         upgrade) operasi_upgrade "$id" "$berkas" ;;
+        install) operasi_pasang "$id" "$berkas" ;;
         backup) operasi_backup "$id" ;;
         install_license) operasi_lisensi "$id" "$berkas" ;;
         rotate_key) operasi_putar_kunci "$id" ;;
@@ -1297,7 +1582,7 @@ perintah_enroll() {
     pastikan_keadaan
 
     printf '    terdaftar sebagai situs %s\n' "$SITUS_ID"
-    printf '\nRilis pertama diminta dari halaman situs di admin.erp, bukan dari server ini.\n'
+    printf '\nRilis pertama dipasang lewat operasi install dari admin.erp, bukan dari server ini.\n'
 }
 
 perintah_run() {
@@ -1366,6 +1651,10 @@ perintah_run() {
     )
     hasil=$?
     set -e
+
+    # Operasi yang pulang tanpa ditutup — dilepas admin.erp, atau jawaban ganti kunci yang hilang — tidak
+    # boleh tampil sebagai sedang berjalan di terminal pemasang sampai operasi berikutnya datang.
+    ubah_keadaan 'del(.current_operation)'
 
     # Laporan sesudah operasi supaya admin.erp melihat rilis atau cadangan baru tanpa menunggu putaran
     # berikutnya. Gagalnya tidak menggagalkan putaran: operasinya sendiri sudah dilaporkan.

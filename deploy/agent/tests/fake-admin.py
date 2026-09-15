@@ -13,6 +13,11 @@ Ini bukan admin.erp versi kecil. Tugasnya satu: menolak apa pun yang tidak sesua
   yang melewatkan `minimum` tanpa suara membuat pengujian lulus untuk alasan yang salah.
 
 Endpoint `/_test/...` dipakai `run-tests.sh` untuk mengantre operasi dan membaca apa yang diterima.
+
+Berkas pemasang disajikan seperti admin.erp menyajikannya (PS-07 di docs/todo/pasang-satu-perintah):
+`/pasang.sh` dengan alamat server ini ditanam di isiannya, dan `/agen/<berkas>` byte persis dari berkas yang
+diuji. Pengujian pasang.sh karena itu berjalan lewat jalur yang sama dengan server klien, tanpa jalan pintas
+di skrip yang dipasang.
 """
 
 import argparse
@@ -26,12 +31,15 @@ import subprocess
 import tempfile
 import threading
 import time
+import traceback
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
 BATAS_SELISIH_DETIK = 300
 LEASE_DETIK = 900
+ISIAN_ALAMAT_ADMIN = b'@@COREERP_ADMIN_URL@@'
+BERKAS_AGEN = ('coreerp-agent', 'coreerp-agent.service', 'coreerp-agent.timer', 'env.template', 'update.sh', 'kunci-rilis.pub')
 
 KATA_KUNCI_SKEMA = {
     'type', 'properties', 'required', 'additionalProperties', 'enum', 'maxLength', 'minLength',
@@ -195,10 +203,13 @@ def kunci_publik_sah(pem):
 
 
 class Admin:
-    def __init__(self, kontrak, folder_rilis, kunci_lisensi):
+    def __init__(self, kontrak, folder_rilis, kunci_lisensi, pasang, berkas_agen):
         self.kontrak = kontrak
         self.folder_rilis = folder_rilis
         self.kunci_lisensi = kunci_lisensi
+        self.pasang = pasang
+        self.berkas_agen = berkas_agen
+        self.isi_agen_pengganti = {}
         self.kunci = threading.Lock()
         self.token = {}
         self.situs = {}
@@ -212,6 +223,27 @@ class Admin:
         if operasi['status'] == 'running' and operasi['lease_until'] < time.time():
             operasi['status'] = 'failed'
             operasi['failure_message'] = 'lease habis'
+
+    def buat_operasi(self, site_id, data):
+        """Dipanggil dengan self.kunci dipegang."""
+        nomor = f'op-{len(self.urutan) + 1:04d}'
+        self.operasi[nomor] = {
+            'id': nomor,
+            'site_id': site_id,
+            'operation': data['operation'],
+            'parameters': data.get('parameters', {}),
+            'status': 'requested',
+            'lease_until': 0,
+            'langkah': [],
+            'percobaan_langkah': 0,
+            'failure_message': None,
+            'lepas_setelah': data.get('lepas_setelah'),
+            'tanpa_validasi': bool(data.get('tanpa_validasi')),
+            # Klaim sebanyak ini dijawab 204 dulu — admin.erp yang belum menentukan rilisnya.
+            'sembunyi_klaim': int(data.get('sembunyi_klaim') or 0),
+        }
+        self.urutan.append(nomor)
+        return nomor
 
 
 class Penangan(BaseHTTPRequestHandler):
@@ -251,6 +283,9 @@ class Penangan(BaseHTTPRequestHandler):
                 muatan['message'] = t.message
             badan, jenis = json.dumps(muatan).encode(), 'application/json'
         except Exception as e:  # noqa: BLE001 — server uji melaporkan apa pun sebagai 500
+            # Juga ke stderr, yang ditulis run-tests.sh ke log/fake-admin.log: agen tidak mencetak isi jawaban
+            # 500, dan tanpa ini sebabnya hilang bersama jawabannya.
+            traceback.print_exc()
             status, badan, jenis = 500, json.dumps({'error': 'internal', 'message': repr(e)}).encode(), 'application/json'
 
         # Permintaan `/_test/...` tidak dicatat: pengujian yang menghitung permintaan agen tidak boleh ikut
@@ -351,6 +386,12 @@ class Penangan(BaseHTTPRequestHandler):
         if jalur.startswith('/_test/'):
             return self.rute_uji(metode, jalur, isi)
 
+        if metode == 'get' and jalur == '/pasang.sh':
+            return self.skrip_pasang()
+        m = re.fullmatch(r'/agen/([^/]+)', jalur)
+        if metode == 'get' and m:
+            return self.berkas_agen(m.group(1))
+
         if not jalur.startswith('/api/'):
             raise Tolak(404, 'not_found')
         dalam = jalur[len('/api'):]
@@ -375,6 +416,23 @@ class Penangan(BaseHTTPRequestHandler):
 
         raise Tolak(404, 'not_found')
 
+    def skrip_pasang(self):
+        # Alamat yang ditanam alamat server ini sendiri, seperti admin.erp menanam APP_URL-nya. Setiap
+        # kemunculan isian diganti, sama dengan `str_replace` di admin.erp.
+        alamat = f'http://127.0.0.1:{self.server.server_address[1]}'.encode()
+        with open(self.admin.pasang, 'rb') as f:
+            return 200, f.read().replace(ISIAN_ALAMAT_ADMIN, alamat), 'text/plain; charset=utf-8'
+
+    def berkas_agen(self, nama):
+        if nama not in BERKAS_AGEN:
+            raise Tolak(404, 'not_found')
+        with self.admin.kunci:
+            pengganti = self.admin.isi_agen_pengganti.get(nama)
+        if pengganti is not None:
+            return 200, pengganti, 'text/plain; charset=utf-8'
+        with open(self.admin.berkas_agen[nama], 'rb') as f:
+            return 200, f.read(), 'text/plain; charset=utf-8'
+
     def enroll(self, isi):
         data = self.json_isi(isi, '/agent/v1/enroll', 'post')
         if not kunci_publik_sah(data['public_key']):
@@ -388,6 +446,10 @@ class Penangan(BaseHTTPRequestHandler):
             situs = ulid()
             tenant = token['tenant_id']
             self.admin.situs[situs] = {'public_key': data['public_key'], 'dicabut': False, 'riwayat_kunci': []}
+            # Operasi yang dibuat bersama tokennya, seperti "Buat perintah pasang" membuat operasi install
+            # sebelum server klien pernah mendaftar.
+            for operasi in token['operasi']:
+                self.admin.buat_operasi(situs, operasi)
 
         return self.json_jawaban(201, {
             'site_id': situs,
@@ -423,6 +485,9 @@ class Penangan(BaseHTTPRequestHandler):
                 return 204, None, None
             pilihan = next((o for o in milik if o['status'] == 'requested'), None)
             if pilihan is None:
+                return 204, None, None
+            if pilihan['sembunyi_klaim'] > 0:
+                pilihan['sembunyi_klaim'] -= 1
                 return 204, None, None
             pilihan['status'] = 'running'
             pilihan['lease_until'] = time.time() + LEASE_DETIK
@@ -507,27 +572,24 @@ class Penangan(BaseHTTPRequestHandler):
                     'dipakai': False,
                     'tenant_id': data.get('tenant_id') or ulid(),
                     'tenant_name': data.get('tenant_name') or 'Apotek Uji',
+                    'operasi': data.get('operasi') or [],
                 }
             return 201, b'{}', 'application/json'
 
         if metode == 'post' and jalur == '/_test/operations':
             with self.admin.kunci:
-                nomor = f'op-{len(self.admin.urutan) + 1:04d}'
-                self.admin.operasi[nomor] = {
-                    'id': nomor,
-                    'site_id': data['site_id'],
-                    'operation': data['operation'],
-                    'parameters': data.get('parameters', {}),
-                    'status': 'requested',
-                    'lease_until': 0,
-                    'langkah': [],
-                    'percobaan_langkah': 0,
-                    'failure_message': None,
-                    'lepas_setelah': data.get('lepas_setelah'),
-                    'tanpa_validasi': bool(data.get('tanpa_validasi')),
-                }
-                self.admin.urutan.append(nomor)
+                nomor = self.admin.buat_operasi(data['site_id'], data)
             return 201, json.dumps({'id': nomor}).encode(), 'application/json'
+
+        # {"isi": "..."} menggantikan isi /agen/<berkas>; {"isi": null} mengembalikan berkas aslinya.
+        m = re.fullmatch(r'/_test/agen/([^/]+)', jalur)
+        if metode == 'post' and m and m.group(1) in BERKAS_AGEN:
+            with self.admin.kunci:
+                if data.get('isi') is None:
+                    self.admin.isi_agen_pengganti.pop(m.group(1), None)
+                else:
+                    self.admin.isi_agen_pengganti[m.group(1)] = data['isi'].encode()
+            return 200, b'{}', 'application/json'
 
         if metode == 'get' and jalur == '/_test/state':
             with self.admin.kunci:
@@ -572,6 +634,11 @@ def utama():
     argumen.add_argument('--releases', required=True, help='folder <edisi>/<rilis>/<berkas>')
     argumen.add_argument('--license-public-key', required=True, help='kunci publik lisensi (PEM)')
     argumen.add_argument('--port-file', required=True, help='berkas tempat nomor port ditulis')
+    argumen.add_argument('--pasang', required=True, help='pasang.sh yang disajikan di /pasang.sh')
+    argumen.add_argument('--agen', required=True, help='coreerp-agent yang disajikan di /agen/coreerp-agent')
+    argumen.add_argument('--update-sh', required=True, help='update.sh yang disajikan di /agen/update.sh')
+    argumen.add_argument('--folder-agen', required=True, help='folder unit systemd dan env.template')
+    argumen.add_argument('--release-public-key', required=True, help='kunci publik rilis di /agen/kunci-rilis.pub')
     a = argumen.parse_args()
 
     with open(a.contract) as f:
@@ -579,8 +646,17 @@ def utama():
     with open(a.license_public_key) as f:
         kunci_lisensi = f.read()
 
+    berkas_agen = {
+        'coreerp-agent': a.agen,
+        'coreerp-agent.service': os.path.join(a.folder_agen, 'coreerp-agent.service'),
+        'coreerp-agent.timer': os.path.join(a.folder_agen, 'coreerp-agent.timer'),
+        'env.template': os.path.join(a.folder_agen, 'env.template'),
+        'update.sh': a.update_sh,
+        'kunci-rilis.pub': a.release_public_key,
+    }
+
     server = ThreadingHTTPServer(('127.0.0.1', 0), Penangan)
-    server.admin = Admin(kontrak, a.releases, kunci_lisensi)
+    server.admin = Admin(kontrak, a.releases, kunci_lisensi, a.pasang, berkas_agen)
 
     sementara = a.port_file + '.baru'
     with open(sementara, 'w') as f:

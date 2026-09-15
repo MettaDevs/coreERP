@@ -12,7 +12,8 @@
 # - admin.erp diganti `tests/fake-admin.py`, yang memeriksa tanda tangan dan skema dari kontraknya;
 # - `tests/klien-bertanda.py` menandatangani permintaan secara terpisah dari agen, supaya agen dan
 #   admin.erp tiruan tidak dapat lulus bersama karena salah dengan cara yang sama;
-# - pasang.sh mengambil berkas agen dari repo ini lewat COREERP_REPO_DIR, bukan dari GitHub.
+# - pasang.sh diambil dari admin.erp tiruan dan dialirkan ke bash seperti di server klien, dan ia mengambil
+#   berkas agen dari sana juga. Yang disajikan adalah berkas yang diuji, byte persis.
 #
 # Kunci rilis dan kunci lisensi dibuat baru pada setiap putaran dan hilang bersama folder kerjanya.
 # Tidak ada kunci yang disimpan di repo.
@@ -114,6 +115,11 @@ python3 "$folder_uji/fake-admin.py" \
     --contract "$KERJA/kontrak.json" \
     --releases "$KERJA/rilis" \
     --license-public-key "$KERJA/kunci/lisensi.pub" \
+    --pasang "$PASANG" \
+    --agen "$AGEN" \
+    --update-sh "$UPDATE_SH" \
+    --folder-agen "$akar/deploy/agent" \
+    --release-public-key "$KERJA/kunci/rilis.pub" \
     --port-file "$KERJA/port" 2> "$KERJA/log/fake-admin.log" &
 PID_ADMIN=$!
 
@@ -135,6 +141,15 @@ TOKEN='token-pendaftaran-0123456789abcdef012345'
 TENANT_ID='01JTENANTUJI00000000000000'
 TENANT_NAMA='Apotek Sejahtera Uji'
 
+# Operasi install. TENANT_ID di atas bukan ULID (U dan I bukan huruf Crockford base32) dan hanya dipakai di
+# jalur yang tidak memeriksanya. ULID berhuruf kecil, seperti yang ditulis admin.erp.
+TENANT_ULID='01j9zq4x7b8c2d3e4f5g6h7jkm'
+# Konstanta image tunggal yang dikirim admin.erp sebagai edition operasi install.
+EDISI_PASANG='coreerp'
+BADAN_HASH='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXY./'
+# shellcheck disable=SC2016 # hash bcrypt harfiah, bukan ekspansi
+HASH_UJI='$2y$12$'"$BADAN_HASH"
+
 # --- Pembantu ------------------------------------------------------------------------------------------
 
 lulus=0
@@ -147,6 +162,13 @@ nama_gagal=()
 # yang gagal di tengah pengujian lalu lewat tanpa suara.
 uji() {
     local nama="$1" fungsi="$2" log status
+
+    # COREERP_UJI_SARING=<pola bash> menjalankan hanya pengujian yang nama fungsinya cocok. Pengujian berbagi
+    # keadaan; saringan hanya untuk pengujian yang berdiri sendiri, dan hasil yang dilaporkan tetap dari
+    # suite lengkap.
+    if [ -n "${COREERP_UJI_SARING:-}" ] && ! [[ "$fungsi" =~ $COREERP_UJI_SARING ]]; then
+        return 0
+    fi
 
     log="$KERJA/log/$fungsi.log"
 
@@ -336,6 +358,56 @@ token_baru() {
 
     admin_post /_test/tokens "$(jq -cn --arg t "$token" '{token: $t}')" >/dev/null
     printf '%s' "$token"
+}
+
+# parameter_pasang RILIS [FILTER] — parameter operasi install yang sah, lalu diubah FILTER jq. FILTER dapat
+# memakai $b, 53 huruf badan hash uji, untuk menyusun hash yang salah bentuk.
+parameter_pasang() {
+    jq -cn --arg e "$EDISI_PASANG" --arg r "$1" --arg t "$TENANT_ULID" --arg h "$HASH_UJI" '{
+        edition: $e,
+        release: $r,
+        tenant_id: $t,
+        tenant_name: "Klinik Sehat Sentosa",
+        app_ids: ["human-resources", "management-aset"],
+        admin_name: "Dr. Budi Santoso",
+        admin_email: "budi@klinik.test",
+        admin_password_hash: $h
+    }' | jq -c --arg b "$BADAN_HASH" "${2:-.}"
+}
+
+# token_pasang NAMA RILIS [FILTER] — token pendaftaran beserta operasi install untuk situs yang mendaftar
+# dengannya, seperti "Buat perintah pasang" di admin.erp. FILTER jq mengubah isi permintaannya.
+#
+# Bentuk tokennya bentuk yang dibuat admin.erp: 48 huruf dan angka, diturunkan dari NAMA supaya tetap sama
+# untuk nama yang sama.
+token_pasang() {
+    local token
+
+    token="$(printf '%s' "$1" | openssl dgst -sha512 -binary | base64 -w0 | tr -dc 'A-Za-z0-9' | cut -c1-48)"
+
+    admin_post /_test/tokens "$(jq -cn --arg t "$token" --arg i "$TENANT_ULID" --argjson p "$(parameter_pasang "$2")" \
+        '{token: $t, tenant_id: $i, tenant_name: "Klinik Sehat Sentosa", operasi: [{operation: "install", parameters: $p}]}' \
+        | jq -c "${3:-.}")" >/dev/null
+    printf '%s' "$token"
+}
+
+# jalankan_pasang LOG [VAR=nilai ...] -- [argumen pasang.sh ...]
+#
+# Persis seperti perintah yang ditempel di server klien: pasang.sh diambil dari admin.erp tiruan dan dialirkan
+# ke `bash -s`. Batas waktu luar menjaga suite dari salinan pasang.sh yang kehilangan batas waktunya sendiri.
+jalankan_pasang() {
+    local log="$1" lingkungan=()
+    shift
+
+    while [ "$#" -gt 0 ] && [ "$1" != -- ]; do
+        lingkungan+=("$1")
+        shift
+    done
+    shift
+
+    curl -fsS "$ADMIN/pasang.sh" \
+        | timeout 90 env COREERP_PASANG_JEDA_DETIK=1 COREERP_PASANG_BATAS_DETIK=60 "${lingkungan[@]}" bash -s -- "$@" \
+        > "$log" 2>&1
 }
 
 variabel_compose() {
@@ -978,6 +1050,195 @@ uji_10b_rotasi_jawaban_hilang() {
     sama 'putaran berikutnya langsung diterima' "$(status_sejak "$sebelum" /api/agent/v1/report)" 200
 }
 
+# --- Pengujian: operasi install ------------------------------------------------------------------------
+
+uji_11_install() {
+    local rumah="$KERJA/rumah-install" stdin="$KERJA/docker-stdin" log="$KERJA/log/install-agen.log"
+    local s id op diharapkan kasus keterangan filter potongan sebelum
+
+    rm -rf "$rumah"
+    mkdir -p "$rumah"
+    cp "$KERJA/kunci/rilis.pub" "$rumah/kunci-rilis.pub"
+    cp "$TEMPLAT_ENV" "$rumah/.env"
+
+    env COREERP_HOME="$rumah" bash "$AGEN" enroll --admin-url "$ADMIN" --token "$(token_baru install)" >/dev/null
+    s="$(jq -r .site_id "$rumah/agent/site.json")"
+
+    buat_rilis "$EDISI_PASANG" 1.0.0
+    buat_rilis "$EDISI_PASANG" 2.0.0
+
+    # putaran_install PARAMETER [VAR=nilai ...] — mengantre install untuk situs ini dan menjalankan satu
+    # putaran; mengisi $id dan $op. Keluaran agen di $log.
+    putaran_install() {
+        local parameter="$1"
+        shift
+
+        : > "$FAKE_DOCKER_LOG"
+        : > "$FAKE_DOCKER_JSON_LOG"
+        : > "$FAKE_UPDATE_JEJAK"
+        rm -f "$stdin"
+        sebelum="$(jumlah_permintaan)"
+        id="$(antre "$(jq -cn --arg s "$s" --argjson p "$parameter" '{site_id: $s, operation: "install", parameters: $p}')")"
+
+        env FAKE_DOCKER_STDIN="$stdin" COREERP_HOME="$rumah" "$@" bash "$AGEN" run --now > "$log" 2>&1 \
+            || { cat "$log"; tail -n 15 "$KERJA/log/fake-admin.log"; printf 'putaran install keluar bukan nol: %s\n' "$parameter"; return 1; }
+
+        op="$(operasi "$id")"
+    }
+
+    # tanpa_hash KETERANGAN — hash, dan badannya tanpa awalan, tidak ada di keluaran agen, di bawah
+    # COREERP_HOME, maupun di argumen docker.
+    tanpa_hash() {
+        harus_gagal "$1: badan hash tidak ada di keluaran agen" grep -qF -- "$BADAN_HASH" "$log"
+        harus_gagal "$1: badan hash tidak ada di berkas mana pun di bawah COREERP_HOME" grep -rqF -- "$BADAN_HASH" "$rumah"
+        harus_gagal "$1: badan hash tidak ada di argumen docker" \
+            grep -qF -- "$BADAN_HASH" "$FAKE_DOCKER_LOG_LENGKAP" "$FAKE_DOCKER_JSON_LOG"
+        harus_gagal "$1: badan hash tidak ada di failure_message" grep -qF -- "$BADAN_HASH" <<< "$(jq -r '.failure_message // ""' <<< "$op")"
+    }
+
+    sama 'hash uji berbentuk hash bcrypt 60 huruf' "${#HASH_UJI}" 60
+
+    # --- berhasil ---
+    putaran_install "$(parameter_pasang 1.0.0)"
+
+    sama 'install selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'setiap langkah dilaporkan berurutan' \
+        "$(jq -c '[.langkah[] | select(.status == "running") | .step]' <<< "$op")" \
+        '["Mengunduh dan memeriksa rilis 1.0.0","Memeriksa tanda tangan","Menjalankan migrasi","Memeriksa kesehatan","Melahirkan tenant dan admin pertama"]'
+    sama 'langkah terakhir' "$(jq -c '.langkah[-1] | [.status, .step]' <<< "$op")" '["succeeded","Pemasangan selesai: rilis 1.0.0"]'
+    sama 'update.sh dijalankan atas rilis yang terverifikasi' "$(cat "$FAKE_UPDATE_JEJAK")" \
+        "mulai $rumah/agent/releases/$EDISI_PASANG-1.0.0"$'\n'"selesai $rumah/agent/releases/$EDISI_PASANG-1.0.0"
+
+    diharapkan="$(jq -cn --arg env "$rumah/.env" --arg c "$rumah/keadaan/compose-sehat.yaml" --arg t "$TENANT_ULID" \
+        --arg i "$(jq -r .image "$rumah/agent/releases/$EDISI_PASANG-1.0.0/manifest.json")" \
+        '[$i, ["compose","--project-name","coreerp","--env-file",$env,"-f",$c,"exec","-T","core-app","php","artisan",
+          "tenant:bootstrap-site",("--tenant-id=" + $t),"--name=Klinik Sehat Sentosa","--admin-name=Dr. Budi Santoso",
+          "--admin-email=budi@klinik.test","--admin-password-hash-stdin","--app=human-resources","--app=management-aset"]]')"
+    sama 'tenant:bootstrap-site dengan setiap --app, pada image yang dicatat update.sh' \
+        "$(jq -c 'select(.args | index("tenant:bootstrap-site")) | [.edition_image, .args]' "$FAKE_DOCKER_JSON_LOG")" "$diharapkan"
+
+    pastikan 'hash sampai lewat stdin' test -f "$stdin"
+    sama 'stdin berisi hash persis, tanpa akhir baris' "$(wc -c < "$stdin")" 60
+    sama 'isi stdin' "$(cat "$stdin")" "$HASH_UJI"
+    tanpa_hash 'berhasil'
+    pastikan 'keluaran Core masuk log operasi' grep -qxF 'Tenant lahir (tiruan).' "$rumah/agent/log/operasi-$id.log"
+
+    sama 'state.json mencatat install terakhir' "$(jq -c .last_install "$rumah/agent/state.json")" \
+        "{\"id\":\"$id\",\"result\":\"succeeded\",\"step\":\"Pemasangan selesai: rilis 1.0.0\",\"message\":null}"
+    sama 'operasi berjalan dibersihkan sesudah putaran' "$(jq -c .current_operation "$rumah/agent/state.json")" null
+    sama 'state.json mencatat rilis' "$(jq -r '[.edition, .release] | join(" ")' "$rumah/agent/state.json")" "$EDISI_PASANG 1.0.0"
+    sama 'laporan sesudahnya tetap sesuai skema Report' "$(validasi Report "$(laporan_terakhir)")" '[]'
+
+    # --- diulang: rilis yang sama tidak dipasang ulang, Core menjawab "sudah ada" ---
+    putaran_install "$(parameter_pasang 1.0.0)"
+
+    sama 'ulangan selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'ulangan langsung ke langkah tenant' "$(jq -c '[.langkah[] | select(.status == "running") | .step]' <<< "$op")" \
+        '["Rilis 1.0.0 sudah terpasang; pembaruan dilewati","Melahirkan tenant dan admin pertama"]'
+    sama 'ulangan tidak menjalankan update.sh' "$(cat "$FAKE_UPDATE_JEJAK")" ''
+    sama 'ulangan tidak mengunduh rilis' \
+        "$(admin_keadaan | jq --argjson n "$sebelum" '[.requests[$n:][] | select(.method == "GET")] | length')" 0
+    sama 'ulangan menjalankan tenant:bootstrap-site sekali' "$(grep -c 'tenant:bootstrap-site' "$FAKE_DOCKER_LOG")" 1
+
+    # --- app_ids kosong: tanpa --app; tenant_id berhuruf besar diterima ---
+    putaran_install "$(parameter_pasang 1.0.0 '(.app_ids = []) | (.tenant_id |= ascii_upcase)')"
+
+    sama 'app_ids kosong selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'tanpa --app' "$(jq -c 'select(.args | index("tenant:bootstrap-site")) | [.args[] | select(startswith("--app"))]' "$FAKE_DOCKER_JSON_LOG")" '[]'
+
+    # --- Core yang keliru mencetak stdin: disaring sebelum ditulis ke mana pun ---
+    putaran_install "$(parameter_pasang 1.0.0)" FAKE_DOCKER_GEMA_STDIN=1
+
+    sama 'selesai walau Core mencetak stdin' "$(jq -r .status <<< "$op")" succeeded
+    pastikan 'baris yang memuat hash tersaring di log operasi' \
+        grep -qxF 'stdin yang diterima: [hash disembunyikan]' "$rumah/agent/log/operasi-$id.log"
+    tanpa_hash 'Core mencetak stdin'
+
+    # --- Core menolak: gagal di langkah tenant dengan sebab dari Core, tanpa hash ---
+    putaran_install "$(parameter_pasang 1.0.0)" FAKE_DOCKER_GEMA_STDIN=1 FAKE_DOCKER_BOOTSTRAP_EXIT=1
+
+    sama 'penolakan Core menggagalkan operasi' "$(jq -c '[.status, .langkah[-1].step]' <<< "$op")" \
+        '["failed","Melahirkan tenant dan admin pertama"]'
+    memuat 'sebabnya dari Core' "$(jq -r .failure_message <<< "$op")" 'owner-nya bukan admin yang diminta'
+    sama 'state.json mencatat install gagal beserta sebabnya' \
+        "$(jq -c '.last_install | [.id, .result, .step, (.message | contains("owner-nya bukan"))]' "$rumah/agent/state.json")" \
+        "[\"$id\",\"failed\",\"Melahirkan tenant dan admin pertama\",true]"
+    tanpa_hash 'Core menolak'
+
+    # --- parameter yang tidak sah: ditolak sebelum mengunduh, update.sh, dan docker compose exec ---
+    #
+    # Rilis 2.0.0 ada dan lebih baru: tanpa penjaganya, operasi ini berjalan sampai Core.
+    # Dipisah `~`, bukan `|`: filter jq memakai `|=`.
+    while IFS='~' read -r keterangan filter potongan; do
+        [ -n "$keterangan" ] || continue
+        pastikan "$keterangan: kasus terbaca utuh" test -n "$filter" -a -n "$potongan"
+        pastikan "$keterangan: parameter tetap objek" jq -e 'type == "object"' <<< "$(parameter_pasang 2.0.0 "$filter")" >/dev/null
+
+        putaran_install "$(parameter_pasang 2.0.0 "$filter")"
+
+        sama "$keterangan: ditolak" "$(jq -c '[.status, .langkah[-1].step]' <<< "$op")" '["failed","Menolak pemasangan"]'
+        memuat "$keterangan: sebabnya" "$(jq -r .failure_message <<< "$op")" "$potongan"
+        sama "$keterangan: rilis tidak diunduh" \
+            "$(admin_keadaan | jq --argjson n "$sebelum" '[.requests[$n:][] | select(.method == "GET")] | length')" 0
+        sama "$keterangan: update.sh tidak dijalankan" "$(cat "$FAKE_UPDATE_JEJAK")" ''
+        sama "$keterangan: docker compose exec tidak dipanggil" "$(grep -c ' exec ' "$FAKE_DOCKER_LOG" || true)" 0
+        tanpa_hash "$keterangan"
+    done <<'KASUS'
+edition tidak ada~del(.edition)~edition dan release wajib ada
+edition null~.edition = null~edition dan release wajib ada
+edition kosong~.edition = ""~edition dan release wajib ada
+edition berhuruf besar~.edition = "CoreERP"~edition dan release wajib ada
+edition berisi garis miring~.edition = "coreerp/../lain"~edition dan release wajib ada
+release null~.release = null~edition dan release wajib ada
+release kosong~.release = ""~edition dan release wajib ada
+release tidak sah~.release = "2.0.0-rc1"~edition dan release wajib ada
+tenant_id berhuruf di luar Crockford~.tenant_id = "01JTENANTUJI00000000000000"~tenant_id bukan ULID
+tenant_id 25 huruf~.tenant_id |= .[0:25]~tenant_id bukan ULID
+tenant_id berhuruf pertama 8~.tenant_id = "8" + .tenant_id[1:]~tenant_id bukan ULID
+tenant_id berakhir baris baru~.tenant_id += "\n"~tenant_id bukan ULID
+tenant_id bukan teks~.tenant_id = 7~tenant_id bukan ULID
+tenant_name kosong~.tenant_name = ""~tenant_name wajib berupa teks yang tidak kosong
+tenant_name hanya spasi~.tenant_name = "   "~tenant_name wajib berupa teks yang tidak kosong
+tenant_name bukan teks~.tenant_name = ["Klinik"]~tenant_name wajib berupa teks yang tidak kosong
+tenant_name 256 huruf~.tenant_name = "a" * 256~tenant_name lebih dari 255 huruf
+tenant_name berbaris baru~.tenant_name = "Klinik\nSehat"~tenant_name memuat huruf kendali
+admin_name tidak ada~del(.admin_name)~admin_name wajib berupa teks yang tidak kosong
+admin_name 256 huruf~.admin_name = "b" * 256~admin_name lebih dari 255 huruf
+admin_name memuat escape terminal~.admin_name = "Budi[2J"~admin_name memuat huruf kendali
+admin_email tanpa @~.admin_email = "budi.klinik.test"~admin_email bukan alamat email
+admin_email tanpa domain~.admin_email = "budi@"~admin_email bukan alamat email
+admin_email tanpa nama~.admin_email = "@klinik.test"~admin_email bukan alamat email
+admin_email dua @~.admin_email = "budi@x@klinik.test"~admin_email bukan alamat email
+admin_email berspasi~.admin_email = "budi santoso@klinik.test"~admin_email bukan alamat email
+admin_email berakhir baris baru~.admin_email += "\n"~admin_email bukan alamat email
+admin_email bukan teks~.admin_email = null~admin_email bukan alamat email
+admin_email 256 huruf~.admin_email = ("c" * 244) + "@klinik.test"~admin_email lebih dari 255 huruf
+app_ids bukan larik~.app_ids = "human-resources"~app_ids bukan larik id app
+app_ids berupa objek~.app_ids = {"hr": "human-resources"}~app_ids bukan larik id app
+app_ids tidak ada~del(.app_ids)~app_ids bukan larik id app
+id app berhuruf besar~.app_ids = ["Human-Resources"]~app_ids bukan larik id app
+id app diawali minus~.app_ids = ["-hr"]~app_ids bukan larik id app
+id app berakhir baris baru~.app_ids = ["human-resources\n"]~app_ids bukan larik id app
+id app bukan teks~.app_ids = ["human-resources", 7]~app_ids bukan larik id app
+id app ganda~.app_ids = ["human-resources", "management-aset", "human-resources"]~app_ids menyebut app yang sama lebih dari sekali
+hash berawalan 2a~.admin_password_hash = "$2a$12$" + $b~admin_password_hash bukan hash bcrypt
+hash biaya 03~.admin_password_hash = "$2y$03$" + $b~admin_password_hash bukan hash bcrypt
+hash biaya 32~.admin_password_hash = "$2y$32$" + $b~admin_password_hash bukan hash bcrypt
+hash 52 huruf~.admin_password_hash = "$2y$12$" + $b[1:]~admin_password_hash bukan hash bcrypt
+hash 54 huruf~.admin_password_hash = "$2y$12$" + $b + "a"~admin_password_hash bukan hash bcrypt
+hash berhuruf di luar alfabet bcrypt~.admin_password_hash = "$2y$12$" + $b[1:] + "!"~admin_password_hash bukan hash bcrypt
+hash berakhir baris baru~.admin_password_hash += "\n"~admin_password_hash bukan hash bcrypt
+hash bukan teks~.admin_password_hash = 12~admin_password_hash bukan hash bcrypt
+hash tidak ada~del(.admin_password_hash)~admin_password_hash bukan hash bcrypt
+KASUS
+
+    # Biaya di ujung rentang yang diterima Core.
+    for kasus in 04 31; do
+        putaran_install "$(parameter_pasang 1.0.0 ".admin_password_hash = \"\$2y\$$kasus\$\" + \$b")"
+        sama "hash biaya $kasus diterima" "$(jq -r .status <<< "$op")" succeeded
+    done
+}
+
 # --- Pengujian: kunci putaran, cadangan, operasi asing, tenant ----------------------------------------
 
 uji_12_flock() {
@@ -1097,10 +1358,10 @@ uji_15_bootstrap_tenant() {
     harus_gagal 'kata sandi tidak tertulis di berkas mana pun di bawah COREERP_HOME' \
         grep -rq 'Sementara-XyZ-789' "$COREERP_HOME"
 
-    # Log docker yang lengkap sejak awal putaran uji: seluruh `run` di pengujian sebelumnya tidak pernah
-    # memanggilnya, hanya perintah manual di atas.
-    sama 'dipanggil tepat sekali, oleh perintah manual' \
-        "$(grep -c 'tenant:bootstrap-site' "$KERJA/docker-lengkap.log")" 1
+    # Log docker yang lengkap sejak awal putaran uji: `run` di pengujian sebelumnya hanya memanggilnya lewat
+    # operasi install, dengan hash dari stdin. Bentuk yang mencetak kata sandi hanya dari perintah manual di atas.
+    sama 'bentuk yang mencetak kata sandi dipanggil tepat sekali, oleh perintah manual' \
+        "$(grep 'tenant:bootstrap-site' "$KERJA/docker-lengkap.log" | grep -cv -e '--admin-password-hash-stdin')" 1
 }
 
 # --- Pengujian: update.sh dan pasang.sh ----------------------------------------------------------------
@@ -1169,18 +1430,25 @@ uji_16_update_sh_tanpa_arsip_image() {
 
 uji_17_pasang() {
     local rumah="$KERJA/rumah-pasang" folder_bin="$KERJA/bin-pasang" folder_systemd="$KERJA/systemd"
-    local token keluaran keluaran_ulang nilai kata_sandi sidik_env situs_id nama kurang=()
+    local token keluaran keluaran_ulang nilai kata_sandi sidik_env situs_id nama kurang=() sebelum baris_tunggu baris_langkah baris_selesai
 
-    token="$(token_baru pasang)"
+    buat_rilis "$EDISI_PASANG" 1.0.0
 
-    # Kunci rilis lewat --release-key: `deploy/agent/kunci-rilis.pub` belum ada di repo.
+    # Operasi install baru dapat diklaim pada putaran kedua, seperti admin.erp yang belum menentukan rilisnya
+    # saat server tersambung.
+    token="$(token_pasang pasang 1.0.0 '.operasi[0].sembunyi_klaim = 1')"
+    pastikan 'token berbentuk token admin.erp: 48 huruf dan angka' cocok_pola "$token" '^[A-Za-z0-9]{48}$'
+    sebelum="$(jumlah_permintaan)"
+
+    # Migrasi tiruan diam dua detik supaya langkahnya terbaca putaran pasang.sh yang membaca tiap detik.
     pasang() {
-        env COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$folder_systemd" COREERP_BIN_DIR="$folder_bin" \
-            COREERP_FOLDER_CADANGAN="$rumah/cadangan" COREERP_REPO_DIR="$akar" \
-            bash "$PASANG" --admin-url "$ADMIN" --token "$token" --release-key "$KERJA/kunci/rilis.pub"
+        jalankan_pasang "$KERJA/log/pasang.log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$folder_systemd" \
+            COREERP_BIN_DIR="$folder_bin" COREERP_FOLDER_CADANGAN="$rumah/cadangan" FAKE_UPDATE_JEDA=2 \
+            -- --token "$token"
     }
 
-    keluaran="$(pasang 2>&1)" || { printf '%s\n' "$keluaran"; return 1; }
+    pasang || { cat "$KERJA/log/pasang.log"; return 1; }
+    keluaran="$(cat "$KERJA/log/pasang.log")"
 
     sama 'mode .env' "$(stat -c %a "$rumah/.env")" 600
     harus_gagal '.env tidak menyisakan isian' grep -q '@@[A-Z_]*@@' "$rumah/.env"
@@ -1209,28 +1477,232 @@ uji_17_pasang() {
     pastikan 'unit service memakai COREERP_HOME' grep -qxF "ExecStart=$rumah/bin/coreerp-agent run" "$folder_systemd/coreerp-agent.service"
     pastikan 'unit timer terpasang' grep -q '^OnUnitActiveSec=60s' "$folder_systemd/coreerp-agent.timer"
     sama 'pembungkus perintah' "$("$folder_bin/coreerp-agent" --version)" 'coreerp-agent 0.1.0'
-    pastikan 'kunci rilis dari --release-key' cmp -s "$rumah/kunci-rilis.pub" "$KERJA/kunci/rilis.pub"
+
+    # Setiap berkas datang dari admin.erp, byte persis dengan yang disajikannya.
+    pastikan 'agen yang terpasang sama dengan yang disajikan admin.erp' cmp -s "$rumah/bin/coreerp-agent" "$AGEN"
+    pastikan 'update.sh yang terpasang sama dengan yang disajikan admin.erp' cmp -s "$rumah/update.sh" "$UPDATE_SH"
+    pastikan 'kunci rilis dari admin.erp' cmp -s "$rumah/kunci-rilis.pub" "$KERJA/kunci/rilis.pub"
+    sama 'setiap berkas agen diambil dari admin.erp' \
+        "$(admin_keadaan | jq -c --argjson n "$sebelum" '[.requests[$n:][] | select(.path | startswith("/agen/")) | [.path, .status]]')" \
+        '[["/agen/coreerp-agent",200],["/agen/coreerp-agent.service",200],["/agen/coreerp-agent.timer",200],["/agen/env.template",200],["/agen/update.sh",200],["/agen/kunci-rilis.pub",200]]'
 
     situs_id="$(jq -r .site_id "$rumah/agent/site.json")"
     sama 'situs terdaftar dengan kunci yang dipegang admin.erp' \
         "$(admin_keadaan | jq -r --arg s "$situs_id" '.sites[$s].public_key')" "$(cat "$rumah/agent/site-public.pem")"
     sama 'token pendaftaran terpakai' "$(admin_keadaan | jq -r --arg t "$token" '.tokens[$t].dipakai')" true
-    sama 'rilis pertama tidak dipasang skrip pasang' "$(jq -r '.release // ""' "$rumah/agent/state.json")" ''
-    memuat 'langkah berikutnya meminta rilis pertama dari admin.erp' "$keluaran" 'minta "Perbarui" ke rilis pertama'
-    memuat 'langkah berikutnya menyebut bootstrap-tenant' "$keluaran" 'coreerp-agent bootstrap-tenant'
 
-    # Dijalankan ulang: .env tidak ditimpa, kata sandi tidak dicetak lagi, dan token yang sudah terpakai
-    # tidak dikirim lagi — pendaftaran ulang dengan token itu akan ditolak admin.erp.
+    # Putaran sampai operasi install selesai: menunggu rilis, langkah demi langkah, lalu selesai.
+    sama 'operasi install selesai di admin.erp' \
+        "$(admin_keadaan | jq -r --arg s "$situs_id" '[.operations[] | select(.site_id == $s) | [.operation, .status] | join(" ")] | join(",")')" \
+        'install succeeded'
+    sama 'rilis pertama terpasang lewat operasi install' "$(jq -r '[.edition, .release] | join(" ")' "$rumah/agent/state.json")" "$EDISI_PASANG 1.0.0"
+    baris_tunggu="$(grep -nxF '    Server tersambung ke admin.erp. Menunggu admin.erp memberi rilis…' <<< "$keluaran" | cut -d: -f1 || true)"
+    baris_langkah="$(grep -nxF '    Memasang rilis 1.0.0 — langkah: Menjalankan migrasi' <<< "$keluaran" | cut -d: -f1 || true)"
+    baris_selesai="$(grep -nxF 'Selesai. Buka admin.erp untuk melihat server ini.' <<< "$keluaran" | cut -d: -f1 || true)"
+    pastikan 'menunggu rilis dicetak sekali' test "$(grep -c 'Menunggu admin.erp memberi rilis' <<< "$keluaran")" -eq 1
+    pastikan 'langkah pemasangan dicetak' test -n "$baris_langkah"
+    pastikan 'selesai dicetak' test -n "$baris_selesai"
+    pastikan 'menunggu dicetak sebelum memasang' test "${baris_tunggu:-x}" -lt "$baris_langkah"
+    pastikan 'memasang dicetak sebelum selesai' test "$baris_langkah" -lt "$baris_selesai"
+    sama 'langkah yang sama dicetak sekali' "$(grep -cxF '    Memasang rilis 1.0.0 — langkah: Menjalankan migrasi' <<< "$keluaran" || true)" 1
+    pastikan 'keluaran agen masuk log di server, bukan terminal' grep -qF 'Tenant lahir (tiruan).' "$rumah/agent/log/pasang.log"
+    harus_gagal 'keluaran Core tidak dicetak ke terminal' grep -qF 'Tenant lahir (tiruan).' <<< "$keluaran"
+    harus_gagal 'hash tidak tercetak' grep -qF -- "$BADAN_HASH" <<< "$keluaran"
+    harus_gagal 'hash tidak ada di bawah COREERP_HOME' grep -rqF -- "$BADAN_HASH" "$rumah"
+    harus_gagal 'token tidak tercetak' grep -qF -- "$token" <<< "$keluaran"
+
+    # Dijalankan ulang: .env tidak ditimpa, kata sandi tidak dicetak lagi, token yang sudah terpakai tidak
+    # dikirim lagi — pendaftaran ulang dengan token itu akan ditolak admin.erp — dan pemasangan yang sudah
+    # selesai tidak ditunggu lagi.
     sidik_env="$(cat "$rumah/.env" "$rumah/agent/agent.env" "$rumah/agent/site-key.pem" | sha256sum)"
-    keluaran_ulang="$(pasang 2>&1)" || { printf '%s\n' "$keluaran_ulang"; return 1; }
+    pasang || { cat "$KERJA/log/pasang.log"; return 1; }
+    keluaran_ulang="$(cat "$KERJA/log/pasang.log")"
     sama '.env, agent.env, dan kunci situs tidak ditimpa' \
         "$(cat "$rumah/.env" "$rumah/agent/agent.env" "$rumah/agent/site-key.pem" | sha256sum)" "$sidik_env"
     harus_gagal 'kata sandi tidak dicetak ulang' grep -q -- "$kata_sandi" <<< "$keluaran_ulang"
     memuat 'pemasangan ulang menjelaskan .env' "$keluaran_ulang" 'sudah ada; tidak ditimpa'
     memuat 'pemasangan ulang melewati pendaftaran' "$keluaran_ulang" 'pendaftaran dilewati'
+    memuat 'pemasangan ulang tidak menunggu lagi' "$keluaran_ulang" 'sudah selesai sebelumnya di server ini'
+    memuat 'pemasangan ulang tetap selesai' "$keluaran_ulang" 'Selesai. Buka admin.erp untuk melihat server ini.'
+}
 
-    harus_gagal 'tanpa --token ditolak' env COREERP_HOME="$KERJA/rumah-tanpa-token" COREERP_REPO_DIR="$akar" \
-        bash "$PASANG" --admin-url "$ADMIN"
+# Penjaga berkas yang diambil dari admin.erp: isian alamat, pilihan lama, kunci rilis, berkas kosong, alamat
+# yang bukan HTTPS, dan skrip yang terpotong di tengah unduhan.
+uji_17b_pasang_berkas_admin() {
+    local rumah="$KERJA/rumah-berkas" log="$KERJA/log/pasang-berkas.log" salinan="$KERJA/pasang-salinan.sh"
+    local token offset
+
+    token="$(token_baru berkas)"
+
+    # tolak_pasang KETERANGAN POTONGAN [argumen pasang.sh...] — pasang.sh dari admin.erp tiruan menolak dengan
+    # POTONGAN di keluarannya, dan tidak menulis apa pun ke COREERP_HOME.
+    tolak_pasang() {
+        local keterangan="$1" potongan="$2"
+        shift 2
+
+        rm -rf "$rumah"
+
+        if jalankan_pasang "$log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$KERJA/systemd-berkas" \
+            COREERP_BIN_DIR="$KERJA/bin-berkas" -- "$@"; then
+            cat "$log"
+            printf '%s: pasang.sh diterima padahal harus menolak\n' "$keterangan"
+            return 1
+        fi
+
+        memuat "$keterangan" "$(cat "$log")" "$potongan"
+        pastikan "$keterangan: tidak ada yang ditulis ke COREERP_HOME" test ! -e "$rumah"
+    }
+
+    # ganti_berkas NAMA ISI|null — isi yang disajikan admin.erp tiruan untuk /agen/NAMA.
+    ganti_berkas() {
+        admin_post "/_test/agen/$1" "$(jq -cn --argjson isi "$2" '{isi: $isi}')" >/dev/null
+    }
+
+    # Pengujian sesudahnya memakai admin.erp tiruan yang sama. Berkas yang diganti dikembalikan juga ketika
+    # pengujian ini berhenti di tengah, supaya satu kegagalan di sini tidak menyeret pengujian pasang.sh lain.
+    trap 'ganti_berkas kunci-rilis.pub null; ganti_berkas env.template null' EXIT
+
+    # Isian alamat yang tidak diganti: salinan dari repo, dengan pilihan baru maupun pilihan lama.
+    for satu in "--token $token" "--admin-url $ADMIN --token $token"; do
+        # shellcheck disable=SC2086 # pilihan memang dipecah di spasi
+        if env COREERP_HOME="$rumah" bash "$PASANG" $satu > "$log" 2>&1; then
+            printf 'pasang.sh dari repo berjalan dengan isian alamat yang tidak diganti (%s)\n' "$satu"
+            return 1
+        fi
+        memuat "isian tidak diganti ditolak ($satu)" "$(cat "$log")" 'Unduh pasang.sh dari admin.erp, bukan dari repo'
+        pastikan 'tidak ada yang ditulis ke COREERP_HOME' test ! -e "$rumah"
+    done
+
+    sama 'pasang.sh yang disajikan tidak menyisakan isian alamat' "$(curl -fsS "$ADMIN/pasang.sh" | grep -c '@@COREERP_ADMIN_URL@@' || true)" 0
+    sama 'pasang.sh yang disajikan menanam alamat admin.erp' "$(curl -fsS "$ADMIN/pasang.sh" | grep -c "^ALAMAT_ADMIN='$ADMIN'$" || true)" 1
+
+    # Hanya --token, --app-port, dan --app-bind.
+    tolak_pasang 'tanpa --token ditolak' 'Skrip pasang menuntut --token.'
+    tolak_pasang '--admin-url ditolak' 'Argumen tidak dikenal: --admin-url' --admin-url "$ADMIN" --token "$token"
+    tolak_pasang '--ref ditolak' 'Argumen tidak dikenal: --ref' --token "$token" --ref main
+    tolak_pasang '--release-key ditolak' 'Argumen tidak dikenal: --release-key' --token "$token" --release-key "$KERJA/kunci/rilis.pub"
+
+    # Kunci rilis yang disajikan admin.erp.
+    ganti_berkas kunci-rilis.pub "$(jq -Rs . < "$KERJA/kunci/rilis.key")"
+    tolak_pasang 'kunci privat ditolak' 'memuat kunci PRIVAT' --token "$token"
+    ganti_berkas kunci-rilis.pub "$(cat "$KERJA/kunci/rilis.pub" "$KERJA/kunci/rilis.key" | jq -Rs .)"
+    tolak_pasang 'kunci publik yang digabung kunci privat ditolak' 'memuat kunci PRIVAT' --token "$token"
+    ganti_berkas kunci-rilis.pub '"bukan kunci\n"'
+    tolak_pasang 'kunci yang bukan PEM ditolak' 'bukan kunci publik PEM yang sah' --token "$token"
+    ganti_berkas kunci-rilis.pub null
+
+    # Berkas agen yang kosong.
+    ganti_berkas env.template '""'
+    tolak_pasang 'berkas kosong ditolak' 'agen/env.template dari admin.erp kosong' --token "$token"
+    ganti_berkas env.template null
+
+    # Kunci rilis yang sudah dipaku tidak diganti oleh kunci lain dari admin.erp.
+    rm -rf "$rumah"
+    mkdir -p "$rumah"
+    cp "$KERJA/kunci/asing.pub" "$rumah/kunci-rilis.pub"
+    if jalankan_pasang "$log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$KERJA/systemd-berkas" \
+        COREERP_BIN_DIR="$KERJA/bin-berkas" -- --token "$token"; then
+        cat "$log"
+        printf 'kunci rilis yang sudah dipaku diganti\n'
+        return 1
+    fi
+    memuat 'kunci yang dipaku tidak diganti' "$(cat "$log")" 'berbeda dari yang baru diambil'
+    pastikan 'kunci yang dipaku tetap' cmp -s "$rumah/kunci-rilis.pub" "$KERJA/kunci/asing.pub"
+    sama 'tidak ada yang lain ditulis' "$(find "$rumah" -mindepth 1 | wc -l)" 1
+
+    # Alamat yang ditanam: HTTP hanya ke mesin ini, tanpa path, tanpa nama pengguna yang menyamarkan host.
+    for satu in 'http://admin.erp.contoh|harus HTTPS' 'http://127.0.0.1:1@admin.erp.contoh|bukan nama host yang sah' \
+        'https://admin.erp.contoh/konsol|tidak boleh memuat path' 'ftp://admin.erp.contoh|tidak dikenali'; do
+        rm -rf "$rumah"
+        sed "s|@@COREERP_ADMIN_URL@@|${satu%%|*}|" "$PASANG" > "$salinan"
+        if env COREERP_HOME="$rumah" timeout 60 bash "$salinan" --token "$token" > "$log" 2>&1; then
+            printf 'alamat %s diterima\n' "${satu%%|*}"
+            return 1
+        fi
+        memuat "alamat ${satu%%|*} ditolak" "$(cat "$log")" "${satu#*|}"
+        pastikan "alamat ${satu%%|*}: tidak ada yang ditulis" test ! -e "$rumah"
+    done
+
+    # Skrip yang terpotong di tengah unduhan tidak menjalankan apa pun — dipotong sesudah folder-folder dibuat
+    # dan berkas agen dipasang, di tempat skrip yang dijalankan baris demi baris sudah menulis ke disk.
+    rm -rf "$rumah"
+    curl -fsS "$ADMIN/pasang.sh" > "$salinan"
+    offset="$(grep -b -m 1 "langkah 'Memasang unit systemd'" "$salinan" | cut -d: -f1)"
+    pastikan 'titik potong ditemukan' test -n "$offset"
+    if head -c "$offset" "$salinan" | timeout 60 env COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$KERJA/systemd-berkas" \
+        COREERP_BIN_DIR="$KERJA/bin-berkas" bash -s -- --token "$token" > "$log" 2>&1; then
+        cat "$log"
+        printf 'skrip yang terpotong keluar nol\n'
+        return 1
+    fi
+    pastikan 'skrip yang terpotong tidak menulis apa pun' test ! -e "$rumah"
+    sama 'token tidak terpakai oleh skrip yang terpotong' "$(admin_keadaan | jq -r --arg t "$token" '.tokens[$t].dipakai')" false
+}
+
+# Putaran pasang.sh yang tidak berakhir dengan pemasangan: install yang gagal, dan admin.erp yang tidak pernah
+# memberi rilis.
+uji_17c_putaran_pasang() {
+    local rumah="$KERJA/rumah-putaran" log="$KERJA/log/pasang-putaran.log" token mulai lama keluaran
+
+    putaran() {
+        rm -rf "$rumah"
+        mulai="$(date +%s)"
+
+        if jalankan_pasang "$log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$KERJA/systemd-putaran" \
+            COREERP_BIN_DIR="$KERJA/bin-putaran" "$@"; then
+            cat "$log"
+            printf 'pasang.sh keluar nol padahal pemasangan tidak selesai\n'
+            return 1
+        fi
+
+        lama="$(( $(date +%s) - mulai ))"
+        keluaran="$(cat "$log")"
+    }
+
+    buat_rilis "$EDISI_PASANG" 1.0.0
+
+    # install gagal di update.sh: berhenti pada kegagalannya dengan langkah dan sebab, tidak menunggu batas waktu.
+    token="$(token_pasang putaran-gagal 1.0.0)"
+    putaran COREERP_PASANG_BATAS_DETIK=40 FAKE_UPDATE_EXIT=1 -- --token "$token"
+
+    memuat 'gagal: langkahnya' "$keluaran" 'Pemasangan GAGAL pada langkah: Menjalankan migrasi'
+    memuat 'gagal: sebabnya' "$keluaran" 'SQLSTATE[42703]'
+    memuat 'gagal: arahan berikutnya' "$keluaran" 'minta "Coba lagi"'
+    harus_gagal 'gagal: tidak menunggu sampai batas waktu' grep -q 'Batas waktu' <<< "$keluaran"
+    harus_gagal 'gagal: tidak mencetak selesai' grep -q '^Selesai' <<< "$keluaran"
+    pastikan 'gagal: berhenti jauh sebelum batas waktu' test "$lama" -lt 30
+
+    # "Coba lagi" di admin.erp, lalu pasang.sh dijalankan lagi di server yang sama: kegagalan lama bukan hasil
+    # pemasangan ini, dan yang ditunggu operasi install yang baru.
+    antre "$(jq -cn --arg s "$(jq -r .site_id "$rumah/agent/site.json")" --argjson p "$(parameter_pasang 1.0.0)" \
+        '{site_id: $s, operation: "install", parameters: $p, sembunyi_klaim: 1}')" >/dev/null
+    jalankan_pasang "$log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$KERJA/systemd-putaran" \
+        COREERP_BIN_DIR="$KERJA/bin-putaran" COREERP_PASANG_BATAS_DETIK=40 -- --token "$token" \
+        || { cat "$log"; printf 'coba lagi: pasang.sh tidak selesai\n'; return 1; }
+    keluaran="$(cat "$log")"
+
+    memuat 'coba lagi: kegagalan sebelumnya disebut' "$keluaran" 'pemasangan sebelumnya gagal'
+    memuat 'coba lagi: menunggu operasi baru' "$keluaran" 'Menunggu admin.erp memberi rilis'
+    memuat 'coba lagi: selesai' "$keluaran" 'Selesai. Buka admin.erp untuk melihat server ini.'
+    harus_gagal 'coba lagi: kegagalan lama tidak dicetak sebagai hasil' grep -q 'Pemasangan GAGAL' <<< "$keluaran"
+
+    # install ditolak agen: sebabnya tercetak tanpa hash.
+    token="$(token_pasang putaran-tolak 1.0.0 '.operasi[0].parameters.admin_password_hash += "\n"')"
+    putaran COREERP_PASANG_BATAS_DETIK=40 -- --token "$token"
+
+    memuat 'ditolak: langkahnya' "$keluaran" 'Pemasangan GAGAL pada langkah: Menolak pemasangan'
+    memuat 'ditolak: sebabnya' "$keluaran" 'admin_password_hash bukan hash bcrypt'
+    harus_gagal 'ditolak: hash tidak tercetak' grep -qF -- "$BADAN_HASH" <<< "$keluaran"
+    harus_gagal 'ditolak: hash tidak ada di bawah COREERP_HOME' grep -rqF -- "$BADAN_HASH" "$rumah"
+
+    # admin.erp tidak pernah memberi rilis: berhenti di batas waktu tanpa membunuh apa pun.
+    token="$(token_baru putaran-habis)"
+    putaran COREERP_PASANG_BATAS_DETIK=4 -- --token "$token"
+
+    memuat 'habis: menunggu rilis' "$keluaran" 'Server tersambung ke admin.erp. Menunggu admin.erp memberi rilis…'
+    memuat 'habis: batas waktu' "$keluaran" 'Batas waktu menunggu habis sebelum pemasangan selesai.'
+    harus_gagal 'habis: tidak mencetak selesai' grep -q '^Selesai' <<< "$keluaran"
+    pastikan 'habis: berhenti dekat batas waktunya' test "$lama" -lt 30
 }
 
 # dengarkan PORT — soket TCP sungguhan yang mendengarkan PORT di semua alamat IPv4, sampai subshell
@@ -1267,16 +1739,16 @@ uji_18_pasang_port_dan_setelan() {
     local rumah="$KERJA/rumah-port" folder_bin="$KERJA/bin-port" folder_systemd="$KERJA/systemd-port"
     local cadangan="$KERJA/cadangan-port" token keluaran sidik diharapkan
 
-    token="$(token_baru port)"
+    buat_rilis "$EDISI_PASANG" 1.0.0
+    token="$(token_pasang port 1.0.0)"
 
     # pasang_port PROYEK [pilihan pasang.sh...] — keluaran di $KERJA/log/pasang-port.log
     pasang_port() {
         local proyek="$1"
         shift
-        env COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$folder_systemd" COREERP_BIN_DIR="$folder_bin" \
-            COREERP_PROYEK="$proyek" COREERP_FOLDER_CADANGAN="$cadangan" COREERP_REPO_DIR="$akar" \
-            bash "$PASANG" --admin-url "$ADMIN" --token "$token" --release-key "$KERJA/kunci/rilis.pub" "$@" \
-            > "$KERJA/log/pasang-port.log" 2>&1
+        jalankan_pasang "$KERJA/log/pasang-port.log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$folder_systemd" \
+            COREERP_BIN_DIR="$folder_bin" COREERP_PROYEK="$proyek" COREERP_FOLDER_CADANGAN="$cadangan" \
+            -- --token "$token" "$@"
     }
 
     # Port bawaan dari env.template sudah didengar layanan lain: ditolak sebelum satu berkas pun ditulis.
@@ -1312,6 +1784,7 @@ uji_18_pasang_port_dan_setelan() {
     sama '.env memakai port dan alamat ikat pilihan' \
         "$(grep -E '^CORE_APP_(PORT|BIND)=' "$rumah/.env" | sort | paste -sd' ')" 'CORE_APP_BIND=172.17.0.1 CORE_APP_PORT=18081'
     memuat 'alamat aplikasi dicetak untuk reverse proxy' "$keluaran" 'aplikasi didengar di 172.17.0.1:18081'
+    memuat 'pemasangan selesai' "$keluaran" 'Selesai. Buka admin.erp untuk melihat server ini.'
     sama 'agent.env menyimpan proyek dan folder cadangan' "$(grep -v '^#' "$rumah/agent/agent.env")" \
         "COREERP_PROYEK=coreerp-situs"$'\n'"COREERP_FOLDER_CADANGAN=$cadangan"
     sama 'mode agent.env' "$(stat -c %a "$rumah/agent/agent.env")" 600
@@ -1448,12 +1921,15 @@ uji '09b lisensi di jawaban laporan: dipasang lewat pemeriksaan yang sama; yang 
 uji '09c license_required dari .env: true hanya bentuk persis di baris terakhir, null bila tidak terbaca' uji_09c_lisensi_diwajibkan
 uji '10 rotate_key: kunci lama ditolak, kunci baru diterima' uji_10_putar_kunci
 uji '10b rotate_key yang jawabannya hilang dipulihkan dengan kunci tertunda' uji_10b_rotasi_jawaban_hilang
+uji '11 install: rilis, lalu tenant:bootstrap-site dengan hash lewat stdin; parameter tidak sah ditolak; aman diulang' uji_11_install
 uji '12 dua run bersamaan: yang kedua keluar tanpa bekerja; lease diperpanjang' uji_12_flock
 uji '13 backup: pg_dump lewat compose sehat, gagal dilaporkan gagal' uji_13_cadangan
 uji '14 operasi di luar daftar tertutup ditolak' uji_14_operasi_asing
 uji '15 bootstrap-tenant: argumen diteruskan, kata sandi tidak disimpan' uji_15_bootstrap_tenant
 uji '16 update.sh tanpa images.tar.gz menarik image dan tetap memeriksa digest' uji_16_update_sh_tanpa_arsip_image
-uji '17 pasang.sh: .env, unit, pendaftaran ke admin.erp, pemasangan ulang' uji_17_pasang
+uji '17 pasang.sh dari admin.erp: .env, unit, pendaftaran, putaran sampai install selesai, pemasangan ulang' uji_17_pasang
+uji '17b pasang.sh: isian alamat, pilihan lama, kunci rilis, berkas kosong, alamat, dan skrip terpotong ditolak' uji_17b_pasang_berkas_admin
+uji '17c pasang.sh: putaran berhenti pada install yang gagal dan pada batas waktu' uji_17c_putaran_pasang
 uji '18 pasang.sh: port terpakai ditolak di pemasangan pertama; port, alamat ikat, dan agent.env ditulis' uji_18_pasang_port_dan_setelan
 uji '19 agent.env dibaca agen sendiri: isi di luar daftar ditolak, lingkungan menang, diteruskan ke update.sh' uji_19_agent_env
 
