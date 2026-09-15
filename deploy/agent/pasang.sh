@@ -475,6 +475,38 @@ utama() {
         fi
     fi
 
+    # Folder dan proyek compose milik stack lain. Diperiksa sebelum satu berkas pun ditulis, dan hanya bila folder
+    # ini belum pernah dipasang agen — pemasangan ulang di atas pemasangan agen memang sah.
+    #
+    # Ditemukan di server uji kedua: `/opt/coreerp` di sana berisi stack CoreERP lama yang sedang berjalan, dengan
+    # `.env`-nya sendiri dan volume `coreerp_core-db-data`. Tanpa penjaga ini perintah pasang bawaan membiarkan
+    # `.env` itu (skrip ini tidak pernah menimpa `.env`), lalu update.sh menjalankan proyek compose `coreerp` —
+    # nama yang sama — sehingga container stack lama diambil alih dan database-nya dipakai. Yang rusak adalah
+    # layanan yang sedang melayani orang lain, dan kerusakannya baru terlihat sesudah terjadi.
+    if [ ! -e "$RUMAH/kunci-rilis.pub" ] && [ ! -e "$RUMAH/agent/site.json" ]; then
+        proyek_pasang="${COREERP_PROYEK:-coreerp}"
+        saran_terpisah="  curl -fsSL $ALAMAT_ADMIN/pasang.sh | sudo COREERP_HOME=/opt/coreerp-situs COREERP_PROYEK=coreerp-situs bash -s -- --token TOKEN"
+
+        if [ -e "$BERKAS_ENV" ]; then
+            gagal \
+                "$BERKAS_ENV sudah ada, tetapi $RUMAH bukan pemasangan agen CoreERP." \
+                '' \
+                'Skrip ini tidak menimpa .env, jadi memasang di sini menyalakan CoreERP dengan setelan milik stack lain.' \
+                'Pasang ke folder dan proyek compose tersendiri, dengan token yang sama:' \
+                "$saran_terpisah"
+        fi
+
+        if docker compose ls --all --format json 2>/dev/null | jq -e --arg p "$proyek_pasang" 'any(.[]?; .Name == $p)' >/dev/null 2>&1 \
+            || docker volume ls --quiet --filter "label=com.docker.compose.project=$proyek_pasang" 2>/dev/null | grep -q .; then
+            gagal \
+                "Proyek compose \"$proyek_pasang\" sudah dipakai stack lain di server ini (container atau volume)." \
+                '' \
+                'Memasang dengan nama proyek yang sama mengambil alih container-nya dan memakai volume database-nya.' \
+                'Pasang ke folder dan proyek compose tersendiri, dengan token yang sama:' \
+                "$saran_terpisah"
+        fi
+    fi
+
     # agent.env yang sudah ada tidak diubah. Bila isinya berbeda dari yang disebut sekarang, perintah di dalam
     # skrip ini — yang membawa nilai dari lingkungannya — akan memakai nilai yang baru, sementara timer
     # memakai nilai di berkas: dua proyek compose atau dua folder cadangan untuk satu server.

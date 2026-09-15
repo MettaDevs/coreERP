@@ -1812,6 +1812,58 @@ time.sleep(600)
 
 PENDENGAR=()
 
+# Server uji kedua: `/opt/coreerp` berisi stack CoreERP lama yang berjalan, dengan `.env` dan volume
+# `coreerp_core-db-data`-nya. Perintah pasang bawaan tidak boleh mengambil alih keduanya.
+uji_17d_pasang_stack_lain() {
+    local rumah="$KERJA/rumah-stack-lain" log="$KERJA/log/pasang-stack-lain.log" token
+
+    token="$(token_baru stack-lain)"
+
+    # tolak_stack KETERANGAN POTONGAN [VAR=nilai...] — pasang.sh menolak dengan POTONGAN, menyarankan folder dan
+    # proyek tersendiri, dan tidak memasang agen.
+    tolak_stack() {
+        local keterangan="$1" potongan="$2"
+        shift 2
+
+        if jalankan_pasang "$log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$KERJA/systemd-stack-lain" \
+            COREERP_BIN_DIR="$KERJA/bin-stack-lain" "$@" -- --token "$token"; then
+            cat "$log"
+            printf '%s: pasang.sh diterima padahal harus menolak\n' "$keterangan"
+            return 1
+        fi
+
+        memuat "$keterangan" "$(cat "$log")" "$potongan"
+        memuat "$keterangan: menyarankan folder dan proyek tersendiri" "$(cat "$log")" 'COREERP_PROYEK=coreerp-situs'
+        pastikan "$keterangan: agen tidak dipasang" test ! -e "$rumah/bin/coreerp-agent"
+        pastikan "$keterangan: unit tidak dipasang" test ! -e "$KERJA/systemd-stack-lain/coreerp-agent.service"
+    }
+
+    rm -rf "$rumah"
+    mkdir -p "$rumah"
+    printf 'APP_KEY=milik-stack-lama\n' > "$rumah/.env"
+    tolak_stack '.env milik stack lain' 'bukan pemasangan agen CoreERP'
+    sama '.env milik stack lain tidak disentuh' "$(cat "$rumah/.env")" 'APP_KEY=milik-stack-lama'
+    pastikan '.env milik stack lain: tidak ada folder agen' test ! -e "$rumah/agent"
+
+    rm -rf "$rumah"
+    tolak_stack 'proyek compose yang berjalan' 'sudah dipakai stack lain' \
+        FAKE_DOCKER_COMPOSE_LS='[{"Name":"coreerp","Status":"running(11)","ConfigFiles":"/opt/coreerp/compose.server.yaml"}]'
+    pastikan 'proyek compose yang berjalan: folder tidak dibuat' test ! -e "$rumah"
+
+    tolak_stack 'volume proyek yang tertinggal' 'sudah dipakai stack lain' FAKE_DOCKER_VOLUME='coreerp_core-db-data'
+    pastikan 'volume proyek yang tertinggal: folder tidak dibuat' test ! -e "$rumah"
+
+    # Nama proyek lain tidak tertahan oleh stack bernama `coreerp`: penjaganya membandingkan nama persis. Token
+    # ini tidak membawa operasi install, jadi putaran pasang.sh berhenti pada batas waktunya yang dipendekkan;
+    # yang diuji hanya bahwa penjaganya terlewati dan agen terpasang.
+    jalankan_pasang "$log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$KERJA/systemd-stack-lain" \
+        COREERP_BIN_DIR="$KERJA/bin-stack-lain" COREERP_PROYEK=coreerp-situs COREERP_PASANG_BATAS_DETIK=3 \
+        FAKE_DOCKER_COMPOSE_LS='[{"Name":"coreerp","Status":"running(11)"},{"Name":"coreerp-server-giw2cp","Status":"running(11)"}]' \
+        -- --token "$token" || true
+    harus_gagal 'proyek tersendiri tidak ditolak penjaga stack lain' grep -q 'sudah dipakai stack lain' "$log"
+    pastikan 'proyek tersendiri: agen terpasang' test -x "$rumah/bin/coreerp-agent"
+}
+
 uji_18_pasang_port_dan_setelan() {
     local rumah="$KERJA/rumah-port" folder_bin="$KERJA/bin-port" folder_systemd="$KERJA/systemd-port"
     local cadangan="$KERJA/cadangan-port" token keluaran sidik diharapkan
@@ -2527,6 +2579,7 @@ uji '16 update.sh tanpa images.tar.gz menarik image dan tetap memeriksa digest' 
 uji '17 pasang.sh dari admin.erp: .env, unit, pendaftaran, putaran sampai install selesai, pemasangan ulang' uji_17_pasang
 uji '17b pasang.sh: isian alamat, pilihan lama, kunci rilis, berkas kosong, alamat, dan skrip terpotong ditolak' uji_17b_pasang_berkas_admin
 uji '17c pasang.sh: putaran berhenti pada install yang gagal dan pada batas waktu' uji_17c_putaran_pasang
+uji '17d pasang.sh: folder atau proyek compose milik stack lain ditolak sebelum apa pun ditulis' uji_17d_pasang_stack_lain
 uji '18 pasang.sh: port terpakai ditolak di pemasangan pertama; port, alamat ikat, dan agent.env ditulis' uji_18_pasang_port_dan_setelan
 uji '19 agent.env dibaca agen sendiri: isi di luar daftar ditolak, lingkungan menang, diteruskan ke update.sh' uji_19_agent_env
 uji '20 v2: kredensial per operasi, login lewat stdin, pull lewat digest, tag lokal, logout, tanpa sisa kredensial' uji_20_v2_tarik_image
