@@ -57,7 +57,15 @@ type Props = {
     canManage: boolean;
 };
 
-const DAY_NAMES = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+const DAY_NAMES = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
+];
 
 export default function ComposeWorkingTimesPage({
     calendars,
@@ -100,8 +108,13 @@ export default function ComposeWorkingTimesPage({
         if (!selectedTemplate) return [];
 
         return DAY_NAMES.map((name, dayIndex) => {
-            const dayLines = selectedTemplate.lines.filter((l) => l.day_of_week === dayIndex);
-            const totalHours = dayLines.reduce((acc, l) => acc + (l.hours || 0), 0);
+            const dayLines = selectedTemplate.lines.filter(
+                (l) => l.day_of_week === dayIndex,
+            );
+            const totalHours = dayLines.reduce(
+                (acc, l) => acc + (l.hours || 0),
+                0,
+            );
             const isOpen = dayLines.length > 0 && totalHours > 0;
 
             return {
@@ -141,12 +154,16 @@ export default function ComposeWorkingTimesPage({
         e.preventDefault();
 
         if (!calendarId) {
-            setErrors({ calendar_id: 'Pilih kalender kerja sasaran terlebih dahulu.' });
+            setErrors({
+                calendar_id: 'Pilih kalender kerja sasaran terlebih dahulu.',
+            });
             return;
         }
 
         if (!templateId) {
-            setErrors({ template_id: 'Pilih pola jam kerja acuan terlebih dahulu.' });
+            setErrors({
+                template_id: 'Pilih pola jam kerja acuan terlebih dahulu.',
+            });
             return;
         }
 
@@ -161,7 +178,10 @@ export default function ComposeWorkingTimesPage({
         }
 
         if (fromDate > toDate) {
-            setErrors({ to_date: 'Tanggal selesai tidak boleh lebih awal dari tanggal mulai.' });
+            setErrors({
+                to_date:
+                    'Tanggal selesai tidak boleh lebih awal dari tanggal mulai.',
+            });
             return;
         }
 
@@ -239,7 +259,12 @@ export default function ComposeWorkingTimesPage({
                                     Penyusunan Jadwal Kerja Otomatis
                                 </p>
                                 <p className="text-muted-foreground">
-                                    Fitur ini menerapkan pola jam kerja mingguan (working time template) ke dalam kalender kerja untuk rentang tanggal yang Anda tentukan. Hari kerja, jam kerja per shift, efisiensi, dan kapasitas akan dihitung secara otomatis.
+                                    Fitur ini menerapkan pola jam kerja mingguan
+                                    (working time template) ke dalam kalender
+                                    kerja untuk rentang tanggal yang Anda
+                                    tentukan. Hari kerja, jam kerja per shift,
+                                    efisiensi, dan kapasitas akan dihitung
+                                    secara otomatis.
                                 </p>
                             </div>
                         </div>
@@ -263,18 +288,23 @@ export default function ComposeWorkingTimesPage({
                                         Parameter Penyusunan Jadwal
                                     </h2>
                                     <p className="text-xs text-muted-foreground">
-                                        Pilih kalender sasaran, pola acuan, serta rentang tanggal pelaksanaan.
+                                        Pilih kalender sasaran, pola acuan,
+                                        serta rentang tanggal pelaksanaan.
                                     </p>
                                 </div>
 
                                 {/* Field 1: Target Calendar */}
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-semibold text-foreground">
-                                        Kalender Kerja Sasaran <span className="text-destructive">*</span>
+                                        Kalender Kerja Sasaran{' '}
+                                        <span className="text-destructive">
+                                            *
+                                        </span>
                                     </label>
                                     {calendars.length === 0 ? (
                                         <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
-                                            Belum ada kalender kerja yang dibuat.{' '}
+                                            Belum ada kalender kerja yang
+                                            dibuat.{' '}
                                             <Link
                                                 href="/settings/working-time-calendars"
                                                 className="font-semibold underline hover:no-underline"
@@ -285,25 +315,34 @@ export default function ComposeWorkingTimesPage({
                                     ) : (
                                         <select
                                             value={calendarId}
-                                            onChange={(e) => setCalendarId(e.target.value)}
-                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                            onChange={(e) =>
+                                                setCalendarId(e.target.value)
+                                            }
+                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
                                         >
                                             {calendars.map((c) => (
                                                 <option key={c.id} value={c.id}>
-                                                    {c.code} — {c.name} ({c.standard_work_hours} jam/hari)
+                                                    {c.code} — {c.name} (
+                                                    {c.standard_work_hours}{' '}
+                                                    jam/hari)
                                                 </option>
                                             ))}
                                         </select>
                                     )}
                                     {errors.calendar_id && (
-                                        <p className="text-xs text-destructive">{errors.calendar_id}</p>
+                                        <p className="text-xs text-destructive">
+                                            {errors.calendar_id}
+                                        </p>
                                     )}
                                 </div>
 
                                 {/* Field 2: Working Time Template */}
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-semibold text-foreground">
-                                        Pola Jam Kerja Acuan <span className="text-destructive">*</span>
+                                        Pola Jam Kerja Acuan{' '}
+                                        <span className="text-destructive">
+                                            *
+                                        </span>
                                     </label>
                                     {templates.length === 0 ? (
                                         <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-600 dark:text-amber-400">
@@ -318,8 +357,10 @@ export default function ComposeWorkingTimesPage({
                                     ) : (
                                         <select
                                             value={templateId}
-                                            onChange={(e) => setTemplateId(e.target.value)}
-                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                            onChange={(e) =>
+                                                setTemplateId(e.target.value)
+                                            }
+                                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
                                         >
                                             {templates.map((t) => (
                                                 <option key={t.id} value={t.id}>
@@ -329,7 +370,9 @@ export default function ComposeWorkingTimesPage({
                                         </select>
                                     )}
                                     {errors.template_id && (
-                                        <p className="text-xs text-destructive">{errors.template_id}</p>
+                                        <p className="text-xs text-destructive">
+                                            {errors.template_id}
+                                        </p>
                                     )}
                                 </div>
 
@@ -337,28 +380,39 @@ export default function ComposeWorkingTimesPage({
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
                                         <label className="text-xs font-semibold text-foreground">
-                                            Rentang Tanggal <span className="text-destructive">*</span>
+                                            Rentang Tanggal{' '}
+                                            <span className="text-destructive">
+                                                *
+                                            </span>
                                         </label>
                                         {/* Presets */}
                                         <div className="flex items-center gap-1.5 text-[11px]">
-                                            <span className="text-muted-foreground">Pilihan cepat:</span>
+                                            <span className="text-muted-foreground">
+                                                Pilihan cepat:
+                                            </span>
                                             <button
                                                 type="button"
-                                                onClick={handleSetRangeCurrentMonth}
+                                                onClick={
+                                                    handleSetRangeCurrentMonth
+                                                }
                                                 className="rounded bg-muted px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                                             >
                                                 Bulan Ini
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={handleSetRangeNextMonth}
+                                                onClick={
+                                                    handleSetRangeNextMonth
+                                                }
                                                 className="rounded bg-muted px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                                             >
                                                 Bulan Depan
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={handleSetRangeCurrentYear}
+                                                onClick={
+                                                    handleSetRangeCurrentYear
+                                                }
                                                 className="rounded bg-muted px-2 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                                             >
                                                 Tahun Ini
@@ -374,11 +428,15 @@ export default function ComposeWorkingTimesPage({
                                             <Input
                                                 type="date"
                                                 value={fromDate}
-                                                onChange={(e) => setFromDate(e.target.value)}
+                                                onChange={(e) =>
+                                                    setFromDate(e.target.value)
+                                                }
                                                 className="h-8 text-xs"
                                             />
                                             {errors.from_date && (
-                                                <p className="text-xs text-destructive">{errors.from_date}</p>
+                                                <p className="text-xs text-destructive">
+                                                    {errors.from_date}
+                                                </p>
                                             )}
                                         </div>
 
@@ -389,16 +447,22 @@ export default function ComposeWorkingTimesPage({
                                             <Input
                                                 type="date"
                                                 value={toDate}
-                                                onChange={(e) => setToDate(e.target.value)}
+                                                onChange={(e) =>
+                                                    setToDate(e.target.value)
+                                                }
                                                 className="h-8 text-xs"
                                             />
                                             {errors.to_date && (
-                                                <p className="text-xs text-destructive">{errors.to_date}</p>
+                                                <p className="text-xs text-destructive">
+                                                    {errors.to_date}
+                                                </p>
                                             )}
                                         </div>
                                     </div>
                                     <p className="text-[11px] text-muted-foreground">
-                                        Setiap hari dalam rentang ini yang telah memiliki jadwal akan ditimpa dengan konfigurasi pola terbaru.
+                                        Setiap hari dalam rentang ini yang telah
+                                        memiliki jadwal akan ditimpa dengan
+                                        konfigurasi pola terbaru.
                                     </p>
                                 </div>
 
@@ -422,7 +486,9 @@ export default function ComposeWorkingTimesPage({
                                     >
                                         <Play className="size-3.5 fill-current" />
                                         <span>
-                                            {isSubmitting ? 'Memproses Jadwal…' : 'Terapkan Jadwal dari Pola'}
+                                            {isSubmitting
+                                                ? 'Memproses Jadwal…'
+                                                : 'Terapkan Jadwal dari Pola'}
                                         </span>
                                     </Button>
                                 </div>
@@ -435,7 +501,10 @@ export default function ComposeWorkingTimesPage({
                                     <div className="rounded-lg border border-border bg-card p-4 text-xs">
                                         <div className="flex items-center gap-2 border-b border-border pb-2 text-xs font-semibold text-foreground">
                                             <CalendarDays className="size-4 text-primary" />
-                                            <span>Kalender Sasaran: {selectedCalendar.code}</span>
+                                            <span>
+                                                Kalender Sasaran:{' '}
+                                                {selectedCalendar.code}
+                                            </span>
                                         </div>
                                         <div className="mt-3 space-y-1 text-muted-foreground">
                                             <p className="font-medium text-foreground">
@@ -444,7 +513,10 @@ export default function ComposeWorkingTimesPage({
                                             <p>
                                                 Standar jam kerja per hari:{' '}
                                                 <span className="font-semibold text-foreground">
-                                                    {selectedCalendar.standard_work_hours} jam
+                                                    {
+                                                        selectedCalendar.standard_work_hours
+                                                    }{' '}
+                                                    jam
                                                 </span>
                                             </p>
                                         </div>
@@ -457,12 +529,18 @@ export default function ComposeWorkingTimesPage({
                                         <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                                             <Clock className="size-4 text-primary" />
                                             <span>
-                                                Pratinjau Pola: {selectedTemplate?.code ?? 'Belum ada pola'}
+                                                Pratinjau Pola:{' '}
+                                                {selectedTemplate?.code ??
+                                                    'Belum ada pola'}
                                             </span>
                                         </div>
                                         {selectedTemplate && (
-                                            <Badge variant="outline" className="text-[10px]">
-                                                {selectedTemplate.lines.length} Baris Shift
+                                            <Badge
+                                                variant="outline"
+                                                className="text-[10px]"
+                                            >
+                                                {selectedTemplate.lines.length}{' '}
+                                                Baris Shift
                                             </Badge>
                                         )}
                                     </div>
@@ -472,60 +550,107 @@ export default function ComposeWorkingTimesPage({
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
-                                                        <TableHead className="w-20 text-xs">Hari</TableHead>
-                                                        <TableHead className="w-16 text-center text-xs">Status</TableHead>
-                                                        <TableHead className="text-xs">Jam Kerja</TableHead>
-                                                        <TableHead className="w-16 text-right text-xs">Total</TableHead>
+                                                        <TableHead className="w-20 text-xs">
+                                                            Hari
+                                                        </TableHead>
+                                                        <TableHead className="w-16 text-center text-xs">
+                                                            Status
+                                                        </TableHead>
+                                                        <TableHead className="text-xs">
+                                                            Jam Kerja
+                                                        </TableHead>
+                                                        <TableHead className="w-16 text-right text-xs">
+                                                            Total
+                                                        </TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
-                                                    {templatePreviewByDay.map((item) => (
-                                                        <TableRow key={item.dayIndex}>
-                                                            <TableCell className="text-xs font-medium text-foreground">
-                                                                {item.dayName}
-                                                            </TableCell>
-                                                            <TableCell className="text-center text-xs">
-                                                                {item.isOpen ? (
-                                                                    <Badge className="bg-emerald-500/10 text-[10px] text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400">
-                                                                        Buka
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <Badge variant="secondary" className="text-[10px] text-muted-foreground">
-                                                                        Libur
-                                                                    </Badge>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-xs text-muted-foreground">
-                                                                {item.lines.length > 0 ? (
-                                                                    <div className="space-y-0.5">
-                                                                        {item.lines.map((l) => (
-                                                                            <div key={l.id} className="flex items-center gap-1 font-mono text-[11px]">
-                                                                                <span>
-                                                                                    {l.from_time} - {l.to_time}
-                                                                                </span>
-                                                                                {l.property && (
-                                                                                    <span className="text-muted-foreground">
-                                                                                        ({l.property})
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                ) : (
-                                                                    <span className="italic text-muted-foreground">-</span>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell className="text-right font-mono text-xs font-semibold text-foreground">
-                                                                {item.totalHours.toFixed(1)} j
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
+                                                    {templatePreviewByDay.map(
+                                                        (item) => (
+                                                            <TableRow
+                                                                key={
+                                                                    item.dayIndex
+                                                                }
+                                                            >
+                                                                <TableCell className="text-xs font-medium text-foreground">
+                                                                    {
+                                                                        item.dayName
+                                                                    }
+                                                                </TableCell>
+                                                                <TableCell className="text-center text-xs">
+                                                                    {item.isOpen ? (
+                                                                        <Badge className="bg-emerald-500/10 text-[10px] text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400">
+                                                                            Buka
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        <Badge
+                                                                            variant="secondary"
+                                                                            className="text-[10px] text-muted-foreground"
+                                                                        >
+                                                                            Libur
+                                                                        </Badge>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell className="text-xs text-muted-foreground">
+                                                                    {item.lines
+                                                                        .length >
+                                                                    0 ? (
+                                                                        <div className="space-y-0.5">
+                                                                            {item.lines.map(
+                                                                                (
+                                                                                    l,
+                                                                                ) => (
+                                                                                    <div
+                                                                                        key={
+                                                                                            l.id
+                                                                                        }
+                                                                                        className="flex items-center gap-1 font-mono text-[11px]"
+                                                                                    >
+                                                                                        <span>
+                                                                                            {
+                                                                                                l.from_time
+                                                                                            }{' '}
+                                                                                            -{' '}
+                                                                                            {
+                                                                                                l.to_time
+                                                                                            }
+                                                                                        </span>
+                                                                                        {l.property && (
+                                                                                            <span className="text-muted-foreground">
+                                                                                                (
+                                                                                                {
+                                                                                                    l.property
+                                                                                                }
+
+                                                                                                )
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                ),
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-muted-foreground italic">
+                                                                            -
+                                                                        </span>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell className="text-right font-mono text-xs font-semibold text-foreground">
+                                                                    {item.totalHours.toFixed(
+                                                                        1,
+                                                                    )}{' '}
+                                                                    j
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ),
+                                                    )}
                                                 </TableBody>
                                             </Table>
                                         </div>
                                     ) : (
                                         <div className="py-8 text-center text-xs text-muted-foreground">
-                                            Pilih pola jam kerja untuk melihat rincian jam per hari.
+                                            Pilih pola jam kerja untuk melihat
+                                            rincian jam per hari.
                                         </div>
                                     )}
                                 </div>

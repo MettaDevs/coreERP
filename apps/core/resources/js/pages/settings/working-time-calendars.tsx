@@ -22,7 +22,15 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarCheck, CalendarDays, Clock, Copy, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import {
+    CalendarCheck,
+    CalendarDays,
+    Clock,
+    Copy,
+    Plus,
+    Trash2,
+    ArrowLeft,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types/navigation';
@@ -166,18 +174,25 @@ export default function WorkingTimeCalendars({
 
     const handleDelete = () => {
         if (!selectedCalendar) return;
-        if (!confirm(`Apakah Anda yakin ingin mengarsipkan kalender kerja "${selectedCalendar.name}"?`)) {
+        if (
+            !confirm(
+                `Apakah Anda yakin ingin mengarsipkan kalender kerja "${selectedCalendar.name}"?`,
+            )
+        ) {
             return;
         }
 
         setIsDeleting(true);
-        router.delete(`/settings/working-time-calendars/${selectedCalendar.id}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setSelectedCalendarId(null);
+        router.delete(
+            `/settings/working-time-calendars/${selectedCalendar.id}`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSelectedCalendarId(null);
+                },
+                onFinish: () => setIsDeleting(false),
             },
-            onFinish: () => setIsDeleting(false),
-        });
+        );
     };
 
     const handleExecuteCopy = () => {
@@ -205,7 +220,9 @@ export default function WorkingTimeCalendars({
 
     const handleNavigateToTimes = () => {
         if (!selectedCalendar) return;
-        router.visit(`/settings/working-time-calendars/${selectedCalendar.id}/times`);
+        router.visit(
+            `/settings/working-time-calendars/${selectedCalendar.id}/times`,
+        );
     };
 
     return (
@@ -298,7 +315,9 @@ export default function WorkingTimeCalendars({
                 {!currentLegalEntity && (
                     <div className="mx-4 mt-4 flex items-center justify-between rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
                         <span>
-                            <strong>Pemberitahuan:</strong> Belum ada entitas legal yang aktif pada sesi ini. Kalender kerja memerlukan entitas legal aktif.
+                            <strong>Pemberitahuan:</strong> Belum ada entitas
+                            legal yang aktif pada sesi ini. Kalender kerja
+                            memerlukan entitas legal aktif.
                         </span>
                         <a
                             href="/settings/organization"
@@ -315,50 +334,85 @@ export default function WorkingTimeCalendars({
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-12 text-center">Pilih</TableHead>
-                                    <TableHead className="w-40">Kalender</TableHead>
+                                    <TableHead className="w-12 text-center">
+                                        Pilih
+                                    </TableHead>
+                                    <TableHead className="w-40">
+                                        Kalender
+                                    </TableHead>
                                     <TableHead>Nama</TableHead>
-                                    <TableHead className="w-48">Kalender dasar</TableHead>
-                                    <TableHead className="w-40 text-right">Jam kerja standar</TableHead>
+                                    <TableHead className="w-48">
+                                        Kalender dasar
+                                    </TableHead>
+                                    <TableHead className="w-40 text-right">
+                                        Jam kerja standar
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {calendars.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                                            Belum ada kalender kerja. Klik <strong>+ Baru</strong> untuk menambahkan.
+                                        <TableCell
+                                            colSpan={5}
+                                            className="py-8 text-center text-muted-foreground"
+                                        >
+                                            Belum ada kalender kerja. Klik{' '}
+                                            <strong>+ Baru</strong> untuk
+                                            menambahkan.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     calendars.map((calendar) => {
-                                        const isSelected = calendar.id === selectedCalendarId;
+                                        const isSelected =
+                                            calendar.id === selectedCalendarId;
                                         return (
                                             <TableRow
                                                 key={calendar.id}
                                                 className={cn(
                                                     'cursor-pointer transition-colors hover:bg-muted/50',
-                                                    isSelected && 'bg-primary/10 hover:bg-primary/15',
+                                                    isSelected &&
+                                                        'bg-primary/10 hover:bg-primary/15',
                                                 )}
-                                                onClick={() => setSelectedCalendarId(calendar.id)}
-                                                onDoubleClick={handleNavigateToTimes}
+                                                onClick={() =>
+                                                    setSelectedCalendarId(
+                                                        calendar.id,
+                                                    )
+                                                }
+                                                onDoubleClick={
+                                                    handleNavigateToTimes
+                                                }
                                             >
-                                                <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                                                <TableCell
+                                                    className="text-center"
+                                                    onClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                >
                                                     <Checkbox
                                                         checked={isSelected}
-                                                        onCheckedChange={() => setSelectedCalendarId(calendar.id)}
+                                                        onCheckedChange={() =>
+                                                            setSelectedCalendarId(
+                                                                calendar.id,
+                                                            )
+                                                        }
                                                     />
                                                 </TableCell>
                                                 <TableCell className="font-semibold text-foreground">
                                                     {calendar.code}
                                                 </TableCell>
-                                                <TableCell>{calendar.name}</TableCell>
+                                                <TableCell>
+                                                    {calendar.name}
+                                                </TableCell>
                                                 <TableCell className="text-muted-foreground">
                                                     {calendar.base_calendar_code
                                                         ? `${calendar.base_calendar_code} - ${calendar.base_calendar_name}`
                                                         : '-'}
                                                 </TableCell>
                                                 <TableCell className="text-right font-mono">
-                                                    {calendar.standard_work_hours.toFixed(2)} jam
+                                                    {calendar.standard_work_hours.toFixed(
+                                                        2,
+                                                    )}{' '}
+                                                    jam
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -376,7 +430,8 @@ export default function WorkingTimeCalendars({
                     <DialogHeader>
                         <DialogTitle>Tambah Kalender Kerja Baru</DialogTitle>
                         <DialogDescription>
-                            Definisikan master kalender kerja untuk entitas legal aktif.
+                            Definisikan master kalender kerja untuk entitas
+                            legal aktif.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -388,23 +443,29 @@ export default function WorkingTimeCalendars({
                         )}
                         <div>
                             <label className="text-xs font-semibold text-foreground">
-                                Kode Kalender <span className="text-destructive">*</span>
+                                Kode Kalender{' '}
+                                <span className="text-destructive">*</span>
                             </label>
                             <Input
                                 value={formCode}
-                                onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+                                onChange={(e) =>
+                                    setFormCode(e.target.value.toUpperCase())
+                                }
                                 placeholder="Contoh: 24HR, PROD, PAYROLL"
                                 className="mt-1"
                                 autoFocus
                             />
                             {formErrors.code && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.code}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.code}
+                                </p>
                             )}
                         </div>
 
                         <div>
                             <label className="text-xs font-semibold text-foreground">
-                                Nama Kalender <span className="text-destructive">*</span>
+                                Nama Kalender{' '}
+                                <span className="text-destructive">*</span>
                             </label>
                             <Input
                                 value={formName}
@@ -413,7 +474,9 @@ export default function WorkingTimeCalendars({
                                 className="mt-1"
                             />
                             {formErrors.name && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.name}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.name}
+                                </p>
                             )}
                         </div>
 
@@ -424,9 +487,11 @@ export default function WorkingTimeCalendars({
                             <select
                                 value={formBaseId}
                                 onChange={(e) => setFormBaseId(e.target.value)}
-                                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:outline-none"
                             >
-                                <option value="">-- Tanpa Kalender Dasar --</option>
+                                <option value="">
+                                    -- Tanpa Kalender Dasar --
+                                </option>
                                 {calendars.map((c) => (
                                     <option key={c.id} value={c.id}>
                                         {c.code} - {c.name}
@@ -434,7 +499,9 @@ export default function WorkingTimeCalendars({
                                 ))}
                             </select>
                             {formErrors.base_calendar_id && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.base_calendar_id}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.base_calendar_id}
+                                </p>
                             )}
                         </div>
 
@@ -448,11 +515,15 @@ export default function WorkingTimeCalendars({
                                 min="0"
                                 max="24"
                                 value={formHours}
-                                onChange={(e) => setFormHours(Number(e.target.value))}
+                                onChange={(e) =>
+                                    setFormHours(Number(e.target.value))
+                                }
                                 className="mt-1"
                             />
                             {formErrors.standard_work_hours && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.standard_work_hours}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.standard_work_hours}
+                                </p>
                             )}
                         </div>
 
@@ -470,7 +541,10 @@ export default function WorkingTimeCalendars({
                     </DialogBody>
 
                     <DialogFooter>
-                        <DialogAction onClick={handleCreate} disabled={isSubmitting || !formCode || !formName}>
+                        <DialogAction
+                            onClick={handleCreate}
+                            disabled={isSubmitting || !formCode || !formName}
+                        >
                             {isSubmitting ? 'Menyimpan…' : 'Simpan'}
                         </DialogAction>
                         <DialogCancel onClick={() => setIsCreateOpen(false)} />
@@ -491,21 +565,27 @@ export default function WorkingTimeCalendars({
                     <DialogBody className="space-y-4 py-2">
                         <div>
                             <label className="text-xs font-semibold text-foreground">
-                                Kode Kalender <span className="text-destructive">*</span>
+                                Kode Kalender{' '}
+                                <span className="text-destructive">*</span>
                             </label>
                             <Input
                                 value={formCode}
-                                onChange={(e) => setFormCode(e.target.value.toUpperCase())}
+                                onChange={(e) =>
+                                    setFormCode(e.target.value.toUpperCase())
+                                }
                                 className="mt-1"
                             />
                             {formErrors.code && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.code}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.code}
+                                </p>
                             )}
                         </div>
 
                         <div>
                             <label className="text-xs font-semibold text-foreground">
-                                Nama Kalender <span className="text-destructive">*</span>
+                                Nama Kalender{' '}
+                                <span className="text-destructive">*</span>
                             </label>
                             <Input
                                 value={formName}
@@ -513,7 +593,9 @@ export default function WorkingTimeCalendars({
                                 className="mt-1"
                             />
                             {formErrors.name && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.name}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.name}
+                                </p>
                             )}
                         </div>
 
@@ -524,11 +606,15 @@ export default function WorkingTimeCalendars({
                             <select
                                 value={formBaseId}
                                 onChange={(e) => setFormBaseId(e.target.value)}
-                                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-ring focus:outline-none"
                             >
-                                <option value="">-- Tanpa Kalender Dasar --</option>
+                                <option value="">
+                                    -- Tanpa Kalender Dasar --
+                                </option>
                                 {calendars
-                                    .filter((c) => c.id !== selectedCalendar?.id)
+                                    .filter(
+                                        (c) => c.id !== selectedCalendar?.id,
+                                    )
                                     .map((c) => (
                                         <option key={c.id} value={c.id}>
                                             {c.code} - {c.name}
@@ -536,7 +622,9 @@ export default function WorkingTimeCalendars({
                                     ))}
                             </select>
                             {formErrors.base_calendar_id && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.base_calendar_id}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.base_calendar_id}
+                                </p>
                             )}
                         </div>
 
@@ -550,11 +638,15 @@ export default function WorkingTimeCalendars({
                                 min="0"
                                 max="24"
                                 value={formHours}
-                                onChange={(e) => setFormHours(Number(e.target.value))}
+                                onChange={(e) =>
+                                    setFormHours(Number(e.target.value))
+                                }
                                 className="mt-1"
                             />
                             {formErrors.standard_work_hours && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.standard_work_hours}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.standard_work_hours}
+                                </p>
                             )}
                         </div>
 
@@ -571,7 +663,10 @@ export default function WorkingTimeCalendars({
                     </DialogBody>
 
                     <DialogFooter>
-                        <DialogAction onClick={handleUpdate} disabled={isSubmitting || !formCode || !formName}>
+                        <DialogAction
+                            onClick={handleUpdate}
+                            disabled={isSubmitting || !formCode || !formName}
+                        >
                             {isSubmitting ? 'Menyimpan…' : 'Simpan Perubahan'}
                         </DialogAction>
                         <DialogCancel onClick={() => setIsEditOpen(false)} />
@@ -585,43 +680,65 @@ export default function WorkingTimeCalendars({
                     <DialogHeader>
                         <DialogTitle>Salin Kalender Kerja</DialogTitle>
                         <DialogDescription>
-                            Salin kalender <strong>{selectedCalendar?.code}</strong> beserta seluruh rincian hari kerja dan jam kerjanya ke kalender baru.
+                            Salin kalender{' '}
+                            <strong>{selectedCalendar?.code}</strong> beserta
+                            seluruh rincian hari kerja dan jam kerjanya ke
+                            kalender baru.
                         </DialogDescription>
                     </DialogHeader>
 
                     <DialogBody className="space-y-4 py-2">
                         <div>
                             <label className="text-xs font-semibold text-foreground">
-                                Kode Kalender Baru <span className="text-destructive">*</span>
+                                Kode Kalender Baru{' '}
+                                <span className="text-destructive">*</span>
                             </label>
                             <Input
                                 value={copyTargetCode}
-                                onChange={(e) => setCopyTargetCode(e.target.value.toUpperCase())}
+                                onChange={(e) =>
+                                    setCopyTargetCode(
+                                        e.target.value.toUpperCase(),
+                                    )
+                                }
                                 className="mt-1"
                                 autoFocus
                             />
                             {formErrors.code && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.code}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.code}
+                                </p>
                             )}
                         </div>
 
                         <div>
                             <label className="text-xs font-semibold text-foreground">
-                                Nama Kalender Baru <span className="text-destructive">*</span>
+                                Nama Kalender Baru{' '}
+                                <span className="text-destructive">*</span>
                             </label>
                             <Input
                                 value={copyTargetName}
-                                onChange={(e) => setCopyTargetName(e.target.value)}
+                                onChange={(e) =>
+                                    setCopyTargetName(e.target.value)
+                                }
                                 className="mt-1"
                             />
                             {formErrors.name && (
-                                <p className="mt-1 text-xs text-destructive">{formErrors.name}</p>
+                                <p className="mt-1 text-xs text-destructive">
+                                    {formErrors.name}
+                                </p>
                             )}
                         </div>
                     </DialogBody>
 
                     <DialogFooter>
-                        <DialogAction onClick={handleExecuteCopy} disabled={isSubmitting || !copyTargetCode || !copyTargetName}>
+                        <DialogAction
+                            onClick={handleExecuteCopy}
+                            disabled={
+                                isSubmitting ||
+                                !copyTargetCode ||
+                                !copyTargetName
+                            }
+                        >
                             {isSubmitting ? 'Menyalin…' : 'Salin Kalender'}
                         </DialogAction>
                         <DialogCancel onClick={() => setIsCopyOpen(false)} />
