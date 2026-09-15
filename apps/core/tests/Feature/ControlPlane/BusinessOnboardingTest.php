@@ -6,6 +6,7 @@ use App\Models\CoreApp;
 use App\Models\ModuleInstallation;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\ControlPlane\EnvironmentAddress;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -151,6 +152,38 @@ class BusinessOnboardingTest extends TestCase
             'minimum_number' => 0,
             'maximum_number' => 19999,
         ]);
+    }
+
+    /**
+     * `admin.<domain>` dan `registry.<domain>` dijawab konsol dan registry image, bukan Core. Usaha
+     * yang kebetulan bernama "Admin" atau "Registry" harus lahir dengan slug lain — kalau tidak,
+     * alamat produksinya tidak pernah sampai ke Core dan pemiliknya tidak pernah tahu sebabnya.
+     */
+    public function test_a_business_named_after_a_reserved_label_gets_another_slug(): void
+    {
+        config(['coreerp.base_domain' => 'erp.contoh.co.id']);
+
+        foreach (['Registry', 'Admin'] as $i => $nama) {
+            $this->postJson('/api/v1/business-registrations', [
+                'name' => 'Owner '.$nama,
+                'business_name' => $nama,
+                'app_ids' => ['app-uji'],
+                'email' => "cadangan{$i}@metta.test",
+                'password' => 'password',
+                'password_confirmation' => 'password',
+            ])->assertCreated();
+
+            $label = Str::lower($nama);
+            $slug = (string) Tenant::query()->where('name', $nama)->value('slug');
+
+            $this->assertNotSame($label, $slug);
+            $this->assertStringStartsWith($label.'-', $slug);
+            $this->assertSame(
+                $slug,
+                EnvironmentAddress::fromHost(EnvironmentAddress::forEnvironment($slug, 'production') ?? '')?->tenant,
+                'Alamat produksi tenant ini harus terbaca kembali sebagai miliknya.',
+            );
+        }
     }
 
     public function test_duplicate_email_rolls_back_without_creating_a_second_tenant(): void

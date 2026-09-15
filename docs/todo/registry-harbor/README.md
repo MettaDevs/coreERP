@@ -277,7 +277,7 @@ Dua alasan yang sama pentingnya:
 | Robot perakit dicuri | Tag rilis immutable; agen hanya menjalankan digest yang disebut manifest bertanda tangan kunci rilis — image baru tanpa tanda tangan tidak pernah dijalankan |
 | Robot situs dicuri dari server klien | Pull saja; mati bersama operasinya atau paling lama satu hari; dicabut saat situs dicabut |
 | Harbor dibobol | Sama dengan robot perakit dicuri: image palsu tidak punya tanda tangan yang sah |
-| UI Harbor diserang dari internet | Jalur UI dan API admin dibatasi `ipAllowList`; admin.erp memanggil API lewat jaringan internal; kata sandi admin awal diganti saat pemasangan dan tidak pernah dicetak di log |
+| UI Harbor diserang dari internet | Jalur UI dan API admin melewati `ipAllowList` — sejak 15 September 2026 dibuka untuk semua alamat atas keputusan pemilik produk, lihat "Hasil Tahap 0"; admin.erp memanggil API lewat jaringan internal; kata sandi admin awal diganti saat pemasangan dan tidak pernah dicetak di log |
 | Namespace Docker Hub diserobot | Tag lokal `coreerp.local/*` + `pull_policy: never` |
 | Brute force login | Pembatasan bawaan Harbor + rate limit Traefik pada `/service/token` |
 | Slug tenant `registry` merampas alamat | CORE-01 dikerjakan **sebelum** rute registry dipasang |
@@ -346,6 +346,37 @@ dan metrik tampil di SigNoz.
 **Tahap 7 — sebelum klien produksi pertama.** Penandatanganan pindah ke mesin terpisah; langkah push GHCR
 dan jalur tarball sudah hilang dari repo.
 
+## Hasil Tahap 0 dan keputusan yang menunggu
+
+Tahap 0 dikerjakan 15 September 2026; angka dan buktinya di `deploy/registry/SPIKE.md`. Harbor v2.15.2
+terpasang di server pertama dari `deploy/registry`, dan CORE-01, REG-01 sampai REG-07 dikerjakan
+bersamanya. Tiga temuan mengubah kontrak di atas:
+
+| Temuan | Akibat bagi kontrak | Usulan |
+| --- | --- | --- |
+| Aturan immutability **memblok retensi**: artifact bertag immutable tidak dapat dihapus siapa pun, dan retensi mencatat `Immutable tag` lalu melewatinya | "Tag rilis immutable" dan "retensi membuang rilis lama" tidak dapat berlaku bersamaan; tanpa perubahan, disk tumbuh tanpa batas | **Diputuskan 15 September 2026: dibiarkan menyala dulu**, ditinjau lagi di CP-05. Rilis bertambah ±11 MB lapisan kode, dan ±237 MB bila lapisan basis dibangun ulang — beberapa GB per tahun terhadap sisa disk 257 GB, **asalkan perakit memakai cache build** |
+| Memberi tag `terpasang-*` menaikkan `PushedTime` artifact | Aturan `latestPushedK` menghitung rilis yang baru diberi tag sebagai rilis terbaru, sehingga rilis lain terdorong keluar | Tetapkan K di CP-05 dengan memperhitungkan rilis terpasang, atau biarkan admin.erp yang memilih rilis yang dipensiunkan |
+| Batas waktu baca Traefik 60 detik memutus push lapisan 100 MB dari server kedua, yang uplink-nya ±1 MB/s; dari server pertama push yang sama selesai 5,7 detik | Kriteria "push dari server kedua" tidak lulus | OWN-03: jangan dinaikkan selama perakit — satu-satunya yang push — berjalan di server pertama |
+
+**Diputuskan pemilik produk, 15 September 2026:** UI dan API admin Harbor dibuka untuk semua alamat
+(`REGISTRY_IZIN_UI=0.0.0.0/0 ::/0`) supaya tim lain dapat memakainya tanpa mendaftarkan IP. Penjaganya kini
+hanya kata sandi: admin dan robot memakai rahasia acak 32 karakter. Middleware `ipAllowList` tetap
+terpasang, jadi menutupnya kembali cukup dengan `pasang.sh --izin-ui`. Risiko yang tersisa ada pada akun
+manusia: Harbor tidak membatasi percobaan login, dan kata sandi yang lolos kebijakannya (8 karakter) dapat
+ditebak.
+
+Temuan lain yang sudah dijaga di kode, bukan menunggu keputusan:
+
+- **Jeda pencabutan robot** terukur `token_expiration` + ±60 detik; `atur-harbor.sh` menyetel umur token
+  5 menit. Login dengan robot yang dihapus ditolak seketika.
+- Harbor menerima basic auth **langsung di `/v2/`**, jadi batas laju `/service/token` tidak menahan tebakan
+  kata sandi lewat `/v2/`. Aman selama tidak ada akun manusia berkata sandi di Harbor ini.
+- `RepoDigests` sama dengan digest sesudah push di store klasik maupun containerd; `Id` hanya sama di
+  containerd. Agen mencocokkan lewat `RepoDigests`.
+- Retensi `coreerp` sengaja **tidak dijadwalkan** sampai temuan pertama diputuskan dan CP-05 ada.
+- Server kedua mengunduh ±0,13 MB/s: pemasangan pertama image ±100 MB di sana butuh ±12 menit. Batas
+  waktu operasi agen di E2E-01 harus menampungnya.
+
 ## TODO
 
 Setiap butir menyebut tempat kerjanya, kriteria terimanya, dan butir yang harus selesai lebih dulu.
@@ -408,6 +439,17 @@ untuk endpoint bertanda tangan, `app/Sites/SiteOperations.php` untuk klaim dan l
 Cabang lokal `feat/perakit` di laptop pemilik produk dibangun untuk rancangan tarball dan belum selesai;
 ia ditulis ulang, bukan dilanjutkan apa adanya.
 
+**Keadaan perakit, 15 September 2026.** `deploy/perakit/rakit.sh` mengerjakan PK-01, PK-02 tanpa langkah
+pendaftaran (menunggu CP-04), PK-03, dan PK-04. Rilis `0.2.0` dari commit `cbda6ed` dirakit di server
+pertama: image 112 MB, manifest v2 bertanda tangan di `/var/lib/coreerp-perakit/rilis/0.2.0`. Dua hal yang
+dipelajari saat merakitnya:
+
+- **Nomor rilis diberikan operator** (`--rilis`), bukan dibaca dari `editions/*.yaml`, karena berkas edisi
+  menyimpan nomor per pelanggan sedangkan image dipakai semua klien.
+- **Image pendamping jauh lebih besar dari image aplikasi**: gotenberg 702 MB dan postgres 116 MB
+  terkompres. Pemasangan pertama di server yang mengunduh ±0,13 MB/s — seperti server kedua — menarik
+  ±930 MB, sekitar dua jam. Keduanya hanya ditarik ulang saat versinya berubah.
+
 ### Agen — `deploy/agent/`, `scripts/update.sh`, `deploy/compose.edition.yaml`
 
 | ID | Pekerjaan | Selesai bila | Setelah |
@@ -424,6 +466,18 @@ ia ditulis ulang, bukan dilanjutkan apa adanya.
 | IMG-01 | Dockerfile ramping versi produksi dari percobaan 15 September 2026, **tanpa** mencabut paket secara paksa: klien PostgreSQL diambil dari tahap build, perkakas Apache tidak membawa Perl ke tahap akhir | Suite Core hijau, `scripts/verify-edition.sh` lulus, deploy dev menyala, image ≤ 100 MB terkompres; `pg_dump` dan `pg_restore` berjalan, ekstensi `intl gd pdo_pgsql zip bcmath opcache opentelemetry` termuat | — |
 
 `apps/core/Dockerfile` dipakai SaaS juga. Perubahannya diuji di kedua jalur sebelum digabung.
+
+**Keadaan IMG-01, 15 September 2026.** Pemilik produk memutuskan image rilis dipisah dulu dari SaaS:
+`deploy/perakit/Dockerfile`, diuji `deploy/perakit/uji-image.sh`. Dua kriteria di atas berubah:
+
+- **112 MB terkompres di Harbor, bukan ≤ 100 MB.** `apache2-bin` Debian menuntut `perl:any`, jadi
+  Perl (±14 MB) hanya dapat dibuang dengan mencabut paksa — yang dilarang butir ini, dan yang
+  dibuktikan `uji-image.sh` merah lewat `dpkg --audit`. Selisihnya di lapisan basis dan dibayar sekali
+  per klien; lapisan kode app tetap 10,6 MB per rilis.
+- **`scripts/verify-edition.sh` tidak berlaku.** Satu image membawa seluruh module, sehingga ketiga
+  jalur module-nya selalu merah terhadap edisi mana pun. Jalur pertama — hanya `apps/core` di image —
+  diperiksa `uji-image.sh`. "Deploy dev menyala" diganti migration dan `/login` 200 terhadap
+  PostgreSQL 16 kosong di container sekali pakai.
 
 ### Uji ujung-ke-ujung — server kedua
 
@@ -466,7 +520,8 @@ volume databasenya dihapus oleh pemilik produk sendiri.
 | Cabang `chore/buang-jalur-offline` | Jalur klien tanpa internet dibuang dari agen, admin.erp, kontrak, dan database; route pendaftaran menjadi `/situs/{situs}/pendaftaran` |
 | Cabang lokal `feat/pasang-inti` | WIP: hosting `client_server`, tabel antrean build per edisi — antrean itu diganti build per rilis |
 | Cabang lokal `feat/perakit` | WIP rancangan tarball — ditulis ulang oleh PK-01..05 |
-| Server pertama | Kunci privat rilis di `/etc/coreerp/perakit/kunci-rilis-privat.pem` (root, 0600), kunci publiknya di `/etc/coreerp/kunci/rilis-publik.pem`; Harbor belum dipasang |
+| Server pertama | Kunci privat rilis di `/etc/coreerp/perakit/kunci-rilis-privat.pem` (root, 0600), kunci publiknya di `/etc/coreerp/kunci/rilis-publik.pem`; Harbor v2.15.2 terpasang, project `coreerp` dan robot perakit ada, retensi belum dijadwalkan |
+| Cabang `feat/registry-harbor` | `deploy/registry` (pasang, atur, uji asap, putar kata sandi, SPIKE, RUNBOOK) dan CORE-01 |
 | GHCR | Paket edisi lama sudah dihapus pemilik produk; akan muncul lagi pada merge berikutnya sampai PK-05 |
 
 ## Sumber

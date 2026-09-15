@@ -84,7 +84,7 @@ final class EnvironmentAddress
      */
     public static function reservedLabels(): array
     {
-        $list = config('coreerp.reserved_labels', ['admin', 'www', 'api']);
+        $list = config('coreerp.reserved_labels', ['admin', 'www', 'api', 'registry']);
 
         return is_array($list) ? array_values(array_map(strval(...), $list)) : [];
     }
