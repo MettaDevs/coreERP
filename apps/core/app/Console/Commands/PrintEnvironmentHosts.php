@@ -75,7 +75,11 @@ final class PrintEnvironmentHosts extends Command
             $lines[] = $ip.' '.$label.'.'.$domain;
         }
 
+        // Kecuali yang berjalan di server klien. Alamatnya bukan milik server ini — `ResolveEnvironment`
+        // menjawabnya 404 di sini apa pun statusnya — jadi mengarahkannya ke mesin ini hanya membuat
+        // pengembang membuka alamat yang dijamin tidak pernah dilayani.
         $environments = Environment::query()
+            ->hostedByProvider()
             ->with('tenant:id,slug')
             ->whereNull('deleted_at')
             ->orderBy('tenant_id')

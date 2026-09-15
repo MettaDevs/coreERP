@@ -36,6 +36,12 @@ final class UninstallModule
             return $this->apply($moduleId, $tenantId);
         }
 
+        // Ditolak, bukan disaring. Alasannya di {@see InstallModule}: tanpa lingkungan, cabang di
+        // atas menulis ke database bawaan server ini atas nama tenant yang bekerja di tempat lain.
+        if ($target->hostedOnClientServer()) {
+            throw new RuntimeException($target->clientServerRefusal(sprintf('Mencabut module "%s"', $moduleId)));
+        }
+
         return app(EnvironmentConnection::class)->runWithin(
             $target,
             fn (): ModuleInstallation => $this->apply($moduleId, $tenantId),

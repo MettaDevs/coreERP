@@ -117,6 +117,7 @@ final class PurgeEnvironment extends Command
     {
         try {
             return Environment::query()
+                ->hostedByProvider()
                 ->whereNotNull('deleted_at')
                 ->whereNull('purged_at')
                 ->doesntExist();
@@ -152,7 +153,13 @@ final class PurgeEnvironment extends Command
      */
     private function sweepAll(): int
     {
+        // Server klien disaring meski hari ini ia selalu produksi — dan karena itu sudah tersaring
+        // baris sesudahnya. Saringannya tidak bersandar pada kebetulan itu: yang dijaga di sini
+        // `DROP DATABASE`, dan aturan "server klien hanya produksi" adalah keputusan produk yang
+        // boleh berubah tanpa ada yang ingat bahwa perintah paling merusak di repo ini ikut
+        // bersandar padanya.
         $list = Environment::query()
+            ->hostedByProvider()
             ->where('kind', '<>', 'production')
             ->where('status', 'soft_deleted')
             ->whereNotNull('deleted_at')
@@ -289,6 +296,13 @@ final class PurgeEnvironment extends Command
      */
     private function refusalReason(Environment $environment): ?string
     {
+        // Paling depan, di atas produksi. Keduanya sama-sama menolak hari ini, tetapi kalimat
+        // produksi menyuruh orang memutuskan "nasib datanya" — padahal datanya tidak pernah di sini,
+        // dan tidak ada yang dapat diputuskan dari server ini tentangnya.
+        if ($environment->hostedOnClientServer()) {
+            return lcfirst($environment->clientServerRefusal('Pembuangan permanen'));
+        }
+
         // Produksi, apa pun statusnya. Ia tempat kerja pelanggan yang sedang membayar, dan tidak
         // ada keadaan di rancangan ini yang membuat membuangnya lewat perintah terjadwal menjadi
         // jawaban yang benar. Constraint `environments_produksi_tidak_dibuang` menolaknya sekali

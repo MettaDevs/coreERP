@@ -147,12 +147,22 @@ class ActiveEnvironment
         $this->resolved = false;
     }
 
+    /**
+     * Lingkungan yang berjalan di server klien tidak pernah menjadi jawabannya.
+     *
+     * Di server ini ia bukan tempat kerja siapa pun, jadi pekerjaan yang sedang berjalan di sini
+     * bukan pekerjaannya — bahkan ketika tenantnya sama. Tanpa saringan, turunan dari tenant memilih
+     * produksi server klien itu lebih dulu, lalu menjawab "boleh keluar" untuk job milik demo tenant
+     * yang sama yang memang ada di server ini. Dengan saringan, demonya yang terpilih, dan jawabannya
+     * menolak — sisi yang aman ketika ragu. Tenant yang tidak punya lingkungan lain di sini jatuh ke
+     * "tidak tahu", persis seperti tenant tanpa lingkungan.
+     */
     private function resolve(): ?Environment
     {
         if ($this->container->bound(self::KEY)) {
             $id = $this->container->get(self::KEY);
 
-            return is_string($id) ? Environment::query()->find($id) : null;
+            return is_string($id) ? Environment::query()->hostedByProvider()->find($id) : null;
         }
 
         if (! $this->container->bound(TenantScope::KUNCI)) {
@@ -166,6 +176,7 @@ class ActiveEnvironment
         }
 
         return Environment::query()
+            ->hostedByProvider()
             ->where('tenant_id', $tenantId)
             ->whereNull('deleted_at')
             ->orderByRaw("CASE WHEN kind = 'production' THEN 0 ELSE 1 END")

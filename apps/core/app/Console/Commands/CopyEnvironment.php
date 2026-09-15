@@ -389,6 +389,16 @@ final class CopyEnvironment extends Command
             return null;
         }
 
+        // Paling depan, sebelum syarat yang lain. Produksi server klien memang tidak punya database
+        // di sini, dan syarat ketiga di bawah akan menolaknya juga — tetapi dengan saran
+        // "pisahkan databasenya lewat `environment:provision`", yaitu menyuruh operator menyiapkan
+        // database pooled untuk tenant yang datanya tinggal di server lain.
+        if ($source->hostedOnClientServer()) {
+            $this->error($source->clientServerRefusal('Penyalinan menjadi sandbox'));
+
+            return null;
+        }
+
         if (! $source->produksi()) {
             $this->error(sprintf(
                 'Environment "%s" berjenis %s. Yang disalin menjadi sandbox hanya produksi — '
@@ -1008,6 +1018,11 @@ final class CopyEnvironment extends Command
         // akan jatuh di tengah jalan. Registry di salinan bukan yang berwenang, jadi indeksnya yang
         // dibuang, bukan penurunannya yang dilonggarkan.
         $db->statement('DROP INDEX IF EXISTS environments_satu_per_jenis');
+
+        // Alasan yang sama untuk `environments_server_klien_hanya_produksi`: ia melarang baris server
+        // klien berjenis selain produksi, dan penurunan di bawah menjadikan setiap baris sandbox.
+        // Migration-nya melewati koneksi `environment_*`, jadi biasanya ia memang tidak ada di sini.
+        $db->statement('ALTER TABLE environments DROP CONSTRAINT IF EXISTS environments_server_klien_hanya_produksi');
 
         return $db->table('environments')
             ->where(static function (Builder $query): void {
