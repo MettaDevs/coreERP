@@ -77,6 +77,7 @@ export const siteStateLabels: Record<string, string> = {
 };
 
 export const siteOperationLabels: Record<string, string> = {
+    install: 'Pasang',
     upgrade: 'Perbarui',
     backup: 'Cadangkan',
     install_license: 'Pasang lisensi',
@@ -91,6 +92,26 @@ export const siteOperationStatusLabels: Record<string, string> = {
     failed: 'Gagal',
     cancelled: 'Dibatalkan',
     expired: 'Tidak pernah diambil',
+};
+
+/**
+ * Keadaan pemasangan server klien, dihitung `InstallProgress` di server.
+ *
+ * Satu daftar untuk panel di halaman lingkungan, daftar lingkungan, dan ringkasan situs — kata yang
+ * sama di ketiganya. `stale` di sini "Tertinggal", bukan "Tidak melapor" seperti keadaan situs: yang
+ * dibaca dari daftar ini adalah server yang **sudah terpasang** lalu berhenti terlihat.
+ */
+export const installStateLabels: Record<string, string> = {
+    not_prepared: 'Belum disiapkan',
+    no_command: 'Perintah pasang belum dibuat',
+    awaiting_command: 'Menunggu perintah dijalankan',
+    awaiting_release: 'Menunggu rilis',
+    connected: 'Server tersambung',
+    installing: 'Memasang',
+    ready: 'Jalan',
+    stale: 'Tertinggal',
+    failed: 'Gagal',
+    revoked: 'Dicabut',
 };
 
 export function labelFor(labels: Record<string, string>, key: string): string {

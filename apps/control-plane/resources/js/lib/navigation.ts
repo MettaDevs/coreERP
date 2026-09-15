@@ -6,14 +6,16 @@ export type NavItem = { href: string; title: string };
  * perusahaan yang belum menjadi pelanggan, dan layar Pembaruan tidak punya apa pun untuk
  * dibandingkan sebelum ada lingkungan.
  *
- * Situs paling akhir: ia server milik klien on-prem yang dikelola lewat agen, dan tenant-nya harus
- * sudah ada lebih dulu.
+ * Situs sesudahnya: ia server milik klien on-prem yang dikelola lewat agen, dan tenant-nya harus
+ * sudah ada lebih dulu. Pengaturan paling akhir, karena ia dibuka sesekali — saat menyiapkan konsol,
+ * atau saat perintah pasang dan lisensi tidak bekerja — bukan setiap hari.
  */
 export const navigation: NavItem[] = [
     { href: '/tenant', title: 'Tenant' },
     { href: '/lingkungan', title: 'Lingkungan' },
     { href: '/pembaruan', title: 'Pembaruan' },
     { href: '/situs', title: 'Situs' },
+    { href: '/pengaturan', title: 'Pengaturan' },
 ];
 
 /**

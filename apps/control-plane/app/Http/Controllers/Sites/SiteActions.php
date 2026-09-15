@@ -45,20 +45,10 @@ final class SiteActions extends Controller
             return $issued;
         });
 
-        $source = rtrim((string) config('sites.agent_source'), '/');
-        $ref = (string) config('sites.agent_source_ref');
-
         // Perintahnya hanya lewat flash session: tampil sekali, tidak pernah di alamat, tidak pernah
         // di log. Token di dalamnya sekali pakai dan kedaluwarsa dalam satu jam.
         return redirect('/situs/'.$row->id)->with('enrollment', [
-            'command' => sprintf(
-                'curl -fsSL %s/%s/deploy/agent/pasang.sh | sudo bash -s -- --admin-url %s --token %s --ref %s',
-                $source,
-                $ref,
-                rtrim((string) config('app.url'), '/'),
-                $issued['token'],
-                $ref,
-            ),
+            'command' => EnrollmentTokens::installCommand($issued['token']),
             'expiresAt' => $issued['expires_at']->toDateTimeString(),
         ]);
     }
@@ -105,7 +95,7 @@ final class SiteActions extends Controller
             $cancelled = SiteOperation::query()
                 ->where('site_id', $row->id)
                 ->where('status', 'requested')
-                ->update(['status' => 'cancelled', 'finished_at' => now(), 'updated_at' => now()]);
+                ->update(SiteOperations::closingColumns('cancelled'));
 
             OperatorAudit::record($request, 'site.revoked', 'site', $row->id, ['cancelled_operations' => $cancelled]);
         });
@@ -135,7 +125,7 @@ final class SiteActions extends Controller
                 ->where('site_id', $row->id)
                 ->where('operation', 'install_license')
                 ->where('status', 'requested')
-                ->update(['status' => 'cancelled', 'finished_at' => now(), 'updated_at' => now()]);
+                ->update(SiteOperations::closingColumns('cancelled'));
 
             OperatorAudit::record($request, 'site.license.renewal_suspended', 'site', $row->id, [
                 'license_valid_until' => $row->license_valid_until?->toDateString(),

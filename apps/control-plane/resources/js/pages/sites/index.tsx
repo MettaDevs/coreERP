@@ -1,16 +1,5 @@
 import { Button } from '@apperp/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@apperp/ui/dialog';
-import { Input } from '@apperp/ui/input';
-import { NativeSelect } from '@apperp/ui/native-select';
-import {
     Table,
     TableBody,
     TableCell,
@@ -18,200 +7,33 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
-import type { FormEvent } from 'react';
-import { SiteStateBadge } from '@/components/badges';
+import { Head, Link } from '@inertiajs/react';
+import { InstallStateBadge } from '@/components/badges';
 import Shell from '@/components/shell';
+import { progressDetail } from '@/lib/install-progress';
+import type { InstallProgress } from '@/lib/install-progress';
 
 type SiteRow = {
     id: string;
     name: string;
     tenant: string;
-    edition: string;
-    state: string;
-    reportedRelease: string | null;
+    environment: { id: string; name: string } | null;
+    progress: InstallProgress;
     lastSeenAt: string | null;
 };
 
-function FieldError({ message }: { message?: string }) {
-    return message ? (
-        <p className="text-sm text-destructive">{message}</p>
-    ) : null;
-}
-
-function CreateDialog({
-    tenants,
-}: {
-    tenants: { id: string; name: string }[];
-}) {
-    const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useForm({
-        tenant_id: tenants[0]?.id ?? '',
-        name: '',
-        edition: '',
-        address: '',
-        update_window_start: '',
-        update_window_end: '',
-    });
-
-    function submit(e: FormEvent) {
-        e.preventDefault();
-        post('/situs', {
-            onSuccess: () => {
-                reset();
-                setOpen(false);
-            },
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button disabled={tenants.length === 0}>Situs baru</Button>
-            </DialogTrigger>
-            <DialogContent>
-                <form onSubmit={submit}>
-                    <DialogHeader>
-                        <DialogTitle>Situs baru</DialogTitle>
-                        <DialogDescription>
-                            Server milik klien yang dikelola dari sini lewat
-                            agen. Mencatatnya belum memasang apa pun.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <NativeSelect
-                                id="tenant_id"
-                                label="Tenant"
-                                value={data.tenant_id}
-                                onChange={(e) =>
-                                    setData('tenant_id', e.target.value)
-                                }
-                            >
-                                {tenants.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.name}
-                                    </option>
-                                ))}
-                            </NativeSelect>
-                            <FieldError message={errors.tenant_id} />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Input
-                                id="name"
-                                label="Nama situs"
-                                required
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData('name', e.target.value)
-                                }
-                            />
-                            <FieldError message={errors.name} />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Input
-                                id="edition"
-                                label="Edisi"
-                                required
-                                value={data.edition}
-                                onChange={(e) =>
-                                    setData('edition', e.target.value)
-                                }
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Sama dengan nama berkas di folder editions,
-                                misalnya apotek-sejahtera. Situs hanya dapat
-                                memasang rilis dari edisi ini.
-                            </p>
-                            <FieldError message={errors.edition} />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Input
-                                id="address"
-                                label="Alamat aplikasi (boleh kosong)"
-                                type="url"
-                                value={data.address}
-                                onChange={(e) =>
-                                    setData('address', e.target.value)
-                                }
-                            />
-                            <FieldError message={errors.address} />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                                <Input
-                                    id="update_window_start"
-                                    label="Jendela mulai"
-                                    type="time"
-                                    value={data.update_window_start}
-                                    onChange={(e) =>
-                                        setData(
-                                            'update_window_start',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                <FieldError
-                                    message={errors.update_window_start}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Input
-                                    id="update_window_end"
-                                    label="Jendela selesai"
-                                    type="time"
-                                    value={data.update_window_end}
-                                    onChange={(e) =>
-                                        setData(
-                                            'update_window_end',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                <FieldError
-                                    message={errors.update_window_end}
-                                />
-                            </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            Jam pembaruan yang disepakati dengan klien, waktu
-                            Jakarta. Kosongkan keduanya bila pembaruan boleh
-                            kapan saja.
-                        </p>
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="submit" disabled={processing}>
-                            Catat situs
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 /**
- * Daftar server milik klien on-prem yang dikelola dari konsol ini.
+ * Ringkasan server milik klien on-prem yang dikelola dari konsol ini.
+ *
+ * Tidak ada tombol "Situs baru". Server klien disiapkan dari halaman lingkungan produksinya, tempat
+ * perintah pasang dan progresnya juga tampil; setiap baris di sini menaut ke sana. Situs lama yang
+ * didaftarkan sebelum 15 September 2026 tidak menyebut lingkungan dan hanya punya rincian situsnya.
  */
-export default function Index({
-    sites,
-    tenants,
-}: {
-    sites: SiteRow[];
-    tenants: { id: string; name: string }[];
-}) {
+export default function Index({ sites }: { sites: SiteRow[] }) {
     return (
         <Shell
             title="Situs"
-            description="Server milik klien yang dikelola lewat agen: keadaannya, rilis yang terpasang, dan kapan terakhir melapor."
-            actions={<CreateDialog tenants={tenants} />}
+            description="Server milik klien yang dikelola lewat agen. Menyiapkan server klien dan membuat perintah pasangnya dikerjakan dari halaman lingkungan produksi tenant."
         >
             <Head title="Situs" />
 
@@ -221,9 +43,8 @@ export default function Index({
                         <TableRow>
                             <TableHead>Nama</TableHead>
                             <TableHead>Tenant</TableHead>
-                            <TableHead>Edisi</TableHead>
+                            <TableHead>Lingkungan</TableHead>
                             <TableHead>Keadaan</TableHead>
-                            <TableHead>Rilis terpasang</TableHead>
                             <TableHead>Terakhir terlihat</TableHead>
                             <TableHead />
                         </TableRow>
@@ -232,10 +53,12 @@ export default function Index({
                         {sites.length === 0 && (
                             <TableRow>
                                 <TableCell
-                                    colSpan={7}
+                                    colSpan={6}
                                     className="py-10 text-center text-sm text-muted-foreground"
                                 >
-                                    Belum ada situs yang tercatat.
+                                    Belum ada situs. Server klien disiapkan dari
+                                    halaman lingkungan produksi yang berjalan di
+                                    server klien.
                                 </TableCell>
                             </TableRow>
                         )}
@@ -245,14 +68,31 @@ export default function Index({
                                     {row.name}
                                 </TableCell>
                                 <TableCell>{row.tenant}</TableCell>
-                                <TableCell className="font-mono text-xs">
-                                    {row.edition}
+                                <TableCell>
+                                    {row.environment ? (
+                                        <Link
+                                            href={`/lingkungan/${row.environment.id}`}
+                                            className="underline underline-offset-4"
+                                        >
+                                            {row.environment.name}
+                                        </Link>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">
+                                            Didaftarkan tanpa lingkungan
+                                        </span>
+                                    )}
                                 </TableCell>
                                 <TableCell>
-                                    <SiteStateBadge state={row.state} />
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">
-                                    {row.reportedRelease ?? '—'}
+                                    <div className="space-y-1">
+                                        <InstallStateBadge
+                                            state={row.progress.state}
+                                        />
+                                        {progressDetail(row.progress) && (
+                                            <p className="text-xs text-muted-foreground">
+                                                {progressDetail(row.progress)}
+                                            </p>
+                                        )}
+                                    </div>
                                 </TableCell>
                                 <TableCell className="text-sm text-muted-foreground">
                                     {row.lastSeenAt ?? 'Belum pernah'}

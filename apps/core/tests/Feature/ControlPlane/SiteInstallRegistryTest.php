@@ -88,6 +88,35 @@ final class SiteInstallRegistryTest extends TestCase
         $this->assertRejectedBy('site_operations_jenis_dikenal', fn () => $this->operation($site, 'install_everything'));
     }
 
+    /** Hash kata sandi sementara yang tertinggal di operasi tertutup hanya menunggu dibocorkan. */
+    public function test_a_password_hash_may_only_live_on_an_open_operation(): void
+    {
+        $site = $this->site($this->tenant, ['name' => 'Server', 'environment_id' => $this->production->id]);
+        $hash = ['admin_password_hash' => '$2y$12$'.str_repeat('a', 53)];
+
+        $open = $this->operation($site, 'install', $hash);
+        DB::table('site_operations')->where('id', $open)->update(['status' => 'running', 'started_at' => now(), 'lease_until' => now()->addMinutes(15)]);
+
+        foreach (['succeeded', 'cancelled', 'expired'] as $status) {
+            $this->assertRejectedBy('site_operations_hash_sandi_hanya_saat_terbuka', fn () => DB::table('site_operations')
+                ->where('id', $open)
+                ->update(['status' => $status, 'finished_at' => now(), 'lease_until' => null]));
+        }
+
+        $this->assertRejectedBy('site_operations_hash_sandi_hanya_saat_terbuka', fn () => DB::table('site_operations')
+            ->where('id', $open)
+            ->update(['status' => 'failed', 'failure_message' => 'gagal', 'finished_at' => now()]));
+
+        // Menutup sambil membuang hash-nya diterima.
+        DB::table('site_operations')->where('id', $open)->update([
+            'status' => 'succeeded',
+            'finished_at' => now(),
+            'parameters' => DB::raw("parameters - 'admin_password_hash'"),
+        ]);
+
+        $this->assertSame('succeeded', DB::table('site_operations')->where('id', $open)->value('status'));
+    }
+
     // ------------------------------------------------------------------ console_settings
 
     public function test_a_setting_is_one_row_per_key_and_outlives_the_user_who_changed_it(): void
@@ -154,19 +183,24 @@ final class SiteInstallRegistryTest extends TestCase
         return $id;
     }
 
-    private function operation(string $siteId, string $operation): void
+    /** @param  array<string, mixed>  $parameters */
+    private function operation(string $siteId, string $operation, array $parameters = []): string
     {
+        $id = (string) Str::ulid();
+
         DB::table('site_operations')->insert([
-            'id' => (string) Str::ulid(),
+            'id' => $id,
             'site_id' => $siteId,
             'operation' => $operation,
-            'parameters' => '{}',
+            'parameters' => json_encode((object) $parameters),
             'status' => 'requested',
             'requested_at' => now(),
             'expires_at' => now()->addDay(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        return $id;
     }
 
     private function assertRejectedBy(string $constraint, Closure $write): void

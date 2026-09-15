@@ -66,14 +66,6 @@ return [
      */
     'license_renew_cooldown_minutes' => 60,
 
-    /*
-     * Dari commit mana skrip pasang dan kunci publik rilis diambil. Keduanya diambil dari repo di
-     * GitHub, bukan dari konsol ini: kunci pemverifikasi yang diantar oleh pihak yang juga mengantar
-     * perintahnya tidak memverifikasi apa pun terhadap pihak itu.
-     */
-    'agent_source' => env('CONSOLE_AGENT_SOURCE', 'https://raw.githubusercontent.com/MettaDevs/coreERP'),
-    'agent_source_ref' => env('CONSOLE_AGENT_SOURCE_REF', 'main'),
-
     'interval_seconds' => 60,
 
     /* Selisih jam terbesar yang diterima pada tanda tangan permintaan agen. */

@@ -9,7 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import type { FormEvent, ReactNode } from 'react';
 import { SiteStateBadge } from '@/components/badges';
 import Shell from '@/components/shell';
@@ -53,6 +53,7 @@ type Site = {
     id: string;
     name: string;
     tenant: string;
+    environment: { id: string; name: string } | null;
     edition: string;
     state: string;
     reportedRelease: string | null;
@@ -207,11 +208,13 @@ function Enrollment({ site }: { site: Site }) {
 
 function RequestOperation({
     site,
+    operations,
     releases,
     licenseKeyConfigured,
     licenseValidDays,
 }: {
     site: Site;
+    operations: string[];
     releases: string[];
     licenseKeyConfigured: boolean;
     licenseValidDays: number;
@@ -243,9 +246,13 @@ function RequestOperation({
                     value={data.operation}
                     onChange={(e) => setData('operation', e.target.value)}
                 >
-                    {Object.entries(siteOperationLabels).map(([key, label]) => (
+                    {/*
+                        Daftarnya dari server, bukan dari seluruh label. Label memuat `install`
+                        untuk riwayat, dan pemasangan hanya lahir dari "Buat perintah pasang".
+                    */}
+                    {operations.map((key) => (
                         <option key={key} value={key}>
-                            {label}
+                            {labelFor(siteOperationLabels, key)}
                         </option>
                     ))}
                 </NativeSelect>
@@ -425,6 +432,7 @@ function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
 export default function Show({
     site,
     history,
+    operations,
     releases,
     audit,
     licenseKeyConfigured,
@@ -432,6 +440,7 @@ export default function Show({
 }: {
     site: Site;
     history: Operation[];
+    operations: string[];
     releases: string[];
     audit: AuditEvent[];
     licenseKeyConfigured: boolean;
@@ -469,6 +478,18 @@ export default function Show({
                     <dl>
                         <Row label="Keadaan">
                             <SiteStateBadge state={site.state} />
+                        </Row>
+                        <Row label="Lingkungan">
+                            {site.environment ? (
+                                <Link
+                                    href={`/lingkungan/${site.environment.id}`}
+                                    className="underline underline-offset-4"
+                                >
+                                    {site.environment.name}
+                                </Link>
+                            ) : (
+                                'Didaftarkan tanpa lingkungan'
+                            )}
                         </Row>
                         <Row label="Edisi">{site.edition}</Row>
                         <Row label="Rilis terpasang">
@@ -548,6 +569,7 @@ export default function Show({
                 {!revoked && site.state !== 'not_enrolled' && (
                     <RequestOperation
                         site={site}
+                        operations={operations}
                         releases={releases}
                         licenseKeyConfigured={licenseKeyConfigured}
                         licenseValidDays={licenseValidDays}

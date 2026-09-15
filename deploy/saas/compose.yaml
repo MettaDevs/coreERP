@@ -361,7 +361,6 @@ services:
       CONSOLE_RELEASE_TOKEN: ${CONSOLE_RELEASE_TOKEN:-}
       CONSOLE_LICENSE_PRIVATE_KEY_PATH: ${CONSOLE_LICENSE_PRIVATE_KEY_PATH:-/run/coreerp-kunci/lisensi-privat.pem}
       CONSOLE_LICENSE_PUBLIC_KEY_PATH: ${CONSOLE_LICENSE_PUBLIC_KEY_PATH:-/run/coreerp-kunci/lisensi-publik.pem}
-      CONSOLE_AGENT_SOURCE_REF: ${CONSOLE_AGENT_SOURCE_REF:-main}
     volumes:
       - ${COREERP_KUNCI_DIR:-/etc/coreerp/kunci}:/run/coreerp-kunci:ro
       # Sesi operator hidup di sini. Tanpa volume, setiap penyebaran melempar keluar semua orang
