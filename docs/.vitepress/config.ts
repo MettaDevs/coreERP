@@ -208,6 +208,7 @@ export default withMermaid({
           text: 'Rilis dan operasi',
           collapsed: true,
           items: [
+            { text: 'Dari branch sampai server klien', link: '/dev/29-alur-rilis-server-klien' },
             { text: 'Release dan on-prem', link: '/dev/03-release-and-on-prem' },
             { text: 'Mendaftarkan katalog produk', link: '/dev/13-publishing-an-app-release' },
             { text: 'CI/CD polyrepo', link: '/dev/22-ci-cd' },

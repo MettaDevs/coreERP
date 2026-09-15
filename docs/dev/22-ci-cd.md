@@ -14,7 +14,7 @@ submodule atau build pada server production.
 > ini. Yang berbahaya bukan rencana yang belum terwujud, melainkan dokumen yang tidak
 > membedakan keduanya.
 
-Empat alur, seluruhnya di GitHub Actions:
+Alur yang berjalan, seluruhnya di GitHub Actions:
 
 | Alur | Kapan | Yang dijaganya |
 | --- | --- | --- |
@@ -22,6 +22,13 @@ Empat alur, seluruhnya di GitHub Actions:
 | `lint.yml` | tiap pull request | Gaya PHP (`pint`, termasuk `modules/`), gaya dan tipe frontend, format berkas. |
 | `edition.yml` | tiap pull request dan push ke `main` | Membangun dua image edisi dan membuktikan modul yang tidak dibeli tidak ada di dalamnya, lalu membuat pemeriksanya merah dengan sengaja untuk membuktikan ia masih memeriksa. |
 | `release.yml` | push ke `main` | Membangun image tiap edisi, memeriksanya, lalu mendorongnya ke registry bertanda SHA commit. |
+| `deploy-dev.yml` | push ke `main` | Memasang `main` ke SaaS dev dan admin.erp di server pertama. |
+
+**Merge ke `main` bukan rilis untuk server klien.** Sejak 15 September 2026 rilis untuk server klien on-prem
+yang dikelola dirakit perakit di server pertama, didorong ke Harbor, dan dipasang agen — di luar GitHub
+Actions. Alurnya di [Dari branch sampai server klien](29-alur-rilis-server-klien.md). Image per edisi dari
+`release.yml` di bawah adalah jalur lama yang tidak dipakai server klien itu, dan dibuang bersama PK-05 di
+PRD registry Harbor.
 
 **Penandaan penempatan memakai digest atau SHA, tidak pernah awalan yang bergerak.** Dua server
 pelanggan yang menarik `latest` pada hari berbeda mendapat isi yang berbeda, dan ketika salah
@@ -44,7 +51,7 @@ migrasi per app sudah tidak berlaku sama sekali.
 
 ## Aturan yang ditegakkan pemeriksa hari ini
 
-Keempat alur di atas menjalankan aturan; bagian ini menjelaskan aturannya beserta alasannya,
+Alur pemeriksaan di atas menjalankan aturan; bagian ini menjelaskan aturannya beserta alasannya,
 supaya sebuah langkah yang tampak sewenang-wenang tidak dibuang orang berikutnya.
 
 ### Pemeriksa yang menjangkau `modules/` didaftar, bukan ditunggu
