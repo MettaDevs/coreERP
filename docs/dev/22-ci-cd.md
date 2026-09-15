@@ -21,26 +21,22 @@ Alur yang berjalan, seluruhnya di GitHub Actions:
 | `tests.yml` | tiap pull request, push ke `main`, dan jadwal mingguan | Satu perintah menjalankan test Core **dan** seluruh module — `php artisan test --parallel`, dengan suite `Module` yang menyapu `modules/*/*/tests`. Tidak ada alur kedua untuk module. Ditambah pemeriksa bundel: React hanya boleh termuat sekali. |
 | `lint.yml` | tiap pull request | Gaya PHP (`pint`, termasuk `modules/`), gaya dan tipe frontend, format berkas. |
 | `edition.yml` | tiap pull request dan push ke `main` | Membangun dua image edisi dan membuktikan modul yang tidak dibeli tidak ada di dalamnya, lalu membuat pemeriksanya merah dengan sengaja untuk membuktikan ia masih memeriksa. |
-| `release.yml` | push ke `main` | Membangun image tiap edisi, memeriksanya, lalu mendorongnya ke registry bertanda SHA commit. |
-| `deploy-dev.yml` | push ke `main` | Memasang `main` ke SaaS dev dan admin.erp di server pertama. |
+| `rilis.yml` | tangan: Run workflow dengan nomor rilis dan commit `main` | Menjalankan perakit di server pertama — image core dan konsol dibangun sekali, diuji, didorong ke Harbor, manifest rilis ditandatangani dan didaftarkan — lalu memanggil `deploy-dev.yml` untuk rilis itu. |
+| `deploy-dev.yml` | dipanggil `rilis.yml`, atau tangan dengan nomor rilis yang sudah ada | Memasang rilis ke SaaS dev dan admin.erp di server pertama lewat digest. Tidak membangun apa pun. |
 
-**Merge ke `main` bukan rilis untuk server klien.** Sejak 15 September 2026 rilis untuk server klien on-prem
-yang dikelola dirakit perakit di server pertama, didorong ke Harbor, dan dipasang agen — di luar GitHub
-Actions. Alurnya di [Dari branch sampai server klien](29-alur-rilis-server-klien.md). Image per edisi dari
-`release.yml` di bawah adalah jalur lama yang tidak dipakai server klien itu, dan dibuang bersama PK-05 di
-PRD registry Harbor.
+**Merge ke `main` tidak men-deploy apa pun.** Sejak 15 September 2026 SaaS dev dan server klien sama-sama
+memakai **rilis**: image yang dibangun sekali dan disimpan di Harbor. Alurnya, beserta diagramnya, di
+[Dari branch sampai server klien](29-alur-rilis-server-klien.md). Alur `release.yml` yang dulu mendorong image
+per edisi ke GitHub Container Registry pada setiap merge sudah dibuang (PK-05 di PRD registry Harbor).
 
-**Penandaan penempatan memakai digest atau SHA, tidak pernah awalan yang bergerak.** Dua server
-pelanggan yang menarik `latest` pada hari berbeda mendapat isi yang berbeda, dan ketika salah
-satunya bermasalah tidak ada cara mengetahui versi mana yang sedang berjalan di sana. Larangan
-itu dijaga satu langkah di dalam `release.yml` yang membaca alur itu sendiri.
+**Penempatan memakai digest, tidak pernah awalan yang bergerak.** Dua server yang menarik `latest` pada hari
+berbeda mendapat isi yang berbeda, dan ketika salah satunya bermasalah tidak ada cara mengetahui versi mana yang
+sedang berjalan di sana. SaaS dev menarik rilis lewat digest yang dicatat perakit, dan agen server klien lewat
+digest di manifest bertanda tangan; tag bernomor rilis di Harbor tidak dapat ditimpa.
 
-**Yang belum ada, dan disebut di sini supaya tidak dikira ada.** Bundle on-prem beserta skrip
-pemasangannya (F5-06) belum dibangun: kriteria selesainya menuntut pemasangan di mesin virtual
-bersih. Registry yang dipakai `release.yml` masih GitHub Container Registry, bukan Harbor.
-Langkah `docker push` sendiri baru berjalan pada penggabungan pertama ke `main` — sampai itu
-terjadi, yang terbukti hanya bagian bangun dan periksanya, yang memang dijalankan tiap pull
-request lewat `edition.yml`.
+**Yang belum ada, dan disebut di sini supaya tidak dikira ada.** Bundle on-prem luring beserta skrip
+pemasangannya (F5-06) tidak dibangun: klien tanpa internet tidak akan ada. Uji ujung-ke-ujung rilis sampai server
+klien sungguhan (E2E-01) belum dijalankan.
 
 **Pemeriksa susunan repo app yang lama** (`app-erp-ci-workflows`, action
 `validate-app-repository`) tidak dipanggil satu pun alur di repo ini. Aturannya yang masih
@@ -216,10 +212,9 @@ menggeser daftar modul, jadi pemeriksaan aplikasi dapat rusak total tanpa satu p
 berubah warna; karena itu ia punya modenya sendiri, `--buktikan-aplikasi-bisa-merah`, yang
 membangun dua image alpine sekali pakai alih-alih membangun ulang image edisi.
 
-Daftar edisi dibaca dari folder `editions/`, tidak ditulis di dalam alur. Sebuah edisi baru yang
-tidak ikut terbangun adalah kegagalan yang tidak berbunyi — pelanggannya baru tahu saat
-memutakhirkan. Langkah `Kumpulkan daftar edisi` di `.github/workflows/release.yml` yang
-membacanya, dan ia gagal bila folder itu kosong.
+Pemangkasan per edisi hari ini hanya dibuktikan `edition.yml` pada setiap pull request. Image yang
+dikirim ke server klien tidak lagi dipangkas per edisi: satu image rilis membawa seluruh module, dan
+app yang boleh dibuka tenant dijaga lisensi — lihat [Dari branch sampai server klien](29-alur-rilis-server-klien.md).
 
 Yang belum ada, dan disebut supaya tidak dikira ada: pemangkasan source per edisi hanya hidup di
 dalam pembangunan image. Tidak ada keluaran ekspor source per edisi yang berdiri sendiri di luar

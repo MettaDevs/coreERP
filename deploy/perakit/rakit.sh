@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Merakit satu rilis CoreERP untuk server klien: membangun image, mengujinya, mendorongnya ke Harbor
-# bersama image pendamping, lalu menulis dan menandatangani manifest rilis v2. Dijalankan sebagai root di
-# server pertama:
+# Merakit satu rilis CoreERP: membangun image core dan konsol, mengujinya, mendorongnya ke Harbor bersama image
+# pendamping, lalu menulis dan menandatangani manifest rilis v2. Biasanya dipanggil alur GitHub `rilis.yml` lewat
+# /usr/local/sbin/coreerp-rilis; dapat juga dijalankan langsung sebagai root di server pertama:
 #
 #   sudo bash deploy/perakit/rakit.sh --rilis 0.2.1 [--ref origin/main] [--tanpa-daftar]
 #   sudo bash deploy/perakit/rakit.sh --daftar 0.2.1      # mendaftarkan ulang rilis yang sudah dirakit
@@ -36,6 +36,7 @@ shopt -s inherit_errexit
 HOST_REGISTRY='registry.erp.grenery.xyz'
 REPO_IMAGE='coreerp/core'
 REPO_PENDAMPING='coreerp/pendamping'
+REPO_KONSOL='coreerp/konsol'
 PLATFORM='linux/amd64'
 CRANE='gcr.io/go-containerregistry/crane:v0.22.1'
 REPO_SUMBER="${PERAKIT_REPO:-https://github.com/MettaDevs/coreERP.git}"
@@ -257,6 +258,32 @@ config_digest="$(printf '%s' "$manifest_image" | jq -r '.config.digest')"
     || gagal 'Manifest yang dibaca tidak cocok dengan digestnya.'
 printf '    %s@%s\n' "$REPO_IMAGE" "$digest"
 
+langkah 'Image konsol (admin.erp)'
+# Konsol ikut rilis supaya SaaS dev dan admin.erp dipasang dari rilis yang sama dengan server klien, bukan dari
+# `main` — tidak ada lagi yang dibangun di server saat men-deploy. Ia tidak pernah dikirim ke server klien: manifest
+# v2 tidak menyebutnya, dan agen hanya menarik yang disebut manifest. Digestnya dicatat di saas.json.
+tujuan_konsol="$HOST_REGISTRY/$REPO_KONSOL:$rilis"
+image_lokal_konsol="coreerp-perakit/konsol:$rilis"
+if [ "$(keadaan_tag "$tujuan_konsol")" = 'ada' ]; then
+    revisi_konsol="$(crane config "$tujuan_konsol" | jq -r '.config.Labels["org.opencontainers.image.revision"] // ""')"
+    [ "$revisi_konsol" = "$commit" ] || gagal "Tag $REPO_KONSOL:$rilis sudah ada di Harbor dari commit ${revisi_konsol:-tak dikenal}." \
+        'Tag rilis immutable; pakai nomor rilis berikutnya.'
+    printf '    sudah ada dari commit yang sama\n'
+else
+    docker build --quiet --platform "$PLATFORM" \
+        -f "$FOLDER_SUMBER/apps/control-plane/Dockerfile" \
+        --label "org.opencontainers.image.revision=$commit" \
+        --label "org.opencontainers.image.version=$rilis" \
+        -t "$image_lokal_konsol" "$FOLDER_SUMBER" > "$kerja/build-konsol.id" \
+        || gagal 'docker build konsol gagal.'
+    docker tag "$image_lokal_konsol" "$tujuan_konsol"
+    docker push --quiet "$tujuan_konsol" >/dev/null || gagal "docker push $tujuan_konsol gagal."
+    docker rmi "$tujuan_konsol" "$image_lokal_konsol" >/dev/null 2>&1 || true
+fi
+digest_konsol="$(crane digest "$tujuan_konsol")"
+[[ $digest_konsol == sha256:* ]] || gagal 'Digest image konsol tidak terbaca dari Harbor.'
+printf '    %s@%s\n' "$REPO_KONSOL" "$digest_konsol"
+
 langkah 'Image pendamping'
 # Diambil dari baris `image:` harfiah di compose rilis, seperti yang dilakukan build-release-files.sh untuk
 # v1. Image aplikasi memakai variabel, jadi tidak ikut terbaca di sini.
@@ -325,6 +352,12 @@ cp "$FOLDER_SUMBER/scripts/update.sh" "$folder_baru/update.sh"
 openssl dgst -sha256 -sign "$KUNCI_PRIVAT" -out "$folder_baru/SHA256SUMS.sig" "$folder_baru/SHA256SUMS"
 openssl dgst -sha256 -verify "$KUNCI_PUBLIK" -signature "$folder_baru/SHA256SUMS.sig" "$folder_baru/SHA256SUMS" >/dev/null \
     || gagal 'Tanda tangan yang baru dibuat tidak lolos pemeriksaan kunci publik rilis.'
+
+# Untuk deploy SaaS dev (deploy/saas/pasang-rilis.sh), bukan untuk server klien, dan karena itu di luar
+# SHA256SUMS: agen tidak pernah mengunduhnya, dan admin.erp tidak menyimpannya.
+jq -n --arg rilis "$rilis" --arg commit "$commit" --arg registry "$HOST_REGISTRY" \
+    --arg core "$REPO_IMAGE@$digest" --arg konsol "$REPO_KONSOL@$digest_konsol" \
+    '{rilis: $rilis, commit: $commit, registry: $registry, core: $core, konsol: $konsol}' > "$folder_baru/saas.json"
 
 mkdir -p "$FOLDER_RILIS"
 chmod 0755 "$RUMAH" "$FOLDER_RILIS"

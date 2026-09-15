@@ -1,44 +1,54 @@
-# Setiap merge ke `main` mendarat di server dev.
+# Memasang satu RILIS ke SaaS dev dan admin.erp di server pertama.
 #
-# ## Kenapa server yang membangun, bukan CI
+# ## Tidak lagi dipicu merge ke main
 #
-# Tidak ada registry image di susunan ini. Membangun di CI berarti menambah registry — satu layanan
-# lagi untuk dipasang, dijaga, dan dibayar — demi memindahkan pekerjaan yang server dev-nya sendiri
-# sanggup kerjakan dalam beberapa menit dengan delapan core.
+# Sejak 15 September 2026 merge ke `main` tidak men-deploy apa pun. SaaS dev menjalankan rilis — image yang
+# dirakit sekali oleh perakit, disimpan di Harbor, dan persis sama dengan yang nanti dipasang agen di server
+# klien. Yang lolos di SaaS dev karena itu adalah yang dikirim. Dulu alur ini membangun image sendiri di server
+# dari setiap merge, sehingga yang diuji tim bukan yang diterima klien. Alurnya lengkap di
+# docs/dev/29-alur-rilis-server-klien.md.
 #
-# Itu berhenti benar pada hari node aplikasi kedua menyala: dua node yang masing-masing membangun
-# image dari commit yang sama dapat menghasilkan isi yang berbeda, dan yang berbeda di antara
-# keduanya tidak akan terlihat sampai sesuatu berperilaku lain di salah satunya. Pada hari itu,
-# registry menjadi wajib.
+# Dua cara menjalankannya:
 #
-# ## Kenapa deploy tidak menunggu test
-#
-# Ia berjalan pada `main`, dan `main` hanya menerima perubahan lewat pull request — yang testnya
-# sudah dijalankan alur `tests.yml` sebelum merge. Menjalankannya lagi di sini menunda penyebaran
-# tanpa memeriksa satu hal baru pun.
+# - otomatis dari alur `rilis.yml`, sesudah rilis selesai dirakit;
+# - tangan, dengan nomor rilis yang sudah ada — untuk memasang ulang sesudah menyunting /etc/coreerp/saas.env,
+#   atau untuk mundur ke rilis sebelumnya di SaaS dev.
 #
 # ## Yang TIDAK dilakukan alur ini
 #
-# **Tidak menyentuh produksi.** Ia hanya tahu satu host, dan host itu server dev. Produksi kelak
-# menuntut gerbang manual — bukan karena alurnya berbeda, melainkan karena keputusannya berbeda.
+# **Tidak membangun apa pun** dan **tidak menyentuh server klien.** Server klien memilih rilisnya lewat
+# admin.erp dan menariknya sendiri.
 #
-# **Tidak memegang sudo.** User `deploy` di server hanya anggota grup `docker` dan `coreerp`: ia
-# dapat menjalankan container dan membaca satu berkas rahasia, tidak lebih. Secret yang bocor
-# karena itu tidak berarti root.
+# **Tidak memegang sudo.** User `deploy` di server hanya anggota grup `docker` dan `coreerp`: ia dapat
+# menjalankan container, membaca /etc/coreerp/saas.env dan kredensial pull-only SaaS dev, tidak lebih.
 
 name: deploy-dev
 
 on:
-  push:
-    branches: [main]
-  # Dapat dijalankan tangan, untuk memasang ulang tanpa commit baru — misalnya sesudah menyunting
-  # `/etc/coreerp/saas.env` di server.
   workflow_dispatch:
+    inputs:
+      rilis:
+        description: 'Nomor rilis yang sudah dirakit, misalnya 0.3.0'
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      rilis:
+        required: true
+        type: string
+    secrets:
+      DEV_SSH_KEY:
+        required: true
+      DEV_KNOWN_HOSTS:
+        required: true
+      DEV_HOST:
+        required: true
+      DEV_USER:
+        required: true
 
 concurrency:
-  # Dua penyebaran yang berjalan bersamaan akan saling menimpa image dengan tag yang sama, dan yang
-  # menang ditentukan urutan acak. `cancel-in-progress` dimatikan dengan sengaja: membatalkan
-  # penyebaran di tengah `docker compose up` meninggalkan stack separuh jadi.
+  # Dua pemasangan yang berjalan bersamaan saling menimpa stack yang sama. `cancel-in-progress` dimatikan
+  # dengan sengaja: membatalkan di tengah `docker compose up` meninggalkan stack separuh jadi.
   group: deploy-dev
   cancel-in-progress: false
 
@@ -48,145 +58,51 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Periksa nomor rilis
+        env:
+          RILIS: ${{ inputs.rilis }}
+        run: |
+          # Nilainya dikirim ke shell di server. Diperiksa di sini supaya isian yang bukan nomor rilis tidak
+          # pernah menjadi perintah.
+          [[ $RILIS =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || { echo "::error::Nomor rilis tidak sah: $RILIS"; exit 1; }
+
       - name: Siapkan kunci SSH
         run: |
           install -d -m 700 ~/.ssh
           printf '%s\n' "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          # Kunci host dipin dari secret, BUKAN diterima begitu saja. `StrictHostKeyChecking=no`
-          # membuat alur ini menyerahkan kredensialnya kepada siapa pun yang berhasil menyamar
-          # sebagai server itu.
+          # Kunci host dipin dari secret, BUKAN diterima begitu saja. `StrictHostKeyChecking=no` membuat alur ini
+          # menyerahkan kredensialnya kepada siapa pun yang berhasil menyamar sebagai server itu.
           printf '%s\n' "${{ secrets.DEV_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-          # Penjaga ini ada karena kegagalannya sudah terjadi sungguhan.
-          #
-          # Secretnya diisi dengan `ssh-keyscan -t ed25519 <host> | gh secret set`, dan server ini
-          # ternyata hanya punya kunci host RSA. Keyscan memulangkan nol kunci — hanya satu baris
-          # komentar `# host:22 SSH-2.0-OpenSSH_9.6p1` — dan `gh secret set` menyimpannya tanpa
-          # mengeluh sedikit pun. Penyebaran pertama mati dengan "Host key verification failed",
-          # kalimat yang tidak menyebut bahwa yang salah justru isi secretnya.
-          #
-          # Diperiksa DI SINI, bukan dibiarkan muncul sebagai kegagalan ssh, karena kalimat di
-          # bawah menyebut sebab dan obatnya sekaligus.
+          # Secret yang diisi `ssh-keyscan -t ed25519` pada server yang hanya punya kunci host RSA berisi baris
+          # komentar saja, dan ssh lalu gagal dengan kalimat yang tidak menyebut sebabnya. Kejadian sungguhan.
           if ! grep -qE '^[^#[:space:]]+ +(ssh-(rsa|ed25519)|ecdsa-)' ~/.ssh/known_hosts; then
             echo "::error::Secret DEV_KNOWN_HOSTS tidak memuat satu pun baris kunci host."
-            echo "Isi ulang dengan keluaran lengkap 'ssh-keyscan <host>' — TANPA -t, supaya jenis"
-            echo "kunci apa pun yang dipunyai server ikut terbawa. Baris komentar saja tidak cukup."
+            echo "Isi ulang dengan keluaran lengkap 'ssh-keyscan <host>' — TANPA -t."
             exit 1
           fi
 
-      - name: Pasang di server dev
+      - name: Pasang rilis di server dev
         env:
           DEV_HOST: ${{ secrets.DEV_HOST }}
           DEV_USER: ${{ secrets.DEV_USER }}
+          RILIS: ${{ inputs.rilis }}
         run: |
-          ssh -o BatchMode=yes "$DEV_USER@$DEV_HOST" 'bash -seu' <<'REMOTE'
+          ssh -o BatchMode=yes "$DEV_USER@$DEV_HOST" "RILIS=$RILIS bash -seu" <<'REMOTE'
           cd /opt/coreerp
 
-          # Repo ini dimiliki user lain, dan git menolak bekerja di repo milik orang lain sejak
-          # CVE-2022-24765. `--add` idempoten, jadi alur ini menyembuhkan dirinya sendiri pada
-          # server yang dibangun ulang alih-alih gagal dengan "dubious ownership".
+          # Repo ini dimiliki user lain, dan git menolak bekerja di repo milik orang lain sejak CVE-2022-24765.
           git config --global --add safe.directory /opt/coreerp 2>/dev/null || true
 
+          catatan="/var/lib/coreerp-perakit/rilis/$RILIS/saas.json"
+          [ -r "$catatan" ] || { echo "Rilis $RILIS belum dirakit di server ini."; exit 1; }
+          commit="$(jq -r '.commit' "$catatan")"
+
+          # Compose, migrasi, dan skrip pemasangnya diambil dari commit rilis itu sendiri — bukan dari main —
+          # supaya image dan berkas yang menjalankannya selalu satu commit.
           git fetch --quiet origin
-          git checkout -q main 2>/dev/null || git checkout -q -b main origin/main
-          git reset --hard -q origin/main
-          echo "commit: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
-
-          # Dibangun ke tag sementara lebih dulu. Build yang gagal karena itu tidak pernah
-          # mengganti image yang sedang melayani — stack lama tetap berjalan, dan alur ini merah.
-          docker build -q -f apps/core/Dockerfile -t coreerp:baru .
-          docker build -q -f apps/control-plane/Dockerfile -t coreerp-console:baru .
-          docker tag coreerp:baru coreerp:dev
-          docker tag coreerp-console:baru coreerp-console:dev
-
-          compose() {
-            docker compose --env-file /etc/coreerp/saas.env \
-              -f deploy/saas/compose.yaml -f deploy/saas/compose.dokploy.yaml "$@"
-          }
-
-          # Penyebarannya bertahap, dan bukan demi kerapian.
-          #
-          # Percobaan pertama memakai satu perintah untuk seluruhnya — seluruh profil sekaligus,
-          # lalu `up -d --wait`. Perintah itu memulangkan 1 pada penyebaran yang BERHASIL: `--wait`
-          # menunggu setiap container yang ia nyalakan mencapai running/healthy, dan container
-          # sekali-jalan — `core-minio-init`, `core-migrate` — tidak pernah mencapainya. Mereka
-          # selesai lalu keluar, dan compose melaporkannya sebagai kegagalan apa pun kode keluarnya:
-          #
-          #   container coreerp-saas-core-minio-init-1 exited (0)   ->  exit 1
-          #
-          # Yang jauh lebih buruk daripada merah palsunya: migration yang benar-benar GAGAL juga
-          # memulangkan 1. Diukur langsung di server — migrate yang keluar dengan kode 7 dan
-          # penyebaran yang seluruhnya sehat sama-sama berbunyi `exit 1`, tidak terbedakan.
-          #
-          # `compose wait` memulangkan kode keluar container itu sendiri (diukur: 0 ketika berhasil,
-          # 7 ketika gagal), jadi tiap tahap punya suaranya sendiri. `bash -e` yang menghentikannya.
-
-          # 1. Data. `core-minio-init` membuat bucket lalu keluar; ditunggu terpisah.
-          compose --profile data up -d
-          compose --profile data wait core-minio-init
-
-          # 2. Migrasi — migration Core, manifest app, lalu `environment:upgrade` yang membawa
-          #    SETIAP database lingkungan ke skema yang berlaku. `--force-recreate` supaya ia
-          #    benar-benar berjalan tiap penyebaran: tanpa itu, commit yang tidak mengubah image
-          #    melewatinya, dan app yang baru dibeli tenant tidak pernah terpasang.
-          compose --profile migrate up -d --force-recreate core-migrate
-          compose --profile migrate wait core-migrate
-
-          # 3. Yang melayani. Baru sesudah migrasi selesai, jadi tidak ada container baru yang
-          #    melayani di atas skema lama.
-          #
-          #    `worker` ikut, dan sebelumnya tidak — itu cacat yang berdiri sendiri.
-          #    `QUEUE_CONNECTION` di stack ini `database`, dan tanpa satu pun worker, tombol
-          #    "Perbarui" di layar armada serta setiap ekspor laporan mengantre selamanya tanpa
-          #    pesan galat apa pun.
-          compose --profile app --profile console --profile scheduler --profile worker \
-            up -d --wait --wait-timeout 600
-
-          docker image prune -f --filter 'until=168h' >/dev/null || true
-          REMOTE
-
-      - name: Buktikan ia benar-benar melayani
-        env:
-          DEV_HOST: ${{ secrets.DEV_HOST }}
-          DEV_USER: ${{ secrets.DEV_USER }}
-        run: |
-          ssh -o BatchMode=yes "$DEV_USER@$DEV_HOST" 'bash -seu' <<'REMOTE'
-          # Diperiksa dari dalam server, lewat jaringan container — bukan dari runner. Yang ingin
-          # dibuktikan aplikasinya menjawab, dan memeriksanya lewat internet publik akan
-          # memerahkan penyebaran karena sebab yang tidak ada hubungannya: DNS, TLS, atau firewall.
-          #
-          # Diulang, bukan sekali tembak. `compose up --wait` memang menunggu healthcheck, tetapi
-          # pemeriksaan yang berjalan pada detik pertama sesudahnya tetap berbalapan dengan
-          # container yang baru saja dibuat — dan pada dry-run pertama ia memang kalah, sementara
-          # permintaan yang sama semenit kemudian menjawab 200.
-          #
-          # Penyebaran yang merah karena balapan adalah penyebaran yang orang belajar abaikan.
-          for percobaan in $(seq 1 20); do
-            if docker exec coreerp-saas-core-console-1 curl -sf -o /dev/null --max-time 10 http://core-app/up; then
-              echo "core menjawab /up (percobaan $percobaan)"
-              break
-            fi
-            if [ "$percobaan" = "20" ]; then
-              echo "core tidak pernah menjawab /up sesudah 20 percobaan"
-              docker logs --tail 40 coreerp-saas-core-app-1 || true
-              exit 1
-            fi
-            sleep 3
-          done
-
-          # Penjaga terakhir, dan ia menangkap yang lolos dari tahap di atas: layanan yang menyala
-          # lalu mati sendiri beberapa detik kemudian — worker yang koneksinya ditolak, misalnya.
-          # `--wait` sudah selesai sebelum itu sempat terjadi.
-          gagal=$(docker compose --env-file /etc/coreerp/saas.env \
-            -f /opt/coreerp/deploy/saas/compose.yaml -f /opt/coreerp/deploy/saas/compose.dokploy.yaml \
-            ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}' \
-            | awk '$2 == "exited" && $3 != "0" { print $1 }')
-
-          if [ -n "$gagal" ]; then
-            echo "layanan yang keluar dengan galat: $gagal"
-            exit 1
-          fi
-          echo "tidak ada layanan yang keluar dengan galat"
+          git checkout -q --detach "$commit"
+          bash deploy/saas/pasang-rilis.sh "$RILIS"
           REMOTE

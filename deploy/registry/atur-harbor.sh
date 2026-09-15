@@ -26,6 +26,8 @@ FOLDER_PERAKIT='/etc/coreerp/perakit'
 BERKAS_ROBOT_PERAKIT="$FOLDER_PERAKIT/registry-robot.env"
 NAMA_ROBOT_KONSOL='konsol'
 BERKAS_ROBOT_KONSOL='/etc/coreerp/registry/robot-konsol.env'
+NAMA_ROBOT_SAAS='saas-dev'
+BERKAS_ROBOT_SAAS='/etc/coreerp/saas-registry.env'
 HOST_REGISTRY='registry.erp.grenery.xyz'
 
 # Tag rilis diawali angka (`0.1.0`, `0.2.0-rc1`). Tag `terpasang-*` sengaja tidak cocok: admin.erp harus
@@ -208,8 +210,11 @@ id_robot="$(printf '%s' "$jawaban" | jq -r --arg n "$nama_robot" '.[]? | select(
 # tulis_rahasia_robot BERKAS NAMA RAHASIA — berkas root 0600 di folder 0700. Nilainya bertanda kutip tunggal
 # karena nama robot memuat `$`.
 tulis_rahasia_robot() {
-    local berkas="$1" nama="$2" rahasia="$3"
-    install -d -m 0700 -o root -g root "$(dirname "$berkas")"
+    local berkas="$1" nama="$2" rahasia="$3" folder
+    folder="$(dirname "$berkas")"
+    # Hanya folder yang belum ada yang dibuat 0700. `install -d` pada folder yang sudah ada mengubah izin dan
+    # pemiliknya — dan /etc/coreerp harus tetap terbaca grup coreerp, tempat user deploy membaca saas.env.
+    [ -d "$folder" ] || install -d -m 0700 -o root -g root "$folder"
     (
         umask 077
         printf "REGISTRY_HOST='%s'\nREGISTRY_USERNAME='%s'\nREGISTRY_PASSWORD='%s'\n" \
@@ -239,6 +244,37 @@ else
     [ -n "$rahasia" ] || gagal 'Harbor tidak mengembalikan rahasia robot perakit.'
     tulis_rahasia_robot "$BERKAS_ROBOT_PERAKIT" "$(printf '%s' "$jawaban" | jq -r '.name')" "$rahasia"
     printf '    dibuat, rahasia di %s\n' "$BERKAS_ROBOT_PERAKIT"
+fi
+
+langkah 'Robot SaaS dev'
+# Pull saja, tanpa tenggat, dipakai deploy/saas/pasang-rilis.sh untuk menarik rilis ke SaaS dev. Berkasnya
+# root:coreerp 0640 di /etc/coreerp — bukan di /etc/coreerp/registry yang 0700 — karena yang membacanya user
+# `deploy` (grup coreerp) yang sengaja tidak punya sudo. Robot ini tidak dapat push, jadi berkas yang bocor tidak
+# dapat mengubah rilis apa pun.
+api GET "/robots?q=$(jq -rn --arg q "Level=project,ProjectID=$id_project" '$q | @uri')&page_size=100"
+id_robot_saas="$(printf '%s' "$jawaban" | jq -r --arg n "$PROJECT+$NAMA_ROBOT_SAAS" '.[]? | select(.name | endswith($n)) | .id')"
+if [ -n "$id_robot_saas" ] && [ -f "$BERKAS_ROBOT_SAAS" ]; then
+    printf '    sudah ada, rahasia di %s\n' "$BERKAS_ROBOT_SAAS"
+else
+    if [ -n "$id_robot_saas" ]; then
+        api PATCH "/robots/$id_robot_saas" '{"secret":""}'
+        rahasia="$(printf '%s' "$jawaban" | jq -r '.secret // empty')"
+        api GET "/robots/$id_robot_saas"
+        nama_saas="$(printf '%s' "$jawaban" | jq -r '.name')"
+    else
+        api POST /robots "$(jq -cn --arg n "$NAMA_ROBOT_SAAS" --arg p "$PROJECT" '{
+            name: $n, level: "project", duration: -1, disable: false,
+            description: "SaaS dev di server pertama: menarik image rilis untuk deploy/saas/pasang-rilis.sh.",
+            permissions: [{kind: "project", namespace: $p, access: [{resource: "repository", action: "pull"}]}]
+        }')"
+        rahasia="$(printf '%s' "$jawaban" | jq -r '.secret // empty')"
+        nama_saas="$(printf '%s' "$jawaban" | jq -r '.name')"
+    fi
+    [ -n "$rahasia" ] || gagal 'Harbor tidak mengembalikan rahasia robot SaaS dev.'
+    tulis_rahasia_robot "$BERKAS_ROBOT_SAAS" "$nama_saas" "$rahasia"
+    chown root:coreerp "$BERKAS_ROBOT_SAAS"
+    chmod 0640 "$BERKAS_ROBOT_SAAS"
+    printf '    ditulis ke %s (root:coreerp 0640)\n' "$BERKAS_ROBOT_SAAS"
 fi
 
 langkah 'Robot sistem admin.erp'

@@ -1,8 +1,9 @@
 # Release, provisioning, dan on-prem perpetual
 
-> **Server klien on-prem yang dikelola vendor memakai alur lain sejak 15 September 2026:** satu image untuk
-> semua klien, dirakit di server pertama, disimpan di Harbor, dipilih operator di admin.erp, dan dipasang agen
-> lewat digest. Alurnya, beserta diagramnya, di [Dari branch sampai server klien](29-alur-rilis-server-klien.md).
+> **Sejak 15 September 2026 yang di-deploy selalu rilis, bukan `main`:** satu image untuk semua klien, dirakit
+> sekali di server pertama, disimpan di Harbor, dipasang ke SaaS dev lewat digest, lalu dipilih operator di
+> admin.erp untuk server klien dan dipasang agen dengan digest yang sama. Alurnya, beserta diagramnya, di
+> [Dari branch sampai server klien](29-alur-rilis-server-klien.md).
 >
 > Bagian halaman ini tentang image per edisi, bundle, dan admin pelanggan yang menjalankan pembaruan sendiri
 > menggambarkan jalur yang lebih dulu ada dan tidak berlaku untuk server klien yang dikelola. Aturan tentang
