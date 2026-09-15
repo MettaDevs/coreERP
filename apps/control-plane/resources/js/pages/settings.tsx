@@ -12,6 +12,11 @@ type Props = {
         public: KeyState;
         pairMatches: boolean | null;
     };
+    registry: {
+        host: string;
+        robot: string | null;
+        check: { ok: true } | { ok: false; error: string };
+    };
 };
 
 function Section({
@@ -65,13 +70,13 @@ function Fingerprint({ state }: { state: KeyState }) {
 }
 
 /**
- * Pengaturan konsol: kunci yang dibutuhkan server klien, dan tempat bagian registry.
+ * Pengaturan konsol: kunci dan registry yang dibutuhkan server klien.
  *
- * Isinya dibaca, bukan diubah. Kunci disetel lewat berkas di server konsol; halaman ini ada supaya
- * kunci yang hilang atau tertukar ditemukan operator sebelum perintah pasang dibuat — bukan oleh
- * teknisi yang terminalnya menjawab 503 di lokasi klien.
+ * Isinya dibaca, bukan diubah. Kunci disetel lewat berkas di server konsol dan robot registry lewat
+ * perintah artisan; halaman ini ada supaya yang hilang atau tertukar ditemukan operator sebelum perintah
+ * pasang dibuat — bukan oleh teknisi yang terminalnya menjawab 503 di lokasi klien.
  */
-export default function Settings({ releaseKey, licenseKey }: Props) {
+export default function Settings({ releaseKey, licenseKey, registry }: Props) {
     return (
         <Shell
             title="Pengaturan"
@@ -129,21 +134,37 @@ export default function Settings({ releaseKey, licenseKey }: Props) {
                 </dl>
             </Section>
 
-            {/*
-                Tempat untuk CP-06 di docs/todo/registry-harbor: status Harbor, robot sistem, dan
-                pemakaian disk. Milik tim registry — bagian ini sengaja kosong sampai datanya dikirim
-                controller `Settings`.
-            */}
             <Section
                 title="Registry (Harbor)"
-                description="Status registry image — terjangkau, robot sistem, dan pemakaian disk — akan tampil di sini."
+                description="Server klien menarik image rilis dari registry ini dengan robot pull-only yang diterbitkan konsol per operasi. Tanpa robot sistem yang diterima Harbor, pemasangan dan pembaruan gagal saat menarik image."
             >
-                <p
-                    className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground"
-                    data-test="harbor-slot"
-                >
-                    Belum tersedia. Bagian ini disiapkan untuk integrasi
-                    registry Harbor.
+                <dl data-test="registry">
+                    <Row label="Alamat untuk server klien">
+                        <span className="font-mono text-xs">
+                            {registry.host}
+                        </span>
+                    </Row>
+                    <Row label="Robot sistem">
+                        {registry.robot ?? (
+                            <Problem>
+                                Belum disetel. Jalankan php artisan
+                                registry:robot-sistem di server konsol.
+                            </Problem>
+                        )}
+                    </Row>
+                    {registry.robot !== null && (
+                        <Row label="Keadaan">
+                            {registry.check.ok ? (
+                                'Terhubung, robot diterima Harbor'
+                            ) : (
+                                <Problem>{registry.check.error}</Problem>
+                            )}
+                        </Row>
+                    )}
+                </dl>
+                <p className="text-xs text-muted-foreground">
+                    Rahasia robot sistem tersimpan terenkripsi dan tidak pernah
+                    ditampilkan. Pemakaian disk registry belum dikumpulkan.
                 </p>
             </Section>
         </Shell>

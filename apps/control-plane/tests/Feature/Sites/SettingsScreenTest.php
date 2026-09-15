@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace ControlPlane\Tests\Feature\Sites;
 
+use ControlPlane\Models\OperatorAuditEvent;
 use ControlPlane\Models\User;
+use ControlPlane\Registry\RegistrySettings;
+use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 /**
  * Halaman Pengaturan (PS-08): sidik jari kunci rilis, keadaan kunci lisensi, dan tempat bagian Harbor.
@@ -101,6 +106,71 @@ final class SettingsScreenTest extends SiteTestCase
 
         $page = (string) file_get_contents(base_path('resources/js/pages/settings.tsx'));
         $this->assertStringContainsString('Registry (Harbor)', $page);
+    }
+
+    /**
+     * CP-06: operator melihat robot registry yang hilang atau ditolak Harbor sebelum membuat perintah pasang,
+     * bukan dari pemasangan yang gagal menarik image di lokasi klien. Rahasianya tidak pernah dikirim ke layar.
+     */
+    public function test_the_registry_section_names_the_robot_and_whether_harbor_accepts_it(): void
+    {
+        config(['sites.registry_api_url' => 'http://harbor.uji', 'sites.registry_host' => 'registry.uji.test']);
+        $operator = $this->operator();
+
+        // Satu palsuan dengan keadaan: palsuan Http yang didaftarkan belakangan tidak menggantikan yang pertama.
+        $jawaban = Http::response([['name' => 'coreerp', 'project_id' => 2]], 200);
+        Http::fake(function (HttpRequest $request) use (&$jawaban) {
+            return $request->url() === 'http://harbor.uji/api/v2.0/projects?name=coreerp' ? $jawaban : Http::response([], 404);
+        });
+
+        $this->actingAs($operator)->get('/pengaturan')
+            ->assertInertia(fn ($page) => $page
+                ->where('registry.host', 'registry.uji.test')
+                ->where('registry.robot', null)
+                ->where('registry.check', ['ok' => true]));
+        Http::assertNothingSent();
+
+        app(RegistrySettings::class)->storeRobot('robot$konsol', 'rahasia-robot-sistem', null);
+
+        $page = $this->actingAs($operator)->get('/pengaturan');
+        $page->assertInertia(fn ($inertia) => $inertia
+            ->where('registry.robot', 'robot$konsol')
+            ->where('registry.check', ['ok' => true]));
+        $this->assertStringNotContainsString('rahasia-robot-sistem', (string) $page->getContent());
+
+        $jawaban = Http::response(['errors' => [['code' => 'UNAUTHORIZED']]], 401);
+
+        $this->actingAs($operator)->get('/pengaturan')
+            ->assertInertia(fn ($inertia) => $inertia
+                ->where('registry.check.ok', false)
+                ->where('registry.check.error', fn (string $error): bool => str_contains($error, 'menolak kredensial robot sistem')));
+    }
+
+    /** Robot yang ditolak Harbor tidak menggantikan robot yang sedang bekerja. */
+    public function test_the_robot_command_stores_only_credentials_that_harbor_accepts(): void
+    {
+        config(['sites.registry_api_url' => 'http://harbor.uji']);
+        $settings = app(RegistrySettings::class);
+        $settings->storeRobot('robot$lama', 'rahasia-lama', null);
+
+        $harbor = new class
+        {
+            public bool $menerima = false;
+        };
+        Http::fake(fn () => $harbor->menerima ? Http::response([['name' => 'coreerp']], 200) : Http::response([], 401));
+
+        $berkas = $this->file("REGISTRY_HOST='registry.uji.test'\nREGISTRY_USERNAME='robot\$konsol'\nREGISTRY_PASSWORD='rahasia-baru'\n");
+
+        $this->assertSame(1, Artisan::call('registry:robot-sistem', ['--berkas' => $berkas]));
+        $this->assertSame(['name' => 'robot$lama', 'secret' => 'rahasia-lama'], $settings->robot());
+
+        $harbor->menerima = true;
+        $this->assertSame(0, Artisan::call('registry:robot-sistem', ['--berkas' => $berkas]));
+        $this->assertSame(['name' => 'robot$konsol', 'secret' => 'rahasia-baru'], $settings->robot());
+
+        // Terenkripsi di database: rahasia tidak terbaca dari isi tabel tanpa APP_KEY.
+        $this->assertStringNotContainsString('rahasia-baru', (string) DB::table('console_settings')->where('key', RegistrySettings::ROBOT_SECRET)->value('value'));
+        $this->assertStringNotContainsString('rahasia-baru', (string) json_encode(OperatorAuditEvent::query()->pluck('detail')));
     }
 
     private function file(string $content): string

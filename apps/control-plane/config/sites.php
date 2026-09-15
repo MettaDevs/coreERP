@@ -91,4 +91,27 @@ return [
      * sengaja tanpa env, karena tidak ada alasan produksi untuk menyajikan berkas dari tempat lain.
      */
     'installer_source_root' => base_path('../..'),
+
+    /*
+     * Registry image Harbor (`docs/todo/registry-harbor`, `deploy/registry`).
+     *
+     * Dua alamat untuk satu registry, dan keduanya disengaja:
+     *
+     * - `registry_host` adalah nama yang diberikan kepada agen di server klien. Ia tidak pernah tersimpan di
+     *   server klien — datang lagi di setiap operasi — jadi registry dapat pindah tanpa menyentuh klien.
+     * - `registry_api_url` adalah jalan konsol ini ke API Harbor lewat jaringan Docker internal. Jalur admin
+     *   Harbor di internet dapat dibatasi daftar IP, dan panggilan konsol tidak perlu keluar mesin.
+     *
+     * Rahasia robot sistem tidak di sini melainkan di `console_settings`, terenkripsi, lewat
+     * `php artisan registry:robot-sistem` — lihat `ControlPlane\Registry\RegistrySettings`.
+     */
+    'registry_host' => env('CONSOLE_REGISTRY_HOST', 'registry.erp.grenery.xyz'),
+    'registry_api_url' => env('CONSOLE_REGISTRY_API_URL', 'http://harbor-registry-proxy:8080'),
+    'registry_project' => 'coreerp',
+
+    /*
+     * Umur robot situs dalam hari, satuan terkecil yang diterima Harbor. Batas atasnya saja: robot dihapus
+     * begitu operasinya ditutup, dan umur ini hanya penjaga bila penghapusan itu tidak pernah berhasil.
+     */
+    'registry_robot_days' => 1,
 ];

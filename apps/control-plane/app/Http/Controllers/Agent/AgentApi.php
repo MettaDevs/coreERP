@@ -9,6 +9,8 @@ use ControlPlane\Http\Middleware\VerifyAgentSignature;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Models\SiteRelease;
+use ControlPlane\Registry\RegistryCredentials;
+use ControlPlane\Registry\RegistryUnavailable;
 use ControlPlane\Sites\EnrollmentTokens;
 use ControlPlane\Sites\LicenseIssuer;
 use ControlPlane\Sites\LicenseRenewal;
@@ -93,7 +95,7 @@ final class AgentApi extends Controller
         return response()->json($answer);
     }
 
-    public function claim(Request $request, SiteOperations $operations): Response
+    public function claim(Request $request, SiteOperations $operations, RegistryCredentials $credentials): Response
     {
         $site = $this->site($request);
 
@@ -102,6 +104,10 @@ final class AgentApi extends Controller
         }
 
         $operation = $operations->claim($site);
+
+        // Sesudah klaim, karena klaim menutup operasi yang tenggatnya habis: robot milik operasi itu baru
+        // tersapu bila penutupnya sudah terjadi.
+        $credentials->releaseClosed($site, $request->ip());
 
         if (! $operation instanceof SiteOperation) {
             return response()->noContent();
@@ -115,7 +121,7 @@ final class AgentApi extends Controller
         ]);
     }
 
-    public function step(Request $request, SiteOperations $operations, string $operation): JsonResponse
+    public function step(Request $request, SiteOperations $operations, RegistryCredentials $credentials, string $operation): JsonResponse
     {
         $site = $this->site($request);
         $body = $request->json()->all();
@@ -133,9 +139,50 @@ final class AgentApi extends Controller
             return response()->json(['error' => $e->reason], 409);
         }
 
+        if ($recorded->status !== 'running') {
+            // Operasi baru saja ditutup. Robot registry-nya dihapus sekarang, bukan menunggu sapuan berikutnya.
+            $credentials->releaseClosed($site, $request->ip());
+        }
+
         return response()->json([
             'lease_until' => $recorded->status === 'running' ? $recorded->lease_until?->toIso8601String() : null,
         ]);
+    }
+
+    /**
+     * Kredensial pull-only ke registry untuk operasi `install` atau `upgrade` yang sedang dipegang (CP-03).
+     *
+     * `503` bukan `409`: registry yang belum disetel atau tidak menjawab bukan kesalahan agen, dan operasinya
+     * tetap dipegang. Agen yang menerima 503 menutup operasinya dengan pesan registry, bukan pesan "tidak
+     * dipegang" yang akan menyuruh operator mencari masalah di tempat yang salah.
+     */
+    public function registryCredential(Request $request, RegistryCredentials $credentials): JsonResponse
+    {
+        $site = $this->site($request);
+        $body = $request->json()->all();
+
+        if (array_keys($body) !== ['operation_id']
+            || ! is_string($body['operation_id']) || $body['operation_id'] === '' || strlen($body['operation_id']) > 26) {
+            return response()->json(['error' => 'invalid_request'], 422);
+        }
+
+        try {
+            $credential = $credentials->issue($site, $body['operation_id'], $request->ip());
+        } catch (SiteRejected $e) {
+            return response()->json(['error' => $e->reason], 409);
+        } catch (RegistryUnavailable $e) {
+            Log::warning('Agen situs: kredensial registry tidak dapat diterbitkan.', ['situs' => $site->id, 'sebab' => $e->getMessage()]);
+
+            return response()->json(['error' => 'registry_unavailable'], 503);
+        }
+
+        Log::info('Agen situs: kredensial registry diterbitkan.', [
+            'situs' => $site->id,
+            'operasi' => $body['operation_id'],
+            'robot' => $credential['username'],
+        ]);
+
+        return response()->json($credential, 200, ['Cache-Control' => 'no-store']);
     }
 
     public function releaseFile(Request $request, string $edition, string $release, string $file): Response

@@ -25,6 +25,8 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $started_at
  * @property ?Carbon $lease_until
  * @property ?Carbon $finished_at
+ * @property ?int $registry_robot_id
+ * @property ?string $registry_robot_name
  */
 class SiteOperation extends Model
 {
@@ -80,6 +82,7 @@ class SiteOperation extends Model
             'started_at' => 'datetime',
             'lease_until' => 'datetime',
             'finished_at' => 'datetime',
+            'registry_robot_id' => 'integer',
         ];
     }
 
