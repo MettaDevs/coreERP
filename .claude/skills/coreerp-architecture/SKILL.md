@@ -16,7 +16,7 @@ Read only the sections relevant to the task:
 - `docs/dev/08-query-scopes-and-schema.md` defines organization persistence and query scope.
 - `docs/dev/09-identity-and-access.md` defines workforce and responsibility-based access.
 - `docs/dev/03-release-and-on-prem.md` defines releases, updates, and the N-1 schema rule that makes rolling back an image safe without touching the database.
-- `docs/dev/29-alur-rilis-server-klien.md` defines how merged code reaches a managed client server, and how release numbers are chosen.
+- `docs/dev/29-alur-rilis-server-klien.md` defines how merged code becomes a release that SaaS dev and managed client servers run, and how release numbers are chosen.
 - `docs/references/dynamics-365-organization-model.md` records the Microsoft Dynamics 365 sources and the mapping decisions used by CoreERP.
 
 The Dynamics reference governs organization, workforce, and responsibility-based security inside a tenant. CoreERP's tenant, entitlement, deployment, and on-prem boundaries remain separate decisions.
@@ -330,11 +330,11 @@ If a requested change cannot be made N-1 compatible in one release, stop and pro
 
 ### Release number gate
 
-Apply when choosing the number passed to `deploy/perakit/rakit.sh --rilis`, when advising someone which number to use, or when writing docs, tests, or code that parse or compare release numbers. The canonical rule is `docs/dev/29-alur-rilis-server-klien.md`, section "Nomor rilis".
+Apply when choosing the number entered in the `rilis` workflow (**Run workflow**, which runs `deploy/perakit/rakit.sh --rilis` on the first server), when advising someone which number to use, or when writing docs, tests, or code that parse or compare release numbers. The canonical rule is `docs/dev/29-alur-rilis-server-klien.md`, section "Nomor rilis".
 
 Code enforces only the form and the order: one number has one content, a number already in Harbor is burned, and releases only move forward. The meaning of each part is a team convention that no checker enforces, so apply it deliberately.
 
-- **Always exactly three parts, `MAJOR.MINOR.PATCH`.** No suffix (`-rc1`), no leading zeros, no fourth build number. The perakit and admin.erp accept two to four parts with leading zeros, while the agent rejects leading zeros. PHP `version_compare` ranks `0.2.0` above `0.2`, while the agent treats them as equal. Three plain parts is the only form every component agrees on.
+- **Always exactly three parts, `MAJOR.MINOR.PATCH`.** No suffix (`-rc1`), no leading zeros, no fourth build number. Every step on GitHub and the first server (`rilis.yml`, `deploy-dev.yml`, `coreerp-rilis`, `rakit.sh`, `pasang-rilis.sh`) and admin.erp accept two to four parts with leading zeros, while the agent rejects leading zeros. A number only the agent rejects is still pushed to Harbor, registered, and deployed to SaaS dev, then burned. PHP `version_compare` ranks `0.2.0` above `0.2`, while the agent treats them as equal. Three plain parts is the only form every component agrees on.
 - **PATCH:** fixes only, with no migration since the previous release's commit. A fix that needs a migration ships as MINOR. Check it with the migration diff command in the canonical section: it needs `':(glob)modules/*/*/database/migrations/**'`, because a plain `modules/*/*/database/migrations` pathspec silently matches no module file.
 - **MINOR:** new features or modules, and any migration that passes the schema change and rollback gate, including an `@kontrak` step.
 - **MAJOR:** a change someone outside the code must act on:
