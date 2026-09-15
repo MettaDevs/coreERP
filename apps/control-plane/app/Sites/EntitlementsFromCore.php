@@ -82,8 +82,12 @@ final class EntitlementsFromCore
         $apps = [];
 
         foreach ($payload['apps'] as $app) {
-            if (! is_string($app) || $app === '') {
-                throw new EntitlementsUnavailable('Jawaban '.$endpoint.' memuat id app yang bukan teks.');
+            // Pola yang sama dengan yang diperiksa agen (`SignedLicense` di `contracts/openapi-agent.yaml`).
+            // Lisensi dengan id di luar pola ditolak agen tanpa suara — yang terlihat di sini hanya
+            // tanggal berakhir yang tidak bergerak — jadi penolakannya dipindah ke tempat yang mencatat
+            // sebabnya.
+            if (! is_string($app) || preg_match('/^[a-z0-9][a-z0-9-]*$/', $app) !== 1) {
+                throw new EntitlementsUnavailable('Jawaban '.$endpoint.' memuat id app di luar pola ^[a-z0-9][a-z0-9-]*$.');
             }
 
             $apps[$app] = true;

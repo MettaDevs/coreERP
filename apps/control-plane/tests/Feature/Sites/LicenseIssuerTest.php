@@ -103,6 +103,9 @@ class LicenseIssuerTest extends SiteTestCase
         yield 'apps bukan daftar' => [[200, ['tenant_id' => '__TENANT__', 'apps' => ['a' => 'human-resources']]]];
         yield 'anggota bukan teks' => [[200, ['tenant_id' => '__TENANT__', 'apps' => ['human-resources', 7]]]];
         yield 'anggota kosong' => [[200, ['tenant_id' => '__TENANT__', 'apps' => ['']]]];
+        // Ditolak agen; lebih baik ditolak di sini, tempat sebabnya tercatat.
+        yield 'id app huruf besar' => [[200, ['tenant_id' => '__TENANT__', 'apps' => ['Human-Resources']]]];
+        yield 'id app diawali tanda hubung' => [[200, ['tenant_id' => '__TENANT__', 'apps' => ['-hr']]]];
         yield 'tenant lain' => [[200, ['tenant_id' => '01JZZZZZZZZZZZZZZZZZZZZZZZ', 'apps' => ['human-resources']]]];
     }
 

@@ -87,11 +87,18 @@ class LicenseRenewalTest extends SiteTestCase
 
         $this->assertSame(['interval_seconds', 'license'], array_keys($answer));
         $this->assertSame(['license', 'signature'], array_keys($answer['license']));
+        // Base64 standar satu baris: agen menulisnya apa adanya ke `license.json.sig`.
+        $this->assertMatchesRegularExpression('#^[A-Za-z0-9+/]+={0,2}$#', $answer['license']['signature']);
         $license = json_decode($answer['license']['license'], true);
+        // Agen tidak memeriksa `tenant_id`, `issued_at`, maupun keunikan dan urutan `apps`; Core yang
+        // membacanya. Jadi yang menjaganya di sisi ini test, bukan agen.
+        $this->assertSame(['version', 'tenant_id', 'site_id', 'apps', 'valid_until', 'issued_at'], array_keys($license));
         $this->assertSame(2, $license['version']);
+        $this->assertSame($site->tenant_id, $license['tenant_id']);
         $this->assertSame($site->id, $license['site_id']);
         $this->assertSame(['human-resources'], $license['apps']);
         $this->assertSame('2026-10-15', $license['valid_until']);
+        $this->assertSame('2026-09-15T08:00:00Z', $license['issued_at']);
         $this->assertSame(1, openssl_verify($answer['license']['license'], (string) base64_decode($answer['license']['signature'], true), $this->public, OPENSSL_ALGO_SHA256));
 
         // Laporan berikutnya masih membawa tanggal lama — agen belum memasangnya. Jeda menahan lisensi
