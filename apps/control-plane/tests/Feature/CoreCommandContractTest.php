@@ -210,6 +210,27 @@ class CoreCommandContractTest extends TestCase
     }
 
     /**
+     * Pemanggil kelima: daftar app untuk lisensi. Diulang dengan alasan yang sama — cacat per pemanggil.
+     *
+     * Alamatnya `/tenants/{tenant}/entitlements` sengaja belum dituntut ada di kontrak dari sini: rute
+     * dan kontraknya lahir di cabang Core yang dikerjakan bersamaan. Begitu keduanya bertemu,
+     * pemeriksaan alamat seperti di atas wajib ditambahkan untuk pemanggil ini.
+     */
+    public function test_the_entitlements_caller_also_uses_bearer(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../app/Sites/EntitlementsFromCore.php');
+
+        $this->assertStringContainsString(
+            'Http::withToken(',
+            $source,
+            'Kontrak menuntut token dikirim sebagai `Authorization: Bearer`, tetapi EntitlementsFromCore '
+            .'tidak memakai `Http::withToken()`.'
+        );
+
+        $this->assertStringNotContainsString('X-Control-Plane-Token', $source);
+    }
+
+    /**
      * Mengantrekan bukan mengerjakan, dan tenggatnya harus menyebutkan yang mana.
      *
      * Core memulangkan 202 begitu job-nya masuk antrean, jadi panggilan ini selesai dalam hitungan

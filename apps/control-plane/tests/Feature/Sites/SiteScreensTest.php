@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ControlPlane\Tests\Feature\Sites;
 
+use Carbon\CarbonImmutable;
 use ControlPlane\Models\OperatorAuditEvent;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteEnrollmentToken;
@@ -12,30 +13,19 @@ use ControlPlane\Models\SiteRelease;
 use ControlPlane\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Layar Situs dan tindakan operator: konfirmasi tertulis dan jejak audit.
  */
 class SiteScreensTest extends SiteTestCase
 {
-    private string $licenseKeyPath;
-
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->licenseKeyPath = tempnam(sys_get_temp_dir(), 'kunci-lisensi-');
-        file_put_contents($this->licenseKeyPath, $this->rsaKey(7)['private']);
-        config(['sites.license_private_key_path' => $this->licenseKeyPath]);
-    }
-
-    protected function tearDown(): void
-    {
-        try {
-            @unlink($this->licenseKeyPath);
-        } finally {
-            parent::tearDown();
-        }
+        $this->useLicenseKey();
     }
 
     // ------------------------------------------------------------------ pembuatan dan akses
@@ -180,20 +170,227 @@ class SiteScreensTest extends SiteTestCase
     public function test_a_license_operation_carries_a_license_signed_for_this_site(): void
     {
         $site = $this->enrolledSite();
+        $operator = $this->operator();
+        $this->fakeEntitlements($site, ['management-aset', 'human-resources']);
 
-        $this->actingAs($this->operator())
+        $this->actingAs($operator)
             ->post("/situs/{$site->id}/operasi", ['operation' => 'install_license', 'valid_until' => '2027-09-14', 'confirm_name' => $site->name])
             ->assertRedirect();
 
         $parameters = SiteOperation::query()->sole()->parameters;
         $license = json_decode($parameters['license'], true);
 
+        $this->assertSame(2, $license['version']);
         $this->assertSame($site->id, $license['site_id']);
         $this->assertSame($site->tenant_id, $license['tenant_id']);
+        $this->assertSame(['human-resources', 'management-aset'], $license['apps']);
         $this->assertSame('2027-09-14', $license['valid_until']);
         $signature = base64_decode($parameters['signature'], true);
         $this->assertIsString($signature);
         $this->assertSame(1, openssl_verify($parameters['license'], $signature, $this->rsaKey(7)['public'], OPENSSL_ALGO_SHA256));
+
+        $site->refresh();
+        $this->assertSame('2027-09-14', $site->license_valid_until?->toDateString());
+        $this->assertNotNull($site->license_issued_at);
+
+        // Penerbitan oleh operator dicatat atas namanya, bersama permintaan operasinya.
+        $issued = OperatorAuditEvent::query()->where('action', 'site.license.issued')->sole();
+        $this->assertSame((int) $operator->id, (int) $issued->user_id);
+        $this->assertSame(['human-resources', 'management-aset'], $issued->detail['apps']);
+        $this->assertStringNotContainsString($parameters['signature'], (string) json_encode($issued->detail));
+        $this->assertSame(1, OperatorAuditEvent::query()->where('action', 'site.operation.requested')->count());
+    }
+
+    public function test_a_license_operation_without_a_date_uses_the_issuers_default(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-15 08:00:00', 'UTC'));
+        $site = $this->enrolledSite();
+        $this->fakeEntitlements($site);
+
+        $this->actingAs($this->operator())
+            ->post("/situs/{$site->id}/operasi", ['operation' => 'install_license', 'valid_until' => null, 'confirm_name' => $site->name])
+            ->assertRedirect("/situs/{$site->id}");
+
+        $license = json_decode(SiteOperation::query()->sole()->parameters['license'], true);
+        $this->assertSame('2026-10-15', $license['valid_until']);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function refusedLicenseDates(): iterable
+    {
+        yield 'bukan tanggal' => ['besok'];
+        yield 'tanggal yang tidak ada di kalender' => ['2027-02-31'];
+        yield 'bulan ketiga belas' => ['2027-13-01'];
+        yield 'sudah lewat' => ['2026-09-14'];
+    }
+
+    #[DataProvider('refusedLicenseDates')]
+    public function test_an_explicit_license_date_is_still_checked(string $date): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-15 08:00:00', 'UTC'));
+        $site = $this->enrolledSite();
+        $this->fakeEntitlements($site);
+
+        $this->actingAs($this->operator())
+            ->post("/situs/{$site->id}/operasi", ['operation' => 'install_license', 'valid_until' => $date, 'confirm_name' => $site->name])
+            ->assertSessionHasErrors('operation');
+
+        $this->assertSame(0, SiteOperation::query()->count());
+        $this->assertNull($site->refresh()->license_issued_at);
+        Http::assertNothingSent();
+    }
+
+    public function test_a_license_operation_is_refused_when_core_cannot_list_the_apps(): void
+    {
+        $site = $this->enrolledSite();
+        Http::fake([$this->entitlementsUrl($site) => Http::response(['message' => 'rusak'], 500)]);
+
+        $this->actingAs($this->operator())
+            ->post("/situs/{$site->id}/operasi", ['operation' => 'install_license', 'confirm_name' => $site->name])
+            ->assertSessionHasErrors('operation');
+
+        $this->assertSame(0, SiteOperation::query()->count());
+        $this->assertSame(0, OperatorAuditEvent::query()->count());
+        $this->assertNull($site->refresh()->license_issued_at);
+    }
+
+    /**
+     * Permintaan kedua ditolak indeks satu-permintaan-per-jenis. Lisensi yang diterbitkan untuknya tidak
+     * pernah diantar ke mana pun, jadi catatannya harus ikut batal.
+     */
+    public function test_a_refused_duplicate_license_request_leaves_no_issuance_behind(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-15 08:00:00', 'UTC'));
+        $site = $this->enrolledSite();
+        $operator = $this->operator();
+        $this->fakeEntitlements($site);
+        $input = ['operation' => 'install_license', 'confirm_name' => $site->name];
+
+        $this->actingAs($operator)->post("/situs/{$site->id}/operasi", $input)->assertRedirect("/situs/{$site->id}");
+
+        $this->travelTo(CarbonImmutable::parse('2026-09-16 08:00:00', 'UTC'));
+        $this->actingAs($operator)->post("/situs/{$site->id}/operasi", $input)->assertSessionHasErrors('operation');
+
+        $site->refresh();
+        $this->assertSame('2026-09-15 08:00:00', $site->license_issued_at?->utc()->toDateTimeString());
+        $this->assertSame('2026-10-15', $site->license_valid_until?->toDateString());
+        $this->assertSame(1, OperatorAuditEvent::query()->where('action', 'site.license.issued')->count());
+    }
+
+    // ------------------------------------------------------------------ perpanjangan lisensi
+
+    public function test_suspending_and_resuming_renewal_require_the_name_and_are_audited(): void
+    {
+        $site = $this->enrolledSite();
+        $operator = $this->operator();
+
+        $license = SiteOperation::query()->create([
+            'site_id' => $site->id, 'operation' => 'install_license', 'parameters' => ['license' => '{}', 'signature' => 'x'],
+            'status' => 'requested', 'requested_at' => now(), 'expires_at' => now()->addDays(7),
+        ]);
+        $backup = SiteOperation::query()->create([
+            'site_id' => $site->id, 'operation' => 'backup', 'parameters' => [],
+            'status' => 'requested', 'requested_at' => now(), 'expires_at' => now()->addDays(7),
+        ]);
+
+        foreach (['hentikan', 'lanjutkan'] as $action) {
+            $this->actingAs($operator)
+                ->post("/situs/{$site->id}/lisensi/{$action}", ['confirm_name' => 'situs uji'])
+                ->assertSessionHasErrors('confirm_name');
+        }
+
+        $this->assertNull($site->refresh()->license_suspended_at);
+        $this->assertSame('requested', $license->refresh()->status);
+        $this->assertSame(0, OperatorAuditEvent::query()->count());
+
+        $this->actingAs($operator)
+            ->post("/situs/{$site->id}/lisensi/hentikan", ['confirm_name' => $site->name])
+            ->assertRedirect("/situs/{$site->id}");
+
+        $this->assertNotNull($site->refresh()->license_suspended_at);
+        // Lisensi yang menunggu di antrean akan memperpanjang sewa yang baru saja dihentikan.
+        $this->assertSame('cancelled', $license->refresh()->status);
+        $this->assertSame('requested', $backup->refresh()->status);
+
+        $suspended = OperatorAuditEvent::query()->sole();
+        $this->assertSame('site.license.renewal_suspended', $suspended->action);
+        $this->assertSame((int) $operator->id, (int) $suspended->user_id);
+        $this->assertSame(1, $suspended->detail['cancelled_operations']);
+
+        // Menghentikan yang sudah berhenti tidak menambah jejak.
+        $this->actingAs($operator)->post("/situs/{$site->id}/lisensi/hentikan", ['confirm_name' => $site->name])->assertRedirect();
+        $this->assertSame(1, OperatorAuditEvent::query()->count());
+
+        $this->actingAs($operator)
+            ->post("/situs/{$site->id}/lisensi/lanjutkan", ['confirm_name' => $site->name])
+            ->assertRedirect("/situs/{$site->id}");
+
+        $this->assertNull($site->refresh()->license_suspended_at);
+        $this->assertSame(
+            ['site.license.renewal_suspended', 'site.license.renewal_resumed'],
+            OperatorAuditEvent::query()->orderBy('occurred_at')->orderBy('id')->pluck('action')->all(),
+        );
+    }
+
+    public function test_non_operators_cannot_suspend_renewal(): void
+    {
+        $site = $this->site();
+        $id = DB::table('users')->insertGetId([
+            'name' => 'Bukan Operator', 'email' => 'biasa@contoh.test', 'password' => bcrypt('x'),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs(User::query()->findOrFail($id))
+            ->post("/situs/{$site->id}/lisensi/hentikan", ['confirm_name' => $site->name])
+            ->assertNotFound();
+
+        $this->assertNull($site->refresh()->license_suspended_at);
+    }
+
+    public function test_the_site_page_shows_the_license_state(): void
+    {
+        $site = $this->enrolledSite();
+        $site->forceFill([
+            'last_report' => $this->report($site),
+            'license_issued_at' => CarbonImmutable::parse('2026-09-15 08:00:00', 'UTC'),
+            'license_valid_until' => '2026-10-15',
+            'license_suspended_at' => CarbonImmutable::parse('2026-09-20 09:30:00', 'UTC'),
+        ])->save();
+        $operator = $this->operator();
+
+        $this->actingAs($operator)->get("/situs/{$site->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('sites/show')
+                ->where('site.license.validUntil', '2026-10-15')
+                ->where('site.license.issuedAt', '2026-09-15 08:00:00')
+                ->where('site.license.suspendedAt', '2026-09-20 09:30:00')
+                ->where('site.license.notRequiredOnServer', false)
+                ->where('licenseValidDays', 30));
+    }
+
+    /** @return iterable<string, array{?bool, bool}> */
+    public static function reportedLicenseRequirements(): iterable
+    {
+        yield 'dilaporkan tidak wajib' => [false, true];
+        yield 'dilaporkan wajib' => [true, false];
+        yield 'agen lama tanpa bidangnya' => [null, false];
+    }
+
+    #[DataProvider('reportedLicenseRequirements')]
+    public function test_the_site_page_warns_only_when_the_server_reports_license_not_required(?bool $reported, bool $warned): void
+    {
+        $site = $this->enrolledSite();
+        $report = $this->report($site, ['license_required' => $reported]);
+
+        if ($reported === null) {
+            unset($report['license_required']);
+        }
+
+        $site->forceFill(['last_report' => $report])->save();
+
+        $this->actingAs($this->operator())->get("/situs/{$site->id}")
+            ->assertInertia(fn ($page) => $page->where('site.license.notRequiredOnServer', $warned));
     }
 
     public function test_cancelling_and_revoking_are_audited_and_revoking_cancels_pending_operations(): void
