@@ -390,6 +390,27 @@ final class BootstrapSiteTenantTest extends TestCase
         $this->assertDatabaseMissing('core_module_installations', ['tenant_id' => self::TENANT_ID, 'module_id' => 'management-aset']);
     }
 
+    /**
+     * Tenant yang hanya membeli Core tidak diberi modul apa pun, walaupun image membawa semuanya.
+     *
+     * Agen tidak dapat menyebut "tidak ada app" selain dengan tidak mengirim `--app` sama sekali. Pada
+     * jalur tangan yang lama, itu berarti seluruh modul di image; pada jalur operasi `install` itu
+     * berarti daftar kosong dari admin.erp, dan menafsirkannya sebagai "semua" membuat entitlement di
+     * server klien tidak lagi sama dengan yang dibeli.
+     */
+    public function test_an_install_without_any_app_entitles_nothing_even_when_the_image_carries_modules(): void
+    {
+        $this->seed(NumberSequenceProfileSeeder::class);
+        $this->assertSame(Command::SUCCESS, Artisan::call('app:register-manifest'), Artisan::output());
+        $this->assertNotSame([], app(ModuleRegistry::class)->semua(), 'Test ini butuh image yang membawa modul supaya "tidak ada app" dapat gagal.');
+
+        [$exitCode, $output] = $this->bootstrapWithStdin(password_hash('apa-saja', PASSWORD_BCRYPT, ['cost' => 4]));
+
+        $this->assertSame(Command::SUCCESS, $exitCode, $output);
+        $this->assertSame(0, DB::table('tenant_app_entitlements')->where('tenant_id', self::TENANT_ID)->count());
+        $this->assertSame(0, DB::table('core_module_installations')->where('tenant_id', self::TENANT_ID)->count());
+    }
+
     // ------------------------------------------------------------------ pembantu
 
     /**

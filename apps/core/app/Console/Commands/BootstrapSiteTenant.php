@@ -56,8 +56,10 @@ use Throwable;
  * on-prem dikelola membawa seluruh modul, jadi app yang tidak ada berarti image dan admin.erp tidak
  * sepakat tentang katalognya; memberikannya melahirkan produk yang sudah dibayar dan tidak dapat
  * dibuka. Yang dibeli dan yang boleh dibuka dijaga dua lapis: entitlement yang ditulis di sini, dan
- * lisensi bertanda tangan (`docs/todo/lisensi-mengunci`). Tanpa `--app`, seluruh modul di image ini,
- * seperti sebelum opsi itu ada.
+ * lisensi bertanda tangan (`docs/todo/lisensi-mengunci`). Pada jalur operasi `install`
+ * (`--admin-password-hash-stdin`), tanpa `--app` berarti **tidak ada app** — tenant yang hanya membeli
+ * Core. Pada jalur tangan yang lama, tanpa `--app` berarti seluruh modul di image ini, seperti sebelum
+ * opsi itu ada.
  *
  * ## Aman diulang, tetapi hanya untuk owner yang sama
  *
@@ -187,7 +189,7 @@ final class BootstrapSiteTenant extends Command
             return self::FAILURE;
         }
 
-        $appIds = $this->appsToEntitle($registry, $input['apps']);
+        $appIds = $this->appsToEntitle($registry, $input['apps'], $this->input->getOption('admin-password-hash-stdin') === true);
 
         if ($appIds === null) {
             return self::FAILURE;
@@ -305,15 +307,21 @@ final class BootstrapSiteTenant extends Command
     /**
      * App yang diberikan kepada tenant ini, atau null bila ada yang tidak dapat diberikan.
      *
+     * `$exactly` benar pada jalur operasi `install` (hash kata sandi lewat stdin): daftar `--app`
+     * adalah salinan app yang dibeli di admin.erp, **termasuk bila kosong**. Tanpa itu, tenant yang
+     * hanya membeli Core diberi seluruh modul di image — dan image on-prem dikelola membawa semua
+     * modul — sehingga entitlement di server klien tidak lagi sama dengan admin.erp. Jalur tangan
+     * yang lama tetap memberi seluruh modul bila `--app` tidak disebut.
+     *
      * @param  list<string>  $requested
      * @return list<string>|null
      */
-    private function appsToEntitle(ModuleRegistry $registry, array $requested): ?array
+    private function appsToEntitle(ModuleRegistry $registry, array $requested, bool $exactly): ?array
     {
         $inImage = $this->modulesInThisImage($registry);
 
         if ($requested === []) {
-            return $inImage;
+            return $exactly ? [] : $inImage;
         }
 
         $missing = array_values(array_diff($requested, $inImage));
