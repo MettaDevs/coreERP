@@ -333,8 +333,9 @@ yang membuatnya tidak menggagalkan CI:
 Env yang sama juga mendiamkan peringatan di mesin pengembang.
 
 `edition.yml` membangun image dengan `PASANG_OTEL=0` sehingga kompilasi PECL dilewati; ia
-membangun hanya untuk memverifikasi pemangkasan module lalu membuang hasilnya. `release.yml`
-tidak menyetelnya, jadi image yang benar-benar dikirim selalu membawa ekstensinya.
+membangun hanya untuk memverifikasi pemangkasan module lalu membuang hasilnya. Image yang
+benar-benar dikirim dirakit perakit dari `deploy/perakit/Dockerfile`, yang selalu mengompilasi
+ekstensinya, dan `deploy/perakit/uji-image.sh` menolak rilis yang tidak memuatnya.
 Konsekuensinya disadari: image yang diverifikasi saat PR bukan image yang dikirim.
 
 ## Berkas terkait

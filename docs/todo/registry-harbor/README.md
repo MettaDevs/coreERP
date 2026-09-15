@@ -440,6 +440,12 @@ untuk endpoint bertanda tangan, `app/Sites/SiteOperations.php` untuk klaim dan l
 Cabang lokal `feat/perakit` di laptop pemilik produk dibangun untuk rancangan tarball dan belum selesai;
 ia ditulis ulang, bukan dilanjutkan apa adanya.
 
+**Diputuskan pemilik produk, 15 September 2026: SaaS dev juga memakai rilis.** Merge ke `main` tidak lagi
+men-deploy apa pun. Alur GitHub `rilis.yml` menjalankan perakit di server pertama lewat pembungkus sudo yang
+hanya menerima commit di `main`, merakit image core dan konsol sekali, lalu `deploy-dev.yml` memasang rilis itu
+ke SaaS dev lewat digest. `release.yml` yang mendorong image per edisi ke GHCR dibuang (PK-05). Alurnya di
+[Dari branch sampai server klien](/dev/29-alur-rilis-server-klien).
+
 **Keadaan perakit, 15 September 2026.** `deploy/perakit/rakit.sh` mengerjakan PK-01, PK-02 tanpa langkah
 pendaftaran (menunggu CP-04), PK-03, dan PK-04. Rilis `0.2.0` dari commit `cbda6ed` dirakit di server
 pertama: image 112 MB, manifest v2 bertanda tangan di `/var/lib/coreerp-perakit/rilis/0.2.0`. Dua hal yang

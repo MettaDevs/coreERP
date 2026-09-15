@@ -1,0 +1,87 @@
+# Membuat rilis: tombol "Run workflow" dengan nomor rilis dan commit `main`.
+#
+# 1. Perakit di server pertama membangun image core dan konsol SEKALI, mengujinya, mendorongnya ke Harbor
+#    beserta image pendamping, menandatangani manifest rilis v2, dan mendaftarkannya ke admin.erp.
+# 2. Rilis itu langsung dipasang ke SaaS dev lewat `deploy-dev.yml`, dengan digest yang sama.
+# 3. Sesudah tim mengujinya di SaaS dev, operator memilihnya untuk server klien di admin.erp. Langkah itu bukan
+#    bagian alur ini, dan memang sengaja: memasang ke klinik adalah keputusan per situs, di jendela pembaruannya.
+#
+# Alurnya lengkap di docs/dev/29-alur-rilis-server-klien.md.
+#
+# ## Kenapa build di server, bukan di runner GitHub
+#
+# Pemilik produk memutuskan tidak ada biaya GitHub untuk membangun dan membagikan rilis. Runner hanya membuka
+# SSH dan menunggu; image dibangun di server pertama dengan cache build-nya, didorong ke Harbor di mesin yang
+# sama, dan kunci privat rilis tidak pernah meninggalkan server itu.
+#
+# ## Kenapa sudo untuk satu perintah
+#
+# Perakit memegang kunci rilis, jadi ia berjalan sebagai root, sedangkan user `deploy` tidak punya sudo.
+# /etc/sudoers.d/coreerp-rilis mengizinkan `deploy` menjalankan /usr/local/sbin/coreerp-rilis saja, dan
+# pembungkus itu menolak commit yang tidak ada di `main`. Pemasangannya: deploy/perakit/pasang-pemicu.sh.
+
+name: rilis
+
+on:
+  workflow_dispatch:
+    inputs:
+      rilis:
+        description: 'Nomor rilis baru, angka bertitik — misalnya 0.3.0. Nomor yang sudah dipakai ditolak.'
+        required: true
+        type: string
+      ref:
+        description: 'Commit yang dirakit: main, atau SHA commit yang sudah ada di main'
+        required: true
+        default: main
+        type: string
+
+concurrency:
+  group: rilis
+  cancel-in-progress: false
+
+jobs:
+  rakit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Periksa masukan
+        env:
+          RILIS: ${{ inputs.rilis }}
+          REF: ${{ inputs.ref }}
+        run: |
+          # Keduanya dikirim ke shell di server. Diperiksa di sini, dan sekali lagi di pembungkus di server.
+          [[ $RILIS =~ ^[0-9]+(\.[0-9]+){1,3}$ ]] || { echo "::error::Nomor rilis tidak sah: $RILIS"; exit 1; }
+          [[ $REF =~ ^(main|[0-9a-f]{7,40})$ ]] || { echo "::error::Ref harus main atau SHA commit: $REF"; exit 1; }
+
+      - name: Siapkan kunci SSH
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEV_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEV_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          if ! grep -qE '^[^#[:space:]]+ +(ssh-(rsa|ed25519)|ecdsa-)' ~/.ssh/known_hosts; then
+            echo "::error::Secret DEV_KNOWN_HOSTS tidak memuat satu pun baris kunci host."
+            exit 1
+          fi
+
+      - name: Rakit rilis di server pertama
+        env:
+          DEV_HOST: ${{ secrets.DEV_HOST }}
+          DEV_USER: ${{ secrets.DEV_USER }}
+          RILIS: ${{ inputs.rilis }}
+          REF: ${{ inputs.ref }}
+        run: |
+          ssh -o BatchMode=yes "$DEV_USER@$DEV_HOST" "sudo -n /usr/local/sbin/coreerp-rilis $RILIS $REF"
+
+  pasang-dev:
+    needs: rakit
+    uses: ./.github/workflows/deploy-dev.yml
+    with:
+      rilis: ${{ inputs.rilis }}
+    secrets:
+      DEV_SSH_KEY: ${{ secrets.DEV_SSH_KEY }}
+      DEV_KNOWN_HOSTS: ${{ secrets.DEV_KNOWN_HOSTS }}
+      DEV_HOST: ${{ secrets.DEV_HOST }}
+      DEV_USER: ${{ secrets.DEV_USER }}

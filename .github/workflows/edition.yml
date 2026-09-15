@@ -56,8 +56,8 @@ jobs:
       # `PASANG_OTEL: '0'` melewatkan kompilasi ekstensi `opentelemetry` saat membangun image.
       # Alur ini membangun dua image pada setiap PR hanya untuk membuktikan pemangkasan module
       # bekerja, lalu membuangnya. Konsekuensinya disadari dan diterima: image yang diverifikasi
-      # di sini bukan image yang dikirim ke pelanggan. Yang dikirim dibangun `release.yml`, dan
-      # alur itu sengaja tidak menyetel variabel ini.
+      # di sini bukan image yang dikirim ke pelanggan. Yang dikirim dirakit perakit dari
+      # `deploy/perakit/Dockerfile` (alur `rilis.yml`), yang selalu mengompilasi ekstensinya.
       OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
       PASANG_OTEL: '0'
       DB_HOST: 127.0.0.1

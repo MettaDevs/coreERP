@@ -1,5 +1,14 @@
 # Release, provisioning, dan on-prem perpetual
 
+> **Sejak 15 September 2026 yang di-deploy selalu rilis, bukan `main`:** satu image untuk semua klien, dirakit
+> sekali di server pertama, disimpan di Harbor, dipasang ke SaaS dev lewat digest, lalu dipilih operator di
+> admin.erp untuk server klien dan dipasang agen dengan digest yang sama. Alurnya, beserta diagramnya, di
+> [Dari branch sampai server klien](29-alur-rilis-server-klien.md).
+>
+> Bagian halaman ini tentang image per edisi, bundle, dan admin pelanggan yang menjalankan pembaruan sendiri
+> menggambarkan jalur yang lebih dulu ada dan tidak berlaku untuk server klien yang dikelola. Aturan tentang
+> migration yang kompatibel mundur dan pembaruan yang aman diulang tetap berlaku untuk keduanya.
+
 ## Dua bentuk rilis
 
 Module yang berjalan di runtime Core **ikut image edisi Core**; ia tidak punya image sendiri. Satu
