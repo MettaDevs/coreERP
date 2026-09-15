@@ -74,8 +74,11 @@ final class HarborClient
     }
 
     /**
-     * Robot sistem sah bila Harbor menunjukkan project registry kepadanya. Project privat tidak terlihat
-     * oleh kredensial yang salah, dan kredensial yang salah dijawab 401.
+     * Robot sistem sah bila Harbor menunjukkan project registry yang privat kepadanya.
+     *
+     * Status HTTP saja tidak cukup, dan ini diukur, bukan ditebak: Harbor v2.15.2 menjawab `GET /projects`
+     * dengan kredensial yang **salah** sebagai `200 []` — permintaan diperlakukan anonim, dan anonim tidak
+     * melihat project privat. Yang membuktikan kredensialnya diterima adalah project itu ada di jawabannya.
      */
     public function verifyRobot(): void
     {
@@ -93,7 +96,10 @@ final class HarborClient
         }
 
         if (! in_array($project, $names, true)) {
-            throw new RegistryUnavailable(sprintf('Robot sistem tidak dapat melihat project %s.', $project));
+            throw new RegistryUnavailable(sprintf(
+                'Harbor tidak menunjukkan project %s kepada robot sistem: rahasianya salah, robotnya sudah dihapus, atau izinnya tidak mencakup project itu.',
+                $project,
+            ));
         }
     }
 

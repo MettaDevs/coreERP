@@ -138,6 +138,15 @@ final class SettingsScreenTest extends SiteTestCase
             ->where('registry.check', ['ok' => true]));
         $this->assertStringNotContainsString('rahasia-robot-sistem', (string) $page->getContent());
 
+        // Bentuk jawaban Harbor v2.15.2 untuk rahasia yang salah, diukur di server pertama: 200 dengan daftar
+        // kosong, bukan 401. Pemeriksaan yang hanya melihat status akan menyatakan robot yang salah sah.
+        $jawaban = Http::response([], 200);
+
+        $this->actingAs($operator)->get('/pengaturan')
+            ->assertInertia(fn ($inertia) => $inertia
+                ->where('registry.check.ok', false)
+                ->where('registry.check.error', fn (string $error): bool => str_contains($error, 'rahasianya salah')));
+
         $jawaban = Http::response(['errors' => [['code' => 'UNAUTHORIZED']]], 401);
 
         $this->actingAs($operator)->get('/pengaturan')
@@ -157,7 +166,8 @@ final class SettingsScreenTest extends SiteTestCase
         {
             public bool $menerima = false;
         };
-        Http::fake(fn () => $harbor->menerima ? Http::response([['name' => 'coreerp']], 200) : Http::response([], 401));
+        // Rahasia yang salah dijawab Harbor 200 dengan daftar kosong, bukan 401 — lihat HarborClient::verifyRobot.
+        Http::fake(fn () => $harbor->menerima ? Http::response([['name' => 'coreerp']], 200) : Http::response([], 200));
 
         $berkas = $this->file("REGISTRY_HOST='registry.uji.test'\nREGISTRY_USERNAME='robot\$konsol'\nREGISTRY_PASSWORD='rahasia-baru'\n");
 

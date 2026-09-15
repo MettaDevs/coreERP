@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # Menyelaraskan isi Harbor dengan kontrak di docs/todo/registry-harbor lewat API: setelan sistem, project
-# `coreerp`, aturan immutability, aturan retensi, jadwal GC, dan robot perakit. Dijalankan sebagai root di
-# server pertama, sesudah pasang.sh:
+# `coreerp`, aturan immutability, aturan retensi, jadwal GC, robot perakit, dan robot sistem admin.erp.
+# Dijalankan sebagai root di server pertama, sesudah pasang.sh:
 #
 #   sudo bash deploy/registry/atur-harbor.sh
 #
@@ -24,6 +24,8 @@ BERKAS_RAHASIA='/etc/coreerp/registry/rahasia.env'
 BERKAS_SETELAN='/etc/coreerp/registry/setelan.env'
 FOLDER_PERAKIT='/etc/coreerp/perakit'
 BERKAS_ROBOT_PERAKIT="$FOLDER_PERAKIT/registry-robot.env"
+NAMA_ROBOT_KONSOL='konsol'
+BERKAS_ROBOT_KONSOL='/etc/coreerp/registry/robot-konsol.env'
 HOST_REGISTRY='registry.erp.grenery.xyz'
 
 # Tag rilis diawali angka (`0.1.0`, `0.2.0-rc1`). Tag `terpasang-*` sengaja tidak cocok: admin.erp harus
@@ -203,13 +205,15 @@ langkah 'Robot perakit'
 nama_robot="$PROJECT+perakit"
 api GET "/robots?q=$(jq -rn --arg q "Level=project,ProjectID=$id_project" '$q | @uri')&page_size=100"
 id_robot="$(printf '%s' "$jawaban" | jq -r --arg n "$nama_robot" '.[]? | select(.name | endswith($n)) | .id')"
+# tulis_rahasia_robot BERKAS NAMA RAHASIA — berkas root 0600 di folder 0700. Nilainya bertanda kutip tunggal
+# karena nama robot memuat `$`.
 tulis_rahasia_robot() {
-    local nama="$1" rahasia="$2"
-    install -d -m 0700 -o root -g root "$FOLDER_PERAKIT"
+    local berkas="$1" nama="$2" rahasia="$3"
+    install -d -m 0700 -o root -g root "$(dirname "$berkas")"
     (
         umask 077
         printf "REGISTRY_HOST='%s'\nREGISTRY_USERNAME='%s'\nREGISTRY_PASSWORD='%s'\n" \
-            "$HOST_REGISTRY" "$nama" "$rahasia" > "$BERKAS_ROBOT_PERAKIT"
+            "$HOST_REGISTRY" "$nama" "$rahasia" > "$berkas"
     )
 }
 if [ -n "$id_robot" ] && [ -f "$BERKAS_ROBOT_PERAKIT" ]; then
@@ -220,7 +224,7 @@ elif [ -n "$id_robot" ]; then
     rahasia="$(printf '%s' "$jawaban" | jq -r '.secret // empty')"
     [ -n "$rahasia" ] || gagal 'Harbor tidak mengembalikan rahasia baru untuk robot perakit.'
     api GET "/robots/$id_robot"
-    tulis_rahasia_robot "$(printf '%s' "$jawaban" | jq -r '.name')" "$rahasia"
+    tulis_rahasia_robot "$BERKAS_ROBOT_PERAKIT" "$(printf '%s' "$jawaban" | jq -r '.name')" "$rahasia"
     printf '    rahasia diputar, ditulis ke %s\n' "$BERKAS_ROBOT_PERAKIT"
 else
     api POST /robots "$(jq -cn --arg p "$PROJECT" '{
@@ -233,8 +237,46 @@ else
     }')"
     rahasia="$(printf '%s' "$jawaban" | jq -r '.secret // empty')"
     [ -n "$rahasia" ] || gagal 'Harbor tidak mengembalikan rahasia robot perakit.'
-    tulis_rahasia_robot "$(printf '%s' "$jawaban" | jq -r '.name')" "$rahasia"
+    tulis_rahasia_robot "$BERKAS_ROBOT_PERAKIT" "$(printf '%s' "$jawaban" | jq -r '.name')" "$rahasia"
     printf '    dibuat, rahasia di %s\n' "$BERKAS_ROBOT_PERAKIT"
+fi
+
+langkah 'Robot sistem admin.erp'
+# Dipakai admin.erp untuk membuat dan menghapus robot situs per operasi (CP-01, CP-02). Izinnya diukur di
+# Harbor v2.15.2, bukan ditebak: robot create/delete/list/read dan repository pull di project coreerp.
+# Pull wajib ada karena Harbor menolak robot membuat robot yang izinnya lebih luas dari miliknya, dan tanpa
+# push robot ini tidak dapat melahirkan robot yang dapat mendorong image. Harbor tidak mengenal robot:update,
+# jadi admin.erp mengganti robot situs dengan menghapus lalu membuat.
+#
+# Rahasianya ditulis ke berkas root 0600 di sini, lalu dipasang ke konsol dengan
+#   sudo cat /etc/coreerp/registry/robot-konsol.env | docker exec -i <container konsol> php artisan registry:robot-sistem
+# yang menyimpannya terenkripsi di database konsol sesudah memeriksanya ke Harbor.
+api GET "/robots?q=$(jq -rn '"Level=system" | @uri')&page_size=100"
+id_robot_konsol="$(printf '%s' "$jawaban" | jq -r --arg n "robot\$$NAMA_ROBOT_KONSOL" '.[]? | select(.name == $n) | .id')"
+if [ -n "$id_robot_konsol" ] && [ -f "$BERKAS_ROBOT_KONSOL" ]; then
+    printf '    sudah ada, rahasia di %s\n' "$BERKAS_ROBOT_KONSOL"
+elif [ -n "$id_robot_konsol" ]; then
+    api PATCH "/robots/$id_robot_konsol" '{"secret":""}'
+    rahasia="$(printf '%s' "$jawaban" | jq -r '.secret // empty')"
+    [ -n "$rahasia" ] || gagal 'Harbor tidak mengembalikan rahasia baru untuk robot sistem admin.erp.'
+    tulis_rahasia_robot "$BERKAS_ROBOT_KONSOL" "robot\$$NAMA_ROBOT_KONSOL" "$rahasia"
+    printf '    rahasia diputar, ditulis ke %s — pasang ulang ke konsol\n' "$BERKAS_ROBOT_KONSOL"
+else
+    api POST /robots "$(jq -cn --arg n "$NAMA_ROBOT_KONSOL" --arg p "$PROJECT" '{
+        name: $n, level: "system", duration: -1, disable: false,
+        description: "admin.erp: membuat dan menghapus robot pull-only per operasi situs.",
+        permissions: [{kind: "project", namespace: $p, access: [
+            {resource: "robot", action: "create"},
+            {resource: "robot", action: "delete"},
+            {resource: "robot", action: "list"},
+            {resource: "robot", action: "read"},
+            {resource: "repository", action: "pull"}
+        ]}]
+    }')"
+    rahasia="$(printf '%s' "$jawaban" | jq -r '.secret // empty')"
+    [ -n "$rahasia" ] || gagal 'Harbor tidak mengembalikan rahasia robot sistem admin.erp.'
+    tulis_rahasia_robot "$BERKAS_ROBOT_KONSOL" "$(printf '%s' "$jawaban" | jq -r '.name')" "$rahasia"
+    printf '    dibuat, rahasia di %s — pasang ke konsol\n' "$BERKAS_ROBOT_KONSOL"
 fi
 
 printf '\nHarbor selaras dengan kontrak.\n'
