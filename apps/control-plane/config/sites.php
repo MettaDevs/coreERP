@@ -63,4 +63,13 @@ return [
 
     /* Situs online yang tidak melapor selama ini ditampilkan tertinggal, bukan sehat. */
     'stale_after_seconds' => 180,
+
+    /*
+     * Akar susunan repo tempat berkas pemasang dibaca (`deploy/agent`, `scripts/update.sh`).
+     *
+     * Di laptop pengembang dan di image konsol keduanya dua tingkat di atas aplikasi ini — Dockerfile
+     * menirukan susunan itu. Setelan ini ada hanya supaya test dapat menunjuk salinan berkas tiruan;
+     * sengaja tanpa env, karena tidak ada alasan produksi untuk menyajikan berkas dari tempat lain.
+     */
+    'installer_source_root' => base_path('../..'),
 ];

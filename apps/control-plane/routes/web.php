@@ -9,6 +9,7 @@ use ControlPlane\Http\Controllers\Environments\Index as EnvironmentIndex;
 use ControlPlane\Http\Controllers\Environments\Provision as EnvironmentProvision;
 use ControlPlane\Http\Controllers\Environments\Show as EnvironmentShow;
 use ControlPlane\Http\Controllers\Environments\Store as EnvironmentStore;
+use ControlPlane\Http\Controllers\Installer\InstallerFiles;
 use ControlPlane\Http\Controllers\Login;
 use ControlPlane\Http\Controllers\Logout;
 use ControlPlane\Http\Controllers\Sites\SiteActions;
@@ -20,6 +21,20 @@ use ControlPlane\Http\Controllers\Updates\Upgrade as UpdateUpgrade;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/lingkungan');
+
+/*
+ * Berkas pemasang untuk server klien. Tanpa login: isinya bukan rahasia, dan yang membuat pemasangan
+ * sah adalah token pendaftaran berumur satu jam. Alasan lengkapnya di InstallerFiles.
+ *
+ * `kunci-rilis.pub` didaftarkan sebelum `{berkas}`, supaya namanya tidak pernah ditangkap pola umum.
+ */
+Route::middleware('throttle:60,1')->group(function (): void {
+    Route::get('/pasang.sh', [InstallerFiles::class, 'installer'])->name('installer.script');
+    Route::get('/agen/kunci-rilis.pub', [InstallerFiles::class, 'releaseKey'])->name('installer.release-key');
+    Route::get('/agen/{berkas}', [InstallerFiles::class, 'file'])
+        ->whereIn('berkas', array_keys(InstallerFiles::FILES))
+        ->name('installer.file');
+});
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [Login::class, 'form'])->name('login');
