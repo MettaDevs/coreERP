@@ -267,6 +267,13 @@ rilis_lebih_baru() {
 periksa_alamat_admin() {
     local alamat="$1" sisa host
 
+    # Bagian pengguna (`orang@host`) tidak pernah sah untuk admin.erp, dan ia menipu pemotong host di
+    # bawah: `http://127.0.0.1:1@admin.erp.contoh` terbaca localhost, padahal curl mengirim permintaannya
+    # ke admin.erp.contoh tanpa TLS.
+    case "$alamat" in
+        *@*) gagal "Alamat admin.erp tidak boleh memuat bagian pengguna (@): $alamat" 'Contoh yang benar: https://admin.erp.contoh' ;;
+    esac
+
     case "$alamat" in
         https://*) ;;
         http://*)

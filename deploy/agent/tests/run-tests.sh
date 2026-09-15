@@ -548,6 +548,17 @@ uji_01_enroll() {
     # Alamat HTTP ke mesin lain ditolak sebelum apa pun dikirim.
     harus_gagal 'alamat HTTP ke host lain ditolak' \
         env COREERP_HOME="$KERJA/rumah-http" bash "$AGEN" enroll --admin-url http://admin.erp.contoh --token "$TOKEN"
+
+    # `http://127.0.0.1:1@admin.erp.contoh` terbaca sebagai localhost oleh pemotong host yang naif,
+    # padahal curl mengirimnya ke admin.erp.contoh tanpa TLS. `pasang.sh` sudah menolaknya, tetapi
+    # `enroll` yang dijalankan tangan tidak melewati pasang.sh.
+    # Sebabnya ikut diperiksa: tanpa penjaga, pendaftaran tetap gagal — karena jaringan, bukan karena
+    # alamatnya ditolak — dan penolakan yang benar tidak dapat dibedakan dari kebetulan.
+    harus_gagal 'alamat dengan bagian pengguna (@) ditolak' \
+        env COREERP_HOME="$KERJA/rumah-userinfo" bash "$AGEN" enroll --admin-url 'http://127.0.0.1:1@admin.erp.contoh' --token "$TOKEN" \
+        > "$KERJA/log/enroll-userinfo.log" 2>&1
+    memuat 'alamat dengan @ ditolak karena bagian penggunanya' "$(cat "$KERJA/log/enroll-userinfo.log")" 'bagian pengguna (@)'
+    pastikan 'tidak ada kunci dibuat untuk alamat dengan @' test ! -e "$KERJA/rumah-userinfo/agent/site-key.pem"
 }
 
 uji_02_laporan() {

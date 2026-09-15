@@ -87,6 +87,24 @@ operasi `upgrade`. Sampai AG-01 selesai, PA-03 memakai jalur yang ada di `main`;
 keduanya menarik dari Harbor tanpa perubahan di PA-03. PA-01 dan AG-03 sama-sama menyentuh
 `kunci-rilis.pub` — yang menyelesaikan lebih dahulu memberi tahu yang lain.
 
+## Keadaan 15 September 2026
+
+PS-01 sampai PS-08 dan PA-01 sampai PA-03 berdiri di cabang `feat/pasang-satu-perintah` dan lulus
+suite konsol, Core, dan agen. **Belum pernah dijalankan di server sungguhan.** PA-04 menunggu uji di server
+kedua.
+
+Yang ditemukan saat bagian-bagiannya dipertemukan:
+
+- `tenant:bootstrap-site` tanpa `--app` memberi **seluruh** modul di image. Pada operasi `install` itu
+  berarti tenant yang hanya membeli Core diberi semuanya. Kini jalur `--admin-password-hash-stdin` membaca
+  daftar `--app` persis, termasuk bila kosong (PR #124).
+- Parameter operasi `install` membawa `edition` (konstanta image tunggal `coreerp`), karena berkas rilis
+  diambil lewat `releases/{edition}/{release}` yang sama dengan `upgrade`.
+- Agen menolak alamat admin.erp yang memuat bagian pengguna (`http://127.0.0.1:1@host`): pemotong host
+  membacanya localhost, padahal permintaannya dikirim ke host lain tanpa TLS.
+- Hash kata sandi sementara dijaga constraint PostgreSQL: operasi yang sudah ditutup tidak boleh lagi
+  membawanya.
+
 ## Urutan
 
 1. PR #122 (jalur offline dibuang) dan PR #124 (fondasi Core) masuk.
