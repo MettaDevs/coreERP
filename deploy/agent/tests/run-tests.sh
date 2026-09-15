@@ -144,7 +144,8 @@ TENANT_NAMA='Apotek Sejahtera Uji'
 # Operasi install. TENANT_ID di atas bukan ULID (U dan I bukan huruf Crockford base32) dan hanya dipakai di
 # jalur yang tidak memeriksanya. ULID berhuruf kecil, seperti yang ditulis admin.erp.
 TENANT_ULID='01j9zq4x7b8c2d3e4f5g6h7jkm'
-EDISI_PASANG='klinik-pasang'
+# Konstanta image tunggal yang dikirim admin.erp sebagai edition operasi install.
+EDISI_PASANG='coreerp'
 BADAN_HASH='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXY./'
 # shellcheck disable=SC2016 # hash bcrypt harfiah, bukan ekspansi
 HASH_UJI='$2y$12$'"$BADAN_HASH"
@@ -376,8 +377,13 @@ parameter_pasang() {
 
 # token_pasang NAMA RILIS [FILTER] — token pendaftaran beserta operasi install untuk situs yang mendaftar
 # dengannya, seperti "Buat perintah pasang" di admin.erp. FILTER jq mengubah isi permintaannya.
+#
+# Bentuk tokennya bentuk yang dibuat admin.erp: 48 huruf dan angka, diturunkan dari NAMA supaya tetap sama
+# untuk nama yang sama.
 token_pasang() {
-    local token="token-$1-0123456789abcdef0123456789abcdef"
+    local token
+
+    token="$(printf '%s' "$1" | openssl dgst -sha512 -binary | base64 -w0 | tr -dc 'A-Za-z0-9' | cut -c1-48)"
 
     admin_post /_test/tokens "$(jq -cn --arg t "$token" --arg i "$TENANT_ULID" --argjson p "$(parameter_pasang "$2")" \
         '{token: $t, tenant_id: $i, tenant_name: "Klinik Sehat Sentosa", operasi: [{operation: "install", parameters: $p}]}' \
@@ -1166,7 +1172,7 @@ uji_11_install() {
     while IFS='~' read -r keterangan filter potongan; do
         [ -n "$keterangan" ] || continue
         pastikan "$keterangan: kasus terbaca utuh" test -n "$filter" -a -n "$potongan"
-        pastikan "$keterangan: parameter tetap objek" jq -e 'type == "object"' <<< "$(parameter_pasang 2.0.0 "$filter")"
+        pastikan "$keterangan: parameter tetap objek" jq -e 'type == "object"' <<< "$(parameter_pasang 2.0.0 "$filter")" >/dev/null
 
         putaran_install "$(parameter_pasang 2.0.0 "$filter")"
 
@@ -1179,6 +1185,12 @@ uji_11_install() {
         tanpa_hash "$keterangan"
     done <<'KASUS'
 edition tidak ada~del(.edition)~edition dan release wajib ada
+edition null~.edition = null~edition dan release wajib ada
+edition kosong~.edition = ""~edition dan release wajib ada
+edition berhuruf besar~.edition = "CoreERP"~edition dan release wajib ada
+edition berisi garis miring~.edition = "coreerp/../lain"~edition dan release wajib ada
+release null~.release = null~edition dan release wajib ada
+release kosong~.release = ""~edition dan release wajib ada
 release tidak sah~.release = "2.0.0-rc1"~edition dan release wajib ada
 tenant_id berhuruf di luar Crockford~.tenant_id = "01JTENANTUJI00000000000000"~tenant_id bukan ULID
 tenant_id 25 huruf~.tenant_id |= .[0:25]~tenant_id bukan ULID
@@ -1208,6 +1220,7 @@ id app berhuruf besar~.app_ids = ["Human-Resources"]~app_ids bukan larik id app
 id app diawali minus~.app_ids = ["-hr"]~app_ids bukan larik id app
 id app berakhir baris baru~.app_ids = ["human-resources\n"]~app_ids bukan larik id app
 id app bukan teks~.app_ids = ["human-resources", 7]~app_ids bukan larik id app
+id app ganda~.app_ids = ["human-resources", "management-aset", "human-resources"]~app_ids menyebut app yang sama lebih dari sekali
 hash berawalan 2a~.admin_password_hash = "$2a$12$" + $b~admin_password_hash bukan hash bcrypt
 hash biaya 03~.admin_password_hash = "$2y$03$" + $b~admin_password_hash bukan hash bcrypt
 hash biaya 32~.admin_password_hash = "$2y$32$" + $b~admin_password_hash bukan hash bcrypt
@@ -1424,6 +1437,7 @@ uji_17_pasang() {
     # Operasi install baru dapat diklaim pada putaran kedua, seperti admin.erp yang belum menentukan rilisnya
     # saat server tersambung.
     token="$(token_pasang pasang 1.0.0 '.operasi[0].sembunyi_klaim = 1')"
+    pastikan 'token berbentuk token admin.erp: 48 huruf dan angka' cocok_pola "$token" '^[A-Za-z0-9]{48}$'
     sebelum="$(jumlah_permintaan)"
 
     # Migrasi tiruan diam dua detik supaya langkahnya terbaca putaran pasang.sh yang membaca tiap detik.
@@ -1543,6 +1557,10 @@ uji_17b_pasang_berkas_admin() {
     ganti_berkas() {
         admin_post "/_test/agen/$1" "$(jq -cn --argjson isi "$2" '{isi: $isi}')" >/dev/null
     }
+
+    # Pengujian sesudahnya memakai admin.erp tiruan yang sama. Berkas yang diganti dikembalikan juga ketika
+    # pengujian ini berhenti di tengah, supaya satu kegagalan di sini tidak menyeret pengujian pasang.sh lain.
+    trap 'ganti_berkas kunci-rilis.pub null; ganti_berkas env.template null' EXIT
 
     # Isian alamat yang tidak diganti: salinan dari repo, dengan pilihan baru maupun pilihan lama.
     for satu in "--token $token" "--admin-url $ADMIN --token $token"; do

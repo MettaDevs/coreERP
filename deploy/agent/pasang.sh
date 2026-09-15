@@ -200,7 +200,11 @@ cetak_langkah_pemasangan() {
 
     [ "$(keadaan '.current_operation.operation // ""')" = install ] || return 0
 
-    baris="Memasang rilis $(keadaan '.current_operation.release // "?"') — langkah: $(keadaan '.current_operation.step // "memulai"')"
+    # Rilisnya baru dicatat agen sesudah parameternya lolos pemeriksaan; install yang ditolak tidak pernah
+    # tampil sebagai sedang dipasang.
+    [ -n "$(keadaan '.current_operation.release // ""')" ] || return 0
+
+    baris="Memasang rilis $(keadaan '.current_operation.release') — langkah: $(keadaan '.current_operation.step // "memulai"')"
 
     if [ "$baris" != "$TAMPIL_LANGKAH" ]; then
         TAMPIL_LANGKAH="$baris"
@@ -291,6 +295,8 @@ tunggu_pemasangan() {
             fi
         fi
 
+        # Diperiksa juga di sini, di antara putaran, supaya batas yang habis saat menunggu tidak memulai putaran
+        # baru yang langsung ditinggalkan.
         [ "$(date +%s)" -lt "$batas" ] || return 0
         sleep "$jeda_detik"
     done

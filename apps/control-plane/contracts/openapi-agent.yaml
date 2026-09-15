@@ -461,14 +461,21 @@ components:
             `tenant:bootstrap-site` di Core. Agen menolak seluruh operasi, sebelum mengunduh apa pun,
             bila satu bidang tidak memenuhi aturannya:
 
+            ```json
+            {"edition":"coreerp","release":"1.0.0","tenant_id":"01J...","tenant_name":"...",
+             "app_ids":["human-resources","management-aset"],"admin_name":"...","admin_email":"...",
+             "admin_password_hash":"$2y$12$<53 karakter>"}
+            ```
+
             | Bidang | Aturan |
             | --- | --- |
-            | `edition`, `release` | sama dengan `upgrade`; `edition` ada selama berkas rilis diambil per edisi |
+            | `edition` | aturan yang sama dengan `upgrade`, dipakai bersama `release` untuk mengambil berkas rilis; admin.erp mengirim konstanta image tunggal `coreerp` |
+            | `release` | aturan yang sama dengan `upgrade`; `null` atau kosong ditolak, walaupun admin.erp hanya memberikan `install` bila rilisnya sudah ditentukan |
             | `tenant_id` | ULID tenant di admin.erp: 26 huruf Crockford base32, huruf pertama `0`–`7`, huruf besar atau kecil |
             | `tenant_name`, `admin_name` | teks tidak kosong, paling panjang 255, tanpa huruf kendali |
             | `admin_email` | `lokal@domain` tanpa spasi dan huruf kendali, paling panjang 255 |
-            | `app_ids` | larik id app `^[a-z0-9][a-z0-9-]*$`, boleh kosong; satu `--app` per id |
-            | `admin_password_hash` | hash bcrypt `$2y$`, biaya `04`–`31`, 53 karakter `[./A-Za-z0-9]` |
+            | `app_ids` | larik id app `^[a-z0-9][a-z0-9-]*$`, unik, terurut, boleh kosong; satu `--app` per id. Agen menolak id ganda; urutannya tidak diperiksa |
+            | `admin_password_hash` | hash bcrypt `$2y$`, biaya `04`–`31` (admin.erp memakai `BCRYPT_ROUNDS`-nya), 53 karakter `[./A-Za-z0-9]` |
 
             Hash hanya sampai ke Core lewat stdin; agen tidak pernah menaruhnya di argumen proses, log, atau
             `failure_message`. Rilis yang sama yang sudah terpasang tidak dipasang ulang, dan Core menjawab

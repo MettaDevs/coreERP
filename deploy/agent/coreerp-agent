@@ -931,7 +931,8 @@ PARAMETER_RILIS=''
 # baca_parameter_rilis BERKAS_OPERASI — mengisi PARAMETER_EDISI dan PARAMETER_RILIS; pulang 1 dengan ALASAN.
 #
 # `upgrade` dan `install` menyebut rilisnya dengan cara yang sama, karena keduanya mengambil rilis lewat
-# jalur yang sama (`pasang_rilis`).
+# jalur yang sama (`pasang_rilis`). `release` yang null atau kosong ditolak di sini: admin.erp tidak pernah
+# memberikan install tanpa rilis, dan agen tidak bergantung pada janji itu.
 baca_parameter_rilis() {
     local berkas="$1"
 
@@ -1107,6 +1108,10 @@ periksa_parameter_pasang() {
     jq -e '(.parameters.app_ids | type) == "array"
         and all(.parameters.app_ids[]; type == "string" and test("\\A[a-z0-9][a-z0-9-]*\\z"))' "$berkas" >/dev/null 2>&1 \
         || { tolak 'app_ids bukan larik id app (huruf kecil, angka, dan tanda minus)'; return 1; }
+
+    # admin.erp mengirim id yang unik. Core menolak id ganda — tetapi baru sesudah rilisnya terpasang.
+    jq -e '(.parameters.app_ids | length) == (.parameters.app_ids | unique | length)' "$berkas" >/dev/null 2>&1 \
+        || { tolak 'app_ids menyebut app yang sama lebih dari sekali'; return 1; }
 
     # Bentuk yang sama persis dengan yang diterima Core. `$2a$` dan `$2b$` tidak dikenali Laravel sebagai hash,
     # dan di-hash ulang sebagai teks polos: admin pertama tidak pernah dapat masuk.
