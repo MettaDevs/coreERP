@@ -88,13 +88,12 @@ Route::middleware(['auth', 'operator'])->group(function (): void {
     Route::get('/situs', [SiteScreens::class, 'index'])->name('sites.index');
     Route::post('/situs', [SiteScreens::class, 'store'])->name('sites.store');
     Route::get('/situs/{situs}', [SiteScreens::class, 'show'])->name('sites.show');
-    Route::post('/situs/{situs}/pendaftaran-online', [SiteActions::class, 'issueOnlineEnrollment'])->middleware('throttle:10,1')->name('sites.enrollment.online');
-    Route::post('/situs/{situs}/paket-pendaftaran', [SiteActions::class, 'downloadOfflinePackage'])->middleware('throttle:10,1')->name('sites.enrollment.offline');
+    Route::post('/situs/{situs}/pendaftaran', [SiteActions::class, 'issueEnrollment'])->middleware('throttle:10,1')->name('sites.enrollment');
     Route::post('/situs/{situs}/operasi', [SiteActions::class, 'requestOperation'])->middleware('throttle:30,1')->name('sites.operations.request');
     Route::post('/situs/{situs}/operasi/{operasi}/batal', [SiteActions::class, 'cancelOperation'])->name('sites.operations.cancel');
-    Route::post('/situs/{situs}/lisensi-offline', [SiteActions::class, 'downloadOfflineLicense'])->middleware('throttle:10,1')->name('sites.license.offline');
-    Route::post('/situs/{situs}/laporan', [SiteActions::class, 'uploadReportFile'])->middleware('throttle:30,1')->name('sites.report.upload');
     Route::post('/situs/{situs}/cabut', [SiteActions::class, 'revoke'])->name('sites.revoke');
+    Route::post('/situs/{situs}/lisensi/hentikan', [SiteActions::class, 'suspendLicense'])->name('sites.license.suspend');
+    Route::post('/situs/{situs}/lisensi/lanjutkan', [SiteActions::class, 'resumeLicense'])->name('sites.license.resume');
 
     Route::get('/akun', [Account::class, 'show'])->name('account.show');
     Route::post('/akun/sso', [Account::class, 'connect'])->middleware('throttle:10,1')->name('account.sso.connect');

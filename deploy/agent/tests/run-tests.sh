@@ -11,7 +11,8 @@
 #   update.sh sendiri;
 # - admin.erp diganti `tests/fake-admin.py`, yang memeriksa tanda tangan dan skema dari kontraknya;
 # - `tests/klien-bertanda.py` menandatangani permintaan secara terpisah dari agen, supaya agen dan
-#   admin.erp tiruan tidak dapat lulus bersama karena salah dengan cara yang sama.
+#   admin.erp tiruan tidak dapat lulus bersama karena salah dengan cara yang sama;
+# - pasang.sh mengambil berkas agen dari repo ini lewat COREERP_REPO_DIR, bukan dari GitHub.
 #
 # Kunci rilis dan kunci lisensi dibuat baru pada setiap putaran dan hilang bersama folder kerjanya.
 # Tidak ada kunci yang disimpan di repo.
@@ -130,12 +131,9 @@ export COREERP_UPDATE_SCRIPT="$folder_uji/fake-update.sh"
 mkdir -p "$COREERP_HOME"
 cp "$KERJA/kunci/rilis.pub" "$COREERP_HOME/kunci-rilis.pub"
 
-TOKEN='token-pendaftaran-online-0123456789abcdef'
-TENANT_ID='01JTENANTONLINE00000000000'
+TOKEN='token-pendaftaran-0123456789abcdef012345'
+TENANT_ID='01JTENANTUJI00000000000000'
 TENANT_NAMA='Apotek Sejahtera Uji'
-TENANT_ID_OFFLINE='01JTENANTOFFLINE0000000000'
-SITUS_OFFLINE='01JSITUSOFFLINE00000000000'
-TOKEN_OFFLINE='token-pendaftaran-offline-0123456789abcdef'
 
 # --- Pembantu ------------------------------------------------------------------------------------------
 
@@ -320,46 +318,12 @@ buat_lisensi() {
         '{license: $l, signature: $t}'
 }
 
-# buat_paket FOLDER SITUS TOKEN — paket pendaftaran offline seperti yang dibuat admin.erp.
-buat_paket() {
-    local folder="$1" lisensi
+# token_baru NAMA — mendaftarkan satu token pendaftaran sekali pakai di admin.erp tiruan dan mencetaknya.
+token_baru() {
+    local token="token-$1-0123456789abcdef0123456789abcdef"
 
-    mkdir -p "$folder"
-    lisensi="$(buat_lisensi "$KERJA/lisensi-paket-$2.json" "$2" 2027-12-31 "$KERJA/kunci/lisensi.key")"
-
-    jq -n --arg s "$2" --arg t "$TENANT_ID_OFFLINE" --arg token "$3" --arg admin "$ADMIN" \
-        --rawfile kunci "$KERJA/kunci/lisensi.pub" --argjson lisensi "$lisensi" '{
-            site_id: $s,
-            tenant_id: $t,
-            tenant_name: "Klinik Tanpa Internet",
-            admin_url: $admin,
-            channel: "offline",
-            enrollment_token: $token,
-            update_window: {start: "22:00", end: "23:59", timezone: "Asia/Makassar"},
-            license_public_key: $kunci,
-            license: $lisensi
-        }' > "$folder/site.json"
-
-    cp "$KERJA/kunci/rilis.pub" "$folder/kunci-rilis.pub"
-}
-
-# periksa_berkas_laporan BERKAS KUNCI_PUBLIK — memeriksa file laporan offline, menulis isinya ke
-# $KERJA/isi-laporan.json.
-periksa_berkas_laporan() {
-    local berkas="$1" kunci="$2"
-
-    sama 'kunci pembungkus file laporan' "$(jq -c 'keys' "$berkas")" '["content","format","signature"]'
-    sama 'format file laporan' "$(jq -r .format "$berkas")" coreerp-site-report-v1
-
-    jq -r .content "$berkas" | base64 -d > "$KERJA/isi-laporan.json"
-    jq -r .signature "$berkas" | base64 -d > "$KERJA/tanda-laporan.bin"
-
-    pastikan 'tanda tangan file laporan sah dengan kunci publik situs' \
-        openssl dgst -sha256 -verify "$kunci" -signature "$KERJA/tanda-laporan.bin" "$KERJA/isi-laporan.json"
-
-    sama 'kunci isi file laporan' "$(jq -c 'keys' "$KERJA/isi-laporan.json")" '["enrollment","report"]'
-    sama 'report di file laporan sesuai skema Report' \
-        "$(validasi Report "$(jq -c .report "$KERJA/isi-laporan.json")")" '[]'
+    admin_post /_test/tokens "$(jq -cn --arg t "$token" '{token: $t}')" >/dev/null
+    printf '%s' "$token"
 }
 
 variabel_compose() {
@@ -448,7 +412,8 @@ uji_01_enroll() {
     pastikan 'site.json ditulis' test -f "$berkas_situs"
     id="$(jq -r .site_id "$berkas_situs")"
 
-    sama 'kanal' "$(jq -r .channel "$berkas_situs")" online
+    sama 'kunci site.json' "$(jq -c 'keys' "$berkas_situs")" \
+        '["admin_url","interval_seconds","site_id","tenant_id","tenant_name","update_window"]'
     sama 'alamat admin' "$(jq -r .admin_url "$berkas_situs")" "$ADMIN"
     sama 'tenant_id' "$(jq -r .tenant_id "$berkas_situs")" "$TENANT_ID"
     sama 'tenant_name' "$(jq -r .tenant_name "$berkas_situs")" "$TENANT_NAMA"
@@ -819,111 +784,6 @@ uji_10b_rotasi_jawaban_hilang() {
     sama 'putaran berikutnya langsung diterima' "$(status_sejak "$sebelum" /api/agent/v1/report)" 200
 }
 
-# --- Pengujian: jalur offline --------------------------------------------------------------------------
-
-uji_11_tulis_laporan() {
-    local s berkas rumah_offline="$KERJA/rumah-offline" sebelum
-
-    s="$(situs)"
-    berkas="$(agen write-report "$KERJA/keluar-online")"
-
-    pastikan 'nama file laporan' cocok_pola "$(basename "$berkas")" "^laporan-$s-[0-9]{8}T[0-9]{6}Z\\.json\$"
-    periksa_berkas_laporan "$berkas" "$COREERP_HOME/agent/site-public.pem"
-    sama 'situs yang sudah terikat tidak membawa enrollment' "$(jq -c .enrollment "$KERJA/isi-laporan.json")" null
-    sama 'report milik situs ini' "$(jq -r .report.site_id "$KERJA/isi-laporan.json")" "$s"
-
-    # Merah lebih dulu: isi yang diubah satu byte tidak lolos pemeriksaan tanda tangan.
-    printf ' ' >> "$KERJA/isi-laporan.json"
-    harus_gagal 'isi yang diubah ditolak' openssl dgst -sha256 -verify "$COREERP_HOME/agent/site-public.pem" \
-        -signature "$KERJA/tanda-laporan.bin" "$KERJA/isi-laporan.json"
-
-    # Situs offline yang belum terikat.
-    buat_paket "$KERJA/paket-offline" "$SITUS_OFFLINE" "$TOKEN_OFFLINE"
-    env COREERP_HOME="$rumah_offline" bash "$AGEN" import-package "$KERJA/paket-offline"
-
-    sama 'site.json offline' \
-        "$(jq -c '[.site_id, .tenant_id, .tenant_name, .channel, .enrolled, .enrollment_token]' "$rumah_offline/agent/site.json")" \
-        "[\"$SITUS_OFFLINE\",\"$TENANT_ID_OFFLINE\",\"Klinik Tanpa Internet\",\"offline\",false,\"$TOKEN_OFFLINE\"]"
-    sama 'mode kunci privat situs offline' "$(stat -c %a "$rumah_offline/agent/site-key.pem")" 600
-    pastikan 'lisensi dari paket terpasang' \
-        cmp -s "$rumah_offline/agent/license/license.json" "$KERJA/lisensi-paket-$SITUS_OFFLINE.json"
-
-    berkas="$(env COREERP_HOME="$rumah_offline" bash "$AGEN" write-report)"
-    sama 'bawaan ditulis ke outbox' "$(dirname "$berkas")" "$rumah_offline/agent/outbox"
-    periksa_berkas_laporan "$berkas" "$rumah_offline/agent/site-public.pem"
-    sama 'enrollment membawa token' "$(jq -r .enrollment.token "$KERJA/isi-laporan.json")" "$TOKEN_OFFLINE"
-    sama 'enrollment membawa kunci publik situs' "$(jq -r .enrollment.public_key "$KERJA/isi-laporan.json")" \
-        "$(cat "$rumah_offline/agent/site-public.pem")"
-    sama 'laporan offline menyebut habis lisensi' "$(jq -r .report.license_expires_at "$KERJA/isi-laporan.json")" 2027-12-31
-
-    sebelum="$(jumlah_permintaan)"
-    env COREERP_HOME="$rumah_offline" bash "$AGEN" run --now
-    sama 'run pada kanal offline tidak menghubungi admin.erp' "$(jumlah_permintaan)" "$sebelum"
-
-    env COREERP_HOME="$rumah_offline" bash "$AGEN" confirm-enrollment
-    sama 'token dihapus sesudah terikat' \
-        "$(jq -c '[.enrolled, has("enrollment_token")]' "$rumah_offline/agent/site.json")" '[true,false]'
-
-    berkas="$(env COREERP_HOME="$rumah_offline" bash "$AGEN" write-report "$KERJA/keluar-offline-2")"
-    periksa_berkas_laporan "$berkas" "$rumah_offline/agent/site-public.pem"
-    sama 'sesudah terikat enrollment tidak ikut' "$(jq -c .enrollment "$KERJA/isi-laporan.json")" null
-    harus_gagal 'token tidak ada di file laporan' grep -q "$TOKEN_OFFLINE" "$KERJA/isi-laporan.json"
-}
-
-uji_11b_import_menolak_kunci_ada() {
-    local rumah="$KERJA/rumah-kunci-ada" sidik
-
-    mkdir -p "$rumah/agent"
-    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$rumah/agent/site-key.pem" 2>/dev/null
-    sidik="$(sha256sum < "$rumah/agent/site-key.pem")"
-
-    buat_paket "$KERJA/paket-kunci-ada" 01JSITUSKUNCIADA0000000000 token-kunci-ada-0123456789abcdef0123
-
-    if env COREERP_HOME="$rumah" bash "$AGEN" import-package "$KERJA/paket-kunci-ada" \
-        > "$KERJA/log/import-kunci-ada.log" 2>&1; then
-        printf 'import-package berhasil padahal kunci situs sudah ada\n'
-        return 1
-    fi
-
-    memuat 'pesan penolakan' "$(cat "$KERJA/log/import-kunci-ada.log")" 'sudah punya kunci situs'
-    sama 'kunci situs tidak tertimpa' "$(sha256sum < "$rumah/agent/site-key.pem")" "$sidik"
-    pastikan 'site.json tidak dibuat' test ! -e "$rumah/agent/site.json"
-    pastikan 'lisensi paket tidak dipasang' test ! -e "$rumah/agent/license/license.json"
-
-    # Situs offline yang sudah terdaftar juga menolak paket berikutnya.
-    sidik="$(sha256sum < "$KERJA/rumah-offline/agent/site-key.pem")"
-    harus_gagal 'paket kedua ditolak' env COREERP_HOME="$KERJA/rumah-offline" bash "$AGEN" import-package "$KERJA/paket-offline"
-    sama 'kunci situs offline tidak tertimpa' "$(sha256sum < "$KERJA/rumah-offline/agent/site-key.pem")" "$sidik"
-}
-
-uji_11c_install_license_berkas() {
-    local rumah="$KERJA/rumah-offline" berkas_lisensi sidik
-
-    berkas_lisensi="$rumah/agent/license/license.json"
-    sidik="$(sha256sum < "$berkas_lisensi")"
-
-    buat_lisensi "$KERJA/lisensi-berkas-palsu.json" "$SITUS_OFFLINE" 2028-01-31 "$KERJA/kunci/lisensi-palsu.key" \
-        > "$KERJA/berkas-lisensi-palsu.json"
-
-    if env COREERP_HOME="$rumah" bash "$AGEN" install-license "$KERJA/berkas-lisensi-palsu.json" \
-        > "$KERJA/log/install-license-palsu.log" 2>&1; then
-        printf 'install-license menerima tanda tangan yang salah\n'
-        return 1
-    fi
-
-    memuat 'sebabnya tanda tangan' "$(cat "$KERJA/log/install-license-palsu.log")" 'tanda tangan lisensi TIDAK sah'
-    sama 'lisensi lama tidak berubah' "$(sha256sum < "$berkas_lisensi")" "$sidik"
-
-    buat_lisensi "$KERJA/lisensi-berkas.json" "$SITUS_OFFLINE" 2028-01-31 "$KERJA/kunci/lisensi.key" \
-        > "$KERJA/berkas-lisensi.json"
-    env COREERP_HOME="$rumah" bash "$AGEN" install-license "$KERJA/berkas-lisensi.json"
-
-    pastikan 'lisensi baru terpasang persis' cmp -s "$berkas_lisensi" "$KERJA/lisensi-berkas.json"
-    base64 -d "$berkas_lisensi.sig" > "$KERJA/lisensi-berkas.sig"
-    pastikan 'tanda tangan terpasang sah' \
-        openssl dgst -sha256 -verify "$KERJA/kunci/lisensi.pub" -signature "$KERJA/lisensi-berkas.sig" "$berkas_lisensi"
-}
-
 # --- Pengujian: kunci putaran, cadangan, operasi asing, tenant ----------------------------------------
 
 uji_12_flock() {
@@ -1013,9 +873,14 @@ uji_14_operasi_asing() {
 }
 
 uji_15_bootstrap_tenant() {
-    local keluaran diharapkan
+    local keluaran diharapkan rumah_tanpa_rilis="$KERJA/rumah-tanpa-rilis"
 
-    if env COREERP_HOME="$KERJA/rumah-offline" bash "$AGEN" bootstrap-tenant --admin-name 'A' --admin-email a@contoh.test \
+    # Situs terdaftar yang belum pernah memasang rilis: tidak ada compose dan image yang terbukti sehat.
+    rm -rf "$rumah_tanpa_rilis"
+    cp -a "$COREERP_HOME" "$rumah_tanpa_rilis"
+    rm -rf "$rumah_tanpa_rilis/keadaan"
+
+    if env COREERP_HOME="$rumah_tanpa_rilis" bash "$AGEN" bootstrap-tenant --admin-name 'A' --admin-email a@contoh.test \
         > "$KERJA/log/bootstrap-tanpa-rilis.log" 2>&1; then
         printf 'bootstrap-tenant berjalan tanpa rilis terpasang\n'
         return 1
@@ -1047,7 +912,7 @@ uji_15_bootstrap_tenant() {
 # --- Pengujian: update.sh dan pasang.sh ----------------------------------------------------------------
 
 uji_16_update_sh_tanpa_arsip_image() {
-    local rumah="$KERJA/rumah-update" folder="$KERJA/berkas-update/online" bundle="$KERJA/berkas-update/bundle" image
+    local rumah="$KERJA/rumah-update" folder="$KERJA/berkas-update/rilis" bundle="$KERJA/berkas-update/bundle" image
 
     mkdir -p "$rumah"
     cp "$KERJA/kunci/rilis.pub" "$rumah/kunci-rilis.pub"
@@ -1067,10 +932,10 @@ uji_16_update_sh_tanpa_arsip_image() {
     }
 
     : > "$FAKE_DOCKER_LOG"
-    jalankan_update "$digest" "$folder" > "$KERJA/log/update-online.log" 2>&1 \
-        || { cat "$KERJA/log/update-online.log"; return 1; }
+    jalankan_update "$digest" "$folder" > "$KERJA/log/update-registry.log" 2>&1 \
+        || { cat "$KERJA/log/update-registry.log"; return 1; }
 
-    memuat 'langkah tarik image' "$(cat "$KERJA/log/update-online.log")" '==> Menarik image dari registry'
+    memuat 'langkah tarik image' "$(cat "$KERJA/log/update-registry.log")" '==> Menarik image dari registry'
     pastikan 'image edisi ditarik lewat digest' grep -qxF "pull --quiet $image" "$FAKE_DOCKER_LOG"
     pastikan 'pendamping yang belum ada ditarik' grep -qxF 'pull --quiet gotenberg/gotenberg:8' "$FAKE_DOCKER_LOG"
     harus_gagal 'pendamping yang sudah ada tidak ditarik' grep -q 'pull --quiet postgres:16-alpine' "$FAKE_DOCKER_LOG"
@@ -1085,7 +950,7 @@ uji_16_update_sh_tanpa_arsip_image() {
     fi
     memuat 'penolakan digest' "$(cat "$KERJA/log/update-digest.log")" 'bukan image yang disebut manifest'
 
-    # Arsip image yang diselipkan ke samping berkas rilis online, tidak tercantum di SHA256SUMS.
+    # Arsip image yang diselipkan ke samping berkas rilis, tidak tercantum di SHA256SUMS.
     printf 'bukan arsip image kami' | gzip > "$folder/images.tar.gz"
     : > "$FAKE_DOCKER_LOG"
     if jalankan_update "$digest" "$folder" > "$KERJA/log/update-selundupan.log" 2>&1; then
@@ -1108,18 +973,17 @@ uji_16_update_sh_tanpa_arsip_image() {
     harus_gagal 'bundle lengkap tidak menarik apa pun' grep -q '^pull' "$FAKE_DOCKER_LOG"
 }
 
-uji_17_pasang_offline() {
-    local rumah="$KERJA/rumah-pasang" paket="$KERJA/paket-pasang" bundle="$KERJA/bundle-pasang"
-    local folder_bin="$KERJA/bin-pasang" folder_systemd="$KERJA/systemd" keluaran keluaran_ulang
-    local nilai kata_sandi sidik_env nama kurang=()
+uji_17_pasang() {
+    local rumah="$KERJA/rumah-pasang" folder_bin="$KERJA/bin-pasang" folder_systemd="$KERJA/systemd"
+    local token keluaran keluaran_ulang nilai kata_sandi sidik_env situs_id nama kurang=()
 
-    buat_paket "$paket" 01JSITUSPASANG000000000000 token-pasang-0123456789abcdef0123456789
-    mkdir -p "$bundle"
-    tulis_berkas_rilis "$bundle" apotek-uji 0.8.0 "$KERJA/kunci/rilis.key" --dengan-image
+    token="$(token_baru pasang)"
 
+    # Kunci rilis lewat --release-key: `deploy/agent/kunci-rilis.pub` belum ada di repo.
     pasang() {
         env COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$folder_systemd" COREERP_BIN_DIR="$folder_bin" \
-            COREERP_FOLDER_CADANGAN="$rumah/cadangan" bash "$PASANG" --paket "$paket" --bundle "$bundle"
+            COREERP_FOLDER_CADANGAN="$rumah/cadangan" COREERP_REPO_DIR="$akar" \
+            bash "$PASANG" --admin-url "$ADMIN" --token "$token" --release-key "$KERJA/kunci/rilis.pub"
     }
 
     keluaran="$(pasang 2>&1)" || { printf '%s\n' "$keluaran"; return 1; }
@@ -1151,18 +1015,28 @@ uji_17_pasang_offline() {
     pastikan 'unit service memakai COREERP_HOME' grep -qxF "ExecStart=$rumah/bin/coreerp-agent run" "$folder_systemd/coreerp-agent.service"
     pastikan 'unit timer terpasang' grep -q '^OnUnitActiveSec=60s' "$folder_systemd/coreerp-agent.timer"
     sama 'pembungkus perintah' "$("$folder_bin/coreerp-agent" --version)" 'coreerp-agent 0.1.0'
-    pastikan 'kunci rilis dari paket' cmp -s "$rumah/kunci-rilis.pub" "$KERJA/kunci/rilis.pub"
-    sama 'situs terdaftar dari paket' "$(jq -r '[.site_id, .enrolled] | map(tostring) | join(" ")' "$rumah/agent/site.json")" \
-        '01JSITUSPASANG000000000000 false'
-    sama 'bundle terpasang' "$(jq -r '[.edition, .release] | join(" ")' "$rumah/agent/state.json")" 'apotek-uji 0.8.0'
+    pastikan 'kunci rilis dari --release-key' cmp -s "$rumah/kunci-rilis.pub" "$KERJA/kunci/rilis.pub"
+
+    situs_id="$(jq -r .site_id "$rumah/agent/site.json")"
+    sama 'situs terdaftar dengan kunci yang dipegang admin.erp' \
+        "$(admin_keadaan | jq -r --arg s "$situs_id" '.sites[$s].public_key')" "$(cat "$rumah/agent/site-public.pem")"
+    sama 'token pendaftaran terpakai' "$(admin_keadaan | jq -r --arg t "$token" '.tokens[$t].dipakai')" true
+    sama 'rilis pertama tidak dipasang skrip pasang' "$(jq -r '.release // ""' "$rumah/agent/state.json")" ''
+    memuat 'langkah berikutnya meminta rilis pertama dari admin.erp' "$keluaran" 'minta "Perbarui" ke rilis pertama'
     memuat 'langkah berikutnya menyebut bootstrap-tenant' "$keluaran" 'coreerp-agent bootstrap-tenant'
 
-    # Dijalankan ulang: .env tidak ditimpa dan kata sandi tidak dicetak lagi.
-    sidik_env="$(cat "$rumah/.env" "$rumah/agent/agent.env" | sha256sum)"
+    # Dijalankan ulang: .env tidak ditimpa, kata sandi tidak dicetak lagi, dan token yang sudah terpakai
+    # tidak dikirim lagi — pendaftaran ulang dengan token itu akan ditolak admin.erp.
+    sidik_env="$(cat "$rumah/.env" "$rumah/agent/agent.env" "$rumah/agent/site-key.pem" | sha256sum)"
     keluaran_ulang="$(pasang 2>&1)" || { printf '%s\n' "$keluaran_ulang"; return 1; }
-    sama '.env dan agent.env tidak ditimpa' "$(cat "$rumah/.env" "$rumah/agent/agent.env" | sha256sum)" "$sidik_env"
+    sama '.env, agent.env, dan kunci situs tidak ditimpa' \
+        "$(cat "$rumah/.env" "$rumah/agent/agent.env" "$rumah/agent/site-key.pem" | sha256sum)" "$sidik_env"
     harus_gagal 'kata sandi tidak dicetak ulang' grep -q -- "$kata_sandi" <<< "$keluaran_ulang"
     memuat 'pemasangan ulang menjelaskan .env' "$keluaran_ulang" 'sudah ada; tidak ditimpa'
+    memuat 'pemasangan ulang melewati pendaftaran' "$keluaran_ulang" 'pendaftaran dilewati'
+
+    harus_gagal 'tanpa --token ditolak' env COREERP_HOME="$KERJA/rumah-tanpa-token" COREERP_REPO_DIR="$akar" \
+        bash "$PASANG" --admin-url "$ADMIN"
 }
 
 # dengarkan PORT — soket TCP sungguhan yang mendengarkan PORT di semua alamat IPv4, sampai subshell
@@ -1196,21 +1070,19 @@ time.sleep(600)
 PENDENGAR=()
 
 uji_18_pasang_port_dan_setelan() {
-    local rumah="$KERJA/rumah-port" paket="$KERJA/paket-port" bundle="$KERJA/bundle-port"
-    local folder_bin="$KERJA/bin-port" folder_systemd="$KERJA/systemd-port" cadangan="$KERJA/cadangan-port"
-    local keluaran sidik diharapkan
+    local rumah="$KERJA/rumah-port" folder_bin="$KERJA/bin-port" folder_systemd="$KERJA/systemd-port"
+    local cadangan="$KERJA/cadangan-port" token keluaran sidik diharapkan
 
-    buat_paket "$paket" 01JSITUSPORT00000000000000 token-port-0123456789abcdef0123456789ab
-    mkdir -p "$bundle"
-    tulis_berkas_rilis "$bundle" apotek-uji 0.8.0 "$KERJA/kunci/rilis.key" --dengan-image
+    token="$(token_baru port)"
 
     # pasang_port PROYEK [pilihan pasang.sh...] — keluaran di $KERJA/log/pasang-port.log
     pasang_port() {
         local proyek="$1"
         shift
         env COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$folder_systemd" COREERP_BIN_DIR="$folder_bin" \
-            COREERP_PROYEK="$proyek" COREERP_FOLDER_CADANGAN="$cadangan" \
-            bash "$PASANG" --paket "$paket" --bundle "$bundle" "$@" > "$KERJA/log/pasang-port.log" 2>&1
+            COREERP_PROYEK="$proyek" COREERP_FOLDER_CADANGAN="$cadangan" COREERP_REPO_DIR="$akar" \
+            bash "$PASANG" --admin-url "$ADMIN" --token "$token" --release-key "$KERJA/kunci/rilis.pub" "$@" \
+            > "$KERJA/log/pasang-port.log" 2>&1
     }
 
     # Port bawaan dari env.template sudah didengar layanan lain: ditolak sebelum satu berkas pun ditulis.
@@ -1279,10 +1151,10 @@ uji_18_pasang_port_dan_setelan() {
 }
 
 uji_19_agent_env() {
-    local rumah="$KERJA/rumah-setelan" rumah_bundle="$KERJA/rumah-setelan-bundle" rumah_tolak="$KERJA/rumah-setelan-tolak"
-    local bundle="$KERJA/bundle-setelan" kunci_kode kunci dikecualikan
+    local rumah="$KERJA/rumah-setelan" rumah_upgrade="$KERJA/rumah-setelan-upgrade" rumah_tolak="$KERJA/rumah-setelan-tolak"
+    local kunci_kode kunci dikecualikan id
 
-    rm -rf "$rumah" "$rumah_bundle" "$rumah_tolak"
+    rm -rf "$rumah" "$rumah_upgrade" "$rumah_tolak"
     mkdir -p "$rumah_tolak/agent"
 
     # tolak KETERANGAN BARIS POTONGAN_PESAN [BERKAS_YANG_TIDAK_BOLEH_LAHIR]
@@ -1345,21 +1217,21 @@ uji_19_agent_env() {
     sama 'lingkungan perintah menang atas agent.env' \
         "$(proyek_bootstrap env COREERP_HOME="$rumah" COREERP_PROYEK=coreerp-terminal bash "$AGEN")" coreerp-terminal
 
-    # Setelan dari agent.env diekspor sampai ke update.sh yang dijalankan agen.
-    cp -a "$KERJA/rumah-offline" "$rumah_bundle"
-    cp "$KERJA/kunci/rilis.pub" "$rumah_bundle/kunci-rilis.pub"
+    # Setelan dari agent.env diekspor sampai ke update.sh yang dijalankan `run` dari terminal, tanpa
+    # EnvironmentFile milik systemd.
+    cp -a "$COREERP_HOME" "$rumah_upgrade"
     printf 'COREERP_PROYEK=coreerp-situs\nCOREERP_FOLDER_CADANGAN=%s\n' "$KERJA/cadangan-disk-kedua" \
-        > "$rumah_bundle/agent/agent.env"
-    mkdir -p "$bundle"
-    tulis_berkas_rilis "$bundle" apotek-uji 0.1.0 "$KERJA/kunci/rilis.key" --dengan-image
+        > "$rumah_upgrade/agent/agent.env"
+    buat_rilis apotek-uji 1.0.0
+    id="$(antre_upgrade apotek-uji 1.0.0)"
     rm -f "$KERJA/lingkungan-update"
 
-    env -u COREERP_FOLDER_CADANGAN COREERP_HOME="$rumah_bundle" FAKE_UPDATE_LINGKUNGAN="$KERJA/lingkungan-update" \
-        bash "$AGEN" install-bundle "$bundle" > "$KERJA/log/setelan-install-bundle.log" 2>&1 \
-        || { cat "$KERJA/log/setelan-install-bundle.log"; return 1; }
+    env -u COREERP_FOLDER_CADANGAN COREERP_HOME="$rumah_upgrade" FAKE_UPDATE_LINGKUNGAN="$KERJA/lingkungan-update" \
+        bash "$AGEN" run --now > "$KERJA/log/setelan-upgrade.log" 2>&1 \
+        || { cat "$KERJA/log/setelan-upgrade.log"; return 1; }
+    sama 'pembaruan dari terminal selesai' "$(operasi "$id" | jq -r .status)" succeeded
     sama 'update.sh menerima proyek dan folder cadangan dari agent.env' "$(cat "$KERJA/lingkungan-update")" \
         "COREERP_PROYEK=coreerp-situs"$'\n'"COREERP_FOLDER_CADANGAN=$KERJA/cadangan-disk-kedua"
-
 }
 
 # --- Jalankan ------------------------------------------------------------------------------------------
@@ -1380,15 +1252,12 @@ uji '08 409 menghentikan laporan langkah tanpa membunuh update.sh' uji_08_409
 uji '09 install_license: tanda tangan salah ditolak, yang sah terpasang' uji_09_lisensi_operasi
 uji '10 rotate_key: kunci lama ditolak, kunci baru diterima' uji_10_putar_kunci
 uji '10b rotate_key yang jawabannya hilang dipulihkan dengan kunci tertunda' uji_10b_rotasi_jawaban_hilang
-uji '11 write-report bertanda tangan; enrollment hanya sebelum terikat' uji_11_tulis_laporan
-uji '11b import-package menolak server yang sudah punya kunci situs' uji_11b_import_menolak_kunci_ada
-uji '11c install-license dari berkas: salah ditolak, sah terpasang' uji_11c_install_license_berkas
 uji '12 dua run bersamaan: yang kedua keluar tanpa bekerja; lease diperpanjang' uji_12_flock
 uji '13 backup: pg_dump lewat compose sehat, gagal dilaporkan gagal' uji_13_cadangan
 uji '14 operasi di luar daftar tertutup ditolak' uji_14_operasi_asing
 uji '15 bootstrap-tenant: argumen diteruskan, kata sandi tidak disimpan' uji_15_bootstrap_tenant
 uji '16 update.sh tanpa images.tar.gz menarik image dan tetap memeriksa digest' uji_16_update_sh_tanpa_arsip_image
-uji '17 pasang.sh offline: .env, unit, pendaftaran, bundle' uji_17_pasang_offline
+uji '17 pasang.sh: .env, unit, pendaftaran ke admin.erp, pemasangan ulang' uji_17_pasang
 uji '18 pasang.sh: port terpakai ditolak di pemasangan pertama; port, alamat ikat, dan agent.env ditulis' uji_18_pasang_port_dan_setelan
 uji '19 agent.env dibaca agen sendiri: isi di luar daftar ditolak, lingkungan menang, diteruskan ke update.sh' uji_19_agent_env
 

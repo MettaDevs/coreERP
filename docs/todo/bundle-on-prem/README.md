@@ -26,8 +26,8 @@ orang lain, yang kita punya baru cara membangun, bukan cara mengirim.
 
 Jalur yang ada itu **membangun di server pelanggan**: ia menyinkronkan repo CoreERP lewat git, lalu
 `docker build`. Itu memadai untuk server yang kita pegang sendiri, dan **tidak** memadai untuk
-pelanggan on-prem sungguhan — ia menuntut git, akses ke repo privat kita, composer, npm, dan
-sambungan keluar. Bundle inilah yang menghapus keempat tuntutan itu.
+pelanggan on-prem sungguhan — ia menuntut git, akses ke repo privat kita, composer, dan npm. Bundle
+inilah yang menghapus keempat tuntutan itu.
 
 ## Yang belum ada
 
@@ -67,10 +67,9 @@ pemverifikasi harus tiba lewat jalur yang berbeda dari benda yang diverifikasiny
 membawa kunci pemverifikasinya sendiri tidak memverifikasi apa pun terhadap orang yang mengganti
 keduanya sekaligus — ia hanya membuktikan bundle itu konsisten dengan dirinya sendiri.
 
-Praktik industrinya hari ini **Sigstore/cosign**, dan untuk lingkungan terputus polanya jelas:
-seluruh bahan verifikasi menyeberang lebih dulu, dan akar kepercayaannya diambil lewat **TUF**,
-bukan lewat unduhan biasa. Itu bentuk yang lebih kuat, dan ia **dicatat sebagai jalur naik** ketika
-pengiriman lewat registry sudah ada.
+Praktik industrinya hari ini **Sigstore/cosign**, dengan akar kepercayaan yang diambil lewat
+**TUF**, bukan lewat unduhan biasa. Itu bentuk yang lebih kuat, dan ia **dicatat sebagai jalur naik**
+ketika pengiriman lewat registry sudah ada.
 
 Alasan tidak memakainya sekarang disebut apa adanya, bukan disembunyikan: cosign menuntut pelanggan
 memasang alat tambahan dan mengelola akar kepercayaan sendiri. Untuk satu server di sebuah apotek,
@@ -134,16 +133,16 @@ Acuannya aturan **3-2-1** — tiga salinan, dua jenis media, satu di luar lokasi
 paling mengena: sebuah cadangan yang duduk di sebelah produksi, pada perangkat keras yang sama,
 berjarak satu kejadian buruk dari menjadi tidak berguna.
 
-Tetapi menuntut cadangan menyeberang ke S3 atau NAS **sebelum** pembaruan boleh jalan akan membuat
-pembaruan mustahil di tempat yang benar-benar terputus dari jaringan — dan pelanggan seperti itu
-justru alasan bentuk on-prem ini ada.
+Tetapi menuntut cadangan menyeberang ke S3 atau NAS **sebelum** pembaruan boleh jalan membuat
+setiap pembaruan bergantung pada penyimpanan di luar server: lambat untuk database yang besar, dan
+tertahan setiap kali penyimpanan itu tidak terjangkau pada jendela pembaruan.
 
 Pembedaannya yang menyelesaikan pertentangan itu:
 
 | | Cadangan mundur | Cadangan bencana |
 | --- | --- | --- |
 | Dipakai kapan | beberapa menit setelah dibuat, oleh skrip yang sedang berjalan | berhari-hari kemudian, oleh manusia |
-| Harus | cepat, dan bekerja tanpa internet | jauh dari mesin aslinya |
+| Harus | cepat, dan tidak bergantung pada penyimpanan lain | jauh dari mesin aslinya |
 | Tempatnya | lokal, di filesystem yang **berbeda** dari data database | luar lokasi — S3, NAS, mesin lain |
 | Siapa yang mengurus | `update.sh` | runbook pelanggan |
 
@@ -160,8 +159,6 @@ Dibaca dari sumbernya pada 10 September 2026, bukan dari ingatan.
 - [Announcing Amazon ECS deployment circuit breaker](https://aws.amazon.com/blogs/containers/announcing-amazon-ecs-deployment-circuit-breaker/)
   — latar dan contoh pemakaiannya.
 - [Cosign signing overview](https://docs.sigstore.dev/cosign/signing/overview/) — bentuk penandatanganan yang berlaku sekarang.
-- [Verifying cosign signatures in an air-gapped environment](https://oneuptime.com/blog/post/2026-08-11-verify-cosign-air-gapped-sigstore-bundles/view)
-  — apa saja yang harus menyeberang lebih dulu pada lingkungan terputus.
 - [Sigstore: bring your own TUF](https://blog.sigstore.dev/sigstore-bring-your-own-stuf-with-tuf-40febfd2badd/)
   — kenapa akar kepercayaan diambil lewat TUF, bukan unduhan biasa.
 - [3-2-1 backup rule](https://www.druva.com/learning-center/glossary/3-2-1-backup-rule) — tiga salinan, dua media, satu di luar lokasi.
@@ -210,14 +207,13 @@ Ketiga berkas sudah ada: `scripts/build-bundle.sh`, `scripts/update.sh`, dan
 ### Satu koreksi terhadap rencana di atas
 
 Bagian "Bentuk yang dituju" menyebut bundle berisi **image edisi**. Itu tidak cukup: `core-db` dan
-`core-renderer` memakai image dari registry publik, jadi bundle satu-image gagal menyala di mesin
-tanpa internet — dan gagalnya pada langkah menyalakan container, sesudah admin mengira pemasangannya
-berhasil.
+`core-renderer` memakai image dari registry publik, jadi bundle satu-image masih harus menarik
+keduanya saat dipasang — dan bila tarikan itu gagal, gagalnya pada langkah menyalakan container,
+sesudah admin mengira pemasangannya berhasil.
 
 Bundle sekarang membawa **seluruh** image, dan daftarnya **dibaca dari berkas compose** yang ikut di
 dalamnya. Daftar yang ditulis tangan akan menyimpang pada hari sebuah layanan ditambahkan, dan
-menyimpangnya baru ketahuan di mesin yang tidak punya internet untuk menambalnya. Akibat yang
-mengikat: kedua image pendamping ditulis **harfiah** di `deploy/compose.edition.yaml`, bukan lewat
+menyimpangnya baru ketahuan di mesin pelanggan. Akibat yang mengikat: kedua image pendamping ditulis **harfiah** di `deploy/compose.edition.yaml`, bukan lewat
 variabel — variabel membuat keduanya lolos dari pembacaan itu.
 
 Ongkosnya disebut apa adanya: bundle edisi apotek menjadi **329 MB**.

@@ -11,6 +11,7 @@ use ControlPlane\Models\SiteOperation;
 use ControlPlane\Models\SiteRelease;
 use ControlPlane\Sites\EnrollmentTokens;
 use ControlPlane\Sites\LicenseIssuer;
+use ControlPlane\Sites\LicenseRenewal;
 use ControlPlane\Sites\SiteOperations;
 use ControlPlane\Sites\SitePublicKey;
 use ControlPlane\Sites\SiteRejected;
@@ -44,7 +45,7 @@ final class AgentApi extends Controller
         }
 
         try {
-            $site = $tokens->redeem($body['token'], 'online', $body['public_key']);
+            $site = $tokens->redeem($body['token'], $body['public_key']);
         } catch (SiteRejected $e) {
             Log::info('Agen situs: pendaftaran ditolak.', ['sebab' => $e->reason]);
 
@@ -65,7 +66,7 @@ final class AgentApi extends Controller
         ], 201);
     }
 
-    public function report(Request $request, SiteReports $reports): JsonResponse
+    public function report(Request $request, SiteReports $reports, LicenseRenewal $renewal): JsonResponse
     {
         $site = $this->site($request);
 
@@ -77,9 +78,19 @@ final class AgentApi extends Controller
             return response()->json(['error' => 'report_invalid'], 422);
         }
 
-        $reports->record($site, $report, 'heartbeat');
+        $reports->record($site, $report);
 
-        return response()->json(['interval_seconds' => (int) config('sites.interval_seconds')]);
+        $answer = ['interval_seconds' => (int) config('sites.interval_seconds')];
+
+        // Sesudah laporan tercatat, dan tanpa pernah melempar: lisensi yang gagal diterbitkan hanya
+        // berarti jawaban tanpa `license`, bukan laporan yang hilang. Lihat `LicenseRenewal`.
+        $license = $renewal->licenseFor($site, $report, $request->ip());
+
+        if ($license !== null) {
+            $answer['license'] = $license;
+        }
+
+        return response()->json($answer);
     }
 
     public function claim(Request $request, SiteOperations $operations): Response

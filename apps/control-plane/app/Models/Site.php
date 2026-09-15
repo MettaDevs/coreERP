@@ -15,8 +15,8 @@ use Illuminate\Support\Carbon;
  * Satu server milik klien yang dikelola dari konsol ini — tabel `sites` milik Core.
  *
  * Layarnya berbunyi "Situs". Aturan kerasnya — kunci dan waktu pendaftaran berpasangan, jendela
- * pembaruan berpasangan, konektivitas dan profil yang dikenal — ditegakkan CHECK constraint di
- * migration `create_site_registry_tables`, bukan di kelas ini.
+ * pembaruan berpasangan, profil yang dikenal — ditegakkan CHECK constraint di migration
+ * `create_site_registry_tables`, bukan di kelas ini.
  *
  * @property string $id
  * @property string $tenant_id
@@ -24,7 +24,6 @@ use Illuminate\Support\Carbon;
  * @property string $profile
  * @property string $edition
  * @property ?string $address
- * @property string $connectivity
  * @property ?string $update_window_start
  * @property ?string $update_window_end
  * @property string $timezone
@@ -35,8 +34,10 @@ use Illuminate\Support\Carbon;
  * @property ?string $reported_release
  * @property ?string $reported_digest
  * @property ?Carbon $last_seen_at
- * @property ?string $last_seen_via
  * @property ?array<string, mixed> $last_report
+ * @property ?Carbon $license_issued_at
+ * @property ?Carbon $license_valid_until
+ * @property ?Carbon $license_suspended_at
  * @property ?int $created_by
  * @property ?Carbon $created_at
  */
@@ -46,8 +47,6 @@ class Site extends Model
 
     public const PROFILES = ['managed_on_prem'];
 
-    public const CONNECTIVITIES = ['online', 'offline'];
-
     protected $table = 'sites';
 
     protected $fillable = [
@@ -56,7 +55,6 @@ class Site extends Model
         'profile',
         'edition',
         'address',
-        'connectivity',
         'update_window_start',
         'update_window_end',
         'timezone',
@@ -67,9 +65,11 @@ class Site extends Model
         'reported_release',
         'reported_digest',
         'last_seen_at',
-        'last_seen_via',
         'last_report',
         'created_by',
+        // Kolom lisensi sengaja tidak ada di sini. Yang boleh menulisnya hanya penerbit lisensi dan
+        // tombol henti/lanjut perpanjangan, masing-masing dengan jejak auditnya; isian formulir yang
+        // kebetulan membawa `license_suspended_at` tidak boleh ikut tersimpan lewat `create()`.
     ];
 
     protected function casts(): array
@@ -79,6 +79,9 @@ class Site extends Model
             'revoked_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'last_report' => 'array',
+            'license_issued_at' => 'datetime',
+            'license_valid_until' => 'date',
+            'license_suspended_at' => 'datetime',
         ];
     }
 
@@ -104,6 +107,11 @@ class Site extends Model
         return $this->revoked_at !== null;
     }
 
+    public function licenseRenewalSuspended(): bool
+    {
+        return $this->license_suspended_at !== null;
+    }
+
     /**
      * Apakah sekarang berada di jendela pembaruan situs ini.
      *
@@ -126,13 +134,10 @@ class Site extends Model
             : $local >= $start || $local <= $end;
     }
 
-    /**
-     * Situs online yang laporannya berhenti datang. Situs offline tidak pernah "tertinggal": konsol
-     * ini memang tidak tahu keadaannya sesudah file laporan terakhir.
-     */
+    /** Situs terdaftar yang laporannya berhenti datang. */
     public function stale(): bool
     {
-        if ($this->connectivity !== 'online' || ! $this->enrolled()) {
+        if (! $this->enrolled()) {
             return false;
         }
 

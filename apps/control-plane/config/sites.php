@@ -26,12 +26,45 @@ return [
     'release_token' => env('CONSOLE_RELEASE_TOKEN'),
 
     /*
-     * Pasangan kunci lisensi. Berbeda dari kunci rilis, kunci privat lisensi memang tinggal di sini:
-     * lisensi palsu hanya menyembunyikan peringatan di layar klien, tidak membuka apa pun, jadi ia
-     * tidak layak dijaga seketat kunci rilis.
+     * Pasangan kunci lisensi. Berbeda dari kunci rilis, kunci privat lisensi memang harus tinggal di
+     * sini: perpanjangan otomatis menandatangani lisensi di dalam jawaban laporan agen, tanpa manusia
+     * yang dapat diminta membawa kunci dari tempat lain.
+     *
+     * Sejak lisensi mengunci (`docs/todo/lisensi-mengunci`), kunci ini yang memutuskan app mana yang
+     * boleh dibuka di server klien. Konsol yang dibobol dapat menerbitkan lisensi untuk app yang tidak
+     * dibeli — jadi berkasnya dijaga seperti rahasia produksi lain, bukan seperti setelan tampilan.
      */
     'license_private_key_path' => env('CONSOLE_LICENSE_PRIVATE_KEY_PATH'),
     'license_public_key_path' => env('CONSOLE_LICENSE_PUBLIC_KEY_PATH'),
+
+    /*
+     * Masa berlaku lisensi yang diterbitkan tanpa tanggal dari operator.
+     *
+     * Tiga puluh hari, bukan setahun: sewa yang berhenti harus mengunci aplikasi dalam hitungan
+     * minggu. Ongkosnya ditanggung server yang tidak dapat menghubungi admin.erp selama tiga minggu
+     * lebih — ia ikut terkunci.
+     */
+    'license_valid_days' => 30,
+
+    /*
+     * Lisensi baru disertakan di jawaban laporan begitu sisa masa lisensi terpasang sebanyak ini atau
+     * kurang.
+     *
+     * Sepuluh, bukan tujuh: peringatan di Core tampil tujuh hari sebelum habis. Perpanjangan yang
+     * mulai lebih awal dari peringatan itu selesai sebelum pengguna klinik pernah melihatnya, dan
+     * gangguan jaringan selama tiga hari pertama belum terlihat oleh siapa pun di klinik.
+     */
+    'license_renew_before_days' => 10,
+
+    /*
+     * Jeda terpendek antara dua penerbitan untuk situs yang sama, dan jeda sebelum mencoba lagi
+     * sesudah penerbitan gagal.
+     *
+     * Agen melapor setiap menit, dan laporan sesudah lisensi dikirim masih membawa tanggal lama bila
+     * agen gagal memasangnya. Tanpa jeda, setiap laporan itu melahirkan lisensi baru dan satu baris
+     * audit baru; dengan Core yang mati, setiap laporan menjadi satu panggilan yang pasti gagal.
+     */
+    'license_renew_cooldown_minutes' => 60,
 
     /*
      * Dari commit mana skrip pasang dan kunci publik rilis diambil. Keduanya diambil dari repo di
@@ -52,16 +85,10 @@ return [
     /* Permintaan yang tidak pernah diambil agen berhenti menunggu sesudah ini. */
     'request_expiry_days' => 7,
 
-    /*
-     * Umur token pendaftaran. Online cukup satu jam: perintahnya dijalankan saat itu juga. Offline
-     * tiga puluh hari, karena paketnya dibawa dengan flashdisk ke lokasi klien.
-     */
-    'enrollment_token_minutes' => [
-        'online' => 60,
-        'offline' => 60 * 24 * 30,
-    ],
+    /* Umur token pendaftaran. Satu jam cukup: perintah pasangnya dijalankan saat itu juga. */
+    'enrollment_token_minutes' => 60,
 
-    /* Situs online yang tidak melapor selama ini ditampilkan tertinggal, bukan sehat. */
+    /* Situs yang tidak melapor selama ini ditampilkan tertinggal, bukan sehat. */
     'stale_after_seconds' => 180,
 
     /*

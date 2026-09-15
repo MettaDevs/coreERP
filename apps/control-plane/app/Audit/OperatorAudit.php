@@ -35,4 +35,28 @@ final class OperatorAudit
             'occurred_at' => now(),
         ]);
     }
+
+    /**
+     * Mencatat tindakan yang dijalankan konsol sendiri, bukan operator — misalnya perpanjangan lisensi
+     * lewat jawaban laporan agen.
+     *
+     * Pengguna selalu kosong, dan itu ditulis tegas di sini alih-alih dibaca dari permintaan. Kolom
+     * yang kosong adalah satu-satunya tanda di jejak ini bahwa tidak ada manusia yang memutuskannya;
+     * penjaga autentikasi yang kelak kebetulan mengenali seseorang di permintaan agen tidak boleh
+     * membuat perpanjangan otomatis tercatat atas nama orang itu.
+     *
+     * @param  array<string, mixed>  $detail
+     */
+    public static function recordBySystem(?string $ipAddress, string $action, string $subjectType, ?string $subjectId, array $detail = []): OperatorAuditEvent
+    {
+        return OperatorAuditEvent::query()->create([
+            'user_id' => null,
+            'action' => $action,
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'detail' => $detail,
+            'ip_address' => $ipAddress,
+            'occurred_at' => now(),
+        ]);
+    }
 }

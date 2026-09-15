@@ -11,6 +11,7 @@ use ControlPlane\Sites\SignedAgentRequest;
 use ControlPlane\Tests\CoreSchema;
 use ControlPlane\Tests\TestCase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -27,8 +28,66 @@ abstract class SiteTestCase extends TestCase
 {
     use CoreSchema;
 
+    protected const CORE_URL = 'http://core.uji:8000';
+
     /** @var array<int, array{private: string, public: string}> */
     private static array $keys = [];
+
+    /** @var list<string> */
+    private array $temporaryFiles = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['core.base_url' => self::CORE_URL, 'core.token' => 'kunci-uji']);
+
+        // Laporan agen kini dapat memanggil Core untuk menerbitkan lisensi. Panggilan yang lolos dari
+        // palsuan harus menjadi kegagalan yang berisik, bukan permintaan sungguhan ke luar mesin ini.
+        Http::preventStrayRequests();
+    }
+
+    protected function tearDown(): void
+    {
+        try {
+            foreach ($this->temporaryFiles as $file) {
+                @unlink($file);
+            }
+        } finally {
+            parent::tearDown();
+        }
+    }
+
+    /**
+     * Menyetel kunci privat lisensi dari slot kunci uji, dan memulangkan kunci publiknya.
+     */
+    protected function useLicenseKey(int $slot = 7): string
+    {
+        $path = (string) tempnam(sys_get_temp_dir(), 'kunci-lisensi-');
+        file_put_contents($path, $this->rsaKey($slot)['private']);
+        $this->temporaryFiles[] = $path;
+
+        config(['sites.license_private_key_path' => $path]);
+
+        return $this->rsaKey($slot)['public'];
+    }
+
+    /**
+     * Jawaban palsu API entitlements Core, dalam bentuk kontraknya.
+     *
+     * @param  list<string>  $apps
+     */
+    protected function fakeEntitlements(Site $site, array $apps = ['management-aset', 'human-resources']): void
+    {
+        Http::fake([
+            $this->entitlementsUrl($site) => Http::response(['tenant_id' => $site->tenant_id, 'apps' => $apps]),
+        ]);
+    }
+
+    protected function entitlementsUrl(Site $site): string
+    {
+        return self::CORE_URL.'/api/internal/v1/tenants/'.$site->tenant_id.'/entitlements';
+    }
 
     protected function operator(string $email = 'operator@contoh.test'): User
     {
@@ -83,7 +142,6 @@ abstract class SiteTestCase extends TestCase
             'name' => 'Situs Uji',
             'profile' => 'managed_on_prem',
             'edition' => 'apotek-sejahtera',
-            'connectivity' => 'online',
             'timezone' => 'Asia/Jakarta',
             ...$attributes,
         ]);
@@ -126,14 +184,13 @@ abstract class SiteTestCase extends TestCase
         ]);
     }
 
-    protected function enrollmentToken(Site $site, string $channel = 'online', ?\DateTimeInterface $expiresAt = null): string
+    protected function enrollmentToken(Site $site, ?\DateTimeInterface $expiresAt = null): string
     {
         $token = Str::random(48);
 
         SiteEnrollmentToken::query()->create([
             'site_id' => $site->id,
             'token_hash' => hash('sha256', $token),
-            'channel' => $channel,
             'expires_at' => $expiresAt ?? now()->addHour(),
         ]);
 
@@ -194,7 +251,10 @@ abstract class SiteTestCase extends TestCase
             'last_backup' => null,
             'last_operation' => null,
             'certificate_expires_at' => null,
-            'license_expires_at' => '2027-01-01',
+            // Relatif, bukan tanggal tetap: tanggal tetap suatu hari masuk jendela perpanjangan, dan
+            // setiap test laporan diam-diam berubah menjadi test perpanjangan lisensi.
+            'license_expires_at' => now()->addYear()->toDateString(),
+            'license_required' => true,
             ...$overrides,
         ];
     }

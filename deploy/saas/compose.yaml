@@ -10,7 +10,7 @@
 # ## Ini BUKAN `compose.edition.yaml`
 #
 # Yang itu bundle on-prem: satu mesin milik pelanggan, seluruh layanan di dalamnya, image dimuat
-# dari `images.tar.gz` tanpa internet. Bentuk itu benar untuk on-prem dan sengaja tidak diubah.
+# dari `images.tar.gz` atau ditarik lewat digest. Bentuk itu benar untuk on-prem dan sengaja tidak diubah.
 #
 # Yang ini penyebaran SaaS milik kita sendiri: beberapa node, database terpisah dari aplikasi, dan
 # Traefik sebagai pintu depan sekaligus pembagi beban.
