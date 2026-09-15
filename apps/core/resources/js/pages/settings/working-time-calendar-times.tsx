@@ -24,6 +24,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { ArrowLeft, CalendarDays, Check, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import type { BreadcrumbItem } from '@/types/navigation';
 
 export type CalendarLine = {
     id: string;

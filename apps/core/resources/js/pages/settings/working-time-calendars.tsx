@@ -25,6 +25,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { CalendarCheck, Clock, Copy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import type { BreadcrumbItem } from '@/types/navigation';
 
 export type CalendarItem = {
     id: string;

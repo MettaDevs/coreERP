@@ -20,6 +20,7 @@ import {
     Sparkles,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import type { BreadcrumbItem } from '@/types/navigation';
 
 export type TemplateLine = {
     id: string;
@@ -671,3 +672,13 @@ export default function ComposeWorkingTimesPage({
         </>
     );
 }
+
+ComposeWorkingTimesPage.layout = {
+    breadcrumbs: [
+        { title: 'Kalender', href: '/settings/working-time-calendars' },
+        {
+            title: 'Jadwal dari pola',
+            href: '/settings/compose-working-times',
+        },
+    ] satisfies BreadcrumbItem[],
+};
