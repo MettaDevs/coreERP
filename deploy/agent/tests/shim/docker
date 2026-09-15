@@ -16,6 +16,12 @@
 #   FAKE_DOCKER_IMAGE_ID      id image yang dijawab `docker image inspect`
 #   FAKE_DOCKER_PGDUMP_GAGAL  1 membuat pg_dump gagal
 #   FAKE_KATA_SANDI           kata sandi sementara yang dicetak tenant:bootstrap-site tiruan
+#
+# tenant:bootstrap-site dengan --admin-password-hash-stdin membaca stdin seperti Core:
+#
+#   FAKE_DOCKER_STDIN           berkas tempat stdin terakhir disalin persis, untuk membuktikan hash lewat stdin
+#   FAKE_DOCKER_GEMA_STDIN      1 mencetak stdin ke keluaran — Core yang keliru — untuk menguji saringan agen
+#   FAKE_DOCKER_BOOTSTRAP_EXIT  kode keluar; bukan 0 menirukan Core yang menolak
 
 set -euo pipefail
 
@@ -118,6 +124,19 @@ case "${1:-}" in
                             exit 1
                         fi
                         printf 'PGDMP-tiruan'
+                        ;;
+                    'core-app php artisan tenant:bootstrap-site'*' --admin-password-hash-stdin'*)
+                        stdin="${FAKE_DOCKER_STDIN:-$(mktemp)}"
+                        cat > "$stdin"
+
+                        [ "${FAKE_DOCKER_GEMA_STDIN:-0}" != 1 ] || printf 'stdin yang diterima: %s\n' "$(cat "$stdin")"
+
+                        if [ "${FAKE_DOCKER_BOOTSTRAP_EXIT:-0}" != 0 ]; then
+                            printf 'Tenant sudah ada di server ini, tetapi owner-nya bukan admin yang diminta (tiruan).\n' >&2
+                            exit "$FAKE_DOCKER_BOOTSTRAP_EXIT"
+                        fi
+
+                        printf 'Tenant lahir (tiruan).\n'
                         ;;
                     'core-app php artisan tenant:bootstrap-site'*)
                         printf 'Tenant dilahirkan.\nKata sandi sementara: %s\n' "${FAKE_KATA_SANDI:-RahasiaSementara-123}"

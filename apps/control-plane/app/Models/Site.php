@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $tenant_id
+ * @property ?string $environment_id
  * @property string $name
  * @property string $profile
  * @property string $edition
@@ -47,10 +48,22 @@ class Site extends Model
 
     public const PROFILES = ['managed_on_prem'];
 
+    /**
+     * Edisi setiap situs yang lahir dari panel "Server klien".
+     *
+     * Sejak 15 September 2026 satu image dipakai semua klien (`docs/todo/registry-harbor`): image membawa
+     * Core dan seluruh modul, dan yang membedakan klien hanya lisensinya. Kolom `sites.edition` dan
+     * `site_releases.edition` masih ada karena alur rilis dan agen hari ini mencocokkan berkas rilis per
+     * edisi, jadi nilainya satu konstanta, bukan pilihan operator. PRD Harbor membuang kunci edisi itu
+     * dari manifest dan rilis; konstanta ini ikut dibuang bersamanya.
+     */
+    public const SINGLE_IMAGE_EDITION = 'coreerp';
+
     protected $table = 'sites';
 
     protected $fillable = [
         'tenant_id',
+        'environment_id',
         'name',
         'profile',
         'edition',
@@ -89,6 +102,17 @@ class Site extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * Lingkungan produksi yang dijalankan situs ini. Kosong pada situs yang didaftarkan sebelum
+     * 15 September 2026 — lihat migration `add_environment_to_sites`.
+     *
+     * @return BelongsTo<Environment, $this>
+     */
+    public function environment(): BelongsTo
+    {
+        return $this->belongsTo(Environment::class);
     }
 
     /** @return HasMany<SiteOperation, $this> */

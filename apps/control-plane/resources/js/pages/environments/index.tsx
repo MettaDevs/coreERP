@@ -8,8 +8,10 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link } from '@inertiajs/react';
-import { KindBadge, StatusBadge } from '@/components/badges';
+import { InstallStateBadge, KindBadge, StatusBadge } from '@/components/badges';
 import Shell from '@/components/shell';
+import { progressDetail } from '@/lib/install-progress';
+import type { InstallProgress } from '@/lib/install-progress';
 import CreateDialog from '@/pages/environments/create-dialog';
 
 type Row = {
@@ -18,11 +20,13 @@ type Row = {
     slug: string;
     kind: string;
     status: string;
+    hosting: string;
     outboundAllowed: boolean;
     database: string;
     url: string | null;
     expiresAt: string | null;
     tenant: string;
+    serverClient: InstallProgress | null;
 };
 
 export default function Index({
@@ -50,6 +54,7 @@ export default function Index({
                             <TableHead>Tenant</TableHead>
                             <TableHead>Jenis</TableHead>
                             <TableHead>Status</TableHead>
+                            <TableHead>Server klien</TableHead>
                             <TableHead>Alamat</TableHead>
                             <TableHead>Berakhir</TableHead>
                             <TableHead />
@@ -59,7 +64,7 @@ export default function Index({
                         {environments.length === 0 && (
                             <TableRow>
                                 <TableCell
-                                    colSpan={7}
+                                    colSpan={8}
                                     className="py-10 text-center text-sm text-muted-foreground"
                                 >
                                     Belum ada lingkungan yang tercatat.
@@ -80,6 +85,33 @@ export default function Index({
                                 </TableCell>
                                 <TableCell>
                                     <StatusBadge status={row.status} />
+                                </TableCell>
+                                {/*
+                                    Hanya produksi di server klien yang punya keadaan pemasangan.
+                                    Lingkungan lain berjalan di server kita, dan kolom kosong di
+                                    barisnya berarti persis itu — bukan data yang belum terbaca.
+                                */}
+                                <TableCell>
+                                    {row.serverClient ? (
+                                        <div className="space-y-1">
+                                            <InstallStateBadge
+                                                state={row.serverClient.state}
+                                            />
+                                            {progressDetail(
+                                                row.serverClient,
+                                            ) && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    {progressDetail(
+                                                        row.serverClient,
+                                                    )}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">
+                                            —
+                                        </span>
+                                    )}
                                 </TableCell>
                                 {/*
                                     Alamat menggantikan nama database di kolom ini.

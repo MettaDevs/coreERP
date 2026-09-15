@@ -18,12 +18,45 @@ use Illuminate\Support\Str;
  */
 final class EnrollmentTokens
 {
-    /** @return array{token: string, expires_at: Carbon} */
+    /**
+     * Perintah yang ditempel teknisi di server klien, untuk satu token.
+     *
+     * Skripnya disajikan konsol ini sendiri (`InstallerFiles`, PS-07) dan alamat konsol sudah tertanam
+     * di dalamnya, jadi perintahnya hanya membawa token. Dulu skripnya diambil dari GitHub raw dengan
+     * `--admin-url` dan `--ref`; repo kembali privat dan server klien tidak dapat menjangkaunya.
+     *
+     * Alamatnya `APP_URL`, bukan host permintaan yang sedang dilayani: operator yang membuka konsol lewat
+     * alamat internal tidak boleh menghasilkan perintah yang hanya dapat dijangkau dari jaringan kantor.
+     */
+    public static function installCommand(string $token): string
+    {
+        return sprintf(
+            'curl -fsSL %s/pasang.sh | sudo bash -s -- --token %s',
+            rtrim((string) config('app.url'), '/'),
+            $token,
+        );
+    }
+
+    /**
+     * Token baru untuk situs ini. Token lain yang belum dipakai ikut gugur.
+     *
+     * Perintah pasang yang dibuat ulang — karena yang pertama hilang, atau pemasangan diulang — tidak
+     * boleh meninggalkan perintah lama yang masih dapat dipakai siapa pun yang pernah melihatnya di chat.
+     * Gugurnya ditulis sebagai `used_at`, sama dengan token yang gugur saat pendaftaran berhasil:
+     * yang dijaga `redeem()` hanya "belum dipakai", dan tidak ada yang perlu membedakan sebabnya.
+     *
+     * @return array{token: string, expires_at: Carbon}
+     */
     public function issue(Site $site, ?int $createdBy): array
     {
         if ($site->revoked()) {
             throw new SiteRejected('site_revoked', 'Situs ini sudah dicabut dan tidak dapat didaftarkan lagi.');
         }
+
+        SiteEnrollmentToken::query()
+            ->where('site_id', $site->id)
+            ->whereNull('used_at')
+            ->update(['used_at' => now(), 'updated_at' => now()]);
 
         $token = Str::random(48);
         $expiresAt = now()->addMinutes((int) config('sites.enrollment_token_minutes'));
