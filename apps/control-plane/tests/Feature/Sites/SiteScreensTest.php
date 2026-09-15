@@ -28,41 +28,44 @@ class SiteScreensTest extends SiteTestCase
         $this->useLicenseKey();
     }
 
-    // ------------------------------------------------------------------ pembuatan dan akses
+    // ------------------------------------------------------------------ akses dan ringkasan
 
-    public function test_an_operator_creates_a_site_and_the_action_is_audited(): void
-    {
-        $operator = $this->operator();
-        $tenant = $this->tenant();
-
-        $this->actingAs($operator)->post('/situs', [
-            'tenant_id' => $tenant,
-            'name' => 'Server Klinik Pusat',
-            'edition' => 'apotek-sejahtera',
-            'update_window_start' => '22:00',
-            'update_window_end' => '04:00',
-        ])->assertRedirect();
-
-        $site = Site::query()->sole();
-        $this->assertSame('managed_on_prem', $site->profile);
-        $this->assertSame(['start' => '22:00', 'end' => '04:00', 'timezone' => 'Asia/Jakarta'], $site->updateWindow());
-
-        $event = OperatorAuditEvent::query()->sole();
-        $this->assertSame('site.created', $event->action);
-        $this->assertSame((int) $operator->id, (int) $event->user_id);
-        $this->assertSame($site->id, $event->subject_id);
-    }
-
-    public function test_a_half_update_window_is_refused(): void
+    /**
+     * Formulir "Situs baru" yang berdiri sendiri dibuang (PS-05). Situs lahir dari panel "Server klien"
+     * di halaman lingkungannya; `POST /situs` tidak lagi menjadi pintu kedua yang melewati aturannya.
+     */
+    public function test_there_is_no_standalone_site_creation_any_more(): void
     {
         $this->actingAs($this->operator())->post('/situs', [
             'tenant_id' => $this->tenant(),
-            'name' => 'Setengah Jendela',
+            'name' => 'Server Klinik Pusat',
             'edition' => 'apotek-sejahtera',
-            'update_window_start' => '22:00',
-        ])->assertSessionHasErrors('update_window_end');
+        ])->assertStatus(405);
 
         $this->assertSame(0, Site::query()->count());
+    }
+
+    /** Ringkasan menaut ke halaman lingkungan, dan situs lama tanpa lingkungan tetap tampil. */
+    public function test_the_overview_links_each_site_to_its_environment_and_keeps_legacy_sites(): void
+    {
+        $tenant = $this->tenant('PT Klinik Baru');
+        $environment = $this->clientServerEnvironment($tenant);
+        $new = $this->site(['tenant_id' => $tenant, 'name' => 'PT Klinik Baru — Produksi', 'environment_id' => $environment->id, 'edition' => Site::SINGLE_IMAGE_EDITION]);
+        $legacy = $this->enrolledSite(0, ['name' => 'Server Lama', 'reported_release' => '0.3.0', 'last_seen_at' => now()]);
+
+        $this->actingAs($this->operator())->get('/situs')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('sites/index')
+                ->missing('tenants')
+                ->has('sites', 2)
+                ->where('sites.0.id', $new->id)
+                ->where('sites.0.environment.id', $environment->id)
+                ->where('sites.0.progress.state', 'no_command')
+                ->where('sites.1.id', $legacy->id)
+                ->where('sites.1.environment', null)
+                ->where('sites.1.progress.state', 'ready')
+                ->where('sites.1.progress.reportedRelease', '0.3.0'));
     }
 
     public function test_non_operators_see_nothing(): void
@@ -416,18 +419,22 @@ class SiteScreensTest extends SiteTestCase
 
     // ------------------------------------------------------------------ pendaftaran
 
+    /**
+     * Perintah pendaftaran lama ikut memakai skrip yang disajikan konsol ini. Repo privat; server klien
+     * tidak dapat menjangkau GitHub raw, dan perintah itu tidak lagi membawa `--admin-url` atau `--ref`.
+     */
     public function test_the_install_command_is_shown_once_and_its_token_is_not_audited(): void
     {
         $site = $this->site();
-        config(['sites.agent_source_ref' => 'abc123', 'app.url' => 'https://admin.contoh.test']);
+        config(['app.url' => 'https://admin.contoh.test/']);
 
         $response = $this->actingAs($this->operator())
             ->post("/situs/{$site->id}/pendaftaran", ['confirm_name' => $site->name])
             ->assertRedirect("/situs/{$site->id}");
 
         $command = (string) session('enrollment')['command'];
-        $this->assertStringStartsWith('curl -fsSL https://raw.githubusercontent.com/MettaDevs/coreERP/abc123/deploy/agent/pasang.sh', $command);
-        $this->assertStringContainsString('--admin-url https://admin.contoh.test', $command);
+        $this->assertMatchesRegularExpression('#^curl -fsSL https://admin\.contoh\.test/pasang\.sh \| sudo bash -s -- --token [A-Za-z0-9]{48}$#', $command);
+        $this->assertStringNotContainsString('github', $command);
 
         preg_match('/--token (\S+)/', $command, $match);
         $token = $match[1] ?? '';
@@ -436,6 +443,24 @@ class SiteScreensTest extends SiteTestCase
 
         $this->assertStringNotContainsString($token, (string) json_encode(OperatorAuditEvent::query()->sole()->detail));
         $response->assertSessionHas('enrollment');
+        $this->assertNull(config('sites.agent_source'));
+        $this->assertNull(config('sites.agent_source_ref'));
+    }
+
+    /** Formulir "Minta operasi" tidak menawarkan `install`, dan permintaan tangan untuknya ditolak. */
+    public function test_install_is_not_a_manual_operation(): void
+    {
+        $site = $this->enrolledSite();
+        $operator = $this->operator();
+
+        $this->actingAs($operator)->get("/situs/{$site->id}")
+            ->assertInertia(fn ($page) => $page->where('operations', ['upgrade', 'backup', 'install_license', 'rotate_key', 'send_diagnostics']));
+
+        $this->actingAs($operator)
+            ->post("/situs/{$site->id}/operasi", ['operation' => 'install', 'confirm_name' => $site->name])
+            ->assertSessionHasErrors(['operation' => 'Pemasangan dibuat dari halaman lingkungan produksinya, lewat "Buat perintah pasang".']);
+
+        $this->assertSame(0, SiteOperation::query()->count());
     }
 
     // ------------------------------------------------------------------ jejak audit

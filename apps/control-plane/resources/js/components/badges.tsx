@@ -1,6 +1,7 @@
 import { Badge } from '@apperp/ui/badge';
 import {
     fleetStateLabels,
+    installStateLabels,
     kindLabels,
     labelFor,
     moduleStatusLabels,
@@ -99,6 +100,36 @@ export function FleetStateBadge({ state }: { state: string }) {
  * lihat, dan itu keadaan yang harus ditanyakan hari itu juga — berbeda dari lingkungan yang
  * tertinggal migrasi.
  */
+/**
+ * Keadaan pemasangan server klien.
+ *
+ * Hijau hanya `ready`. Merah untuk yang menuntut tindakan hari itu juga — `failed`, dan `stale`
+ * karena server terpasang yang berhenti terlihat sama gentingnya dengan situs yang tidak melapor.
+ * Kuning untuk yang sedang menunggu seseorang: teknisi, rilis, atau agen. Abu untuk yang belum
+ * dimulai atau sudah diakhiri dengan sengaja.
+ */
+export function InstallStateBadge({ state }: { state: string }) {
+    const classes =
+        state === 'ready'
+            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            : state === 'failed' || state === 'stale'
+              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+              : [
+                      'awaiting_command',
+                      'awaiting_release',
+                      'connected',
+                      'installing',
+                  ].includes(state)
+                ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
+                : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+
+    return (
+        <Badge variant="outline" className={classes}>
+            {labelFor(installStateLabels, state)}
+        </Badge>
+    );
+}
+
 export function SiteStateBadge({ state }: { state: string }) {
     const classes =
         state === 'enrolled'

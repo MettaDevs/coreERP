@@ -4,87 +4,60 @@ declare(strict_types=1);
 
 namespace ControlPlane\Http\Controllers\Sites;
 
-use ControlPlane\Audit\OperatorAudit;
 use ControlPlane\Http\Controllers\Controller;
 use ControlPlane\Models\OperatorAuditEvent;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Models\SiteRelease;
-use ControlPlane\Models\Tenant;
+use ControlPlane\Sites\InstallProgress;
 use ControlPlane\Sites\SiteOperations;
-use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
 /**
- * Layar Situs: daftar, pembuatan, dan rincian.
+ * Layar Situs: ringkasan dan rincian.
  *
  * Tindakan yang mengubah server klien — operasi, token pendaftaran, pencabutan, perpanjangan lisensi — ada di
  * `SiteActions`, terpisah dari yang hanya membaca, supaya setiap method yang menulis jejak audit
  * terkumpul di satu tempat yang mudah diperiksa.
+ *
+ * ## Tidak ada lagi "Situs baru"
+ *
+ * Situs lahir dari panel "Server klien" di halaman lingkungan produksinya (`ClientServerSetup`). Formulir
+ * yang berdiri sendiri menanyakan hal yang sudah diketahui sistem — tenant, nama, edisi — dan tidak
+ * menyebut apakah sesuatu sudah terpasang. Ringkasan di sini menaut ke halaman lingkungan itu; situs
+ * lama yang lahir sebelum 15 September 2026 tanpa lingkungan tetap tampil dan tetap punya rinciannya.
  */
 final class SiteScreens extends Controller
 {
-    public function index(): InertiaResponse
+    public function index(SiteOperations $operations): InertiaResponse
     {
-        $sites = Site::query()
-            ->with('tenant:id,name')
+        $rows = Site::query()
+            ->with(['tenant:id,name', 'environment:id,name'])
             ->orderBy('name')
-            ->get()
-            ->map(fn (Site $site): array => $this->row($site))
-            ->all();
+            ->get();
 
-        return Inertia::render('sites/index', [
-            'sites' => $sites,
-            'tenants' => Tenant::options(),
-        ]);
-    }
-
-    public function store(Request $request): RedirectResponse
-    {
-        $input = $request->validate([
-            'tenant_id' => ['required', 'string', 'exists:tenants,id'],
-            'name' => ['required', 'string', 'max:100'],
-            'edition' => ['required', 'string', 'max:80', 'regex:/^[a-z0-9][a-z0-9-]*$/'],
-            'address' => ['nullable', 'url:https,http', 'max:255'],
-            'update_window_start' => ['nullable', 'date_format:H:i', 'required_with:update_window_end'],
-            'update_window_end' => ['nullable', 'date_format:H:i', 'required_with:update_window_start'],
-        ], [
-            'edition.regex' => 'Edisi ditulis huruf kecil, angka, dan tanda hubung — sama dengan nama berkas di folder editions.',
-            'update_window_start.required_with' => 'Jendela pembaruan butuh jam mulai dan jam selesai.',
-            'update_window_end.required_with' => 'Jendela pembaruan butuh jam mulai dan jam selesai.',
-        ]);
-
-        try {
-            $site = DB::transaction(function () use ($request, $input): Site {
-                $site = Site::query()->create([
-                    ...$input,
-                    'profile' => 'managed_on_prem',
-                    'timezone' => 'Asia/Jakarta',
-                    'created_by' => $request->user()?->getAuthIdentifier(),
-                ]);
-
-                OperatorAudit::record($request, 'site.created', 'site', $site->id, [
-                    'tenant_id' => $site->tenant_id,
-                    'edition' => $site->edition,
-                ]);
-
-                return $site;
-            });
-        } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages(['name' => 'Tenant ini sudah punya situs dengan nama itu.']);
+        foreach ($rows as $site) {
+            $operations->expireStale($site);
         }
 
-        return redirect('/situs/'.$site->id)->with('message', 'Situs "'.$site->name.'" tercatat. Buat perintah pasangnya.');
+        $progress = InstallProgress::forSites($rows->all());
+
+        return Inertia::render('sites/index', [
+            'sites' => $rows
+                ->map(fn (Site $site): array => $this->row($site) + [
+                    'environment' => $site->environment !== null
+                        ? ['id' => $site->environment->id, 'name' => $site->environment->name]
+                        : null,
+                    'progress' => $progress[$site->id],
+                ])
+                ->all(),
+        ]);
     }
 
     public function show(string $site, SiteOperations $operations): InertiaResponse
     {
-        $row = Site::query()->with('tenant:id,name')->whereKey($site)->firstOrFail();
+        $row = Site::query()->with(['tenant:id,name', 'environment:id,name'])->whereKey($site)->firstOrFail();
 
         // Tenggat yang habis ditutup sekarang, supaya layar tidak menampilkan operasi "berjalan" milik
         // agen yang sudah lama berhenti.
@@ -135,6 +108,9 @@ final class SiteScreens extends Controller
 
         return Inertia::render('sites/show', [
             'site' => $this->row($row) + [
+                'environment' => $row->environment !== null
+                    ? ['id' => $row->environment->id, 'name' => $row->environment->name]
+                    : null,
                 'address' => $row->address,
                 'profile' => $row->profile,
                 'updateWindow' => $row->updateWindow(),
@@ -154,6 +130,9 @@ final class SiteScreens extends Controller
                 ],
             ],
             'history' => $history,
+            // Daftar formulir "Minta operasi", dari server. `install` tidak ada di sana — lihat
+            // `SiteOperation::MANUAL_OPERATIONS` — walaupun riwayat di bawahnya dapat memuatnya.
+            'operations' => SiteOperation::MANUAL_OPERATIONS,
             'releases' => $releases,
             'audit' => $audit,
             'licenseKeyConfigured' => config('sites.license_private_key_path') !== null

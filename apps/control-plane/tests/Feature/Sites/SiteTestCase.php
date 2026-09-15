@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace ControlPlane\Tests\Feature\Sites;
 
+use ControlPlane\Models\Environment;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteEnrollmentToken;
+use ControlPlane\Models\SiteRelease;
 use ControlPlane\Models\User;
 use ControlPlane\Sites\SignedAgentRequest;
 use ControlPlane\Tests\CoreSchema;
@@ -132,6 +134,74 @@ abstract class SiteTestCase extends TestCase
         ]);
 
         return $tenantId;
+    }
+
+    /**
+     * Lingkungan produksi tenant ini yang berjalan di server klien — bentuk yang dilahirkan Core untuk
+     * `first_environment_hosting=client_server`.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    protected function clientServerEnvironment(string $tenantId, array $overrides = []): Environment
+    {
+        $id = (string) Str::ulid();
+
+        DB::table('environments')->insert([
+            'id' => $id,
+            'tenant_id' => $tenantId,
+            'kind' => 'production',
+            'name' => 'Produksi',
+            'slug' => 'produksi-'.Str::lower(Str::random(6)),
+            'database_name' => null,
+            'hosting' => 'client_server',
+            'status' => 'provisioning',
+            'outbound_allowed' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+            ...$overrides,
+        ]);
+
+        return Environment::query()->findOrFail($id);
+    }
+
+    /** Owner aktif tenant — admin pertama yang dilahirkan di server klien. */
+    protected function owner(string $tenantId, string $name = 'Dewi Pemilik', string $email = 'dewi@klinik.test', string $status = 'active'): int
+    {
+        $userId = DB::table('users')->insertGetId([
+            'name' => $name,
+            'email' => $email,
+            'password' => bcrypt('rahasia-owner'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('tenant_memberships')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'system_role' => 'owner',
+            'status' => $status,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $userId;
+    }
+
+    /** Rilis terdaftar dengan isi berkas tiruan. */
+    protected function release(string $release, string $edition = Site::SINGLE_IMAGE_EDITION): SiteRelease
+    {
+        return SiteRelease::query()->create([
+            'edition' => $edition,
+            'release' => $release,
+            'image' => 'ghcr.io/x@sha256:'.str_repeat('a', 64),
+            'digest' => 'sha256:'.str_repeat('b', 64),
+            'manifest' => '{}',
+            'compose' => '',
+            'update_script' => '',
+            'checksums' => '',
+            'signature' => base64_encode('x'),
+        ]);
     }
 
     /** @param  array<string, mixed>  $attributes */

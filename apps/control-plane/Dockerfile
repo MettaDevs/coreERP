@@ -67,6 +67,13 @@ WORKDIR /repo
 COPY --from=vendor /repo/apps/control-plane ./apps/control-plane
 COPY --from=assets /repo/apps/control-plane/public/build ./apps/control-plane/public/build
 
+# Berkas pemasang yang disajikan konsol ke server klien (`/pasang.sh`, `/agen/*`), diambil dari commit
+# yang sama dengan konsol ini. Susunan repo ditirukan supaya `InstallerFiles` membacanya dari jalur yang
+# sama di laptop pengembang dan di image. Hanya berkas yang disajikan yang disalin — suite test agen
+# dan dokumennya tidak punya urusan di server.
+COPY deploy/agent/pasang.sh deploy/agent/coreerp-agent deploy/agent/coreerp-agent.service deploy/agent/coreerp-agent.timer deploy/agent/env.template ./deploy/agent/
+COPY scripts/update.sh ./scripts/update.sh
+
 # Suite test tidak ikut ke server. Ia bukan bagian runtime, dan berkas resep pembangunannya pun
 # tidak: sebuah image runtime tidak punya keperluan apa pun dengan Dockerfile yang membangunnya.
 RUN rm -rf apps/control-plane/tests && rm -f apps/control-plane/Dockerfile

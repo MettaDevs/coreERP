@@ -29,6 +29,15 @@ class Store extends Controller
                 'date',
                 'after:today',
             ],
+            // Tempat produksinya berjalan. Hanya bermakna untuk produksi — demo dan sandbox selalu di
+            // server kita — jadi selain produksi nilainya dibuang, bukan ditolak: formulir yang
+            // berpindah dari produksi ke demo tidak boleh gagal karena pilihan yang sudah tidak
+            // tampil. Core menolak kombinasi yang salah sekali lagi di pintunya sendiri.
+            'first_environment_hosting' => [
+                'exclude_unless:first_environment,production',
+                'sometimes',
+                'in:provider,client_server',
+            ],
             // Bentuknya diperiksa di sini, **ketersediaannya tidak**. Yang tahu app mana tersedia,
             // apa prerequisite-nya, dan apakah ia ada di edisi ini hanyalah Core — dan ia memang
             // memeriksanya saat permintaannya tiba. Menyalin pemeriksaan itu ke sini berarti dua
@@ -64,6 +73,7 @@ class Store extends Controller
                 isset($input['first_environment_expires_at']) && is_string($input['first_environment_expires_at'])
                     ? $input['first_environment_expires_at']
                     : null,
+                ($input['first_environment_hosting'] ?? null) === 'client_server' ? 'client_server' : 'provider',
             );
         } catch (CustomerRejected $rejected) {
             // Penolakan Core dipulangkan sebagai kesalahan formulir, bukan halaman 500. Keduanya
