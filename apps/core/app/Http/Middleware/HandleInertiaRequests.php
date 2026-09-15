@@ -69,8 +69,10 @@ class HandleInertiaRequests extends Middleware
              * Tamu memperoleh null tanpa pembacaan apa pun: halaman masuk tidak memuat spanduknya,
              * dan keadaan pemasangan tidak perlu diumumkan kepada orang yang belum dikenal.
              *
-             * Tidak ada yang lain membaca nilai ini untuk memutuskan boleh-tidaknya sesuatu. Lisensi
-             * adalah tanda, bukan kunci — lihat App\Support\License\SiteLicense.
+             * Peramban tidak memutuskan apa pun dari nilai ini. Yang mengunci dan menyaring app
+             * adalah server — `EnforceSiteLicense` dan `SiteLicense::allowsApp()` — jadi halaman yang
+             * disunting di peramban tidak membuka apa pun. Pengguna tenant yang terkunci tidak pernah
+             * melihat spanduk ini; yang melihatnya saat terkunci hanya akun provider.
              */
             'siteLicense' => fn (): ?array => $user ? app(SiteLicense::class)->state()->toArray() : null,
             'auth' => [
@@ -132,10 +134,17 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
+        // Disaring lisensi situs juga, bukan hanya daftar yang dapat diluncurkan. Peluncur menampilkan
+        // setiap produk di daftar ini — yang belum siap tetap tampil, hanya tidak dapat diklik, dan
+        // dihitung sebagai "N lainnya masih dipasang". App yang tidak dibeli tetapi barisnya
+        // ditambahkan langsung di database server klien tidak boleh muncul di sana sebagai janji.
+        $lisensi = app(SiteLicense::class);
+
         $entitledIds = $membership->tenant->entitlements()
             ->where('status', 'active')
             ->whereRaw('(ends_at is null or ends_at > ?)', [now()])
-            ->pluck('app_id');
+            ->pluck('app_id')
+            ->filter(fn (mixed $appId): bool => $lisensi->allowsApp((string) $appId));
         /** @var array<int, array<string, mixed>> $catalog */
         $catalog = $this->appCatalog();
 

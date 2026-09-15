@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\CoreApp;
 use App\Models\ModuleInstallation;
 use App\Models\TenantMembership;
+use App\Support\License\SiteLicense;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -106,9 +107,17 @@ class LaunchableAppCatalog
         // Satu penentu kesiapan, karena sekarang hanya ada satu jalur: sebuah app siap
         // diluncurkan bila catatan pemasangan module-nya berstatus terpasang. Tidak ada
         // artifact yang ditempatkan dan tidak ada runtime kedua yang perlu dinyatakan siap.
-        $readyAppIds = array_values(array_intersect(
-            $this->moduleTerpasang($membership),
-            $authorizedAppIds->map(strval(...))->all(),
+        //
+        // Lisensi situs menyaring sesudahnya. Pemasangan dan izin sama-sama tinggal di database
+        // server klien, dan database itu dapat diubah siapa pun yang memegang server-nya; daftar
+        // app di lisensi bertanda tangan tidak. Peluncur, `/apps/{app}`, dan `launch-manifest`
+        // semuanya membaca daftar ini, jadi saringan di sini menutup ketiganya sekaligus.
+        $readyAppIds = array_values(array_filter(
+            array_intersect(
+                $this->moduleTerpasang($membership),
+                $authorizedAppIds->map(strval(...))->all(),
+            ),
+            app(SiteLicense::class)->allowsApp(...),
         ));
 
         return array_values(

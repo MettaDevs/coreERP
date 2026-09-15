@@ -1,63 +1,68 @@
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import { usePage } from '@inertiajs/react';
 import { TriangleAlertIcon } from 'lucide-react';
-
-type SiteLicenseStatus =
-    'not_required' | 'missing' | 'invalid' | 'valid' | 'expiring' | 'expired';
+import { formatLicenseDate } from '@/lib/site-license';
+import type { SiteLicense } from '@/lib/site-license';
 
 type SharedProps = {
-    siteLicense: {
-        status: SiteLicenseStatus;
-        validUntil: string | null;
-    } | null;
+    siteLicense: SiteLicense | null;
 };
 
-/**
- * `2027-09-14` menjadi `14 September 2027`.
- *
- * Diurai per bagian dan ditulis dalam UTC, bukan `new Date('2027-09-14')` biasa: bentuk itu dibaca
- * sebagai tengah malam UTC, lalu peramban yang zona waktunya di belakang UTC menampilkannya sebagai
- * tanggal sehari sebelumnya — tanggal berakhir yang salah justru pada kalimat yang menyebut tanggal.
- */
-function formatDate(value: string | null): string {
-    if (!value) {
-        return '';
+/** "hari ini", "besok", atau "dalam N hari" — angka nol dan satu tidak dibaca orang sebagai hitungan. */
+function remaining(daysLeft: number | null): string {
+    if (daysLeft === null || daysLeft <= 0) {
+        return 'hari ini';
     }
 
-    const [year, month, day] = value.split('-').map(Number);
+    if (daysLeft === 1) {
+        return 'besok';
+    }
 
-    return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(
-        'id-ID',
-        { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' },
-    );
+    return `dalam ${daysLeft} hari`;
 }
 
 function copyFor(
-    status: SiteLicenseStatus,
-    validUntil: string,
+    license: SiteLicense,
 ): { title: string; sentence: string } | null {
-    switch (status) {
+    const validUntil = formatLicenseDate(license.validUntil);
+
+    /*
+     * Dua nada, dan yang memilih adalah `required`, bukan keadaannya.
+     *
+     * Bila lisensi wajib, keadaan yang buruk berarti pengguna tenant sudah terkunci — satu-satunya
+     * yang masih melihat spanduk ini akun penyedia. Menulis "aplikasi tetap dapat dipakai" kepadanya
+     * adalah kalimat yang salah tepat pada saat yang paling penting. Bila tidak wajib, kalimat itu
+     * justru yang harus ada: orang yang membacanya di tengah pelayanan akan mengira pekerjaannya
+     * sebentar lagi terkunci dan berhenti menyimpan.
+     */
+    switch (license.status) {
         case 'expiring':
             return {
-                title: 'Masa lisensi segera berakhir',
-                sentence: `Lisensi berlaku sampai ${validUntil}. Hubungi penyedia untuk memperpanjang; aplikasi tetap dapat dipakai seperti biasa.`,
+                title: `Lisensi berakhir ${remaining(license.daysLeft)}`,
+                sentence: license.required
+                    ? `Lisensi aplikasi ini berlaku sampai ${validUntil}. Setelah itu aplikasi tidak dapat dibuka sampai lisensinya diperpanjang. Hubungi penyedia aplikasi sekarang.`
+                    : `Lisensi berlaku sampai ${validUntil}. Hubungi penyedia untuk memperpanjang; aplikasi tetap dapat dipakai seperti biasa.`,
             };
         case 'expired':
             return {
                 title: 'Masa lisensi sudah berakhir',
-                sentence: `Masa lisensi berakhir pada ${validUntil}. Aplikasi tetap dapat dipakai; hubungi penyedia untuk memperpanjang.`,
+                sentence: license.required
+                    ? `Masa lisensi berakhir pada ${validUntil}. Pengguna lain tidak dapat membuka aplikasi sampai lisensinya diperpanjang.`
+                    : `Masa lisensi berakhir pada ${validUntil}. Aplikasi tetap dapat dipakai; hubungi penyedia untuk memperpanjang.`,
             };
         case 'missing':
             return {
                 title: 'Lisensi belum terpasang',
-                sentence:
-                    'Lisensi tidak ditemukan di server ini. Aplikasi tetap dapat dipakai; hubungi penyedia untuk memasangnya.',
+                sentence: license.required
+                    ? 'Lisensi tidak ditemukan. Pengguna lain tidak dapat membuka aplikasi sampai lisensinya dipasang.'
+                    : 'Lisensi tidak ditemukan. Aplikasi tetap dapat dipakai; hubungi penyedia untuk memasangnya.',
             };
         case 'invalid':
             return {
                 title: 'Lisensi tidak dapat diperiksa',
-                sentence:
-                    'Lisensi di server ini tidak dapat dipastikan keasliannya. Aplikasi tetap dapat dipakai; hubungi penyedia untuk menggantinya.',
+                sentence: license.required
+                    ? 'Keaslian lisensi tidak dapat dipastikan. Pengguna lain tidak dapat membuka aplikasi sampai lisensinya diganti.'
+                    : 'Keaslian lisensi tidak dapat dipastikan. Aplikasi tetap dapat dipakai; hubungi penyedia untuk menggantinya.',
             };
         default:
             return null;
@@ -65,12 +70,11 @@ function copyFor(
 }
 
 /**
- * Memberi tahu bahwa lisensi pemasangan ini perlu diurus — tanpa menghalangi apa pun.
+ * Memberi tahu bahwa lisensi pemasangan ini perlu diurus.
  *
- * Lisensi adalah tanda, bukan kunci. Pelanggan on-prem kita fasilitas kesehatan, jadi yang boleh
- * dilakukan lisensi yang habis hanya satu: memberi tahu. Karena itu setiap kalimat menyebut bahwa
- * aplikasi tetap dapat dipakai — tanpa itu, orang yang membacanya di tengah pelayanan akan mengira
- * pekerjaannya sebentar lagi terkunci dan berhenti menyimpan.
+ * Spanduk ini tidak menghalangi apa pun; yang mengunci server. Ia tampil selama lisensi segera
+ * berakhir — tujuh hari sebelumnya, dan dalam keadaan sehat tidak pernah, karena lisensi diperpanjang
+ * otomatis jauh sebelum itu. Begitu ia terlihat, perpanjangannya sudah gagal beberapa kali.
  *
  * Tidak dapat ditutup, sama seperti spanduk lingkungan: yang dapat ditutup ditutup pada hari
  * pertama, lalu tidak terlihat lagi justru ketika tanggalnya lewat.
@@ -82,21 +86,25 @@ export default function SiteLicenseBanner() {
         return null;
     }
 
-    const copy = copyFor(
-        siteLicense.status,
-        formatDate(siteLicense.validUntil),
-    );
+    const copy = copyFor(siteLicense);
 
     if (!copy) {
         return null;
     }
+
+    // Merah untuk keadaan yang sudah mengunci pengguna lain, dan untuk lisensi yang sudah habis.
+    // Yang segera berakhir tetap netral: ia masih peringatan, bukan kejadian.
+    const locksOthers =
+        siteLicense.required && siteLicense.status !== 'expiring';
 
     return (
         <div className="px-4 pt-3">
             <Alert
                 role="status"
                 variant={
-                    siteLicense.status === 'expired' ? 'destructive' : 'default'
+                    locksOthers || siteLicense.status === 'expired'
+                        ? 'destructive'
+                        : 'default'
                 }
             >
                 <TriangleAlertIcon />
