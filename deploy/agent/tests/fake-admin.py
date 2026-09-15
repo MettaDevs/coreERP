@@ -402,9 +402,16 @@ class Penangan(BaseHTTPRequestHandler):
         data = self.json_isi(isi, '/agent/v1/report', 'post')
         if data['site_id'] != situs:
             raise Tolak(422, 'invalid', 'site_id berbeda dari keyid')
+        jawaban = {'interval_seconds': self.admin.interval}
         with self.admin.kunci:
-            self.admin.laporan.append({'site_id': situs, 'isi': data})
-        return self.json_jawaban(200, {'interval_seconds': self.admin.interval}, '/agent/v1/report', 'post')
+            # Lisensi titipan pengujian ikut di jawaban laporan berikutnya saja, lalu dibuang — seperti
+            # admin.erp sungguhan yang berhenti menyertakannya begitu perpanjangan tidak lagi jatuh tempo.
+            # Keputusan jatuh tempo milik admin.erp, bukan agen, jadi tidak ditirukan di sini.
+            lisensi = self.admin.situs.get(situs, {}).pop('lisensi_laporan', None)
+            if lisensi is not None:
+                jawaban['license'] = lisensi
+            self.admin.laporan.append({'site_id': situs, 'isi': data, 'lisensi_dijawab': lisensi is not None})
+        return self.json_jawaban(200, jawaban, '/agent/v1/report', 'post')
 
     def klaim(self, situs, isi):
         self.json_isi(isi, '/agent/v1/operations/claim', 'post')
@@ -537,6 +544,12 @@ class Penangan(BaseHTTPRequestHandler):
         if metode == 'post' and m:
             with self.admin.kunci:
                 self.admin.situs[m.group(1)]['putus_ganti_kunci'] = True
+            return 200, b'{}', 'application/json'
+
+        m = re.fullmatch(r'/_test/sites/([^/]+)/lisensi-laporan', jalur)
+        if metode == 'post' and m:
+            with self.admin.kunci:
+                self.admin.situs[m.group(1)]['lisensi_laporan'] = data
             return 200, b'{}', 'application/json'
 
         m = re.fullmatch(r'/_test/operations/([^/]+)/expire', jalur)

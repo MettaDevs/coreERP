@@ -503,10 +503,41 @@ tanggal_habis_lisensi() {
     fi
 }
 
+# Mencetak `true`, `false`, atau `null` — nilai JSON `license_required` di laporan.
+#
+# Root di server klien dapat mematikan kunci lisensi dengan satu baris `.env`, dan agen tidak dapat
+# mencegahnya. Yang dapat dilakukan agen: melaporkan apa yang akan dilihat Core, supaya admin.erp tahu.
+#
+# Yang dibaca `.env` yang sama dengan yang diberikan update.sh ke Compose. Compose memakai baris terakhir
+# untuk kunci yang disebut dua kali, jadi baris terakhir yang menentukan — `=false` yang ditambahkan di
+# bawah `=true` tetap berarti mati. `true` hanya untuk bentuk yang persis; kutip, spasi, komentar di ujung,
+# atau `export` dilaporkan `false`. Keliru ke arah itu hanya menyalakan peringatan yang lalu diperiksa
+# orang; keliru ke arah sebaliknya menyembunyikan kunci yang dimatikan.
+lisensi_diwajibkan() {
+    local baris status=0
+
+    baris="$(grep -E '^[[:space:]]*(export[[:space:]]+)?COREERP_LICENSE_REQUIRED[[:space:]]*=' "$BERKAS_ENV" 2>/dev/null \
+        | tail -n 1)" || status=$?
+
+    case "$status" in
+        0) ;;
+        # Kuncinya tidak disebut: Compose memakai bawaan false.
+        1) printf 'false'; return 0 ;;
+        # Berkasnya tidak ada atau tidak terbaca. Yang tidak diketahui tidak dilaporkan sebagai false.
+        *) printf 'null'; return 0 ;;
+    esac
+
+    if [ "$baris" = 'COREERP_LICENSE_REQUIRED=true' ]; then
+        printf 'true'
+    else
+        printf 'false'
+    fi
+}
+
 # Setiap kunci laporan disebut satu per satu. Tidak ada `+ $keadaan` atau salinan utuh dari berkas
 # lain: kunci baru di state.json tidak boleh ikut keluar hanya karena seseorang menambahkannya di sana.
 susun_laporan() {
-    local tujuan="$1" sekarang kontainer data cadangan lisensi
+    local tujuan="$1" sekarang kontainer data cadangan lisensi wajib
 
     sekarang="$(sekarang_utc)"
     kontainer="$SEMENTARA/kontainer.json"
@@ -515,6 +546,7 @@ susun_laporan() {
     data="$(ruang_bebas "$(folder_data)")"
     cadangan="$(ruang_bebas "$FOLDER_CADANGAN")"
     lisensi="$(tanggal_habis_lisensi)"
+    wajib="$(lisensi_diwajibkan)"
 
     jq -c -n \
         --arg site_id "$SITUS_ID" \
@@ -523,6 +555,7 @@ susun_laporan() {
         --arg data "$data" \
         --arg cadangan "$cadangan" \
         --arg lisensi "$lisensi" \
+        --argjson wajib "$wajib" \
         --slurpfile keadaan "$BERKAS_KEADAAN" \
         --slurpfile kontainer "$kontainer" '
         def angka($s): if ($s | test("^[0-9]+$")) then ($s | tonumber) else null end;
@@ -550,12 +583,32 @@ susun_laporan() {
                 else null end
             ),
             certificate_expires_at: null,
-            license_expires_at: teks($lisensi)
+            license_expires_at: teks($lisensi),
+            license_required: $wajib
           }
         | if .containers == null then del(.containers) else . end' > "$tujuan"
 }
 
-# Mencetak kode HTTP. Interval dari admin.erp disimpan di site.json dan dipakai sebagai jeda putaran.
+# Perpanjangan lisensi datang di jawaban laporan saat jatuh tempo — tanpa penjadwal di server ini dan tanpa
+# operator yang harus mengingatnya. Keluarannya hanya ke stderr: stdout kirim_laporan adalah kode HTTP.
+#
+# Gagal memasang tidak menggagalkan laporan maupun putaran. Lisensi yang terpasang tetap berlaku sampai
+# tanggalnya, laporan berikutnya masih menyebut tanggal lama, dan admin.erp menyertakan lisensi lagi sesudah
+# jedanya. Putaran yang berhenti di sini justru tidak lagi mengambil operasi yang dapat memperbaikinya.
+pasang_lisensi_dari_laporan() {
+    local jawaban="$1"
+
+    jq -e 'type == "object" and has("license")' "$jawaban" >/dev/null 2>&1 || return 0
+
+    if pasang_lisensi "$jawaban" '.license'; then
+        catat "Lisensi dari admin.erp terpasang, berlaku sampai $(tanggal_habis_lisensi)."
+    else
+        catat "Lisensi dari admin.erp DITOLAK dan tidak dipasang: $ALASAN. Lisensi yang terpasang tidak diubah."
+    fi
+}
+
+# Mencetak kode HTTP. Interval dari admin.erp disimpan di site.json dan dipakai sebagai jeda putaran;
+# lisensi yang disertakan admin.erp dipasang.
 kirim_laporan() {
     local isi="$SEMENTARA/laporan.json" jawaban="$SEMENTARA/laporan-jawaban.json" kode interval
 
@@ -572,6 +625,8 @@ kirim_laporan() {
 
         # shellcheck disable=SC2016 # variabel jq
         ubah_keadaan --argjson t "$(date +%s)" '.last_report_epoch = $t'
+
+        pasang_lisensi_dari_laporan "$jawaban"
     fi
 
     printf '%s' "$kode"
@@ -983,12 +1038,23 @@ ambil_lisensi() {
 
 # pasang_lisensi BERKAS_JSON FILTER — pulang 1 dengan ALASAN bila ditolak.
 #
-# Kunci pemeriksanya kunci lisensi yang datang dari admin.erp, bukan kunci rilis. Lisensi hanya
-# menyalakan atau memadamkan peringatan di Core — tidak mengunci dan tidak membuka apa pun — jadi lisensi
-# palsu dari admin.erp yang dibobol hanya menyembunyikan peringatan.
+# Satu-satunya jalan lisensi masuk ke folder lisensi. Operasi `install_license` dan jawaban laporan
+# sama-sama memanggilnya, supaya perpanjangan otomatis — yang tidak dilihat siapa pun — tidak pernah
+# diperiksa lebih longgar daripada pemasangan yang diminta operator.
+#
+# Lisensi versi 2 **mengunci**. Core yang mewajibkan lisensi hanya membuka app yang disebut `apps`, dan
+# lisensi yang tidak dapat dibacanya mengunci seluruh tenant. Karena itu semua pemeriksaan selesai sebelum
+# lisensi yang terpasang disentuh: lisensi yang akan ditolak Core tidak boleh menggantikan lisensi yang
+# masih diterimanya. Yang ditolak di sini, lisensi lama tetap berlaku sampai tanggalnya sendiri.
+#
+# Kunci pemeriksanya kunci lisensi yang diantar admin.erp saat pendaftaran, bukan kunci rilis. admin.erp
+# memang sumber kebenaran app yang dibeli; lisensi menentukan app yang boleh dibuka, tetapi tidak dapat
+# mengganti kode yang berjalan. Yang dijaga di sini lisensi yang rusak di jalan, lisensi milik situs lain,
+# dan bentuk yang tidak dibaca Core.
 pasang_lisensi() {
-    local sumber="$1" filter="$2" kunci="$FOLDER_LISENSI/license-public.pem" situs_lisensi
+    local sumber="$1" filter="$2" kunci="$FOLDER_LISENSI/license-public.pem" situs_lisensi berlaku
     local lisensi="$SEMENTARA/lisensi.json" tanda="$SEMENTARA/lisensi.sig"
+    local baru="$FOLDER_LISENSI/.license.json.baru" baru_tanda="$FOLDER_LISENSI/.license.json.sig.baru"
 
     ambil_lisensi "$sumber" "$filter" || return 1
 
@@ -1001,20 +1067,55 @@ pasang_lisensi() {
 
     jq -e 'type == "object"' "$lisensi" >/dev/null 2>&1 || { tolak 'lisensi bukan objek JSON'; return 1; }
 
-    situs_lisensi="$(jq -r '.site_id // "" | tostring' "$lisensi")"
+    # Situs yang tidak disebut ditolak seperti situs lain. Kunci publik lisensi sama untuk semua situs, jadi
+    # lisensi tanpa situs dapat dipasang di server mana pun — termasuk lisensi tenant lain dengan app lebih
+    # banyak.
+    # shellcheck disable=SC2016 # $s adalah variabel jq
+    if ! jq -e --arg s "$SITUS_ID" '.site_id == $s' "$lisensi" >/dev/null 2>&1; then
+        situs_lisensi="$(jq -r 'if (.site_id | type) == "string" then .site_id[0:100] else "" end' "$lisensi")"
 
-    if [ -n "$situs_lisensi" ] && [ "$situs_lisensi" != "$SITUS_ID" ]; then
-        tolak "lisensi ini untuk situs $situs_lisensi, bukan situs ini"
+        if [ -z "$situs_lisensi" ]; then
+            tolak 'lisensi tidak menyebut situs; lisensi tanpa situs tidak dipasang'
+        else
+            tolak "lisensi ini untuk situs $situs_lisensi, bukan situs ini"
+        fi
         return 1
     fi
 
-    # Byte lisensi disalin persis — tanda tangannya atas byte itu, dan Core dapat memeriksanya lagi.
-    install -m 0644 "$lisensi" "$FOLDER_LISENSI/.license.json.baru"
-    base64 -w0 "$tanda" > "$FOLDER_LISENSI/.license.json.sig.baru"
-    chmod 0644 "$FOLDER_LISENSI/.license.json.sig.baru"
+    # Core membaca tepat satu versi. Versi lain yang terpasang terbaca tidak sah, dan itu mengunci.
+    jq -e '.version == 2' "$lisensi" >/dev/null 2>&1 \
+        || { tolak 'lisensi bukan format versi 2; agen hanya memasang versi yang dibaca Core'; return 1; }
 
-    mv -f "$FOLDER_LISENSI/.license.json.sig.baru" "$FOLDER_LISENSI/license.json.sig"
-    mv -f "$FOLDER_LISENSI/.license.json.baru" "$FOLDER_LISENSI/license.json"
+    # `\A` dan `\z`, bukan `^` dan `$`: jq memakai Oniguruma, dan di sana `$` juga cocok sebelum baris baru —
+    # "human-resources\n" akan lolos sebagai id app.
+    jq -e '(.apps | type) == "array"
+        and all(.apps[]; type == "string" and test("\\A[a-z0-9][a-z0-9-]*\\z"))' "$lisensi" >/dev/null 2>&1 \
+        || { tolak 'apps di lisensi bukan larik id app (huruf kecil, angka, dan tanda minus)'; return 1; }
+
+    jq -e '(.valid_until | type) == "string" and (.valid_until | test("\\A[0-9]{4}-[0-9]{2}-[0-9]{2}\\z"))' \
+        "$lisensi" >/dev/null 2>&1 \
+        || { tolak 'valid_until di lisensi bukan tanggal berbentuk YYYY-MM-DD'; return 1; }
+
+    # Bentuk yang benar belum tentu tanggal yang ada. Core menolak 2027-02-30, jadi agen juga.
+    berlaku="$(jq -r '.valid_until' "$lisensi")"
+    if [ "$(date -u -d "$berlaku" +%Y-%m-%d 2>/dev/null || true)" != "$berlaku" ]; then
+        tolak "valid_until di lisensi bukan tanggal kalender: $berlaku"
+        return 1
+    fi
+
+    # Byte lisensi disalin persis — tanda tangannya atas byte itu, dan Core memeriksanya lagi. Setiap tulisan
+    # diperiksa sendiri: fungsi ini dipanggil dari dalam `if`, tempat `set -e` tidak menghentikan apa pun,
+    # dan tanda tangan yang terpotong karena disk penuh lalu diganti namanya akan mengunci situs ini.
+    if ! install -m 0644 "$lisensi" "$baru" \
+        || ! base64 -w0 "$tanda" > "$baru_tanda" \
+        || ! chmod 0644 "$baru_tanda"; then
+        rm -f "$baru" "$baru_tanda"
+        tolak "lisensi tidak dapat ditulis ke $FOLDER_LISENSI"
+        return 1
+    fi
+
+    mv -f "$baru_tanda" "$FOLDER_LISENSI/license.json.sig"
+    mv -f "$baru" "$FOLDER_LISENSI/license.json"
 }
 
 operasi_lisensi() {

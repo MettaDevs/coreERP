@@ -50,6 +50,21 @@ Operasi dari admin.erp — daftar tertutup, yang lain dilaporkan `failed` dengan
 terpasang, atau nomornya tidak lebih besar dari yang terpasang. Nomor yang dibandingkan adalah nomor di
 `manifest.json` yang ditandatangani, dan nomor itu juga harus sama dengan yang diminta admin.erp.
 
+## Lisensi
+
+Lisensi format versi 2 mengunci Core bila `.env` menyetel `COREERP_LICENSE_REQUIRED=true`, yang ditulis
+`env.template`. Rancangannya di `docs/todo/lisensi-mengunci/README.md`.
+
+Lisensi datang lewat dua jalan: operasi `install_license`, dan jawaban laporan yang membawa `license` saat
+admin.erp menilai perpanjangan jatuh tempo. Keduanya lewat `pasang_lisensi`, yang menolak tanda tangan
+yang tidak sah terhadap `license/license-public.pem`, `site_id` yang bukan situs ini, `version` selain `2`,
+`apps` yang bukan larik id app, dan `valid_until` yang bukan tanggal kalender. Lisensi yang ditolak tidak
+menyentuh yang terpasang. Penolakan dari jawaban laporan dicatat di keluaran agen dan tidak menggagalkan
+putaran; admin.erp melihatnya sebagai `license_expires_at` yang tidak bergerak.
+
+Laporan membawa `license_required`: `true` hanya bila baris terakhir untuk kunci itu di `.env` tertulis
+persis `COREERP_LICENSE_REQUIRED=true`, `false` untuk bentuk lain, `null` bila `.env` tidak terbaca.
+
 ## Memasang
 
 Selain `--admin-url`, `--token`, dan `--ref`, `pasang.sh` menerima:

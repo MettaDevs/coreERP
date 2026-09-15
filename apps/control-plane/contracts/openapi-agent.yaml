@@ -134,6 +134,17 @@ paths:
                 properties:
                   interval_seconds:
                     type: integer
+                  license:
+                    $ref: '#/components/schemas/SignedLicense'
+                    description: |
+                      Lisensi baru, disertakan **hanya saat perpanjangan jatuh tempo**: situs tidak dicabut,
+                      perpanjangannya tidak dihentikan, `license_expires_at` di laporan ini kosong atau ≤ hari
+                      ini + `license_renew_before_days`, dan lisensi terakhir diterbitkan lebih lama dari
+                      `license_renew_cooldown_minutes` yang lalu. Di luar itu kuncinya tidak ada.
+
+                      Agen memasangnya lewat pemeriksaan yang sama dengan operasi `install_license`. Lisensi
+                      yang ditolak agen tidak menggantikan yang terpasang dan tidak menggagalkan putaran; ia
+                      terlihat di admin.erp sebagai `license_expires_at` yang tidak bergerak.
         '401':
           $ref: '#/components/responses/SignatureInvalid'
         '422':
@@ -408,9 +419,10 @@ components:
         license_public_key:
           type: [string, 'null']
           description: |
-            Kunci publik lisensi dalam PEM. Kunci ini milik admin.erp — lisensi palsu hanya
-            menyembunyikan peringatan, tidak membuka apa pun. Kunci publik **rilis** tidak pernah
-            datang dari sini.
+            Kunci publik lisensi dalam PEM, pemeriksa `SignedLicense` di agen dan di Core. Pasangan
+            privatnya dipegang admin.erp, yang memang sumber kebenaran app yang dibeli: lisensi
+            menentukan app mana yang boleh dibuka, tetapi tidak dapat mengganti kode yang berjalan.
+            Kunci publik **rilis** tidak pernah datang dari sini.
 
     UpdateWindow:
       type: [object, 'null']
@@ -438,9 +450,9 @@ components:
           enum: [upgrade, backup, install_license, rotate_key, send_diagnostics]
         parameters:
           description: |
-            `upgrade`: `{edition, release}`. `install_license`: `{license, signature}` — `license`
-            string JSON persis yang ditandatangani, `signature` base64 RSA SHA-256 atasnya. Operasi
-            lain: objek kosong.
+            `upgrade`: `{edition, release}`. `install_license`: `{license, signature}` berbentuk
+            `SignedLicense` — lisensi format versi 2, diperiksa agen persis seperti lisensi di jawaban
+            laporan. Operasi lain: objek kosong.
           type: object
         lease_until:
           type: string
@@ -531,3 +543,45 @@ components:
         license_expires_at:
           type: [string, 'null']
           format: date
+        license_required:
+          type: [boolean, 'null']
+          description: |
+            Apakah `.env` pemasangan mewajibkan lisensi: `true` hanya bila baris terakhir untuk
+            `COREERP_LICENSE_REQUIRED` tertulis persis `COREERP_LICENSE_REQUIRED=true`, `false` untuk
+            bentuk lain atau bila kuncinya tidak ada, `null` bila `.env` tidak dapat dibaca. Nilainya
+            dapat diubah root di server klien; situs on-prem dikelola yang melaporkan `false` berarti
+            kunci lisensinya mati, dan admin.erp menampilkan peringatan.
+
+    SignedLicense:
+      type: object
+      additionalProperties: false
+      required: [license, signature]
+      description: |
+        Lisensi situs bertanda tangan, **format versi 2**. Bentuk yang sama dipakai parameter operasi
+        `install_license` dan jawaban laporan.
+
+        `license` adalah byte persis yang ditandatangani, dan agen menyalinnya apa adanya ke
+        `license.json`:
+
+        ```json
+        {"version":2,"tenant_id":"01J...","site_id":"01J...","apps":["human-resources","management-aset"],"valid_until":"2026-10-15","issued_at":"2026-09-15T08:00:00Z"}
+        ```
+
+        | Bidang | Aturan |
+        | --- | --- |
+        | `version` | tepat `2`; versi lain ditolak |
+        | `site_id` | id situs penerima |
+        | `apps` | id app `^[a-z0-9][a-z0-9-]*$`, unik, terurut; boleh kosong (hanya Core) |
+        | `valid_until` | tanggal kalender `YYYY-MM-DD`; hari itu masih berlaku |
+
+        Agen menolak lisensi yang tanda tangannya tidak sah terhadap kunci publik lisensi yang
+        diterimanya saat pendaftaran, yang `site_id`-nya bukan situs itu, yang `version`-nya bukan
+        `2`, yang `apps`-nya bukan larik id app, atau yang `valid_until`-nya bukan tanggal kalender.
+        Lisensi yang ditolak tidak menggantikan lisensi yang terpasang.
+      properties:
+        license:
+          type: string
+          description: JSON lisensi versi 2, byte persis yang ditandatangani.
+        signature:
+          type: string
+          description: Base64 satu baris dari tanda tangan RSA PKCS#1 v1.5 SHA-256 atas byte `license`.
