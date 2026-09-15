@@ -212,19 +212,23 @@ export default function Show({
                                 >
                                     {environment.url}
                                 </a>
-                                {onClientServer ? (
-                                    <span className="ms-2 text-xs text-muted-foreground">
-                                        — terbuka setelah record DNS dan
-                                        pemasangan di server klien selesai
-                                    </span>
-                                ) : (
-                                    environment.status !== 'active' && (
-                                        <span className="ms-2 text-xs text-muted-foreground">
-                                            — belum dapat dibuka sampai
-                                            statusnya Aktif
-                                        </span>
-                                    )
-                                )}
+                                {onClientServer
+                                    ? // Hanya selama belum terpasang. Server yang sudah melapor, atau pernah
+                                      // melapor lalu berhenti, sudah melewati kedua langkah itu.
+                                      !['ready', 'stale'].includes(
+                                          serverClient?.progress.state ?? '',
+                                      ) && (
+                                          <span className="ms-2 text-xs text-muted-foreground">
+                                              — terbuka setelah record DNS dan
+                                              pemasangan di server klien selesai
+                                          </span>
+                                      )
+                                    : environment.status !== 'active' && (
+                                          <span className="ms-2 text-xs text-muted-foreground">
+                                              — belum dapat dibuka sampai
+                                              statusnya Aktif
+                                          </span>
+                                      )}
                             </Row>
                         )}
                         <Row label="Jenis">
