@@ -1,20 +1,26 @@
 # Opt-in: satu image untuk semua klien on-prem dikelola
 
-**Status: opt-in, tidak sedang dikerjakan.** Ditulis 14 September 2026 dari percakapan dengan pemilik
-produk. Halaman ini baru diambil kalau pemilik produk memintanya. Sampai saat itu, yang berlaku
-adalah skema di [On-prem yang dikelola vendor](/todo/on-prem-dikelola/): paket **per kombinasi modul**,
-dirakit di server kita sendiri, lalu disajikan admin.erp ke agen.
+::: warning Sebagian besar sudah diputuskan pada 15 September 2026
+A, B, dan C diambil. E diputuskan **bukan** GHCR dan bukan tarball lewat admin.erp, melainkan registry
+sendiri dengan Harbor. Rinciannya, beserta TODO-nya, berlaku dari
+[Registry image sendiri dengan Harbor](/todo/registry-harbor/). Yang masih opt-in hanya D.
+
+Isi di bawah dibiarkan apa adanya sebagai catatan pertimbangan. Hasil ukur di bagian C sudah
+diperbarui: image ramping terukur 99,4 MB, bukan perkiraan.
+:::
+
+**Status awal: opt-in.** Ditulis 14 September 2026 dari percakapan dengan pemilik produk.
 
 Isinya lima usulan yang **dapat dipilih satu per satu**. Tidak ada yang saling mewajibkan, kecuali
 yang disebut di bagiannya.
 
-| | Usulan | Pengganti untuk |
-| --- | --- | --- |
-| A | Satu image berisi semua modul untuk semua klien; app yang dapat dibuka diatur dari admin.erp | image per kombinasi modul |
-| B | Lisensi **mengunci**, dan isinya dibaca dari admin.erp | lisensi yang hanya memperingatkan |
-| C | Image dirampingkan: tanpa compiler dan header C | image berbasis `php:8.4-apache` apa adanya |
-| D | Versi hanya lahir dari tag (`v1.2.0`) | versi dari tanggal commit setiap kali paket diminta |
-| E | Tempat menyimpan image: GHCR, atau tetap admin.erp | admin.erp |
+| | Usulan | Pengganti untuk | Keadaan |
+| --- | --- | --- | --- |
+| A | Satu image berisi semua modul untuk semua klien; app yang dapat dibuka diatur dari admin.erp | image per kombinasi modul | **diputuskan** |
+| B | Lisensi **mengunci**, dan isinya dibaca dari admin.erp | lisensi yang hanya memperingatkan | **diputuskan** |
+| C | Image dirampingkan: tanpa compiler dan header C | image berbasis `php:8.4-apache` apa adanya | **diputuskan** |
+| D | Versi hanya lahir dari tag (`v1.2.0`) | versi dari tanggal commit setiap kali paket diminta | opt-in |
+| E | Tempat menyimpan image | admin.erp | **diputuskan: Harbor sendiri** |
 
 ## Yang sudah diukur
 
@@ -98,7 +104,19 @@ Cara merampingkannya:
 2. Tahap akhir memakai Debian slim dengan PHP 8.4 dan Apache tanpa compiler dan tanpa paket `-dev`. Yang
    disalin hanya hasil kompilasi ekstensinya dan library runtime yang dibutuhkannya.
 
-Perkiraan ukurannya 70–90 MB terkompres. **Angka itu belum diuji.**
+Perkiraan awalnya 70–90 MB. **Diukur 15 September 2026** dari image Core + seluruh modul, commit
+`e4d4e6b`:
+
+| Bentuk | Terkompres |
+| --- | --- |
+| `php:8.4-apache` apa adanya | 237,1 MB |
+| `debian:trixie-slim` + PHP 8.4 dari paket Debian | 113,5 MB |
+| Ditambah Perl dibuang | 99,4 MB |
+
+Perl ikut terpasang lewat klien PostgreSQL dan perkakas konfigurasi Apache, dan tidak dipakai saat
+aplikasi berjalan. Bentuk terakhir menjalankan seluruh migration terhadap PostgreSQL sungguhan,
+melayani halaman masuk, dan memuat ekstensi yang dibutuhkan. Cara membuangnya di percobaan itu masih
+mencabut paket secara paksa; versi produksinya adalah IMG-01 di halaman registry.
 
 `apps/core/Dockerfile` dipakai SaaS juga, jadi perubahannya diuji di kedua jalur: suite Core,
 `scripts/verify-edition.sh`, dan penyebaran dev.

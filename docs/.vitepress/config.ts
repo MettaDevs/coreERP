@@ -39,6 +39,7 @@ export default withMermaid({
     'todo/on-prem-dikelola/README.md': 'todo/on-prem-dikelola/index.md',
     'todo/opt-in-image-tunggal/README.md':
       'todo/opt-in-image-tunggal/index.md',
+    'todo/registry-harbor/README.md': 'todo/registry-harbor/index.md',
     'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
     'todo/environment-dan-pusat-admin/README.md':
       'todo/environment-dan-pusat-admin/index.md',
@@ -264,6 +265,10 @@ export default withMermaid({
                 {
                   text: 'On-prem yang dikelola vendor',
                   link: '/todo/on-prem-dikelola/',
+                },
+                {
+                  text: 'Registry image sendiri dengan Harbor',
+                  link: '/todo/registry-harbor/',
                 },
                 {
                   text: 'Opt-in: satu image untuk semua klien',
