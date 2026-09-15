@@ -3,6 +3,14 @@
 Rencana kerja, bukan desain kanonik. Ditulis 14 September 2026 setelah seorang calon klien meminta
 aplikasi **disewa**, **dipasang di server miliknya sendiri**, tetapi **tetap kita yang mengelola**.
 
+::: warning Bagian image dan distribusi rilis sudah digantikan
+Sejak 15 September 2026 image untuk server klien ditarik dari **Harbor milik kita sendiri**, satu image
+untuk semua klien, dan lisensi **mengunci**. Semua yang di halaman ini menyebut GHCR, image per edisi,
+`RELEASE_SIGNING_KEY` di GitHub, atau lisensi yang hanya memperingatkan berlaku dari
+[Registry image sendiri dengan Harbor](/todo/registry-harbor/), bukan dari sini. Sisanya — agen yang
+menarik, daftar operasi tertutup, kunci situs, dan tanda tangan permintaan — tetap berlaku.
+:::
+
 ## Pertanyaan yang harus dijawab halaman ini
 
 - Bagaimana admin provider mengelola server milik klien **hanya dari admin.erp**, tanpa SSH ke
