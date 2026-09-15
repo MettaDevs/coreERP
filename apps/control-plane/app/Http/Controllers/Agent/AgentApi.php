@@ -80,7 +80,7 @@ final class AgentApi extends Controller
             return response()->json(['error' => 'report_invalid'], 422);
         }
 
-        $reports->record($site, $report);
+        $reports->record($site, $report, $request->ip());
 
         $answer = ['interval_seconds' => (int) config('sites.interval_seconds')];
 

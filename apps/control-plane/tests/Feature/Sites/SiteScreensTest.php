@@ -14,6 +14,7 @@ use ControlPlane\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -66,6 +67,86 @@ class SiteScreensTest extends SiteTestCase
                 ->where('sites.1.environment', null)
                 ->where('sites.1.progress.state', 'ready')
                 ->where('sites.1.progress.reportedRelease', '0.3.0'));
+    }
+
+    /**
+     * Setiap baris membawa yang dicari operator di daftar server klien: alamat mesin, dari mana agen melapor,
+     * rilis terpasang terhadap rilis terbaru edisinya, dan masa lisensi — tanpa membuka rinciannya.
+     */
+    public function test_each_row_carries_its_address_release_and_license(): void
+    {
+        $this->release('0.3.0');
+        $this->release('0.10.0');
+        $this->release('9.9.9', 'apotek-sejahtera');
+
+        $site = $this->enrolledSite(0, [
+            'name' => 'Server Klinik Utara',
+            'edition' => Site::SINGLE_IMAGE_EDITION,
+            'server_address' => '103.122.2.72',
+            'reported_release' => '0.3.0',
+            'last_seen_at' => now(),
+        ]);
+        $site->forceFill(['last_seen_ip' => '36.72.1.9', 'license_issued_at' => now(), 'license_valid_until' => now()->addDays(5)->toDateString()])->save();
+
+        $this->actingAs($this->operator())->get('/situs')
+            ->assertInertia(fn ($page) => $page
+                ->where('sites.0.serverAddress', '103.122.2.72')
+                ->where('sites.0.lastSeenIp', '36.72.1.9')
+                ->where('sites.0.reportedRelease', '0.3.0')
+                // Dibandingkan sebagai angka dan per edisi: `0.10.0` di atas `0.3.0`, dan `9.9.9` milik edisi lain.
+                ->where('sites.0.newestRelease', '0.10.0')
+                ->where('sites.0.licenseValidUntil', now()->addDays(5)->toDateString())
+                ->where('sites.0.licenseSuspended', false)
+                ->where('sites.0.lastSeenIso', fn (string $iso): bool => str_contains($iso, 'T')));
+    }
+
+    /**
+     * "Tambah server klien" hanya menawarkan produksi di server klien yang belum punya server. Setiap bentuk
+     * lain di bawah pasti ditolak `ClientServerSetup`, jadi tidak boleh muncul sebagai pilihan.
+     */
+    public function test_only_client_server_productions_without_a_server_are_offered(): void
+    {
+        $free = $this->clientServerEnvironment($this->tenant('PT Belum Punya Server'));
+        $taken = $this->clientServerEnvironment($this->tenant('PT Sudah Punya Server'));
+        $this->site(['tenant_id' => $taken->tenant_id, 'environment_id' => $taken->id]);
+        $this->clientServerEnvironment($this->tenant('PT Dihapus'), [
+            'status' => 'soft_deleted', 'deleted_at' => now(), 'purge_after' => now()->addDays(30),
+        ]);
+
+        DB::table('environments')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->tenant('PT Server Kita'), 'kind' => 'production', 'name' => 'Produksi',
+            'slug' => 'produksi', 'hosting' => 'provider', 'status' => 'active', 'outbound_allowed' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->operator())->get('/situs')
+            ->assertInertia(fn ($page) => $page
+                ->has('candidates', 1)
+                ->where('candidates.0.id', $free->id)
+                ->where('candidates.0.tenant', 'PT Belum Punya Server'));
+    }
+
+    /**
+     * Situs yang punya lingkungan dipasang dari panel lingkungannya, yang membuat token dan operasi pasang
+     * sekaligus. Token saja dari halaman situs mendaftarkan agen yang tidak punya apa pun untuk dipasang.
+     * Situs lama tanpa lingkungan tetap boleh — test `the_install_command_is_shown_once...` di bawah.
+     */
+    public function test_a_site_with_an_environment_is_not_enrolled_from_the_site_page(): void
+    {
+        $environment = $this->clientServerEnvironment($this->tenant());
+        $site = $this->site(['tenant_id' => $environment->tenant_id, 'environment_id' => $environment->id]);
+
+        $this->actingAs($this->operator())
+            ->post("/situs/{$site->id}/pendaftaran", ['confirm_name' => $site->name])
+            ->assertSessionHasErrors(['operation' => 'Server klien ini dipasang dari halaman lingkungannya, lewat "Buat perintah pasang".']);
+
+        $this->assertSame(0, SiteEnrollmentToken::query()->count());
+        $this->assertSame(0, OperatorAuditEvent::query()->count());
+
+        $this->actingAs($this->operator('kedua@contoh.test'))->get("/situs/{$site->id}")
+            ->assertInertia(fn ($page) => $page
+                ->where('site.environment.id', $environment->id)
+                ->where('site.progress.state', 'no_command'));
     }
 
     public function test_non_operators_see_nothing(): void

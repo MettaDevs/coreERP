@@ -105,6 +105,28 @@ Yang ditemukan saat bagian-bagiannya dipertemukan:
 - Hash kata sandi sementara dijaga constraint PostgreSQL: operasi yang sudah ditutup tidak boleh lagi
   membawanya.
 
+### Sesudah dicoba pemilik produk dari admin.erp
+
+Tiga celah layar ditemukan saat pemilik produk menyiapkan uji di server kedua, dan ditutup di cabang
+`feat/konsol-hosting-situs`:
+
+- **Produksi di server klien hanya dapat lahir bersama tenant baru.** Dialog "Buat lingkungan" tidak
+  menanyakan tempat berjalan, jadi tenant yang produksinya dibuat belakangan tidak punya jalan ke server
+  klien. Kini dialog itu menawarkan **Server kita** atau **Server klien** untuk produksi, dan server menolak
+  server klien untuk jenis lain.
+- **Layar Situs tidak menjawab untuk apa ia ada.** Ia berganti kata menjadi **Server klien** (alamatnya tetap
+  `/situs`) dan menjadi daftar setiap VPS klien: alamat mesin, keadaan pemasangan, rilis terpasang terhadap
+  rilis terbaru, masa lisensi, dan kapan serta dari IP mana agen terakhir melapor. Tombol **Tambah server
+  klien** memilih produksi server klien yang belum punya server, lalu memakai pintu yang sama dengan panel
+  lingkungan — bukan formulir "Situs baru" yang dibuang PS-05.
+- **Alamat mesin tidak tercatat di mana pun.** `sites.address` adalah alamat aplikasi. Kolom baru
+  `sites.server_address` menyimpan IP atau nama host yang dicatat operator, dan `sites.last_seen_ip` asal
+  laporan agen terakhir. Keduanya boleh kosong, jadi kriteria "tanpa isian wajib" di bawah tetap berlaku.
+
+Dua penyesuaian ikut: produksi di server klien tidak lagi menampilkan alamat di domain kita (Core tidak
+merutekannya), dan keadaan `stale` berbunyi "Tidak melapor" alih-alih "Tertinggal" dari PS-05, karena
+daftar server klien kini juga menandai rilis yang tertinggal.
+
 ## Urutan
 
 1. PR #122 (jalur offline dibuang) dan PR #124 (fondasi Core) masuk.

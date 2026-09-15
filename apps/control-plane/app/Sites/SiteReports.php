@@ -87,8 +87,12 @@ final class SiteReports
         return $report;
     }
 
-    /** @param  array<string, mixed>  $report laporan yang sudah lolos `validate()` */
-    public function record(Site $site, array $report): void
+    /**
+     * @param  array<string, mixed>  $report  laporan yang sudah lolos `validate()`
+     * @param  ?string  $ip  alamat asal permintaan agen; di belakang Traefik ia terbaca benar karena proxy-nya
+     *                       dipercaya (`COREERP_TRUSTED_PROXIES`)
+     */
+    public function record(Site $site, array $report, ?string $ip = null): void
     {
         $comparable = array_diff_key($report, array_flip(self::VOLATILE));
         ksort($comparable);
@@ -96,12 +100,15 @@ final class SiteReports
 
         $reportedAt = Carbon::parse((string) $report['created_at']);
 
-        DB::transaction(function () use ($site, $report, $hash, $reportedAt): void {
+        DB::transaction(function () use ($site, $report, $hash, $reportedAt, $ip): void {
             $site->forceFill([
                 'reported_edition' => $report['edition'] ?? null,
                 'reported_release' => $report['release'] ?? null,
                 'reported_digest' => $report['digest'] ?? null,
                 'last_seen_at' => now(),
+                // Hanya bila alamatnya sah. Kolomnya 45 karakter — panjang IPv6 terpanjang — dan nilai
+                // lain dari header yang rusak tidak boleh menggagalkan laporan yang sudah sah.
+                'last_seen_ip' => filter_var($ip, FILTER_VALIDATE_IP) !== false ? $ip : $site->last_seen_ip,
                 'last_report' => $report,
             ])->save();
 

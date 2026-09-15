@@ -16,6 +16,7 @@ use ControlPlane\Http\Controllers\Logout;
 use ControlPlane\Http\Controllers\Settings;
 use ControlPlane\Http\Controllers\Sites\SiteActions;
 use ControlPlane\Http\Controllers\Sites\SiteScreens;
+use ControlPlane\Http\Controllers\Sites\SiteSettings;
 use ControlPlane\Http\Controllers\Sso\SsoBackchannelLogout;
 use ControlPlane\Http\Controllers\Sso\SsoLogin;
 use ControlPlane\Http\Controllers\Updates\Index as UpdateIndex;
@@ -93,13 +94,16 @@ Route::middleware(['auth', 'operator'])->group(function (): void {
     Route::post('/pembaruan/{lingkungan}', UpdateUpgrade::class)->name('updates.upgrade-one');
 
     /*
-     * Situs: server milik klien yang dikelola lewat agen. Setiap POST di bawah meminta nama situs
-     * diketik ulang dan menulis jejak audit — lihat `SiteActions`.
+     * Server klien (alamatnya tetap `/situs`): mesin milik klien yang dikelola lewat agen. Setiap POST di
+     * bawah meminta nama situs diketik ulang dan menulis jejak audit — lihat `SiteActions`. Setelan alamat
+     * dan jendela pembaruan tidak memerintah server klien, jadi ia PATCH tanpa konfirmasi (`SiteSettings`).
      *
-     * Tidak ada `POST /situs`: situs lahir dari panel "Server klien" di halaman lingkungannya.
+     * Tidak ada `POST /situs`: situs lahir dari `POST /lingkungan/{id}/server-klien`, baik dari panel di
+     * halaman lingkungan maupun dari tombol "Tambah server klien" di daftar ini.
      */
     Route::get('/situs', [SiteScreens::class, 'index'])->name('sites.index');
     Route::get('/situs/{situs}', [SiteScreens::class, 'show'])->name('sites.show');
+    Route::patch('/situs/{situs}/setelan', [SiteSettings::class, 'update'])->name('sites.settings.update');
     Route::post('/situs/{situs}/pendaftaran', [SiteActions::class, 'issueEnrollment'])->middleware('throttle:10,1')->name('sites.enrollment');
     Route::post('/situs/{situs}/operasi', [SiteActions::class, 'requestOperation'])->middleware('throttle:30,1')->name('sites.operations.request');
     Route::post('/situs/{situs}/operasi/{operasi}/batal', [SiteActions::class, 'cancelOperation'])->name('sites.operations.cancel');

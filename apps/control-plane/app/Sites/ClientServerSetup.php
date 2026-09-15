@@ -46,7 +46,7 @@ final class ClientServerSetup
     /**
      * Mencatat situs untuk lingkungan produksi di server klien.
      *
-     * @param  array{address?: ?string, update_window_start?: ?string, update_window_end?: ?string}  $settings
+     * @param  array{server_address?: ?string, address?: ?string, update_window_start?: ?string, update_window_end?: ?string}  $settings
      */
     public function prepare(Request $request, Environment $environment, array $settings): Site
     {
@@ -74,6 +74,7 @@ final class ClientServerSetup
                     'profile' => 'managed_on_prem',
                     'edition' => Site::SINGLE_IMAGE_EDITION,
                     'timezone' => self::DEFAULT_TIMEZONE,
+                    'server_address' => $settings['server_address'] ?? null,
                     'address' => $settings['address'] ?? null,
                     'update_window_start' => $settings['update_window_start'] ?? null,
                     'update_window_end' => $settings['update_window_end'] ?? null,
@@ -84,6 +85,7 @@ final class ClientServerSetup
                     'tenant_id' => $site->tenant_id,
                     'environment_id' => $environment->id,
                     'edition' => $site->edition,
+                    'server_address' => $site->server_address,
                 ]);
 
                 return $site;
@@ -102,9 +104,10 @@ final class ClientServerSetup
     }
 
     /**
-     * Alamat aplikasi dan jendela pembaruan, yang di panel berada di bawah "Lanjutan".
+     * Alamat server, alamat aplikasi, dan jendela pembaruan — dari panel di halaman lingkungan maupun dari
+     * halaman rincian server klien. Isiannya dirapikan dan diperiksa `ServerSettings`.
      *
-     * @param  array{address?: ?string, update_window_start?: ?string, update_window_end?: ?string}  $settings
+     * @param  array{server_address?: ?string, address?: ?string, update_window_start?: ?string, update_window_end?: ?string}  $settings
      */
     public function updateSettings(Request $request, Site $site, array $settings): void
     {
@@ -113,9 +116,10 @@ final class ClientServerSetup
         }
 
         DB::transaction(function () use ($request, $site, $settings): void {
-            $before = ['address' => $site->address, 'update_window' => $site->updateWindow()];
+            $before = self::settingsOf($site);
 
             $site->forceFill([
+                'server_address' => $settings['server_address'] ?? null,
                 'address' => $settings['address'] ?? null,
                 'update_window_start' => $settings['update_window_start'] ?? null,
                 'update_window_end' => $settings['update_window_end'] ?? null,
@@ -123,7 +127,7 @@ final class ClientServerSetup
 
             OperatorAudit::record($request, 'site.settings.updated', 'site', $site->id, [
                 'before' => $before,
-                'after' => ['address' => $site->address, 'update_window' => $site->updateWindow()],
+                'after' => self::settingsOf($site),
             ]);
         });
     }
@@ -251,6 +255,16 @@ final class ClientServerSetup
         $room = 100 - mb_strlen(self::SITE_NAME_SUFFIX);
 
         return rtrim(mb_substr(trim($tenantName), 0, $room)).self::SITE_NAME_SUFFIX;
+    }
+
+    /** @return array{server_address: ?string, address: ?string, update_window: array{start: string, end: string, timezone: string}|null} */
+    private static function settingsOf(Site $site): array
+    {
+        return [
+            'server_address' => $site->server_address,
+            'address' => $site->address,
+            'update_window' => $site->updateWindow(),
+        ];
     }
 
     private function assertClientServer(Environment $environment): void

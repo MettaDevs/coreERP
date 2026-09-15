@@ -97,9 +97,14 @@ export const siteOperationStatusLabels: Record<string, string> = {
 /**
  * Keadaan pemasangan server klien, dihitung `InstallProgress` di server.
  *
- * Satu daftar untuk panel di halaman lingkungan, daftar lingkungan, dan ringkasan situs — kata yang
- * sama di ketiganya. `stale` di sini "Tertinggal", bukan "Tidak melapor" seperti keadaan situs: yang
- * dibaca dari daftar ini adalah server yang **sudah terpasang** lalu berhenti terlihat.
+ * Satu daftar untuk panel di halaman lingkungan, daftar lingkungan, dan daftar server klien — kata yang
+ * sama di ketiganya.
+ *
+ * `stale` berbunyi "Tidak melapor". PRD pemasangan satu perintah (PS-05) menulisnya "Tertinggal", dan kata itu
+ * bertahan sampai daftar server klien mulai menandai rilis yang lebih lama dari rilis terbaru: di baris yang
+ * sama "Tertinggal" dan "rilis 0.2.0" terbaca sebagai ketinggalan rilis, padahal artinya server yang sudah
+ * terpasang berhenti terlihat. "Tidak melapor" menyebut yang benar-benar diketahui konsol, sama dengan
+ * `siteStateLabels`.
  */
 export const installStateLabels: Record<string, string> = {
     not_prepared: 'Belum disiapkan',
@@ -109,9 +114,36 @@ export const installStateLabels: Record<string, string> = {
     connected: 'Server tersambung',
     installing: 'Memasang',
     ready: 'Jalan',
-    stale: 'Tertinggal',
+    stale: 'Tidak melapor',
     failed: 'Gagal',
     revoked: 'Dicabut',
+};
+
+/** Tempat sebuah lingkungan berjalan — kolom `environments.hosting`. */
+export const hostingLabels: Record<string, string> = {
+    provider: 'Server kita',
+    client_server: 'Server klien',
+};
+
+/**
+ * Jejak audit server klien dalam kata operator. Kunci aslinya tetap tampil di sampingnya: kunci itu yang
+ * dicari di log dan di tabel `operator_audit_events`, dan kata yang dibaca tidak boleh menggantikannya.
+ * Kunci yang belum ada di sini tampil apa adanya lewat `labelFor`, bukan disembunyikan.
+ */
+export const siteAuditLabels: Record<string, string> = {
+    'site.created': 'Server klien dicatat',
+    'site.settings.updated': 'Setelan diubah',
+    'site.install_command.issued': 'Perintah pasang dibuat',
+    'site.enrollment_token.issued': 'Token pendaftaran dibuat',
+    'site.operation.requested': 'Operasi diminta',
+    'site.operation.cancelled': 'Operasi dibatalkan',
+    'site.license.issued': 'Lisensi diterbitkan operator',
+    'site.license.renewed': 'Lisensi diperpanjang otomatis',
+    'site.license.renewal_suspended': 'Perpanjangan lisensi dihentikan',
+    'site.license.renewal_resumed': 'Perpanjangan lisensi dilanjutkan',
+    'site.registry_robot.issued': 'Kredensial registry diterbitkan',
+    'site.registry_robot.deleted': 'Kredensial registry dihapus',
+    'site.revoked': 'Server klien dicabut',
 };
 
 export function labelFor(labels: Record<string, string>, key: string): string {

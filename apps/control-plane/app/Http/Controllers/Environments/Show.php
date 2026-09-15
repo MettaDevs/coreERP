@@ -100,6 +100,8 @@ class Show extends Controller
             'site' => $site instanceof Site ? [
                 'id' => $site->id,
                 'name' => $site->name,
+                'serverAddress' => $site->server_address,
+                'lastSeenIp' => $site->last_seen_ip,
                 'address' => $site->address,
                 'updateWindow' => $site->updateWindow(),
                 'enrolledAt' => $site->enrolled_at?->toDateTimeString(),
