@@ -212,11 +212,18 @@ export default function Show({
                                 >
                                     {environment.url}
                                 </a>
-                                {environment.status !== 'active' && (
+                                {onClientServer ? (
                                     <span className="ms-2 text-xs text-muted-foreground">
-                                        — belum dapat dibuka sampai statusnya
-                                        Aktif
+                                        — terbuka setelah record DNS dan
+                                        pemasangan di server klien selesai
                                     </span>
+                                ) : (
+                                    environment.status !== 'active' && (
+                                        <span className="ms-2 text-xs text-muted-foreground">
+                                            — belum dapat dibuka sampai
+                                            statusnya Aktif
+                                        </span>
+                                    )
                                 )}
                             </Row>
                         )}

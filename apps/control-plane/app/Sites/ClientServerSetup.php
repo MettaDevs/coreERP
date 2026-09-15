@@ -6,6 +6,7 @@ namespace ControlPlane\Sites;
 
 use Carbon\CarbonInterface;
 use ControlPlane\Audit\OperatorAudit;
+use ControlPlane\Dns\DnsUnavailable;
 use ControlPlane\Models\Environment;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
@@ -19,11 +20,16 @@ use Illuminate\Support\Facades\Hash;
  * Panel "Server klien" di halaman lingkungan produksi: menyiapkan situsnya, mengubah setelannya, dan
  * membuat perintah pasang. Rancangannya `docs/todo/pasang-satu-perintah`, PS-02 dan PS-03.
  *
- * ## Tanpa isian wajib
+ * ## Satu isian wajib: alamat server
  *
- * Semua yang dibutuhkan pemasangan sudah diketahui sistem: tenant, owner-nya, app yang dibeli, dan rilis
- * terbaru. Formulir "Situs baru" yang lama menanyakan nama dan edisi; keduanya kini diturunkan, jadi
- * tidak ada yang dapat salah ketik.
+ * Semua yang lain sudah diketahui sistem: tenant, owner-nya, app yang dibeli, rilis terbaru, dan alamat
+ * aplikasinya (`<tenant>.<domain dasar>`, lihat `Site::appUrl()`). Formulir "Situs baru" yang lama menanyakan
+ * nama dan edisi; keduanya kini diturunkan, jadi tidak ada yang dapat salah ketik.
+ *
+ * Alamat server (IP VPS) boleh kosong saat menyiapkan, tetapi wajib saat perintah pasang dibuat. Sejak
+ * 15 September 2026 perintah pasang memastikan record DNS alamat aplikasi menunjuk ke mesin itu (`SiteDns`),
+ * karena proxy agen di server klien mengambil sertifikat Let's Encrypt untuk alamat tersebut — tanpa record,
+ * sertifikatnya tidak pernah terbit dan tidak ada yang dapat masuk.
  *
  * ## Kata sandi sementara tidak pernah tersimpan
  *
@@ -41,12 +47,13 @@ final class ClientServerSetup
     public function __construct(
         private readonly EnrollmentTokens $tokens,
         private readonly EntitlementsFromCore $entitlements,
+        private readonly SiteDns $dns,
     ) {}
 
     /**
      * Mencatat situs untuk lingkungan produksi di server klien.
      *
-     * @param  array{server_address?: ?string, address?: ?string, update_window_start?: ?string, update_window_end?: ?string}  $settings
+     * @param  array{server_address?: ?string, update_window_start?: ?string, update_window_end?: ?string}  $settings
      */
     public function prepare(Request $request, Environment $environment, array $settings): Site
     {
@@ -75,7 +82,6 @@ final class ClientServerSetup
                     'edition' => Site::SINGLE_IMAGE_EDITION,
                     'timezone' => self::DEFAULT_TIMEZONE,
                     'server_address' => $settings['server_address'] ?? null,
-                    'address' => $settings['address'] ?? null,
                     'update_window_start' => $settings['update_window_start'] ?? null,
                     'update_window_end' => $settings['update_window_end'] ?? null,
                     'created_by' => $request->user()?->getAuthIdentifier(),
@@ -104,23 +110,27 @@ final class ClientServerSetup
     }
 
     /**
-     * Alamat server, alamat aplikasi, dan jendela pembaruan — dari panel di halaman lingkungan maupun dari
-     * halaman rincian server klien. Isiannya dirapikan dan diperiksa `ServerSettings`.
+     * Alamat server dan jendela pembaruan — dari panel di halaman lingkungan maupun dari halaman rincian
+     * server klien. Isiannya dirapikan dan diperiksa `ServerSettings`.
      *
-     * @param  array{server_address?: ?string, address?: ?string, update_window_start?: ?string, update_window_end?: ?string}  $settings
+     * Bila record DNS situs ini sudah pernah ditulis dan alamat server berubah, record itu ikut diperbarui
+     * sesudah setelannya tersimpan. Cloudflare yang menolak tidak membatalkan setelan: kalimatnya dipulangkan
+     * untuk ditampilkan, dan layar menandai record yang belum mengikuti sampai "Sinkronkan DNS" berhasil.
+     *
+     * @param  array{server_address?: ?string, update_window_start?: ?string, update_window_end?: ?string}  $settings
+     * @return ?string peringatan DNS, atau null bila tidak ada
      */
-    public function updateSettings(Request $request, Site $site, array $settings): void
+    public function updateSettings(Request $request, Site $site, array $settings): ?string
     {
         if ($site->revoked()) {
             throw new SiteRejected('site_revoked', 'Situs ini sudah dicabut.');
         }
 
-        DB::transaction(function () use ($request, $site, $settings): void {
+        $changedAddress = DB::transaction(function () use ($request, $site, $settings): bool {
             $before = self::settingsOf($site);
 
             $site->forceFill([
                 'server_address' => $settings['server_address'] ?? null,
-                'address' => $settings['address'] ?? null,
                 'update_window_start' => $settings['update_window_start'] ?? null,
                 'update_window_end' => $settings['update_window_end'] ?? null,
             ])->save();
@@ -129,7 +139,41 @@ final class ClientServerSetup
                 'before' => $before,
                 'after' => self::settingsOf($site),
             ]);
+
+            return $before['server_address'] !== $site->server_address;
         });
+
+        if (! $changedAddress || $site->dns_record_id === null) {
+            return null;
+        }
+
+        if ($site->server_address === null) {
+            return 'Alamat server dikosongkan, tetapi record DNS lama tetap menunjuk alamat sebelumnya sampai alamat baru dicatat atau server klien dicabut.';
+        }
+
+        try {
+            $this->dns->ensure($request, $site);
+        } catch (DnsUnavailable $e) {
+            return 'Setelan disimpan, tetapi record DNS belum mengikuti alamat baru: '.$e->getMessage();
+        }
+
+        return null;
+    }
+
+    /**
+     * "Sinkronkan DNS": menulis ulang record alamat aplikasi ke alamat server yang tercatat sekarang.
+     */
+    public function syncDns(Request $request, Site $site): void
+    {
+        if ($site->revoked()) {
+            throw new SiteRejected('site_revoked', 'Situs ini sudah dicabut.');
+        }
+
+        try {
+            $this->dns->ensure($request, $site);
+        } catch (DnsUnavailable $e) {
+            throw new SiteRejected('dns_unavailable', $e->getMessage());
+        }
     }
 
     /**
@@ -149,6 +193,16 @@ final class ClientServerSetup
 
         // Diperiksa sebelum Core dipanggil, dan sekali lagi di bawah kunci baris situs.
         $this->assertInstallable($site);
+
+        $site->setRelation('environment', $environment);
+        $appUrl = self::installableAppUrl($site);
+
+        if ($site->server_address === null) {
+            throw new SiteRejected('server_address_missing', sprintf(
+                'Catat alamat server (IP VPS) lebih dulu di Setelan server. Record DNS %s dibuat menunjuk ke alamat itu, dan tanpanya proxy di server klien tidak pernah mendapat sertifikat.',
+                (string) parse_url($appUrl, PHP_URL_HOST),
+            ));
+        }
 
         $tenant = $environment->tenant;
 
@@ -171,6 +225,14 @@ final class ClientServerSetup
             throw new SiteRejected('entitlements_unavailable', 'Daftar app tenant tidak terbaca dari Core, jadi perintah pasang tidak dibuat. '.$e->getMessage());
         }
 
+        // Sebelum token dan operasi lahir, di luar transaksi karena ia panggilan jaringan. Perintah pasang yang
+        // dibuat tanpa record DNS menghasilkan server yang terpasang tetapi tidak dapat dibuka siapa pun.
+        try {
+            $this->dns->ensure($request, $site);
+        } catch (DnsUnavailable $e) {
+            throw new SiteRejected('dns_unavailable', 'Perintah pasang tidak dibuat karena record DNS alamat aplikasi belum dapat dipastikan. '.$e->getMessage());
+        }
+
         $release = self::newestRelease($site->edition);
         $password = TemporaryPassword::generate();
 
@@ -180,7 +242,7 @@ final class ClientServerSetup
         // menolak biaya yang lebih tinggi dari setelannya sendiri; keduanya memakai bawaan 12.
         $hash = Hash::driver('bcrypt')->make($password);
 
-        return DB::transaction(function () use ($request, $site, $tenant, $owner, $apps, $release, $password, $hash): array {
+        return DB::transaction(function () use ($request, $site, $tenant, $owner, $apps, $release, $password, $hash, $appUrl): array {
             $locked = Site::query()->lockForUpdate()->findOrFail($site->id);
             $this->assertInstallable($locked);
 
@@ -208,6 +270,9 @@ final class ClientServerSetup
                     'admin_name' => $owner['name'],
                     'admin_email' => $owner['email'],
                     SiteOperation::PASSWORD_HASH_PARAMETER => $hash,
+                    // Ditulis agen ke `APP_URL` dan nama host proxy HTTPS-nya sebelum stack dinyalakan.
+                    // Tanpa ini `pasang.sh` hanya tahu `hostname -f` mesin itu, yang bukan alamat tenant.
+                    'app_url' => $appUrl,
                 ],
                 'status' => 'requested',
                 'requested_by' => $request->user()?->getAuthIdentifier(),
@@ -220,6 +285,7 @@ final class ClientServerSetup
                 'operation_id' => $operation->id,
                 'release' => $release,
                 'app_ids' => $apps,
+                'app_url' => $appUrl,
                 'token_expires_at' => $issued['expires_at']->toIso8601String(),
                 'cancelled_operations' => $cancelled,
             ]);
@@ -257,12 +323,31 @@ final class ClientServerSetup
         return rtrim(mb_substr(trim($tenantName), 0, $room)).self::SITE_NAME_SUFFIX;
     }
 
-    /** @return array{server_address: ?string, address: ?string, update_window: array{start: string, end: string, timezone: string}|null} */
+    /**
+     * Alamat aplikasi dalam bentuk yang diterima agen: `https://<host>` tanpa port dan jalur.
+     *
+     * Bentuk lain lahir dari setelan konsol yang bukan untuk server klien — domain dasar kosong, skema `http`, atau
+     * port pada pengembangan lokal — dan agen menolaknya. Ditolak di sini lebih dulu, dengan sebabnya.
+     */
+    private static function installableAppUrl(Site $site): string
+    {
+        $url = $site->appUrl();
+
+        if (! is_string($url) || preg_match('#^https://(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$#', $url) !== 1) {
+            throw new SiteRejected('app_url_unusable', sprintf(
+                'Alamat aplikasi server klien tidak dapat dibentuk (%s). Konsol ini butuh domain dasar (COREERP_BASE_DOMAIN) dengan skema https tanpa port.',
+                $url ?? 'kosong',
+            ));
+        }
+
+        return $url;
+    }
+
+    /** @return array{server_address: ?string, update_window: array{start: string, end: string, timezone: string}|null} */
     private static function settingsOf(Site $site): array
     {
         return [
             'server_address' => $site->server_address,
-            'address' => $site->address,
             'update_window' => $site->updateWindow(),
         ];
     }

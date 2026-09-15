@@ -15,6 +15,8 @@ import { ArrowUpCircle, ExternalLink } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { InstallStateBadge } from '@/components/badges';
 import CopyButton from '@/components/copy-button';
+import DnsStatus from '@/components/dns-status';
+import type { DnsInfo } from '@/components/dns-status';
 import {
     ServerAddressField,
     ServerAdvancedFields,
@@ -69,7 +71,9 @@ type Site = {
     edition: string;
     state: string;
     serverAddress: string | null;
-    address: string | null;
+    appUrl: string | null;
+    appUrlAutomatic: boolean;
+    dns: DnsInfo;
     lastSeenIp: string | null;
     reportedRelease: string | null;
     newestRelease: string | null;
@@ -208,7 +212,7 @@ function ConfirmName({
 }
 
 /**
- * Setelan server: alamat mesin, alamat aplikasi, dan jendela pembaruan.
+ * Setelan server: alamat mesin dan jendela pembaruan, bersama alamat aplikasi otomatis dan record DNS-nya.
  *
  * Isinya sama dengan "Setelan server" di panel halaman lingkungan, dan disimpan lewat aturan yang sama.
  * Situs yang dicabut hanya ditampilkan, karena setelannya tidak lagi berarti apa pun.
@@ -222,7 +226,6 @@ function ServerSettingsSection({
 }) {
     const { data, setData, patch, processing, errors } = useForm({
         server_address: site.serverAddress ?? '',
-        address: site.address ?? '',
         update_window_start: site.updateWindow?.start ?? '',
         update_window_end: site.updateWindow?.end ?? '',
     });
@@ -233,7 +236,7 @@ function ServerSettingsSection({
             <Section id="setelan" title="Setelan server">
                 <dl>
                     <Row label="Alamat server">{site.serverAddress ?? '—'}</Row>
-                    <Row label="Alamat aplikasi">{site.address ?? '—'}</Row>
+                    <Row label="Alamat aplikasi">{site.appUrl ?? '—'}</Row>
                     <Row label="Jendela pembaruan">
                         {site.updateWindow
                             ? `${site.updateWindow.start}–${site.updateWindow.end} (${site.updateWindow.timezone})`
@@ -248,8 +251,25 @@ function ServerSettingsSection({
         <Section
             id="setelan"
             title="Setelan server"
-            description="Dicatat untuk operator. Tidak satu pun mengubah server klien; jendela pembaruan berlaku pada pembaruan berikutnya."
+            description="Alamat aplikasi dibentuk sistem dan record DNS-nya mengikuti alamat server. Tidak satu pun isian ini mengubah server klien; jendela pembaruan berlaku pada pembaruan berikutnya."
         >
+            <div className="space-y-1.5 rounded-md border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">
+                    Alamat aplikasi{site.appUrlAutomatic ? ' (otomatis)' : ''}
+                </p>
+                {site.appUrlAutomatic ? (
+                    <DnsStatus
+                        siteId={site.id}
+                        appUrl={site.appUrl}
+                        dns={site.dns}
+                        serverAddress={site.serverAddress}
+                    />
+                ) : (
+                    <p className="font-mono text-sm break-all">
+                        {site.appUrl ?? 'Tidak dicatat'}
+                    </p>
+                )}
+            </div>
             <form
                 className="space-y-4"
                 onSubmit={(e: FormEvent) => {
@@ -821,9 +841,9 @@ export default function Show({
                             datang sekitar satu menit setelah agennya terpasang.
                         </p>
                     )}
-                    {site.address && (
+                    {site.appUrl && (
                         <a
-                            href={site.address}
+                            href={site.appUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex items-center gap-1 text-sm underline underline-offset-4"

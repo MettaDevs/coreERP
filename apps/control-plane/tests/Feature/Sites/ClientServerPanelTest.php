@@ -30,6 +30,10 @@ final class ClientServerPanelTest extends SiteTestCase
         parent::setUp();
 
         config(['app.url' => 'https://admin.contoh.test']);
+
+        // Perintah pasang memastikan record DNS alamat aplikasi sebelum apa pun dibuat; aturan DNS-nya sendiri
+        // diuji di `SiteDnsTest`.
+        $this->useCloudflare();
     }
 
     // ------------------------------------------------------------------ PS-02 panel dan penyiapan
@@ -103,22 +107,21 @@ final class ClientServerPanelTest extends SiteTestCase
             ->post("/lingkungan/{$environment->id}/server-klien", ['update_window_start' => '22:00'])
             ->assertSessionHasErrors('update_window_end');
 
-        $this->actingAs($operator)
-            ->post("/lingkungan/{$environment->id}/server-klien", ['address' => 'bukan alamat'])
-            ->assertSessionHasErrors('address');
-
         $this->assertSame(0, Site::query()->count());
 
+        // Alamat aplikasi tidak lagi dapat diisi: ia diturunkan dari lingkungannya. Isian lama yang masih
+        // mengirimnya diabaikan, bukan disimpan.
         $this->actingAs($operator)
             ->post("/lingkungan/{$environment->id}/server-klien", [
-                'address' => 'https://erp.klinik.test',
+                'address' => 'https://erp.klinik-sendiri.test',
                 'update_window_start' => '22:00',
                 'update_window_end' => '04:00',
             ])
             ->assertSessionHasNoErrors();
 
         $site = Site::query()->sole();
-        $this->assertSame('https://erp.klinik.test', $site->address);
+        $this->assertNull($site->address);
+        $this->assertSame('https://'.$environment->tenant?->slug.'.erp.contoh.test', $site->appUrl());
         $this->assertSame(['start' => '22:00', 'end' => '04:00', 'timezone' => 'Asia/Jakarta'], $site->updateWindow());
 
         // Diubah belakangan, dengan aturan yang sama, dan diaudit.
@@ -127,17 +130,17 @@ final class ClientServerPanelTest extends SiteTestCase
             ->assertSessionHasErrors('update_window_start');
 
         $this->actingAs($operator)
-            ->patch("/lingkungan/{$environment->id}/server-klien", ['address' => '', 'update_window_start' => '', 'update_window_end' => ''])
+            ->patch("/lingkungan/{$environment->id}/server-klien", ['update_window_start' => '', 'update_window_end' => ''])
             ->assertSessionHasNoErrors()
             ->assertRedirect("/lingkungan/{$environment->id}");
 
-        $site->refresh();
-        $this->assertNull($site->address);
-        $this->assertNull($site->updateWindow());
+        $this->assertNull($site->refresh()->updateWindow());
 
         $updated = OperatorAuditEvent::query()->where('action', 'site.settings.updated')->sole();
-        $this->assertSame('https://erp.klinik.test', $updated->detail['before']['address']);
-        $this->assertNull($updated->detail['after']['address']);
+        // jsonb tidak menyimpan urutan kunci; yang dibandingkan isinya.
+        $this->assertEquals(['start' => '22:00', 'end' => '04:00', 'timezone' => 'Asia/Jakarta'], $updated->detail['before']['update_window']);
+        $this->assertNull($updated->detail['after']['update_window']);
+        $this->assertArrayNotHasKey('address', $updated->detail['after']);
     }
 
     public function test_preparing_twice_is_refused_with_a_friendly_error(): void
@@ -273,6 +276,7 @@ final class ClientServerPanelTest extends SiteTestCase
             'admin_email' => 'dewi@klinik.test',
             'admin_name' => 'Dewi Pemilik',
             'app_ids' => ['human-resources', 'management-aset'],
+            'app_url' => 'https://'.$environment->tenant?->slug.'.erp.contoh.test',
             'edition' => Site::SINGLE_IMAGE_EDITION,
             'release' => '0.10.0',
             'tenant_id' => $site->tenant_id,
@@ -611,6 +615,7 @@ final class ClientServerPanelTest extends SiteTestCase
             'environment_id' => $environment->id,
             'name' => $tenantName.' — Produksi',
             'edition' => Site::SINGLE_IMAGE_EDITION,
+            'server_address' => '103.122.2.72',
         ]);
 
         return [$environment, $site];

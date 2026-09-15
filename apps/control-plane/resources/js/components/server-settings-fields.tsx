@@ -1,7 +1,7 @@
 import { Input } from '@apperp/ui/input';
 
 export type ServerSettingsKey =
-    'server_address' | 'address' | 'update_window_start' | 'update_window_end';
+    'server_address' | 'update_window_start' | 'update_window_end';
 
 export type ServerSettingsData = Record<ServerSettingsKey, string>;
 
@@ -70,7 +70,9 @@ export function ServerAddressField({
 }
 
 /**
- * Alamat aplikasi dan jendela pembaruan — yang diisi sekali dan jarang diubah.
+ * Jendela pembaruan — diisi sekali dan jarang diubah.
+ *
+ * Alamat aplikasi sengaja tidak ada di sini: ia diturunkan dari lingkungannya dan tidak dapat diganti operator.
  */
 export function ServerAdvancedFields({
     data,
@@ -83,20 +85,6 @@ export function ServerAdvancedFields({
 }) {
     return (
         <div className="space-y-3">
-            <div className="space-y-2">
-                <Input
-                    id="address"
-                    label="Alamat aplikasi"
-                    type="url"
-                    value={data.address}
-                    onChange={(e) => setData('address', e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                    Alamat yang dibuka pengguna klinik, misalnya
-                    https://erp.klinik.id.
-                </p>
-                <FieldError message={errors.address} />
-            </div>
             <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
                     <Input

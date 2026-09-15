@@ -17,6 +17,11 @@ type Props = {
         robot: string | null;
         check: { ok: true } | { ok: false; error: string };
     };
+    dns: {
+        baseDomain: string;
+        configured: boolean;
+        check: { ok: true; zone: string } | { ok: false; error: string } | null;
+    };
 };
 
 function Section({
@@ -76,7 +81,12 @@ function Fingerprint({ state }: { state: KeyState }) {
  * perintah artisan; halaman ini ada supaya yang hilang atau tertukar ditemukan operator sebelum perintah
  * pasang dibuat — bukan oleh teknisi yang terminalnya menjawab 503 di lokasi klien.
  */
-export default function Settings({ releaseKey, licenseKey, registry }: Props) {
+export default function Settings({
+    releaseKey,
+    licenseKey,
+    registry,
+    dns,
+}: Props) {
     return (
         <Shell
             title="Pengaturan"
@@ -165,6 +175,45 @@ export default function Settings({ releaseKey, licenseKey, registry }: Props) {
                 <p className="text-xs text-muted-foreground">
                     Rahasia robot sistem tersimpan terenkripsi dan tidak pernah
                     ditampilkan. Pemakaian disk registry belum dikumpulkan.
+                </p>
+            </Section>
+
+            <Section
+                title="DNS (Cloudflare)"
+                description="Setiap server klien mendapat alamat aplikasi otomatis di domain dasar. Konsol membuat record DNS-nya ke IP server klien saat perintah pasang dibuat, dan menghapusnya saat server klien dicabut. Tanpa token yang melihat zonanya, perintah pasang tidak dapat dibuat."
+            >
+                <dl data-test="dns">
+                    <Row label="Bentuk alamat server klien">
+                        <span className="font-mono text-xs">
+                            {dns.baseDomain
+                                ? `https://<tenant>.${dns.baseDomain}`
+                                : '—'}
+                        </span>
+                    </Row>
+                    <Row label="Token Cloudflare">
+                        {dns.configured ? (
+                            'Tersimpan'
+                        ) : (
+                            <Problem>
+                                Belum disetel. Jalankan php artisan
+                                dns:token-cloudflare di server konsol.
+                            </Problem>
+                        )}
+                    </Row>
+                    {dns.check !== null && (
+                        <Row label="Keadaan">
+                            {dns.check.ok ? (
+                                `Terhubung, zona ${dns.check.zone} terlihat`
+                            ) : (
+                                <Problem>{dns.check.error}</Problem>
+                            )}
+                        </Row>
+                    )}
+                </dl>
+                <p className="text-xs text-muted-foreground">
+                    Token hanya butuh izin Zone → DNS → Edit untuk zona domain
+                    dasar, tersimpan terenkripsi, dan tidak pernah ditampilkan.
+                    Konsol hanya menyentuh record yang ia buat sendiri.
                 </p>
             </Section>
         </Shell>

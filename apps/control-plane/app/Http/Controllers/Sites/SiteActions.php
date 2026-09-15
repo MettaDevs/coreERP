@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace ControlPlane\Http\Controllers\Sites;
 
 use ControlPlane\Audit\OperatorAudit;
+use ControlPlane\Dns\DnsUnavailable;
 use ControlPlane\Http\Controllers\Controller;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Registry\RegistryCredentials;
 use ControlPlane\Sites\EnrollmentTokens;
+use ControlPlane\Sites\SiteDns;
 use ControlPlane\Sites\SiteOperations;
 use ControlPlane\Sites\SiteRejected;
 use Illuminate\Http\RedirectResponse;
@@ -94,7 +96,7 @@ final class SiteActions extends Controller
         return redirect('/situs/'.$row->id)->with('message', 'Permintaan operasi dibatalkan.');
     }
 
-    public function revoke(Request $request, string $site, RegistryCredentials $credentials): RedirectResponse
+    public function revoke(Request $request, string $site, RegistryCredentials $credentials, SiteDns $dns): RedirectResponse
     {
         $row = $this->confirmedSite($request, $site);
 
@@ -118,7 +120,18 @@ final class SiteActions extends Controller
         // dilayani lagi — situs yang dicabut tidak dapat menarik apa pun lagi (E2E-01).
         $credentials->releaseClosed($row, $request->ip(), includeRunning: true);
 
-        return redirect('/situs/'.$row->id)->with('message', 'Situs dicabut. Aplikasinya di server klien tetap berjalan; pengelolaannya yang berhenti.');
+        // Record DNS alamat aplikasi dibuang juga, dengan alasan yang sama dengan robot registry: server yang tidak
+        // lagi dikelola tidak boleh terus memegang nama di domain kita. Cloudflare yang menolak tidak membatalkan
+        // pencabutan; recordnya tetap tercatat sehingga penghapusan dapat diulang dari sini.
+        $message = 'Situs dicabut. Aplikasinya di server klien tetap berjalan; pengelolaannya yang berhenti.';
+
+        try {
+            $dns->remove($request, $row);
+        } catch (DnsUnavailable $e) {
+            $message .= ' Record DNS '.$row->dns_name.' belum terhapus: '.$e->getMessage();
+        }
+
+        return redirect('/situs/'.$row->id)->with('message', $message);
     }
 
     /**
