@@ -15,6 +15,7 @@ use App\Support\Modules\ModuleRegistry;
 use Database\Seeders\AppCatalogSeeder;
 use Database\Seeders\NumberSequenceProfileSeeder;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\Console\Tester\CommandTester;
 use Tests\TestCase;
 
 /**
@@ -228,7 +230,216 @@ final class BootstrapSiteTenantTest extends TestCase
         $this->assertTrue(Hash::check($this->printedPassword($output), $owner->password));
     }
 
+    // ------------------------------------------------------------------ operasi pasang agen
+
+    /**
+     * Hash dari admin.erp tersimpan apa adanya, dan kata sandi aslinya benar-benar membukanya.
+     *
+     * Dua pemeriksaan, dan keduanya perlu. `assertSame` atas hash-nya membuktikan tidak ada yang
+     * meng-hash ulang. `Hash::check` atas teks polosnya membuktikan yang tersimpan memang hash yang
+     * dapat dimasuki — cast `hashed` yang meng-hash ulang hash itu sebagai teks akan lolos pemeriksaan
+     * pertama pun tidak, tetapi penyimpanan yang memotong atau merapikannya dapat lolos yang pertama
+     * dan gagal yang kedua.
+     */
+    public function test_a_password_hash_on_stdin_is_stored_as_is_and_opens_the_account(): void
+    {
+        $this->useImageWithoutModules();
+        $plaintext = 'Sementara-dari-admin.erp-9Qx';
+        $hash = password_hash($plaintext, PASSWORD_BCRYPT, ['cost' => 4]);
+
+        [$exitCode, $output] = $this->bootstrapWithStdin($hash."\n");
+
+        $this->assertSame(Command::SUCCESS, $exitCode, $output);
+
+        $owner = User::query()->where('email', 'admin@apotek.test')->sole();
+        $this->assertSame($hash, $owner->password, 'Hash dari admin.erp harus tersimpan tanpa di-hash ulang.');
+        $this->assertTrue(Hash::check($plaintext, $owner->password), 'Kata sandi yang ditunjukkan admin.erp harus membuka akun ini.');
+        $this->assertTrue($owner->must_change_password, 'Kata sandi sementara wajib diganti saat pertama masuk.');
+
+        $this->assertSame(self::TENANT_ID, Tenant::query()->sole()->id);
+        $this->assertStringNotContainsString($hash, $output, 'Hash tidak boleh dicetak.');
+        $this->assertStringNotContainsString($plaintext, $output);
+        $this->assertStringNotContainsString('Kata sandi sementara', $output, 'Jalur hash tidak mengetahui kata sandinya, jadi tidak ada yang boleh dicetak sebagai kata sandi.');
+    }
+
+    public function test_something_that_is_not_a_bcrypt_hash_is_refused_without_being_printed(): void
+    {
+        $this->useImageWithoutModules();
+
+        foreach ([
+            'kata-sandi-polos-yang-salah-alamat',
+            // `$2b$` sah bagi bcrypt, tetapi tidak dikenali `Hash::isHashed()` — cast `hashed` akan
+            // meng-hash-nya ulang sebagai teks polos.
+            '$2b$10$'.str_repeat('a', 53),
+            '$2y$10$'.str_repeat('a', 52),
+            '',
+        ] as $stdin) {
+            [$exitCode, $output] = $this->bootstrapWithStdin($stdin);
+
+            $this->assertSame(Command::FAILURE, $exitCode, 'Diterima: '.$stdin);
+            $this->assertStringContainsString('bukan hash bcrypt', $output);
+
+            if ($stdin !== '') {
+                $this->assertStringNotContainsString($stdin, $output, 'Isi stdin yang ditolak tidak boleh dicetak.');
+            }
+        }
+
+        $this->assertSame(0, Tenant::query()->count());
+        $this->assertSame(0, User::query()->count());
+    }
+
+    /**
+     * Hash yang biayanya melebihi setelan server ini ditolak sebelum satu baris pun ditulis.
+     *
+     * Cast `hashed` menolaknya juga, tetapi dari dalam `User::create` — di tengah transaksi, dengan
+     * pesan bahasa Inggris yang tidak menyebut setelan mana yang tidak cocok. `BCRYPT_ROUNDS` suite
+     * ini 4, jadi biaya 10 melebihinya.
+     */
+    public function test_a_hash_costlier_than_this_server_allows_is_refused_readably(): void
+    {
+        $this->useImageWithoutModules();
+
+        [$exitCode, $output] = $this->bootstrapWithStdin(password_hash('apa-saja', PASSWORD_BCRYPT, ['cost' => 10]));
+
+        $this->assertSame(Command::FAILURE, $exitCode, $output);
+        $this->assertStringContainsString('BCRYPT_ROUNDS', $output);
+        $this->assertSame(0, Tenant::query()->count());
+        $this->assertSame(0, User::query()->count());
+    }
+
+    public function test_rerunning_the_install_with_the_same_owner_changes_nothing(): void
+    {
+        $this->useImageWithoutModules();
+        $hash = password_hash('pertama', PASSWORD_BCRYPT, ['cost' => 4]);
+
+        $this->assertSame(Command::SUCCESS, $this->bootstrapWithStdin($hash)[0]);
+        $before = $this->rowCounts();
+
+        // Agen mengulang operasinya dengan hash baru — admin.erp membuat kata sandi baru tiap kali
+        // perintah pasang dibuat ulang. Owner yang sudah ada tetap memegang kata sandi pertamanya.
+        [$exitCode, $output] = $this->bootstrapWithStdin(password_hash('kedua', PASSWORD_BCRYPT, ['cost' => 4]), [
+            '--admin-email' => 'Admin@Apotek.test',
+        ]);
+
+        $this->assertSame(Command::SUCCESS, $exitCode, $output);
+        $this->assertStringContainsString('sudah ada', $output);
+        $this->assertSame($before, $this->rowCounts());
+        $this->assertSame($hash, User::query()->where('email', 'admin@apotek.test')->value('password'));
+    }
+
+    public function test_the_same_tenant_id_with_a_different_owner_is_refused(): void
+    {
+        $this->useImageWithoutModules();
+        $this->assertSame(Command::SUCCESS, $this->bootstrapWithStdin(password_hash('pertama', PASSWORD_BCRYPT, ['cost' => 4]))[0]);
+        $before = $this->rowCounts();
+
+        [$exitCode, $output] = $this->bootstrapWithStdin(password_hash('kedua', PASSWORD_BCRYPT, ['cost' => 4]), [
+            '--admin-email' => 'orang-lain@apotek.test',
+        ]);
+
+        $this->assertSame(Command::FAILURE, $exitCode, $output);
+        $this->assertStringContainsString('owner-nya bukan orang-lain@apotek.test', $output);
+        $this->assertStringNotContainsString('sudah ada. Tidak ada yang diubah', $output);
+        $this->assertSame($before, $this->rowCounts());
+        $this->assertFalse(User::query()->where('email', 'orang-lain@apotek.test')->exists());
+    }
+
+    public function test_an_app_that_is_not_a_module_in_this_image_is_refused_by_name(): void
+    {
+        $this->useImageWithoutModules();
+
+        [$exitCode, $output] = $this->bootstrapWithStdin(password_hash('apa-saja', PASSWORD_BCRYPT, ['cost' => 4]), [
+            '--app' => ['human-resources', 'management-aset'],
+        ]);
+
+        $this->assertSame(Command::FAILURE, $exitCode, $output);
+        $this->assertStringContainsString('tidak ada sebagai modul di image ini: human-resources, management-aset', $output);
+        $this->assertSame(0, Tenant::query()->count());
+        $this->assertSame(0, User::query()->count());
+    }
+
+    /**
+     * Dengan `--app`, yang diberikan persis yang dibeli — bukan seluruh isi image.
+     *
+     * Image pengembangan memuat setiap modul, jadi pembeda yang dibuktikan di sini nyata: modul lain
+     * ada di image tetapi tidak diberikan, dan tidak dipasang.
+     */
+    public function test_the_bought_apps_are_entitled_and_installed_and_nothing_else(): void
+    {
+        $this->seed(NumberSequenceProfileSeeder::class);
+        $this->assertSame(Command::SUCCESS, Artisan::call('app:register-manifest'), Artisan::output());
+
+        $inImage = array_map(static fn (ModuleManifest $module): string => $module->id, app(ModuleRegistry::class)->semua());
+        $this->assertContains('human-resources', $inImage);
+        $this->assertContains('management-aset', $inImage, 'Test ini butuh modul kedua di image supaya "hanya yang dibeli" dapat gagal.');
+
+        [$exitCode, $output] = $this->bootstrapWithStdin(password_hash('apa-saja', PASSWORD_BCRYPT, ['cost' => 4]), [
+            '--app' => ['human-resources'],
+        ]);
+
+        $this->assertSame(Command::SUCCESS, $exitCode, $output);
+        $this->assertSame(
+            ['human-resources'],
+            DB::table('tenant_app_entitlements')->where('tenant_id', self::TENANT_ID)->orderBy('app_id')->pluck('app_id')->all(),
+        );
+        $this->assertDatabaseHas('core_module_installations', [
+            'tenant_id' => self::TENANT_ID,
+            'module_id' => 'human-resources',
+            'status' => ModuleInstallation::STATUS_INSTALLED,
+        ]);
+        $this->assertDatabaseMissing('core_module_installations', ['tenant_id' => self::TENANT_ID, 'module_id' => 'management-aset']);
+    }
+
+    /**
+     * Tenant yang hanya membeli Core tidak diberi modul apa pun, walaupun image membawa semuanya.
+     *
+     * Agen tidak dapat menyebut "tidak ada app" selain dengan tidak mengirim `--app` sama sekali. Pada
+     * jalur tangan yang lama, itu berarti seluruh modul di image; pada jalur operasi `install` itu
+     * berarti daftar kosong dari admin.erp, dan menafsirkannya sebagai "semua" membuat entitlement di
+     * server klien tidak lagi sama dengan yang dibeli.
+     */
+    public function test_an_install_without_any_app_entitles_nothing_even_when_the_image_carries_modules(): void
+    {
+        $this->seed(NumberSequenceProfileSeeder::class);
+        $this->assertSame(Command::SUCCESS, Artisan::call('app:register-manifest'), Artisan::output());
+        $this->assertNotSame([], app(ModuleRegistry::class)->semua(), 'Test ini butuh image yang membawa modul supaya "tidak ada app" dapat gagal.');
+
+        [$exitCode, $output] = $this->bootstrapWithStdin(password_hash('apa-saja', PASSWORD_BCRYPT, ['cost' => 4]));
+
+        $this->assertSame(Command::SUCCESS, $exitCode, $output);
+        $this->assertSame(0, DB::table('tenant_app_entitlements')->where('tenant_id', self::TENANT_ID)->count());
+        $this->assertSame(0, DB::table('core_module_installations')->where('tenant_id', self::TENANT_ID)->count());
+    }
+
     // ------------------------------------------------------------------ pembantu
+
+    /**
+     * Menjalankan perintahnya dengan isi stdin, seperti agen yang mengalirkan hash kata sandi.
+     *
+     * Lewat `CommandTester`, bukan `Artisan::call`: yang kedua membangun `ArrayInput` tanpa aliran,
+     * sehingga perintahnya jatuh ke `STDIN` proses PHPUnit — yang di terminal menunggu ketikan, dan di
+     * CI kosong. `CommandTester` memasang aliran di memori, dan itu jalur yang sama dengan aliran
+     * milik input yang dibaca perintahnya.
+     *
+     * @param  array<string, string|list<string>|null>  $options
+     * @return array{int, string}
+     */
+    private function bootstrapWithStdin(string $stdin, array $options = []): array
+    {
+        $command = $this->app->make(Kernel::class)->all()['tenant:bootstrap-site'];
+        $tester = new CommandTester($command);
+        $tester->setInputs([$stdin]);
+
+        $exitCode = $tester->execute(array_filter(array_replace([
+            '--tenant-id' => self::TENANT_ID,
+            '--name' => 'Apotek Sejahtera',
+            '--admin-name' => 'Admin Apotek',
+            '--admin-email' => 'admin@apotek.test',
+            '--admin-password-hash-stdin' => true,
+        ], $options), static fn (mixed $value): bool => $value !== null), ['interactive' => false]);
+
+        return [$exitCode, $tester->getDisplay()];
+    }
 
     /**
      * Menjalankan perintahnya lewat `Artisan::call`, supaya keluarannya — termasuk kata sandi

@@ -94,7 +94,13 @@ final class UpgradeEnvironments extends Command
     public function handle(): int
     {
         $one = $this->argument('environment');
-        $targets = $this->targets(is_string($one) && $one !== '' ? $one : null);
+        $one = is_string($one) && $one !== '' ? $one : null;
+
+        if ($one !== null && $this->refusedAsClientServer($one)) {
+            return self::FAILURE;
+        }
+
+        $targets = $this->targets($one);
 
         if ($targets === []) {
             $this->info('Tidak ada lingkungan yang perlu diperbarui.');
@@ -141,11 +147,17 @@ final class UpgradeEnvironments extends Command
      * Lingkungan yang dihapus lunak dilewati oleh `whereNull('deleted_at')`, dan itu penting: yang
      * sudah diarsipkan tidak boleh dibangunkan oleh sebuah rilis.
      *
+     * Yang berjalan di server klien juga dilewati. Rilis di server ini bukan rilisnya — server klien
+     * diperbarui agennya sendiri, dengan paket rakitan untuk edisinya — dan `database_name`-nya yang
+     * kosong akan membuat langkah module di bawah memasang app tenant itu ke database bersama, lalu
+     * menandai lingkungannya `active` di sini.
+     *
      * @return list<Environment>
      */
     private function targets(?string $one): array
     {
         $query = Environment::query()
+            ->hostedByProvider()
             ->with('tenant:id,name,slug')
             ->whereNull('deleted_at')
             ->whereIn('status', self::UPGRADABLE)
@@ -168,6 +180,27 @@ final class UpgradeEnvironments extends Command
         }
 
         return $rows;
+    }
+
+    /**
+     * Menolak dengan kalimatnya sendiri bila lingkungan yang disebut berjalan di server klien.
+     *
+     * Saringan di {@see self::targets()} sudah membuangnya, tetapi yang tertinggal hanyalah
+     * "tidak ada, sudah diarsipkan, atau berstatus yang tidak boleh diperbarui" dengan kode keluar
+     * nol — jawaban yang salah tentang baris yang jelas ada, untuk operator yang menyebutnya dengan
+     * id. Sapuan seluruh armada tidak melewati sini; di sana diam memang jawaban yang benar.
+     */
+    private function refusedAsClientServer(string $id): bool
+    {
+        $environment = Environment::query()->find($id);
+
+        if (! $environment instanceof Environment || ! $environment->hostedOnClientServer()) {
+            return false;
+        }
+
+        $this->error($environment->clientServerRefusal('Pembaruan dari server ini'));
+
+        return true;
     }
 
     /** @return 'succeeded'|'failed'|'skipped' */
