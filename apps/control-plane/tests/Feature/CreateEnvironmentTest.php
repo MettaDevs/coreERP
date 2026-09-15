@@ -9,6 +9,7 @@ use ControlPlane\Models\User;
 use ControlPlane\Tests\CoreSchema;
 use ControlPlane\Tests\TestCase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -242,6 +243,112 @@ class CreateEnvironmentTest extends TestCase
     public function test_a_guest_is_redirected_to_the_login_page(): void
     {
         $this->get('/lingkungan')->assertRedirect('/login');
+    }
+
+    // ------------------------------------------------------------------ berjalan di mana
+
+    /**
+     * Produksi di server klien dapat dibuat dari layar Lingkungan, bukan hanya saat tenant lahir. Tanpa pilihan
+     * ini, tenant yang produksinya belum dibuat — atau dibuat "Belum" — tidak punya jalan ke server klien.
+     */
+    public function test_a_production_can_be_created_on_the_client_server(): void
+    {
+        $tenant = $this->tenant('PT Server Klien');
+
+        $response = $this->actingAs($this->operator())->post('/lingkungan', [
+            'tenant_id' => $tenant,
+            'kind' => 'production',
+            'name' => 'Produksi',
+            'hosting' => 'client_server',
+        ]);
+
+        $environment = Environment::query()->where('tenant_id', $tenant)->sole();
+
+        $response->assertSessionHasNoErrors()
+            ->assertRedirect('/lingkungan/'.$environment->id)
+            ->assertSessionHas('message', 'Lingkungan "Produksi" tercatat. Sekarang siapkan server kliennya.');
+
+        $this->assertSame('client_server', $environment->hosting);
+        $this->assertTrue($environment->runsOnClientServer());
+        $this->assertNull($environment->database_name);
+        $this->assertSame('provisioning', $environment->status);
+        $this->assertSame('client_server', $environment->operations()->sole()->detail['hosting']);
+    }
+
+    /** Pasangan hijaunya: tanpa `hosting`, produksi tetap lahir di server kita seperti sebelum pilihan ini ada. */
+    public function test_without_a_hosting_choice_the_environment_runs_on_our_server(): void
+    {
+        $tenant = $this->tenant('PT Server Kita');
+
+        $this->actingAs($this->operator())->post('/lingkungan', [
+            'tenant_id' => $tenant,
+            'kind' => 'production',
+            'name' => 'Produksi',
+        ])->assertSessionHas('message', 'Lingkungan "Produksi" tercatat. Sekarang siapkan databasenya.');
+
+        $this->assertSame('provider', Environment::query()->where('tenant_id', $tenant)->sole()->hosting);
+    }
+
+    public function test_only_a_production_may_run_on_the_client_server(): void
+    {
+        $tenant = $this->tenant('PT Demo Klien');
+        $operator = $this->operator();
+
+        $this->actingAs($operator)->post('/lingkungan', [
+            'tenant_id' => $tenant,
+            'kind' => 'demo',
+            'name' => 'Peragaan',
+            'expires_at' => Carbon::now()->addDays(7)->toDateString(),
+            'hosting' => 'client_server',
+        ])->assertSessionHasErrors(['hosting' => 'Server klien hanya untuk lingkungan produksi. Demo dan sandbox selalu berjalan di server kita.']);
+
+        $this->actingAs($operator)->post('/lingkungan', [
+            'tenant_id' => $tenant,
+            'kind' => 'production',
+            'name' => 'Produksi',
+            'hosting' => 'rumah-sendiri',
+        ])->assertSessionHasErrors('hosting');
+
+        $this->assertSame(0, Environment::query()->where('tenant_id', $tenant)->count());
+    }
+
+    /**
+     * Alamat yang disusun dari domain kita tidak pernah terbuka untuk produksi di server klien — Core menolak
+     * merutekannya — jadi layar tidak boleh mencetaknya. Pasangan hijaunya lingkungan server kita pada tenant
+     * yang sama bentuknya.
+     */
+    public function test_a_client_server_production_has_no_address_on_our_domain(): void
+    {
+        config(['core.base_domain' => 'erp.contoh.test']);
+        $operator = $this->operator();
+
+        $ours = $this->tenant('PT Alamat Kita');
+        $theirs = $this->tenant('PT Alamat Klien');
+
+        $this->actingAs($operator)->post('/lingkungan', ['tenant_id' => $ours, 'kind' => 'production', 'name' => 'Produksi']);
+        $this->actingAs($operator)->post('/lingkungan', ['tenant_id' => $theirs, 'kind' => 'production', 'name' => 'Produksi', 'hosting' => 'client_server']);
+
+        $provider = Environment::query()->where('tenant_id', $ours)->sole();
+        $clientServer = Environment::query()->where('tenant_id', $theirs)->sole();
+
+        $this->assertNotNull($provider->url());
+        $this->assertNull($clientServer->url());
+
+        $this->actingAs($operator)->get('/lingkungan/'.$clientServer->id)
+            ->assertInertia(fn ($page) => $page
+                ->where('environment.url', null)
+                ->where('environment.hosting', 'client_server')
+                ->where('serverClient.site', null));
+
+        $this->actingAs($operator)->get('/lingkungan')
+            ->assertInertia(fn ($page) => $page
+                ->where('environments', function (Collection $rows) use ($provider, $clientServer): bool {
+                    $byId = $rows->keyBy('id');
+
+                    return data_get($byId->get($clientServer->id), 'url') === null
+                        && data_get($byId->get($clientServer->id), 'site') === null
+                        && data_get($byId->get($provider->id), 'url') === $provider->url();
+                }));
     }
 
     public function test_the_index_and_show_screens_display_the_created_environment(): void

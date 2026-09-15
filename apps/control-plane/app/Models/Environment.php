@@ -62,6 +62,7 @@ class Environment extends Model
         'source_environment_id',
         'expires_at',
         'outbound_allowed',
+        'hosting',
         'created_by',
     ];
 
@@ -174,9 +175,17 @@ class Environment extends Model
      * disusun ulang di layar. Dua tempat yang menyusun alamat yang sama akan menyimpang, dan
      * penyimpangannya berbentuk pelanggan yang tidak dapat masuk ke alamat yang dicetak sistem
      * itu sendiri.
+     *
+     * Produksi di server klien tidak punya alamat di domain kita: Core di server kita menolak
+     * merutekannya, jadi alamat yang disusun `EnvironmentAddress` untuknya adalah alamat yang tidak pernah
+     * terbuka. Alamatnya milik server klien, dicatat di situsnya (`sites.address`).
      */
     public function url(): ?string
     {
+        if ($this->hosting === 'client_server') {
+            return null;
+        }
+
         return EnvironmentAddress::forEnvironment($this->tenant->slug ?? '', $this->kind);
     }
 }

@@ -14,9 +14,15 @@ use Illuminate\Support\Carbon;
 /**
  * Satu server milik klien yang dikelola dari konsol ini — tabel `sites` milik Core.
  *
- * Layarnya berbunyi "Situs". Aturan kerasnya — kunci dan waktu pendaftaran berpasangan, jendela
+ * Kelasnya `Site` dan alamatnya `/situs`, tetapi layarnya berbunyi "Server klien" sejak 15 September
+ * 2026: kata yang sama dengan panel di halaman lingkungan, dan kata yang langsung menjawab isi daftarnya.
+ * "Situs" terbaca seperti situs web. Aturan kerasnya — kunci dan waktu pendaftaran berpasangan, jendela
  * pembaruan berpasangan, profil yang dikenal — ditegakkan CHECK constraint di migration
  * `create_site_registry_tables`, bukan di kelas ini.
+ *
+ * `address` alamat aplikasi yang dibuka pengguna klinik; `server_address` alamat mesinnya, dicatat
+ * operator; `last_seen_ip` asal laporan agen terakhir. Kenapa ketiganya terpisah ada di migration
+ * `add_server_address_to_sites`.
  *
  * @property string $id
  * @property string $tenant_id
@@ -25,6 +31,8 @@ use Illuminate\Support\Carbon;
  * @property string $profile
  * @property string $edition
  * @property ?string $address
+ * @property ?string $server_address
+ * @property ?string $last_seen_ip
  * @property ?string $update_window_start
  * @property ?string $update_window_end
  * @property string $timezone
@@ -68,6 +76,7 @@ class Site extends Model
         'profile',
         'edition',
         'address',
+        'server_address',
         'update_window_start',
         'update_window_end',
         'timezone',

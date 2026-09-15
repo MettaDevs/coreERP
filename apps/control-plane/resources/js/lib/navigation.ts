@@ -6,15 +6,17 @@ export type NavItem = { href: string; title: string };
  * perusahaan yang belum menjadi pelanggan, dan layar Pembaruan tidak punya apa pun untuk
  * dibandingkan sebelum ada lingkungan.
  *
- * Situs sesudahnya: ia server milik klien on-prem yang dikelola lewat agen, dan tenant-nya harus
- * sudah ada lebih dulu. Pengaturan paling akhir, karena ia dibuka sesekali — saat menyiapkan konsol,
- * atau saat perintah pasang dan lisensi tidak bekerja — bukan setiap hari.
+ * Server klien sesudahnya: VPS milik klien yang dikelola lewat agen, dan tenant beserta lingkungan
+ * produksinya harus sudah ada lebih dulu. Alamatnya tetap `/situs` supaya tautan lama sampai; yang berganti
+ * hanya kata yang dibaca, karena "Situs" terbaca seperti situs web. Pengaturan paling akhir, karena ia
+ * dibuka sesekali — saat menyiapkan konsol, atau saat perintah pasang dan lisensi tidak bekerja — bukan
+ * setiap hari.
  */
 export const navigation: NavItem[] = [
     { href: '/tenant', title: 'Tenant' },
     { href: '/lingkungan', title: 'Lingkungan' },
     { href: '/pembaruan', title: 'Pembaruan' },
-    { href: '/situs', title: 'Situs' },
+    { href: '/situs', title: 'Server klien' },
     { href: '/pengaturan', title: 'Pengaturan' },
 ];
 

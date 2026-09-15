@@ -8,6 +8,7 @@ use ControlPlane\Http\Controllers\Controller;
 use ControlPlane\Models\Environment;
 use ControlPlane\Models\Site;
 use ControlPlane\Sites\ClientServerSetup;
+use ControlPlane\Sites\ServerSettings;
 use ControlPlane\Sites\SiteRejected;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,7 +30,7 @@ final class ClientServer extends Controller
     public function prepare(Request $request, string $environment, ClientServerSetup $setup): RedirectResponse
     {
         $row = $this->environment($environment);
-        $settings = $this->settings($request);
+        $settings = ServerSettings::fromRequest($request);
 
         try {
             $setup->prepare($request, $row, $settings);
@@ -49,7 +50,7 @@ final class ClientServer extends Controller
             throw ValidationException::withMessages(['server_client' => 'Siapkan server klien lebih dulu.']);
         }
 
-        $settings = $this->settings($request);
+        $settings = ServerSettings::fromRequest($request);
 
         try {
             $setup->updateSettings($request, $site, $settings);
@@ -88,30 +89,5 @@ final class ClientServer extends Controller
     private function environment(string $id): Environment
     {
         return Environment::query()->with('tenant:id,name,slug')->whereKey($id)->firstOrFail();
-    }
-
-    /**
-     * Isian "Lanjutan" — aturannya sama dengan formulir "Situs baru" yang digantikan panel ini.
-     *
-     * @return array{address: ?string, update_window_start: ?string, update_window_end: ?string}
-     */
-    private function settings(Request $request): array
-    {
-        $input = $request->validate([
-            'address' => ['nullable', 'url:https,http', 'max:255'],
-            'update_window_start' => ['nullable', 'date_format:H:i', 'required_with:update_window_end'],
-            'update_window_end' => ['nullable', 'date_format:H:i', 'required_with:update_window_start'],
-        ], [
-            'update_window_start.required_with' => 'Jendela pembaruan butuh jam mulai dan jam selesai.',
-            'update_window_end.required_with' => 'Jendela pembaruan butuh jam mulai dan jam selesai.',
-        ]);
-
-        $text = static fn (mixed $value): ?string => is_string($value) && $value !== '' ? $value : null;
-
-        return [
-            'address' => $text($input['address'] ?? null),
-            'update_window_start' => $text($input['update_window_start'] ?? null),
-            'update_window_end' => $text($input['update_window_end'] ?? null),
-        ];
     }
 }

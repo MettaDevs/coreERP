@@ -3,18 +3,24 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
-import { Input } from '@apperp/ui/input';
 import { Spinner } from '@apperp/ui/spinner';
 import { Link, router, useForm, usePage, usePoll } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { InstallStateBadge } from '@/components/badges';
+import CopyButton from '@/components/copy-button';
+import {
+    ServerAddressField,
+    ServerAdvancedFields,
+} from '@/components/server-settings-fields';
 import type { InstallProgress } from '@/lib/install-progress';
 
 export type ServerClient = {
     site: {
         id: string;
         name: string;
+        serverAddress: string | null;
+        lastSeenIp: string | null;
         address: string | null;
         updateWindow: { start: string; end: string; timezone: string } | null;
         enrolledAt: string | null;
@@ -33,51 +39,6 @@ export type InstallCommand = {
 
 /** Selang muat ulang parsial selama pemasangan belum mencapai keadaan akhir. */
 const POLL_MS = 5000;
-
-function FieldError({ message }: { message?: string }) {
-    return message ? (
-        <p className="text-sm text-destructive">{message}</p>
-    ) : null;
-}
-
-function CopyButton({
-    text,
-    label,
-    variant = 'outline',
-}: {
-    text: string;
-    label: string;
-    variant?: 'outline' | 'default';
-}) {
-    const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-
-    // Clipboard API tidak ada pada origin yang bukan HTTPS maupun localhost. Kegagalannya disebut di
-    // tombolnya sendiri, supaya operator tahu ia harus menyorot teksnya dengan tangan.
-    async function copy() {
-        try {
-            await navigator.clipboard.writeText(text);
-            setState('copied');
-            window.setTimeout(() => setState('idle'), 2500);
-        } catch {
-            setState('failed');
-        }
-    }
-
-    return (
-        <Button
-            type="button"
-            size="sm"
-            variant={variant}
-            onClick={() => void copy()}
-        >
-            {state === 'copied'
-                ? 'Tersalin'
-                : state === 'failed'
-                  ? 'Salin dengan tangan'
-                  : label}
-        </Button>
-    );
-}
 
 /**
  * Perintah pasang dan kata sandi sementara, ditampilkan sekali.
@@ -164,77 +125,9 @@ function InstallCommandCard({ issued }: { issued: InstallCommand }) {
     );
 }
 
-/**
- * Isian "Lanjutan": alamat aplikasi dan jendela pembaruan. Semuanya boleh kosong dan boleh diisi
- * belakangan — pemasangan tidak menunggunya.
- */
-function SettingsFields({
-    data,
-    setData,
-    errors,
-}: {
-    data: {
-        address: string;
-        update_window_start: string;
-        update_window_end: string;
-    };
-    setData: (
-        key: 'address' | 'update_window_start' | 'update_window_end',
-        value: string,
-    ) => void;
-    errors: Partial<
-        Record<'address' | 'update_window_start' | 'update_window_end', string>
-    >;
-}) {
-    return (
-        <div className="space-y-3">
-            <div className="space-y-2">
-                <Input
-                    id="address"
-                    label="Alamat aplikasi"
-                    type="url"
-                    value={data.address}
-                    onChange={(e) => setData('address', e.target.value)}
-                />
-                <FieldError message={errors.address} />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                    <Input
-                        id="update_window_start"
-                        label="Jendela pembaruan mulai"
-                        type="time"
-                        value={data.update_window_start}
-                        onChange={(e) =>
-                            setData('update_window_start', e.target.value)
-                        }
-                    />
-                    <FieldError message={errors.update_window_start} />
-                </div>
-                <div className="space-y-2">
-                    <Input
-                        id="update_window_end"
-                        label="Jendela pembaruan selesai"
-                        type="time"
-                        value={data.update_window_end}
-                        onChange={(e) =>
-                            setData('update_window_end', e.target.value)
-                        }
-                    />
-                    <FieldError message={errors.update_window_end} />
-                </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-                Jam pembaruan yang disepakati dengan klien, waktu Jakarta.
-                Kosongkan keduanya bila pembaruan boleh kapan saja. Pemasangan
-                pertama tidak menunggu jendela ini.
-            </p>
-        </div>
-    );
-}
-
 function Prepare({ environmentId }: { environmentId: string }) {
     const { data, setData, post, processing, errors } = useForm({
+        server_address: '',
         address: '',
         update_window_start: '',
         update_window_end: '',
@@ -255,13 +148,18 @@ function Prepare({ environmentId }: { environmentId: string }) {
                 yang dibeli, dan rilisnya diambil sistem. Belum ada yang
                 dipasang sampai perintah pasangnya dijalankan.
             </p>
+            <ServerAddressField
+                value={data.server_address}
+                onChange={(value) => setData('server_address', value)}
+                error={errors.server_address}
+            />
             <CollapsibleSectionGroup>
                 <CollapsibleSection
                     value="lanjutan"
                     title="Lanjutan"
                     summary="Alamat aplikasi dan jendela pembaruan, boleh diisi belakangan"
                 >
-                    <SettingsFields
+                    <ServerAdvancedFields
                         data={data}
                         setData={setData}
                         errors={errors}
@@ -284,13 +182,14 @@ function EditSettings({
     site: NonNullable<ServerClient['site']>;
 }) {
     const { data, setData, patch, processing, errors } = useForm({
+        server_address: site.serverAddress ?? '',
         address: site.address ?? '',
         update_window_start: site.updateWindow?.start ?? '',
         update_window_end: site.updateWindow?.end ?? '',
     });
 
     const summary = [
-        site.address ?? 'Alamat belum diisi',
+        site.serverAddress ?? 'Alamat server belum diisi',
         site.updateWindow
             ? `pembaruan ${site.updateWindow.start}–${site.updateWindow.end}`
             : 'pembaruan kapan saja',
@@ -299,12 +198,12 @@ function EditSettings({
     return (
         <CollapsibleSectionGroup>
             <CollapsibleSection
-                value="lanjutan"
-                title="Lanjutan"
+                value="setelan"
+                title="Setelan server"
                 summary={summary}
             >
                 <form
-                    className="space-y-3"
+                    className="space-y-4"
                     onSubmit={(e: FormEvent) => {
                         e.preventDefault();
                         patch(`/lingkungan/${environmentId}/server-klien`, {
@@ -312,7 +211,13 @@ function EditSettings({
                         });
                     }}
                 >
-                    <SettingsFields
+                    <ServerAddressField
+                        value={data.server_address}
+                        onChange={(value) => setData('server_address', value)}
+                        error={errors.server_address}
+                        lastSeenIp={site.lastSeenIp}
+                    />
+                    <ServerAdvancedFields
                         data={data}
                         setData={setData}
                         errors={errors}
@@ -365,13 +270,13 @@ function StateSentence({
         case 'installing':
             return 'Agen sedang memasang di server klien. Halaman ini memperbarui dirinya sendiri.';
         case 'ready':
-            return 'Terpasang dan melapor. Pembaruan, cadangan, lisensi, ganti kunci, diagnosa, dan pencabutan ada di halaman situsnya.';
+            return 'Terpasang dan melapor. Pembaruan, cadangan, lisensi, ganti kunci, diagnosa, dan pencabutan ada di halaman server kliennya.';
         case 'stale':
             return 'Terpasang, tetapi agen berhenti melapor. Sebabnya dapat berupa server yang mati, internet klien yang putus, atau agen yang berhenti.';
         case 'failed':
             return 'Pemasangan gagal. Periksa langkah dan sebabnya, perbaiki di server klien bila perlu, lalu coba lagi.';
         case 'revoked':
-            return 'Situs ini dicabut. Aplikasinya di server klien tetap berjalan; pengelolaannya yang berhenti.';
+            return 'Server klien ini dicabut. Aplikasinya di sana tetap berjalan; pengelolaannya yang berhenti.';
         default:
             return null;
     }
@@ -496,13 +401,33 @@ export default function ClientServerPanel({
                 <>
                     <dl>
                         {site && (
-                            <Line label="Situs">
+                            <Line label="Server klien">
                                 <Link
                                     href={`/situs/${site.id}`}
                                     className="underline underline-offset-4"
                                 >
                                     {site.name}
                                 </Link>
+                            </Line>
+                        )}
+                        {site && (
+                            <Line label="Alamat server">
+                                {site.serverAddress ? (
+                                    <span className="inline-flex items-center gap-1">
+                                        <span className="font-mono text-xs">
+                                            {site.serverAddress}
+                                        </span>
+                                        <CopyButton
+                                            text={site.serverAddress}
+                                            label="Salin alamat server"
+                                            iconOnly
+                                        />
+                                    </span>
+                                ) : (
+                                    <span className="font-normal text-muted-foreground">
+                                        Belum dicatat — isi di Setelan server
+                                    </span>
+                                )}
                             </Line>
                         )}
                         {(progress.release ||

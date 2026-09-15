@@ -8,6 +8,7 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link } from '@inertiajs/react';
+import { Cloud, Server } from 'lucide-react';
 import { InstallStateBadge, KindBadge, StatusBadge } from '@/components/badges';
 import Shell from '@/components/shell';
 import { progressDetail } from '@/lib/install-progress';
@@ -27,6 +28,11 @@ type Row = {
     expiresAt: string | null;
     tenant: string;
     serverClient: InstallProgress | null;
+    site: {
+        id: string;
+        serverAddress: string | null;
+        address: string | null;
+    } | null;
 };
 
 export default function Index({
@@ -53,8 +59,8 @@ export default function Index({
                             <TableHead>Nama</TableHead>
                             <TableHead>Tenant</TableHead>
                             <TableHead>Jenis</TableHead>
+                            <TableHead>Berjalan di</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead>Server klien</TableHead>
                             <TableHead>Alamat</TableHead>
                             <TableHead>Berakhir</TableHead>
                             <TableHead />
@@ -84,12 +90,30 @@ export default function Index({
                                     <KindBadge kind={row.kind} />
                                 </TableCell>
                                 <TableCell>
-                                    <StatusBadge status={row.status} />
+                                    {row.hosting === 'client_server' ? (
+                                        <span className="inline-flex items-start gap-1.5 text-sm">
+                                            <Server className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                                            <span>
+                                                Server klien
+                                                {row.site?.serverAddress && (
+                                                    <span className="block font-mono text-xs text-muted-foreground">
+                                                        {row.site.serverAddress}
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5 text-sm">
+                                            <Cloud className="size-3.5 shrink-0 text-muted-foreground" />
+                                            Server kita
+                                        </span>
+                                    )}
                                 </TableCell>
                                 {/*
-                                    Hanya produksi di server klien yang punya keadaan pemasangan.
-                                    Lingkungan lain berjalan di server kita, dan kolom kosong di
-                                    barisnya berarti persis itu — bukan data yang belum terbaca.
+                                    Produksi di server klien tidak pernah disiapkan di sini, jadi status
+                                    registry-nya menetap "Sedang disiapkan" selamanya — kata yang benar
+                                    secara teknis dan salah bagi pembacanya. Yang ditampilkan untuknya
+                                    keadaan pemasangan, dihitung `InstallProgress`.
                                 */}
                                 <TableCell>
                                     {row.serverClient ? (
@@ -108,9 +132,7 @@ export default function Index({
                                             )}
                                         </div>
                                     ) : (
-                                        <span className="text-xs text-muted-foreground">
-                                            —
-                                        </span>
+                                        <StatusBadge status={row.status} />
                                     )}
                                 </TableCell>
                                 {/*
@@ -118,10 +140,29 @@ export default function Index({
 
                                     Keduanya sama-sama teknis, tetapi cuma satu yang perlu dikirim
                                     ke pelanggan — dan nama database tetap terbaca di halaman
-                                    rincian bagi yang memang mencarinya.
+                                    rincian bagi yang memang mencarinya. Produksi di server klien
+                                    tidak punya alamat di domain kita; alamatnya milik server itu.
                                 */}
                                 <TableCell className="max-w-[22rem] font-mono text-xs break-all">
-                                    {row.url ? (
+                                    {row.hosting === 'client_server' ? (
+                                        row.site?.address ? (
+                                            <a
+                                                href={row.site.address}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="underline underline-offset-4"
+                                            >
+                                                {row.site.address.replace(
+                                                    /^https?:\/\//,
+                                                    '',
+                                                )}
+                                            </a>
+                                        ) : (
+                                            <span className="font-sans text-muted-foreground">
+                                                Belum dicatat
+                                            </span>
+                                        )
+                                    ) : row.url ? (
                                         <a
                                             href={row.url}
                                             target="_blank"

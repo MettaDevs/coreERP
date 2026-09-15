@@ -1,3 +1,4 @@
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
@@ -10,14 +11,25 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { ArrowUpCircle, ExternalLink } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { SiteStateBadge } from '@/components/badges';
+import { InstallStateBadge } from '@/components/badges';
+import CopyButton from '@/components/copy-button';
+import {
+    ServerAddressField,
+    ServerAdvancedFields,
+} from '@/components/server-settings-fields';
 import Shell from '@/components/shell';
 import {
     labelFor,
+    siteAuditLabels,
     siteOperationLabels,
     siteOperationStatusLabels,
 } from '@/lib/display';
+import { progressDetail } from '@/lib/install-progress';
+import type { InstallProgress } from '@/lib/install-progress';
+import { newerRelease } from '@/lib/release';
+import { daysUntil, relativeTime } from '@/lib/time';
 
 type Report = {
     containers?: { service: string; state: string; health?: string | null }[];
@@ -56,14 +68,19 @@ type Site = {
     environment: { id: string; name: string } | null;
     edition: string;
     state: string;
+    serverAddress: string | null;
+    address: string | null;
+    lastSeenIp: string | null;
     reportedRelease: string | null;
+    newestRelease: string | null;
     reportedDigest: string | null;
     lastSeenAt: string | null;
-    address: string | null;
+    lastSeenIso: string | null;
     updateWindow: { start: string; end: string; timezone: string } | null;
     enrolledAt: string | null;
     lastReport: Report | null;
     license: License;
+    progress: InstallProgress;
 };
 
 type Operation = {
@@ -80,26 +97,36 @@ type Operation = {
 
 type AuditEvent = { id: string; action: string; by: string; at: string };
 
+/** Edisi satu image yang dipakai setiap server klien sejak 15 September 2026 — lihat `Site::SINGLE_IMAGE_EDITION`. */
+const SINGLE_IMAGE_EDITION = 'coreerp';
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
     return (
         <div className="flex flex-wrap justify-between gap-4 border-b py-2.5 last:border-b-0">
             <dt className="text-sm text-muted-foreground">{label}</dt>
-            <dd className="text-sm font-medium break-all">{children}</dd>
+            <dd className="text-end text-sm font-medium break-all">
+                {children}
+            </dd>
         </div>
     );
 }
 
 function Section({
+    id,
     title,
     description,
     children,
 }: {
+    id?: string;
     title: string;
     description?: string;
     children: ReactNode;
 }) {
     return (
-        <section className="space-y-4 rounded-lg border bg-background p-5">
+        <section
+            id={id}
+            className="scroll-mt-24 space-y-4 rounded-lg border bg-background p-5"
+        >
             <div>
                 <h2 className="text-sm font-semibold">{title}</h2>
                 {description && (
@@ -110,6 +137,26 @@ function Section({
             </div>
             {children}
         </section>
+    );
+}
+
+function Summary({
+    label,
+    children,
+    hint,
+}: {
+    label: string;
+    children: ReactNode;
+    hint?: ReactNode;
+}) {
+    return (
+        <div className="min-w-0 rounded-lg border bg-background p-4">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <div className="mt-1.5 min-w-0 text-sm font-medium">{children}</div>
+            {hint && (
+                <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
+            )}
+        </div>
     );
 }
 
@@ -160,6 +207,122 @@ function ConfirmName({
     );
 }
 
+/**
+ * Setelan server: alamat mesin, alamat aplikasi, dan jendela pembaruan.
+ *
+ * Isinya sama dengan "Setelan server" di panel halaman lingkungan, dan disimpan lewat aturan yang sama.
+ * Situs yang dicabut hanya ditampilkan, karena setelannya tidak lagi berarti apa pun.
+ */
+function ServerSettingsSection({
+    site,
+    revoked,
+}: {
+    site: Site;
+    revoked: boolean;
+}) {
+    const { data, setData, patch, processing, errors } = useForm({
+        server_address: site.serverAddress ?? '',
+        address: site.address ?? '',
+        update_window_start: site.updateWindow?.start ?? '',
+        update_window_end: site.updateWindow?.end ?? '',
+    });
+    const refusal = (errors as Record<string, string | undefined>).settings;
+
+    if (revoked) {
+        return (
+            <Section id="setelan" title="Setelan server">
+                <dl>
+                    <Row label="Alamat server">{site.serverAddress ?? '—'}</Row>
+                    <Row label="Alamat aplikasi">{site.address ?? '—'}</Row>
+                    <Row label="Jendela pembaruan">
+                        {site.updateWindow
+                            ? `${site.updateWindow.start}–${site.updateWindow.end} (${site.updateWindow.timezone})`
+                            : 'Kapan saja'}
+                    </Row>
+                </dl>
+            </Section>
+        );
+    }
+
+    return (
+        <Section
+            id="setelan"
+            title="Setelan server"
+            description="Dicatat untuk operator. Tidak satu pun mengubah server klien; jendela pembaruan berlaku pada pembaruan berikutnya."
+        >
+            <form
+                className="space-y-4"
+                onSubmit={(e: FormEvent) => {
+                    e.preventDefault();
+                    patch(`/situs/${site.id}/setelan`, {
+                        preserveScroll: true,
+                    });
+                }}
+            >
+                {refusal && (
+                    <p role="alert" className="text-sm text-destructive">
+                        {refusal}
+                    </p>
+                )}
+                <ServerAddressField
+                    value={data.server_address}
+                    onChange={(value) => setData('server_address', value)}
+                    error={errors.server_address}
+                    lastSeenIp={site.lastSeenIp}
+                />
+                <ServerAdvancedFields
+                    data={data}
+                    setData={setData}
+                    errors={errors}
+                />
+                <Button type="submit" variant="outline" disabled={processing}>
+                    Simpan setelan
+                </Button>
+            </form>
+        </Section>
+    );
+}
+
+/**
+ * Pemasangan server klien yang lahir dari halaman lingkungan: keadaannya di sini, tombolnya di sana.
+ *
+ * Perintah pasang membuat token pendaftaran dan operasi pasang sekaligus, dan hanya panel di halaman
+ * lingkungan yang melakukannya. Menaruh tombol kedua di sini berarti dua tempat yang menampilkan kata sandi
+ * sementara yang sama hanya sekali.
+ */
+function Installation({ site }: { site: Site }) {
+    const detail = progressDetail(site.progress);
+
+    return (
+        <Section
+            title="Pemasangan"
+            description="Perintah pasang dibuat dan dipantau dari panel Server klien di halaman lingkungannya."
+        >
+            <div className="flex flex-wrap items-center gap-2">
+                <InstallStateBadge state={site.progress.state} />
+                {detail && (
+                    <span className="text-sm text-muted-foreground">
+                        {detail}
+                    </span>
+                )}
+            </div>
+            {site.progress.failureMessage && (
+                <p className="text-sm whitespace-pre-line text-destructive">
+                    {site.progress.failureMessage}
+                </p>
+            )}
+            {site.environment && (
+                <Button asChild>
+                    <Link href={`/lingkungan/${site.environment.id}`}>
+                        Buka panel pemasangan
+                    </Link>
+                </Button>
+            )}
+        </Section>
+    );
+}
+
+/** Pendaftaran tangan untuk situs lama tanpa lingkungan — satu-satunya yang masih memakainya. */
 function Enrollment({ site }: { site: Site }) {
     const { enrollment } = usePage<{
         enrollment: { command: string; expiresAt: string } | null;
@@ -169,10 +332,16 @@ function Enrollment({ site }: { site: Site }) {
     return (
         <Section
             title="Pendaftaran"
-            description="Perintah pasang dijalankan sekali di server klien sebagai root. Tokennya sekali pakai dan kedaluwarsa dalam satu jam; perintahnya hanya tampil sekali."
+            description="Situs lama tanpa lingkungan. Perintah pasang dijalankan sekali di server klien sebagai root; tokennya sekali pakai, kedaluwarsa dalam satu jam, dan perintahnya hanya tampil sekali."
         >
             {enrollment && (
                 <div className="space-y-2">
+                    <div className="flex justify-end">
+                        <CopyButton
+                            text={enrollment.command}
+                            label="Salin perintah"
+                        />
+                    </div>
                     <pre className="overflow-x-auto rounded-md bg-muted p-3 font-mono text-xs break-all whitespace-pre-wrap">
                         {enrollment.command}
                     </pre>
@@ -261,7 +430,7 @@ function RequestOperation({
                     (releases.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
                             Belum ada rilis terdaftar yang lebih baru dari rilis
-                            terpasang untuk edisi {site.edition}.
+                            yang terpasang di server ini.
                         </p>
                     ) : (
                         <NativeSelect
@@ -329,10 +498,18 @@ function Revoke({ site }: { site: Site }) {
     });
 
     return (
-        <Section
-            title="Cabut situs"
-            description="Tanda tangan agen situs ini berhenti diterima dan permintaan yang menunggu dibatalkan. Aplikasinya di server klien tetap berjalan — yang berhenti pengelolaannya, bukan pelayanan pasien. Tidak dapat dibatalkan dari layar ini."
-        >
+        <section className="space-y-4 rounded-lg border border-red-200 bg-background p-5 dark:border-red-900/60">
+            <div>
+                <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">
+                    Cabut server klien
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                    Tanda tangan agen server ini berhenti diterima dan
+                    permintaan yang menunggu dibatalkan. Aplikasinya di server
+                    klien tetap berjalan — yang berhenti pengelolaannya, bukan
+                    pelayanan pasien. Tidak dapat dibatalkan dari layar ini.
+                </p>
+            </div>
             <form
                 className="space-y-3"
                 onSubmit={(e: FormEvent) => {
@@ -351,10 +528,10 @@ function Revoke({ site }: { site: Site }) {
                     variant="destructive"
                     disabled={processing}
                 >
-                    Cabut situs
+                    Cabut server klien
                 </Button>
             </form>
-        </Section>
+        </section>
     );
 }
 
@@ -423,11 +600,33 @@ function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
     );
 }
 
+function ContainerBadge({
+    container,
+}: {
+    container: { service: string; state: string; health?: string | null };
+}) {
+    const good =
+        container.state === 'running' &&
+        (!container.health || container.health === 'healthy');
+    const classes = good
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200';
+
+    return (
+        <Badge variant="outline" className={`font-mono ${classes}`}>
+            {container.service}
+            <span className="font-sans opacity-80">
+                {container.health ?? container.state}
+            </span>
+        </Badge>
+    );
+}
+
 /**
- * Rincian satu situs: keadaan terakhir, tindakan, riwayat operasi, dan jejak audit.
+ * Rincian satu server klien: ringkasan di atas, setelan dan laporan, tindakan, lalu riwayat.
  *
- * Tindakan yang tersedia mengikuti keadaan situsnya, bukan disembunyikan setelah ditekan. Situs yang
- * belum terdaftar hanya menawarkan pendaftaran.
+ * Tindakan yang tersedia mengikuti keadaannya, bukan disembunyikan setelah ditekan. Server yang belum
+ * terdaftar menaut ke panel pemasangannya — atau, untuk situs lama tanpa lingkungan, menawarkan pendaftaran.
  */
 export default function Show({
     site,
@@ -449,9 +648,24 @@ export default function Show({
     const report = site.lastReport;
     const revoked = site.state === 'revoked';
     const operationError = usePage().props.errors.operation;
+    const newer = newerRelease(site.reportedRelease, site.newestRelease);
+    const seen = relativeTime(site.lastSeenIso);
+    const licenseDays = daysUntil(site.license.validUntil);
 
     return (
-        <Shell title={site.name} description={`Milik ${site.tenant}`}>
+        <Shell
+            title={site.name}
+            description={`Milik ${site.tenant}`}
+            actions={
+                site.environment && (
+                    <Button asChild variant="outline">
+                        <Link href={`/lingkungan/${site.environment.id}`}>
+                            Lingkungan {site.environment.name}
+                        </Link>
+                    </Button>
+                )
+            }
+        >
             <Head title={site.name} />
 
             {operationError && (
@@ -473,51 +687,78 @@ export default function Show({
                 </div>
             )}
 
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Summary
+                    label="Keadaan"
+                    hint={
+                        seen
+                            ? `Terakhir terlihat ${seen}`
+                            : 'Belum pernah melapor'
+                    }
+                >
+                    <InstallStateBadge state={site.progress.state} />
+                </Summary>
+                <Summary
+                    label="Alamat server"
+                    hint={
+                        site.lastSeenIp
+                            ? `Agen melapor dari ${site.lastSeenIp}`
+                            : undefined
+                    }
+                >
+                    {site.serverAddress ? (
+                        <span className="flex items-center gap-1">
+                            <span className="truncate font-mono">
+                                {site.serverAddress}
+                            </span>
+                            <CopyButton
+                                text={site.serverAddress}
+                                label="Salin alamat server"
+                                iconOnly
+                            />
+                        </span>
+                    ) : (
+                        <a
+                            href="#setelan"
+                            className="font-normal text-amber-700 hover:underline dark:text-amber-300"
+                        >
+                            Belum dicatat
+                        </a>
+                    )}
+                </Summary>
+                <Summary
+                    label="Rilis terpasang"
+                    hint={
+                        newer ? (
+                            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                                <ArrowUpCircle className="size-3.5" />
+                                {newer} tersedia
+                            </span>
+                        ) : site.newestRelease ? (
+                            `Terbaru ${site.newestRelease}`
+                        ) : undefined
+                    }
+                >
+                    <span className="font-mono">
+                        {site.reportedRelease ?? '—'}
+                    </span>
+                </Summary>
+                <Summary
+                    label="Lisensi berlaku sampai"
+                    hint={
+                        licenseDays === null
+                            ? 'Belum diterbitkan'
+                            : licenseDays < 0
+                              ? `Habis ${Math.abs(licenseDays)} hari lalu`
+                              : `${licenseDays} hari lagi`
+                    }
+                >
+                    {site.license.validUntil ?? '—'}
+                </Summary>
+            </div>
+
             <div className="grid gap-6 lg:grid-cols-2">
-                <Section title="Keterangan">
-                    <dl>
-                        <Row label="Keadaan">
-                            <SiteStateBadge state={site.state} />
-                        </Row>
-                        <Row label="Lingkungan">
-                            {site.environment ? (
-                                <Link
-                                    href={`/lingkungan/${site.environment.id}`}
-                                    className="underline underline-offset-4"
-                                >
-                                    {site.environment.name}
-                                </Link>
-                            ) : (
-                                'Didaftarkan tanpa lingkungan'
-                            )}
-                        </Row>
-                        <Row label="Edisi">{site.edition}</Row>
-                        <Row label="Rilis terpasang">
-                            {site.reportedRelease ?? '—'}
-                        </Row>
-                        <Row label="Terakhir terlihat">
-                            {site.lastSeenAt ?? 'Belum pernah'}
-                        </Row>
-                        <Row label="Jendela pembaruan">
-                            {site.updateWindow
-                                ? `${site.updateWindow.start}–${site.updateWindow.end} (${site.updateWindow.timezone})`
-                                : 'Kapan saja'}
-                        </Row>
-                        <Row label="Terdaftar">{site.enrolledAt ?? '—'}</Row>
-                        {site.address && (
-                            <Row label="Alamat">
-                                <a
-                                    href={site.address}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="underline underline-offset-4"
-                                >
-                                    {site.address}
-                                </a>
-                            </Row>
-                        )}
-                    </dl>
-                </Section>
+                <ServerSettingsSection site={site} revoked={revoked} />
 
                 <Section
                     title="Laporan terakhir"
@@ -525,14 +766,21 @@ export default function Show({
                 >
                     {report ? (
                         <dl>
-                            <Row label="Container">
-                                {(report.containers ?? [])
-                                    .map(
-                                        (c) =>
-                                            `${c.service}: ${c.state}${c.health ? ` (${c.health})` : ''}`,
-                                    )
-                                    .join(', ') || '—'}
-                            </Row>
+                            {(report.containers ?? []).length > 0 && (
+                                <div className="space-y-2 border-b py-2.5">
+                                    <dt className="text-sm text-muted-foreground">
+                                        Container
+                                    </dt>
+                                    <dd className="flex flex-wrap gap-1.5">
+                                        {(report.containers ?? []).map((c) => (
+                                            <ContainerBadge
+                                                key={c.service}
+                                                container={c}
+                                            />
+                                        ))}
+                                    </dd>
+                                </div>
+                            )}
                             <Row label="Sisa disk data">
                                 {bytes(report.disk?.data_free_bytes)}
                             </Row>
@@ -544,7 +792,7 @@ export default function Show({
                                     ? `${report.last_backup.at} — ${labelFor(siteOperationStatusLabels, report.last_backup.result)}, ${bytes(report.last_backup.size_bytes)}`
                                     : 'Belum ada'}
                             </Row>
-                            <Row label="Lisensi berakhir">
+                            <Row label="Lisensi terpasang berakhir">
                                 {report.license_expires_at ?? '—'}
                             </Row>
                             <Row label="Sertifikat berakhir">
@@ -553,19 +801,48 @@ export default function Show({
                             <Row label="Versi agen">
                                 {report.agent_version ?? '—'}
                             </Row>
+                            <Row label="Terdaftar">
+                                {site.enrolledAt ?? '—'}
+                            </Row>
+                            {site.edition !== SINGLE_IMAGE_EDITION && (
+                                <Row label="Edisi">{site.edition}</Row>
+                            )}
+                            {site.reportedDigest && (
+                                <Row label="Digest">
+                                    <span className="font-mono text-xs font-normal">
+                                        {site.reportedDigest}
+                                    </span>
+                                </Row>
+                            )}
                         </dl>
                     ) : (
                         <p className="text-sm text-muted-foreground">
-                            Situs ini belum pernah melapor.
+                            Server ini belum pernah melapor. Laporan pertama
+                            datang sekitar satu menit setelah agennya terpasang.
                         </p>
+                    )}
+                    {site.address && (
+                        <a
+                            href={site.address}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
+                        >
+                            Buka aplikasi
+                            <ExternalLink className="size-3.5" />
+                        </a>
                     )}
                 </Section>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-2">
-                {!revoked && site.state === 'not_enrolled' && (
-                    <Enrollment site={site} />
-                )}
+                {!revoked &&
+                    site.state === 'not_enrolled' &&
+                    (site.environment ? (
+                        <Installation site={site} />
+                    ) : (
+                        <Enrollment site={site} />
+                    ))}
                 {!revoked && site.state !== 'not_enrolled' && (
                     <RequestOperation
                         site={site}
@@ -663,23 +940,36 @@ export default function Show({
 
             <Section
                 title="Jejak audit"
-                description="Tindakan operator terhadap situs ini. Jejaknya hanya dapat ditambah; database menolak perubahan dan penghapusan."
+                description="Tindakan operator dan sistem terhadap server ini. Jejaknya hanya dapat ditambah; database menolak perubahan dan penghapusan."
             >
                 {audit.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                         Belum ada tindakan tercatat.
                     </p>
                 ) : (
-                    <ul className="space-y-1 text-sm">
+                    <ul className="divide-y text-sm">
                         {audit.map((event) => (
-                            <li key={event.id} className="flex flex-wrap gap-2">
-                                <span className="text-muted-foreground">
-                                    {event.at}
+                            <li
+                                key={event.id}
+                                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2"
+                            >
+                                <span>
+                                    <span className="font-medium">
+                                        {labelFor(
+                                            siteAuditLabels,
+                                            event.action,
+                                        )}
+                                    </span>
+                                    <span className="ms-2 text-muted-foreground">
+                                        oleh {event.by}
+                                    </span>
                                 </span>
-                                <span className="font-mono text-xs">
-                                    {event.action}
+                                <span className="flex items-baseline gap-3 text-xs text-muted-foreground">
+                                    <span className="font-mono">
+                                        {event.action}
+                                    </span>
+                                    <span>{event.at}</span>
                                 </span>
-                                <span>oleh {event.by}</span>
                             </li>
                         ))}
                     </ul>

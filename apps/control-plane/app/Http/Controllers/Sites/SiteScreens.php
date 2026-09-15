@@ -5,28 +5,38 @@ declare(strict_types=1);
 namespace ControlPlane\Http\Controllers\Sites;
 
 use ControlPlane\Http\Controllers\Controller;
+use ControlPlane\Models\Environment;
 use ControlPlane\Models\OperatorAuditEvent;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Models\SiteRelease;
+use ControlPlane\Sites\ClientServerSetup;
 use ControlPlane\Sites\InstallProgress;
 use ControlPlane\Sites\SiteOperations;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
 /**
- * Layar Situs: ringkasan dan rincian.
+ * Layar Server klien (`/situs`): daftar setiap mesin milik klien yang dikelola dari sini, dan rinciannya.
  *
  * Tindakan yang mengubah server klien — operasi, token pendaftaran, pencabutan, perpanjangan lisensi — ada di
  * `SiteActions`, terpisah dari yang hanya membaca, supaya setiap method yang menulis jejak audit
- * terkumpul di satu tempat yang mudah diperiksa.
+ * terkumpul di satu tempat yang mudah diperiksa. Setelan alamat dan jendela pembaruan ada di `SiteSettings`.
  *
- * ## Tidak ada lagi "Situs baru"
+ * ## Untuk apa daftar ini
  *
- * Situs lahir dari panel "Server klien" di halaman lingkungan produksinya (`ClientServerSetup`). Formulir
- * yang berdiri sendiri menanyakan hal yang sudah diketahui sistem — tenant, nama, edisi — dan tidak
- * menyebut apakah sesuatu sudah terpasang. Ringkasan di sini menaut ke halaman lingkungan itu; situs
- * lama yang lahir sebelum 15 September 2026 tanpa lingkungan tetap tampil dan tetap punya rinciannya.
+ * Satu tempat yang menjawab "server klien mana saja yang kita pegang, di alamat mana, dan mana yang perlu
+ * didatangi hari ini" — tanpa membuka halaman lingkungan tenant satu per satu. Karena itu setiap baris
+ * membawa alamat mesinnya, keadaan pemasangan, rilis terpasang terhadap rilis terbaru, dan masa lisensi.
+ *
+ * ## Tidak ada formulir "Situs baru" yang berdiri sendiri
+ *
+ * Formulir lama menanyakan hal yang sudah diketahui sistem — tenant, nama, edisi — dan tidak menyebut apakah
+ * sesuatu sudah terpasang. Tombol "Tambah server klien" di sini hanya memilih lingkungan produksi server
+ * klien yang belum punya server, lalu memakai pintu yang sama dengan panel di halaman lingkungan
+ * (`ClientServerSetup::prepare`). Situs lama yang lahir sebelum 15 September 2026 tanpa lingkungan tetap
+ * tampil dan tetap punya rinciannya.
  */
 final class SiteScreens extends Controller
 {
@@ -42,6 +52,7 @@ final class SiteScreens extends Controller
         }
 
         $progress = InstallProgress::forSites($rows->all());
+        $newest = $this->newestReleases();
 
         return Inertia::render('sites/index', [
             'sites' => $rows
@@ -50,8 +61,10 @@ final class SiteScreens extends Controller
                         ? ['id' => $site->environment->id, 'name' => $site->environment->name]
                         : null,
                     'progress' => $progress[$site->id],
+                    'newestRelease' => $newest[$site->edition] ?? null,
                 ])
                 ->all(),
+            'candidates' => $this->candidates(),
         ]);
     }
 
@@ -111,9 +124,11 @@ final class SiteScreens extends Controller
                 'environment' => $row->environment !== null
                     ? ['id' => $row->environment->id, 'name' => $row->environment->name]
                     : null,
-                'address' => $row->address,
                 'profile' => $row->profile,
-                'updateWindow' => $row->updateWindow(),
+                'newestRelease' => ClientServerSetup::newestRelease($row->edition),
+                // Situs yang lahir dari halaman lingkungan dipasang dari sana. Rinciannya menampilkan
+                // keadaan pemasangan yang sama dan menaut ke panelnya, bukan formulir pendaftaran lama.
+                'progress' => InstallProgress::forSite($row),
                 'enrolledAt' => $row->enrolled_at?->toDateTimeString(),
                 'reportedDigest' => $row->reported_digest,
                 'lastReport' => $row->last_report,
@@ -142,7 +157,15 @@ final class SiteScreens extends Controller
         ]);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Bentuk yang sama untuk daftar dan rincian.
+     *
+     * Waktu dikirim dua kali: `lastSeenAt` untuk dibaca apa adanya, dan `lastSeenIso` — dengan zona waktunya —
+     * untuk dihitung layar menjadi "3 menit lalu". Menghitung selisih dari teks tanpa zona waktu membuat
+     * peramban di Jakarta membacanya tujuh jam lebih tua dari sebenarnya.
+     *
+     * @return array<string, mixed>
+     */
     private function row(Site $site): array
     {
         return [
@@ -156,8 +179,61 @@ final class SiteScreens extends Controller
                 $site->stale() => 'stale',
                 default => 'enrolled',
             },
+            'serverAddress' => $site->server_address,
+            'address' => $site->address,
+            'lastSeenIp' => $site->last_seen_ip,
+            'updateWindow' => $site->updateWindow(),
             'reportedRelease' => $site->reported_release,
             'lastSeenAt' => $site->last_seen_at?->toDateTimeString(),
+            'lastSeenIso' => $site->last_seen_at?->toIso8601String(),
+            'licenseValidUntil' => $site->license_valid_until?->toDateString(),
+            'licenseSuspended' => $site->licenseRenewalSuspended(),
         ];
+    }
+
+    /**
+     * Rilis terdaftar terbaru per edisi, dengan satu query untuk seluruh daftar.
+     *
+     * @return array<string, string>
+     */
+    private function newestReleases(): array
+    {
+        $newest = [];
+
+        foreach (SiteRelease::query()->get(['edition', 'release']) as $release) {
+            $current = $newest[$release->edition] ?? null;
+
+            if ($current === null || SiteRelease::compare($release->release, $current) > 0) {
+                $newest[$release->edition] = $release->release;
+            }
+        }
+
+        return $newest;
+    }
+
+    /**
+     * Lingkungan yang dapat diberi server klien dari tombol "Tambah server klien": produksi di server klien
+     * yang belum dihapus dan belum punya situs. Aturan yang sama ditegakkan lagi oleh `ClientServerSetup`
+     * dan indeks `sites_satu_per_lingkungan`; daftar ini hanya supaya pilihan yang pasti ditolak tidak
+     * pernah ditawarkan.
+     *
+     * @return list<array{id: string, name: string, tenant: string}>
+     */
+    private function candidates(): array
+    {
+        return array_values(Environment::query()
+            ->with('tenant:id,name')
+            ->where('kind', 'production')
+            ->where('hosting', 'client_server')
+            ->whereNull('deleted_at')
+            ->whereNotExists(fn ($query) => $query->select(DB::raw(1))->from('sites')->whereColumn('sites.environment_id', 'environments.id'))
+            ->get()
+            ->map(fn (Environment $environment): array => [
+                'id' => $environment->id,
+                'name' => $environment->name,
+                'tenant' => $environment->tenant->name ?? 'Tanpa tenant',
+            ])
+            ->sortBy('tenant', SORT_NATURAL | SORT_FLAG_CASE)
+            ->all());
     }
 }

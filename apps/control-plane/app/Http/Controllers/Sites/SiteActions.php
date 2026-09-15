@@ -33,9 +33,21 @@ use Illuminate\Validation\ValidationException;
  */
 final class SiteActions extends Controller
 {
+    /**
+     * Token pendaftaran tanpa operasi pasang — hanya untuk situs lama yang lahir sebelum 15 September 2026
+     * tanpa lingkungan.
+     *
+     * Situs yang punya lingkungan dipasang dari panel di halaman lingkungannya, yang membuat token **dan**
+     * operasi `install` sekaligus. Token saja dari sini akan mendaftarkan agen yang tidak punya apa pun
+     * untuk dipasang, dan panel lingkungannya lalu menunjukkan keadaan yang tidak dibuat siapa pun.
+     */
     public function issueEnrollment(Request $request, string $site, EnrollmentTokens $tokens): RedirectResponse
     {
         $row = $this->confirmedSite($request, $site);
+
+        if ($row->environment_id !== null) {
+            throw ValidationException::withMessages(['operation' => 'Server klien ini dipasang dari halaman lingkungannya, lewat "Buat perintah pasang".']);
+        }
 
         $issued = DB::transaction(function () use ($request, $row, $tokens): array {
             $issued = $tokens->issue($row, $request->user()?->getAuthIdentifier());

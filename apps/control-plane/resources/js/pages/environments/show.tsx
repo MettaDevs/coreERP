@@ -11,7 +11,12 @@ import {
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { KindBadge, ModuleStatusBadge, StatusBadge } from '@/components/badges';
+import {
+    InstallStateBadge,
+    KindBadge,
+    ModuleStatusBadge,
+    StatusBadge,
+} from '@/components/badges';
 import Shell from '@/components/shell';
 import { labelFor, operationLabels, resultLabels } from '@/lib/display';
 import ClientServerPanel from '@/pages/environments/client-server-panel';
@@ -219,10 +224,32 @@ export default function Show({
                             <KindBadge kind={environment.kind} />
                         </Row>
                         <Row label="Berjalan di">
-                            {onClientServer ? 'Server klien' : 'Server kita'}
+                            {onClientServer ? (
+                                <span className="text-end">
+                                    Server klien
+                                    {serverClient?.site?.serverAddress && (
+                                        <span className="block font-mono text-xs font-normal text-muted-foreground">
+                                            {serverClient.site.serverAddress}
+                                        </span>
+                                    )}
+                                </span>
+                            ) : (
+                                'Server kita'
+                            )}
                         </Row>
+                        {/*
+                            Produksi di server klien tidak pernah disiapkan di server kita, jadi status
+                            registry-nya menetap "Sedang disiapkan". Keadaan yang berarti bagi operator
+                            adalah keadaan pemasangannya — kata yang sama dengan panel di atas.
+                        */}
                         <Row label="Status">
-                            <StatusBadge status={environment.status} />
+                            {serverClient ? (
+                                <InstallStateBadge
+                                    state={serverClient.progress.state}
+                                />
+                            ) : (
+                                <StatusBadge status={environment.status} />
+                            )}
                         </Row>
                         <Row label="Slug">
                             <span className="font-mono text-xs">
@@ -239,14 +266,25 @@ export default function Show({
                                 {environment.id}
                             </span>
                         </Row>
-                        <Row label="Database">
-                            <span className="font-mono text-xs">
-                                {environment.database}
-                            </span>
-                        </Row>
-                        <Row label="Database sendiri">
-                            {environment.ownDatabase ? 'Ya' : 'Tidak'}
-                        </Row>
+                        {/*
+                            Nama database yang dikirim server untuk lingkungan tanpa `database_name`
+                            adalah database pooled di server kita. Bagi produksi di server klien nama itu
+                            bukan tempat datanya, dan menampilkannya mengundang orang mencarinya di sana.
+                        */}
+                        {onClientServer ? (
+                            <Row label="Database">Di server klien</Row>
+                        ) : (
+                            <>
+                                <Row label="Database">
+                                    <span className="font-mono text-xs">
+                                        {environment.database}
+                                    </span>
+                                </Row>
+                                <Row label="Database sendiri">
+                                    {environment.ownDatabase ? 'Ya' : 'Tidak'}
+                                </Row>
+                            </>
+                        )}
                         <Row label="Kirim keluar">
                             {environment.outboundAllowed ? 'Ya' : 'Tidak'}
                         </Row>
