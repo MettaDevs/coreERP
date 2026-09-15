@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\WorkingTimeCalendar;
 use App\Models\WorkingTimeCalendarDay;
 use App\Models\WorkingTimeCalendarLine;
+use App\Models\WorkingTimeLine;
 use App\Models\WorkingTimeTemplate;
 use App\Support\CurrentWorkspace;
 use Carbon\Carbon;
@@ -136,7 +137,7 @@ class WorkingTimeCalendarController extends Controller
 
         $calendar = WorkingTimeCalendar::create([
             'tenant_id' => $membership->tenant_id,
-            'legal_entity_id' => $workspaceLegalEntity?->id,
+            'legal_entity_id' => $workspaceLegalEntity->id,
             'code' => strtoupper($validated['code']),
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
@@ -322,31 +323,44 @@ class WorkingTimeCalendarController extends Controller
                 ->get();
         }
 
+        /** @var WorkingTimeCalendar|null $selectedCalendar */
+        $selectedCalendar = $calendar && $calendar->exists ? $calendar : null;
+
         // Jika calendar tidak ditentukan di URL, ambil dari query param atau kalender pertama
-        if (! $calendar || ! $calendar->exists) {
+        if (! $selectedCalendar) {
             $calendarId = $request->query('calendar_id');
-            $calendar = $calendarId
-                ? ($allCalendars->firstWhere('id', $calendarId) ?? WorkingTimeCalendar::where('tenant_id', $membership->tenant_id)->find($calendarId))
-                : $allCalendars->first();
+            if (is_string($calendarId) && $calendarId !== '') {
+                $selectedCalendar = $allCalendars->firstWhere('id', $calendarId);
+                if (! $selectedCalendar) {
+                    $selectedCalendar = WorkingTimeCalendar::query()
+                        ->where('tenant_id', $membership->tenant_id)
+                        ->where('id', $calendarId)
+                        ->first();
+                }
+            }
+
+            if (! $selectedCalendar) {
+                $selectedCalendar = $allCalendars->first();
+            }
         }
 
-        if ($calendar) {
-            abort_if($calendar->tenant_id !== $membership->tenant_id, 404);
+        if ($selectedCalendar) {
+            abort_if($selectedCalendar->tenant_id !== $membership->tenant_id, 404);
         }
 
         // Rentang tanggal default: bulan ini atau parameter dari request
         $from = $request->query('from', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $to = $request->query('to', Carbon::now()->endOfMonth()->format('Y-m-d'));
 
-        $days = $calendar
-            ? $calendar->days()
+        $days = $selectedCalendar
+            ? $selectedCalendar->days()
                 ->whereBetween('date', [$from, $to])
                 ->with(['lines' => fn ($q) => $q->orderBy('from_time')])
                 ->orderBy('date')
                 ->get()
                 ->map(fn (WorkingTimeCalendarDay $d): array => [
                     'id' => $d->id,
-                    'date' => $d->date?->format('Y-m-d') ?? (string) $d->getRawOriginal('date'),
+                    'date' => $d->date->format('Y-m-d'),
                     'day_of_week' => (int) $d->day_of_week,
                     'control' => $d->control,
                     'closed_for_pickup' => (bool) $d->closed_for_pickup,
@@ -381,11 +395,11 @@ class WorkingTimeCalendarController extends Controller
                 ->get(['id', 'code', 'name']);
         }
 
-        $calendarData = $calendar ? [
-            'id' => $calendar->id,
-            'code' => $calendar->code,
-            'name' => $calendar->name,
-            'standard_work_hours' => (float) $calendar->standard_work_hours,
+        $calendarData = $selectedCalendar ? [
+            'id' => $selectedCalendar->id,
+            'code' => $selectedCalendar->code,
+            'name' => $selectedCalendar->name,
+            'standard_work_hours' => (float) $selectedCalendar->standard_work_hours,
         ] : null;
 
         $allCalendarsData = $allCalendars->map(fn (WorkingTimeCalendar $c): array => [
@@ -498,7 +512,8 @@ class WorkingTimeCalendarController extends Controller
             'to_date' => ['required', 'date', 'after_or_equal:from_date'],
         ]);
 
-        $template = WorkingTimeTemplate::findOrFail($validated['template_id']);
+        /** @var WorkingTimeTemplate $template */
+        $template = WorkingTimeTemplate::query()->where('id', $validated['template_id'])->firstOrFail();
 
         $count = $service->compose(
             $calendar,
@@ -563,19 +578,21 @@ class WorkingTimeCalendarController extends Controller
         $fromDate = $request->query('from', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $toDate = $request->query('to', Carbon::now()->endOfMonth()->format('Y-m-d'));
 
+        /** @var array<int, array<string, mixed>> $calendarsData */
         $calendarsData = $allCalendars->map(fn (WorkingTimeCalendar $c): array => [
-            'id' => $c->id,
-            'code' => $c->code,
-            'name' => $c->name,
+            'id' => (string) $c->id,
+            'code' => (string) $c->code,
+            'name' => (string) $c->name,
             'standard_work_hours' => (float) $c->standard_work_hours,
         ])->values()->all();
 
+        /** @var array<int, array<string, mixed>> $templatesData */
         $templatesData = $templates->map(fn (WorkingTimeTemplate $t): array => [
-            'id' => $t->id,
-            'code' => $t->code,
-            'name' => $t->name,
-            'lines' => $t->lines->map(fn ($l): array => [
-                'id' => $l->id,
+            'id' => (string) $t->id,
+            'code' => (string) $t->code,
+            'name' => (string) $t->name,
+            'lines' => $t->lines->map(fn (WorkingTimeLine $l): array => [
+                'id' => (string) $l->id,
                 'day_of_week' => (int) $l->day_of_week,
                 'from_time' => $l->from_time ? substr((string) $l->from_time, 0, 5) : null,
                 'to_time' => $l->to_time ? substr((string) $l->to_time, 0, 5) : null,
@@ -583,7 +600,7 @@ class WorkingTimeCalendarController extends Controller
                 'property' => $l->property,
                 'hours' => (float) $l->hours,
                 'closed_for_pickup' => (bool) $l->closed_for_pickup,
-            ])->all(),
+            ])->values()->all(),
         ])->values()->all();
 
         if ($request->wantsJson() || $request->is('api/*')) {
@@ -645,8 +662,11 @@ class WorkingTimeCalendarController extends Controller
             'to_date.after_or_equal' => 'Tanggal selesai tidak boleh lebih awal dari tanggal mulai.',
         ]);
 
-        $calendar = WorkingTimeCalendar::findOrFail($validated['calendar_id']);
-        $template = WorkingTimeTemplate::findOrFail($validated['template_id']);
+        /** @var WorkingTimeCalendar $calendar */
+        $calendar = WorkingTimeCalendar::query()->where('id', $validated['calendar_id'])->firstOrFail();
+
+        /** @var WorkingTimeTemplate $template */
+        $template = WorkingTimeTemplate::query()->where('id', $validated['template_id'])->firstOrFail();
 
         abort_if($calendar->tenant_id !== $membership->tenant_id, 404);
         abort_if($template->tenant_id !== $membership->tenant_id, 404);
