@@ -43,6 +43,8 @@ export default withMermaid({
     'todo/lisensi-mengunci/README.md': 'todo/lisensi-mengunci/index.md',
     'todo/pasang-satu-perintah/README.md':
       'todo/pasang-satu-perintah/index.md',
+    'todo/rilis-kompatibel-mundur/README.md':
+      'todo/rilis-kompatibel-mundur/index.md',
     'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
     'todo/environment-dan-pusat-admin/README.md':
       'todo/environment-dan-pusat-admin/index.md',
@@ -280,6 +282,10 @@ export default withMermaid({
                 {
                   text: 'Pemasangan satu perintah',
                   link: '/todo/pasang-satu-perintah/',
+                },
+                {
+                  text: 'Mundur tanpa kehilangan data',
+                  link: '/todo/rilis-kompatibel-mundur/',
                 },
                 {
                   text: 'Opt-in: satu image untuk semua klien',
