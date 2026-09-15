@@ -15,6 +15,7 @@ use App\Models\Tenant;
 use App\Models\TenantMembership;
 use App\Models\User;
 use App\Support\AppDependencyGraph;
+use App\Support\ControlPlane\EnvironmentAddress;
 use App\Support\Modules\Contracts\TenantDisiapkan;
 use App\Support\Modules\ModuleRegistry;
 use App\Support\Modules\PengirimEventModul;
@@ -272,8 +273,13 @@ class RegisterBusiness
     {
         $base = Str::slug($name) ?: 'business';
         $slug = $base;
+        // Slug tenant menjadi label alamat produksinya, `<slug>.<base_domain>`. Label yang dipakai
+        // layanan kita sendiri — konsol di `admin`, registry image di `registry` — dijawab router
+        // Traefik yang berprioritas lebih tinggi, jadi tenant yang memperoleh slug itu lahir dengan
+        // alamat yang tidak pernah sampai ke Core. Daftarnya sama dengan yang dibaca pengurai alamat.
+        $reserved = EnvironmentAddress::reservedLabels();
 
-        while (Tenant::query()->where('slug', $slug)->exists() || Client::query()->where('slug', $slug)->exists()) {
+        while (in_array($slug, $reserved, true) || Tenant::query()->where('slug', $slug)->exists() || Client::query()->where('slug', $slug)->exists()) {
             $slug = $base.'-'.Str::lower(Str::random(6));
         }
 

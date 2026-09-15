@@ -44,9 +44,12 @@ return [
      *
      * Menambah baris di sini berarti menyatakan label itu memang bukan milik pelanggan. Itu
      * keputusan produk, bukan keputusan pembangunan — pelanggan yang slug-nya kebetulan `api` akan
-     * kehilangan alamatnya tanpa pernah tahu kenapa.
+     * kehilangan alamatnya tanpa pernah tahu kenapa. Pendaftaran usaha membaca daftar yang sama,
+     * jadi tenant BARU tidak pernah memperoleh label ini; tenant lama yang sudah memakainya tidak.
+     *
+     * `registry` adalah registry image Harbor, `registry.<base_domain>` — lihat deploy/registry.
      */
-    'reserved_labels' => ['admin', 'www', 'api'],
+    'reserved_labels' => ['admin', 'www', 'api', 'registry'],
 
     // `deployment` dibuang pada 11 September 2026 bersama satu-satunya pembacanya: pendaftaran
     // usaha kini menulis baris `environments`, bukan `tenant_deployments`. Sebelumnya `pull_images`

@@ -1,0 +1,83 @@
+# Setelan Harbor untuk registry CoreERP di server pertama.
+#
+# Berkas ini templat. `pasang.sh` mengisi dua rahasianya dari /etc/coreerp/registry/rahasia.env —
+# yang lahir di server dan tidak pernah masuk repo — lalu menulis hasilnya ke /opt/harbor/harbor/harbor.yml
+# dengan izin 0600. Hanya dua variabel yang disebut `pasang.sh` yang diganti; tanda dolar lain dibiarkan.
+#
+# Bentuknya diturunkan dari `harbor.yml.tmpl` bawaan installer v2.15.2. Bagian yang tidak disebut di sini
+# memakai nilai bawaan Harbor; saat menaikkan versi, bandingkan dengan templat versi baru lebih dulu.
+
+# Dipakai Harbor hanya bila external_url kosong, tetapi prepare tetap menuntutnya.
+hostname: registry.erp.grenery.xyz
+
+# TLS diakhiri Traefik, bukan di Harbor. Proxy Harbor mendengar HTTP di 8080 di dalam jaringan Docker,
+# dan tidak menerbitkan port apa pun ke host — lihat compose.dokploy.yml.
+http:
+  port: 8080
+
+# Alamat yang dilihat klien. Harbor memakainya untuk realm token di header WWW-Authenticate dan untuk
+# perintah pull yang ditampilkan UI; tanpa ini docker diarahkan ke http://registry...:8080 dan gagal.
+external_url: https://registry.erp.grenery.xyz
+
+# Hanya dibaca saat database masih kosong. Mengganti isinya sesudah itu tidak mengubah apa pun —
+# kata sandi admin diputar lewat UI atau API, lihat RUNBOOK.md.
+harbor_admin_password: ${HARBOR_ADMIN_PASSWORD}
+
+database:
+  password: ${HARBOR_DB_PASSWORD}
+  max_idle_conns: 100
+  max_open_conns: 900
+  conn_max_lifetime: 5m
+  conn_max_idle_time: 0
+
+# Folder bind, bukan volume Docker bernama: `docker volume prune` dan `down -v` tidak dapat menyentuhnya,
+# dan cadangan cukup menyalin satu jalur.
+data_volume: /var/lib/harbor
+
+jobservice:
+  # Mesin ini dipakai bersama SaaS dev, admin.erp, dan SigNoz. Pekerjaan Harbor di sini hanya GC,
+  # retensi, dan penghapusan robot — empat pekerja lebih dari cukup.
+  max_job_workers: 4
+  max_job_duration_hours: 24
+  job_loggers:
+    - STD_OUTPUT
+    - FILE
+  logger_sweeper_duration: 1 #days
+
+notification:
+  webhook_job_max_retry: 3
+  webhook_job_http_client_timeout: 3 #seconds
+
+log:
+  level: info
+  local:
+    rotate_count: 50
+    rotate_size: 200M
+    location: /var/log/harbor
+
+# Dikumpulkan SigNoz lewat jaringan Docker (REG-09). Port ini tidak pernah diterbitkan ke host.
+metric:
+  enabled: true
+  port: 9090
+  path: /metrics
+
+_version: 2.15.0
+
+proxy:
+  http_proxy:
+  https_proxy:
+  no_proxy:
+  components:
+    - core
+    - jobservice
+
+# Unggahan yang terputus di tengah dibersihkan setelah seminggu.
+upload_purging:
+  enabled: true
+  age: 168h
+  interval: 24h
+  dryrun: false
+
+cache:
+  enabled: false
+  expire_hours: 24
