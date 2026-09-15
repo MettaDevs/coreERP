@@ -128,6 +128,12 @@ case "${1:-}" in
         [ "${2:-}" != --format ] || printf '%s\n' "${FAKE_DOCKER_ROOT:-/}"
         ;;
     volume)
+        # `volume ls` menjawab FAKE_DOCKER_VOLUME (satu nama per baris) — volume stack lain di server. Selain itu
+        # tetap gagal, seperti volume yang tidak ada: update.sh membaca titik data database lewat `volume inspect`.
+        if [ "${2:-}" = ls ]; then
+            [ -z "${FAKE_DOCKER_VOLUME:-}" ] || printf '%s\n' "$FAKE_DOCKER_VOLUME"
+            exit 0
+        fi
         exit 1
         ;;
     load)
@@ -244,6 +250,10 @@ case "${1:-}" in
         case "${1:-}" in
             version)
                 printf 'Docker Compose version v2.0.0-tiruan\n'
+                ;;
+            ls)
+                # Proyek compose yang sudah ada di server, dalam bentuk `compose ls --format json`.
+                printf '%s\n' "${FAKE_DOCKER_COMPOSE_LS:-[]}"
                 ;;
             ps)
                 if [ "${2:-}" = -q ]; then
