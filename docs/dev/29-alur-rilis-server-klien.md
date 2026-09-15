@@ -153,13 +153,97 @@ megabyte. Pembaruan rutin hanya menarik lapisan kode yang berubah, sekitar 11 MB
 
 ## Nomor rilis
 
-- Bentuknya angka bertitik: `0.3.0`, `1.0.0`.
-- Satu nomor untuk satu isi. Nomor yang sudah dipakai ditolak perakit sebelum membangun, dan ditolak admin.erp bila
-  isinya berbeda. Perubahan sekecil apa pun yang ingin dicoba di SaaS dev berarti nomor berikutnya.
-- Rilis untuk server klien hanya boleh maju. admin.erp dan agen sama-sama menolak pembaruan ke rilis yang sama
+Nomor rilis dipilih orang yang menekan **Run workflow** alur `rilis`. Kode hanya menegakkan **bentuk dan
+urutannya**. Arti setiap angka adalah kesepakatan tim yang ditulis di bagian ini, dan tidak ada pemeriksa yang
+menegakkannya.
+
+Yang ditegakkan kode:
+
+- **Satu nomor untuk satu isi.** Nomor yang sudah dipakai ditolak perakit sebelum membangun, dan ditolak admin.erp
+  bila isinya berbeda. Perubahan sekecil apa pun yang ingin dicoba di SaaS dev berarti nomor berikutnya.
+- **Rilis untuk server klien hanya boleh maju.** admin.erp dan agen sama-sama menolak pembaruan ke rilis yang sama
   atau lebih lama; mundur di server klien hanya terjadi di dalam `update.sh` ketika pembaruan gagal.
-- Migration harus tetap dapat dipakai kode rilis sebelumnya, karena yang dimundurkan saat rilis bermasalah adalah
-  image, bukan database. Aturannya di [Release dan on-prem](03-release-and-on-prem.md#perubahan-skema-dan-mundur).
+- **Migration harus tetap dapat dipakai kode rilis sebelumnya**, karena yang dimundurkan saat rilis bermasalah
+  adalah image, bukan database. Aturannya di [Release dan on-prem](03-release-and-on-prem.md#perubahan-skema-dan-mundur).
+
+### Selalu tiga angka: `MAYOR.MINOR.PATCH`
+
+Tulis `0.3.0`, `1.0.0`, `1.4.2`. Tanpa akhiran seperti `-rc1` atau `-beta`, tanpa nol di depan seperti `01.2.0`,
+dan tanpa angka keempat.
+
+Kode menerima bentuk yang lebih longgar, dan tidak sama longgarnya di setiap tempat:
+
+| Tempat | Yang diterima |
+| --- | --- |
+| Semua langkah di GitHub dan server pertama: `.github/workflows/rilis.yml`, `.github/workflows/deploy-dev.yml`, `deploy/perakit/coreerp-rilis`, `deploy/perakit/rakit.sh`, `deploy/saas/pasang-rilis.sh`, dan admin.erp (`apps/control-plane/app/Sites/ReleaseRegistry.php`) | Dua sampai empat angka; nol di depan lolos |
+| Agen (`rilis_sah` di `deploy/agent/coreerp-agent`) | Sampai enam angka; nol di depan ditolak |
+
+Selisih itu punya dua akibat, dan keduanya hilang bila nomornya selalu tiga angka tanpa nol di depan:
+
+- **Nomor yang lolos perakit tetapi ditolak agen tetap hangus.** `0.02.1` terdorong ke Harbor dengan tag yang tidak
+  dapat ditimpa, terdaftar di admin.erp, dan terpasang di SaaS dev, lalu setiap agen server klien menolak
+  memasangnya.
+- **admin.erp dan agen tidak sepakat soal nol di ujung.** admin.erp membandingkan dengan `version_compare` PHP, yang
+  menilai `0.2.0` lebih baru dari `0.2`. Agen membuang `.0` di ujung lebih dahulu, sehingga baginya keduanya rilis
+  yang sama.
+
+Keduanya membandingkan angka sebagai angka, bukan sebagai teks: `0.10.0` lebih baru dari `0.9.3`.
+
+### Angka mana yang dinaikkan
+
+| Naikkan | Bila rilis ini berisi | Contoh |
+| --- | --- | --- |
+| **PATCH** `1.4.2 → 1.4.3` | Hanya perbaikan, **tanpa migration** | Total faktur salah hitung, tombol yang galat |
+| **MINOR** `1.4.3 → 1.5.0` | Fitur atau modul baru, atau migration apa pun yang lolos aturan N-1, termasuk langkah `@kontrak` | Laporan baru, modul baru, kolom baru |
+| **MAYOR** `1.5.0 → 2.0.0` | Perubahan yang menuntut pihak di luar kode ikut bertindak | Lihat di bawah |
+
+Angka di sebelah kanan yang dinaikkan kembali ke nol: `1.4.3 → 1.5.0`, `1.5.0 → 2.0.0`.
+
+**PATCH tidak membawa migration.** Rilis perbaikan biasanya dikirim di luar ritme biasa, ketika ada yang rusak di
+klinik. Tanpa migration, mundur darinya cukup dengan menjalankan image sebelumnya, dan tidak ada langkah skema yang
+dapat gagal di tengah jendela pembaruan. Perbaikan yang butuh migration dikirim sebagai MINOR.
+
+Periksa sebelum menekan Run workflow. Commit rilis sebelumnya tertulis di log run `rilis`-nya di GitHub Actions
+(baris `Merakit rilis … dari commit …`) dan di manifest-nya di server pertama
+(`/var/lib/coreerp-perakit/rilis/<rilis>/manifest.json`, kunci `commit`):
+
+```bash
+git fetch origin
+git diff --name-only <commit-rilis-sebelumnya> origin/main -- \
+    apps/core/database/migrations ':(glob)modules/*/*/database/migrations/**'
+```
+
+Keluaran kosong berarti PATCH boleh. Awalan `:(glob)` dan `/**` wajib: tanpa keduanya, pola `modules/*/*/…` tidak
+mencocokkan berkas di dalam foldernya, dan perintah itu diam-diam melaporkan tidak ada migration modul.
+
+**MAYOR** bila salah satunya terjadi:
+
+- fitur dibuang, atau perilakunya berubah sampai pengguna harus diberi tahu sebelum pembaruan;
+- endpoint atau event yang dipakai pihak di luar CoreERP berubah secara tidak kompatibel;
+- server klien butuh sesuatu yang tidak dapat dipasang agen sendiri, seperti versi Docker, sumber daya, port, atau
+  sistem operasi.
+
+**Langkah `@kontrak` bukan alasan MAYOR.** Ia hanya menghapus yang sudah tidak dibaca rilis sebelumnya, jadi mundur
+satu rilis tetap aman. Yang tidak aman adalah mundur melewati langkah expand-nya. Batas itu dihitung mesin dari
+manifest ([MK-02](/todo/rilis-kompatibel-mundur/)), bukan dibaca operator dari nomor rilis.
+
+### `0.x` sampai klien produksi pertama
+
+Selama belum ada server klien produksi, nomornya `0.MINOR.PATCH`. Rilis pertama yang dipasang di klien produksi
+adalah `1.0.0`, dan sejak itu arti MAYOR berlaku penuh. Janji "MAYOR berarti ada yang putus" baru berguna bila sudah
+ada pihak yang dapat diputus; [Semantic Versioning](https://semver.org/#spec-item-4) memakai batas yang sama.
+
+### Tanpa nomor build
+
+Sebagian produk memakai empat angka, misalnya `1.2.3.14421`. Angka keempat adalah hitungan build, karena di sana
+versi yang sama dibangun berkali-kali. Di sini satu nomor hanya punya satu isi dan dibangun sekali, jadi hitungan
+build tidak membedakan apa pun.
+
+"Rilis ini dari kode yang mana" dijawab manifest, bukan nomor. Commit sumbernya tertulis di `commit` manifest v2,
+yang wajib ada supaya admin.erp mau mendaftarkannya, dan di label `org.opencontainers.image.revision` image-nya.
+
+Rilis yang hanya untuk dicoba di SaaS dev tetap memakai nomor berikutnya sesuai isinya. Nomor itu murah, dan nomor
+yang tidak pernah sampai ke klien tidak merugikan siapa pun.
 
 ## Yang belum ada
 
