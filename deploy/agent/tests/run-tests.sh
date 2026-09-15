@@ -2152,11 +2152,13 @@ uji_20b_v2_detak() {
     siapkan_rumah_v2
 
     # Setiap pull diam lebih lama dari detak: langkahnya dilaporkan ulang selama pull berjalan, bukan hanya sekali.
+    # Tanpa detak di dalam pull, laporannya paling banyak empat — satu di awal dan satu sebelum setiap pull — jadi
+    # batas enam hanya terpenuhi oleh detak selama pull yang diam tiga detik.
     buat_rilis_v2 0.2.1
-    putaran_v2 0.2.1 COREERP_AGENT_DETAK_DETIK=1 FAKE_DOCKER_PULL_JEDA=2
+    putaran_v2 0.2.1 COREERP_AGENT_DETAK_DETIK=1 FAKE_DOCKER_PULL_JEDA=3
     sama 'pull yang lama selesai' "$(jq -r .status <<< "$op")" succeeded
     pastikan 'langkah menarik image dilaporkan ulang selama pull yang diam' \
-        test "$(jq '[.langkah[] | select(.step == "Menarik image rilis 0.2.1")] | length' <<< "$op")" -ge 4
+        test "$(jq '[.langkah[] | select(.step == "Menarik image rilis 0.2.1")] | length' <<< "$op")" -ge 6
 
     # Setiap pull lebih pendek dari detak, jumlahnya lebih panjang: jam detak tidak mulai dari nol di setiap pull.
     buat_rilis_v2 0.2.2
