@@ -11,6 +11,9 @@
 #                       skrip ini mati kena SIGPIPE, dan "selesai" tidak pernah tercatat.
 #   FAKE_UPDATE_LINGKUNGAN  berkas tempat setelan COREERP_* yang sampai ke skrip ini dicatat, untuk
 #                       membuktikan setelan dari agent.env diteruskan agen ke update.sh
+#   FAKE_UPDATE_SISA_DOCKER_CONFIG  berkas tempat jumlah DOCKER_CONFIG sementara agen yang masih ada saat skrip
+#                       ini mulai dicatat, untuk membuktikan kredensial registry sudah dihapus sebelum migrasi —
+#                       bukan baru oleh trap EXIT agen sesudah seluruh pembaruan selesai
 #
 # Yang berhasil mencatat versi-sehat dan compose-sehat.yaml di COREERP_HOME/keadaan, seperti update.sh.
 
@@ -23,6 +26,10 @@ catat() {
 }
 
 catat mulai
+
+if [ -n "${FAKE_UPDATE_SISA_DOCKER_CONFIG:-}" ]; then
+    find "${COREERP_HOME:-/opt/coreerp}/agent" -type d -name 'docker-config.*' | wc -l > "$FAKE_UPDATE_SISA_DOCKER_CONFIG"
+fi
 
 if [ -n "${FAKE_UPDATE_LINGKUNGAN:-}" ]; then
     printf 'COREERP_PROYEK=%s\nCOREERP_FOLDER_CADANGAN=%s\n' \
@@ -54,9 +61,10 @@ printf '    core-app sehat\n'
 
 # Seperti update.sh sungguhan: versi dan compose yang terbukti sehat dicatat sesudah sehat. Operasi install
 # melahirkan tenant dengan keduanya.
+# Manifest v2 menyebut repositori tanpa host; yang dijalankan compose, dan dicatat update.sh, adalah tag lokalnya.
 rumah="${COREERP_HOME:-/opt/coreerp}"
 mkdir -p "$rumah/keadaan"
-jq -j .image "$folder/manifest.json" > "$rumah/keadaan/versi-sehat"
+jq -j 'if .versi == 2 then "coreerp.local/core:" + .rilis else .image end' "$folder/manifest.json" > "$rumah/keadaan/versi-sehat"
 cp "$folder/compose.yaml" "$rumah/keadaan/compose-sehat.yaml"
 
 catat selesai
