@@ -41,6 +41,8 @@ export default withMermaid({
       'todo/opt-in-image-tunggal/index.md',
     'todo/registry-harbor/README.md': 'todo/registry-harbor/index.md',
     'todo/lisensi-mengunci/README.md': 'todo/lisensi-mengunci/index.md',
+    'todo/pasang-satu-perintah/README.md':
+      'todo/pasang-satu-perintah/index.md',
     'todo/sisa-pemindahan/README.md': 'todo/sisa-pemindahan/index.md',
     'todo/environment-dan-pusat-admin/README.md':
       'todo/environment-dan-pusat-admin/index.md',
@@ -274,6 +276,10 @@ export default withMermaid({
                 {
                   text: 'Lisensi yang mengunci',
                   link: '/todo/lisensi-mengunci/',
+                },
+                {
+                  text: 'Pemasangan satu perintah',
+                  link: '/todo/pasang-satu-perintah/',
                 },
                 {
                   text: 'Opt-in: satu image untuk semua klien',
