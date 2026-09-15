@@ -29,6 +29,8 @@ use Illuminate\Http\JsonResponse;
  * Daftarnya unik dan terurut, karena itu yang dituntut kontrak berkas lisensi. Menyusunnya di sini
  * berarti penerbit tidak perlu mengulang aturan itu, dan dua penerbitan atas hak yang sama memuat
  * daftar yang sama persis — perbedaan yang hanya berupa urutan tidak pernah terbaca sebagai perubahan.
+ * Keunikannya dijamin indeks unik `(tenant_id, app_id)` di tabelnya, bukan oleh `DISTINCT` di sini:
+ * satu tenant memang tidak dapat berhak atas satu app dua kali.
  */
 final class TenantEntitlementController extends Controller
 {
@@ -47,7 +49,6 @@ final class TenantEntitlementController extends Controller
             ->where('status', 'active')
             ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
             ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', $now))
-            ->distinct()
             ->orderBy('app_id')
             ->pluck('app_id')
             ->map(fn (mixed $appId): string => (string) $appId)

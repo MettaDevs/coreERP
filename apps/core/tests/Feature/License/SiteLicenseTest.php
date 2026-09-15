@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Inertia\Testing\AssertableInertia;
+use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\WritesSiteLicenses;
 use Tests\TestCase;
@@ -250,6 +251,11 @@ final class SiteLicenseTest extends TestCase
     {
         $this->installSignedLicense('{"version":2,"apps":'.$apps.',"valid_until":"2099-01-01"}');
 
+        // Sebabnya disebut di log. Tanpa pemeriksaan daftar app, jaring terakhir tetap menghasilkan
+        // `invalid` — tetapi dengan pesan "kesalahan tak terduga" yang tidak memberi tahu vendor apa
+        // pun tentang penerbit yang keliru.
+        Log::shouldReceive('warning')->once()->with('Daftar app lisensi situs bukan daftar id app yang unik.', Mockery::any());
+
         $state = $this->freshState();
 
         $this->assertSame(SiteLicenseState::INVALID, $state->status);
@@ -311,6 +317,38 @@ final class SiteLicenseTest extends TestCase
             'tidak wajib, tidak sah' => [SiteLicenseState::INVALID, false, false],
             'tidak wajib, habis' => [SiteLicenseState::EXPIRED, false, false],
             'tidak wajib, tidak disetel' => [SiteLicenseState::NOT_REQUIRED, false, false],
+        ];
+    }
+
+    /**
+     * Aturan app yang diizinkan pada keadaan itu sendiri, tanpa jalan pintas `SiteLicense`.
+     *
+     * `SiteLicense::allowsApp()` menjawab "tidak wajib" tanpa membaca keadaan, jadi test lewat kelas
+     * itu tidak pernah menyentuh cabang yang sama di sini. Keadaan tetap harus benar sendirian:
+     * ia yang dibawa ke mana-mana, dan pembaca berikutnya belum tentu lewat jalan pintas itu.
+     *
+     * @param  list<string>  $apps
+     */
+    #[DataProvider('appMatrix')]
+    public function test_the_state_decides_which_apps_are_allowed(string $status, bool $required, array $apps, string $appId, bool $allowed): void
+    {
+        $state = new SiteLicenseState($status, apps: $apps, required: $required);
+
+        $this->assertSame($allowed, $state->allowsApp($appId));
+    }
+
+    /** @return array<string, array{string, bool, list<string>, string, bool}> */
+    public static function appMatrix(): array
+    {
+        return [
+            'tidak wajib, habis, daftar kosong' => [SiteLicenseState::EXPIRED, false, [], 'contoh-a', true],
+            'tidak wajib, berlaku, app lain' => [SiteLicenseState::VALID, false, ['human-resources'], 'contoh-a', true],
+            'tidak wajib, tidak disetel' => [SiteLicenseState::NOT_REQUIRED, false, [], 'contoh-a', true],
+            'wajib, berlaku, tercantum' => [SiteLicenseState::VALID, true, ['contoh-a'], 'contoh-a', true],
+            'wajib, berlaku, tidak tercantum' => [SiteLicenseState::VALID, true, ['human-resources'], 'contoh-a', false],
+            'wajib, segera habis, tercantum' => [SiteLicenseState::EXPIRING, true, ['contoh-a'], 'contoh-a', true],
+            'wajib, habis, tercantum' => [SiteLicenseState::EXPIRED, true, ['contoh-a'], 'contoh-a', false],
+            'wajib, tidak sah' => [SiteLicenseState::INVALID, true, [], 'contoh-a', false],
         ];
     }
 
@@ -439,12 +477,12 @@ final class SiteLicenseTest extends TestCase
     public static function requiredEnvironmentValues(): array
     {
         return [
-            'true' => ['true', true],
-            '1' => ['1', true],
-            'on' => ['on', true],
-            'false' => ['false', false],
-            '0' => ['0', false],
-            'no' => ['no', false],
+            'teks true' => ['true', true],
+            'teks 1' => ['1', true],
+            'teks on' => ['on', true],
+            'teks false' => ['false', false],
+            'teks 0' => ['0', false],
+            'teks no' => ['no', false],
             'kosong' => ['', false],
             'tidak disetel' => [null, false],
         ];

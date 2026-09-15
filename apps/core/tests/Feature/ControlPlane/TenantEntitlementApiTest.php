@@ -103,13 +103,17 @@ final class TenantEntitlementApiTest extends TestCase
         $other = $this->makeTenant('tenant-lain');
         $this->entitle($other, 'app-tenant-lain', 'active', now()->subMonth(), null);
 
-        $this->withToken(self::TOKEN)
+        $response = $this->withToken(self::TOKEN)
             ->getJson($this->url($this->tenant->id))
             ->assertOk()
             ->assertExactJson([
                 'tenant_id' => $this->tenant->id,
                 'apps' => ['app-aktif', 'app-baru-mulai', 'app-berakhir-nanti'],
             ]);
+
+        // `assertExactJson` mengurutkan kedua sisi sebelum membandingkan, jadi urutan diperiksa
+        // terpisah. Barisnya sengaja disisipkan tidak berurutan di atas.
+        $this->assertSame(['app-aktif', 'app-baru-mulai', 'app-berakhir-nanti'], $response->json('apps'));
     }
 
     /** Tenant yang hanya memakai Core tetap 200 dengan daftar kosong, bukan 404. */
