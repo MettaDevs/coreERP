@@ -1,9 +1,10 @@
 # Registry image CoreERP — Harbor
 
 Harbor di server pertama, `https://registry.erp.grenery.xyz`. Tempat perakit mendorong image rilis dan
-tempat server klien menariknya lewat digest. Rancangan, kontrak, dan urutan kerjanya di
-[PRD registry Harbor](../../docs/todo/registry-harbor/README.md); hasil ukur pemasangan pertama di
-[SPIKE.md](SPIKE.md); prosedur operator di [RUNBOOK.md](RUNBOOK.md).
+tempat server klien menariknya lewat digest. Acuan developer — robot, kredensial per operasi, penarikan, dan
+aturan beserta alasannya — di [docs/dev/30-registry-harbor.md](../../docs/dev/30-registry-harbor.md). Rancangan,
+kontrak, dan urutan kerjanya di [PRD registry Harbor](../../docs/todo/registry-harbor/README.md); hasil ukur
+pemasangan pertama di [SPIKE.md](SPIKE.md); prosedur operator di [RUNBOOK.md](RUNBOOK.md).
 
 ## Isi folder
 
@@ -44,6 +45,8 @@ dinamis `/etc/dokploy/traefik/dynamic`, jaringan `dokploy-network` yang attachab
 | `/etc/coreerp/registry/rahasia.env` | `HARBOR_ADMIN_PASSWORD`, `HARBOR_DB_PASSWORD` (0600) | root |
 | `/etc/coreerp/registry/setelan.env` | `REGISTRY_IZIN_UI`, dan opsional `REGISTRY_SIMPAN_RILIS`, `REGISTRY_TOKEN_MENIT` | root |
 | `/etc/coreerp/perakit/registry-robot.env` | Kredensial robot perakit (0600). Nilainya bertanda kutip tunggal karena nama robot memuat `$` | root |
+| `/etc/coreerp/registry/robot-konsol.env` | Kredensial robot sistem admin.erp (0600), untuk dipasang ke konsol lewat `registry:robot-sistem` | root |
+| `/etc/coreerp/saas-registry.env` | Kredensial robot pull SaaS dev (0640), dibaca `deploy/saas/pasang-rilis.sh` sebagai user `deploy` | root:coreerp |
 | `/etc/dokploy/traefik/dynamic/coreerp-registry.yml` | Rute hasil render | root |
 
 Stack compose bernama `harbor`, terpisah dari `coreerp-saas`. `deploy-dev` tidak pernah menyentuhnya.

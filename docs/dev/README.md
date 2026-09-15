@@ -51,6 +51,12 @@ Target yang dikunci:
 | [22-ci-cd.md](22-ci-cd.md) | CI/CD polyrepo, runner trust zone, immutable image, promotion, signing, dan bundle on-prem |
 | [23-document-rendering.md](23-document-rendering.md) | Dokumen cetak gaya Business Central: dataset milik app, layout Word/Excel milik tenant, engine render milik Core, ekspor di latar belakang |
 | [24-global-address-book.md](24-global-address-book.md) | Buku alamat gaya Global Address Book: party, alamat pos, kontak elektronik; organisasi tenant adalah party, dan kop dokumen membaca alamatnya dari sini |
+| [25-standar-penjaga-dan-pengujian.md](25-standar-penjaga-dan-pengujian.md) | Penjaga batas arsitektur: syarat sebelum sebuah test penjaga boleh dipercaya, termasuk terbukti dapat merah |
+| [26-modul-yang-sedang-dipindah.md](26-modul-yang-sedang-dipindah.md) | Cara Core menampung modul yang baru ditarik lewat subtree dan belum lolos penjaga, tanpa membuka lubang permanen |
+| [27-ui-modul-dalam-shell.md](27-ui-modul-dalam-shell.md) | Layar modul sebagai halaman Inertia di dalam build shell: aturan yang menjaga perpindahan dari iframe, dan alasannya |
+| [28-pelaporan-kesalahan.md](28-pelaporan-kesalahan.md) | Laporan kesalahan ke berkas di mesin dan ke SigNoz: isi, tujuan, dan cara mematikannya |
+| [29-alur-rilis-server-klien.md](29-alur-rilis-server-klien.md) | Dari branch sampai server klien: tombol rilis, perakit, Harbor, SaaS dev, agen, dan nomor rilis |
+| [30-registry-harbor.md](30-registry-harbor.md) | Registry Harbor: isi, robot, kredensial per operasi, penarikan lewat digest, immutability dan retensi, dan jebakan yang terukur |
 
 ## Referensi utama
 
