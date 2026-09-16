@@ -1,0 +1,4 @@
+interface:
+  display_name: "CoreERP Harbor"
+  short_description: "Guardrails for the release registry and image delivery"
+  default_prompt: "Use $coreerp-harbor before changing Harbor, the release assembler, SaaS dev deploys, registry credentials, or image pulls on client servers."

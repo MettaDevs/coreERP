@@ -54,12 +54,9 @@ class Index extends Controller
                     'serverClient' => $e->runsOnClientServer()
                         ? ($site instanceof Site ? $progress[$site->id] : InstallProgress::forSite(null))
                         : null,
-                    // Alamat produksi di server klien milik server itu, bukan domain kita — lihat
-                    // `Environment::url()`. Kolom Alamat di daftar membacanya dari sini.
                     'site' => $site instanceof Site ? [
                         'id' => $site->id,
                         'serverAddress' => $site->server_address,
-                        'address' => $site->address,
                     ] : null,
                 ];
             })

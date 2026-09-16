@@ -31,7 +31,6 @@ type Row = {
     site: {
         id: string;
         serverAddress: string | null;
-        address: string | null;
     } | null;
 };
 
@@ -141,28 +140,10 @@ export default function Index({
                                     Keduanya sama-sama teknis, tetapi cuma satu yang perlu dikirim
                                     ke pelanggan — dan nama database tetap terbaca di halaman
                                     rincian bagi yang memang mencarinya. Produksi di server klien
-                                    tidak punya alamat di domain kita; alamatnya milik server itu.
+                                    memakai bentuk yang sama; record DNS-nya dibuat admin.erp.
                                 */}
                                 <TableCell className="max-w-[22rem] font-mono text-xs break-all">
-                                    {row.hosting === 'client_server' ? (
-                                        row.site?.address ? (
-                                            <a
-                                                href={row.site.address}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="underline underline-offset-4"
-                                            >
-                                                {row.site.address.replace(
-                                                    /^https?:\/\//,
-                                                    '',
-                                                )}
-                                            </a>
-                                        ) : (
-                                            <span className="font-sans text-muted-foreground">
-                                                Belum dicatat
-                                            </span>
-                                        )
-                                    ) : row.url ? (
+                                    {row.url ? (
                                         <a
                                             href={row.url}
                                             target="_blank"

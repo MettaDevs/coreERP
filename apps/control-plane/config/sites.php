@@ -114,4 +114,11 @@ return [
      * begitu operasinya ditutup, dan umur ini hanya penjaga bila penghapusan itu tidak pernah berhasil.
      */
     'registry_robot_days' => 1,
+
+    /*
+     * API Cloudflare untuk record DNS alamat server klien (`ControlPlane\Sites\SiteDns`). Tokennya tidak di
+     * sini melainkan di `console_settings`, terenkripsi, lewat `php artisan dns:token-cloudflare`. Alamat ini
+     * dapat diganti hanya supaya test menunjuk tiruan, bukan untuk dipindah ke penyedia lain.
+     */
+    'cloudflare_api_url' => env('CONSOLE_CLOUDFLARE_API_URL', 'https://api.cloudflare.com/client/v4'),
 ];

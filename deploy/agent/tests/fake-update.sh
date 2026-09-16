@@ -14,6 +14,8 @@
 #   FAKE_UPDATE_SISA_DOCKER_CONFIG  berkas tempat jumlah DOCKER_CONFIG sementara agen yang masih ada saat skrip
 #                       ini mulai dicatat, untuk membuktikan kredensial registry sudah dihapus sebelum migrasi —
 #                       bukan baru oleh trap EXIT agen sesudah seluruh pembaruan selesai
+#   FAKE_UPDATE_SALIN_ENV  berkas tempat .env yang dibaca update.sh disalin saat skrip ini mulai, untuk membuktikan
+#                       alamat dari operasi install sudah tertulis sebelum compose menyala
 #
 # Yang berhasil mencatat versi-sehat dan compose-sehat.yaml di COREERP_HOME/keadaan, seperti update.sh.
 
@@ -34,6 +36,10 @@ fi
 if [ -n "${FAKE_UPDATE_LINGKUNGAN:-}" ]; then
     printf 'COREERP_PROYEK=%s\nCOREERP_FOLDER_CADANGAN=%s\n' \
         "${COREERP_PROYEK:-}" "${COREERP_FOLDER_CADANGAN:-}" > "$FAKE_UPDATE_LINGKUNGAN"
+fi
+
+if [ -n "${FAKE_UPDATE_SALIN_ENV:-}" ]; then
+    cp "${COREERP_ENV:-${COREERP_HOME:-/opt/coreerp}/.env}" "$FAKE_UPDATE_SALIN_ENV"
 fi
 
 [ -f "$folder/manifest.json" ] || { printf 'manifest.json tidak ada di %s\n' "$folder" >&2; exit 9; }

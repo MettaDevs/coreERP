@@ -119,7 +119,7 @@ final class ServerSettingsTest extends SiteTestCase
         $this->actingAs($operator)
             ->patch("/situs/{$site->id}/setelan", [
                 'server_address' => '103.122.2.72',
-                'address' => 'https://erp.klinik.test',
+                'address' => 'https://erp.klinik-sendiri.test',
                 'update_window_start' => '22:00',
                 'update_window_end' => '04:00',
             ])
@@ -128,7 +128,8 @@ final class ServerSettingsTest extends SiteTestCase
 
         $site->refresh();
         $this->assertSame('103.122.2.72', $site->server_address);
-        $this->assertSame('https://erp.klinik.test', $site->address);
+        // Alamat aplikasi milik klien belum didukung; isiannya diabaikan.
+        $this->assertNull($site->address);
         $this->assertSame(['start' => '22:00', 'end' => '04:00', 'timezone' => 'Asia/Jakarta'], $site->updateWindow());
 
         $updated = OperatorAuditEvent::query()->where('action', 'site.settings.updated')->sole();

@@ -11,6 +11,7 @@ use ControlPlane\Models\EnvironmentOperation;
 use ControlPlane\Models\Site;
 use ControlPlane\Sites\ClientServerSetup;
 use ControlPlane\Sites\InstallProgress;
+use ControlPlane\Sites\SiteDns;
 use ControlPlane\Sites\SiteOperations;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -102,7 +103,8 @@ class Show extends Controller
                 'name' => $site->name,
                 'serverAddress' => $site->server_address,
                 'lastSeenIp' => $site->last_seen_ip,
-                'address' => $site->address,
+                'appUrl' => $row->url(),
+                'dns' => SiteDns::forScreen($site->setRelation('environment', $row)),
                 'updateWindow' => $site->updateWindow(),
                 'enrolledAt' => $site->enrolled_at?->toDateTimeString(),
             ] : null,

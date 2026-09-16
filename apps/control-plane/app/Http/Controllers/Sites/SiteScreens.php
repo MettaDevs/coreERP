@@ -13,6 +13,7 @@ use ControlPlane\Models\SiteRelease;
 use ControlPlane\Sites\ClientServerSetup;
 use ControlPlane\Sites\InstallProgress;
 use ControlPlane\Sites\LicenseTerms;
+use ControlPlane\Sites\SiteDns;
 use ControlPlane\Sites\SiteOperations;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -44,7 +45,7 @@ final class SiteScreens extends Controller
     public function index(SiteOperations $operations): InertiaResponse
     {
         $rows = Site::query()
-            ->with(['tenant:id,name', 'environment:id,name'])
+            ->with(['tenant:id,name', 'environment:id,name,tenant_id,kind,hosting', 'environment.tenant:id,slug'])
             ->orderBy('name')
             ->get();
 
@@ -71,7 +72,7 @@ final class SiteScreens extends Controller
 
     public function show(string $site, SiteOperations $operations, LicenseTerms $terms): InertiaResponse
     {
-        $row = Site::query()->with(['tenant:id,name', 'environment:id,name'])->whereKey($site)->firstOrFail();
+        $row = Site::query()->with(['tenant:id,name', 'environment:id,name,tenant_id,kind,hosting', 'environment.tenant:id,slug'])->whereKey($site)->firstOrFail();
 
         // Tenggat yang habis ditutup sekarang, supaya layar tidak menampilkan operasi "berjalan" milik
         // agen yang sudah lama berhenti.
@@ -191,7 +192,9 @@ final class SiteScreens extends Controller
                 default => 'enrolled',
             },
             'serverAddress' => $site->server_address,
-            'address' => $site->address,
+            'appUrl' => $site->appUrl(),
+            'appUrlAutomatic' => $site->environment_id !== null,
+            'dns' => SiteDns::forScreen($site),
             'lastSeenIp' => $site->last_seen_ip,
             'updateWindow' => $site->updateWindow(),
             'reportedRelease' => $site->reported_release,

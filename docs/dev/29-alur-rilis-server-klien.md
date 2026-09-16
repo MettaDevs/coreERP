@@ -264,5 +264,7 @@ yang tidak pernah sampai ke klien tidak merugikan siapa pun.
 - `.github/workflows/rilis.yml` dan `.github/workflows/deploy-dev.yml` — kedua tombol.
 - `deploy/perakit/README.md` — perakit, pembungkus sudo, dan pemasangannya.
 - `deploy/saas/pasang-rilis.sh` — pemasangan rilis ke SaaS dev.
-- `deploy/registry/README.md` dan `deploy/registry/RUNBOOK.md` — Harbor, robot, dan prosedur operator.
+- [Registry Harbor](30-registry-harbor.md) — isi Harbor, robot, kredensial per operasi, penarikan lewat digest, dan
+  jebakan yang terukur.
+- `deploy/registry/README.md` dan `deploy/registry/RUNBOOK.md` — isi server dan prosedur operator.
 - `deploy/agent/README.md` — agen di server klien.

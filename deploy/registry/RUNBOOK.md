@@ -72,12 +72,28 @@ menyimpannya terenkripsi sesudah memeriksanya ke Harbor:
 
 ```bash
 sudo bash deploy/registry/atur-harbor.sh
-sudo cat /etc/coreerp/registry/robot-konsol.env     | docker exec -i coreerp-saas-core-console-1 php artisan registry:robot-sistem
+sudo cat /etc/coreerp/registry/robot-konsol.env | sudo docker exec -i -u www-data coreerp-saas-core-console-1 php artisan registry:robot-sistem
 ```
+
+`-u www-data`, bukan root: perintah artisan yang berjalan sebagai root di container konsol meninggalkan berkas log
+milik root, dan Apache lalu gagal menulis log tanpa jejak di mana pun.
 
 Memutar rahasianya: hapus berkas itu, jalankan kedua perintah lagi. Robot situs yang sedang dipakai tidak
 terpengaruh; yang terhenti hanya penerbitan robot baru di antara kedua perintah. Halaman Pengaturan konsol
 menampilkan apakah Harbor menerima robot yang tersimpan.
+
+## Memasang dan memutar robot SaaS dev — teruji
+
+SaaS dev menarik image rilis dengan robot pull-only `robot$coreerp+saas-dev`. `atur-harbor.sh` membuatnya dan
+menulis rahasianya ke `/etc/coreerp/saas-registry.env` (root:coreerp 0640), yang dibaca
+`deploy/saas/pasang-rilis.sh` sebagai user `deploy`:
+
+```bash
+sudo bash deploy/registry/atur-harbor.sh
+```
+
+Memutar rahasianya: hapus berkas itu dan jalankan perintah yang sama. Pemasangan rilis ke SaaS dev yang sedang
+menarik image saat itu dapat gagal; jalankan ulang alur `deploy-dev` dengan nomor rilis yang sama.
 
 ## Mengubah daftar alamat yang boleh membuka UI — teruji
 

@@ -43,7 +43,6 @@ export default function AddServerDialog({
         useForm({
             environment_id: candidates[0]?.id ?? '',
             server_address: '',
-            address: '',
             update_window_start: '',
             update_window_end: '',
         });
@@ -58,7 +57,6 @@ export default function AddServerDialog({
         // Id lingkungan ada di alamatnya, bukan di isian.
         transform((values) => ({
             server_address: values.server_address,
-            address: values.address,
             update_window_start: values.update_window_start,
             update_window_end: values.update_window_end,
         }));
@@ -188,7 +186,7 @@ export default function AddServerDialog({
                                 <CollapsibleSection
                                     value="lanjutan"
                                     title="Lanjutan"
-                                    summary="Alamat aplikasi dan jendela pembaruan, boleh diisi belakangan"
+                                    summary="Jendela pembaruan, boleh diisi belakangan"
                                 >
                                     <ServerAdvancedFields
                                         data={data}

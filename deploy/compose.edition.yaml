@@ -7,10 +7,10 @@ name: coreerp
 # build`; di sini seluruh image sudah dimuat dari `images.tar.gz` oleh `update.sh` sebelum satu
 # container pun dinyalakan.
 #
-# Dua image di bawah ditulis **harfiah**, bukan lewat variabel, dan itu disengaja: `build-bundle.sh`
+# Image pendamping di bawah ditulis **harfiah**, bukan lewat variabel, dan itu disengaja: `build-bundle.sh`
 # membacanya dari berkas ini untuk menentukan apa saja yang harus ikut disimpan ke dalam bundle.
-# Menggantinya menjadi variabel membuat keduanya lolos dari pembacaan itu, dan bundle-nya akan
-# terlihat lengkap padahal masih harus menarik keduanya dari registry saat dipasang.
+# Menggantinya menjadi variabel membuatnya lolos dari pembacaan itu, dan bundle-nya akan terlihat
+# lengkap padahal masih harus menariknya dari registry saat dipasang.
 #
 # `docs` sengaja tidak ada di sini. Ia satu image lagi yang harus ikut menyeberang, dan dokumentasi
 # bukan bagian yang membuat aplikasi berjalan; pelanggan yang memintanya mendapat bundle terpisah.
@@ -24,7 +24,7 @@ name: coreerp
 # - host registry tidak pernah tertulis di server klien. Registry dapat pindah tanpa menyentuh klien, dan
 #   berkas compose yang menyebut host itu justru mengundang Compose menariknya sendiri.
 #
-# Dua image pendamping di bawah tetap ditulis dengan nama sumbernya, karena perakit membacanya dari sini;
+# Image pendamping di bawah tetap ditulis dengan nama sumbernya, karena perakit membacanya dari sini;
 # `compose.yaml` rilis v2 menggantinya dengan tag lokal.
 
 x-edition-environment: &edition-environment
@@ -224,8 +224,9 @@ services:
     ports:
       # Bawaan 0.0.0.0 menjaga pemasangan beli-putus yang sudah berjalan: port aplikasinya mungkin
       # dijangkau langsung dari jaringan klinik, dan pembaruan tidak boleh memutusnya. On-prem dikelola
-      # mengikatnya ke 127.0.0.1 lewat `deploy/agent/env.template`, karena ia berdiri di belakang reverse
-      # proxy klien dan port yang diterbitkan Docker melewati firewall host.
+      # mengikatnya ke 127.0.0.1 lewat `deploy/agent/env.template`, karena ia berdiri di belakang proxy
+      # HTTPS — core-proxy di bawah, atau reverse proxy klien — dan port yang diterbitkan Docker melewati
+      # firewall host.
       #
       # Satu beda dengan bentuk tanpa alamat yang dipakai sebelumnya: bentuk itu juga menerbitkan port di
       # IPv6 (`::`), sedangkan 0.0.0.0 hanya IPv4 — terlihat di `docker inspect` pada Docker Engine 29.
@@ -301,6 +302,50 @@ services:
       timeout: 5s
       retries: 12
 
+  # Proxy HTTPS di depan core-app untuk server klien yang dipasang agen. Aplikasinya menuntut HTTPS
+  # (SESSION_SECURE_COOKIE), dan server klinik yang tidak punya reverse proxy tidak dapat dimasuki dari
+  # peramban tanpa seseorang menyetelnya dengan tangan. Caddy mengambil sertifikat Let's Encrypt untuk
+  # COREERP_APP_HOST sendiri, dan mengalihkan HTTP ke HTTPS.
+  #
+  # **Hanya menyala dengan profil `proxy`**, yang ditulis pasang.sh ke `.env` server klien sebagai
+  # COMPOSE_PROFILES. Bundle beli-putus memakai berkas yang sama dan tidak pernah menyetelnya: bagi Compose
+  # layanan ini tidak ada, dan port 80 dan 443 — yang lazim sudah dipakai web server klinik — tidak disentuh.
+  # Server yang sudah punya reverse proxy sendiri dipasang dengan `pasang.sh --proxy-luar`, juga tanpa profil.
+  # update.sh menanyakan Compose apakah layanan ini menyala, lalu menyalakannya sesudah core-app sehat.
+  #
+  # Port 80 dan 443 diterbitkan ke semua alamat dengan sengaja: inilah pintu masuk dari internet. Aplikasinya
+  # sendiri tetap hanya di CORE_APP_BIND.
+  #
+  # `--from` bawaan `localhost` berlaku sampai agen menulis alamat tenant dari admin.erp ke `.env`. Untuk
+  # localhost Caddy hanya memakai CA internalnya, jadi tidak ada sertifikat publik yang diminta untuk nama
+  # yang tidak dipilih siapa pun. Host diteruskan apa adanya, dan `X-Forwarded-*` kiriman klien dibuang lalu
+  # ditulis ulang Caddy; Core mempercayai header itu lewat COREERP_TRUSTED_PROXIES.
+  #
+  # Tag versi pasti: tag yang bergerak (`caddy:2`) mengganti Caddy di antara dua rilis tanpa berkas ini
+  # berubah. Perakit menyalinnya ke registry kita lewat digest seperti pendamping lain.
+  core-proxy:
+    image: caddy:2.11.4-alpine
+    pull_policy: never
+    restart: unless-stopped
+    profiles: [proxy]
+    depends_on:
+      core-app:
+        condition: service_healthy
+    command: caddy reverse-proxy --from ${COREERP_APP_HOST:-localhost} --to core-app:80
+    ports:
+      - '80:80'
+      - '443:443'
+      # HTTP/3.
+      - '443:443/udp'
+    networks:
+      - default
+    volumes:
+      # Sertifikat dan kunci akun ACME. Tanpa volume keduanya hilang bersama container pada setiap pembaruan
+      # yang membuat ulang proxy, dan Let's Encrypt membatasi penerbitan ulang untuk nama yang sama: beberapa
+      # pembaruan dalam seminggu dapat meninggalkan situs tanpa sertifikat.
+      - core-proxy-data:/data
+      - core-proxy-config:/config
+
 networks:
   default:
   # Tanpa jalan keluar: container di sini hanya dapat dihubungi container lain pada network yang
@@ -313,3 +358,5 @@ volumes:
   core-db-data:
   core-storage:
   core-logs:
+  core-proxy-data:
+  core-proxy-config:

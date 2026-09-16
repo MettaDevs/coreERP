@@ -17,7 +17,8 @@ hasilnya. Rancangannya di `docs/todo/on-prem-dikelola/README.md`; bentuk HTTP-ny
 
 ```
 /opt/coreerp/                      COREERP_HOME, sama dengan update.sh
-  .env                             setelan compose; dibuat sekali, tidak pernah ditimpa
+  .env                             setelan compose; dibuat sekali, tidak pernah ditimpa — agen hanya mengganti
+                                   APP_URL dan COREERP_APP_HOST dari operasi install
   kunci-rilis.pub                  kunci publik rilis — diambil sekali oleh pasang.sh, lalu dipaku
   update.sh                        salinan untuk dijalankan tangan
   bin/coreerp-agent
@@ -58,6 +59,40 @@ sebelum apa pun diunduh; aturannya di skema `ClaimedOperation` pada kontrak. Has
 hanya dialirkan lewat stdin, tidak pernah menjadi argumen proses, dan keluaran Core disaring darinya
 sebelum ditulis ke log. Rilis yang sama yang sudah terpasang tidak dipasang ulang, jadi `install` yang
 diulang — "Coba lagi" sesudah langkah tenant gagal — langsung mengulang langkah tenant.
+
+`install` dari admin.erp yang memberi alamat otomatis membawa `app_url`, `https://<tenant>.erp.grenery.xyz`.
+Sebelum rilis diunduh, agen melaporkan langkah `Menyetel alamat aplikasi <app_url>` lalu menulis
+`APP_URL=<app_url>` dan `COREERP_APP_HOST=<host>` ke `.env` — mengganti setiap baris yang mendefinisikan kedua
+kunci itu di tempatnya, menambahkannya di ujung bila belum ada, dan tidak menyentuh baris lain. Salinannya
+ditulis ke berkas sementara di folder yang sama, dengan pemilik yang sama dan `0600`, lalu diganti namanya; isi
+yang tidak berubah tidak ditulis. `app_url` yang disebut wajib asal HTTPS polos: tanpa port, jalur, pengguna,
+atau garis miring di ujung, dengan host huruf kecil yang label-labelnya sah menurut DNS dan paling sedikit dua
+label. Yang tidak sah — termasuk `null` — menolak seluruh operasi sebelum apa pun diunduh. admin.erp lama tidak
+mengirimnya, dan `.env` dibiarkan seperti yang ditulis `pasang.sh`.
+
+## Proxy HTTPS
+
+Core menuntut HTTPS (`SESSION_SECURE_COOKIE=true`) dan hanya didengar di `127.0.0.1:8000`. Bawaannya agen
+memasang proxy HTTPS sendiri: layanan `core-proxy` di `compose.edition.yaml`, Caddy dengan tag versi pasti, di
+port 80 dan 443, yang mengambil sertifikat Let's Encrypt untuk `COREERP_APP_HOST` dan meneruskan ke `core-app`.
+Sertifikatnya di volume `core-proxy-data`, jadi tidak diminta ulang pada setiap pembaruan.
+
+- **Di balik profil `proxy`.** `pasang.sh` menulis `COMPOSE_PROFILES=proxy` ke `.env`, dan Compose membacanya
+  lewat `--env-file` yang sama. Bundle beli-putus memakai compose yang sama tanpa profil itu, dan tidak berubah.
+- **Dinyalakan `update.sh`.** Ia menanyakan `docker compose config --services` apakah `core-proxy` menyala
+  dengan `.env` server, lalu menjalankan `up -d --no-deps core-proxy` sesudah `core-app` terbukti sehat.
+  Gagal menyala berarti mundur, seperti kegagalan lain; mundur menyalakan proxy dengan compose versi sehat.
+- **Sebelum alamat tenant datang**, `COREERP_APP_HOST` kosong dan proxy hanya menjawab `localhost` dengan CA
+  internal Caddy, sehingga tidak ada sertifikat publik yang diminta untuk nama mesin.
+- **Core mempercayai proxy** lewat `COREERP_TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` di
+  `env.template`. Alamat container proxy dibagikan Docker dan dapat berganti; rentang privat itu menjangkaunya
+  tanpa mematok subnet, dan yang dapat menyambung ke `core-app` dari sana hanya yang sudah berada di server —
+  selama `CORE_APP_BIND` loopback atau gateway Docker. Nilai yang sama berlaku untuk `--proxy-luar`, karena
+  reverse proxy klien terlihat dari gateway Docker.
+
+Server yang sudah punya reverse proxy (Dokploy, Traefik, nginx) dipasang dengan `--proxy-luar`: tanpa profil
+`proxy`, dan reverse proxy itu yang diarahkan ke `127.0.0.1:<port aplikasi>` — atau ke alamat gateway bridge
+Docker lewat `--app-bind` bila ia berjalan di dalam Docker.
 
 ## Rilis v2: image dari registry kita
 
@@ -130,17 +165,24 @@ Selain `--token`, `pasang.sh` hanya menerima:
 | --- | --- |
 | `--app-port PORT` | port host aplikasi; bawaan `CORE_APP_PORT` di `env.template` |
 | `--app-bind ALAMAT` | alamat IPv4 tempat port itu diikat; bawaan `CORE_APP_BIND` di `env.template`, yaitu `127.0.0.1` |
+| `--proxy-luar` | tanpa proxy HTTPS agen: `COMPOSE_PROFILES` kosong, dan port 80 dan 443 tidak diperiksa |
 
-`--app-port` dan `--app-bind` hanya berlaku pada pemasangan pertama, karena `.env` yang sudah ada tidak
-pernah ditimpa. Pada pemasangan pertama itu juga `pasang.sh` menolak, sebelum menulis apa pun, bila port
-yang dipilih sudah didengar layanan lain: server klien lazim sudah melayani situs lain, dan tabrakannya
-lebih murah ditemukan oleh orang yang sedang memasang daripada oleh rilis pertama di jendela pembaruan.
+Ketiganya hanya berlaku pada pemasangan pertama, karena `.env` yang sudah ada tidak pernah ditimpa; pilihan
+yang disebut pada pemasangan ulang dijelaskan di terminal. Karena tinggal di `.env`, `--proxy-luar` bertahan
+untuk setiap pembaruan sesudahnya. Pada pemasangan pertama itu juga `pasang.sh` menolak, sebelum menulis apa
+pun, bila port aplikasi yang dipilih sudah didengar layanan lain, dan — tanpa `--proxy-luar` — bila port 80
+atau 443 sudah didengar. Pesan penolakan kedua menyebut `--proxy-luar` dan alamat tujuan reverse proxy-nya.
+Server klien lazim sudah melayani situs lain, dan tabrakannya lebih murah ditemukan oleh orang yang sedang
+memasang daripada oleh langkah terakhir rilis pertama.
 
-Port aplikasi diikat ke loopback karena CoreERP dilayani lewat reverse proxy klien, dan port yang
-diterbitkan Docker melewati firewall host — aturan UFW tidak berlaku untuknya. Reverse proxy yang berjalan
-di dalam Docker tidak menjangkau loopback host; untuk bentuk itu sebut alamat gateway bridge Docker lewat
-`--app-bind`. `compose.edition.yaml` sendiri berbawaan `0.0.0.0`, supaya pemasangan beli-putus yang
-menjangkau port itu langsung tidak terputus saat diperbarui.
+Port aplikasi diikat ke loopback karena CoreERP dilayani lewat proxy HTTPS (milik agen atau milik klien), dan
+port yang diterbitkan Docker melewati firewall host — aturan UFW tidak berlaku untuknya. Reverse proxy klien
+yang berjalan di dalam Docker tidak menjangkau loopback host; untuk bentuk itu sebut alamat gateway bridge
+Docker lewat `--app-bind`. `compose.edition.yaml` sendiri berbawaan `0.0.0.0`, supaya pemasangan beli-putus
+yang menjangkau port itu langsung tidak terputus saat diperbarui.
+
+`APP_URL` yang ditulis `pasang.sh` dari `hostname -f` hanya sementara: operasi `install` dari admin.erp yang
+membawa `app_url` menggantinya sebelum rilis pertama menyala.
 
 ## Setelan server: agent.env
 

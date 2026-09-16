@@ -523,9 +523,15 @@ uji_templat_dan_compose() {
     # On-prem dikelola mengunci; bawaan compose tidak, supaya beli-putus dan SaaS tidak pernah terkunci.
     sama 'env.template mewajibkan lisensi' "$(grep 'COREERP_LICENSE_REQUIRED' "$TEMPLAT_ENV" | grep -v '^#')" 'COREERP_LICENSE_REQUIRED=true'
 
-    # shellcheck disable=SC2016 # ${COREERP_LICENSE_DIR:-...} dan ${CORE_APP_BIND:-...} adalah teks harfiah yang dicari di compose
+    # Profil proxy diputuskan pasang.sh (bawaan atau --proxy-luar), dan Core mempercayai proxy dari rentang privat,
+    # bukan `*` dan bukan kosong — kosong membuat setiap pengalihan di belakang proxy menuju http://.
+    sama 'env.template: profil compose diisi pasang.sh' "$(grep '^COMPOSE_PROFILES=' "$TEMPLAT_ENV")" 'COMPOSE_PROFILES=@@COMPOSE_PROFILES@@'
+    sama 'env.template: proxy tepercaya dari rentang RFC 1918' "$(grep '^COREERP_TRUSTED_PROXIES=' "$TEMPLAT_ENV")" \
+        'COREERP_TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16'
+
+    # shellcheck disable=SC2016 # ${COREERP_LICENSE_DIR:-...}, ${CORE_APP_BIND:-...}, dan ${COREERP_APP_HOST:-...} adalah teks harfiah yang dicari di compose
     python3 -c '
-import sys, yaml
+import re, sys, yaml
 with open(sys.argv[1]) as f:
     compose = yaml.safe_load(f)
 lingkungan = compose["x-edition-environment"]
@@ -551,9 +557,28 @@ for nama, layanan in compose["services"].items():
 assert tanpa_mount == ["core-migrate"], "layanan tanpa folder lisensi: %r" % tanpa_mount
 port = compose["services"]["core-app"]["ports"]
 assert port == ["${CORE_APP_BIND:-0.0.0.0}:${CORE_APP_PORT:-8000}:80"], "port core-app: %r" % port
-# Layanan lain yang menerbitkan port lolos dari CORE_APP_BIND dan terbuka ke semua alamat.
+# Layanan lain yang menerbitkan port lolos dari CORE_APP_BIND dan terbuka ke semua alamat. core-proxy satu-satunya
+# pengecualian, dengan sengaja: ia pintu masuk HTTPS dari internet, dan hanya ada di balik profil proxy.
 penerbit = sorted(nama for nama, layanan in compose["services"].items() if "ports" in layanan)
-assert penerbit == ["core-app"], "layanan yang menerbitkan port: %r" % penerbit
+assert penerbit == ["core-app", "core-proxy"], "layanan yang menerbitkan port: %r" % penerbit
+# Bundle beli-putus memakai berkas yang sama tanpa COMPOSE_PROFILES: layanan berprofil tidak ada baginya, jadi hanya
+# core-proxy yang boleh berprofil, dan layanan lain tidak boleh bergantung padanya.
+berprofil = sorted(nama for nama, layanan in compose["services"].items() if layanan.get("profiles"))
+assert berprofil == ["core-proxy"], "layanan berprofil: %r" % berprofil
+proxy = compose["services"]["core-proxy"]
+assert proxy["profiles"] == ["proxy"], "profil core-proxy: %r" % proxy["profiles"]
+for nama, layanan in compose["services"].items():
+    assert "core-proxy" not in (layanan.get("depends_on") or {}), nama + " bergantung pada core-proxy"
+assert re.fullmatch(r"caddy:[0-9]+\.[0-9]+\.[0-9]+-alpine", proxy["image"]), "image core-proxy tanpa versi pasti: %r" % proxy["image"]
+assert proxy["restart"] == "unless-stopped", "restart core-proxy: %r" % proxy["restart"]
+assert proxy["command"] == "caddy reverse-proxy --from ${COREERP_APP_HOST:-localhost} --to core-app:80", "command core-proxy: %r" % proxy["command"]
+assert proxy["depends_on"] == {"core-app": {"condition": "service_healthy"}}, "depends_on core-proxy: %r" % proxy["depends_on"]
+assert proxy["ports"] == ["80:80", "443:443", "443:443/udp"], "port core-proxy: %r" % proxy["ports"]
+assert set(proxy["networks"]) & set(compose["services"]["core-app"]["networks"]), "core-proxy tidak berbagi network dengan core-app"
+# Sertifikat bertahan melewati pembaruan yang membuat ulang container: volume bernama, bukan lapisan tulisnya.
+assert sorted(proxy["volumes"]) == ["core-proxy-config:/config", "core-proxy-data:/data"], "volume core-proxy: %r" % proxy["volumes"]
+for volume in ("core-proxy-data", "core-proxy-config"):
+    assert volume in compose["volumes"], volume + " tidak dideklarasikan"
 # AG-02: Compose tidak pernah menarik image. Tag lokal yang hilang harus menggagalkannya, bukan membuatnya menarik
 # nama yang sama dari Docker Hub.
 tanpa_never = sorted(nama for nama, layanan in compose["services"].items() if layanan.get("pull_policy") != "never")
@@ -566,12 +591,13 @@ for nama, layanan in compose["services"].items():
         assert "." not in bagian[0] and ":" not in bagian[0] and bagian[0] != "localhost", "%s menyebut host registry: %r" % (nama, layanan["image"])
 ' "$COMPOSE_EDISI"
 
-    # build-bundle.sh membaca image pendamping secara harfiah dari berkas compose; perubahan berkas itu
-    # tidak boleh menambah atau menghilangkan satu pun.
+    # build-bundle.sh dan perakit membaca image pendamping secara harfiah dari berkas compose; perubahan berkas itu
+    # tidak boleh menambah atau menghilangkan satu pun tanpa disadari. Caddy ikut ke bundle beli-putus walaupun
+    # profilnya tidak pernah menyala di sana.
     sama 'image pendamping yang dibaca build-bundle.sh' \
         "$(grep -oE '^[[:space:]]*image:[[:space:]]*[^$[:space:]][^[:space:]]*' "$COMPOSE_EDISI" \
             | sed 's/^[[:space:]]*image:[[:space:]]*//' | sort -u | paste -sd,)" \
-        'gotenberg/gotenberg:8,postgres:16-alpine'
+        'caddy:2.11.4-alpine,gotenberg/gotenberg:8,postgres:16-alpine'
 }
 
 # --- Pengujian: agen online ----------------------------------------------------------------------------
@@ -1355,6 +1381,136 @@ KASUS
     done
 }
 
+# Alamat aplikasi dari admin.erp. `app_url` operasi install menulis APP_URL dan COREERP_APP_HOST ke .env sebelum
+# update.sh menyalakan compose, tanpa menyentuh baris lain. admin.erp lama tidak mengirimnya, dan .env tidak
+# disentuh; yang dikirim tetapi tidak sah menolak seluruh operasi.
+uji_11b_install_alamat() {
+    local rumah="$KERJA/rumah-alamat" log="$KERJA/log/install-alamat.log" salinan="$KERJA/env-saat-update"
+    local s id op sebelum sidik inode lain jumlah_baris keterangan filter potongan satu
+    local alamat='https://klinik-sehat.erp.grenery.xyz' pola_kunci='^(APP_URL|COREERP_APP_HOST)='
+
+    [ "$(id -u)" -eq 0 ] || { printf 'memberi .env pemilik lain menuntut root\n'; exit 77; }
+
+    rm -rf "$rumah"
+    mkdir -p "$rumah"
+    cp "$KERJA/kunci/rilis.pub" "$rumah/kunci-rilis.pub"
+    env COREERP_HOME="$rumah" bash "$AGEN" enroll --admin-url "$ADMIN" --token "$(token_baru alamat)" >/dev/null
+    s="$(jq -r .site_id "$rumah/agent/site.json")"
+
+    for satu in 1.0.0 2.0.0 3.0.0; do
+        buat_rilis "$EDISI_PASANG" "$satu"
+    done
+
+    # .env berbentuk hasil pasang.sh — rahasia yang harus bertahan byte demi byte — dengan pemilik dan mode yang
+    # bukan milik proses agen, supaya penulisan yang tidak menjaga keduanya terlihat.
+    sed -e 's|@@APP_URL@@|https://vps-7781.penyedia.test|' \
+        -e 's|@@CORE_APP_KEY@@|base64:RahasiaAplikasiUji0123456789abcdefABCDEF=|' \
+        -e 's|@@CORE_DB_PASSWORD@@|SandiDatabaseUji0123456789abcdef|' \
+        -e 's|@@[A-Z_]*@@|isian-uji|' "$TEMPLAT_ENV" > "$rumah/.env"
+    chown 4321:4321 "$rumah/.env"
+    chmod 0640 "$rumah/.env"
+
+    # putaran PARAMETER — install untuk situs ini, satu putaran; mengisi $id, $op, dan $sebelum. .env yang dibaca
+    # update.sh disalin ke $salinan saat update.sh mulai.
+    putaran() {
+        : > "$FAKE_UPDATE_JEJAK"
+        rm -f "$salinan"
+        sebelum="$(jumlah_permintaan)"
+        id="$(antre "$(jq -cn --arg s "$s" --argjson p "$1" '{site_id: $s, operation: "install", parameters: $p}')")"
+
+        env COREERP_HOME="$rumah" FAKE_UPDATE_SALIN_ENV="$salinan" bash "$AGEN" run --now > "$log" 2>&1 \
+            || { cat "$log"; tail -n 15 "$KERJA/log/fake-admin.log"; printf 'putaran install keluar bukan nol: %s\n' "$1"; return 1; }
+
+        op="$(operasi "$id")"
+    }
+
+    jejak_env() {
+        printf '%s %s' "$(sha256sum < "$rumah/.env" | cut -c1-64)" "$(stat -c '%i %a %u:%g' "$rumah/.env")"
+    }
+
+    # --- admin.erp lama, tanpa app_url: .env tidak disentuh sama sekali ---
+    sidik="$(jejak_env)"
+    putaran "$(parameter_pasang 1.0.0)"
+
+    sama 'tanpa app_url: install selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'tanpa app_url: update.sh berjalan' "$(head -n 1 "$FAKE_UPDATE_JEJAK")" "mulai $rumah/agent/releases/$EDISI_PASANG-1.0.0"
+    sama 'tanpa app_url: .env tidak disentuh — isi, inode, mode, dan pemilik' "$(jejak_env)" "$sidik"
+    harus_gagal 'tanpa app_url: tidak ada langkah alamat' grep -q 'Menyetel alamat' <<< "$(jq -c '.langkah' <<< "$op")"
+
+    # --- app_url tidak sah: seluruh operasi ditolak sebelum mengunduh, dan .env tidak disentuh ---
+    #
+    # Rilis 2.0.0 ada dan lebih baru: tanpa penjaganya, operasi ini berjalan sampai update.sh. Dipisah `~`.
+    potongan='app_url bukan alamat https://<host> tanpa port, jalur, atau garis miring di ujung'
+    while IFS='~' read -r keterangan filter; do
+        [ -n "$keterangan" ] || continue
+        pastikan "$keterangan: kasus terbaca utuh" test -n "$filter"
+
+        putaran "$(parameter_pasang 2.0.0 "$filter")"
+
+        sama "$keterangan: ditolak" "$(jq -c '[.status, .langkah[-1].step]' <<< "$op")" '["failed","Menolak pemasangan"]'
+        memuat "$keterangan: sebabnya" "$(jq -r .failure_message <<< "$op")" "$potongan"
+        sama "$keterangan: rilis tidak diunduh" \
+            "$(admin_keadaan | jq --argjson n "$sebelum" '[.requests[$n:][] | select(.method == "GET")] | length')" 0
+        sama "$keterangan: update.sh tidak dijalankan" "$(cat "$FAKE_UPDATE_JEJAK")" ''
+        sama "$keterangan: .env tidak disentuh" "$(jejak_env)" "$sidik"
+    done <<'KASUS'
+http~.app_url = "http://klinik-sehat.erp.grenery.xyz"
+tanpa skema~.app_url = "klinik-sehat.erp.grenery.xyz"
+dengan port~.app_url = "https://klinik-sehat.erp.grenery.xyz:8443"
+dengan jalur~.app_url = "https://klinik-sehat.erp.grenery.xyz/masuk"
+garis miring di ujung~.app_url = "https://klinik-sehat.erp.grenery.xyz/"
+dengan pengguna~.app_url = "https://admin@klinik-sehat.erp.grenery.xyz"
+huruf besar~.app_url = "https://Klinik-Sehat.erp.grenery.xyz"
+spasi~.app_url = "https://klinik sehat.erp.grenery.xyz"
+satu label~.app_url = "https://klinik-sehat"
+label kosong~.app_url = "https://klinik-sehat..grenery.xyz"
+label diawali minus~.app_url = "https://-klinik.erp.grenery.xyz"
+label 64 huruf~.app_url = "https://" + ("a" * 64) + ".grenery.xyz"
+berakhir baris baru~.app_url = "https://klinik-sehat.erp.grenery.xyz\n"
+kosong~.app_url = ""
+null~.app_url = null
+bukan teks~.app_url = ["https://klinik-sehat.erp.grenery.xyz"]
+KASUS
+
+    # --- app_url sah: diganti di tempatnya sebelum update.sh, baris lain byte demi byte sama ---
+    #
+    # APP_URL disebut dua kali — Compose memakai yang terakhir, jadi keduanya diganti — dan COREERP_APP_HOST sekali.
+    printf 'APP_URL=https://tambahan-tangan.test\n' >> "$rumah/.env"
+    lain="$(grep -vE "$pola_kunci" "$rumah/.env")"
+    jumlah_baris="$(wc -l < "$rumah/.env")"
+    putaran "$(parameter_pasang 2.0.0 ".app_url = \"$alamat\"")"
+
+    sama 'app_url: install selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'app_url: langkahnya dilaporkan sebelum rilis diunduh' \
+        "$(jq -c '[.langkah[] | select(.status == "running") | .step][0:2]' <<< "$op")" \
+        "[\"Menyetel alamat aplikasi $alamat\",\"Mengunduh dan memeriksa rilis 2.0.0\"]"
+    pastikan 'app_url: update.sh berjalan' test -f "$salinan"
+    sama 'app_url: .env saat update.sh mulai sudah memuat alamatnya' "$(grep -E "$pola_kunci" "$salinan")" \
+        "APP_URL=$alamat"$'\n'"COREERP_APP_HOST=klinik-sehat.erp.grenery.xyz"$'\n'"APP_URL=$alamat"
+    sama 'app_url: baris lain tidak berubah' "$(grep -vE "$pola_kunci" "$rumah/.env")" "$lain"
+    sama 'app_url: jumlah baris tetap' "$(wc -l < "$rumah/.env")" "$jumlah_baris"
+    sama 'app_url: mode 0600, pemilik tetap' "$(stat -c '%a %u:%g' "$rumah/.env")" '600 4321:4321'
+    sama 'app_url: tidak ada berkas sementara tertinggal' "$(find "$rumah" -maxdepth 1 -name '.env.*' | wc -l)" 0
+
+    # --- kunci yang belum disebut ditambahkan di ujung ---
+    sed -i '/^COREERP_APP_HOST=/d' "$rumah/.env"
+    lain="$(grep -vE "$pola_kunci" "$rumah/.env")"
+    putaran "$(parameter_pasang 3.0.0 '.app_url = "https://apotek-2.erp.grenery.xyz"')"
+
+    sama 'kunci baru: install selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'kunci baru: COREERP_APP_HOST ditambahkan di baris terakhir' "$(tail -n 1 "$salinan")" 'COREERP_APP_HOST=apotek-2.erp.grenery.xyz'
+    sama 'kunci baru: APP_URL diganti di tempatnya' "$(grep -c '^APP_URL=https://apotek-2.erp.grenery.xyz$' "$rumah/.env")" 2
+    sama 'kunci baru: baris lain tidak berubah' "$(grep -vE "$pola_kunci" "$rumah/.env")" "$lain"
+
+    # --- alamat yang sama diulang: rilis sudah terpasang, dan .env yang isinya sudah benar tidak ditulis ulang ---
+    inode="$(stat -c %i "$rumah/.env")"
+    putaran "$(parameter_pasang 3.0.0 '.app_url = "https://apotek-2.erp.grenery.xyz"')"
+
+    sama 'ulangan: install selesai' "$(jq -r .status <<< "$op")" succeeded
+    sama 'ulangan: update.sh tidak dijalankan' "$(cat "$FAKE_UPDATE_JEJAK")" ''
+    sama 'ulangan: .env tidak ditulis ulang' "$(stat -c %i "$rumah/.env")" "$inode"
+}
+
 # --- Pengujian: kunci putaran, cadangan, operasi asing, tenant ----------------------------------------
 
 uji_12_flock() {
@@ -1544,6 +1700,101 @@ uji_16_update_sh_tanpa_arsip_image() {
     harus_gagal 'bundle lengkap tidak menarik apa pun' grep -q '^pull' "$FAKE_DOCKER_LOG"
 }
 
+# update.sh dan profil proxy. core-proxy dinyalakan hanya bila Compose, dengan .env server, menyebutnya menyala —
+# bundle beli-putus tanpa profil tidak pernah menyentuh port 80 dan 443 — dan hanya sesudah core-app sehat. Proxy
+# yang gagal menyala mundur seperti kegagalan lain; compose yang tidak terbaca ditolak sebelum container disentuh.
+uji_16b_update_sh_proxy() {
+    local rumah="$KERJA/rumah-update-proxy" folder="$KERJA/berkas-update-proxy" log="$KERJA/log/update-proxy.log"
+    local image compose_rilis compose_sehat status_update baris_sehat baris_proxy versi_lama
+
+    rm -rf "$rumah" "$folder"
+    mkdir -p "$rumah" "$folder"
+    cp "$KERJA/kunci/rilis.pub" "$rumah/kunci-rilis.pub"
+    cp "$UPDATE_SH" "$folder/update.sh"
+    tulis_berkas_rilis "$folder" apotek-uji 0.7.0
+    image="$(jq -r .image "$folder/manifest.json")"
+    compose_rilis="compose --project-name coreerp --env-file $rumah/.env -f $folder/compose.yaml"
+    compose_sehat="compose --project-name coreerp --env-file $rumah/.env -f $rumah/keadaan/compose-sehat.yaml"
+    versi_lama="ghcr.io/mettadevs/edisi-apotek-uji@sha256:$(printf '%064d' 6)"
+
+    # jalankan ISI_ENV [VAR=nilai ...] — update.sh atas rilis ini dengan .env berisi ISI_ENV; kode keluarnya di
+    # $status_update.
+    jalankan() {
+        printf '%s\n' "$1" > "$rumah/.env"
+        shift
+        : > "$FAKE_DOCKER_LOG"
+        status_update=0
+        env COREERP_HOME="$rumah" COREERP_FOLDER_CADANGAN="$rumah/cadangan" COREERP_LEWATI_PERIKSA_CADANGAN=1 \
+            FAKE_DOCKER_IMAGE_ADA='postgres:16-alpine gotenberg/gotenberg:8' FAKE_DOCKER_IMAGE_ID="$(jq -r .digest "$folder/manifest.json")" \
+            "$@" bash "$UPDATE_SH" "$folder" > "$log" 2>&1 || status_update=$?
+    }
+
+    # versi_sehat_ada — keadaan server yang sudah pernah sehat: pembaruan mencadangkan dan dapat mundur.
+    versi_sehat_ada() {
+        mkdir -p "$rumah/keadaan"
+        printf '%s' "$versi_lama" > "$rumah/keadaan/versi-sehat"
+        printf 'name: coreerp\n' > "$rumah/keadaan/compose-sehat.yaml"
+    }
+
+    # --- tanpa profil: bentuk bundle beli-putus ---
+    rm -rf "$rumah/keadaan"
+    jalankan 'COMPOSE_PROFILES='
+    sama 'tanpa profil: selesai' "$status_update" 0
+    pastikan 'tanpa profil: layanan ditanyakan ke Compose dengan .env server' grep -qxF "$compose_rilis config --services" "$FAKE_DOCKER_LOG"
+    harus_gagal 'tanpa profil: core-proxy tidak disebut' grep -q 'core-proxy' "$FAKE_DOCKER_LOG"
+    harus_gagal 'tanpa profil: tidak ada langkah proxy' grep -q 'Menyalakan proxy HTTPS' "$log"
+
+    # --- profil proxy: sesudah core-app sehat, tanpa dependensi, lalu versi sehat dicatat ---
+    rm -rf "$rumah/keadaan"
+    jalankan 'COMPOSE_PROFILES=proxy'
+    sama 'profil proxy: selesai' "$status_update" 0
+    memuat 'profil proxy: langkahnya' "$(cat "$log")" '==> Menyalakan proxy HTTPS'
+    baris_sehat="$(grep -n '^inspect ' "$FAKE_DOCKER_LOG" | tail -n 1 | cut -d: -f1)"
+    baris_proxy="$(grep -nxF "$compose_rilis up -d --no-deps core-proxy" "$FAKE_DOCKER_LOG" | cut -d: -f1)"
+    pastikan 'profil proxy: core-proxy dinyalakan tanpa dependensi' test -n "$baris_proxy"
+    pastikan 'profil proxy: sesudah pemeriksaan kesehatan core-app' test "${baris_sehat:-999999}" -lt "$baris_proxy"
+    sama 'profil proxy: satu-satunya pemanggilan yang menyebut core-proxy' "$(grep -c 'core-proxy' "$FAKE_DOCKER_LOG")" 1
+    sama 'profil proxy: versi sehat dicatat' "$(cat "$rumah/keadaan/versi-sehat")" "$image"
+
+    # --- profil dari lingkungan proses: yang ditanya Compose, bukan .env yang dibaca update.sh sendiri ---
+    rm -rf "$rumah/keadaan"
+    jalankan 'COMPOSE_PROFILES=' COMPOSE_PROFILES=proxy
+    sama 'profil dari lingkungan: selesai' "$status_update" 0
+    pastikan 'profil dari lingkungan: core-proxy dinyalakan' grep -qxF "$compose_rilis up -d --no-deps core-proxy" "$FAKE_DOCKER_LOG"
+
+    # --- pemasangan pertama yang proxy-nya gagal menyala: gagal, dan tidak ada yang dicatat sehat ---
+    rm -rf "$rumah/keadaan"
+    jalankan 'COMPOSE_PROFILES=proxy' FAKE_DOCKER_UP_GAGAL='* up -d --no-deps core-proxy'
+    pastikan 'proxy gagal, pertama: update.sh gagal' test "$status_update" -ne 0
+    memuat 'proxy gagal, pertama: sebabnya' "$(cat "$log")" 'Pembaruan gagal: proxy HTTPS gagal dinyalakan'
+    pastikan 'proxy gagal, pertama: versi sehat tidak dicatat' test ! -e "$rumah/keadaan/versi-sehat"
+
+    # --- pembaruan yang proxy-nya gagal menyala: mundur, lalu proxy dinyalakan dengan compose versi sehat ---
+    rm -rf "$rumah/keadaan"
+    versi_sehat_ada
+    jalankan 'COMPOSE_PROFILES=proxy' FAKE_DOCKER_UP_GAGAL="* -f $folder/compose.yaml up -d --no-deps core-proxy"
+    pastikan 'proxy gagal, pembaruan: update.sh gagal' test "$status_update" -ne 0
+    memuat 'proxy gagal, pembaruan: sebabnya' "$(cat "$log")" 'Pembaruan gagal: proxy HTTPS gagal dinyalakan'
+    memuat 'proxy gagal, pembaruan: mundur selesai' "$(cat "$log")" "Pembaruan dibatalkan; sistem kembali ke $versi_lama"
+    pastikan 'proxy gagal, pembaruan: database dipulihkan' grep -q '^compose .* exec -T core-db pg_restore' "$FAKE_DOCKER_LOG"
+    pastikan 'proxy gagal, pembaruan: proxy dinyalakan dengan compose versi sehat' \
+        grep -qxF "$compose_sehat up -d --no-deps core-proxy" "$FAKE_DOCKER_LOG"
+    sama 'proxy gagal, pembaruan: versi sehat tidak berubah' "$(cat "$rumah/keadaan/versi-sehat")" "$versi_lama"
+
+    # --- proxy versi sehat pun gagal menyala: disebut, bukan dilaporkan kembali utuh ---
+    jalankan 'COMPOSE_PROFILES=proxy' FAKE_DOCKER_UP_GAGAL='* up -d --no-deps core-proxy'
+    pastikan 'proxy tetap gagal: update.sh gagal' test "$status_update" -ne 0
+    memuat 'proxy tetap gagal: disebut' "$(cat "$log")" "Aplikasi kembali ke $versi_lama, tetapi proxy HTTPS gagal dinyalakan kembali."
+
+    # --- compose yang tidak terbaca Compose: ditolak sebelum cadangan dan container ---
+    jalankan 'COMPOSE_PROFILES=proxy' FAKE_DOCKER_CONFIG_GAGAL=1
+    pastikan 'compose tidak terbaca: update.sh gagal' test "$status_update" -ne 0
+    memuat 'compose tidak terbaca: sebabnya' "$(cat "$log")" 'compose.yaml rilis tidak dapat dibaca Docker Compose'
+    memuat 'compose tidak terbaca: galat Compose ikut' "$(cat "$log")" 'mapping values are not allowed'
+    sama 'compose tidak terbaca: container tidak disentuh, termasuk core-db untuk cadangan' \
+        "$(grep -cE '^compose .* (up|exec|stop|run)( |$)' "$FAKE_DOCKER_LOG" || true)" 0
+}
+
 uji_17_pasang() {
     local rumah="$KERJA/rumah-pasang" folder_bin="$KERJA/bin-pasang" folder_systemd="$KERJA/systemd"
     local token keluaran keluaran_ulang nilai kata_sandi sidik_env situs_id nama kurang=() sebelum baris_tunggu baris_langkah baris_selesai
@@ -1552,7 +1803,8 @@ uji_17_pasang() {
 
     # Operasi install baru dapat diklaim pada putaran kedua, seperti admin.erp yang belum menentukan rilisnya
     # saat server tersambung.
-    token="$(token_pasang pasang 1.0.0 '.operasi[0].sembunyi_klaim = 1')"
+    token="$(token_pasang pasang 1.0.0 \
+        '.operasi[0].sembunyi_klaim = 1 | .operasi[0].parameters.app_url = "https://klinik-sehat-sentosa.erp.grenery.xyz"')"
     pastikan 'token berbentuk token admin.erp: 48 huruf dan angka' cocok_pola "$token" '^[A-Za-z0-9]{48}$'
     sebelum="$(jumlah_permintaan)"
 
@@ -1567,6 +1819,13 @@ uji_17_pasang() {
     keluaran="$(cat "$KERJA/log/pasang.log")"
 
     sama 'mode .env' "$(stat -c %a "$rumah/.env")" 600
+
+    # Bawaan: proxy HTTPS agen menyala lewat profil compose yang tersimpan di .env, dan alamat tenant dari operasi
+    # install menggantikan alamat sementara dari nama mesin.
+    sama 'profil proxy ditulis ke .env' "$(grep '^COMPOSE_PROFILES' "$rumah/.env")" 'COMPOSE_PROFILES=proxy'
+    memuat 'proxy HTTPS agen disebut' "$keluaran" 'proxy HTTPS agen di port 80 dan 443'
+    sama 'alamat tenant dari operasi install' "$(grep -E '^(APP_URL|COREERP_APP_HOST)=' "$rumah/.env")" \
+        'APP_URL=https://klinik-sehat-sentosa.erp.grenery.xyz'$'\n''COREERP_APP_HOST=klinik-sehat-sentosa.erp.grenery.xyz'
     harus_gagal '.env tidak menyisakan isian' grep -q '@@[A-Z_]*@@' "$rumah/.env"
 
     while IFS= read -r nama; do
@@ -1692,7 +1951,7 @@ uji_17b_pasang_berkas_admin() {
     sama 'pasang.sh yang disajikan tidak menyisakan isian alamat' "$(curl -fsS "$ADMIN/pasang.sh" | grep -c '@@COREERP_ADMIN_URL@@' || true)" 0
     sama 'pasang.sh yang disajikan menanam alamat admin.erp' "$(curl -fsS "$ADMIN/pasang.sh" | grep -c "^ALAMAT_ADMIN='$ADMIN'$" || true)" 1
 
-    # Hanya --token, --app-port, dan --app-bind.
+    # Hanya --token, --app-port, --app-bind, dan --proxy-luar.
     tolak_pasang 'tanpa --token ditolak' 'Skrip pasang menuntut --token.'
     tolak_pasang '--admin-url ditolak' 'Argumen tidak dikenal: --admin-url' --admin-url "$ADMIN" --token "$token"
     tolak_pasang '--ref ditolak' 'Argumen tidak dikenal: --ref' --token "$token" --ref main
@@ -1983,6 +2242,78 @@ uji_18_pasang_port_dan_setelan() {
     diharapkan="$(jq -cn --arg env "$rumah/.env" '["compose","--project-name","coreerp-situs","--env-file",$env]')"
     sama 'bootstrap-tenant lewat pembungkus memakai proyek dari agent.env' \
         "$(jq -c 'select(.args | index("tenant:bootstrap-site")) | .args[0:5]' "$FAKE_DOCKER_JSON_LOG")" "$diharapkan"
+}
+
+# Proxy HTTPS agen menuntut port 80 dan 443. Server yang sudah memakai salah satunya ditolak pada pemasangan
+# pertama sebelum apa pun ditulis, dengan jalan keluar --proxy-luar. Dengan pilihan itu pemasangan berjalan tanpa
+# profil proxy. Pemasangan ulang tidak memeriksa kedua port itu: sesudah terpasang, keduanya didengar CoreERP sendiri.
+uji_18b_pasang_proxy() {
+    local rumah="$KERJA/rumah-proxy" folder_systemd="$KERJA/systemd-proxy" log="$KERJA/log/pasang-proxy.log"
+    local token keluaran sidik
+
+    [ "$(id -u)" -eq 0 ] || { printf 'mendengarkan port 80 dan 443 menuntut root\n'; exit 77; }
+
+    buat_rilis "$EDISI_PASANG" 1.0.0
+    token="$(token_pasang proxy-luar 1.0.0)"
+
+    # pasang_proxy [pilihan pasang.sh...] — keluaran di $log.
+    pasang_proxy() {
+        jalankan_pasang "$log" COREERP_HOME="$rumah" COREERP_SYSTEMD_DIR="$folder_systemd" \
+            COREERP_BIN_DIR="$KERJA/bin-proxy" -- --token "$token" "$@"
+    }
+
+    # tolak_proxy KETERANGAN POTONGAN... — pemasangan pertama ditolak dengan setiap POTONGAN di keluarannya, tanpa
+    # menulis apa pun dan tanpa memakai token.
+    tolak_proxy() {
+        local keterangan="$1" satu
+        shift
+
+        rm -rf "$rumah" "$folder_systemd"
+
+        if pasang_proxy; then
+            cat "$log"
+            printf '%s: pasang.sh diterima padahal harus menolak\n' "$keterangan"
+            return 1
+        fi
+
+        for satu in "$@"; do
+            memuat "$keterangan" "$(cat "$log")" "$satu"
+        done
+
+        pastikan "$keterangan: tidak ada yang ditulis ke COREERP_HOME" test ! -e "$rumah"
+        pastikan "$keterangan: unit systemd tidak ditulis" test ! -e "$folder_systemd"
+        sama "$keterangan: token tidak terpakai" "$(admin_keadaan | jq -r --arg t "$token" '.tokens[$t].dipakai')" false
+    }
+
+    dengarkan 443
+    tolak_proxy '443 didengar' 'Port 443 sudah didengar layanan lain' 'membutuhkan port 80 dan 443' \
+        '--token TOKEN --proxy-luar' 'arahkan host tenant di reverse proxy itu ke 127.0.0.1:8000'
+
+    dengarkan 80
+    tolak_proxy '80 dan 443 didengar' 'Port 80 dan 443 sudah didengar layanan lain' '--proxy-luar'
+
+    # --proxy-luar: tanpa pemeriksaan kedua port, tanpa profil proxy; setelan lain tetap dari env.template.
+    rm -rf "$rumah" "$folder_systemd"
+    pasang_proxy --proxy-luar || { cat "$log"; return 1; }
+    keluaran="$(cat "$log")"
+
+    memuat '--proxy-luar: pemasangan selesai' "$keluaran" 'Selesai. Buka admin.erp untuk melihat server ini.'
+    memuat '--proxy-luar: disebut di keluaran' "$keluaran" 'tanpa proxy HTTPS agen (--proxy-luar)'
+    sama '--proxy-luar: profil compose tanpa proxy' "$(grep '^COMPOSE_PROFILES' "$rumah/.env")" 'COMPOSE_PROFILES='
+    harus_gagal '--proxy-luar: .env tidak menyisakan isian' grep -q '@@[A-Z_]*@@' "$rumah/.env"
+    sama '--proxy-luar: port dan alamat ikat bawaan' \
+        "$(grep -E '^CORE_APP_(PORT|BIND)=' "$rumah/.env" | sort | paste -sd' ')" 'CORE_APP_BIND=127.0.0.1 CORE_APP_PORT=8000'
+
+    # Pemasangan ulang di atasnya, dengan kedua port masih didengar: tidak ditolak, dan .env tidak ditimpa — pilihan
+    # --proxy-luar bertahan karena ia tinggal di .env, bukan di perintah.
+    sidik="$(sha256sum < "$rumah/.env")"
+    pasang_proxy || { cat "$log"; printf 'pemasangan ulang tanpa --proxy-luar ditolak\n'; return 1; }
+    sama 'pemasangan ulang: .env tidak ditimpa' "$(sha256sum < "$rumah/.env")" "$sidik"
+    harus_gagal 'pemasangan ulang: tidak memeriksa 80 dan 443' grep -q 'sudah didengar' "$log"
+
+    pasang_proxy --proxy-luar || { cat "$log"; return 1; }
+    memuat 'pemasangan ulang: --proxy-luar dijelaskan, bukan diam-diam diabaikan' "$(cat "$log")" \
+        '--proxy-luar hanya berlaku pada pemasangan pertama'
 }
 
 uji_19_agent_env() {
@@ -2610,16 +2941,19 @@ uji '09c license_required dari .env: true hanya bentuk persis di baris terakhir,
 uji '10 rotate_key: kunci lama ditolak, kunci baru diterima' uji_10_putar_kunci
 uji '10b rotate_key yang jawabannya hilang dipulihkan dengan kunci tertunda' uji_10b_rotasi_jawaban_hilang
 uji '11 install: rilis, lalu tenant:bootstrap-site dengan hash lewat stdin; parameter tidak sah ditolak; aman diulang' uji_11_install
+uji '11b install: app_url ditulis ke .env sebelum update.sh tanpa menyentuh baris lain; tidak sah ditolak; tanpanya .env tidak disentuh' uji_11b_install_alamat
 uji '12 dua run bersamaan: yang kedua keluar tanpa bekerja; lease diperpanjang' uji_12_flock
 uji '13 backup: pg_dump lewat compose sehat, gagal dilaporkan gagal' uji_13_cadangan
 uji '14 operasi di luar daftar tertutup ditolak' uji_14_operasi_asing
 uji '15 bootstrap-tenant: argumen diteruskan, kata sandi tidak disimpan' uji_15_bootstrap_tenant
 uji '16 update.sh tanpa images.tar.gz menarik image dan tetap memeriksa digest' uji_16_update_sh_tanpa_arsip_image
+uji '16b update.sh: core-proxy hanya dengan profil proxy, sesudah sehat; gagal menyala mundur; compose tak terbaca ditolak' uji_16b_update_sh_proxy
 uji '17 pasang.sh dari admin.erp: .env, unit, pendaftaran, putaran sampai install selesai, pemasangan ulang' uji_17_pasang
 uji '17b pasang.sh: isian alamat, pilihan lama, kunci rilis, berkas kosong, alamat, dan skrip terpotong ditolak' uji_17b_pasang_berkas_admin
 uji '17c pasang.sh: putaran berhenti pada install yang gagal dan pada batas waktu' uji_17c_putaran_pasang
 uji '17d pasang.sh: folder atau proyek compose milik stack lain ditolak sebelum apa pun ditulis' uji_17d_pasang_stack_lain
 uji '18 pasang.sh: port terpakai ditolak di pemasangan pertama; port, alamat ikat, dan agent.env ditulis' uji_18_pasang_port_dan_setelan
+uji '18b pasang.sh: 80/443 terpakai ditolak dengan arahan --proxy-luar; --proxy-luar tanpa profil proxy; pemasangan ulang tidak memeriksa' uji_18b_pasang_proxy
 uji '19 agent.env dibaca agen sendiri: isi di luar daftar ditolak, lingkungan menang, diteruskan ke update.sh' uji_19_agent_env
 uji '20 v2: kredensial per operasi, login lewat stdin, pull lewat digest, tag lokal, logout, tanpa sisa kredensial' uji_20_v2_tarik_image
 uji '20b v2: pull yang diam dan pull beruntun tetap memperpanjang lease' uji_20b_v2_detak

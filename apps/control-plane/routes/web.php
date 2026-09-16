@@ -105,6 +105,7 @@ Route::middleware(['auth', 'operator'])->group(function (): void {
     Route::get('/situs', [SiteScreens::class, 'index'])->name('sites.index');
     Route::get('/situs/{situs}', [SiteScreens::class, 'show'])->name('sites.show');
     Route::patch('/situs/{situs}/setelan', [SiteSettings::class, 'update'])->name('sites.settings.update');
+    Route::post('/situs/{situs}/dns', [SiteSettings::class, 'syncDns'])->middleware('throttle:10,1')->name('sites.dns.sync');
     Route::post('/situs/{situs}/pendaftaran', [SiteActions::class, 'issueEnrollment'])->middleware('throttle:10,1')->name('sites.enrollment');
     Route::post('/situs/{situs}/operasi', [SiteActions::class, 'requestOperation'])->middleware('throttle:30,1')->name('sites.operations.request');
     Route::post('/situs/{situs}/operasi/{operasi}/batal', [SiteActions::class, 'cancelOperation'])->name('sites.operations.cancel');

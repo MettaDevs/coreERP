@@ -24,7 +24,7 @@
 #
 #   periksa tanda tangan → periksa checksum → periksa lokasi cadangan → (v2: periksa image lokal) →
 #   cadangkan database → muat atau tarik image → ganti container → migrasi → periksa kesehatan →
-#   mundur bila gagal
+#   (profil proxy: nyalakan proxy HTTPS) → mundur bila gagal
 #
 # Pada v2 image diperiksa **sebelum** pencadangan, karena pencadangan sudah menyalakan `core-db` dengan compose
 # rilis baru: tag pendamping yang hilang atau salah akan mengganti container database sebelum ada yang menolak.
@@ -314,6 +314,39 @@ fi
 versi_sehat=''
 [ -f "$BERKAS_VERSI_SEHAT" ] && versi_sehat="$(cat "$BERKAS_VERSI_SEHAT")"
 
+# proxy_menyala IMAGE COMPOSE... — pulang 0 bila compose itu, dengan .env server ini, menyalakan `core-proxy`.
+#
+# Layanan itu berprofil `proxy`, yang dinyalakan lewat COMPOSE_PROFILES di .env server klien yang dipasang agen.
+# Yang ditanya Compose sendiri, bukan .env yang dibaca di sini: COMPOSE_PROFILES di lingkungan proses menang
+# atas berkasnya, dan pembacaan kedua dengan aturan yang berbeda dapat menyalakan proxy yang tidak diminta —
+# di port 80 dan 443 milik web server klinik pada bundle beli-putus. Pulang 2 bila Compose tidak dapat membaca
+# compose-nya; keluaran galatnya di PROXY_GALAT.
+PROXY_GALAT=''
+
+proxy_menyala() {
+    local image_compose="$1" layanan
+    shift
+
+    if ! layanan="$(EDITION_IMAGE="$image_compose" "$@" config --services 2>&1)"; then
+        PROXY_GALAT="$layanan"
+        return 2
+    fi
+
+    grep -qxF core-proxy <<< "$layanan"
+}
+
+# Ditanya sekali, sebelum apa pun berubah: compose rilis yang tidak terbaca Compose ditolak di sini, bukan
+# sesudah database dicadangkan dan container diganti.
+proxy_rilis=0
+status_proxy=0
+proxy_menyala "$image" "${compose[@]}" || status_proxy=$?
+
+case "$status_proxy" in
+    0) proxy_rilis=1 ;;
+    1) ;;
+    *) gagal 'compose.yaml rilis tidak dapat dibaca Docker Compose dengan .env server ini.' "$PROXY_GALAT" ;;
+esac
+
 printf '\n'
 printf 'Edisi        : %s\n' "${edisi:-(tidak ada; satu image untuk semua klien)}"
 printf 'Rilis        : %s\n' "$rilis"
@@ -519,6 +552,20 @@ mundur() {
             "Log: docker compose --project-name $PROYEK logs core-app"
     fi
 
+    # Proxy yang ikut dibuat ulang pembaruan yang gagal dikembalikan ke compose versi yang dituju. Proxy yang
+    # tidak disentuh pembaruan — kegagalan sebelum langkahnya — tidak berubah oleh perintah ini. Compose lama
+    # yang tidak mengenal core-proxy, atau tidak terbaca, dilewati: aplikasinya sudah kembali.
+    if proxy_menyala "$versi_sehat" "${compose_mundur[@]}" \
+        && ! EDITION_IMAGE="$versi_sehat" "${compose_mundur[@]}" up -d --no-deps core-proxy >/dev/null 2>&1; then
+        gagal \
+            "Aplikasi kembali ke $versi_sehat, tetapi proxy HTTPS gagal dinyalakan kembali." \
+            '' \
+            'Databasenya sudah dipulihkan dan aplikasinya menyala; yang tidak menyala adalah proxy di port 80' \
+            'dan 443, jadi peramban belum dapat menjangkaunya.' \
+            '' \
+            "Log: docker compose --project-name $PROYEK logs core-proxy"
+    fi
+
     gagal \
         "Pembaruan dibatalkan; sistem kembali ke $versi_sehat." \
         '' \
@@ -568,6 +615,25 @@ done
 [ "$keadaan" = 'healthy' ] || mundur "aplikasi tidak menjadi sehat dalam $BATAS_SEHAT_DETIK detik"
 
 printf '    core-app sehat\n'
+
+# --- 8b. Proxy HTTPS -----------------------------------------------------------------------------
+#
+# Hanya bila compose rilis menyalakan core-proxy; lihat proxy_menyala. Sesudah core-app terbukti sehat, dan
+# dengan --no-deps: tanpanya `up` ikut menjalankan ulang core-migrate yang sudah selesai, karena Compose
+# menyalakan dependensi yang tidak sedang berjalan.
+#
+# Kegagalannya mundur seperti kegagalan lain. Aplikasi yang sehat tetapi tidak dapat dijangkau peramban bukan
+# versi sehat, dan versi yang dicatat sehat di bawah menjadi sasaran mundur pembaruan berikutnya.
+
+if [ "$proxy_rilis" -eq 1 ]; then
+    langkah 'Menyalakan proxy HTTPS'
+
+    if ! EDITION_IMAGE="$image" "${compose[@]}" up -d --no-deps core-proxy >/dev/null; then
+        mundur 'proxy HTTPS gagal dinyalakan'
+    fi
+
+    printf '    core-proxy menyala di port 80 dan 443\n'
+fi
 
 # --- 9. Catat versi sehat ------------------------------------------------------------------------
 #

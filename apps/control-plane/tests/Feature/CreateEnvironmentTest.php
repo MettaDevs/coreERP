@@ -313,13 +313,13 @@ class CreateEnvironmentTest extends TestCase
     }
 
     /**
-     * Alamat yang disusun dari domain kita tidak pernah terbuka untuk produksi di server klien — Core menolak
-     * merutekannya — jadi layar tidak boleh mencetaknya. Pasangan hijaunya lingkungan server kita pada tenant
-     * yang sama bentuknya.
+     * Produksi di server klien memakai bentuk alamat yang sama dengan produksi di server kita,
+     * `<tenant>.<domain dasar>`: operator tidak memilihnya, dan record DNS yang dibuat admin.erp membawanya ke
+     * mesin klien. Keduanya dibandingkan pada tenant yang berbeda supaya yang terbukti sama adalah bentuknya.
      */
-    public function test_a_client_server_production_has_no_address_on_our_domain(): void
+    public function test_a_client_server_production_gets_the_same_address_shape_as_ours(): void
     {
-        config(['core.base_domain' => 'erp.contoh.test']);
+        config(['core.base_domain' => 'erp.contoh.test', 'core.address_scheme' => 'https', 'core.address_port' => null]);
         $operator = $this->operator();
 
         $ours = $this->tenant('PT Alamat Kita');
@@ -331,12 +331,12 @@ class CreateEnvironmentTest extends TestCase
         $provider = Environment::query()->where('tenant_id', $ours)->sole();
         $clientServer = Environment::query()->where('tenant_id', $theirs)->sole();
 
-        $this->assertNotNull($provider->url());
-        $this->assertNull($clientServer->url());
+        $this->assertSame('https://'.$provider->tenant?->slug.'.erp.contoh.test', $provider->url());
+        $this->assertSame('https://'.$clientServer->tenant?->slug.'.erp.contoh.test', $clientServer->url());
 
         $this->actingAs($operator)->get('/lingkungan/'.$clientServer->id)
             ->assertInertia(fn ($page) => $page
-                ->where('environment.url', null)
+                ->where('environment.url', $clientServer->url())
                 ->where('environment.hosting', 'client_server')
                 ->where('serverClient.site', null));
 
@@ -345,7 +345,7 @@ class CreateEnvironmentTest extends TestCase
                 ->where('environments', function (Collection $rows) use ($provider, $clientServer): bool {
                     $byId = $rows->keyBy('id');
 
-                    return data_get($byId->get($clientServer->id), 'url') === null
+                    return data_get($byId->get($clientServer->id), 'url') === $clientServer->url()
                         && data_get($byId->get($clientServer->id), 'site') === null
                         && data_get($byId->get($provider->id), 'url') === $provider->url();
                 }));

@@ -44,7 +44,8 @@ type SiteRow = {
     tenant: string;
     environment: { id: string; name: string } | null;
     serverAddress: string | null;
-    address: string | null;
+    appUrl: string | null;
+    dns: { state: string; name: string | null; target: string | null };
     lastSeenIp: string | null;
     reportedRelease: string | null;
     newestRelease: string | null;
@@ -294,7 +295,7 @@ export default function Index({
                     row.tenant,
                     row.environment?.name,
                     row.serverAddress,
-                    row.address,
+                    row.appUrl,
                     row.lastSeenIp,
                 ].some((value) => value?.toLowerCase().includes(needle))),
     );
@@ -495,6 +496,26 @@ export default function Index({
                                                         Alamat server belum
                                                         dicatat
                                                     </Link>
+                                                )}
+                                                {row.appUrl && (
+                                                    <a
+                                                        href={row.appUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="mt-0.5 block font-mono text-xs break-all text-muted-foreground hover:underline"
+                                                    >
+                                                        {row.appUrl.replace(
+                                                            /^https?:\/\//,
+                                                            '',
+                                                        )}
+                                                    </a>
+                                                )}
+                                                {row.dns.state ===
+                                                    'outdated' && (
+                                                    <span className="mt-0.5 block text-xs text-amber-700 dark:text-amber-300">
+                                                        DNS belum mengikuti
+                                                        alamat server
+                                                    </span>
                                                 )}
                                                 <span className="mt-0.5 block text-xs text-muted-foreground">
                                                     {row.tenant} ·{' '}

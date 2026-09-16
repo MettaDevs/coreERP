@@ -176,16 +176,12 @@ class Environment extends Model
      * penyimpangannya berbentuk pelanggan yang tidak dapat masuk ke alamat yang dicetak sistem
      * itu sendiri.
      *
-     * Produksi di server klien tidak punya alamat di domain kita: Core di server kita menolak
-     * merutekannya, jadi alamat yang disusun `EnvironmentAddress` untuknya adalah alamat yang tidak pernah
-     * terbuka. Alamatnya milik server klien, dicatat di situsnya (`sites.address`).
+     * Produksi di server klien memakai bentuk yang sama. Core di server kita tidak merutekannya; alamat itu
+     * sampai ke server klien lewat record DNS yang dibuat admin.erp (`SiteDns`) dan mengalahkan wildcard
+     * domain dasar. Sampai record itu ada, alamatnya masih jatuh ke server kita dan tidak terbuka.
      */
     public function url(): ?string
     {
-        if ($this->hosting === 'client_server') {
-            return null;
-        }
-
         return EnvironmentAddress::forEnvironment($this->tenant->slug ?? '', $this->kind);
     }
 }
