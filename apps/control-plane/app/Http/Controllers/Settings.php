@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace ControlPlane\Http\Controllers;
 
+use ControlPlane\Dns\CloudflareClient;
+use ControlPlane\Dns\CloudflareSettings;
+use ControlPlane\Dns\DnsUnavailable;
 use ControlPlane\Registry\HarborClient;
 use ControlPlane\Registry\RegistrySettings;
 use ControlPlane\Registry\RegistryUnavailable;
@@ -33,8 +36,20 @@ use Inertia\Response as InertiaResponse;
  */
 final class Settings extends Controller
 {
-    public function __invoke(RegistrySettings $registry, HarborClient $harbor): InertiaResponse
+    public function __invoke(RegistrySettings $registry, HarborClient $harbor, CloudflareSettings $dns, CloudflareClient $cloudflare): InertiaResponse
     {
+        // Diperiksa setiap halaman dibuka, sama dengan robot Harbor: jawaban basi menyembunyikan token yang baru
+        // saja dicabut di Cloudflare.
+        $dnsCheck = null;
+
+        if ($dns->configured()) {
+            try {
+                $dnsCheck = ['ok' => true, 'zone' => $cloudflare->zone()['name']];
+            } catch (DnsUnavailable $e) {
+                $dnsCheck = ['ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+
         $robot = $registry->robotName();
         $check = ['ok' => true];
 
@@ -70,6 +85,11 @@ final class Settings extends Controller
                 'host' => $registry->host(),
                 'robot' => $robot,
                 'check' => $check,
+            ],
+            'dns' => [
+                'baseDomain' => $dns->baseDomain(),
+                'configured' => $dns->configured(),
+                'check' => $dnsCheck,
             ],
         ]);
     }

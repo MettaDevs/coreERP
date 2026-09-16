@@ -123,9 +123,41 @@ Tiga celah layar ditemukan saat pemilik produk menyiapkan uji di server kedua, d
   `sites.server_address` menyimpan IP atau nama host yang dicatat operator, dan `sites.last_seen_ip` asal
   laporan agen terakhir. Keduanya boleh kosong, jadi kriteria "tanpa isian wajib" di bawah tetap berlaku.
 
-Dua penyesuaian ikut: produksi di server klien tidak lagi menampilkan alamat di domain kita (Core tidak
-merutekannya), dan keadaan `stale` berbunyi "Tidak melapor" alih-alih "Tertinggal" dari PS-05, karena
+Satu penyesuaian ikut: keadaan `stale` berbunyi "Tidak melapor" alih-alih "Tertinggal" dari PS-05, karena
 daftar server klien kini juga menandai rilis yang tertinggal.
+
+### Alamat aplikasi otomatis, record DNS, dan HTTPS di server klien
+
+Sebelum uji di server kedua, pemeriksaan menemukan bahwa pemasangan akan "Jalan" tetapi tidak dapat dibuka:
+
+- `pasang.sh` menulis `APP_URL=https://$(hostname -f)` — di server kedua itu domain pribadi pemilik mesinnya;
+- kolom "Alamat aplikasi" di admin.erp hanya catatan yang tidak pernah sampai ke server klien;
+- `<tenant>.erp.grenery.xyz` jatuh ke wildcard server kita, dan Core di sana tidak merutekan lingkungan server klien;
+- aplikasi hanya mendengar di `127.0.0.1` dan wajib HTTPS, sedangkan agen tidak menyiapkan domain maupun sertifikat.
+
+Keputusan pemilik produk: alamat dibentuk sistem (alamat milik klien belum didukung), record DNS dibuat otomatis
+lewat Cloudflare, dan agen memasang proxy HTTPS sendiri.
+
+- **admin.erp** (cabang `feat/alamat-otomatis-server-klien`): produksi server klien memakai bentuk alamat
+  produksi yang sama, `https://<tenant>.<domain dasar>`. Kolom alamat aplikasi dibuang dari setelan. "Buat
+  perintah pasang" kini mewajibkan alamat server (IP VPS), membuat atau memindahkan record `<tenant>.<domain
+  dasar>` ke alamat itu (`SiteDns`, tidak lewat proxy Cloudflare, hanya record berkomentar
+  `coreerp-site:<id>` yang pernah disentuh), lalu mengirim `app_url` di parameter operasi `install`.
+  Pencabutan menghapus record itu. Status token dan zonanya tampil di Pengaturan.
+- **Agen** (cabang `feat/agen-proxy-https`): operasi `install` menulis `APP_URL` dan nama host proxy ke `.env`
+  sebelum stack dinyalakan; compose klien punya service proxy HTTPS di profil `proxy` yang dinyalakan
+  `pasang.sh` secara bawaan; mesin yang port 80/443-nya sudah dipakai proxy lain dipasang dengan
+  `--proxy-luar`.
+
+Token Cloudflare disimpan pemilik produk di server pertama — izin **Zone → DNS → Edit** untuk zona domain dasar
+saja:
+
+```
+read -rsp 'Token Cloudflare: ' T; echo
+printf '%s' "$T" | sudo docker exec -i -u www-data coreerp-saas-core-console-1 php artisan dns:token-cloudflare; unset T
+```
+
+Perintah itu menolak menyimpan token yang tidak melihat zonanya, dan tidak pernah mencetak tokennya.
 
 ## Urutan
 

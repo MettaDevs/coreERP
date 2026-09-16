@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ControlPlane\Tests\Feature\Sites;
 
+use ControlPlane\Dns\CloudflareSettings;
 use ControlPlane\Models\Environment;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteEnrollmentToken;
@@ -84,6 +85,27 @@ abstract class SiteTestCase extends TestCase
         Http::fake([
             $this->entitlementsUrl($site) => Http::response(['tenant_id' => $site->tenant_id, 'apps' => $apps]),
         ]);
+    }
+
+    /**
+     * Konsol dengan domain dasar `erp.contoh.test`, token Cloudflare tersimpan, dan Cloudflare tiruan yang menyimpan
+     * keadaan. Skema dan port disebut tegas: `.env` pengembang lazim berisi `http` dan port 8000, dan alamat server
+     * klien yang sah hanya `https://<host>`.
+     */
+    protected function useCloudflare(?string $storedToken = 'token-uji'): FakeCloudflare
+    {
+        config([
+            'core.base_domain' => 'erp.contoh.test',
+            'core.address_scheme' => 'https',
+            'core.address_port' => null,
+            'sites.cloudflare_api_url' => FakeCloudflare::API,
+        ]);
+
+        if ($storedToken !== null) {
+            app(CloudflareSettings::class)->storeToken($storedToken, null);
+        }
+
+        return new FakeCloudflare('contoh.test');
     }
 
     protected function entitlementsUrl(Site $site): string

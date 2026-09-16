@@ -53,12 +53,12 @@ final class ClientServer extends Controller
         $settings = ServerSettings::fromRequest($request);
 
         try {
-            $setup->updateSettings($request, $site, $settings);
+            $warning = $setup->updateSettings($request, $site, $settings);
         } catch (SiteRejected $e) {
             throw ValidationException::withMessages(['server_client' => $e->getMessage()]);
         }
 
-        return redirect('/lingkungan/'.$row->id)->with('message', 'Setelan server klien disimpan.');
+        return redirect('/lingkungan/'.$row->id)->with('message', $warning ?? 'Setelan server klien disimpan.');
     }
 
     public function issueCommand(Request $request, string $environment, ClientServerSetup $setup): RedirectResponse

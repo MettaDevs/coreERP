@@ -20,9 +20,10 @@ use Illuminate\Support\Carbon;
  * pembaruan berpasangan, profil yang dikenal — ditegakkan CHECK constraint di migration
  * `create_site_registry_tables`, bukan di kelas ini.
  *
- * `address` alamat aplikasi yang dibuka pengguna klinik; `server_address` alamat mesinnya, dicatat
- * operator; `last_seen_ip` asal laporan agen terakhir. Kenapa ketiganya terpisah ada di migration
- * `add_server_address_to_sites`.
+ * Alamat aplikasi situs yang lahir dari lingkungan diturunkan dari lingkungannya — lihat `appUrl()` — dan
+ * `address` hanya berlaku untuk situs lama tanpa lingkungan. `server_address` alamat mesinnya, dicatat
+ * operator; `last_seen_ip` asal laporan agen terakhir; `dns_*` record DNS yang dibuat admin.erp untuk alamat
+ * aplikasi itu. Alasannya di migration `add_server_address_to_sites` dan `add_dns_record_to_sites`.
  *
  * @property string $id
  * @property string $tenant_id
@@ -33,6 +34,10 @@ use Illuminate\Support\Carbon;
  * @property ?string $address
  * @property ?string $server_address
  * @property ?string $last_seen_ip
+ * @property ?string $dns_record_id
+ * @property ?string $dns_name
+ * @property ?string $dns_target
+ * @property ?Carbon $dns_synced_at
  * @property ?string $update_window_start
  * @property ?string $update_window_end
  * @property string $timezone
@@ -104,7 +109,25 @@ class Site extends Model
             'license_issued_at' => 'datetime',
             'license_valid_until' => 'date',
             'license_suspended_at' => 'datetime',
+            'dns_synced_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Alamat yang dibuka pengguna klinik.
+     *
+     * Situs yang lahir dari lingkungan memakai alamat produksi lingkungannya, `<tenant>.<domain dasar>`, sama
+     * dengan produksi di server kita — admin.erp yang membuat record DNS-nya ke server klien. Ia tidak dapat
+     * diganti operator: domain milik klien belum didukung. Situs lama tanpa lingkungan tetap memakai alamat
+     * yang dicatat untuknya.
+     */
+    public function appUrl(): ?string
+    {
+        if ($this->environment_id === null) {
+            return $this->address;
+        }
+
+        return $this->environment?->url();
     }
 
     /** @return BelongsTo<Tenant, $this> */

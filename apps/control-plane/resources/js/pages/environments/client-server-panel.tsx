@@ -9,6 +9,8 @@ import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { InstallStateBadge } from '@/components/badges';
 import CopyButton from '@/components/copy-button';
+import DnsStatus from '@/components/dns-status';
+import type { DnsInfo } from '@/components/dns-status';
 import {
     ServerAddressField,
     ServerAdvancedFields,
@@ -21,7 +23,8 @@ export type ServerClient = {
         name: string;
         serverAddress: string | null;
         lastSeenIp: string | null;
-        address: string | null;
+        appUrl: string | null;
+        dns: DnsInfo;
         updateWindow: { start: string; end: string; timezone: string } | null;
         enrolledAt: string | null;
     } | null;
@@ -128,7 +131,6 @@ function InstallCommandCard({ issued }: { issued: InstallCommand }) {
 function Prepare({ environmentId }: { environmentId: string }) {
     const { data, setData, post, processing, errors } = useForm({
         server_address: '',
-        address: '',
         update_window_start: '',
         update_window_end: '',
     });
@@ -145,8 +147,8 @@ function Prepare({ environmentId }: { environmentId: string }) {
             <p className="text-sm text-muted-foreground">
                 Produksi tenant ini berjalan di server milik klien, bukan di
                 server kita. Menyiapkannya mencatat server itu — namanya, app
-                yang dibeli, dan rilisnya diambil sistem. Belum ada yang
-                dipasang sampai perintah pasangnya dijalankan.
+                yang dibeli, rilis, dan alamat aplikasinya diambil sistem. Belum
+                ada yang dipasang sampai perintah pasangnya dijalankan.
             </p>
             <ServerAddressField
                 value={data.server_address}
@@ -157,7 +159,7 @@ function Prepare({ environmentId }: { environmentId: string }) {
                 <CollapsibleSection
                     value="lanjutan"
                     title="Lanjutan"
-                    summary="Alamat aplikasi dan jendela pembaruan, boleh diisi belakangan"
+                    summary="Jendela pembaruan, boleh diisi belakangan"
                 >
                     <ServerAdvancedFields
                         data={data}
@@ -183,7 +185,6 @@ function EditSettings({
 }) {
     const { data, setData, patch, processing, errors } = useForm({
         server_address: site.serverAddress ?? '',
-        address: site.address ?? '',
         update_window_start: site.updateWindow?.start ?? '',
         update_window_end: site.updateWindow?.end ?? '',
     });
@@ -424,10 +425,22 @@ export default function ClientServerPanel({
                                         />
                                     </span>
                                 ) : (
-                                    <span className="font-normal text-muted-foreground">
-                                        Belum dicatat — isi di Setelan server
+                                    <span className="font-normal text-amber-700 dark:text-amber-300">
+                                        Belum dicatat — wajib sebelum perintah
+                                        pasang, isi di Setelan server
                                     </span>
                                 )}
+                            </Line>
+                        )}
+                        {site && (
+                            <Line label="Alamat aplikasi (otomatis)">
+                                <DnsStatus
+                                    siteId={site.id}
+                                    appUrl={site.appUrl}
+                                    dns={site.dns}
+                                    serverAddress={site.serverAddress}
+                                    revoked={progress.state === 'revoked'}
+                                />
                             </Line>
                         )}
                         {(progress.release ||
@@ -465,10 +478,14 @@ export default function ClientServerPanel({
 
                     {canIssue && (
                         <div className="flex flex-wrap items-center gap-3">
+                            {/*
+                                Tombolnya mati tanpa alamat server, dan server menolaknya juga: record DNS
+                                alamat aplikasi dibuat menunjuk alamat itu saat perintah dibuat.
+                            */}
                             <Button
                                 type="button"
                                 onClick={issueCommand}
-                                disabled={issuing}
+                                disabled={issuing || !site?.serverAddress}
                                 variant={
                                     progress.state === 'awaiting_command'
                                         ? 'outline'
@@ -478,12 +495,20 @@ export default function ClientServerPanel({
                                 {issuing && <Spinner />}
                                 {issueLabel}
                             </Button>
-                            {progress.state !== 'no_command' && (
-                                <p className="max-w-xl text-xs text-muted-foreground">
-                                    Perintah baru membatalkan perintah dan kata
-                                    sandi sementara yang dibuat sebelumnya.
+                            {!site?.serverAddress && (
+                                <p className="max-w-xl text-xs text-amber-700 dark:text-amber-300">
+                                    Catat alamat server (IP VPS) di Setelan
+                                    server lebih dulu.
                                 </p>
                             )}
+                            {site?.serverAddress &&
+                                progress.state !== 'no_command' && (
+                                    <p className="max-w-xl text-xs text-muted-foreground">
+                                        Perintah baru membatalkan perintah dan
+                                        kata sandi sementara yang dibuat
+                                        sebelumnya.
+                                    </p>
+                                )}
                         </div>
                     )}
 

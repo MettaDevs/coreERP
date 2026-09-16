@@ -528,14 +528,14 @@ components:
             laporan. Operasi lain: objek kosong.
 
             `install`: `{edition, release, tenant_id, tenant_name, app_ids, admin_name, admin_email,
-            admin_password_hash}` — rilis pertama lewat jalur yang sama dengan `upgrade`, lalu
+            admin_password_hash, app_url}` — rilis pertama lewat jalur yang sama dengan `upgrade`, lalu
             `tenant:bootstrap-site` di Core. Agen menolak seluruh operasi, sebelum mengunduh apa pun,
             bila satu bidang tidak memenuhi aturannya:
 
             ```json
             {"edition":"coreerp","release":"1.0.0","tenant_id":"01J...","tenant_name":"...",
              "app_ids":["human-resources","management-aset"],"admin_name":"...","admin_email":"...",
-             "admin_password_hash":"$2y$12$<53 karakter>"}
+             "admin_password_hash":"$2y$12$<53 karakter>","app_url":"https://klinik-sehat.erp.grenery.xyz"}
             ```
 
             | Bidang | Aturan |
@@ -547,6 +547,7 @@ components:
             | `admin_email` | `lokal@domain` tanpa spasi dan huruf kendali, paling panjang 255 |
             | `app_ids` | larik id app `^[a-z0-9][a-z0-9-]*$`, unik, terurut, boleh kosong; satu `--app` per id. Agen menolak id ganda; urutannya tidak diperiksa |
             | `admin_password_hash` | hash bcrypt `$2y$`, biaya `04`–`31` (admin.erp memakai `BCRYPT_ROUNDS`-nya), 53 karakter `[./A-Za-z0-9]` |
+            | `app_url` | `https://<host>` tanpa port, jalur, atau garis miring di ujung; host huruf kecil `[a-z0-9.-]`, paling sedikit dua label. Agen menulisnya ke `APP_URL` dan nama host proxy HTTPS di `.env` sebelum stack dinyalakan, tanpa menyentuh baris lain. admin.erp lama tidak mengirimnya; tanpa bidang ini `.env` tidak diubah |
 
             Hash hanya sampai ke Core lewat stdin; agen tidak pernah menaruhnya di argumen proses, log, atau
             `failure_message`. Rilis yang sama yang sudah terpasang tidak dipasang ulang, dan Core menjawab
