@@ -522,7 +522,7 @@ class SsoInvitationTest extends TestCase
                 'jwks_uri' => self::ISSUER.'/.well-known/jwks.json',
             ]),
             self::ISSUER.'/.well-known/jwks.json' => fn () => Http::response($this->jwks),
-            self::ISSUER.'/oauth/token' => function (): \Illuminate\Http\Client\Response {
+            self::ISSUER.'/oauth/token' => function () {
                 $attempt = SsoLoginAttempt::query()->latest('created_at')->firstOrFail();
 
                 return Http::response(['id_token' => $this->idToken($attempt->nonce), 'token_type' => 'Bearer']);
