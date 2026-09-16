@@ -32,12 +32,16 @@ use OpenSSLAsymmetricKey;
  */
 final class LicenseIssuer
 {
-    public function __construct(private readonly EntitlementsFromCore $entitlements) {}
+    public function __construct(
+        private readonly EntitlementsFromCore $entitlements,
+        private readonly LicenseTerms $terms,
+    ) {}
 
     /**
      * Lisensi yang diminta operator, misalnya segera sesudah app ditambah.
      *
      * @param  ?string  $validUntil  `Y-m-d` yang sudah diperiksa pemanggilnya; null berarti masa bawaan.
+     *                               Diabaikan pada situs permanen, yang selalu menerima lisensi tanpa tanggal.
      * @return array{license: string, signature: string}
      *
      * @throws SiteRejected kunci privat belum disetel, atau penandatanganan gagal.
@@ -88,7 +92,7 @@ final class LicenseIssuer
     public function defaultValidUntil(Site $site): string
     {
         return CarbonImmutable::now($site->timezone)
-            ->addDays((int) config('sites.license_valid_days'))
+            ->addDays($this->terms->forSite($site)['validDays'])
             ->toDateString();
     }
 
@@ -102,7 +106,14 @@ final class LicenseIssuer
         // setiap kali agen melapor, dan operator membaca sebab yang benar lebih dulu.
         $key = $this->privateKey();
         $apps = $this->entitlements->appsFor($site->tenant_id);
-        $validUntil ??= $this->defaultValidUntil($site);
+
+        // Situs permanen tidak pernah diberi tanggal, bahkan ketika operator meminta satu. Tanggal yang
+        // diminta datang dari layar yang mungkin dibuka sebelum situs ini ditandai permanen, dan lisensi
+        // bertanggal yang lahir dari situ akan mengunci klinik yang justru dibebaskan dari tanggal.
+        // Dicor, karena model yang dibuat lalu tidak dimuat ulang belum memegang nilai bawaan kolomnya:
+        // atributnya null, dan null yang ditulis ke kolom NOT NULL menggagalkan penerbitan.
+        $perpetual = (bool) $site->license_perpetual;
+        $validUntil = $perpetual ? null : ($validUntil ?? $this->defaultValidUntil($site));
         $issuedAt = CarbonImmutable::now('UTC');
 
         // Urutan kunci bagian dari kontrak: yang ditandatangani adalah byte ini, dan agen maupun Core
@@ -120,15 +131,17 @@ final class LicenseIssuer
             throw new SiteRejected('license_sign_failed', 'Lisensi gagal ditandatangani.');
         }
 
-        DB::transaction(function () use ($site, $apps, $validUntil, $issuedAt, $audit): void {
+        DB::transaction(function () use ($site, $apps, $validUntil, $perpetual, $issuedAt, $audit): void {
             $site->forceFill([
                 'license_issued_at' => $issuedAt,
                 'license_valid_until' => $validUntil,
+                'license_issued_perpetual' => $perpetual,
             ])->save();
 
             $audit([
                 'apps' => $apps,
                 'valid_until' => $validUntil,
+                'perpetual' => $perpetual,
                 'issued_at' => $issuedAt->toIso8601String(),
             ]);
         });

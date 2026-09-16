@@ -398,12 +398,20 @@ APPS_LISENSI='["human-resources","management-aset"]'
 # yang salah dapat ditandatangani dengan kunci yang sah. Tanpa itu penolakan bentuk tidak dapat dibedakan
 # dari penolakan tanda tangan.
 buat_lisensi() {
-    local berkas="$1" situs="$2" berlaku="$3" kunci="$4" versi="${5:-2}" apps="${6:-$APPS_LISENSI}" bidang_situs=''
+    local berkas="$1" situs="$2" berlaku="$3" kunci="$4" versi="${5:-2}" apps="${6:-$APPS_LISENSI}" bidang_situs='' bidang_berlaku=''
 
     [ -z "$situs" ] || bidang_situs="\"site_id\":\"$situs\","
 
-    printf '{"version":%s,"tenant_id":"%s",%s"apps":%s,"valid_until":"%s","issued_at":"2026-09-15T08:00:00Z"}' \
-        "$versi" "$TENANT_ID" "$bidang_situs" "$apps" "$berlaku" > "$berkas"
+    # `null` menulis lisensi permanen, `tanpa` menghilangkan bidangnya sama sekali. Keduanya perlu dapat
+    # ditandatangani kunci yang sah, supaya penolakan bentuk tidak tertukar dengan penolakan tanda tangan.
+    case "$berlaku" in
+        null) bidang_berlaku='"valid_until":null,' ;;
+        tanpa) bidang_berlaku='' ;;
+        *) bidang_berlaku="\"valid_until\":\"$berlaku\"," ;;
+    esac
+
+    printf '{"version":%s,"tenant_id":"%s",%s"apps":%s,%s"issued_at":"2026-09-15T08:00:00Z"}' \
+        "$versi" "$TENANT_ID" "$bidang_situs" "$apps" "$bidang_berlaku" > "$berkas"
     jq -cn --rawfile l "$berkas" --arg t "$(openssl dgst -sha256 -sign "$kunci" "$berkas" | base64 -w0)" \
         '{license: $l, signature: $t}'
 }
@@ -899,6 +907,37 @@ uji_09_lisensi_operasi() {
         openssl dgst -sha256 -verify "$KERJA/kunci/lisensi.pub" -signature "$KERJA/lisensi-terpasang.sig" "$berkas_lisensi"
     sama 'lisensi dapat dibaca container Core' "$(stat -c %a "$berkas_lisensi")" 644
     sama 'laporan menyebut habis lisensi' "$(laporan_terakhir | jq -r .license_expires_at)" 2027-09-30
+    sama 'laporan menandai lisensi bertanggal' "$(laporan_terakhir | jq -r .license_perpetual)" false
+
+    # Lisensi permanen: `valid_until` null. Laporan tidak punya tanggal untuk disebut, jadi penandanya yang
+    # membedakannya dari lisensi yang hilang — dan admin.erp memakai perbedaan itu untuk berhenti
+    # memperpanjang.
+    parameter="$(buat_lisensi "$KERJA/lisensi-permanen.json" "$s" null "$KERJA/kunci/lisensi.key")"
+    id="$(antre "$(jq -cn --arg s "$s" --argjson p "$parameter" '{site_id: $s, operation: "install_license", parameters: $p}')")"
+    agen run --now
+    op="$(operasi "$id")"
+    sama 'lisensi permanen terpasang' "$(jq -r .status <<< "$op")" succeeded
+    pastikan 'license.json permanen persis byte yang ditandatangani' cmp -s "$berkas_lisensi" "$KERJA/lisensi-permanen.json"
+    sama 'laporan tidak menyebut tanggal habis' "$(laporan_terakhir | jq -r .license_expires_at)" null
+    sama 'laporan menandai lisensi permanen' "$(laporan_terakhir | jq -r .license_perpetual)" true
+
+    # Bidang yang hilang bukan bidang yang bernilai null: berkas yang terpotong saat ditulis kehilangan
+    # bidang terakhirnya lebih dulu, dan tidak boleh terbaca sebagai lisensi yang tidak pernah habis.
+    parameter="$(buat_lisensi "$KERJA/lisensi-tanpa-tanggal.json" "$s" tanpa "$KERJA/kunci/lisensi.key")"
+    id="$(antre "$(jq -cn --arg s "$s" --argjson p "$parameter" '{site_id: $s, operation: "install_license", parameters: $p}')")"
+    agen run --now
+    op="$(operasi "$id")"
+    sama 'lisensi tanpa valid_until gagal' "$(jq -r .status <<< "$op")" failed
+    memuat 'sebabnya bidang yang hilang' "$(jq -r .failure_message <<< "$op")" 'tidak menyebut valid_until'
+    pastikan 'lisensi permanen tidak terganti' cmp -s "$berkas_lisensi" "$KERJA/lisensi-permanen.json"
+
+    # Kembali bertanggal: penandanya ikut berubah, sehingga admin.erp tahu klien tidak lagi permanen.
+    parameter="$(buat_lisensi "$KERJA/lisensi-bertanggal-lagi.json" "$s" 2027-10-31 "$KERJA/kunci/lisensi.key")"
+    id="$(antre "$(jq -cn --arg s "$s" --argjson p "$parameter" '{site_id: $s, operation: "install_license", parameters: $p}')")"
+    agen run --now
+    sama 'lisensi bertanggal menggantikan yang permanen' "$(jq -r .status <<< "$(operasi "$id")")" succeeded
+    sama 'laporan menyebut tanggal yang baru' "$(laporan_terakhir | jq -r .license_expires_at)" 2027-10-31
+    sama 'laporan tidak lagi menandai permanen' "$(laporan_terakhir | jq -r .license_perpetual)" false
 }
 
 uji_09b_lisensi_laporan() {

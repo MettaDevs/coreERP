@@ -31,7 +31,7 @@ final class SiteReports
     private const TOP_LEVEL = [
         'site_id', 'agent_version', 'created_at', 'server_time', 'edition', 'release', 'image', 'digest',
         'containers', 'disk', 'last_backup', 'last_operation', 'certificate_expires_at', 'license_expires_at',
-        'license_required',
+        'license_required', 'license_perpetual',
     ];
 
     /** Kunci yang berubah tanpa ada yang terjadi; tidak ikut menentukan apakah laporan "berubah". */
@@ -75,6 +75,10 @@ final class SiteReports
             // mewajibkan lisensi"; agen yang mengirim teks sedang membaca `.env` dengan cara yang salah,
             // dan menerimanya berarti peringatan itu diam-diam bergantung pada tafsiran PHP.
             'report.license_required' => ['nullable', 'boolean:strict'],
+            // Lisensi tanpa tanggal berakhir: `license_expires_at` kosong, dan penanda ini yang
+            // membedakannya dari lisensi yang hilang. Perbedaan itu menentukan apakah konsol
+            // menerbitkan lisensi baru setiap jeda perpanjangan.
+            'report.license_perpetual' => ['nullable', 'boolean:strict'],
         ]);
 
         if ($validator->fails()) {

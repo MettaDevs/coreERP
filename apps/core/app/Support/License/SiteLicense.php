@@ -213,7 +213,20 @@ final class SiteLicense
             return $this->reject(SiteLicenseState::INVALID, 'Lisensi situs diterbitkan untuk tenant yang tidak ada di server ini.', ['path' => $licensePath], $required);
         }
 
-        $validUntil = $license->valid_until ?? null;
+        // Kunci yang tidak ada dan kunci yang bernilai null adalah dua hal berbeda di sini. Lisensi yang
+        // tidak menyebut `valid_until` sama sekali ditolak: berkas yang terpotong di tengah penulisan
+        // tidak boleh terbaca sebagai lisensi tanpa masa berlaku.
+        if (! property_exists($license, 'valid_until')) {
+            return $this->reject(SiteLicenseState::INVALID, 'Lisensi situs tidak menyebut tanggal berakhir.', ['path' => $licensePath], $required);
+        }
+
+        $validUntil = $license->valid_until;
+
+        // `null` berarti lisensi tanpa tanggal berakhir, dipilih operator per situs di admin.erp. Ia
+        // tidak pernah habis dan tidak pernah diperpanjang; yang membatasi tetap daftar `apps`.
+        if ($validUntil === null) {
+            return new SiteLicenseState(SiteLicenseState::VALID, null, $apps, $required, null);
+        }
 
         if (! is_string($validUntil) || ! $this->isCalendarDate($validUntil)) {
             return $this->reject(SiteLicenseState::INVALID, 'Tanggal berakhir lisensi situs bukan tanggal berbentuk YYYY-MM-DD.', ['path' => $licensePath], $required);

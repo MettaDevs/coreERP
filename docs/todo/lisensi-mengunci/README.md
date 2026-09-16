@@ -23,7 +23,8 @@ Halaman ini **menggantikan** keputusan "Lisensi habis → peringatan, tanpa meng
 | --- | --- | --- | --- |
 | Sumber kebenaran app | App yang aktif di `tenant_app_entitlements` saat lisensi diterbitkan, dibaca admin.erp lewat API internal Core | Satu tempat mengubah app yang dibeli, sama dengan SaaS | Perubahan app baru berlaku di server klien setelah lisensi berikutnya terpasang |
 | Isi lisensi | JSON bertanda tangan: tenant, situs, **daftar app**, tanggal berakhir | Mengubah database di server klien tidak dapat menambah app | Format lama (versi 1) tidak lagi diterima — belum ada satu pun klien yang memakainya |
-| Masa berlaku | **30 hari**, diperpanjang otomatis | Sewa yang berhenti mengunci aplikasi dalam hitungan minggu, bukan tahun | Server yang tidak dapat menghubungi admin.erp lebih dari tiga minggu ikut terkunci |
+| Masa berlaku | **30 hari** bawaan, diperpanjang otomatis; diubah operator di halaman Pengaturan dan boleh ditimpa per situs (16 September 2026) | Sewa yang berhenti mengunci aplikasi dalam hitungan minggu, bukan tahun — dan masa dapat dinaikkan sebelum pemeliharaan panjang | Server yang tidak dapat menghubungi admin.erp lebih lama dari masa dikurangi jendela perpanjangan ikut terkunci |
+| Lisensi permanen | Pilihan per situs: lisensi tanpa tanggal berakhir, `valid_until` bernilai null (16 September 2026) | Klien beli-putus dapat dilayani dari admin.erp yang sama, dan mati totalnya server pertama tidak pernah mengunci mereka | Tidak ada lagi kunci waktu untuk situs itu: berhenti membayar hanya dapat dijawab dengan datang ke servernya |
 | Perpanjangan | admin.erp menyertakan lisensi baru di **jawaban laporan agen** saat sisa masanya ≤ 10 hari | Tanpa penjadwal, tanpa operator; setiap perpanjangan diaudit | Satu panggilan API internal saat perpanjangan jatuh tempo |
 | Saat terkunci | Pengguna tenant melihat halaman "Lisensi tidak berlaku"; **akun provider tetap masuk**; data tidak disentuh; login, logout, dan `/up` tetap bekerja | Vendor masih dapat memperbaiki; tidak ada data yang hilang | Pelayanan klinik berhenti — itu memang tujuan kuncinya, dan karena itu peringatannya tampil 7 hari sebelumnya |
 | Lisensi hilang atau tanda tangannya salah | **Terkunci**, sama dengan habis | Menghapus berkas lisensi bukan jalan pintas | Salah pasang di sisi kita juga mengunci; halaman kunci menyebut sebabnya |
@@ -44,7 +45,7 @@ Halaman ini **menggantikan** keputusan "Lisensi habis → peringatan, tanpa meng
 | --- | --- |
 | `version` | tepat `2`; versi lain ditolak |
 | `apps` | id app, unik, terurut; boleh kosong (hanya Core) |
-| `valid_until` | tanggal kalender `YYYY-MM-DD`; hari itu masih berlaku |
+| `valid_until` | tanggal kalender `YYYY-MM-DD` — hari itu masih berlaku — atau `null` untuk lisensi permanen. Bidangnya sendiri wajib ada: berkas yang terpotong saat ditulis kehilangan bidang terakhirnya lebih dulu, dan ketiadaan yang terbaca sebagai lisensi tanpa tanggal berakhir menjadikan berkas rusak sebagai lisensi terkuat di sistem ini |
 
 `license.json.sig` — base64 satu baris dari tanda tangan RSA PKCS#1 v1.5 SHA-256 atas byte
 `license.json`. Kunci publiknya `license-public.pem`, diantar ke agen saat pendaftaran.
@@ -84,17 +85,29 @@ Halaman ini **menggantikan** keputusan "Lisensi habis → peringatan, tanpa meng
 
 ### admin.erp
 
-| Setelan `config/sites.php` | Bawaan |
-| --- | --- |
-| `license_valid_days` | `30` |
-| `license_renew_before_days` | `10` |
-| `license_renew_cooldown_minutes` | `60` |
+| Setelan | Bawaan | Diubah di mana |
+| --- | --- | --- |
+| `license_valid_days` | `30` | Halaman Pengaturan (tersimpan di `console_settings`), atau per situs |
+| `license_renew_before_days` | `10` | Halaman Pengaturan, atau per situs |
+| `license_renew_cooldown_minutes` | `60` | `config/sites.php` |
 
-- Kolom baru di `sites`: `license_issued_at`, `license_valid_until`, `license_suspended_at`.
+Angka yang berlaku dihitung `ControlPlane\Sites\LicenseTerms`: setelan situs, lalu bawaan konsol, lalu
+`config`. Nilai tersimpan yang bukan angka wajar — nol, kosong, teks — diperlakukan seperti belum disetel,
+karena `license.valid_days = 0` berarti setiap lisensi yang lahir sudah habis.
+
+- Kolom di `sites`: `license_issued_at`, `license_valid_until`, `license_suspended_at`, dan sejak
+  16 September 2026 `license_perpetual`, `license_valid_days`, `license_renew_before_days`,
+  `license_issued_perpetual`. Dua constraint menjaganya: keadaan lisensi yang mustahil (tanggal tanpa
+  penerbitan, penerbitan tanpa tanggal yang tidak ditandai permanen) dan masa yang mustahil (nol hari,
+  perpanjangan yang tidak lebih awal dari masanya).
+- **Setelan dan keadaan dipisah.** `license_perpetual` adalah yang dipilih operator; `license_issued_perpetual`
+  adalah yang benar-benar dikirim terakhir kali. Keduanya berbeda selama satu jendela — perubahan baru
+  berlaku pada penerbitan berikutnya — dan layar menyebutkan keadaan itu apa adanya.
 - Jawaban `POST /api/agent/v1/report` menjadi `{"interval_seconds": n, "license"?: {"license": "...", "signature": "..."}}`.
   `license` disertakan hanya bila:
   - situs tidak dicabut dan `license_suspended_at` kosong;
-  - laporan agen menyebut `license_expires_at` kosong atau ≤ hari ini + `license_renew_before_days`;
+  - laporan agen menyebut `license_expires_at` kosong atau ≤ hari ini + `license_renew_before_days`
+    yang berlaku untuk situs itu;
   - lisensi terakhir diterbitkan lebih lama dari `license_renew_cooldown_minutes` yang lalu.
 - API internal Core yang gagal **tidak pernah** menggagalkan laporan: laporan tetap diterima, lisensi
   dicoba lagi setelah jeda.
@@ -102,12 +115,21 @@ Halaman ini **menggantikan** keputusan "Lisensi habis → peringatan, tanpa meng
 - Laporan agen membawa bidang baru `license_required` (boolean). admin.erp menampilkan peringatan bila
   situs on-prem dikelola melaporkan `false`.
 - Operasi `install_license` tetap ada untuk memasang lisensi segera, misalnya setelah app ditambah.
+- **Situs permanen**: penerbit menulis `valid_until: null` dan mengabaikan tanggal yang diminta operator.
+  Perpanjangannya berhenti begitu laporan agen menyebut `license_perpetual: true`; selama yang terpasang
+  masih bertanggal — atau belum ada sama sekali — lisensi permanen tetap dikirim. Situs yang dikembalikan
+  menjadi bertanggal mendapat tanggalnya lagi pada laporan berikutnya, justru karena laporan itu menyebut
+  lisensi permanen.
 
 ### Agen
 
 - Jawaban laporan yang membawa `license` dipasang lewat pemeriksaan yang sama dengan operasi
   `install_license`: tanda tangan, `site_id`, `version`. Kegagalan memasang tidak menggagalkan putaran.
-- `susun_laporan` menambahkan `license_required` dari `.env`.
+- `susun_laporan` menambahkan `license_required` dari `.env`, dan `license_perpetual` dari berkas lisensi
+  yang terpasang. Tanpa penanda kedua itu lisensi permanen terbaca persis seperti lisensi yang hilang,
+  dan admin.erp menerbitkan lisensi baru setiap kali jeda perpanjangannya lewat.
+- **Urutan pemasangan**: konsol lebih dulu, agen sesudahnya. Konsol lama menolak laporan yang membawa
+  bidang yang tidak dikenalnya, dan agen dibagikan konsol — jadi urutan itu memang yang terjadi.
 - `deploy/agent/env.template` menyetel `COREERP_LICENSE_REQUIRED=true`; `deploy/compose.edition.yaml`
   meneruskan `${COREERP_LICENSE_REQUIRED:-false}` ke setiap service yang memasang folder lisensi.
 

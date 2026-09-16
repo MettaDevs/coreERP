@@ -51,6 +51,7 @@ type SiteRow = {
     lastSeenAt: string | null;
     lastSeenIso: string | null;
     licenseValidUntil: string | null;
+    licensePerpetual: boolean;
     licenseSuspended: boolean;
     progress: InstallProgress;
 };
@@ -73,6 +74,11 @@ const WAITING_STATES = [
 ];
 
 function licenseUrgent(row: SiteRow): boolean {
+    // Lisensi permanen tidak pernah mendesak: ia tidak punya tanggal yang dapat mendekat.
+    if (row.licensePerpetual) {
+        return false;
+    }
+
     const days = daysUntil(row.licenseValidUntil);
 
     return (
@@ -164,6 +170,19 @@ function StatCard({
 }
 
 function LicenseCell({ row }: { row: SiteRow }) {
+    // Lisensi permanen tidak punya tanggal, jadi baris ini menyebut apa adanya alih-alih memakai jalur
+    // "belum diterbitkan" di bawahnya, yang sama-sama tidak bertanggal tetapi berarti sebaliknya.
+    if (row.licensePerpetual) {
+        return (
+            <div className="text-sm">
+                Permanen
+                <span className="block text-xs text-muted-foreground">
+                    tanpa tanggal berakhir
+                </span>
+            </div>
+        );
+    }
+
     if (!row.licenseValidUntil) {
         return (
             <span className="text-xs text-muted-foreground">

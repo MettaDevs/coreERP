@@ -58,6 +58,15 @@ type License = {
     validUntil: string | null;
     issuedAt: string | null;
     suspendedAt: string | null;
+    perpetual: boolean;
+    issuedPerpetual: boolean;
+    terms: {
+        perpetual: boolean;
+        validDays: number;
+        renewBeforeDays: number;
+        overridden: boolean;
+    };
+    defaultTerms: { validDays: number; renewBeforeDays: number };
     notRequiredOnServer: boolean;
 };
 
@@ -541,6 +550,126 @@ function Revoke({ site }: { site: Site }) {
  * Yang ditampilkan di sini lisensi yang *dikirim*. Yang *terpasang* di server klien ada di "Laporan
  * terakhir"; selisih keduanya berarti agen gagal memasangnya.
  */
+/** Satu kalimat yang menyebut masa yang berlaku, dan dari mana angkanya datang. */
+function termsSentence(license: License): string {
+    const { terms } = license;
+
+    if (terms.perpetual) {
+        return license.issuedPerpetual
+            ? 'Permanen'
+            : 'Permanen mulai penerbitan berikutnya; yang terpasang sekarang masih bertanggal';
+    }
+
+    const asal = terms.overridden
+        ? 'khusus situs ini'
+        : 'mengikuti bawaan konsol';
+    const dasar = `${terms.validDays} hari, diperpanjang ${terms.renewBeforeDays} hari sebelum habis (${asal})`;
+
+    return license.issuedPerpetual
+        ? `${dasar}. Yang terpasang sekarang masih lisensi permanen, dan diganti pada penerbitan berikutnya`
+        : dasar;
+}
+
+/**
+ * Mengubah masa lisensi situs ini: mengikuti bawaan, angka sendiri, atau permanen.
+ *
+ * Permanen berarti lisensinya tidak pernah habis — bukan bahwa seluruh modul terbuka. Daftar app tetap
+ * datang dari app yang dibeli tenant, jadi kalimat di layar tidak boleh menjanjikan yang sebaliknya.
+ */
+function LicenseTermsForm({ site }: { site: Site }) {
+    const { terms, defaultTerms } = site.license;
+    const { data, setData, post, processing, errors, reset } = useForm({
+        mode: terms.perpetual
+            ? 'perpetual'
+            : terms.overridden
+              ? 'custom'
+              : 'default',
+        valid_days: String(terms.validDays),
+        renew_before_days: String(terms.renewBeforeDays),
+        confirm_name: '',
+    });
+
+    return (
+        <form
+            className="space-y-3 border-t pt-4"
+            onSubmit={(e: FormEvent) => {
+                e.preventDefault();
+                post(`/situs/${site.id}/lisensi/masa`, {
+                    preserveScroll: true,
+                    onSuccess: () => reset('confirm_name'),
+                });
+            }}
+        >
+            <NativeSelect
+                label="Masa lisensi"
+                value={data.mode}
+                onChange={(e) => setData('mode', e.target.value)}
+            >
+                <option value="default">
+                    Bawaan konsol — {defaultTerms.validDays} hari, diperpanjang{' '}
+                    {defaultTerms.renewBeforeDays} hari sebelum habis
+                </option>
+                <option value="custom">Angka sendiri untuk situs ini</option>
+                <option value="perpetual">
+                    Permanen — tanpa tanggal berakhir
+                </option>
+            </NativeSelect>
+
+            {data.mode === 'custom' && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                        <Input
+                            label="Masa berlaku (hari)"
+                            type="number"
+                            min={1}
+                            max={3650}
+                            required
+                            value={data.valid_days}
+                            onChange={(e) =>
+                                setData('valid_days', e.target.value)
+                            }
+                        />
+                        <FieldError message={errors.valid_days} />
+                    </div>
+                    <div className="space-y-2">
+                        <Input
+                            label="Diperpanjang berapa hari sebelum habis"
+                            type="number"
+                            min={1}
+                            max={365}
+                            required
+                            value={data.renew_before_days}
+                            onChange={(e) =>
+                                setData('renew_before_days', e.target.value)
+                            }
+                        />
+                        <FieldError message={errors.renew_before_days} />
+                    </div>
+                </div>
+            )}
+
+            {data.mode === 'perpetual' && (
+                <p className="text-sm text-muted-foreground">
+                    Lisensi permanen tidak pernah habis, jadi aplikasi di server
+                    klien ini tidak akan pernah terkunci karena masa lisensi —
+                    termasuk ketika konsol ini mati berbulan-bulan. App yang
+                    boleh dibuka tetap mengikuti yang dibeli tenant.
+                </p>
+            )}
+
+            <ConfirmName
+                site={site}
+                value={data.confirm_name}
+                onChange={(v) => setData('confirm_name', v)}
+                error={errors.confirm_name}
+            />
+            <Button type="submit" variant="outline" disabled={processing}>
+                Simpan masa lisensi
+            </Button>
+        </form>
+    );
+}
+
 function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
     const { license } = site;
     const suspended = license.suspendedAt !== null;
@@ -554,16 +683,25 @@ function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
             description="Diperpanjang otomatis lewat laporan agen. Menghentikan perpanjangan tidak menyentuh server klien: lisensi yang terpasang tetap berlaku sampai tanggal berakhirnya, lalu aplikasinya terkunci."
         >
             <dl>
-                <Row label="Berlaku sampai">{license.validUntil ?? '—'}</Row>
+                <Row label="Berlaku sampai">
+                    {license.issuedPerpetual
+                        ? 'Permanen, tanpa tanggal berakhir'
+                        : (license.validUntil ?? '—')}
+                </Row>
                 <Row label="Terakhir diterbitkan">
                     {license.issuedAt ?? 'Belum pernah'}
                 </Row>
+                <Row label="Masa lisensi">{termsSentence(license)}</Row>
                 <Row label="Perpanjangan otomatis">
-                    {suspended
-                        ? `Perpanjangan dihentikan sejak ${license.suspendedAt}`
-                        : 'Berjalan'}
+                    {license.issuedPerpetual && license.perpetual
+                        ? 'Tidak diperpanjang; lisensi permanen tidak pernah habis'
+                        : suspended
+                          ? `Perpanjangan dihentikan sejak ${license.suspendedAt}`
+                          : 'Berjalan'}
                 </Row>
             </dl>
+
+            {!revoked && <LicenseTermsForm site={site} />}
 
             {!revoked && (
                 <form
@@ -746,14 +884,18 @@ export default function Show({
                 <Summary
                     label="Lisensi berlaku sampai"
                     hint={
-                        licenseDays === null
-                            ? 'Belum diterbitkan'
-                            : licenseDays < 0
-                              ? `Habis ${Math.abs(licenseDays)} hari lalu`
-                              : `${licenseDays} hari lagi`
+                        site.license.issuedPerpetual
+                            ? 'Tidak pernah habis'
+                            : licenseDays === null
+                              ? 'Belum diterbitkan'
+                              : licenseDays < 0
+                                ? `Habis ${Math.abs(licenseDays)} hari lalu`
+                                : `${licenseDays} hari lagi`
                     }
                 >
-                    {site.license.validUntil ?? '—'}
+                    {site.license.issuedPerpetual
+                        ? 'Permanen'
+                        : (site.license.validUntil ?? '—')}
                 </Summary>
             </div>
 

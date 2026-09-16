@@ -12,6 +12,7 @@ use ControlPlane\Models\SiteOperation;
 use ControlPlane\Models\SiteRelease;
 use ControlPlane\Sites\ClientServerSetup;
 use ControlPlane\Sites\InstallProgress;
+use ControlPlane\Sites\LicenseTerms;
 use ControlPlane\Sites\SiteOperations;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -68,7 +69,7 @@ final class SiteScreens extends Controller
         ]);
     }
 
-    public function show(string $site, SiteOperations $operations): InertiaResponse
+    public function show(string $site, SiteOperations $operations, LicenseTerms $terms): InertiaResponse
     {
         $row = Site::query()->with(['tenant:id,name', 'environment:id,name'])->whereKey($site)->firstOrFail();
 
@@ -137,6 +138,16 @@ final class SiteScreens extends Controller
                     'issuedAt' => $row->license_issued_at?->toDateTimeString(),
                     'suspendedAt' => $row->license_suspended_at?->toDateTimeString(),
                     /*
+                     * Setelan dan keadaan dikirim terpisah. `perpetual` yang menyala sementara
+                     * `issuedPerpetual` masih mati berarti operator baru saja mengubahnya dan lisensi
+                     * permanennya belum sampai ke server klien — layar menyebutkan itu, bukan menyamakan
+                     * keduanya dan berbohong tentang apa yang sedang berlaku di klinik.
+                     */
+                    'perpetual' => $row->license_perpetual,
+                    'issuedPerpetual' => $row->licenseIssuedPerpetual(),
+                    'terms' => $terms->forSite($row),
+                    'defaultTerms' => $terms->defaults(),
+                    /*
                      * Hanya `false` yang dilaporkan agen yang memicu peringatan. Kosong berarti agen
                      * lama yang belum mengenal bidangnya, atau situs yang belum pernah melapor —
                      * keduanya bukan bukti bahwa kewajiban lisensi dimatikan.
@@ -152,7 +163,7 @@ final class SiteScreens extends Controller
             'audit' => $audit,
             'licenseKeyConfigured' => config('sites.license_private_key_path') !== null
                 && is_readable((string) config('sites.license_private_key_path')),
-            'licenseValidDays' => (int) config('sites.license_valid_days'),
+            'licenseValidDays' => $terms->forSite($row)['validDays'],
             'enrollment' => session('enrollment'),
         ]);
     }
@@ -187,6 +198,10 @@ final class SiteScreens extends Controller
             'lastSeenAt' => $site->last_seen_at?->toDateTimeString(),
             'lastSeenIso' => $site->last_seen_at?->toIso8601String(),
             'licenseValidUntil' => $site->license_valid_until?->toDateString(),
+            // Yang ditampilkan daftar adalah lisensi yang sedang berlaku, bukan setelan yang baru diubah:
+            // situs yang ditandai permanen tetapi lisensi permanennya belum diterbitkan masih memakai
+            // tanggal lamanya, dan daftar yang menulis "Permanen" di situ menyembunyikan tanggal itu.
+            'licensePerpetual' => $site->licenseIssuedPerpetual(),
             'licenseSuspended' => $site->licenseRenewalSuspended(),
         ];
     }
