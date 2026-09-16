@@ -67,11 +67,23 @@ export default function Join({
                             dibuat.
                         </p>
                     </div>
-                    <Form action="/sso/gabung" method="post" disableWhileProcessing>
+                    <Form
+                        action="/sso/gabung"
+                        method="post"
+                        disableWhileProcessing
+                    >
                         {({ processing }) => (
                             <>
-                                <input type="hidden" name="code" value={code ?? ''} />
-                                <Button type="submit" disabled={processing} className="w-full">
+                                <input
+                                    type="hidden"
+                                    name="code"
+                                    value={code ?? ''}
+                                />
+                                <Button
+                                    type="submit"
+                                    disabled={processing}
+                                    className="w-full"
+                                >
                                     {processing && <Spinner />}
                                     Masuk lewat SSO
                                 </Button>
