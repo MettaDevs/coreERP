@@ -275,7 +275,7 @@ class SsoInvitationTest extends TestCase
         $invitation = $this->boundInvitation();
         $this->claimOverrides = ['sub' => 'subjek-penyerang'];
 
-        $this->completeCeremony($invitation)->assertRedirect('/join?sso_error=undangan-untuk-akun-lain');
+        $this->completeCeremony($invitation)->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-untuk-akun-lain');
 
         $this->assertGuest();
         $this->assertSame(1, User::query()->count());
@@ -294,7 +294,7 @@ class SsoInvitationTest extends TestCase
         $invitation = $this->boundInvitation();
         $this->claimOverrides = ['sub' => 'subjek-penyerang', 'email' => 'dewi@klinik.test', 'email_verified' => true];
 
-        $this->completeCeremony($invitation)->assertRedirect('/join?sso_error=undangan-untuk-akun-lain');
+        $this->completeCeremony($invitation)->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-untuk-akun-lain');
 
         $this->assertGuest();
         $this->assertSame(0, ExternalIdentity::query()->count());
@@ -337,7 +337,7 @@ class SsoInvitationTest extends TestCase
         $this->completeCeremony($invitation)->assertRedirect('/dashboard');
 
         auth()->logout();
-        $this->completeCeremony($invitation)->assertRedirect('/join?sso_error=undangan-tidak-berlaku');
+        $this->completeCeremony($invitation)->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
 
         $this->assertSame(1, TenantMembership::query()->where('tenant_id', $this->tenant->id)->where('system_role', 'user')->count());
     }
@@ -354,7 +354,7 @@ class SsoInvitationTest extends TestCase
 
         $this->withCookie(SsoLoginController::ATTEMPT_COOKIE, $this->browserSecret($start))
             ->get($handoff)
-            ->assertRedirect('/join?sso_error=undangan-tidak-berlaku');
+            ->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
 
         $this->assertGuest();
         $this->assertSame(1, User::query()->count());
@@ -370,7 +370,7 @@ class SsoInvitationTest extends TestCase
 
         $this->withCookie(SsoLoginController::ATTEMPT_COOKIE, 'rahasia-peramban-lain')
             ->get($handoff)
-            ->assertRedirect('/join?sso_error=kedaluwarsa');
+            ->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=kedaluwarsa');
 
         $this->assertGuest();
         $this->assertSame(1, User::query()->count());
@@ -384,7 +384,7 @@ class SsoInvitationTest extends TestCase
         TenantIdentityProvider::create(['tenant_id' => $other->id, 'mode' => 'bersama', 'protokol' => 'oidc', 'aktif' => true]);
 
         $this->post('http://tenantb.contoh.co.id/sso/gabung', ['code' => (string) $invitation->accessibleCode()])
-            ->assertRedirect('/join?sso_error=undangan-tidak-berlaku');
+            ->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
 
         $this->assertSame(0, SsoLoginAttempt::query()->count());
     }
@@ -397,7 +397,7 @@ class SsoInvitationTest extends TestCase
         $invitation = InvitationCode::query()->sole();
 
         $this->post('http://tenanta.contoh.co.id/sso/gabung', ['code' => (string) $invitation->accessibleCode()])
-            ->assertRedirect('/join?sso_error=undangan-tidak-berlaku');
+            ->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
 
         $this->assertSame(0, SsoLoginAttempt::query()->count());
     }
@@ -410,7 +410,7 @@ class SsoInvitationTest extends TestCase
         $member = $this->member('dewi@klinik.test');
         ExternalIdentity::create(['user_id' => $member->id, 'issuer' => self::ISSUER, 'subject' => '4242']);
 
-        $this->completeCeremony($invitation)->assertRedirect('/join?sso_error=sudah-menjadi-anggota');
+        $this->completeCeremony($invitation)->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=sudah-menjadi-anggota');
 
         $this->assertGuest();
         $this->assertNull($invitation->refresh()->sso_redeemed_at);
@@ -422,7 +422,7 @@ class SsoInvitationTest extends TestCase
         // Akun CoreERP dengan email yang sama, tetapi belum pernah menghubungkan SSO.
         User::factory()->create(['email' => 'dewi@klinik.test']);
 
-        $this->completeCeremony($invitation)->assertRedirect('/join?sso_error=email-sudah-punya-akun');
+        $this->completeCeremony($invitation)->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=email-sudah-punya-akun');
 
         $this->assertGuest();
         $this->assertSame(0, ExternalIdentity::query()->count());
@@ -456,7 +456,7 @@ class SsoInvitationTest extends TestCase
             ->assertRedirect('http://tenanta.contoh.co.id/join?kode='.urlencode($code));
 
         $this->get('http://contoh.co.id/undangan?kode=BUKAN-KODE-APA-PUN')
-            ->assertRedirect('/join?sso_error=undangan-tidak-berlaku');
+            ->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
     }
 
     // ------------------------------------------------------------------ pembantu
