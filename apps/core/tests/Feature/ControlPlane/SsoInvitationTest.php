@@ -66,6 +66,8 @@ class SsoInvitationTest extends TestCase
 
     private int $lookupStatus = 200;
 
+    private int $sendStatus = 200;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -142,7 +144,7 @@ class SsoInvitationTest extends TestCase
     /** Surat yang gagal terkirim tidak menghanguskan undangannya. */
     public function test_an_invitation_survives_a_provider_that_cannot_send_the_email(): void
     {
-        $this->fakeProvider(sendStatus: 503);
+        $this->sendStatus = 503;
 
         $this->createInvitation()->assertSessionHasNoErrors();
 
@@ -390,6 +392,8 @@ class SsoInvitationTest extends TestCase
     public function test_an_anonymous_code_cannot_be_used_to_start_the_sso_ceremony(): void
     {
         $this->createInvitation(email: null);
+        auth()->logout();
+        session()->flush();
         $invitation = InvitationCode::query()->sole();
 
         $this->post('http://tenanta.contoh.co.id/sso/gabung', ['code' => (string) $invitation->accessibleCode()])
@@ -471,6 +475,13 @@ class SsoInvitationTest extends TestCase
     {
         $this->createInvitation()->assertSessionHasNoErrors();
 
+        // Undangan dibuat operator di peramban miliknya; yang menukarkannya orang lain, sebagai
+        // tamu. Tanpa keluar di sini, `guest` pada rute `/sso/gabung` mengalihkan ke dasbor dan
+        // upacaranya tidak pernah lahir — kegagalan yang terbaca seperti cacat produk, padahal
+        // test-nya yang salah memerankan orangnya.
+        auth()->logout();
+        session()->flush();
+
         return InvitationCode::query()->sole();
     }
 
@@ -501,7 +512,7 @@ class SsoInvitationTest extends TestCase
         return (string) $start->getCookie(SsoLoginController::ATTEMPT_COOKIE)?->getValue();
     }
 
-    private function fakeProvider(int $sendStatus = 200): void
+    private function fakeProvider(): void
     {
         Http::fake([
             self::ISSUER.'/.well-known/openid-configuration' => Http::response([
@@ -522,9 +533,9 @@ class SsoInvitationTest extends TestCase
                     : ['success' => true, 'user' => $this->lookupUser],
                 $this->lookupStatus,
             ),
-            self::API.'/notifications/send-invitation' => Http::response(
-                $sendStatus === 200 ? ['success' => true, 'data' => []] : ['message' => 'Sedang mati'],
-                $sendStatus,
+            self::API.'/notifications/send-invitation' => fn () => Http::response(
+                $this->sendStatus === 200 ? ['success' => true, 'data' => []] : ['message' => 'Sedang mati'],
+                $this->sendStatus,
             ),
         ]);
     }
