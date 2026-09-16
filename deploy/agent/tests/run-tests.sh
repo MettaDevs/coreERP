@@ -520,8 +520,15 @@ uji_templat_dan_compose() {
     # Bawaan compose menjaga pemasangan beli-putus; on-prem dikelola mengikat ke loopback lewat templatnya.
     sama 'env.template mengikat port aplikasi ke loopback' "$(grep '^CORE_APP_BIND=' "$TEMPLAT_ENV")" 'CORE_APP_BIND=127.0.0.1'
 
-    # On-prem dikelola mengunci; bawaan compose tidak, supaya beli-putus dan SaaS tidak pernah terkunci.
-    sama 'env.template mewajibkan lisensi' "$(grep 'COREERP_LICENSE_REQUIRED' "$TEMPLAT_ENV" | grep -v '^#')" 'COREERP_LICENSE_REQUIRED=true'
+    # Penguncian lisensi dipilih saat memasang, bukan dipaku di templat: pasang.sh mengisinya `false` atau,
+    # dengan --kunci-lisensi, `true`. Isian yang tertinggal berarti .env memuat teks `@@...@@` sebagai nilai.
+    sama 'env.template: penguncian lisensi diisi pasang.sh' "$(grep 'COREERP_LICENSE_REQUIRED' "$TEMPLAT_ENV" | grep -v '^#')" \
+        'COREERP_LICENSE_REQUIRED=@@COREERP_LICENSE_REQUIRED@@'
+    pastikan 'pasang.sh mengenal --kunci-lisensi' grep -q -- '--kunci-lisensi) kunci_lisensi=true' "$akar/deploy/agent/pasang.sh"
+    sama 'pasang.sh: bawaannya tidak mengunci' "$(grep -c '^    kunci_lisensi=false$' "$akar/deploy/agent/pasang.sh")" '1'
+    # shellcheck disable=SC2016 # yang dicari adalah baris pasang.sh apa adanya, termasuk tanda dolarnya
+    pastikan 'pasang.sh mengisi isian penguncian' \
+        grep -q 'baris="${baris//@@COREERP_LICENSE_REQUIRED@@/"$kunci_lisensi"}"' "$akar/deploy/agent/pasang.sh"
 
     # Profil proxy diputuskan pasang.sh (bawaan atau --proxy-luar), dan Core mempercayai proxy dari rentang privat,
     # bukan `*` dan bukan kosong — kosong membuat setiap pengalihan di belakang proxy menuju http://.
@@ -1089,9 +1096,13 @@ uji_09c_lisensi_diwajibkan() {
     wajib '.env yang tidak dapat dibaca sebagai berkas: null' null
     rmdir "$berkas_env"
 
-    # .env hasil pasang.sh dari env.template.
-    cp "$TEMPLAT_ENV" "$berkas_env"
-    wajib '.env dari env.template: true' true
+    # .env hasil pasang.sh dari env.template, pada kedua pilihan penguncian. Isian `@@...@@` diganti nilai
+    # yang dipilih; templat mentahnya tidak pernah menjadi .env.
+    sed 's/@@COREERP_LICENSE_REQUIRED@@/false/' "$TEMPLAT_ENV" > "$berkas_env"
+    wajib '.env dari env.template tanpa --kunci-lisensi: false' false
+
+    sed 's/@@COREERP_LICENSE_REQUIRED@@/true/' "$TEMPLAT_ENV" > "$berkas_env"
+    wajib '.env dari env.template dengan --kunci-lisensi: true' true
 
     printf 'APP_ENV=production\n' > "$berkas_env"
     wajib 'kunci tidak disebut: false' false

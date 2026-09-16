@@ -9,6 +9,13 @@
 #     --app-port PORT          port host aplikasi, ditulis ke .env (bawaan dari env.template)
 #     --app-bind ALAMAT        alamat IPv4 tempat port itu diikat, ditulis ke .env (bawaan dari env.template)
 #     --proxy-luar             tanpa proxy HTTPS agen, untuk server yang sudah punya reverse proxy sendiri
+#     --kunci-lisensi          lisensi yang habis atau hilang mengunci pengguna tenant (bawaan: tidak)
+#
+#   Tanpa --kunci-lisensi, `.env` ditulis dengan COREERP_LICENSE_REQUIRED=false: lisensi tetap diterbitkan,
+#   diperpanjang, dan dilaporkan, tetapi tidak pernah menutup aplikasi. Itu bawaan yang diputuskan pemilik
+#   produk supaya gangguan penerbitan lisensi tidak mematikan klinik. Penguncian dinyalakan per server
+#   sesudah penerbitannya terbukti berjalan di sana — saat memasang, atau dengan menyunting baris itu di
+#   .env dan menunggu pembaruan berikutnya.
 #
 #   Bawaannya, agen memasang proxy HTTPS sendiri (core-proxy, profil `proxy` di compose.edition.yaml) di port
 #   80 dan 443, dengan sertifikat Let's Encrypt untuk alamat tenant dari admin.erp. Port itu diperiksa bebas
@@ -80,7 +87,7 @@ pemakaian() {
         '' \
         'Pemakaian:' \
         '  curl -fsSL <alamat admin.erp>/pasang.sh | sudo bash -s -- --token TOKEN' \
-        'Pilihan: --app-port PORT  --app-bind ALAMAT  --proxy-luar'
+        'Pilihan: --app-port PORT  --app-bind ALAMAT  --proxy-luar  --kunci-lisensi'
 }
 
 port_sah() {
@@ -314,6 +321,7 @@ utama() {
     port_aplikasi=''
     alamat_ikat=''
     proxy_luar=0
+    kunci_lisensi=false
 
     # Diperiksa sebelum argumen: salinan dari repo yang dijalankan dengan pilihan lama (`--admin-url`) lebih
     # tertolong oleh kalimat ini daripada oleh "argumen tidak dikenal".
@@ -338,6 +346,7 @@ utama() {
                 shift 2
                 ;;
             --proxy-luar) proxy_luar=1; shift ;;
+            --kunci-lisensi) kunci_lisensi=true; shift ;;
             *) pemakaian "Argumen tidak dikenal: $1" ;;
         esac
     done
@@ -644,6 +653,7 @@ utama() {
                 baris="${baris//@@COREERP_PROVIDER_EMAIL@@/"$email_provider"}"
                 baris="${baris//@@COREERP_PROVIDER_PASSWORD@@/"$kata_sandi_provider"}"
                 baris="${baris//@@COREERP_LICENSE_DIR@@/"$RUMAH/agent/license"}"
+                baris="${baris//@@COREERP_LICENSE_REQUIRED@@/"$kunci_lisensi"}"
                 baris="${baris//@@COMPOSE_PROFILES@@/"$profil_compose"}"
 
                 # Port dan alamat ikat punya nilai sungguhan di env.template, bukan isian: berkas itu yang
@@ -682,6 +692,14 @@ utama() {
             printf '    tanpa proxy HTTPS agen (--proxy-luar): arahkan reverse proxy server ini ke alamat di atas\n'
         else
             printf '    proxy HTTPS agen di port 80 dan 443; alamatnya diberikan admin.erp saat pemasangan\n'
+        fi
+
+        # Disebut apa adanya pada kedua nilai. Penguncian yang menyala diam-diam adalah kejutan pada hari
+        # lisensinya gagal terbit; penguncian yang mati diam-diam membuat orang mengira aplikasinya terlindungi.
+        if [ "$kunci_lisensi" = true ]; then
+            printf '    lisensi mengunci (--kunci-lisensi): lisensi yang habis atau hilang menutup aplikasi bagi pengguna tenant\n'
+        else
+            printf '    lisensi tidak mengunci: lisensi tetap diterbitkan dan dilaporkan, tetapi tidak pernah menutup aplikasi\n'
         fi
     fi
 
