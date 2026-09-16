@@ -17,6 +17,7 @@ Read only the sections relevant to the task:
 - `docs/dev/09-identity-and-access.md` defines workforce and responsibility-based access.
 - `docs/dev/03-release-and-on-prem.md` defines releases, updates, and the N-1 schema rule that makes rolling back an image safe without touching the database.
 - `docs/dev/29-alur-rilis-server-klien.md` defines how merged code becomes a release that SaaS dev and managed client servers run, and how release numbers are chosen.
+- `docs/dev/30-registry-harbor.md` defines the Harbor registry, per-operation pull credentials, and digest-only pulls; the `coreerp-harbor` skill holds the working rules for that path.
 - `docs/references/dynamics-365-organization-model.md` records the Microsoft Dynamics 365 sources and the mapping decisions used by CoreERP.
 
 The Dynamics reference governs organization, workforce, and responsibility-based security inside a tenant. CoreERP's tenant, entitlement, deployment, and on-prem boundaries remain separate decisions.
