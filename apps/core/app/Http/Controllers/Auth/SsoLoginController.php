@@ -91,9 +91,16 @@ class SsoLoginController extends Controller
     public function join(Request $request): SymfonyResponse
     {
         $environment = $request->attributes->get('coreerp.environment');
+
+        // Alamat pangkal tidak memiliki tenant, dan upacara ini harus dimulai di alamat tenant:
+        // di sanalah cookie rahasia peramban dipasang, dan ke sanalah token serah kembali.
+        if (! $environment instanceof Environment) {
+            return redirect()->to('/join?sso_error='.SsoFailure::INVITATION_UNUSABLE);
+        }
+
         $code = $request->input('code');
 
-        $invitation = $environment instanceof Environment && is_string($code) && $code !== ''
+        $invitation = is_string($code) && $code !== ''
             ? InvitationCode::query()->where('code_hash', CreateInvitation::hash($code))->first()
             : null;
 
@@ -101,7 +108,6 @@ class SsoLoginController extends Controller
         // dijawab satu kalimat: yang menukarkan tidak perlu — dan tidak boleh — tahu mana di antara
         // keempatnya yang terjadi.
         $dapatDitukar = $invitation instanceof InvitationCode
-            && $environment instanceof Environment
             && $invitation->isSsoBound()
             && $invitation->isOpen()
             && $invitation->sso_issuer === $this->provider->issuer()
