@@ -255,19 +255,22 @@ class LicenseTermsTest extends SiteTestCase
     }
 
     /**
-     * Nama situs yang salah ketik tidak boleh cukup untuk mengubah masa lisensi klinik yang lain. Penjaga
-     * yang sama dipakai seluruh tindakan di halaman situs.
+     * Penjaga ketik-nama dibuang 16 September 2026, dan masa lisensi berubah tanpanya.
+     *
+     * Dulu di sini ada test yang membuktikan nama salah ketik menolak perubahan. Bahwa penjaganya benar-benar
+     * hilang diuji sekali saja, di `SiteScreensTest`; yang diperiksa di sini adalah perubahannya berlaku dan
+     * tercatat.
      */
-    public function test_a_wrong_site_name_changes_nothing(): void
+    public function test_the_term_changes_without_the_site_name_typed_again(): void
     {
         $site = $this->enrolledSite();
 
         $this->actingAs($this->operator())
-            ->post('/situs/'.$site->id.'/lisensi/masa', ['mode' => 'perpetual', 'confirm_name' => 'situs lain'])
-            ->assertSessionHasErrors('confirm_name');
+            ->post('/situs/'.$site->id.'/lisensi/masa', ['mode' => 'perpetual'])
+            ->assertRedirect('/situs/'.$site->id);
 
-        $this->assertFalse(app(LicenseTerms::class)->forSite($site->refresh())['perpetual']);
-        $this->assertSame(0, OperatorAuditEvent::query()->where('action', 'site.license.terms_changed')->count());
+        $this->assertTrue(app(LicenseTerms::class)->forSite($site->refresh())['perpetual']);
+        $this->assertSame(1, OperatorAuditEvent::query()->where('action', 'site.license.terms_changed')->count());
     }
 
     public function test_the_site_page_refuses_a_renewal_window_that_is_not_earlier_than_the_term(): void
