@@ -43,8 +43,7 @@ final class Settings extends Controller
         CloudflareSettings $dns,
         CloudflareClient $cloudflare,
         LicenseTerms $terms,
-    ): InertiaResponse
-    {
+    ): InertiaResponse {
         // Diperiksa setiap halaman dibuka, sama dengan robot Harbor: jawaban basi menyembunyikan token yang baru
         // saja dicabut di Cloudflare.
         $dnsCheck = null;
