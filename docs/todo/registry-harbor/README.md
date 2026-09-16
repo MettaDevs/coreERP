@@ -390,6 +390,7 @@ Setiap butir menyebut tempat kerjanya, kriteria terimanya, dan butir yang harus 
 | OWN-02 | Menentukan tujuan cadangan di luar server pertama | Tujuan dan pemegang aksesnya tertulis di RUNBOOK |
 | OWN-03 | Memberi izin bila spike membuktikan batas waktu baca Traefik harus dinaikkan | Keputusan tertulis di SPIKE.md |
 | OWN-04 | Menyiapkan mesin penandatangan sebelum klien produksi pertama | Mesin tersedia untuk Tahap 7 |
+| OWN-05 | Menyalin kunci privat rilis dan kunci privat lisensi ke luar server pertama | Salinan terenkripsi ada di tujuan OWN-02, dan pemulihannya pernah dicoba sekali |
 
 ### Core
 
@@ -511,6 +512,16 @@ Manifest v1 tetap diterima sampai AG-04. Belum diuji terhadap Harbor sungguhan; 
 Server kedua bukan server kosong — ada Dokploy, stack CoreERP lama di `/opt/coreerp`, dan layanan lain
 yang tidak berhubungan. Stack lama dibersihkan dulu sesuai kesepakatan dengan pemilik produk;
 volume databasenya dihapus oleh pemilik produk sendiri.
+
+**Keadaan 16 September 2026.** Baris pertama E2E-01 — pemasangan baru — lulus di server kedua dengan rilis
+0.5.0: image ditarik lewat digest, migration selesai, seluruh container sehat, dan situs melapor balik ke
+admin.erp. Baris-baris lainnya belum dijalankan.
+
+Dua hal membatasi mesin itu sebagai tempat uji. Port 80 dan 443 dipegang Dokploy, jadi pemasangan memakai
+`--proxy-luar` dan proxy HTTPS milik agen tidak pernah menyala — jalur HTTPS dari internet tidak terbukti,
+dan itu ditulis sebagai PA-07 di [PRD pemasangan satu perintah](/todo/pasang-satu-perintah/). Sesudah uji
+itu penyedia menyuspensi mesinnya dengan alasan *flooding*. Sisa skenario E2E-01 karena itu dipindahkan ke
+VPS lain, sebaiknya yang port 80 dan 443-nya kosong supaya PA-07 terjawab di putaran yang sama.
 
 ## Panduan untuk pelaksana
 
