@@ -6,6 +6,7 @@ namespace Tests\Feature\ControlPlane;
 
 use App\Support\Sso\SsoApiUnavailable;
 use App\Support\Sso\SsoDirectory;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -163,7 +164,7 @@ class SsoDirectoryTest extends TestCase
 
     public function test_a_provider_that_cannot_be_reached_is_refused(): void
     {
-        Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('koneksi habis waktu'));
+        Http::fake(fn () => throw new ConnectionException('koneksi habis waktu'));
 
         $this->expectException(SsoApiUnavailable::class);
         $this->expectExceptionMessage('tidak dapat dihubungi');

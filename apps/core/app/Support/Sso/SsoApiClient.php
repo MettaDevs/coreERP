@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Sso;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
@@ -110,7 +111,7 @@ class SsoApiClient
         return $response;
     }
 
-    private function pending(): \Illuminate\Http\Client\PendingRequest
+    private function pending(): PendingRequest
     {
         return Http::withHeaders([
             'X-Client-ID' => $this->clientId(),

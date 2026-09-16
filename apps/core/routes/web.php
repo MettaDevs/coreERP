@@ -36,7 +36,6 @@ use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
 use Illuminate\Auth\Middleware\RequirePassword;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
 Route::inertia('/', 'welcome')->name('home');
