@@ -133,18 +133,6 @@ parameters:
 			path: app/Http/Controllers/Access/AccessController.php
 
 		-
-			message: '#^Parameter \#2 \$data of method App\\Actions\\Access\\CreateInvitation\:\:handle\(\) expects array\{system_role\: string, label\: string\|null, sso_email\: string\|null, assignments\: list\<array\{role_id\: string, policy_scopes\: list\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool\}\>\}\>\}, array\{system_role\: string, label\: string\|null, sso_email\: string\|null, assignments\: list\<array\<string, mixed\>\>\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Access/InvitationCodeController.php
-
-		-
-			message: '#^Parameter \#3 \$data of method App\\Actions\\Access\\UpdateInvitation\:\:handle\(\) expects array\{system_role\: string, label\: string\|null, assignments\: list\<array\{role_id\: string, policy_scopes\: list\<array\{policy_code\: string, legal_entity_id\: string\|null, organization_id\: string\|null, hierarchy_id\: string\|null, include_descendants\: bool, unrestricted\: bool\}\>\}\>\}, array\{system_role\: string, label\: string\|null, sso_email\: string\|null, assignments\: list\<array\<string, mixed\>\>\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Http/Controllers/Access/InvitationCodeController.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\SecurityDuty\:\:\$source\.$#'
 			identifier: property.notFound
 			count: 1
@@ -341,12 +329,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: app/Http/Middleware/HandleInertiaRequests.php
-
-		-
-			message: '#^Method App\\Http\\Requests\\Access\\InvitationRequest\:\:payloads\(\) should return list\<array\{system_role\: string, label\: string\|null, sso_email\: string\|null, assignments\: list\<array\<string, mixed\>\>\}\> but returns array\<int, array\{system_role\: string, label\: string\|null, sso_email\: string\|null, assignments\: array\<int, array\{role_id\: string, policy_scopes\: array\<int, array\{policy_code\: string, legal_entity_id\: mixed, organization_id\: mixed, hierarchy_id\: mixed, include_descendants\: bool, unrestricted\: bool\}\>\}\>\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Requests/Access/InvitationRequest.php
 
 		-
 			message: '#^Unable to resolve the template type TKey in call to function collect$#'

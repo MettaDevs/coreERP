@@ -47,7 +47,7 @@ class InvitationRequest extends FormRequest
         return is_string($value) && trim($value) !== '' ? $value : null;
     }
 
-    /** @return array{system_role:string,label:?string,sso_email:?string,assignments:list<array<string, mixed>>} */
+    /** @return array{system_role:string,label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>} */
     public function payload(): array
     {
         return $this->payloads()[0];
@@ -56,27 +56,30 @@ class InvitationRequest extends FormRequest
     /**
      * Seluruh kode yang diminta. Bentuk tunggal menghasilkan satu elemen.
      *
-     * @return list<array{system_role:string,label:?string,sso_email:?string,assignments:list<array<string, mixed>>}>
+     * @return list<array{system_role:string,label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool,unrestricted:bool}>}>}>
      */
     public function payloads(): array
     {
         $rows = $this->has('codes') ? $this->collect('codes')->all() : [$this->all()];
 
-        return collect($rows)->map(fn (mixed $row): array => [
+        // `array_values` di ketiga tingkat, bukan `->values()->all()`: keduanya menghasilkan daftar
+        // yang sama, tetapi hanya yang pertama terbaca sebagai daftar berindeks rapat oleh analisis
+        // tipe — dan bentuk itulah yang dijanjikan kepada pemanggilnya.
+        return array_values(collect($rows)->map(fn (mixed $row): array => [
             'system_role' => (string) data_get($row, 'system_role'),
             'label' => self::text(data_get($row, 'label')),
             'sso_email' => self::text(data_get($row, 'sso_email')),
-            'assignments' => collect(data_get($row, 'assignments', []))->map(fn (mixed $assignment): array => [
+            'assignments' => array_values(collect(data_get($row, 'assignments', []))->map(fn (mixed $assignment): array => [
                 'role_id' => (string) data_get($assignment, 'role_id'),
-                'policy_scopes' => collect(data_get($assignment, 'policy_scopes', []))->map(fn (mixed $scope): array => [
+                'policy_scopes' => array_values(collect(data_get($assignment, 'policy_scopes', []))->map(fn (mixed $scope): array => [
                     'policy_code' => (string) data_get($scope, 'policy_code'),
-                    'legal_entity_id' => data_get($scope, 'legal_entity_id') ?: null,
-                    'organization_id' => data_get($scope, 'organization_id') ?: null,
-                    'hierarchy_id' => data_get($scope, 'hierarchy_id') ?: null,
+                    'legal_entity_id' => self::text(data_get($scope, 'legal_entity_id')),
+                    'organization_id' => self::text(data_get($scope, 'organization_id')),
+                    'hierarchy_id' => self::text(data_get($scope, 'hierarchy_id')),
                     'include_descendants' => (bool) data_get($scope, 'include_descendants'),
                     'unrestricted' => (bool) data_get($scope, 'unrestricted'),
-                ])->values()->all(),
-            ])->values()->all(),
-        ])->values()->all();
+                ])->all()),
+            ])->all()),
+        ])->all());
     }
 }
