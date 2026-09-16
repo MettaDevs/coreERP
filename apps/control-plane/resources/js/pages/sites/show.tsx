@@ -484,8 +484,7 @@ function RequestOperation({
 }
 
 function Revoke({ site }: { site: Site }) {
-    const { data, setData, post, processing, errors } = useForm({
-    });
+    const { post, processing } = useForm({});
 
     return (
         <section className="space-y-4 rounded-lg border border-red-200 bg-background p-5 dark:border-red-900/60">
@@ -640,8 +639,7 @@ function LicenseTermsForm({ site }: { site: Site }) {
 function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
     const { license } = site;
     const suspended = license.suspendedAt !== null;
-    const { data, setData, post, processing, errors } = useForm({
-    });
+    const { post, processing } = useForm({});
 
     return (
         <Section
@@ -1023,7 +1021,8 @@ export default function Show({
                                                         `/situs/${site.id}/operasi/${op.id}/batal`,
                                                         {},
                                                         {
-                                                            preserveScroll: true,
+                                                            preserveScroll:
+                                                                true,
                                                         },
                                                     )
                                                 }
