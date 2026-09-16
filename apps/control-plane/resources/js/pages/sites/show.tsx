@@ -1021,8 +1021,7 @@ export default function Show({
                                                         `/situs/${site.id}/operasi/${op.id}/batal`,
                                                         {},
                                                         {
-                                                            preserveScroll:
-                                                                true,
+                                                            preserveScroll: true,
                                                         },
                                                     )
                                                 }
