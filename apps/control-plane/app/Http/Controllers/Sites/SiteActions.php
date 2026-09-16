@@ -11,6 +11,7 @@ use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Registry\RegistryCredentials;
 use ControlPlane\Sites\EnrollmentTokens;
+use ControlPlane\Sites\LicenseTerms;
 use ControlPlane\Sites\SiteDns;
 use ControlPlane\Sites\SiteOperations;
 use ControlPlane\Sites\SiteRejected;
@@ -165,6 +166,49 @@ final class SiteActions extends Controller
         });
 
         return redirect('/situs/'.$row->id)->with('message', 'Perpanjangan lisensi dihentikan. Lisensi yang terpasang tetap berlaku sampai tanggal berakhirnya.');
+    }
+
+    /**
+     * Masa lisensi situs ini: mengikuti bawaan konsol, angka sendiri, atau tanpa tanggal berakhir.
+     *
+     * Berlaku pada penerbitan berikutnya, bukan pada lisensi yang sudah terpasang. Situs yang diubah
+     * menjadi permanen menerima lisensi tanpa tanggal pada laporan berikutnya yang lolos jeda
+     * perpanjangan; yang dikembalikan menjadi bertanggal menerima tanggal pada laporan berikutnya pula,
+     * karena laporan yang menyebut lisensi permanen membuat perpanjangannya jatuh tempo.
+     *
+     * Permanen berarti lisensinya tidak pernah habis — bukan bahwa seluruh modul terbuka. Daftar app di
+     * lisensi tetap datang dari app yang dibeli tenant.
+     */
+    public function updateLicenseTerms(Request $request, string $site, LicenseTerms $terms): RedirectResponse
+    {
+        $row = $this->confirmedSite($request, $site);
+
+        $data = $request->validate([
+            'mode' => ['required', 'in:default,custom,perpetual'],
+            'valid_days' => ['required_if:mode,custom', 'nullable', 'integer', 'min:1', 'max:'.LicenseTerms::MAX_VALID_DAYS],
+            // Perpanjangan yang tidak lebih awal dari masa lisensinya sendiri tidak pernah terjadi, dan
+            // lisensinya habis di klinik. Constraint database menjaga aturan yang sama.
+            'renew_before_days' => ['required_if:mode,custom', 'nullable', 'integer', 'min:1', 'max:'.LicenseTerms::MAX_RENEW_BEFORE_DAYS, 'lt:valid_days'],
+        ]);
+
+        $before = $terms->forSite($row);
+
+        DB::transaction(function () use ($request, $row, $data, $terms, $before): void {
+            $row->forceFill([
+                'license_perpetual' => $data['mode'] === 'perpetual',
+                'license_valid_days' => $data['mode'] === 'custom' ? (int) $data['valid_days'] : null,
+                'license_renew_before_days' => $data['mode'] === 'custom' ? (int) $data['renew_before_days'] : null,
+            ])->save();
+
+            OperatorAudit::record($request, 'site.license.terms_changed', 'site', $row->id, [
+                'from' => $before,
+                'to' => $terms->forSite($row->refresh()),
+            ]);
+        });
+
+        return redirect('/situs/'.$row->id)->with('message', $data['mode'] === 'perpetual'
+            ? 'Situs ini memakai lisensi permanen. Lisensi tanpa tanggal berakhir dikirim pada penerbitan berikutnya.'
+            : 'Masa lisensi disimpan. Berlaku pada penerbitan berikutnya.');
     }
 
     public function resumeLicense(Request $request, string $site): RedirectResponse

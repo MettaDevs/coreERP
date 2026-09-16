@@ -28,7 +28,10 @@ use Throwable;
  */
 final class LicenseRenewal
 {
-    public function __construct(private readonly LicenseIssuer $issuer) {}
+    public function __construct(
+        private readonly LicenseIssuer $issuer,
+        private readonly LicenseTerms $terms,
+    ) {}
 
     /**
      * Apakah laporan ini perlu dijawab dengan lisensi baru.
@@ -47,13 +50,29 @@ final class LicenseRenewal
         // Kosong berarti tidak ada lisensi yang terbaca di server klien — lisensi yang hilang, rusak,
         // atau belum pernah dipasang. Itu justru keadaan yang paling membutuhkan lisensi baru.
         $expires = $report['license_expires_at'] ?? null;
-        $threshold = CarbonImmutable::now($site->timezone)
-            ->addDays((int) config('sites.license_renew_before_days'))
-            ->toDateString();
 
-        // `Y-m-d` sudah dipastikan `SiteReports`, jadi urutan string sama dengan urutan tanggal.
-        if (is_string($expires) && $expires > $threshold) {
-            return false;
+        // Lisensi permanen juga melaporkan tanggal yang kosong, dan tanpa penanda ini ia terbaca persis
+        // seperti lisensi yang hilang: konsol akan menerbitkan lisensi baru setiap kali jedanya lewat,
+        // selamanya. Penandanya datang dari agen, yang membaca `valid_until: null` di berkas terpasang.
+        $perpetualOnSite = ($report['license_perpetual'] ?? null) === true;
+
+        if ($site->license_perpetual) {
+            // Situs permanen hanya butuh lisensi baru selama yang terpasang belum permanen — termasuk
+            // ketika berkasnya hilang, dan ketika situs ini baru saja diubah dari bertanggal.
+            if ($perpetualOnSite) {
+                return false;
+            }
+        } else {
+            // Sebaliknya: lisensi permanen yang masih terpasang di situs yang sudah dikembalikan menjadi
+            // bertanggal harus diganti, sekalipun laporannya tidak menyebut tanggal apa pun.
+            $threshold = CarbonImmutable::now($site->timezone)
+                ->addDays($this->terms->forSite($site)['renewBeforeDays'])
+                ->toDateString();
+
+            // `Y-m-d` sudah dipastikan `SiteReports`, jadi urutan string sama dengan urutan tanggal.
+            if (is_string($expires) && $expires > $threshold) {
+                return false;
+            }
         }
 
         $cooldown = (int) config('sites.license_renew_cooldown_minutes');

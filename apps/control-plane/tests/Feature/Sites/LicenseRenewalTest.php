@@ -47,6 +47,43 @@ class LicenseRenewalTest extends SiteTestCase
         yield 'perpanjangan dihentikan' => [['license_suspended_at' => '2026-09-10 00:00:00'], ['license_expires_at' => null], false];
         yield 'baru diterbitkan 59 menit lalu' => [['license_issued_at' => '2026-09-15 07:01:00', 'license_valid_until' => '2026-10-15'], ['license_expires_at' => null], false];
         yield 'terakhir diterbitkan 61 menit lalu' => [['license_issued_at' => '2026-09-15 06:59:00', 'license_valid_until' => '2026-10-15'], ['license_expires_at' => null], true];
+
+        // Lisensi permanen melaporkan tanggal yang kosong, sama seperti lisensi yang hilang. Yang
+        // membedakan keduanya `license_perpetual` di laporan; tanpa itu situs permanen diberi lisensi
+        // baru setiap kali jeda perpanjangannya lewat, selamanya.
+        yield 'permanen dan yang terpasang sudah permanen' => [
+            ['license_perpetual' => true, 'license_issued_at' => '2026-09-01 00:00:00', 'license_issued_perpetual' => true],
+            ['license_expires_at' => null, 'license_perpetual' => true],
+            false,
+        ];
+        yield 'permanen tetapi yang terpasang masih bertanggal' => [
+            ['license_perpetual' => true],
+            ['license_expires_at' => '2026-12-31'],
+            true,
+        ];
+        yield 'permanen tetapi belum ada lisensi di klien' => [
+            ['license_perpetual' => true],
+            ['license_expires_at' => null],
+            true,
+        ];
+        // Kebalikannya: situs yang dikembalikan menjadi bertanggal harus mengganti lisensi permanen yang
+        // masih terpasang, walaupun laporannya tidak menyebut tanggal apa pun.
+        yield 'kembali bertanggal, klien masih permanen' => [
+            [],
+            ['license_expires_at' => null, 'license_perpetual' => true],
+            true,
+        ];
+        // Jendela perpanjangan per situs: 45 hari sebelum habis, jadi batasnya 30 Oktober.
+        yield 'jendela situs sendiri, masih di luar' => [
+            ['license_valid_days' => 90, 'license_renew_before_days' => 45],
+            ['license_expires_at' => '2026-10-31'],
+            false,
+        ];
+        yield 'jendela situs sendiri, sudah di dalam' => [
+            ['license_valid_days' => 90, 'license_renew_before_days' => 45],
+            ['license_expires_at' => '2026-10-30'],
+            true,
+        ];
     }
 
     /**

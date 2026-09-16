@@ -14,6 +14,7 @@ use ControlPlane\Http\Controllers\Installer\InstallerFiles;
 use ControlPlane\Http\Controllers\Login;
 use ControlPlane\Http\Controllers\Logout;
 use ControlPlane\Http\Controllers\Settings;
+use ControlPlane\Http\Controllers\SettingsLicense;
 use ControlPlane\Http\Controllers\Sites\SiteActions;
 use ControlPlane\Http\Controllers\Sites\SiteScreens;
 use ControlPlane\Http\Controllers\Sites\SiteSettings;
@@ -111,8 +112,10 @@ Route::middleware(['auth', 'operator'])->group(function (): void {
     Route::post('/situs/{situs}/cabut', [SiteActions::class, 'revoke'])->name('sites.revoke');
     Route::post('/situs/{situs}/lisensi/hentikan', [SiteActions::class, 'suspendLicense'])->name('sites.license.suspend');
     Route::post('/situs/{situs}/lisensi/lanjutkan', [SiteActions::class, 'resumeLicense'])->name('sites.license.resume');
+    Route::post('/situs/{situs}/lisensi/masa', [SiteActions::class, 'updateLicenseTerms'])->name('sites.license.terms');
 
     Route::get('/pengaturan', Settings::class)->name('settings.show');
+    Route::patch('/pengaturan/lisensi', [SettingsLicense::class, 'update'])->name('settings.license.update');
 
     Route::get('/akun', [Account::class, 'show'])->name('account.show');
     Route::post('/akun/sso', [Account::class, 'connect'])->middleware('throttle:10,1')->name('account.sso.connect');

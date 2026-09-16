@@ -11,6 +11,7 @@ use ControlPlane\Registry\HarborClient;
 use ControlPlane\Registry\RegistrySettings;
 use ControlPlane\Registry\RegistryUnavailable;
 use ControlPlane\Sites\KeyInspection;
+use ControlPlane\Sites\LicenseTerms;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
@@ -36,8 +37,13 @@ use Inertia\Response as InertiaResponse;
  */
 final class Settings extends Controller
 {
-    public function __invoke(RegistrySettings $registry, HarborClient $harbor, CloudflareSettings $dns, CloudflareClient $cloudflare): InertiaResponse
-    {
+    public function __invoke(
+        RegistrySettings $registry,
+        HarborClient $harbor,
+        CloudflareSettings $dns,
+        CloudflareClient $cloudflare,
+        LicenseTerms $terms,
+    ): InertiaResponse {
         // Diperiksa setiap halaman dibuka, sama dengan robot Harbor: jawaban basi menyembunyikan token yang baru
         // saja dicabut di Cloudflare.
         $dnsCheck = null;
@@ -81,6 +87,13 @@ final class Settings extends Controller
                     ? hash_equals($licensePrivate['fingerprint'], $licensePublic['fingerprint'])
                     : null,
             ],
+            /*
+             * Masa lisensi bawaan, dan satu-satunya tempat angkanya terbaca operator. Sebelum ini ia hanya
+             * ada di `config/sites.php`: layar situs menjanjikan "diperpanjang otomatis" tanpa pernah
+             * menyebut kapan, dan server pertama yang mati lebih lama dari masa itu mengunci setiap klinik
+             * tanpa satu pun peringatan yang menyebut angkanya.
+             */
+            'licenseTerms' => $terms->defaults(),
             'registry' => [
                 'host' => $registry->host(),
                 'robot' => $robot,

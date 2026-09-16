@@ -174,6 +174,47 @@ final class SiteLicenseTest extends TestCase
         $this->assertSame(-1, $state->daysLeft);
     }
 
+    // ------------------------------------------------------------------ tanpa tanggal berakhir
+
+    /**
+     * Lisensi permanen: `valid_until` bernilai null.
+     *
+     * Diterbitkan admin.erp untuk situs yang ditandai permanen, dan tidak pernah diperpanjang. Yang
+     * membatasi app tetap daftar `apps`, jadi lisensi ini bukan jalan pintas menuju seluruh modul.
+     */
+    public function test_a_license_without_an_end_date_is_valid_and_never_locks(): void
+    {
+        config()->set('coreerp.license.required', true);
+        $this->installSignedLicense($this->licenseJson(null, ['human-resources']));
+        $log = Log::spy();
+
+        $state = $this->freshState();
+
+        $this->assertSame(SiteLicenseState::VALID, $state->status);
+        $this->assertNull($state->validUntil);
+        $this->assertNull($state->daysLeft);
+        $this->assertFalse($state->isLocked());
+        $this->assertTrue($state->allowsApp('human-resources'));
+        $this->assertFalse($state->allowsApp('management-aset'));
+        $log->shouldNotHaveReceived('warning');
+    }
+
+    /**
+     * Kunci yang hilang bukan kunci yang bernilai null.
+     *
+     * Berkas yang terpotong saat ditulis kehilangan bidang terakhirnya lebih dulu. Kalau ketiadaan
+     * `valid_until` terbaca sebagai "tanpa tanggal berakhir", berkas rusak justru menjadi lisensi yang
+     * paling kuat di sistem ini.
+     */
+    public function test_a_license_that_never_mentions_an_end_date_is_invalid(): void
+    {
+        $bytes = str_replace('"valid_until":null,', '', $this->licenseJson(null));
+        $this->assertStringNotContainsString('valid_until', $bytes);
+        $this->installSignedLicense($bytes);
+
+        $this->assertSame(SiteLicenseState::INVALID, $this->freshState()->status);
+    }
+
     // ------------------------------------------------------------------ tidak sah
 
     public function test_a_single_tampered_byte_makes_the_license_invalid_and_hides_its_apps(): void

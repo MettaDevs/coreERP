@@ -52,6 +52,10 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $license_issued_at
  * @property ?Carbon $license_valid_until
  * @property ?Carbon $license_suspended_at
+ * @property bool $license_perpetual
+ * @property ?int $license_valid_days
+ * @property ?int $license_renew_before_days
+ * @property bool $license_issued_perpetual
  * @property ?int $created_by
  * @property ?Carbon $created_at
  */
@@ -109,6 +113,10 @@ class Site extends Model
             'license_issued_at' => 'datetime',
             'license_valid_until' => 'date',
             'license_suspended_at' => 'datetime',
+            'license_perpetual' => 'boolean',
+            'license_valid_days' => 'integer',
+            'license_renew_before_days' => 'integer',
+            'license_issued_perpetual' => 'boolean',
             'dns_synced_at' => 'datetime',
         ];
     }
@@ -166,6 +174,12 @@ class Site extends Model
     public function licenseRenewalSuspended(): bool
     {
         return $this->license_suspended_at !== null;
+    }
+
+    /** Apakah lisensi yang **terakhir diterbitkan** untuk situs ini tidak bertanggal. */
+    public function licenseIssuedPerpetual(): bool
+    {
+        return $this->license_issued_at !== null && (bool) $this->license_issued_perpetual;
     }
 
     /**

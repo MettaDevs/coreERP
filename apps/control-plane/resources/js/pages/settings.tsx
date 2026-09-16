@@ -1,5 +1,7 @@
-import { Head } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import { Button } from '@apperp/ui/button';
+import { Input } from '@apperp/ui/input';
+import { Head, useForm } from '@inertiajs/react';
+import type { FormEvent, ReactNode } from 'react';
 import Shell from '@/components/shell';
 
 type KeyState =
@@ -12,6 +14,7 @@ type Props = {
         public: KeyState;
         pairMatches: boolean | null;
     };
+    licenseTerms: { validDays: number; renewBeforeDays: number };
     registry: {
         host: string;
         robot: string | null;
@@ -81,9 +84,92 @@ function Fingerprint({ state }: { state: KeyState }) {
  * perintah artisan; halaman ini ada supaya yang hilang atau tertukar ditemukan operator sebelum perintah
  * pasang dibuat — bukan oleh teknisi yang terminalnya menjawab 503 di lokasi klien.
  */
+/**
+ * Masa lisensi bawaan: berapa lama lisensi berlaku, dan berapa hari sebelum habis ia diperpanjang.
+ *
+ * Angka kedua sekaligus menjawab pertanyaan yang tidak pernah ditanyakan sampai terjadi: berapa lama
+ * konsol ini boleh mati tanpa mengunci klinik. Jawabannya masa lisensi dikurangi jendela perpanjangan,
+ * dan kalimat di bawah isian menyebutkannya, supaya angkanya tidak perlu dihitung orang di kepala.
+ */
+function LicenseTermsForm({
+    terms,
+}: {
+    terms: { validDays: number; renewBeforeDays: number };
+}) {
+    const { data, setData, patch, processing, errors } = useForm({
+        valid_days: String(terms.validDays),
+        renew_before_days: String(terms.renewBeforeDays),
+    });
+
+    const valid = Number(data.valid_days);
+    const renew = Number(data.renew_before_days);
+    const tolerance =
+        Number.isFinite(valid) && Number.isFinite(renew) && valid > renew
+            ? valid - renew
+            : null;
+
+    return (
+        <form
+            className="space-y-4"
+            onSubmit={(e: FormEvent) => {
+                e.preventDefault();
+                patch('/pengaturan/lisensi', { preserveScroll: true });
+            }}
+        >
+            <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                    <Input
+                        label="Masa berlaku (hari)"
+                        type="number"
+                        min={1}
+                        max={3650}
+                        required
+                        value={data.valid_days}
+                        onChange={(e) => setData('valid_days', e.target.value)}
+                    />
+                    {errors.valid_days && (
+                        <p className="text-sm text-destructive">
+                            {errors.valid_days}
+                        </p>
+                    )}
+                </div>
+                <div className="space-y-2">
+                    <Input
+                        label="Diperpanjang berapa hari sebelum habis"
+                        type="number"
+                        min={1}
+                        max={365}
+                        required
+                        value={data.renew_before_days}
+                        onChange={(e) =>
+                            setData('renew_before_days', e.target.value)
+                        }
+                    />
+                    {errors.renew_before_days && (
+                        <p className="text-sm text-destructive">
+                            {errors.renew_before_days}
+                        </p>
+                    )}
+                </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+                {tolerance === null
+                    ? 'Perpanjangan harus mulai sebelum lisensinya habis.'
+                    : `Konsol ini boleh mati paling lama ${tolerance} hari sebelum server klien mulai kehilangan lisensinya.`}
+            </p>
+
+            <Button type="submit" disabled={processing}>
+                Simpan masa lisensi
+            </Button>
+        </form>
+    );
+}
+
 export default function Settings({
     releaseKey,
     licenseKey,
+    licenseTerms,
     registry,
     dns,
 }: Props) {
@@ -142,6 +228,13 @@ export default function Settings({
                         </Row>
                     )}
                 </dl>
+            </Section>
+
+            <Section
+                title="Masa lisensi bawaan"
+                description="Dipakai setiap situs yang tidak punya angkanya sendiri dan tidak memakai lisensi permanen. Berlaku pada penerbitan berikutnya; lisensi yang sudah terpasang di server klien tidak berubah."
+            >
+                <LicenseTermsForm terms={licenseTerms} />
             </Section>
 
             <Section

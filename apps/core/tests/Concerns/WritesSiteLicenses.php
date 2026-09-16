@@ -79,9 +79,10 @@ trait WritesSiteLicenses
     /**
      * Isi lisensi versi 2 dengan urutan bidang yang sama dengan contoh di kontrak.
      *
+     * @param  ?string  $validUntil  `null` menulis `"valid_until": null` — lisensi tanpa tanggal berakhir.
      * @param  list<string>  $apps
      */
-    protected function licenseJson(string $validUntil, array $apps = ['contoh-a']): string
+    protected function licenseJson(?string $validUntil, array $apps = ['contoh-a']): string
     {
         return json_encode([
             'version' => 2,
