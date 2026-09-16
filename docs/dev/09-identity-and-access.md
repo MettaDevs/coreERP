@@ -233,6 +233,28 @@ Pemilihan produk hanya menghasilkan entitlement. Artifact deployment diproses da
 
 Owner/Admin membuat kode undangan yang dapat dipakai berulang sampai dicabut atau kedaluwarsa. Core menyimpan hash untuk validasi dan ciphertext agar admin yang berwenang dapat menyalin ulang kode aktif. Invitation dapat membawa role platform selain `owner`, security-role assignment, serta grant data policy. Redemption membuat identity/membership dan assignment dalam satu transaksi; akses anggota yang sudah bergabung tidak berubah jika kode kemudian dicabut.
 
+### Dua jenis undangan
+
+Sejak 16 September 2026 undangan punya dua bentuk, dan yang membedakannya satu kolom: ada atau tidaknya email yang diundang.
+
+| | Kode anonim | Terikat akun SSO |
+| --- | --- | --- |
+| Siapa yang dapat menukarkan | Siapa pun yang memegang kodenya | Hanya satu akun SSO tertentu |
+| Berapa kali | Berulang, sampai dicabut | Sekali |
+| Kedaluwarsa | Tidak, kecuali disetel | Ya, bawaan tujuh hari |
+| Cara menukarkan | Formulir nama, email, kata sandi di `/join` | Tombol masuk SSO |
+| Syarat | Tidak ada | Email wajib sudah terdaftar di penyedia SSO |
+
+Undangan terikat menyimpan `sso_subject` — nilai yang dijawab endpoint pencarian penyedia saat undangan dibuat, dan yang kelak muncul sebagai klaim `sub` di ID token. **Yang dibandingkan saat penukaran adalah subjek itu, tidak pernah emailnya.** Alasannya sama dengan alasan jalur masuk SSO menolak pencocokan lewat email: penyedia menulis `email_verified_at` pada pendaftaran mandiri tanpa benar-benar memverifikasi, sehingga siapa pun yang mendaftar di sana dengan email orang lain akan lolos kalau email dijadikan bukti.
+
+Konsekuensinya, kode undangan terikat **bukan rahasia yang menentukan**. Ia hanya memilih baris mana yang sedang ditukar, dan itu sebabnya ia boleh dikirim lewat tautan di email. `RedeemInvitation::locate()` menolak kode terikat pada jalur kata sandi, jadi tidak ada jalan lain menukarkannya selain upacara SSO.
+
+Penukarannya memakai upacara tiga kaki yang sama dengan masuk lewat SSO — `sso/gabung` di alamat tenant, `sso/callback` di domain dasar, `sso/serah` kembali di alamat tenant — dengan `sso_login_attempts.invitation_id` sebagai penanda jenis upacaranya. Akun, tautan identitas, keanggotaan, peran, dan batas datanya lahir dalam satu transaksi di kaki ketiga, lewat `RedeemInvitation::attachInvitation()` yang dipakai bersama kedua jalur lain.
+
+Emailnya dikirim penyedia, bukan Core: repo ini tidak punya jalur email sama sekali. Tautannya mendarat di `/undangan` pada **domain dasar** lalu dialihkan ke alamat tenant, karena penyedia menolak `accept_url` yang host-nya di luar alamat balik client — dan alamat balik itu satu per penempatan, di domain dasar.
+
+Yang perlu disadari: endpoint pencarian penyedia tidak mengenal scope, sehingga setiap operator ber-`manage-access` dapat memakainya untuk memeriksa apakah sebuah email terdaftar di direktori. Yang menahannya hanya throttle dan jejak audit `access.invitation.sso.ditolak`.
+
 Role dapat diberikan melalui:
 
 1. assignment manual;

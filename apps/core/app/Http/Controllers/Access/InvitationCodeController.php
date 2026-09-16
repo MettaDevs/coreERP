@@ -7,9 +7,11 @@ use App\Actions\Access\UpdateInvitation;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Access\InvitationRequest;
 use App\Models\InvitationCode;
+use App\Support\Sso\SsoInvitationMailer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class InvitationCodeController extends Controller
 {
@@ -65,6 +67,35 @@ class InvitationCodeController extends Controller
         }
 
         return back();
+    }
+
+    /**
+     * Mengirim ulang email undangan terikat SSO.
+     *
+     * Ada karena pengiriman pertamanya boleh gagal tanpa menghanguskan undangannya: penyedia yang
+     * sedang mati meninggalkan baris yang sah dengan `sso_notified_at` kosong. Kodenya sendiri
+     * dibaca kembali dari simpanan terenkripsi — ia memang harus masuk ke tautan di surat.
+     */
+    public function resend(Request $request, InvitationCode $invitationCode, SsoInvitationMailer $mailer): JsonResponse|RedirectResponse
+    {
+        $membership = $this->currentMembership($request);
+        abort_unless($membership->canManageAccess() && $invitationCode->tenant_id === $membership->tenant_id, 403);
+
+        if (! $invitationCode->isSsoBound() || ! $invitationCode->isOpen()) {
+            throw ValidationException::withMessages(['invitation' => 'Undangan ini tidak dapat dikirim ulang.']);
+        }
+
+        $code = $invitationCode->accessibleCode();
+
+        if ($code === null) {
+            throw ValidationException::withMessages(['invitation' => 'Kode undangan ini tidak dapat dibaca lagi dari simpanan, jadi tautannya tidak dapat dikirim ulang. Cabut undangan ini dan buat yang baru.']);
+        }
+
+        if (! $mailer->send($invitationCode, $code)) {
+            throw ValidationException::withMessages(['invitation' => 'Penyedia SSO tidak dapat diminta mengirim undangan ini sekarang. Coba lagi sebentar lagi.']);
+        }
+
+        return $request->is('api/*') ? response()->json(null, 204) : back();
     }
 
     public function destroy(Request $request, InvitationCode $invitationCode): JsonResponse|RedirectResponse

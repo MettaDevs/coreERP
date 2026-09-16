@@ -40,6 +40,11 @@ class UpdateInvitation
         if ($invitation->revoked_at !== null) {
             throw ValidationException::withMessages(['id' => 'Kode yang sudah dicabut tidak dapat diubah. Buat kode baru.']);
         }
+        // Undangan terikat yang sudah ditukar sama saja: yang menerimanya sudah memegang perannya,
+        // dan mengubah barisnya sekarang hanya membuat jejaknya bercerita hal yang tidak terjadi.
+        if ($invitation->isSpent()) {
+            throw ValidationException::withMessages(['id' => 'Undangan ini sudah dipakai. Ubah peran orangnya di daftar anggota.']);
+        }
 
         $roleIds = collect($data['assignments'])->pluck('role_id')->unique()->values();
         $roles = Role::query()

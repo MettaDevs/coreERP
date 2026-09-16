@@ -162,6 +162,13 @@ type Invitation = {
     redeemed_count: number;
     code: string | null;
     revoked_at: string | null;
+    /** Terisi untuk undangan yang terikat ke satu akun SSO; null untuk kode anonim. */
+    sso: {
+        email: string;
+        name: string | null;
+        notified_at: string | null;
+        redeemed_at: string | null;
+    } | null;
 };
 type Props = {
     tenant: { id: string; name: string };
@@ -174,6 +181,8 @@ type Props = {
     hierarchies: Hierarchy[];
     invitations: Invitation[];
     newInvitationCodes: string[];
+    /** Tenant ini memakai SSO bersama, sehingga undangan lewat email mungkin dibuat. */
+    ssoAvailable: boolean;
 };
 
 const unrestrictedScope = (policyCode: string): PolicyScope => ({
@@ -916,6 +925,11 @@ type CodeDraft = {
     key: string;
     label: string;
     system_role: string;
+    /**
+     * Email orang yang diundang. Kosong berarti kode anonim yang dapat dipakai siapa pun yang
+     * memegangnya — perilaku yang sudah ada sebelum undangan SSO, dan yang sengaja dipertahankan.
+     */
+    sso_email: string;
     assignments: Assignment[];
     /**
      * Terisi untuk kode yang sudah diterbitkan. Baris itu tetap dapat diubah —
@@ -923,18 +937,25 @@ type CodeDraft = {
      * berikutnya. `redeemed` dipakai untuk memperingatkan bahwa kode sudah
      * beredar sebelum perubahan disimpan.
      */
-    issued?: { id: string; revoked: boolean; redeemed: number };
+    issued?: {
+        id: string;
+        revoked: boolean;
+        redeemed: number;
+        sso: Invitation['sso'];
+    };
 };
 
 const issuedDraft = (invitation: Invitation): CodeDraft => ({
     key: `issued-${invitation.id}`,
     label: invitation.label ?? '',
     system_role: invitation.system_role,
+    sso_email: invitation.sso?.email ?? '',
     assignments: invitation.assignments,
     issued: {
         id: invitation.id,
         revoked: Boolean(invitation.revoked_at),
         redeemed: invitation.redeemed_count,
+        sso: invitation.sso,
     },
 });
 
@@ -990,6 +1011,7 @@ const blankCode = (): CodeDraft => ({
     key: crypto.randomUUID(),
     label: '',
     system_role: 'user',
+    sso_email: '',
     assignments: [],
 });
 
@@ -1122,10 +1144,11 @@ function InviteForm({
     organizations,
     hierarchies,
     invitations,
+    ssoAvailable,
 }: Pick<
     Props,
     'roles' | 'dataPolicies' | 'organizations' | 'hierarchies' | 'invitations'
->) {
+> & { ssoAvailable: boolean }) {
     const [open, setOpen] = useState(false);
     const [activeKey, setActiveKey] = useState<string | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -1160,7 +1183,8 @@ function InviteForm({
             .filter((role): role is Role => Boolean(role));
     // Baris terbit yang sudah dicabut tidak dapat ditukar siapa pun lagi,
     // sehingga mengubahnya tidak mengubah akses siapa pun.
-    const locked = (code: CodeDraft) => Boolean(code.issued?.revoked);
+    const locked = (code: CodeDraft) =>
+        Boolean(code.issued?.revoked) || Boolean(code.issued?.sso?.redeemed_at);
     const dirty = (code: CodeDraft) =>
         Boolean(code.issued) &&
         pristine.get(code.key) !== codeFingerprint(code);
@@ -1197,7 +1221,83 @@ function InviteForm({
         );
     };
 
+    /**
+     * Meminta penyedia mengirim ulang email undangan.
+     *
+     * Ada karena pengiriman pertama boleh gagal tanpa menghanguskan undangannya — penyedia yang
+     * sedang mati meninggalkan baris yang sah dengan surat yang tidak pernah keluar.
+     */
+    const resend = (code: CodeDraft) => {
+        if (!code.issued) {
+            return;
+        }
+
+        setSaving(code.key);
+        router.post(
+            `/settings/access/invitations/${code.issued.id}/kirim-ulang`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: (page) => {
+                    setIssuedRows(
+                        (page.props.invitations as Invitation[]).map(
+                            issuedDraft,
+                        ),
+                    );
+                    toast('Penyedia SSO diminta mengirim ulang undangannya.');
+                },
+                onFinish: () => setSaving(null),
+            },
+        );
+    };
+
     const columns: DataTableColumn<CodeDraft>[] = [
+        // Hanya ada bila tenant ini memakai SSO. Tanpa itu, yang muncul adalah kotak email yang
+        // setiap isinya pasti ditolak pembuatan undangannya.
+        ...(ssoAvailable
+            ? [
+                  {
+                      id: 'sso_email',
+                      header: 'Diundang',
+                      width: 240,
+                      cell: (code: CodeDraft) =>
+                          code.issued ? (
+                              code.issued.sso ? (
+                                  <div className="min-w-0">
+                                      <p className="truncate text-sm">
+                                          {code.issued.sso.name ??
+                                              code.issued.sso.email}
+                                      </p>
+                                      <p className="truncate text-xs text-muted-foreground">
+                                          {code.issued.sso.email}
+                                      </p>
+                                  </div>
+                              ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                      Kode anonim
+                                  </span>
+                              )
+                          ) : (
+                              <div>
+                                  <Input
+                                      type="email"
+                                      value={code.sso_email}
+                                      placeholder="nama@rumahsakit.co.id"
+                                      onChange={(event) =>
+                                          update(code.key, {
+                                              sso_email: event.target.value,
+                                          })
+                                      }
+                                  />
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                      Kosongkan untuk kode anonim yang dapat
+                                      dipakai siapa pun yang memegangnya.
+                                  </p>
+                              </div>
+                          ),
+                  } satisfies DataTableColumn<CodeDraft>,
+              ]
+            : []),
         {
             id: 'label',
             header: 'Keterangan',
@@ -1236,10 +1336,33 @@ function InviteForm({
                     ) : (
                         <Badge variant="outline">Baru</Badge>
                     )}
-                    {code.issued && code.issued.redeemed > 0 && (
-                        <Badge variant="outline">
-                            {code.issued.redeemed} terpakai
-                        </Badge>
+                    {code.issued?.sso ? (
+                        <>
+                            {/*
+                                Undangan pribadi hanya punya dua keadaan yang berarti: sudah dipakai
+                                orangnya, atau masih menunggu. Penghitung "n terpakai" milik kode
+                                anonim tidak pernah lebih dari satu di sini, dan membacanya sebagai
+                                angka justru menyesatkan.
+                            */}
+                            <Badge variant="outline">
+                                {code.issued.sso.redeemed_at
+                                    ? 'Dipakai'
+                                    : 'Menunggu'}
+                            </Badge>
+                            {!code.issued.sso.notified_at &&
+                                !code.issued.sso.redeemed_at && (
+                                    <Badge variant="secondary">
+                                        Email belum terkirim
+                                    </Badge>
+                                )}
+                        </>
+                    ) : (
+                        code.issued &&
+                        code.issued.redeemed > 0 && (
+                            <Badge variant="outline">
+                                {code.issued.redeemed} terpakai
+                            </Badge>
+                        )
                     )}
                     {dirty(code) && <Badge variant="outline">Diubah</Badge>}
                 </div>
@@ -1369,6 +1492,24 @@ function InviteForm({
                 }
 
                 if (!dirty(code)) {
+                    // Undangan terikat yang suratnya belum sampai: satu-satunya tindakan yang
+                    // berarti di baris ini adalah mengirimnya lagi.
+                    if (code.issued.sso && !code.issued.sso.redeemed_at) {
+                        return (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={saving === code.key}
+                                onClick={() => resend(code)}
+                            >
+                                {code.issued.sso.notified_at
+                                    ? 'Kirim ulang email'
+                                    : 'Kirim email'}
+                            </Button>
+                        );
+                    }
+
                     return (
                         <span className="text-muted-foreground">Tersimpan</span>
                     );
@@ -1474,6 +1615,10 @@ function InviteForm({
                             codes: data.codes.map((code) => ({
                                 label: code.label,
                                 system_role: code.system_role,
+                                // Dikirim huruf kecil: aturannya `lowercase`, dan menolak
+                                // "Dewi@Klinik.test" karena huruf besarnya adalah penolakan yang
+                                // tidak dapat dijelaskan kepada siapa pun yang mengetiknya.
+                                sso_email: code.sso_email.trim().toLowerCase(),
                                 assignments: code.assignments,
                             })),
                         }));
@@ -1866,6 +2011,7 @@ export default function Access({
     hierarchies,
     invitations = [],
     newInvitationCodes = [],
+    ssoAvailable = false,
 }: Props) {
     const url = usePage().url;
     const queryString = url.includes('?') ? url.split('?')[1] : '';
@@ -2122,6 +2268,7 @@ export default function Access({
                                         organizations={organizations}
                                         hierarchies={hierarchies}
                                         invitations={invitations}
+                                        ssoAvailable={ssoAvailable}
                                     />
                                 </CardAction>
                             )}

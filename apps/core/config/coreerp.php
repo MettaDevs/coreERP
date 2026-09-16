@@ -152,6 +152,27 @@ return [
         'issuer' => env('COREERP_SSO_ISSUER'),
         'client_id' => env('COREERP_SSO_CLIENT_ID'),
         'client_secret' => env('COREERP_SSO_CLIENT_SECRET'),
+
+        /*
+         * API pengelolaan penyedia — mencari pengguna, dan meminta penyedia mengirim email undangan.
+         * Bukan bagian OIDC: alamatnya tidak ada di dokumen discovery, jadi ia satu-satunya alamat
+         * penyedia yang harus disebut. Kosong berarti diturunkan dari issuer dengan akhiran `/api/v1`.
+         *
+         * Kredensialnya bawaan mengikuti pasangan di atas, karena penyedia memeriksa client id dan
+         * secret Passport yang sama dan tidak mengenal kredensial mesin tersendiri. Dua kunci di
+         * bawah ada supaya client kedua yang kelak didaftarkan cukup disetel, tanpa menyentuh kode.
+         */
+        'api_url' => env('COREERP_SSO_API_URL'),
+        'api_client_id' => env('COREERP_SSO_API_CLIENT_ID'),
+        'api_client_secret' => env('COREERP_SSO_API_CLIENT_SECRET'),
+
+        /*
+         * Nama aplikasi yang ditulis penyedia di email undangannya, dan berapa hari undangan berlaku.
+         * Penyedia membatasi 1 sampai 30 hari; `expires_at` undangan diisi angka yang sama supaya
+         * kalimat di email dan keadaan di sini tidak pernah berbeda.
+         */
+        'invitation_app_name' => env('COREERP_SSO_INVITATION_APP_NAME', 'CoreERP'),
+        'invitation_days' => (int) env('COREERP_SSO_INVITATION_DAYS', 7),
     ],
 
     /*
