@@ -65,7 +65,13 @@ return new class extends Migration
             $table->timestamp('sso_notified_at')->nullable();
 
             $table->timestamp('sso_redeemed_at')->nullable();
-            $table->foreignId('sso_redeemed_by')->nullable()->constrained('users')->nullOnDelete();
+
+            // Id biasa, **tanpa** foreign key. `users` ada di sisi pusat sementara tabel ini ada di
+            // sisi environment, dan anggaran foreign key yang menyeberang batas itu hanya boleh
+            // turun — aturannya dijaga `FkMenyeberangBatasTest`. Yang menjaga pasangannya di sini
+            // adalah CHECK di bawah, dan akun yang hilang membuat barisnya tetap terbaca sebagai
+            // "sudah ditukar", yang memang yang terjadi.
+            $table->unsignedBigInteger('sso_redeemed_by')->nullable();
 
             $table->index(['sso_issuer', 'sso_subject']);
         });
@@ -105,14 +111,21 @@ return new class extends Migration
         SQL);
 
         Schema::table('sso_login_attempts', function (Blueprint $table): void {
-            $table->foreignUlid('invitation_id')->nullable()->constrained('invitation_codes')->nullOnDelete();
+            // Juga tanpa foreign key, dan kali ini arahnya yang terlarang: `sso_login_attempts`
+            // milik sisi pusat, `invitation_codes` milik sisi environment, dan sebuah environment
+            // boleh disalin, dikosongkan, lalu dihapus — constraint dari sisi pusat akan menggantung
+            // ke baris yang sudah tidak ada. Upacara yang menunjuk undangan yang lenyap ditolak di
+            // kode dengan kalimat yang sama seperti undangan yang dicabut.
+            $table->ulid('invitation_id')->nullable();
+            $table->index('invitation_id');
         });
     }
 
     public function down(): void
     {
         Schema::table('sso_login_attempts', function (Blueprint $table): void {
-            $table->dropConstrainedForeignId('invitation_id');
+            $table->dropIndex(['invitation_id']);
+            $table->dropColumn('invitation_id');
         });
 
         DB::statement('DROP INDEX IF EXISTS undangan_sso_satu_yang_terbuka');
@@ -122,9 +135,9 @@ return new class extends Migration
         }
 
         Schema::table('invitation_codes', function (Blueprint $table): void {
-            $table->dropConstrainedForeignId('sso_redeemed_by');
             $table->dropIndex(['sso_issuer', 'sso_subject']);
             $table->dropColumn([
+                'sso_redeemed_by',
                 'sso_issuer',
                 'sso_subject',
                 'sso_email_at_invite',
