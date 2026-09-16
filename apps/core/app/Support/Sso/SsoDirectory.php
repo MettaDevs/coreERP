@@ -31,6 +31,7 @@ class SsoDirectory
      * Pengguna dengan email itu, atau `null` bila penyedia tidak mengenalnya.
      *
      * @throws SsoApiUnavailable Penyedia tidak menjawab, menolak kredensial, atau menjawab hal yang tidak dapat dibaca.
+     * @throws \App\Support\ControlPlane\OutboundRefused Lingkungan ini memang tidak boleh menjangkau luar.
      */
     public function find(string $email): ?SsoDirectoryUser
     {

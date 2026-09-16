@@ -104,8 +104,7 @@ class SsoLoginController extends Controller
             && $invitation->isSsoBound()
             && $invitation->isOpen()
             && $invitation->sso_issuer === $this->provider->issuer()
-            && $environment instanceof Environment
-            && $invitation->tenant_id === $environment->tenant_id;
+            && $invitation->tenant_id === $environment?->tenant_id;
 
         if (! $dapatDitukar) {
             return redirect()->to('/join?sso_error='.SsoFailure::INVITATION_UNUSABLE);

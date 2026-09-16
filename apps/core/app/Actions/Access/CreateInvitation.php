@@ -34,7 +34,7 @@ class CreateInvitation
     private const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
     /**
-     * @param  array{system_role:string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool}>}>}  $data
+     * @param  array{system_role:string,label:?string,sso_email:?string,assignments:list<array{role_id:string,policy_scopes:list<array{policy_code:string,legal_entity_id:?string,organization_id:?string,hierarchy_id:?string,include_descendants:bool}>}>}  $data
      * @return array{invitation:InvitationCode,code:string}
      */
     public function handle(TenantMembership $actor, array $data): array

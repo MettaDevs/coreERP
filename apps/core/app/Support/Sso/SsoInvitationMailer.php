@@ -99,7 +99,7 @@ class SsoInvitationMailer
     {
         $days = $invitation->expires_at === null
             ? (int) config('coreerp.sso.invitation_days', 7)
-            : (int) ceil(now()->floatDiffInDays($invitation->expires_at, false));
+            : (int) ceil(now()->diffInDays($invitation->expires_at));
 
         return max(1, min(30, $days));
     }
