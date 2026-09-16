@@ -497,6 +497,14 @@ class SsoInvitationTest extends TestCase
     private function completeCeremony(InvitationCode $invitation): TestResponse
     {
         [$start, $state] = $this->startJoin($invitation);
+
+        // Undangan yang sudah habis, dicabut, atau milik tenant lain ditolak sebelum upacara lahir.
+        // Tanpa cabang ini, pembantu ini meneruskan `state` kosong ke alamat balik dan yang terbaca
+        // adalah 403 "upacara tidak dikenal" — benar, tetapi bukan penolakan yang sedang diuji.
+        if ($state === '') {
+            return $start;
+        }
+
         $callback = $this->get('http://contoh.co.id/sso/callback?code=kode-uji&state='.$state);
         $location = (string) $callback->headers->get('Location');
 
