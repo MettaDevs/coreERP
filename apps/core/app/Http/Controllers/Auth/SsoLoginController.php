@@ -101,10 +101,11 @@ class SsoLoginController extends Controller
         // dijawab satu kalimat: yang menukarkan tidak perlu — dan tidak boleh — tahu mana di antara
         // keempatnya yang terjadi.
         $dapatDitukar = $invitation instanceof InvitationCode
+            && $environment instanceof Environment
             && $invitation->isSsoBound()
             && $invitation->isOpen()
             && $invitation->sso_issuer === $this->provider->issuer()
-            && $invitation->tenant_id === $environment?->tenant_id;
+            && $invitation->tenant_id === $environment->tenant_id;
 
         if (! $dapatDitukar) {
             return redirect()->to('/join?sso_error='.SsoFailure::INVITATION_UNUSABLE);

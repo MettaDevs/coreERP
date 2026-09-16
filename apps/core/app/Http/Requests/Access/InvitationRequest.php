@@ -41,7 +41,13 @@ class InvitationRequest extends FormRequest
         ]);
     }
 
-    /** @return array{system_role:string,sso_email:?string,assignments:list<array<string, mixed>>} */
+    /** Teks yang benar-benar terisi, atau null. Kosong dan bukan-string sama-sama berarti tidak ada. */
+    private static function text(mixed $value): ?string
+    {
+        return is_string($value) && trim($value) !== '' ? $value : null;
+    }
+
+    /** @return array{system_role:string,label:?string,sso_email:?string,assignments:list<array<string, mixed>>} */
     public function payload(): array
     {
         return $this->payloads()[0];
@@ -50,7 +56,7 @@ class InvitationRequest extends FormRequest
     /**
      * Seluruh kode yang diminta. Bentuk tunggal menghasilkan satu elemen.
      *
-     * @return list<array{system_role:string,sso_email:?string,assignments:list<array<string, mixed>>}>
+     * @return list<array{system_role:string,label:?string,sso_email:?string,assignments:list<array<string, mixed>>}>
      */
     public function payloads(): array
     {
@@ -58,8 +64,8 @@ class InvitationRequest extends FormRequest
 
         return collect($rows)->map(fn (mixed $row): array => [
             'system_role' => (string) data_get($row, 'system_role'),
-            'label' => data_get($row, 'label') ?: null,
-            'sso_email' => data_get($row, 'sso_email') ?: null,
+            'label' => self::text(data_get($row, 'label')),
+            'sso_email' => self::text(data_get($row, 'sso_email')),
             'assignments' => collect(data_get($row, 'assignments', []))->map(fn (mixed $assignment): array => [
                 'role_id' => (string) data_get($assignment, 'role_id'),
                 'policy_scopes' => collect(data_get($assignment, 'policy_scopes', []))->map(fn (mixed $scope): array => [
