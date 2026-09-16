@@ -74,7 +74,7 @@ class RedeemInvitation
                 'password' => $data['password'],
             ]);
 
-            $this->attach($invitation, $user);
+            $this->attachInvitation($invitation, $user);
 
             return $user;
         });
@@ -90,7 +90,7 @@ class RedeemInvitation
     public function handleForUser(User $user, string $code): TenantMembership
     {
         return DB::transaction(function () use ($user, $code): TenantMembership {
-            return $this->attach($this->locate($code), $user);
+            return $this->attachInvitation($this->locate($code), $user);
         });
     }
 
@@ -108,22 +108,38 @@ class RedeemInvitation
             ->lockForUpdate()
             ->first();
 
-        if (! $invitation || $invitation->revoked_at || ($invitation->expires_at !== null && $invitation->expires_at->isPast())) {
+        if (! $invitation || $invitation->revoked_at || $invitation->hasExpired()) {
             throw ValidationException::withMessages(['code' => 'Kode akses tidak valid, sudah dicabut, atau sudah kedaluwarsa.']);
+        }
+
+        // Undangan terikat SSO tidak pernah boleh lewat sini. Jalur ini menerima nama, email, dan
+        // kata sandi dari siapa pun yang memegang kodenya — sementara undangan terikat justru
+        // berjanji bahwa hanya satu akun SSO tertentu yang dapat menukarkannya. Penjaga ini yang
+        // menutup pintu itu; tanpanya, kodenya sendiri yang menjadi rahasia penentu, dan seluruh
+        // pengikatan ke subjek tidak berarti apa-apa.
+        if ($invitation->isSsoBound()) {
+            throw ValidationException::withMessages([
+                'code' => 'Undangan ini hanya dapat ditukar lewat tombol masuk SSO, bukan dengan mengisi kata sandi.',
+            ]);
         }
 
         return $invitation;
     }
 
     /**
-     * Memasang keanggotaan, peran, dan cakupan datanya — bagian yang sama bagi kedua jalur.
+     * Memasang keanggotaan, peran, dan cakupan datanya — bagian yang sama bagi ketiga jalur.
      *
      * Diangkat ke satu tempat karena ia **protokol izin**. Dua salinan protokol izin adalah dua
      * kesempatan untuk menyimpang pada hal yang justru tidak terlihat ketika ia salah: jalur yang
      * satu memberi cakupan data, jalur yang lain lupa, dan yang terlihat hanya orang yang "tidak
      * bisa melihat apa-apa" tanpa seorang pun tahu kenapa.
+     *
+     * Publik sejak jalur ketiga lahir: penukaran undangan terikat SSO diselesaikan
+     * `SsoLoginController::handoff()` di dalam transaksinya sendiri, dan ia memanggil method ini
+     * alih-alih menyalin protokolnya. Pemanggil dari luar bertanggung jawab atas transaksi dan
+     * atas pemeriksaan bahwa undangannya memang masih boleh ditukar; yang di sini hanya izinnya.
      */
-    private function attach(InvitationCode $invitation, User $user): TenantMembership
+    public function attachInvitation(InvitationCode $invitation, User $user): TenantMembership
     {
         $membership = TenantMembership::query()
             ->where('tenant_id', $invitation->tenant_id)

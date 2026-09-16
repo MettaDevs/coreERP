@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Access\CreateInvitation;
+use App\Actions\Onboarding\RedeemInvitation;
 use App\Http\Controllers\Controller;
 use App\Models\Environment;
 use App\Models\ExternalIdentity;
+use App\Models\InvitationCode;
 use App\Models\SsoLoginAttempt;
 use App\Models\TenantMembership;
 use App\Models\User;
@@ -21,6 +24,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -68,12 +72,46 @@ class SsoLoginController extends Controller
     public function __construct(
         private readonly SharedIdentityProvider $provider,
         private readonly TenantSso $tenantSso,
+        private readonly RedeemInvitation $redeemer,
     ) {}
 
     /** Upacara masuk. Tamu saja. */
     public function start(Request $request): SymfonyResponse
     {
         return $this->begin($request, linkUserId: null);
+    }
+
+    /**
+     * Upacara menukarkan undangan terikat SSO. Tamu saja.
+     *
+     * Kode undangan hanya memilih baris mana yang sedang ditukar; yang membukanya klaim `sub` di
+     * `callback`. Karena itu kode boleh datang lewat tautan di email, dan tidak ada yang berubah
+     * bila ia terbaca orang lain — tanpa akun SSO yang diundang, ia tidak membuka apa pun.
+     */
+    public function join(Request $request): SymfonyResponse
+    {
+        $environment = $request->attributes->get('coreerp.environment');
+        $code = $request->input('code');
+
+        $invitation = $environment instanceof Environment && is_string($code) && $code !== ''
+            ? InvitationCode::query()->where('code_hash', CreateInvitation::hash($code))->first()
+            : null;
+
+        // Undangan yang tidak dikenal, anonim, sudah habis, atau milik tenant lain sama-sama
+        // dijawab satu kalimat: yang menukarkan tidak perlu — dan tidak boleh — tahu mana di antara
+        // keempatnya yang terjadi.
+        $dapatDitukar = $invitation instanceof InvitationCode
+            && $invitation->isSsoBound()
+            && $invitation->isOpen()
+            && $invitation->sso_issuer === $this->provider->issuer()
+            && $environment instanceof Environment
+            && $invitation->tenant_id === $environment->tenant_id;
+
+        if (! $dapatDitukar) {
+            return redirect()->to('/join?sso_error='.SsoFailure::INVITATION_UNUSABLE);
+        }
+
+        return $this->begin($request, linkUserId: null, invitationId: $invitation->id);
     }
 
     /** Upacara menghubungkan akun SSO ke akun yang sedang masuk. */
@@ -134,18 +172,23 @@ class SsoLoginController extends Controller
             $claims = $this->provider->exchangeCode($code, $attempt->code_verifier, $attempt->redirect_uri, $attempt->nonce);
             $subject = (string) $claims['sub'];
 
-            $user = $attempt->isLinking()
-                ? $this->assertLinkable((int) $attempt->link_user_id, $subject)
-                : $this->linkedUser($subject);
+            // Tiga upacara, saling eksklusif. Penggabung boleh belum punya akun sama sekali, jadi
+            // cabangnya adalah satu-satunya yang dapat memulangkan null.
+            $user = match (true) {
+                $attempt->isLinking() => $this->assertLinkable((int) $attempt->link_user_id, $subject),
+                $attempt->isJoining() => $this->invitableUser($attempt, $subject),
+                default => $this->linkedUser($subject),
+            };
 
-            if (! $this->isActiveMember($user, $attempt->tenant_id)) {
+            // Penggabung memang belum jadi anggota — itu seluruh alasan ia diundang.
+            if (! $attempt->isJoining() && ! $this->isActiveMember($user, $attempt->tenant_id)) {
                 throw new SsoFailure(SsoFailure::NOT_A_MEMBER, sprintf('User %d bukan anggota aktif tenant %s.', $user->id, $attempt->tenant_id));
             }
 
             $handoffToken = Str::random(64);
 
             $attempt->update([
-                'user_id' => $user->id,
+                'user_id' => $user?->id,
                 'subject' => $subject,
                 'subject_email' => is_string($claims['email'] ?? null) ? $claims['email'] : null,
                 'handoff_token_hash' => hash('sha256', $handoffToken),
@@ -155,7 +198,7 @@ class SsoLoginController extends Controller
             $attempt->update(['expires_at' => now(), 'completed_at' => now()]);
             Log::info('SSO: upacara berhenti.', ['alasan' => $e->reason, 'hubungkan' => $attempt->isLinking(), 'detail' => $e->getMessage()]);
 
-            $page = $attempt->isLinking() ? self::SECURITY_PAGE : '/login';
+            $page = $this->failurePage($attempt);
 
             return redirect()->away($attempt->return_origin.$page.'?sso_error='.$e->reason);
         }
@@ -177,12 +220,12 @@ class SsoLoginController extends Controller
             && $attempt->environment_id === $environment->id
             && $attempt->completed_at !== null
             && $attempt->consumed_at === null
-            && $attempt->user_id !== null
+            && ($attempt->user_id !== null || $attempt->isJoining())
             && ! $attempt->hasExpired()
             && is_string($browserSecret)
             && hash_equals($attempt->browser_secret_hash, hash('sha256', $browserSecret));
 
-        $failurePage = $attempt instanceof SsoLoginAttempt && $attempt->isLinking() ? self::SECURITY_PAGE : '/login';
+        $failurePage = $attempt instanceof SsoLoginAttempt ? $this->failurePage($attempt) : '/login';
 
         if (! $valid) {
             return redirect()->to($failurePage.'?sso_error='.SsoFailure::EXPIRED)->withoutCookie(self::ATTEMPT_COOKIE);
@@ -199,9 +242,19 @@ class SsoLoginController extends Controller
             ->whereNull('consumed_at')
             ->update(['consumed_at' => now()]);
 
+        // Kalah dalam perlombaan dua tab berarti upacaranya sudah dipakai, bukan bahwa orangnya
+        // bukan anggota. Dulu keduanya dijawab kalimat yang sama.
+        if ($claimed !== 1) {
+            return redirect()->to($failurePage.'?sso_error='.SsoFailure::EXPIRED)->withoutCookie(self::ATTEMPT_COOKIE);
+        }
+
+        if ($attempt->isJoining()) {
+            return $this->completeJoin($request, $attempt);
+        }
+
         $user = User::query()->find($attempt->user_id);
 
-        if ($claimed !== 1 || ! $user instanceof User || ! $this->isActiveMember($user, $attempt->tenant_id)) {
+        if (! $user instanceof User || ! $this->isActiveMember($user, $attempt->tenant_id)) {
             return redirect()->to($failurePage.'?sso_error='.SsoFailure::NOT_A_MEMBER)->withoutCookie(self::ATTEMPT_COOKIE);
         }
 
@@ -234,7 +287,7 @@ class SsoLoginController extends Controller
         return redirect()->intended('/dashboard')->withoutCookie(self::ATTEMPT_COOKIE);
     }
 
-    private function begin(Request $request, ?int $linkUserId): SymfonyResponse
+    private function begin(Request $request, ?int $linkUserId, ?string $invitationId = null): SymfonyResponse
     {
         $environment = $request->attributes->get('coreerp.environment');
 
@@ -259,6 +312,9 @@ class SsoLoginController extends Controller
             'return_origin' => $request->getSchemeAndHttpHost(),
             'redirect_uri' => $redirectUri,
             'link_user_id' => $linkUserId,
+            // Id barisnya, bukan kodenya: baris upacara yang terbaca siapa pun tidak boleh memuat
+            // sesuatu yang dapat ditukar di tempat lain.
+            'invitation_id' => $invitationId,
             'expires_at' => now()->addMinutes(self::ATTEMPT_MINUTES),
         ]);
 
@@ -322,6 +378,181 @@ class SsoLoginController extends Controller
         }
 
         return $user;
+    }
+
+    /** Halaman tempat kegagalan upacara ini dibaca orangnya. */
+    private function failurePage(SsoLoginAttempt $attempt): string
+    {
+        return match (true) {
+            $attempt->isLinking() => self::SECURITY_PAGE,
+            $attempt->isJoining() => '/join',
+            default => '/login',
+        };
+    }
+
+    /**
+     * Akun yang akan menerima undangan ini, atau null bila ia belum ada — tanpa menulis apa pun.
+     *
+     * Disiplin yang sama dengan `assertLinkable`, dan alasannya sama: di `callback` belum ada bukti
+     * bahwa peramban yang kembali adalah peramban yang memulai upacara. Yang dibuktikan di sini
+     * barulah "penyedia mengakui subjek ini"; yang membuktikan "orang ini yang menekan tombolnya"
+     * adalah cookie rahasia peramban, dan itu baru diperiksa di `handoff`.
+     *
+     * @throws SsoFailure
+     */
+    private function invitableUser(SsoLoginAttempt $attempt, string $subject): ?User
+    {
+        $invitation = InvitationCode::query()->find($attempt->invitation_id);
+
+        if (! $invitation instanceof InvitationCode || ! $invitation->isSsoBound() || ! $invitation->isOpen()) {
+            throw new SsoFailure(SsoFailure::INVITATION_UNUSABLE, 'Undangan sudah dicabut, kedaluwarsa, atau dipakai.');
+        }
+
+        // Inti seluruh rancangan ini. Bukan email yang dibandingkan — email penyedia ditulis tanpa
+        // verifikasi sungguhan, jadi siapa pun dapat mendaftar dengan email orang lain. Yang
+        // dibandingkan subjek: angka yang sama yang dijawab pencarian saat undangan dibuat.
+        if (! hash_equals((string) $invitation->sso_subject, $subject)) {
+            $this->auditMismatch($invitation, $subject);
+
+            throw new SsoFailure(SsoFailure::INVITATION_OTHER_SUBJECT, 'Subjek yang masuk bukan subjek yang diundang.');
+        }
+
+        $userId = ExternalIdentity::query()
+            ->where('issuer', $this->provider->issuer())
+            ->where('subject', $subject)
+            ->value('user_id');
+
+        if ($userId !== null) {
+            $user = User::query()->find($userId);
+
+            if (! $user instanceof User) {
+                throw new SsoFailure(SsoFailure::INVITATION_UNUSABLE, 'Tautan identitas menunjuk akun yang sudah tidak ada.');
+            }
+
+            if ($this->isActiveMember($user, $attempt->tenant_id)) {
+                throw new SsoFailure(SsoFailure::ALREADY_A_MEMBER, sprintf('User %d sudah anggota aktif tenant %s.', $user->id, $attempt->tenant_id));
+            }
+
+            return $user;
+        }
+
+        // Subjek belum punya akun di sini. Kalau emailnya sudah dipakai akun lain, yang benar adalah
+        // orangnya masuk dengan kata sandi akun itu lalu menghubungkan SSO-nya — bukan kita yang
+        // menyambungkan keduanya berdasarkan kesamaan email.
+        $email = $attempt->subject_email ?? $invitation->sso_email_at_invite;
+
+        if (is_string($email) && User::query()->whereRaw('lower(email) = ?', [Str::lower($email)])->exists()) {
+            throw new SsoFailure(SsoFailure::EMAIL_TAKEN, 'Email subjek ini sudah dipakai akun CoreERP yang belum terhubung.');
+        }
+
+        return null;
+    }
+
+    /**
+     * Menyelesaikan penukaran undangan: akun, tautan identitas, keanggotaan, dan perannya sekaligus.
+     *
+     * Satu transaksi, dan undangannya dikunci di dalamnya: sepuluh menit upacara berjalan adalah
+     * sepuluh menit operator masih dapat mencabutnya.
+     */
+    private function completeJoin(Request $request, SsoLoginAttempt $attempt): RedirectResponse
+    {
+        try {
+            $user = DB::transaction(function () use ($attempt): User {
+                $invitation = InvitationCode::query()
+                    ->with('roles')
+                    ->whereKey($attempt->invitation_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $invitation instanceof InvitationCode || ! $invitation->isSsoBound() || ! $invitation->isOpen()) {
+                    throw new SsoFailure(SsoFailure::INVITATION_UNUSABLE, 'Undangan berubah keadaan selama upacara berjalan.');
+                }
+
+                if (! hash_equals((string) $invitation->sso_subject, (string) $attempt->subject)) {
+                    throw new SsoFailure(SsoFailure::INVITATION_OTHER_SUBJECT, 'Subjek tidak cocok saat penyelesaian.');
+                }
+
+                $user = $attempt->user_id !== null ? User::query()->find($attempt->user_id) : null;
+                $akunBaru = ! $user instanceof User;
+
+                if ($akunBaru) {
+                    $user = User::create([
+                        'name' => $invitation->sso_name_at_invite ?? (string) $invitation->sso_email_at_invite,
+                        'email' => Str::lower((string) ($attempt->subject_email ?? $invitation->sso_email_at_invite)),
+                        // Tidak dapat dipakai siapa pun: kolomnya NOT NULL, dan orang ini masuk
+                        // lewat SSO. Yang membuka akun ini adalah tautan identitas di bawah.
+                        'password' => Str::random(64),
+                    ]);
+
+                    ExternalIdentity::create([
+                        'user_id' => $user->id,
+                        'issuer' => $this->provider->issuer(),
+                        'subject' => (string) $attempt->subject,
+                        'email_at_link' => $attempt->subject_email,
+                    ]);
+                }
+
+                $membership = $this->redeemer->attachInvitation($invitation, $user);
+
+                $invitation->update(['sso_redeemed_at' => now(), 'sso_redeemed_by' => $user->id]);
+
+                DB::table('access_audit_events')->insert([
+                    'id' => (string) Str::ulid(),
+                    'tenant_id' => $invitation->tenant_id,
+                    'membership_id' => $membership->id,
+                    'action' => 'access.invitation.sso.ditukar',
+                    'payload' => json_encode([
+                        'invitation_id' => $invitation->id,
+                        'user_id' => $user->id,
+                        'subject' => $attempt->subject,
+                        'akun_baru' => $akunBaru,
+                    ], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                return $user;
+            });
+        } catch (SsoFailure $e) {
+            Log::info('SSO: penukaran undangan berhenti.', ['alasan' => $e->reason, 'detail' => $e->getMessage()]);
+
+            return redirect()->to('/join?sso_error='.$e->reason)->withoutCookie(self::ATTEMPT_COOKIE);
+        } catch (UniqueConstraintViolationException|ValidationException $e) {
+            Log::info('SSO: penukaran undangan ditolak.', ['detail' => $e->getMessage()]);
+
+            return redirect()->to('/join?sso_error='.SsoFailure::INVITATION_UNUSABLE)->withoutCookie(self::ATTEMPT_COOKIE);
+        }
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return redirect()->to('/dashboard')->withoutCookie(self::ATTEMPT_COOKIE);
+    }
+
+    /**
+     * Akun SSO lain mencoba menukarkan undangan orang ini. Dicatat karena ia sinyal serangan —
+     * dan karena yang menerbitkannya berhak tahu.
+     */
+    private function auditMismatch(InvitationCode $invitation, string $subject): void
+    {
+        $membershipId = TenantMembership::query()
+            ->where('tenant_id', $invitation->tenant_id)
+            ->where('user_id', $invitation->created_by)
+            ->value('id');
+
+        DB::table('access_audit_events')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $invitation->tenant_id,
+            'membership_id' => $membershipId,
+            'action' => 'access.invitation.sso.subjek_tidak_cocok',
+            'payload' => json_encode([
+                'invitation_id' => $invitation->id,
+                'subjek_diharapkan' => $invitation->sso_subject,
+                'subjek_dibawa' => $subject,
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     /**

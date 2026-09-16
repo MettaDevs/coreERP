@@ -25,6 +25,10 @@ class InvitationRequest extends FormRequest
         return array_merge($this->has('codes') ? ['codes' => ['required', 'array', 'min:1']] : [], [
             $prefix.'system_role' => ['required', 'in:user,admin'],
             $prefix.'label' => ['nullable', 'string', 'max:120'],
+            // Kosong berarti kode anonim seperti sebelum undangan SSO ada. Terisi berarti
+            // undangan untuk satu orang, dan `CreateInvitation` yang memastikan orangnya memang
+            // ada di penyedia — di sini hanya bentuknya yang diperiksa.
+            $prefix.'sso_email' => ['nullable', 'string', 'lowercase', 'email', 'max:255'],
             $prefix.'assignments' => ['present', 'array'],
             $prefix.'assignments.*.role_id' => ['required', 'string'],
             $prefix.'assignments.*.policy_scopes' => ['present', 'array'],
@@ -37,7 +41,7 @@ class InvitationRequest extends FormRequest
         ]);
     }
 
-    /** @return array{system_role:string,assignments:list<array<string, mixed>>} */
+    /** @return array{system_role:string,sso_email:?string,assignments:list<array<string, mixed>>} */
     public function payload(): array
     {
         return $this->payloads()[0];
@@ -46,7 +50,7 @@ class InvitationRequest extends FormRequest
     /**
      * Seluruh kode yang diminta. Bentuk tunggal menghasilkan satu elemen.
      *
-     * @return list<array{system_role:string,assignments:list<array<string, mixed>>}>
+     * @return list<array{system_role:string,sso_email:?string,assignments:list<array<string, mixed>>}>
      */
     public function payloads(): array
     {
@@ -55,6 +59,7 @@ class InvitationRequest extends FormRequest
         return collect($rows)->map(fn (mixed $row): array => [
             'system_role' => (string) data_get($row, 'system_role'),
             'label' => data_get($row, 'label') ?: null,
+            'sso_email' => data_get($row, 'sso_email') ?: null,
             'assignments' => collect(data_get($row, 'assignments', []))->map(fn (mixed $assignment): array => [
                 'role_id' => (string) data_get($assignment, 'role_id'),
                 'policy_scopes' => collect(data_get($assignment, 'policy_scopes', []))->map(fn (mixed $scope): array => [

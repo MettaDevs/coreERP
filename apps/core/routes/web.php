@@ -14,6 +14,7 @@ use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;
 use App\Http\Controllers\NumberSequence\NumberSequenceController;
 use App\Http\Controllers\Onboarding\BusinessRegistrationController;
+use App\Http\Controllers\Onboarding\InvitationLandingController;
 use App\Http\Controllers\Onboarding\InvitationRedemptionController;
 use App\Http\Controllers\Organization\OrganizationController;
 use App\Http\Controllers\Organization\PrintIdentityController;
@@ -86,10 +87,16 @@ Route::get('api/v1/control/apps', fn () => response()->json([
  * Yang memilih jalurnya adalah controller-nya, dari ada atau tidaknya pengguna pada permintaan.
  * Orang baru mengirim nama, email, dan kata sandi; orang yang sudah masuk hanya mengirim kodenya.
  */
-Route::get('join', fn () => Inertia::render('auth/join', [
-    'passwordRules' => Password::defaults()->toPasswordRulesString(),
-    'authenticated' => auth()->check(),
-]))->name('join');
+Route::get('join', [InvitationRedemptionController::class, 'show'])->name('join');
+
+/*
+ * Pendaratan tautan undangan di domain dasar. Penyedia SSO menolak mengirim email yang tautannya
+ * menuju host di luar alamat balik client — dan alamat balik itu ada di domain dasar, bukan di
+ * alamat tenant. Lihat `InvitationLandingController`.
+ */
+Route::get('undangan', InvitationLandingController::class)
+    ->middleware('throttle:30,1')
+    ->name('undangan');
 Route::post('join', [InvitationRedemptionController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('join.store');
@@ -113,6 +120,14 @@ Route::middleware(['auth', RequirePassword::class, 'throttle:10,1'])->group(func
     Route::post('sso/hubungkan', [SsoLoginController::class, 'connect'])->name('sso.connect');
     Route::delete('sso/hubungkan', [SsoLoginController::class, 'disconnect'])->name('sso.disconnect');
 });
+/*
+ * Menukarkan undangan terikat SSO. Tamu saja: undangan terikat dibuktikan lewat upacara, bukan lewat
+ * sesi yang kebetulan sedang terbuka. Orang yang sudah masuk dan ingin tenant kedua memakai kode
+ * anonim, atau keluar dulu.
+ */
+Route::post('sso/gabung', [SsoLoginController::class, 'join'])
+    ->middleware(['guest', 'throttle:5,1'])
+    ->name('sso.join');
 Route::get('sso/callback', [SsoLoginController::class, 'callback'])
     ->middleware('throttle:30,1')
     ->name('sso.callback');
@@ -273,6 +288,9 @@ Route::middleware(['auth'])->group(function () {
         ->name('access.invitations.store');
     Route::patch('settings/access/invitations/{invitationCode}', [InvitationCodeController::class, 'update'])
         ->name('access.invitations.update');
+    Route::post('settings/access/invitations/{invitationCode}/kirim-ulang', [InvitationCodeController::class, 'resend'])
+        ->middleware('throttle:10,1')
+        ->name('settings.access.invitations.resend');
     Route::delete('settings/access/invitations/{invitationCode}', [InvitationCodeController::class, 'destroy'])
         ->name('access.invitations.destroy');
 

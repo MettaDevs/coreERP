@@ -9,6 +9,7 @@ use App\Models\InvitationCode;
 use App\Models\Organization;
 use App\Models\OrganizationHierarchy;
 use App\Models\Role;
+use App\Support\Sso\TenantSso;
 use App\Models\RoleAssignment;
 use App\Models\TenantMembership;
 use App\Support\RoleHierarchy;
@@ -95,6 +96,9 @@ class AccessController extends Controller
             'hierarchies' => $this->hierarchies($tenantId),
             'invitations' => $this->invitations($tenantId, $membership->canManageAccess()),
             'newInvitationCodes' => $request->session()->pull('new_invitation_codes', []),
+            // Kolom "Diundang" hanya berarti bila tenant ini memang memakai SSO; tanpa itu, yang
+            // muncul adalah kotak email yang setiap isinya pasti ditolak.
+            'ssoAvailable' => app(TenantSso::class)->availableFor($tenantId),
         ]);
     }
 
@@ -160,6 +164,14 @@ class AccessController extends Controller
                     'code' => $canManage ? $invitation->accessibleCode() : null,
                     'expires_at' => $invitation->expires_at,
                     'revoked_at' => $invitation->revoked_at,
+                    // Kosong untuk kode anonim. Isinya hanya untuk ditampilkan: yang menentukan
+                    // siapa boleh menukarkannya adalah subjek, dan subjek tidak pernah ke layar.
+                    'sso' => $invitation->isSsoBound() ? [
+                        'email' => $invitation->sso_email_at_invite,
+                        'name' => $invitation->sso_name_at_invite,
+                        'notified_at' => $invitation->sso_notified_at,
+                        'redeemed_at' => $invitation->sso_redeemed_at,
+                    ] : null,
                 ];
             });
     }
