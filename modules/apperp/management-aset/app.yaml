@@ -27,6 +27,8 @@ ui:
         label: Maintenance
       - id: transaksi
         label: Transaksi
+      - id: laporan
+        label: Laporan
     sidebar:
       master:
         # Dua sumbu klasifikasi yang ditunjuk aset secara langsung didahulukan,
@@ -137,6 +139,25 @@ ui:
         - id: penyusutan
           label: Penyusutan aset
           permission: management-aset.penyusutan.read
+      laporan:
+        - id: laporan-penyusutan-aset
+          label: Laporan penyusutan aset
+          permission: management-aset.penyusutan.read
+        - id: laporan-mutasi-aset
+          label: Laporan mutasi aset
+          permission: management-aset.mutasi-aset.read
+        - id: laporan-monitoring-aset
+          label: Laporan monitoring aset
+          permission: management-aset.monitoring-aset.read
+        - id: laporan-pemeliharaan-aset
+          label: Laporan pemeliharaan aset
+          permission: management-aset.pemeliharaan-aset.read
+        - id: laporan-penjualan-aset
+          label: Laporan penjualan aset
+          permission: management-aset.penjualan-aset.read
+        - id: laporan-pemusnahan-aset
+          label: Laporan pemusnahan aset
+          permission: management-aset.pemusnahan-aset.read
 database:
   logical_name: app_erp_management_aset
   migrations: database/migrations

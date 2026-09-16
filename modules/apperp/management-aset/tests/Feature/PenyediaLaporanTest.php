@@ -115,6 +115,26 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame([], $ditutup['tables']['baris']);
     }
 
+    public function test_endpoint_preview_laporan_mengembalikan_data(): void
+    {
+        $this->workOrder();
+
+        $this->headers([])
+            ->getJson('/api/modules/management-aset/v1/laporan/daftar-work-order')
+            ->assertForbidden();
+
+        $response = $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/daftar-work-order')
+            ->assertOk()
+            ->json();
+
+        $this->assertArrayHasKey('data', $response);
+        $this->assertArrayHasKey('fields', $response['data']);
+        $this->assertArrayHasKey('tables', $response['data']);
+        $this->assertArrayHasKey('baris', $response['data']['tables']);
+        $this->assertGreaterThanOrEqual(1, count($response['data']['tables']['baris']));
+    }
+
     /** @param list<string> $permissions */
     private function headers(array $permissions): static
     {
