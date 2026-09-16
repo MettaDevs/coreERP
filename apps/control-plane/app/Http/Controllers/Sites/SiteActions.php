@@ -23,11 +23,16 @@ use Illuminate\Validation\ValidationException;
 /**
  * Tindakan operator yang mengubah, atau membuka jalan untuk mengubah, server milik klien.
  *
- * ## Konfirmasi tertulis
+ * ## Tanpa konfirmasi tertulis
  *
- * Setiap tindakan di sini meminta nama situs diketik ulang. Satu klik yang salah baris di daftar
- * situs tidak boleh cukup untuk memperbarui server fasilitas kesehatan yang keliru — dan nama yang
- * diketik membuat operator membaca situs mana yang sedang ia perintah.
+ * Sampai 16 September 2026 setiap tindakan di sini menuntut nama situs diketik ulang. Penjaga itu
+ * dibuang atas keputusan pemilik produk, dan pengalaman memakainya menjelaskan kenapa: konsol
+ * menamai situs `<Tenant> — Produksi` dengan tanda pisah panjang, yang tidak ada di papan ketik,
+ * sehingga satu-satunya cara lolos adalah menyalin-tempel nama itu. Penjaga yang selalu dilewati
+ * dengan salin-tempel tidak membuat siapa pun membaca nama yang diketiknya.
+ *
+ * Halamannya sendiri yang menanggung tugas itu: tiap tindakan berdiri di halaman satu situs, dengan
+ * namanya di judul.
  *
  * ## Jejak audit
  *
@@ -46,7 +51,7 @@ final class SiteActions extends Controller
      */
     public function issueEnrollment(Request $request, string $site, EnrollmentTokens $tokens): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
 
         if ($row->environment_id !== null) {
             throw ValidationException::withMessages(['operation' => 'Server klien ini dipasang dari halaman lingkungannya, lewat "Buat perintah pasang".']);
@@ -71,7 +76,7 @@ final class SiteActions extends Controller
 
     public function requestOperation(Request $request, string $site, SiteOperations $operations): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
         $operation = (string) $request->input('operation');
 
         try {
@@ -99,7 +104,7 @@ final class SiteActions extends Controller
 
     public function revoke(Request $request, string $site, RegistryCredentials $credentials, SiteDns $dns): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
 
         if ($row->revoked()) {
             return redirect('/situs/'.$row->id);
@@ -144,7 +149,7 @@ final class SiteActions extends Controller
      */
     public function suspendLicense(Request $request, string $site): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
 
         if ($row->licenseRenewalSuspended()) {
             return redirect('/situs/'.$row->id);
@@ -181,7 +186,7 @@ final class SiteActions extends Controller
      */
     public function updateLicenseTerms(Request $request, string $site, LicenseTerms $terms): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
 
         $data = $request->validate([
             'mode' => ['required', 'in:default,custom,perpetual'],
@@ -213,7 +218,7 @@ final class SiteActions extends Controller
 
     public function resumeLicense(Request $request, string $site): RedirectResponse
     {
-        $row = $this->confirmedSite($request, $site);
+        $row = $this->site($site);
 
         if (! $row->licenseRenewalSuspended()) {
             return redirect('/situs/'.$row->id);
@@ -231,14 +236,8 @@ final class SiteActions extends Controller
         return redirect('/situs/'.$row->id)->with('message', 'Perpanjangan lisensi dilanjutkan. Lisensi baru ikut di laporan agen berikutnya bila sudah jatuh tempo.');
     }
 
-    private function confirmedSite(Request $request, string $site): Site
+    private function site(string $site): Site
     {
-        $row = Site::query()->whereKey($site)->firstOrFail();
-
-        if (! hash_equals($row->name, (string) $request->input('confirm_name'))) {
-            throw ValidationException::withMessages(['confirm_name' => 'Ketik nama situs persis seperti tertulis untuk melanjutkan.']);
-        }
-
-        return $row;
+        return Site::query()->whereKey($site)->firstOrFail();
     }
 }

@@ -196,30 +196,6 @@ function bytes(value?: number | null): string {
     return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
 }
 
-function ConfirmName({
-    site,
-    value,
-    onChange,
-    error,
-}: {
-    site: Site;
-    value: string;
-    onChange: (value: string) => void;
-    error?: string;
-}) {
-    return (
-        <div className="space-y-2">
-            <Input
-                label={`Ketik "${site.name}" untuk melanjutkan`}
-                required
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-            />
-            <FieldError message={error} />
-        </div>
-    );
-}
-
 /**
  * Setelan server: alamat mesin dan jendela pembaruan, bersama alamat aplikasi otomatis dan record DNS-nya.
  *
@@ -356,7 +332,7 @@ function Enrollment({ site }: { site: Site }) {
     const { enrollment } = usePage<{
         enrollment: { command: string; expiresAt: string } | null;
     }>().props;
-    const form = useForm({ confirm_name: '' });
+    const form = useForm({});
 
     return (
         <Section
@@ -390,12 +366,6 @@ function Enrollment({ site }: { site: Site }) {
                     });
                 }}
             >
-                <ConfirmName
-                    site={site}
-                    value={form.data.confirm_name}
-                    onChange={(v) => form.setData('confirm_name', v)}
-                    error={form.errors.confirm_name}
-                />
                 <Button type="submit" disabled={form.processing}>
                     Buat perintah pasang
                 </Button>
@@ -417,11 +387,10 @@ function RequestOperation({
     licenseKeyConfigured: boolean;
     licenseValidDays: number;
 }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors } = useForm({
         operation: 'backup',
         release: releases[0] ?? '',
         valid_until: '',
-        confirm_name: '',
     });
 
     return (
@@ -435,7 +404,6 @@ function RequestOperation({
                     e.preventDefault();
                     post(`/situs/${site.id}/operasi`, {
                         preserveScroll: true,
-                        onSuccess: () => reset('confirm_name'),
                     });
                 }}
             >
@@ -501,12 +469,6 @@ function RequestOperation({
                     </>
                 )}
 
-                <ConfirmName
-                    site={site}
-                    value={data.confirm_name}
-                    onChange={(v) => setData('confirm_name', v)}
-                    error={errors.confirm_name}
-                />
                 <FieldError message={errors.operation} />
 
                 <Button type="submit" disabled={processing}>
@@ -522,9 +484,7 @@ function RequestOperation({
 }
 
 function Revoke({ site }: { site: Site }) {
-    const { data, setData, post, processing, errors } = useForm({
-        confirm_name: '',
-    });
+    const { post, processing } = useForm({});
 
     return (
         <section className="space-y-4 rounded-lg border border-red-200 bg-background p-5 dark:border-red-900/60">
@@ -546,12 +506,6 @@ function Revoke({ site }: { site: Site }) {
                     post(`/situs/${site.id}/cabut`, { preserveScroll: true });
                 }}
             >
-                <ConfirmName
-                    site={site}
-                    value={data.confirm_name}
-                    onChange={(v) => setData('confirm_name', v)}
-                    error={errors.confirm_name}
-                />
                 <Button
                     type="submit"
                     variant="destructive"
@@ -598,7 +552,7 @@ function termsSentence(license: License): string {
  */
 function LicenseTermsForm({ site }: { site: Site }) {
     const { terms, defaultTerms } = site.license;
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors } = useForm({
         mode: terms.perpetual
             ? 'perpetual'
             : terms.overridden
@@ -606,7 +560,6 @@ function LicenseTermsForm({ site }: { site: Site }) {
               : 'default',
         valid_days: String(terms.validDays),
         renew_before_days: String(terms.renewBeforeDays),
-        confirm_name: '',
     });
 
     return (
@@ -616,7 +569,6 @@ function LicenseTermsForm({ site }: { site: Site }) {
                 e.preventDefault();
                 post(`/situs/${site.id}/lisensi/masa`, {
                     preserveScroll: true,
-                    onSuccess: () => reset('confirm_name'),
                 });
             }}
         >
@@ -677,12 +629,6 @@ function LicenseTermsForm({ site }: { site: Site }) {
                 </p>
             )}
 
-            <ConfirmName
-                site={site}
-                value={data.confirm_name}
-                onChange={(v) => setData('confirm_name', v)}
-                error={errors.confirm_name}
-            />
             <Button type="submit" variant="outline" disabled={processing}>
                 Simpan masa lisensi
             </Button>
@@ -693,9 +639,7 @@ function LicenseTermsForm({ site }: { site: Site }) {
 function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
     const { license } = site;
     const suspended = license.suspendedAt !== null;
-    const { data, setData, post, processing, errors, reset } = useForm({
-        confirm_name: '',
-    });
+    const { post, processing } = useForm({});
 
     return (
         <Section
@@ -732,17 +676,10 @@ function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
                             `/situs/${site.id}/lisensi/${suspended ? 'lanjutkan' : 'hentikan'}`,
                             {
                                 preserveScroll: true,
-                                onSuccess: () => reset('confirm_name'),
                             },
                         );
                     }}
                 >
-                    <ConfirmName
-                        site={site}
-                        value={data.confirm_name}
-                        onChange={(v) => setData('confirm_name', v)}
-                        error={errors.confirm_name}
-                    />
                     <Button
                         type="submit"
                         variant={suspended ? 'default' : 'destructive'}

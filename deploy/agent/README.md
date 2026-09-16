@@ -129,8 +129,15 @@ Manifest v1 (tanpa `versi`) tetap diterima sampai AG-04.
 
 ## Lisensi
 
-Lisensi format versi 2 mengunci Core bila `.env` menyetel `COREERP_LICENSE_REQUIRED=true`, yang ditulis
-`env.template`. Rancangannya di `docs/todo/lisensi-mengunci/README.md`.
+Lisensi format versi 2 mengunci Core bila `.env` menyetel `COREERP_LICENSE_REQUIRED=true`. Rancangannya di
+`docs/todo/lisensi-mengunci/README.md`.
+
+Nilainya dipilih saat memasang. Bawaannya `false` — lisensi tetap diterbitkan, diperpanjang, dan dilaporkan,
+tetapi tidak pernah menutup aplikasi — dan `pasang.sh --kunci-lisensi` menyalakannya. Bawaan itu keputusan
+pemilik produk pada 16 September 2026: penguncian dinyalakan per server sesudah penerbitan lisensi terbukti
+berjalan di sana, supaya gangguan di sisi kita tidak mematikan klinik yang sudah membayar. `.env` hanya
+ditulis sekali, jadi mengubahnya sesudah terpasang berarti menyunting baris itu sebagai root di server;
+nilainya berlaku pada pembaruan berikutnya, dan agen melaporkannya apa adanya.
 
 Lisensi datang lewat dua jalan: operasi `install_license`, dan jawaban laporan yang membawa `license` saat
 admin.erp menilai perpanjangan jatuh tempo. Keduanya lewat `pasang_lisensi`, yang menolak tanda tangan

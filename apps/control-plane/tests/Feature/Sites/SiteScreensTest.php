@@ -173,22 +173,27 @@ class SiteScreensTest extends SiteTestCase
 
     // ------------------------------------------------------------------ operasi
 
-    public function test_every_action_requires_the_site_name_typed_again(): void
+    /**
+     * Penjaga ketik-nama dibuang 16 September 2026; tindakan berjalan tanpa `confirm_name`.
+     *
+     * Diuji pada operasi dan pencabutan sekaligus, karena keduanya dulu memakai penjaga yang sama, dan
+     * nama yang salah pun tidak lagi menghalangi.
+     */
+    public function test_actions_no_longer_ask_for_the_site_name_to_be_typed(): void
     {
         $site = $this->enrolledSite();
         $operator = $this->operator();
 
         $this->actingAs($operator)
-            ->post("/situs/{$site->id}/operasi", ['operation' => 'backup', 'confirm_name' => 'situs uji'])
-            ->assertSessionHasErrors('confirm_name');
+            ->post("/situs/{$site->id}/operasi", ['operation' => 'backup'])
+            ->assertRedirect("/situs/{$site->id}");
 
         $this->actingAs($operator)
-            ->post("/situs/{$site->id}/cabut", ['confirm_name' => ''])
-            ->assertSessionHasErrors('confirm_name');
+            ->post("/situs/{$site->id}/cabut", ['confirm_name' => 'nama yang salah'])
+            ->assertRedirect("/situs/{$site->id}");
 
-        $this->assertSame(0, SiteOperation::query()->count());
-        $this->assertNull($site->refresh()->revoked_at);
-        $this->assertSame(0, OperatorAuditEvent::query()->count());
+        $this->assertSame(1, SiteOperation::query()->count());
+        $this->assertNotNull($site->refresh()->revoked_at);
     }
 
     public function test_a_requested_operation_is_audited_and_cannot_be_requested_twice_while_pending(): void
@@ -377,18 +382,17 @@ class SiteScreensTest extends SiteTestCase
             'status' => 'requested', 'requested_at' => now(), 'expires_at' => now()->addDays(7),
         ]);
 
-        foreach (['hentikan', 'lanjutkan'] as $action) {
-            $this->actingAs($operator)
-                ->post("/situs/{$site->id}/lisensi/{$action}", ['confirm_name' => 'situs uji'])
-                ->assertSessionHasErrors('confirm_name');
-        }
+        // Melanjutkan sewa yang tidak pernah dihentikan tidak mengubah apa pun, dan tidak menulis jejak.
+        $this->actingAs($operator)
+            ->post("/situs/{$site->id}/lisensi/lanjutkan")
+            ->assertRedirect("/situs/{$site->id}");
 
         $this->assertNull($site->refresh()->license_suspended_at);
         $this->assertSame('requested', $license->refresh()->status);
         $this->assertSame(0, OperatorAuditEvent::query()->count());
 
         $this->actingAs($operator)
-            ->post("/situs/{$site->id}/lisensi/hentikan", ['confirm_name' => $site->name])
+            ->post("/situs/{$site->id}/lisensi/hentikan")
             ->assertRedirect("/situs/{$site->id}");
 
         $this->assertNotNull($site->refresh()->license_suspended_at);
