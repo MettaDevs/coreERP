@@ -384,7 +384,7 @@ class SsoInvitationTest extends TestCase
         TenantIdentityProvider::create(['tenant_id' => $other->id, 'mode' => 'bersama', 'protokol' => 'oidc', 'aktif' => true]);
 
         $this->post('http://tenantb.contoh.co.id/sso/gabung', ['code' => (string) $invitation->accessibleCode()])
-            ->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
+            ->assertRedirect('http://tenantb.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
 
         $this->assertSame(0, SsoLoginAttempt::query()->count());
     }
@@ -456,7 +456,7 @@ class SsoInvitationTest extends TestCase
             ->assertRedirect('http://tenanta.contoh.co.id/join?kode='.urlencode($code));
 
         $this->get('http://contoh.co.id/undangan?kode=BUKAN-KODE-APA-PUN')
-            ->assertRedirect('http://tenanta.contoh.co.id/join?sso_error=undangan-tidak-berlaku');
+            ->assertRedirect('http://contoh.co.id/join?sso_error=undangan-tidak-berlaku');
     }
 
     // ------------------------------------------------------------------ pembantu
