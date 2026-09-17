@@ -88,6 +88,11 @@ Legenda status: `[ ]` belum · `[~]` sedang dikerjakan · `[x]` selesai + ada bu
 
 ### [ ] `SEC-14` — Enterprise authentication missing: no SSO/OIDC/SAML, no SCIM, no per-tenant MFA or session policy, no service accounts, no token-auth API
 
+> **Sebagian sudah dikerjakan sejak temuan ini ditulis.** SSO OIDC berdiri sejak 13 September 2026 di
+> Core dan di admin.erp — authorization code + PKCE, identitas ditautkan lewat `iss`+`sub`, undangan
+> terikat subjek, dan back-channel logout; lihat [SSO](/dev/32-sso). Yang **masih** kosong dari butir
+> ini: SCIM, kebijakan MFA dan sesi per tenant, service account, dan API ber-token.
+
 **Jenis:** missing-core-capability · **Verifikasi:** ADJUSTED · **Memblokir:** enterprise-sales, integration-apis, tenant-security-policy, offboarding-hygiene
 
 - **Dynamics 365:** D365 F&O delegates identity to Microsoft Entra ID: federated SSO, conditional access and MFA policy owned by the customer tenant, group-based provisioning, and OAuth service principals for machine access. The ERP itself stores no passwords.

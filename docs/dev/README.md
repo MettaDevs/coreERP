@@ -35,7 +35,7 @@ Target yang dikunci:
 | [06-worktree-target.md](06-worktree-target.md) | Kondisi repo sekarang dan target pemisahan repository |
 | [07-reporting-and-replicas.md](07-reporting-and-replicas.md) | Read replica per app, reporting projection lintas app, dan consistency policy |
 | [08-query-scopes-and-schema.md](08-query-scopes-and-schema.md) | Schema organization/hierarchy target dan query tenant/legal-entity/organization scope |
-| [09-identity-and-access.md](09-identity-and-access.md) | Role platform, security role/duty/privilege/permission, workforce, SoD, dan organization scope |
+| [09-identity-and-access.md](09-identity-and-access.md) | Role platform, security role/duty/privilege/permission, workforce, SoD, organization scope, kapan tenant memakai SSO, dan dua jenis undangan |
 | [10-core-foundation-gates.md](10-core-foundation-gates.md) | Fondasi Core yang belum tersedia, pemilik kebenaran, dan kondisi kapan implementasinya boleh dimulai |
 | [11-local-docker-development.md](11-local-docker-development.md) | Stack Docker lokal, akses database, dan checklist menambah app |
 | [12-external-module-integration.md](12-external-module-integration.md) | Panduan integrasi sistem eksternal ke modul CoreERP |
@@ -57,6 +57,8 @@ Target yang dikunci:
 | [28-pelaporan-kesalahan.md](28-pelaporan-kesalahan.md) | Laporan kesalahan ke berkas di mesin dan ke SigNoz: isi, tujuan, dan cara mematikannya |
 | [29-alur-rilis-server-klien.md](29-alur-rilis-server-klien.md) | Dari branch sampai server klien: tombol rilis, perakit, Harbor, SaaS dev, agen, dan nomor rilis |
 | [30-registry-harbor.md](30-registry-harbor.md) | Registry Harbor: isi, robot, kredensial per operasi, penarikan lewat digest, immutability dan retensi, dan jebakan yang terukur |
+| [31-admin-erp-konsol.md](31-admin-erp-konsol.md) | admin.erp: batas datanya, percakapan ke Core dan ke agen, layar dan rutenya, rahasia, jejak audit, dan aturan yang dijaga |
+| [32-sso.md](32-sso.md) | SSO: upacara tiga kaki di Core, upacara satu alamat di konsol, yang diperiksa sebelum sesi berdiri, logout back-channel, dan setelannya |
 
 ## Referensi utama
 
