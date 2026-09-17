@@ -213,6 +213,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/address-setup/external-codes', [AddressSetupController::class, 'getExternalCodes'])->name('address-setup.external-codes.index');
     Route::get('settings/address-setup/translations', [AddressSetupController::class, 'getTranslations'])->name('address-setup.translations.index');
 
+    // Master wilayah tidak punya pintu tulis di sisi tenant, dan itu disengaja (OWN-05, 29 September 2026).
+    // Tabel `ref_*` dipakai bersama semua tenant: satu baris yang ditambahkan satu tenant langsung menjadi
+    // milik semua tenant. Isinya datang dari migrasi, seeder, dan perintah impor; layar ini hanya membaca.
+    // Lihat docs/todo/buku-alamat-global/.
+
     // Laporan cetak/ekspor untuk semua app; lihat docs/dev/23-document-rendering.md.
     Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REPORT_LAYOUT_READ));
     Route::get('reports/exports', [ReportExportController::class, 'page'])->name('report-exports.index');

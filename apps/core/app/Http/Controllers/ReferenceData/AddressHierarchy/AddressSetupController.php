@@ -347,6 +347,18 @@ final class AddressSetupController extends Controller
      * negara diisi migrasi dan seeder, dan layar tenant hanya membacanya.
      */
 
+    /*
+     * Method tulis di bawah ini tidak lagi punya rute sejak 17 September 2026.
+     *
+     * Ia dipertahankan, bukan dibuang, karena isinya bukan sekadar simpan: ada aturan
+     * nama ganda per induk, penurunan zona waktu, penjagaan anak sebelum menghapus, dan
+     * pemetaan kode wilayah. Semua itu yang akan dipakai kembali begitu data bersama ini
+     * punya pemilik — lewat layar admin, atau lewat `tenant_id` yang benar-benar diisi.
+     *
+     * Yang tidak boleh dilakukan: memasang kembali rutenya tanpa menjawab pertanyaan
+     * kepemilikan itu lebih dulu. Lihat docs/todo/buku-alamat-global/, OWN-05.
+     */
+
     public function storeProvince(Request $request): RedirectResponse
     {
         $data = $request->validate([

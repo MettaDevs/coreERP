@@ -143,42 +143,34 @@ class CountryRegionMergeTest extends TestCase
         CountryRegion::query()->where('code', 'SG')->delete();
     }
 
-    public function test_a_member_without_the_right_cannot_write_reference_data(): void
+    public function test_the_address_master_has_no_write_doors_for_a_tenant(): void
     {
-        $anggota = User::factory()->create();
-        TenantMembership::create([
-            'tenant_id' => $this->tenant->id,
-            'user_id' => $anggota->id,
-            'system_role' => 'member',
-            'status' => 'active',
-        ]);
+        // Data wilayah dipakai bersama seluruh tenant dan tidak punya pemilik per baris,
+        // jadi tidak ada pintu tulisnya sama sekali — bukan sekadar dijaga izin. Bahkan
+        // pemilik tenant pun tidak dapat menambahnya.
+        $pintu = [
+            ['post', '/settings/address-setup/countries', ['code' => 'ZZ', 'name' => 'Karangan']],
+            ['post', '/settings/address-setup/provinces', ['country_code' => 'ID', 'code' => '98', 'name' => 'Karangan']],
+            ['post', '/settings/address-setup/villages', ['name' => 'Karangan']],
+            ['post', '/settings/address-setup/postal-codes', ['postal_code' => '99999']],
+            ['post', '/settings/address-setup/parameters', ['country_code' => 'ID']],
+        ];
 
-        $this->actingAs($anggota)
-            ->post('/settings/address-setup/provinces', [
-                'country_code' => 'ID',
-                'code' => '98',
-                'name' => 'Provinsi Karangan',
-            ])
-            ->assertForbidden();
+        foreach ($pintu as [$cara, $alamat, $isi]) {
+            $this->actingAs($this->admin)->{$cara}($alamat, $isi)->assertNotFound();
+        }
 
+        $this->assertDatabaseMissing('country_regions', ['code' => 'ZZ']);
         $this->assertDatabaseMissing('ref_provinces', ['code' => '98']);
     }
 
-    public function test_someone_without_any_membership_cannot_write_reference_data(): void
+    public function test_the_address_master_is_still_readable(): void
     {
-        // Master wilayah dipakai seluruh tenant. Sampai 17 September 2026 akun tanpa
-        // keanggotaan mana pun dapat menambah dan menghapus isinya.
-        $orangLuar = User::factory()->create();
-
-        $this->actingAs($orangLuar)
-            ->post('/settings/address-setup/provinces', [
-                'country_code' => 'ID',
-                'code' => '99',
-                'name' => 'Provinsi Karangan',
-            ])
-            ->assertForbidden();
-
-        $this->assertDatabaseMissing('ref_provinces', ['code' => '99']);
+        // Mengunci tulisannya tidak boleh ikut menutup bacaannya: layar dan pencarian
+        // alamat tetap membutuhkannya.
+        $this->actingAs($this->admin)
+            ->get('/settings/address-setup?section=countries')
+            ->assertOk();
     }
 
     public function test_the_country_seeder_does_not_overwrite_indonesian_names(): void

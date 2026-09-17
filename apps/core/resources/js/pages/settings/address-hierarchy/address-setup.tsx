@@ -1710,22 +1710,10 @@ export default function AddressSetup({
 
         setIsDeleting(true);
 
-        const routeMap: Record<Section, string> = {
-            parameters: '',
-            addressFormat: '',
-            // Negara adalah data bersama; layar tenant hanya membacanya.
-            countries: '',
-            provinces: `/settings/address-setup/provinces/${deleteConfirmTarget.id}`,
-            regencies: `/settings/address-setup/regencies/${deleteConfirmTarget.id}`,
-            cities: `/settings/address-setup/regencies/${deleteConfirmTarget.id}`,
-            districts: `/settings/address-setup/districts/${deleteConfirmTarget.id}`,
-            villages: `/settings/address-setup/villages/${deleteConfirmTarget.id}`,
-            streets: `/settings/address-setup/streets/${deleteConfirmTarget.id}`,
-            groupOfHouses: `/settings/address-setup/group-of-houses/${deleteConfirmTarget.id}`,
-            landPlots: `/settings/address-setup/land-plots/${deleteConfirmTarget.id}`,
-            buildings: `/settings/address-setup/buildings/${deleteConfirmTarget.id}`,
-            postalCodes: `/settings/address-setup/postal-codes/${deleteConfirmTarget.id}`,
-        };
+        // Master wilayah dikunci: tidak ada endpoint tulis di sisi tenant, jadi tidak ada
+        // URL yang dapat dituju. Peta dikosongkan supaya tombol yang kelak dihidupkan
+        // kembali tidak diam-diam menembak rute yang sudah tidak ada.
+        const routeMap: Partial<Record<Section, string>> = {};
 
         const targetUrl = routeMap[activeSection];
 
@@ -1888,20 +1876,7 @@ export default function AddressSetup({
     const handleSave = () => {
         setIsSaving(true);
 
-        const storeRouteMap: Partial<Record<Section, string>> = {
-            parameters: '/settings/address-setup/parameters',
-            addressFormat: '/settings/address-setup/parameters',
-            provinces: '/settings/address-setup/provinces',
-            regencies: '/settings/address-setup/regencies',
-            cities: '/settings/address-setup/regencies',
-            districts: '/settings/address-setup/districts',
-            villages: '/settings/address-setup/villages',
-            streets: '/settings/address-setup/streets',
-            groupOfHouses: '/settings/address-setup/group-of-houses',
-            landPlots: '/settings/address-setup/land-plots',
-            buildings: '/settings/address-setup/buildings',
-            postalCodes: '/settings/address-setup/postal-codes',
-        };
+        const storeRouteMap: Partial<Record<Section, string>> = {};
 
         const targetUrl = storeRouteMap[activeSection];
 
