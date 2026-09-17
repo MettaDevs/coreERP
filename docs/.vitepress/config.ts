@@ -53,6 +53,8 @@ export default withMermaid({
       'todo/produksi-database-sendiri/index.md',
     'todo/AnalisaGapCoreErpkeBCPhase1/README.md':
       'todo/AnalisaGapCoreErpkeBCPhase1/index.md',
+    'todo/buku-alamat-global/README.md':
+      'todo/buku-alamat-global/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -347,6 +349,16 @@ export default withMermaid({
                 {
                   text: 'TODO analisa gap fase 1',
                   link: '/todo/AnalisaGapCoreErpkeBCPhase1/TODO',
+                },
+              ],
+            },
+            {
+              text: 'Buku alamat global',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Bentuk lokasi, peran, dan relasi',
+                  link: '/todo/buku-alamat-global/',
                 },
               ],
             },
