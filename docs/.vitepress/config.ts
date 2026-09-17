@@ -210,7 +210,7 @@ export default withMermaid({
           items: [
             { text: 'Dari branch sampai server klien', link: '/dev/29-alur-rilis-server-klien' },
             { text: 'Registry Harbor', link: '/dev/30-registry-harbor' },
-            { text: 'admin.erp: konsol operator', link: '/dev/31-admin-erp-konsol' },
+            { text: 'admin.erp: konsol operator', link: '/dev/31-admin-erp-control-plane' },
             { text: 'SSO', link: '/dev/32-sso' },
             { text: 'Release dan on-prem', link: '/dev/03-release-and-on-prem' },
             { text: 'Mendaftarkan katalog produk', link: '/dev/13-publishing-an-app-release' },

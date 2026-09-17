@@ -13,7 +13,7 @@ live in a server's `.env`.
 
 Read only what the task needs:
 
-- `docs/dev/31-admin-erp-konsol.md` — what the console is, its data boundary, both directions of conversation, audit, and the rules it enforces.
+- `docs/dev/31-admin-erp-control-plane.md` — what the console is, its data boundary, both directions of conversation, audit, and the rules it enforces.
 - `docs/dev/32-sso.md` — the SSO ceremony, its guards, settings, and what is temporary.
 - `docs/dev/09-identity-and-access.md` — when a tenant uses SSO, and the two kinds of invitation.
 - `docs/dev/29-alur-rilis-server-klien.md` and `docs/dev/30-registry-harbor.md` — where releases and images come from.

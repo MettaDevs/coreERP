@@ -6,7 +6,7 @@ tentang *kapan sebuah tenant memakai SSO* dan *dua jenis undangan* ada di
 mengulangnya.
 
 Dua aplikasi memakai SSO dengan penyedia yang sama tetapi **klien OIDC yang berbeda**: Core untuk pengguna
-tenant, dan [admin.erp](31-admin-erp-konsol.md) untuk operator. Keduanya memakai OIDC authorization code +
+tenant, dan [admin.erp](31-admin-erp-control-plane.md) untuk operator. Keduanya memakai OIDC authorization code +
 PKCE, dan keduanya memverifikasi ID token sendiri terhadap JWKS penyedia.
 
 ## Anggapan yang keliru
@@ -167,5 +167,5 @@ membuka alamat tenant lain, dan halaman masuk yang tidak pernah mencetak teks da
 ## Halaman terkait
 
 - [Identity dan access](09-identity-and-access.md) — kapan tenant memakai SSO, dan dua jenis undangan.
-- [admin.erp: konsol operator](31-admin-erp-konsol.md) — siapa yang dianggap operator.
+- [admin.erp: konsol operator](31-admin-erp-control-plane.md) — siapa yang dianggap operator.
 - `apps/core/app/Support/Sso/` dan `apps/control-plane/app/Sso/` — kodenya.
