@@ -10,10 +10,21 @@ use App\Support\Sso\SharedIdentityProvider;
 use Illuminate\Console\Command;
 
 /**
- * Menyalakan atau mematikan masuk lewat penyedia identitas bersama untuk satu tenant.
+ * Mengecualikan satu tenant dari bawaan penempatan — atau mengembalikannya.
  *
- * Perintah, bukan layar, dan itu sementara: layar setelan penyedia identitas di konsol belum ada,
- * dan tanpa jalan apa pun untuk menulis barisnya, SSO tidak dapat dicoba di server dev sama sekali.
+ * Yang dipakai sehari-hari `--matikan`. Sejak `TenantSso` membaca tenant tanpa baris sebagai
+ * "ikut bawaan penempatan", menyalakan SSO tidak lagi menuntut perintah apa pun: penempatan yang
+ * menyetel `COREERP_SSO_*` sudah menyalakannya untuk seluruh tenantnya. Yang tersisa bagi perintah
+ * ini adalah menuliskan **keputusan sebaliknya**.
+ *
+ * Bentuk tanpa `--matikan` tetap ada untuk mencabut pengecualian itu. Ia menulis baris `bersama`
+ * yang eksplisit, yang hasilnya sama dengan tidak ada baris sama sekali — dan memang begitu
+ * seharusnya, karena satu-satunya beda di antara keduanya adalah apakah keputusannya pernah
+ * diucapkan.
+ *
+ * Perintah, bukan layar, dan itu masih sementara: layar setelan penyedia identitas di konsol belum
+ * ada. Saat ia dibuat, yang ditampilkannya wajib keadaan efektif dari `TenantSso::availableFor()`,
+ * bukan isi baris ini — sebuah tenant dapat memakai SSO tanpa punya baris.
  *
  * Menyalakan tidak menutup kata sandi. Tenant bermode `bersama` tetap menampilkan formulir kata
  * sandi di bawah tombol SSO — menutupnya keputusan tersendiri yang belum diambil.
@@ -22,9 +33,9 @@ class ConfigureTenantSso extends Command
 {
     protected $signature = 'tenant:sso
         {tenant : Slug tenant}
-        {--matikan : Kembali ke kata sandi saja}';
+        {--matikan : Kecualikan tenant ini — kata sandi saja, walau penempatannya memakai SSO}';
 
-    protected $description = 'Nyalakan atau matikan masuk lewat penyedia identitas bersama untuk satu tenant';
+    protected $description = 'Kecualikan satu tenant dari bawaan penempatan, atau kembalikan ke bawaan';
 
     public function handle(SharedIdentityProvider $provider): int
     {
