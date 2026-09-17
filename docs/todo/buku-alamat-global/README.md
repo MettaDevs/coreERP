@@ -243,6 +243,28 @@ Dua aturan yang tidak berubah di tahap mana pun: **setiap tabel membawa `tenant_
 tabel anak memakai composite foreign key** `(tenant_id, induk_id)` supaya database sendiri yang menolak
 induk milik tenant lain — bukan hanya scope Eloquent.
 
+### Tempat tidak menuntut party
+
+Dibaca dari dokumentasi Microsoft, bukan dari diagram ringkasnya: tabel `LogisticsLocation`
+**tidak punya kolom party sama sekali** — isinya nama, kode, induk, dan penanda alamat pos.
+Party menempel padanya lewat `DirPartyLocation`, dan hal lain yang butuh alamat menempel lewat
+tabel penghubungnya sendiri dengan bentuk yang sama persis: gudang memakai
+`InventLocationLogisticsLocation`, yang membawa `Location`, `IsPrimary`, `IsPrivate`,
+`IsPostalAddress`, dan `AttentionToAddressLine`.
+
+Dua akibat bagi kita:
+
+1. **Aturan "tempat yang tidak dipakai party mana pun ikut terhapus" dicabut** (GAB-12). Ia
+   tidak ada di Dynamics, dan begitu modul menunjuk tempat secara langsung, ia menghapus tempat
+   yang masih dipakai — sementara Core tidak boleh mengintip tabel modul untuk memeriksanya.
+   Melepas tautan berarti melepas tautan, bukan menghancurkan tempatnya.
+2. **Lokasi aset tidak dipaksa menjadi party.** Modul aset menunjuk tempat lewat miliknya
+   sendiri, sebagaimana gudang di Dynamics.
+
+Dua kolom `LogisticsLocation` yang belum ada di `locations` kita: kode lokasi (`LocationId`) dan
+induk lokasi (`ParentLocation`). Keduanya belum punya pemanggil; hierarki lokasi aset hari ini
+dipegang modul aset sendiri. Ditinggal tercatat di sini, bukan dibangun mendahului kebutuhan.
+
 ### Yang berubah bagi pembaca yang sudah ada
 
 Identitas cetak membaca alamat dan kontak organisasi lewat `OrganizationAddressBook::summary()`. Setelah
@@ -313,7 +335,7 @@ yang belum ada. Ia dibuka ketika integrator luar benar-benar memintanya — liha
 | --- | --- | --- |
 | **0** | Core menjadi warga katalog: baris `apps`, entitlement, objek keamanan buku alamat, dan referensi nomor pihak | Hak buku alamat dapat diberikan kepada seorang pengguna tanpa menjadikannya admin tenant |
 | **1** | Bentuk lokasi: lokasi berdiri sendiri, kegunaan ganda, kontak pindah ke lokasi, jenis party dibereskan | Buku alamat organisasi berjalan persis seperti sekarang di atas bentuk baru, dan empat test lama hijau tanpa diubah |
-| **2** | Party dapat dipakai modul: kontrak `BukuAlamat`, registry peran diisi, worker HR menjadi party | "Pemasok ini pelanggan kita juga?" dapat dijawab satu query, dan pegawai punya alamat tanpa kolom alamat di HR |
+| **2** | Tempat dapat dipakai modul: kontrak `BukuAlamat`, dan lokasi aset memperoleh alamat | Lokasi aset punya alamat yang dipakai bersama, bukan kolom alamat baru di modul aset |
 | **3** | Person dan organisasi punya isinya; relasi antar-party | Kontak person sebuah organisasi, keluarga pasien, dan penjamin dapat dicatat |
 | **4** | Halaman Buku Alamat Global yang sesungguhnya | Mockup diganti: daftar party, detail, simpan beneran, izin sesuai OWN-01 |
 | **5** | Alamat terstruktur dan satu tabel negara | Alamat Indonesia menunjuk wilayah; `ref_countries` tidak ada lagi |
@@ -366,14 +388,19 @@ yang membuktikan keadaan sebelumnya tidak dapat menyamar sebagai keadaan berikut
 
 ### Tahap 2 — party untuk modul
 
+Pemanggil pertamanya **management aset**, bukan Human Resources. Keputusan pemilik produk,
+17 September 2026: modul HR belum dipakai siapa pun, dan kontrak yang dibangun dari kebutuhan
+pemanggil yang tidak ada adalah kontrak yang ditebak. Registry peran ikut ditunda bersamanya —
+peran berlaku per legal entity, dan tidak ada modul yang memegang legal entity hari ini.
+
 | ID | Pekerjaan | Selesai bila | Setelah |
 | --- | --- | --- | --- |
-| GAB-10 | Baca jalur pembuatan dan pengubahan worker di HR, tulis daftar kebutuhan konkretnya sebelum kontrak ditulis | Daftar kebutuhan ada di PR; setiap metode kontrak dapat ditunjuk pemanggilnya | GAB-09 |
+| GAB-10 | Baca jalur master lokasi aset dan pabrikan di modul aset, tulis daftar kebutuhan konkretnya sebelum kontrak ditulis | Daftar kebutuhan ada di PR; setiap metode kontrak dapat ditunjuk pemanggilnya | GAB-09 |
 | GAB-11 | Kontrak `BukuAlamat` + `BukuAlamatCore` + pendaftaran di `CoreServices::PEMETAAN` | Modul dapat resolve lewat container; test membuktikan panggilan dari modul ikut transaksi pemanggil | GAB-10 |
-| GAB-12 | Registry peran diisi lewat kontrak, idempoten, dan dicabut saat perannya berakhir | Test: mendaftarkan peran dua kali tidak membuat dua baris; peran hilang saat worker diarsipkan | GAB-11 |
-| HR-01 | `hr_workers.party_id` dan penautannya saat worker dibuat atau diubah | Worker baru selalu punya party; worker lama ditautkan lewat migrasi data | GAB-11 |
-| HR-02 | Alamat dan kontak pegawai dibaca dari buku alamat, bukan dari kolom HR | Tidak ada kolom alamat baru di HR; halaman pegawai menampilkan alamat dari party | HR-01 |
-| GAB-13 | Bagian "peran" pada kartu party membaca registry | "Pemasok ini pelanggan kita juga?" terjawab satu query tanpa menyentuh tabel modul | GAB-12 |
+| GAB-12 | Tempat tidak lagi dihapus saat tautan party terakhir dilepas | Test: tempat yang masih ditunjuk modul tetap ada sesudah organisasi melepas alamatnya | — |
+| AST-01 | `m_lokasi_aset` menunjuk tempat di Core, dan layarnya menyimpan alamat lewat kontrak | Lokasi aset punya alamat; tidak ada kolom alamat baru di modul aset | GAB-11, GAB-12 |
+| AST-02 | Alamat lokasi aset diwariskan dari induknya bila kosong, mengikuti aturan functional location Dynamics 365 | Test: sub-lokasi tanpa alamat menampilkan alamat induknya; yang punya alamat sendiri tidak tertimpa | AST-01 |
+| AST-03 | Pabrikan (`m_pabrikan_aset`) menjadi party organisasi, dengan alamat dan kontak dari buku alamat | Kartu pabrikan menampilkan alamat dan kontak; tidak ada kolom kontak baru di modul aset | GAB-11 |
 
 ### Tahap 3 sampai 6 — garis besar
 
