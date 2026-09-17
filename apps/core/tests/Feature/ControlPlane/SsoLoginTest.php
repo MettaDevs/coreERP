@@ -478,6 +478,52 @@ class SsoLoginTest extends TestCase
             ->assertInertia(fn ($page) => $page->where('ssoLoginUrl', null));
     }
 
+    /**
+     * Tenant yang belum pernah memutuskan apa pun mengikuti penempatannya.
+     *
+     * Ini kebalikan dari perilaku lama, dan pembalikannya disengaja: sebelumnya setiap tenant
+     * menuntut satu perintah manual, layar setelannya belum ada, dan akibatnya penempatan yang
+     * penyedianya sudah disetel penuh tetap tidak punya satu pun tenant ber-SSO.
+     */
+    public function test_a_tenant_without_a_row_follows_the_deployment(): void
+    {
+        TenantIdentityProvider::query()->delete();
+
+        $this->get('http://tenanta.contoh.co.id/sso/masuk')->assertRedirect();
+        $this->get('http://tenanta.contoh.co.id/login')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('ssoLoginUrl', '/sso/masuk'));
+    }
+
+    /** Bawaan penempatan tetap menuntut penempatan yang benar-benar menyetel penyedianya. */
+    public function test_a_tenant_without_a_row_is_offered_nothing_when_the_deployment_has_no_provider(): void
+    {
+        TenantIdentityProvider::query()->delete();
+        config(['coreerp.sso.client_secret' => '']);
+
+        $this->get('http://tenanta.contoh.co.id/sso/masuk')->assertNotFound();
+        $this->get('http://tenanta.contoh.co.id/login')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('ssoLoginUrl', null));
+    }
+
+    /**
+     * Baris selalu menang atas bawaan — termasuk mode `sendiri`.
+     *
+     * Tenant yang memakai penyedianya sendiri tidak boleh ditawari penyedia bersama ini hanya
+     * karena penempatannya menyetel satu. Penjaga ini yang membedakan "belum memutuskan" dari
+     * "sudah memutuskan sesuatu yang lain".
+     */
+    public function test_a_tenant_that_brings_its_own_provider_is_not_offered_the_shared_one(): void
+    {
+        TenantIdentityProvider::query()->update(['mode' => 'sendiri', 'protokol' => 'saml', 'aktif' => true]);
+
+        $this->get('http://tenanta.contoh.co.id/sso/masuk')->assertNotFound();
+        $this->get('http://tenanta.contoh.co.id/login')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('ssoLoginUrl', null));
+    }
+
     public function test_nothing_is_offered_when_the_provider_is_not_configured(): void
     {
         config(['coreerp.sso.client_secret' => '']);

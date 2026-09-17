@@ -174,6 +174,16 @@ class SsoInvitationTest extends TestCase
         $this->assertSame(0, InvitationCode::query()->count());
     }
 
+    /** Bawaan penempatan sampai ke undangan juga, bukan hanya ke tombol masuk. */
+    public function test_a_tenant_without_a_row_can_still_invite_by_email(): void
+    {
+        TenantIdentityProvider::query()->delete();
+
+        $this->createInvitation()->assertSessionHasNoErrors();
+
+        $this->assertSame(1, InvitationCode::query()->count());
+    }
+
     public function test_a_tenant_that_does_not_use_sso_cannot_invite_by_email(): void
     {
         TenantIdentityProvider::query()->where('tenant_id', $this->tenant->id)->update(['mode' => 'lokal', 'aktif' => false]);

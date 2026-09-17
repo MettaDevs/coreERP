@@ -233,6 +233,30 @@ Pemilihan produk hanya menghasilkan entitlement. Artifact deployment diproses da
 
 Owner/Admin membuat kode undangan yang dapat dipakai berulang sampai dicabut atau kedaluwarsa. Core menyimpan hash untuk validasi dan ciphertext agar admin yang berwenang dapat menyalin ulang kode aktif. Invitation dapat membawa role platform selain `owner`, security-role assignment, serta grant data policy. Redemption membuat identity/membership dan assignment dalam satu transaksi; akses anggota yang sudah bergabung tidak berubah jika kode kemudian dicabut.
 
+### Kapan sebuah tenant memakai SSO
+
+Dua syarat, dan yang kedua berbentuk terbalik dari yang biasa diduga:
+
+1. **Penempatannya menyetel penyedia** — `COREERP_SSO_ISSUER`, `_CLIENT_ID`, dan `_CLIENT_SECRET` terisi ketiganya. Templat env agen on-prem tidak memuat satu pun di antaranya, jadi server klien selalu menjawab tidak.
+2. **Tenant itu tidak mengatakan sebaliknya.** Baris `tenant_identity_providers` mencatat *pengecualian*, bukan izin: tenant tanpa baris mengikuti bawaan penempatan, yaitu menyala.
+
+Jawabannya dihitung di satu tempat, `TenantSso::availableFor()`, yang dibaca halaman masuk, seluruh rute `/sso/*`, dan pembuatan undangan terikat.
+
+Arahnya dibalik pada 17 September 2026. Sebelumnya setiap tenant menuntut satu baris yang ditulis manual lewat `tenant:sso`, sementara layar setelannya belum ada — akibatnya penempatan yang penyedianya sudah disetel penuh tetap punya nol tenant ber-SSO, bukan karena ada yang memutuskan begitu melainkan karena tidak ada yang menjalankan perintahnya.
+
+Ongkosnya nyata dan harus diingat: **isi tabel ini tidak lagi cukup untuk menyimpulkan siapa memakai SSO.** Pembacanya harus tahu env penempatannya juga, dan layar setelan yang kelak dibuat wajib menampilkan hasil `availableFor()`, bukan membaca barisnya sendiri.
+
+Mengecualikan satu tenant, dan mengembalikannya:
+
+```bash
+php artisan tenant:sso <slug> --matikan   # kata sandi saja, walau penempatannya memakai SSO
+php artisan tenant:sso <slug>             # kembali mengikuti penempatan
+```
+
+Baris bermode `sendiri` — penyedia milik pelanggan — juga berarti "tidak memakai penyedia bersama ini". Tempatnya sudah ada di skema, integrasinya belum.
+
+Menyalakan tidak menutup kata sandi: yang bertambah tombol SSO di samping formulir yang sudah ada.
+
 ### Dua jenis undangan
 
 Sejak 16 September 2026 undangan punya dua bentuk, dan yang membedakannya satu kolom: ada atau tidaknya email yang diundang.
