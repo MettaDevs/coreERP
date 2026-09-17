@@ -101,22 +101,111 @@ Dua alasan lain menguatkannya:
 | Riwayat alamat | **Ditunda.** Masa berlaku tetap pada tautan party–lokasi; alamat pos belum diberi `valid_from`/`valid_to` | Dokumen lama sudah aman karena bentuk tercetak disalin ke kolom `formatted` | "Alamat pemasok ini tahun lalu apa?" belum terjawab; menambahnya nanti hanya menambah kolom |
 | Person dan Organization | **Tabel turunan sendiri** (`party_persons`, `party_organizations`) | Nama depan/belakang, gender, tanggal lahir, NPWP, dan nomor registrasi punya tempat yang benar | Dua tabel lagi, dan satu aturan bagaimana `parties.name` disusun dari nama orang |
 | Tabel negara | **Satu**: `country_regions` menang sebagai identitas negara; kolom tambahan `ref_countries` dipindahkan ke sana | Alamat pos dan master wilayah akhirnya menunjuk negara yang sama | Master wilayah, importer, dan halaman Address setup ikut berubah — kode yang ditulis orang lain |
+| Siapa boleh mengubah negara | **Bukan tenant.** Daftar negara adalah data bersama: isinya dari migrasi dan seeder, perubahannya lewat admin | Satu tenant tidak dapat mengubah pilihan alamat milik tenant lain | Menambah negara menuntut rilis atau tindakan admin, bukan swalayan di layar tenant |
 | Alamat terstruktur | Alamat Indonesia **menunjuk baris wilayah** (`ref_provinces` … `ref_villages`) dan tetap menyimpan namanya untuk dicetak | Kode pos dan ejaan berhenti jadi tebakan pengetik | Alamat luar negeri tetap teks bebas, jadi kode menangani dua bentuk |
 | Cara modul memakainya | **Kontrak PHP dalam satu proses**, didaftarkan di `CoreServices::PEMETAAN`, seperti `PenerbitNomor` dan `DirektoriOrganisasi` | Pola yang sudah dipakai HR dan Management Aset; tanpa token, tanpa HTTP, ikut transaksi pemanggilnya | Modul di luar runtime tidak terlayani sampai ada yang memintanya |
 | `internal/v1` untuk party | **Belum**, sampai ada pemanggil di luar runtime | Kontrak tidak ditulis untuk pemanggil yang belum ada | Integrator luar menunggu; dicatat di [API untuk sistem pelanggan](../api-untuk-integrator/) |
 | Address book (grup) | **Tahap terakhir, boleh tidak pernah dikerjakan** | — | Tanpa ini, seluruh party terlihat oleh siapa pun yang boleh membuka buku alamat |
-| Nomor party | Lewat **Number Sequence** Core: non-continuous, lingkup tenant, tanpa reset | Nomor yang dapat diucapkan dan dicari, seperti `PartyNumber` di D365 | Satu referensi number sequence baru; **menunggu persetujuan**, lihat OWN-02 |
+| Nomor party | Lewat **Number Sequence** Core: referensi `core.party`, awalan `PIHK`, non-continuous, lingkup tenant, tanpa reset | Nomor yang dapat diucapkan dan dicari, seperti `PartyNumber` di D365 | Referensi number sequence menuntut baris `apps` untuk Core — dikerjakan bersama izin di bawah |
 
 ### Yang sengaja tidak diputuskan di sini
 
-- **Pembagian permission** untuk halaman buku alamat. Core hari ini tidak punya entry point per halaman:
-  penjaganya Gate platform `manage-access`, `manage-reference-data`, dan seterusnya di
-  `apps/core/app/Providers/AppServiceProvider.php:125-141`, dan buku alamat organisasi memakai
-  `canManageAccess()` (`app/Http/Controllers/GlobalAddressBook/OrganizationLocationController.php:80-85`).
-  Gate keamanan menuntut resource dan action, bukan nama menu, dan pilihannya milik pemilik produk.
-  Usulan terkecil ada di OWN-01.
 - **Event keluar** (`core.party.*.v1`). Tidak ada konsumen di luar runtime hari ini, dan kontrak yang
   ditulis sebelum pemanggilnya ada selalu melewatkan yang benar-benar dipakai.
+
+## Izin buku alamat, dan Core sebagai warga katalog
+
+Bagian ini menjawab OWN-01. Ia lahir dari satu temuan yang mengubah bentuk pertanyaannya.
+
+### Temuan: rantai izin Core tidak pernah dipakai Core
+
+Rantai `entry point → permission → privilege → duty → security role → penugasan` **sudah berjalan
+penuh** di produk ini, tetapi hanya untuk modul. Yang menjaga halaman Core sendiri adalah Gate
+platform di `apps/core/app/Providers/AppServiceProvider.php:126-143` — `manage-access`,
+`manage-reference-data`, dan seterusnya — dan semuanya bermuara pada satu pertanyaan yang sama:
+apakah `system_role` keanggotaan ini `owner` atau `admin` (`app/Models/TenantMembership.php:45-48`).
+
+Akibatnya tepat seperti yang kamu keluhkan: **izin buku alamat tidak dapat diberikan kepada seorang
+pengguna.** Yang ada hanya "jadikan dia admin tenant" — yang sekaligus memberinya hak mengatur hak
+akses, katalog nomor, layout dokumen, dan seluruh master referensi.
+
+Tiga hal di kode yang menentukan jalan keluarnya:
+
+| Kenyataan | Bukti | Akibat |
+| --- | --- | --- |
+| `app_entry_points.app_id` dan `permissions.app_id` **NOT NULL**, dengan foreign key ke tabel `apps` | `database/migrations/2026_07_20_000000_create_core_identity_access_tables.php:128-147` | Permission milik Core mustahil disimpan sebelum Core punya baris di `apps` |
+| Tidak ada baris `apps` untuk Core | tidak ada manifest untuk Core; satu-satunya jalur pendaftaran adalah `app:register-manifest` dari `modules/*/*/app.yaml` | Core bukan warga katalog hari ini |
+| Halaman `settings/access` dan `settings/security-configuration` menyaring duty dan privilege lewat `tenant_app_entitlements` | `app/Http/Controllers/Access/AccessController.php:27-30`, `.../SecurityConfigurationController.php:281-286` | Duty Core tidak akan pernah terlihat kecuali setiap tenant punya entitlement ke `core` |
+
+`security_privileges.app_id` dan `security_duties.app_id` sudah boleh kosong (untuk objek custom milik
+tenant), tetapi entry point dan permission tidak. Jadi tidak ada jalan pintas: **Core harus punya baris
+`apps` sendiri.**
+
+### Keputusan
+
+1. **Core menjadi warga katalog dengan id `core`.** Satu baris `apps` bernama Core, tanpa UI yang
+   diluncurkan. Ini tidak memunculkan kartu produk di launcher, karena launcher membaca
+   `core_module_installations`, bukan tabel `apps`.
+2. **Setiap tenant otomatis ter-entitle ke `core`** — saat tenant dibuat, dan lewat backfill untuk
+   tenant yang sudah ada. Tanpa itu, duty Core tidak terlihat di layar hak akses.
+3. **Objek keamanan Core dideklarasikan di repo**, bukan dibuat lewat UI, dan di-ingest lewat jalur
+   validasi yang sama dengan manifest modul (`AppCatalogRequest` + `RegisterAppCatalog`), sehingga
+   aturan yang sudah ada ikut berlaku: kode wajib berawalan `core.`, kode privilege tidak boleh sama
+   dengan kode permission, permission wajib menunjuk entry point yang dideklarasikan.
+4. **Admin tenant tetap lolos tanpa penugasan role.** `owner` dan `admin` terus memperoleh akses penuh
+   seperti hari ini; permission baru menambah jalan bagi pengguna biasa, bukan mencabut jalan yang ada.
+   Tanpa jembatan ini, setiap tenant kehilangan akses buku alamatnya pada menit pertama setelah rilis.
+
+### Pembagian izin
+
+Dipecah menurut **resource dan aksi**, bukan menurut nama halaman. Empat resource, karena empat hal ini
+memang dikerjakan orang yang berbeda:
+
+| Resource | Kenapa berdiri sendiri |
+| --- | --- |
+| `party` | Membuat pihak baru berarti menambah identitas ke direktori bersama seluruh tenant |
+| `location` | Memperbaiki alamat adalah pekerjaan harian; ia tidak boleh menuntut hak membuat pihak |
+| `contact` | Sama seperti alamat, dan sering dikerjakan orang yang sama |
+| `relationship` | Relasi antar-pihak menyentuh dua pihak sekaligus, termasuk milik orang lain |
+
+Permission (entry point ditulis lengkap saat implementasi):
+
+| Kode | Aksi | Untuk |
+| --- | --- | --- |
+| `core.address-book.party.read` | read | Melihat kartu pihak dan daftarnya |
+| `core.address-book.party.create` | create | Menambah pihak baru |
+| `core.address-book.party.update` | update | Mengubah nama dan atribut pihak |
+| `core.address-book.party.archive` | delete | Mengarsipkan pihak |
+| `core.address-book.location.read` / `.create` / `.update` / `.archive` | read/create/update/delete | Alamat dan lokasi |
+| `core.address-book.contact.read` / `.create` / `.update` / `.archive` | read/create/update/delete | Email, telepon, whatsapp |
+| `core.address-book.relationship.read` / `.create` / `.archive` | read/create/delete | Relasi antar-pihak |
+| `core.address-book.role.read` | read | Registry peran; penulisnya modul, bukan manusia |
+
+Privilege — satu tugas, bukan satu tabel:
+
+| Kode | Isi |
+| --- | --- |
+| `core.address-book.view` | seluruh `*.read` |
+| `core.address-book.party.maintain` | `party.create`, `party.update` |
+| `core.address-book.address.maintain` | `location.*` dan `contact.*` selain archive |
+| `core.address-book.address.retire` | `location.archive`, `contact.archive` |
+| `core.address-book.party.retire` | `party.archive` |
+| `core.address-book.relationship.maintain` | `relationship.create`, `relationship.archive` |
+
+Duty — yang dipasang tenant ke role-nya:
+
+| Kode | Isi | Untuk siapa |
+| --- | --- | --- |
+| `core.address-book.lihat` | view | Staf yang perlu membaca alamat pemasok atau pegawai |
+| `core.address-book.kelola-alamat` | view + address.maintain | Staf yang memperbaiki alamat dan kontak sehari-hari |
+| `core.address-book.kelola-pihak` | view + party.maintain + address.maintain + relationship.maintain | Orang yang memang mengurus direktori |
+| `core.address-book.pensiunkan` | party.retire + address.retire | Dipisah karena mengarsipkan pihak berdampak ke seluruh modul |
+
+### Yang ikut berubah
+
+Endpoint alamat dan kontak organisasi (`app/Http/Controllers/GlobalAddressBook/`) hari ini menuntut
+`canManageAccess()`. Setelah ini ia menuntut permission di atas, dengan admin tenant tetap lolos. Itulah
+inti perubahannya: memperbaiki alamat kantor tidak lagi menuntut hak mengatur hak akses.
 
 ## Bentuk target
 
@@ -222,6 +311,7 @@ yang belum ada. Ia dibuka ketika integrator luar benar-benar memintanya — liha
 
 | Tahap | Isi | Selesai berarti |
 | --- | --- | --- |
+| **0** | Core menjadi warga katalog: baris `apps`, entitlement, objek keamanan buku alamat, dan referensi nomor pihak | Hak buku alamat dapat diberikan kepada seorang pengguna tanpa menjadikannya admin tenant |
 | **1** | Bentuk lokasi: lokasi berdiri sendiri, kegunaan ganda, kontak pindah ke lokasi, jenis party dibereskan | Buku alamat organisasi berjalan persis seperti sekarang di atas bentuk baru, dan empat test lama hijau tanpa diubah |
 | **2** | Party dapat dipakai modul: kontrak `BukuAlamat`, registry peran diisi, worker HR menjadi party | "Pemasok ini pelanggan kita juga?" dapat dijawab satu query, dan pegawai punya alamat tanpa kolom alamat di HR |
 | **3** | Person dan organisasi punya isinya; relasi antar-party | Kontak person sebuah organisasi, keluarga pasien, dan penjamin dapat dicatat |
@@ -229,7 +319,8 @@ yang belum ada. Ia dibuka ketika integrator luar benar-benar memintanya — liha
 | **5** | Alamat terstruktur dan satu tabel negara | Alamat Indonesia menunjuk wilayah; `ref_countries` tidak ada lagi |
 | **6** | Address book (grup) — opsional | Party dapat dipilah per grup, dan hak melihatnya mengikuti grup |
 
-Tahap 1 berdiri sendiri dan tidak menunggu keputusan apa pun. Tahap 2 ke atas menunggu OWN-01.
+Tahap 0 dan Tahap 1 tidak saling menunggu: yang satu menyentuh katalog dan izin, yang lain menyentuh
+bentuk tabel alamat. Keduanya dapat dikerjakan berbarengan, dan Tahap 2 menunggu keduanya.
 
 ## TODO
 
@@ -242,9 +333,21 @@ yang membuktikan keadaan sebelumnya tidak dapat menyamar sebagai keadaan berikut
 
 | ID | Pekerjaan | Selesai bila |
 | --- | --- | --- |
-| OWN-01 | Memutuskan pembagian izin buku alamat. Usulan terkecil: baca untuk semua anggota tenant aktif (seperti sekarang), tulis lewat satu Gate baru `manage-address-book` yang terpisah dari `manage-access`, karena mengubah alamat pemasok bukan pekerjaan yang sama dengan mengatur hak akses | Keputusannya tertulis di halaman ini, dan Gate-nya ada di `AppServiceProvider` bersama `manage-*` yang lain |
-| OWN-02 | Menyetujui nomor party lewat Number Sequence: non-continuous, lingkup tenant, tanpa reset, format usulan `P-########` | Referensinya terdaftar dan tertulis di [Number sequence](../../dev/14-number-sequences.md) |
+| OWN-01 | **Dijawab di halaman ini**, lihat [Izin buku alamat](#izin-buku-alamat-dan-core-sebagai-warga-katalog). Yang tersisa untukmu: menyetujui empat duty yang dipasang tenant ke role-nya | Kamu menyatakan setuju, atau menyebut duty mana yang dipecah lain |
+| OWN-02 | **Dijawab di halaman ini**: referensi `core.party`, awalan `PIHK`, non-continuous, lingkup tenant, tanpa reset | Kamu menyatakan setuju, atau menyebut awalan lain |
 | OWN-03 | Menyetujui penggabungan dua tabel negara, dan menunjuk siapa yang mengerjakan master wilayah yang ikut berubah | Keputusan tertulis; pemilik kerjanya tahu |
+| OWN-05 | Memutuskan nasib provinsi sampai kode pos: ikut dikunci seperti negara (isi dari seed saja), atau diberi pemilik dengan mengisi `tenant_id` sehingga tambahan satu tenant tidak bocor ke tenant lain | Keputusan tertulis di halaman ini, dan kodenya mengikuti |
+
+### Tahap 0 — Core sebagai warga katalog
+
+| ID | Pekerjaan | Selesai bila | Setelah |
+| --- | --- | --- | --- |
+| CORE-01 | Baris `apps` untuk `core`, entitlement otomatis saat tenant dibuat, dan backfill untuk tenant yang sudah ada | Tenant baru maupun lama punya entitlement `core` aktif; test membuktikan tenant baru tidak pernah lahir tanpanya | — |
+| CORE-02 | Deklarasi entry point, permission, privilege, dan duty buku alamat, di-ingest lewat jalur validasi manifest | Keempat lapis tersimpan sebagai baris berbeda; kode privilege tidak sama dengan kode permission; test | CORE-01 |
+| CORE-03 | Penegakan izin Core: satu jalan memeriksa permission `core.*` di luar rute module, dengan `owner`/`admin` tetap lolos | Anggota tanpa duty ditolak 403; anggota dengan duty `kelola-alamat` mengubah alamat tanpa menjadi admin; admin lama tidak kehilangan apa pun | CORE-02 |
+| CORE-04 | Endpoint alamat dan kontak organisasi pindah dari `canManageAccess()` ke permission buku alamat | Test lama tetap hijau; test baru membuktikan anggota biasa dengan duty dapat menulis | CORE-03 |
+| CORE-05 | Referensi number sequence `core.party` (awalan `PIHK`, lingkup tenant) beserta draft per tenant | Referensinya tampil di halaman Number sequences dan satu nomor dapat diterbitkan | CORE-01 |
+| CORE-06 | Duty Core tampil dan dapat dipasang ke role di `settings/access` | Test: role dengan duty `core.address-book.kelola-alamat` menghasilkan permission yang benar lewat `permissionsFor` | CORE-02 |
 
 ### Tahap 1 — Core, buku alamat
 
@@ -282,6 +385,26 @@ yang membuktikan keadaan sebelumnya tidak dapat menyamar sebagai keadaan berikut
 | GAB-23 | Alamat terstruktur menunjuk `ref_villages`, bentuk cetak memakai `ref_address_parameters` | Alamat Indonesia tidak lagi teks bebas; alamat luar negeri tetap bisa disimpan |
 | GAB-24 | Satu tabel negara: kolom `ref_countries` pindah ke `country_regions`, master wilayah menunjuk ke sana | `ref_countries` tidak ada lagi; halaman Address setup tetap berjalan |
 | GAB-25 | Address book (grup) dan hak melihat per grup | Party dapat dipilah; tanpa grup, perilakunya sama seperti sebelumnya |
+
+## Data bersama yang belum punya pemilik
+
+Master wilayah menyimpan negara, provinsi, kabupaten, kecamatan, kelurahan, jalan, gedung, dan kode pos
+dalam tabel `ref_*`. Setiap tabel itu **punya kolom `tenant_id`, tetapi tidak ada satu pun kode yang
+mengisinya**: controller layar Address setup tidak pernah menulis `tenant_id` sama sekali. Artinya baris
+yang dibuat satu tenant langsung menjadi milik semua tenant.
+
+Sampai 17 September 2026 seluruh endpoint tulisnya juga tidak memeriksa hak apa pun, sehingga akun mana
+pun — termasuk akun tanpa keanggotaan tenant — dapat menambah dan menghapus isinya. Dua hal sudah
+dikerjakan:
+
+- **Negara: pintu tulisnya dibuang dari layar tenant.** Ia kunci yang dirujuk seluruh alamat pos;
+  menghapusnya menyentuh dokumen tenant lain. Isinya datang dari migrasi `seed_country_regions` dan
+  seeder `WorldCountriesSeeder`.
+- **Sisa wilayahnya dijaga hak `manage-reference-data`** di rute, supaya method baru ikut terjaga.
+
+Yang belum diputuskan: apakah provinsi sampai kode pos juga dikunci seperti negara, atau diberi pemilik
+sungguhan dengan mengisi `tenant_id` sehingga tambahan satu tenant tidak terlihat tenant lain. Lihat
+OWN-05.
 
 ## Risiko dan jebakan yang sudah diketahui
 
