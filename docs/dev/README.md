@@ -57,7 +57,7 @@ Target yang dikunci:
 | [28-pelaporan-kesalahan.md](28-pelaporan-kesalahan.md) | Laporan kesalahan ke berkas di mesin dan ke SigNoz: isi, tujuan, dan cara mematikannya |
 | [29-alur-rilis-server-klien.md](29-alur-rilis-server-klien.md) | Dari branch sampai server klien: tombol rilis, perakit, Harbor, SaaS dev, agen, dan nomor rilis |
 | [30-registry-harbor.md](30-registry-harbor.md) | Registry Harbor: isi, robot, kredensial per operasi, penarikan lewat digest, immutability dan retensi, dan jebakan yang terukur |
-| [31-admin-erp-konsol.md](31-admin-erp-konsol.md) | admin.erp: batas datanya, percakapan ke Core dan ke agen, layar dan rutenya, rahasia, jejak audit, dan aturan yang dijaga |
+| [31-admin-erp-konsol.md](31-admin-erp-konsol.md) | admin.erp (`apps/control-plane`): batas datanya, percakapan ke Core dan ke agen, layar dan rutenya, rahasia, jejak audit, dan aturan yang dijaga |
 | [32-sso.md](32-sso.md) | SSO: upacara tiga kaki di Core, upacara satu alamat di konsol, yang diperiksa sebelum sesi berdiri, logout back-channel, dan setelannya |
 
 ## Referensi utama

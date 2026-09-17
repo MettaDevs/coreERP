@@ -4,6 +4,12 @@ Halaman ini menjawab satu pertanyaan: **apa sebenarnya admin.erp itu, dan apa ya
 dilakukannya?** Ia aplikasi kedua di repo ini — `apps/control-plane`, namespace `ControlPlane\` — dan satu-satunya
 yang dipakai orang kita, bukan pengguna klinik.
 
+**Tiga nama, satu benda.** `apps/control-plane` adalah tempat kodenya, `admin.erp.<domain>` adalah alamatnya, dan
+"konsol operator" adalah sebutannya di layar. *Control plane* sendiri adalah **peran** dalam istilah SaaS —
+layanan global yang mengelola tenant, lisensi, dan penempatan — dan hampir setiap halaman lain memakainya dalam
+arti itu, bukan sebagai nama aplikasi ini. Halaman ini memakai **admin.erp** karena yang dibahas benda yang
+konkret: satu image, satu alamat, satu database bersama Core.
+
 Aplikasi ini mengerjakan tiga hal: melahirkan tenant beserta lingkungannya, mengelola **server klien on-prem**
 lewat agen, dan menyimpan setelan yang tidak boleh tinggal di `.env` server. Alur rilis yang memasoknya ada di
 [Dari branch sampai server klien](29-alur-rilis-server-klien.md); registry-nya di

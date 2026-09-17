@@ -56,7 +56,8 @@ Ketiganya adalah fakta terpisah. Lihat [Tiga kebenaran lifecycle](/onboarding/ti
 
 | Istilah | Arti di CoreERP |
 | --- | --- |
-| **Control plane** | Layanan global vendor untuk mengelola tenant, lisensi, deployment, operasi, dan billing **SaaS**. |
+| **Control plane** | Layanan global vendor untuk mengelola tenant, lisensi, deployment, operasi, dan billing **SaaS**. Itu perannya, bukan nama satu aplikasi. |
+| **admin.erp** | Aplikasi yang menjalankan peran itu hari ini: kode di `apps/control-plane`, namespace `ControlPlane`, alamatnya `admin.erp.<domain>`. Dipakai operator kita, bukan pengguna klinik. Halamannya [admin.erp: konsol operator](/dev/31-admin-erp-konsol). |
 | **Application plane** | API/UI/database yang menjalankan fungsi ERP untuk tenant. |
 | **Pool / pooled** | Tenant berbagi deployment dan database module, dipisahkan oleh `tenant_id`. |
 | **Silo / isolated** | Resource suatu module ditempatkan khusus untuk satu tenant. |
