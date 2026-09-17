@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\ReferenceData\AddressHierarchy;
 
 use App\Http\Controllers\Controller;
+use App\Models\CountryRegion;
 use App\Models\ReferenceData\AddressHierarchy\AdministrativeDivision;
 use App\Models\ReferenceData\AddressHierarchy\AdministrativeDivisionExternalCode;
 use App\Models\ReferenceData\AddressHierarchy\AdministrativeDivisionTranslation;
 use App\Models\ReferenceData\AddressHierarchy\Building;
-use App\Models\ReferenceData\AddressHierarchy\Country;
 use App\Models\ReferenceData\AddressHierarchy\CountryHierarchyLevel;
 use App\Models\ReferenceData\AddressHierarchy\District;
 use App\Models\ReferenceData\AddressHierarchy\GroupOfHouses;
@@ -159,9 +159,9 @@ final class AddressSetupController extends Controller
             }
         }
 
-        $allCountries = Country::where('active', true)->orderBy('name')->get();
+        $allCountries = CountryRegion::where('active', true)->orderBy('name')->get();
         if ($allCountries->isEmpty()) {
-            $allCountries = Country::orderBy('name')->get();
+            $allCountries = CountryRegion::orderBy('name')->get();
         }
 
         $countries = ($country && $section === 'countries')
@@ -290,7 +290,7 @@ final class AddressSetupController extends Controller
             ->limit(500)
             ->get();
 
-        $currentCountry = $country !== '' ? Country::where('code', $country)->first() : null;
+        $currentCountry = $country !== '' ? CountryRegion::where('code', $country)->first() : null;
         $currentProvince = $province !== '' ? Province::where('id', $province)->first() : null;
         $currentRegency = $regency !== '' ? Regency::where('id', $regency)->first() : null;
         $currentDistrict = $district !== '' ? District::where('id', $district)->first() : null;
@@ -330,65 +330,28 @@ final class AddressSetupController extends Controller
                 'district' => $currentDistrict ? ['id' => $currentDistrict->id, 'name' => $currentDistrict->name, 'code' => $currentDistrict->code] : null,
             ],
             'selectedId' => $selectedId ?: null,
+            'canManage' => $request->user()?->can('manage-reference-data') ?? false,
             'filters' => compact('country', 'province', 'regency', 'district', 'village'),
         ]);
     }
 
-    public function storeCountry(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'code' => 'required|string|max:3|uppercase',
-            'iso3' => 'nullable|string|max:3|uppercase',
-            'name' => 'required|string|max:100',
-            'phone_code' => 'nullable|string|max:10',
-            'timezone' => 'nullable|string|max:50',
-            'active' => 'boolean',
-        ]);
-
-        if (empty($data['timezone'])) {
-            $data['timezone'] = $this->timezoneResolver->inferCountryTimezone($data['code']) ?? 'UTC';
-        }
-
-        DB::table('ref_countries')->updateOrInsert(['code' => $data['code']], array_merge($data, [
-            'created_at' => now(), 'updated_at' => now(),
-        ]));
-
-        DB::table('ref_administrative_division_timezones')->updateOrInsert(
-            ['division_type' => 'country', 'division_id' => $data['code']],
-            [
-                'id' => (string) Str::ulid(),
-                'timezone' => $data['timezone'],
-                'is_default' => true,
-                'status' => 'active',
-                'updated_at' => now(),
-            ]
-        );
-        Cache::forget("timezone:division:country:{$data['code']}");
-
-        return back()->with([
-            'saved_id' => $data['code'],
-            'saved_section' => 'countries',
-            'status' => 'Record saved successfully.',
-        ]);
-    }
-
-    public function destroyCountry(string $code): RedirectResponse
-    {
-        if (Province::where('country_code', $code)->exists()) {
-            return back()->withErrors(['error' => 'Data negara tidak dapat dihapus karena masih memiliki child data provinsi.']);
-        }
-        DB::table('ref_countries')->where('code', $code)->delete();
-        DB::table('ref_administrative_division_timezones')->where('division_type', 'country')->where('division_id', $code)->delete();
-        Cache::forget("timezone:division:country:{$code}");
-
-        return back();
-    }
+    /*
+     * storeCountry() dan destroyCountry() dibuang pada 17 September 2026.
+     *
+     * Tabel negara tidak punya kolom pemilik yang terisi — controller ini tidak pernah
+     * menulis `tenant_id` sama sekali — sehingga baris yang dibuat satu tenant menjadi
+     * milik semua tenant. Untuk negara akibatnya paling jauh: ia kunci yang dirujuk
+     * seluruh alamat pos, dan menghapusnya menyentuh dokumen tenant lain.
+     *
+     * Selama belum ada layar admin yang memang berwenang atas data bersama, daftar
+     * negara diisi migrasi dan seeder, dan layar tenant hanya membacanya.
+     */
 
     public function storeProvince(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'id' => 'nullable|string|exists:ref_provinces,id',
-            'country_code' => 'required|string|max:3|exists:ref_countries,code',
+            'country_code' => 'required|string|size:2|exists:country_regions,code',
             'code' => 'required|string|max:20',
             'name' => 'required|string|max:150',
             'description' => 'nullable|string|max:500',
@@ -786,7 +749,7 @@ final class AddressSetupController extends Controller
     {
         $data = $request->validate([
             'id' => 'nullable|string|exists:ref_postal_codes,id',
-            'country_code' => 'required|string|max:3|exists:ref_countries,code',
+            'country_code' => 'required|string|size:2|exists:country_regions,code',
             'postal_code' => 'required|string|max:10',
             'province_id' => 'nullable|string|exists:ref_provinces,id',
             'regency_id' => 'nullable|string|exists:ref_regencies,id',
@@ -985,7 +948,7 @@ final class AddressSetupController extends Controller
     public function storeParameters(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'country_code' => 'required|string|max:3|exists:ref_countries,code',
+            'country_code' => 'required|string|size:2|exists:country_regions,code',
             'use_province' => 'boolean',
             'use_regency' => 'boolean',
             'use_district' => 'boolean',

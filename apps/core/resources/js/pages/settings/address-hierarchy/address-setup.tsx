@@ -1713,7 +1713,8 @@ export default function AddressSetup({
         const routeMap: Record<Section, string> = {
             parameters: '',
             addressFormat: '',
-            countries: `/settings/address-setup/countries/${deleteConfirmTarget.id}`,
+            // Negara adalah data bersama; layar tenant hanya membacanya.
+            countries: '',
             provinces: `/settings/address-setup/provinces/${deleteConfirmTarget.id}`,
             regencies: `/settings/address-setup/regencies/${deleteConfirmTarget.id}`,
             cities: `/settings/address-setup/regencies/${deleteConfirmTarget.id}`,
@@ -1890,7 +1891,6 @@ export default function AddressSetup({
         const storeRouteMap: Partial<Record<Section, string>> = {
             parameters: '/settings/address-setup/parameters',
             addressFormat: '/settings/address-setup/parameters',
-            countries: '/settings/address-setup/countries',
             provinces: '/settings/address-setup/provinces',
             regencies: '/settings/address-setup/regencies',
             cities: '/settings/address-setup/regencies',

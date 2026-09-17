@@ -3,7 +3,7 @@
 namespace Tests\Feature\Settings;
 
 use App\Models\Client;
-use App\Models\ReferenceData\AddressHierarchy\Country;
+use App\Models\CountryRegion;
 use App\Models\ReferenceData\AddressHierarchy\District;
 use App\Models\ReferenceData\AddressHierarchy\Province;
 use App\Models\ReferenceData\AddressHierarchy\Regency;
@@ -56,7 +56,7 @@ class AddressHierarchyTest extends TestCase
     /** Test 1 — Top Down Traversal: Indonesia -> Bali -> Badung -> Kuta Selatan -> Benoa */
     public function test_top_down_hierarchy_traversal(): void
     {
-        $country = Country::where('code', 'ID')->first();
+        $country = CountryRegion::where('code', 'ID')->first();
         $this->assertNotNull($country);
 
         $bali = Province::where('country_code', $country->code)->where('code', '51')->first();

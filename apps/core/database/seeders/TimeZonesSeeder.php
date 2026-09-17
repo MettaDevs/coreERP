@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\ReferenceData\AddressHierarchy\Country;
+use App\Models\CountryRegion;
 use App\Models\ReferenceData\AddressHierarchy\TimeZone;
 use DateTime;
 use DateTimeZone;
@@ -139,8 +139,8 @@ class TimeZonesSeeder extends Seeder
             ],
         ];
 
-        // 2. Iterate through all countries in ref_countries
-        $countries = Country::all();
+        // 2. Iterate through all countries in country_regions
+        $countries = CountryRegion::all();
 
         foreach ($countries as $country) {
             $cc = strtoupper($country->code);

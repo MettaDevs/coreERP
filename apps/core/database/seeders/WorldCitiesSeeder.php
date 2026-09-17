@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\ReferenceData\AddressHierarchy\Country;
 use App\Models\ReferenceData\AddressHierarchy\Province;
 use App\Models\ReferenceData\AddressHierarchy\Regency;
 use Illuminate\Database\Seeder;

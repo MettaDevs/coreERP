@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ReferenceData\AddressHierarchy\Country;
+use App\Models\CountryRegion;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -33,19 +33,19 @@ final class ImportIndonesianAddressHierarchyCommand extends Command
         }
 
         // 1. Verify Country
-        $country = Country::where('code', 'ID')->first();
+        $country = CountryRegion::where('code', 'ID')->first();
         if (! $country && ! $dryRun) {
-            Country::create([
+            CountryRegion::create([
                 'code' => 'ID',
                 'iso3' => 'IDN',
                 'name' => 'Indonesia',
                 'phone_code' => '+62',
                 'active' => true,
             ]);
-            $country = Country::where('code', 'ID')->first();
+            $country = CountryRegion::where('code', 'ID')->first();
         }
 
-        $allCountriesCount = Country::count();
+        $allCountriesCount = CountryRegion::count();
         $this->line("Countries in system: <info>{$allCountriesCount}</info> (Selected: Indonesia / ID)");
 
         // 2. Load JSON Datasets

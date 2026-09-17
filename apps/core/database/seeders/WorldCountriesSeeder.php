@@ -269,10 +269,19 @@ class WorldCountriesSeeder extends Seeder
         $now = now();
 
         foreach (self::COUNTRIES as $c) {
-            // 1. Seed ref_countries
-            DB::table('ref_countries')->updateOrInsert(
-                ['code' => $c['code']],
-                [
+            // Negaranya sendiri sudah diisi migrasi `seed_country_regions` beserta nama
+            // Indonesianya. Seeder ini hanya melengkapi kode telepon dan zona waktu;
+            // menimpa `name` di sini akan mengembalikan seluruh daftar ke bahasa Inggris.
+            $sudahAda = DB::table('country_regions')->where('code', $c['code'])->exists();
+
+            if ($sudahAda) {
+                DB::table('country_regions')->where('code', $c['code'])->update([
+                    'phone_code' => $c['phone_code'],
+                    'timezone' => $c['timezone'],
+                    'updated_at' => $now,
+                ]);
+            } else {
+                DB::table('country_regions')->insert([
                     'code' => $c['code'],
                     'iso3' => $c['iso3'],
                     'name' => $c['name'],
@@ -281,20 +290,8 @@ class WorldCountriesSeeder extends Seeder
                     'active' => true,
                     'created_at' => $now,
                     'updated_at' => $now,
-                ]
-            );
-
-            // 2. Sync global country_regions table for party / address reference
-            DB::table('country_regions')->updateOrInsert(
-                ['code' => $c['code']],
-                [
-                    'code' => $c['code'],
-                    'iso3' => $c['iso3'],
-                    'name' => $c['name'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]
-            );
+                ]);
+            }
 
             // 3. Seed administrative division timezone mapping
             DB::table('ref_administrative_division_timezones')->updateOrInsert(

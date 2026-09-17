@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\ReferenceData\AddressHierarchy\Country;
+use App\Models\CountryRegion;
 use App\Models\ReferenceData\AddressHierarchy\Province;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +23,7 @@ class WorldProvincesSeeder extends Seeder
         $subdivisionsPath = __DIR__.'/data/world_provinces_dataset.php';
         $countrySubdivisions = file_exists($subdivisionsPath) ? require $subdivisionsPath : [];
 
-        $allCountries = Country::all();
+        $allCountries = CountryRegion::all();
 
         foreach ($allCountries as $country) {
             $cc = strtoupper($country->code);
