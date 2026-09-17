@@ -64,7 +64,7 @@ kind: business-app
 requires:
   core: ^1.0
 dependsOn:
-  business-partner: ^1.0
+  human-resources: ^1.0
 api:
   image: registry.apperp.local/apps/accounting-api:1.0.0
   openapi: contracts/openapi.yaml

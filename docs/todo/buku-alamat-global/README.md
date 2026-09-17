@@ -92,7 +92,7 @@ Dua alasan lain menguatkannya:
 | Keputusan | Diambil | Yang dibeli | Yang dibayar |
 | --- | --- | --- | --- |
 | Bentuk acuan | **Global Address Book Dynamics 365**: satu direktori bersama; party adalah identitas, lokasi adalah tempat | Alamat diubah sekali dan seluruh peran ikut berubah; tidak ada app yang menyimpan alamat sendiri | Tabelnya lebih banyak daripada sekadar "kolom alamat di tabel pemasok" |
-| Pemilik party | **Core**, bukan app `business-partner` | Legal entity, operating unit, pegawai, pemasok, dan pasien hidup di satu direktori; identitas organisasi memang sudah di Core | Dokumen [app business-partner](../../apps/business-partner/) harus diperbaiki: app itu memiliki **peran** pemasok/pelanggan beserta proses bisnisnya, bukan identitas party-nya |
+| Pemilik party | **Core**. App `business-partner` dihapus dari repo pada 17 September 2026 | Legal entity, operating unit, pegawai, pemasok, dan pasien hidup di satu direktori; identitas organisasi memang sudah di Core | Modul bisnis memiliki **peran** pemasok/pelanggan beserta prosesnya, dan harus memanggil buku alamat untuk identitasnya |
 | Lokasi | **Berdiri sendiri** (`locations`), ditautkan ke party lewat tabel penghubung | Satu gedung dapat dipakai beberapa pihak; pindah kantor cukup satu baris | Satu tabel dan satu join tambahan pada setiap pembacaan alamat |
 | Kegunaan alamat | **Boleh lebih dari satu**, disimpan pada tautan party–lokasi | Satu alamat bisa sekaligus alamat bisnis, kirim, dan tagih | Kegunaan tidak lagi satu kolom yang terbaca sekilas |
 | Kontak elektronik | **Menempel ke lokasi**, seperti D365 | Telepon cabang melekat pada cabangnya | Kontak pada lokasi yang dipakai bersama otomatis ikut terbagi |
@@ -245,7 +245,6 @@ yang membuktikan keadaan sebelumnya tidak dapat menyamar sebagai keadaan berikut
 | OWN-01 | Memutuskan pembagian izin buku alamat. Usulan terkecil: baca untuk semua anggota tenant aktif (seperti sekarang), tulis lewat satu Gate baru `manage-address-book` yang terpisah dari `manage-access`, karena mengubah alamat pemasok bukan pekerjaan yang sama dengan mengatur hak akses | Keputusannya tertulis di halaman ini, dan Gate-nya ada di `AppServiceProvider` bersama `manage-*` yang lain |
 | OWN-02 | Menyetujui nomor party lewat Number Sequence: non-continuous, lingkup tenant, tanpa reset, format usulan `P-########` | Referensinya terdaftar dan tertulis di [Number sequence](../../dev/14-number-sequences.md) |
 | OWN-03 | Menyetujui penggabungan dua tabel negara, dan menunjuk siapa yang mengerjakan master wilayah yang ikut berubah | Keputusan tertulis; pemilik kerjanya tahu |
-| OWN-04 | Menegaskan batas app `business-partner`: Core memiliki identitas party, app memiliki peran pemasok/pelanggan beserta prosesnya | [Dokumen app business-partner](../../apps/business-partner/) diperbaiki agar tidak lagi menjanjikan identitas party |
 
 ### Tahap 1 — Core, buku alamat
 
@@ -307,4 +306,3 @@ yang membuktikan keadaan sebelumnya tidak dapat menyamar sebagai keadaan berikut
 | [Dokumen cetak, layout, dan ekspor](../../dev/23-document-rendering.md) | Kalimat tentang dari mana kop membaca kontak |
 | [Organisasi dan konsolidasi](../general/01-organisasi-dan-konsolidasi.md) | `ORG-01` ditutup dengan menunjuk halaman ini |
 | [Layanan platform](../general/04-layanan-platform.md) | `PLAT-04` ditutup dengan menunjuk halaman ini |
-| [App business-partner](../../apps/business-partner/) | Batas identitas versus peran, sesuai OWN-04 |
