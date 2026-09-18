@@ -4,6 +4,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     Briefcase,
     Building2,
+    CalendarCheck,
     CalendarDays,
     Clock,
     Contact,
@@ -153,6 +154,21 @@ export function AppSidebar() {
                                         label: 'Pola jam kerja',
                                         icon: Clock,
                                         href: '/settings/working-time-templates',
+                                    },
+                                    {
+                                        label: 'Kalender kerja',
+                                        icon: CalendarDays,
+                                        href: '/settings/working-time-calendars',
+                                    },
+                                    {
+                                        label: 'Jadwal kerja',
+                                        icon: Clock,
+                                        href: '/settings/working-time-calendar-times',
+                                    },
+                                    {
+                                        label: 'Jadwal dari pola',
+                                        icon: CalendarCheck,
+                                        href: '/settings/compose-working-times',
                                     },
                                 ],
                             },

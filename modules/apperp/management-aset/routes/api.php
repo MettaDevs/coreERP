@@ -34,6 +34,7 @@ use Modules\Apperp\ManagementAset\Http\Controllers\master\TipeWorkOrderControlle
 use Modules\Apperp\ManagementAset\Http\Controllers\master\TradeController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\ValidasiStatusWorkOrderController;
 use Modules\Apperp\ManagementAset\Http\Controllers\ReferenceDataController;
+use Modules\Apperp\ManagementAset\Http\Controllers\ReportPreviewController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\DokumenSiklusAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\AssetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\DepreciationController;
@@ -155,6 +156,7 @@ Route::prefix('v1')->middleware('konteks-module:management-aset')->group(functio
     Route::get('penyusutan/buku', [DepreciationController::class, 'books']);
     Route::post('penyusutan/{id}/finalisasi', [DepreciationController::class, 'finalize']);
     Route::post('penyusutan/{id}/reversal', [DepreciationController::class, 'reverse']);
+    Route::get('laporan/{code}', [ReportPreviewController::class, 'show']);
 
     foreach ($masters as $slug => $controller) {
         Route::get($slug, [$controller, 'index']);

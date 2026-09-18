@@ -75,6 +75,24 @@ const WorkOrderPage = lazy(
 const FixedAssetSetupPlaceholderPage = lazy(
     () => import('./fixed-assets-setup/FixedAssetSetupPlaceholderPage'),
 );
+const LaporanPenyusutanAsetPage = lazy(
+    () => import('./laporan/LaporanPenyusutanAsetPage'),
+);
+const LaporanMutasiAsetPage = lazy(
+    () => import('./laporan/LaporanMutasiAsetPage'),
+);
+const LaporanMonitoringAsetPage = lazy(
+    () => import('./laporan/LaporanMonitoringAsetPage'),
+);
+const LaporanPemeliharaanAsetPage = lazy(
+    () => import('./laporan/LaporanPemeliharaanAsetPage'),
+);
+const LaporanPenjualanAsetPage = lazy(
+    () => import('./laporan/LaporanPenjualanAsetPage'),
+);
+const LaporanPemusnahanAsetPage = lazy(
+    () => import('./laporan/LaporanPemusnahanAsetPage'),
+);
 
 /**
  * Dokumen siklus hidup aset, berkunci id entri menunya.
@@ -247,6 +265,72 @@ export default function App({
                     context={konteks}
                     config={LIFECYCLE[view]}
                 />
+            </main>
+        );
+    }
+
+    if (
+        view === 'laporan-penyusutan-aset' &&
+        permissions.includes('management-aset.penyusutan.read')
+    ) {
+        return (
+            <main>
+                <LaporanPenyusutanAsetPage />
+            </main>
+        );
+    }
+
+    if (
+        view === 'laporan-mutasi-aset' &&
+        permissions.includes('management-aset.mutasi-aset.read')
+    ) {
+        return (
+            <main>
+                <LaporanMutasiAsetPage />
+            </main>
+        );
+    }
+
+    if (
+        view === 'laporan-monitoring-aset' &&
+        permissions.includes('management-aset.monitoring-aset.read')
+    ) {
+        return (
+            <main>
+                <LaporanMonitoringAsetPage />
+            </main>
+        );
+    }
+
+    if (
+        view === 'laporan-pemeliharaan-aset' &&
+        permissions.includes('management-aset.pemeliharaan-aset.read')
+    ) {
+        return (
+            <main>
+                <LaporanPemeliharaanAsetPage />
+            </main>
+        );
+    }
+
+    if (
+        view === 'laporan-penjualan-aset' &&
+        permissions.includes('management-aset.penjualan-aset.read')
+    ) {
+        return (
+            <main>
+                <LaporanPenjualanAsetPage />
+            </main>
+        );
+    }
+
+    if (
+        view === 'laporan-pemusnahan-aset' &&
+        permissions.includes('management-aset.pemusnahan-aset.read')
+    ) {
+        return (
+            <main>
+                <LaporanPemusnahanAsetPage />
             </main>
         );
     }
