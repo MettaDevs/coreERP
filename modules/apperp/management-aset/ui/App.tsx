@@ -167,7 +167,9 @@ export default function App({
 
     if (
         view === 'fixed-aset-posting-profiles' &&
-        permissions.includes('management-aset.fixed-asset-posting-profiles.read')
+        permissions.includes(
+            'management-aset.fixed-asset-posting-profiles.read',
+        )
     ) {
         return (
             <main>
