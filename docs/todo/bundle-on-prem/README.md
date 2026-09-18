@@ -17,7 +17,7 @@ orang lain, yang kita punya baru cara membangun, bukan cara mengirim.
 
 | Bagian | Keadaan | Tempatnya |
 | --- | --- | --- |
-| Menghitung modul sebuah edisi | Ada | `php artisan edition:resolve` |
+| Menghitung modul yang ikut ke dalam image | Ada | `php artisan edition:modules` |
 | Membangun image edisi | Ada | `scripts/build-edition.sh` |
 | Membuktikan modul yang tidak dibeli tidak ada di dalam image | Ada, dijaga CI | `scripts/verify-edition.sh` |
 | Membuktikan sisa mesin pembangun tidak ikut | Ada, dijaga CI | `scripts/periksa-sisa-mesin.sh` |

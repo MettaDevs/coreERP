@@ -19,7 +19,7 @@ use Modules\Apperp\ContohA\Models\Barang;
  * dipertukarkan lebih dulu, dan tidak ada layar kosong selama permintaan kedua berjalan.
  *
  * Nama halaman berbentuk `<id module>::<berkas>` dan diselesaikan pemilih halaman shell ke
- * `modules/apperp/contoh-a/ui/Pages/Daftar.tsx`. Yang menerjemahkannya adalah
+ * `apps/core/tests/Fixtures/modules/apperp/contoh-a/ui/Pages/Daftar.tsx`. Yang menerjemahkannya adalah
  * `resources/js/app.tsx`; module tidak perlu tahu di mana build shell meletakkan
  * potongannya.
  *

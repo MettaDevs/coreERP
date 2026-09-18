@@ -111,7 +111,7 @@ Polanya sudah ada di beberapa tempat dan tinggal diikuti:
 | `apps/core/tests/Feature/Boundary/PemindaiModul.php` | Modul palsu untuk penjaga batas |
 | `apps/core/tests/Feature/Boundary/ModulSedangDipindahTest.php` | Sepasang modul yang identik sampai ke barisnya, beda hanya nama folder |
 | `apps/core/tests/Feature/Boundary/SusunanManifestModulTest.php` | Manifest palsu yang membuktikan aturannya bisa merah |
-| `apps/core/tests/Feature/ControlPlane/EditionResolverTest.php` | Folder modul yang dibaca resolver edisi |
+| `apps/core/tests/Feature/ControlPlane/EditionModulesTest.php` | Folder modul yang dibaca penentu isi image |
 
 ## Setiap tabel yang diisi migrasi terdaftar sebagai pengecualian pemangkasan
 

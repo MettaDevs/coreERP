@@ -1,16 +1,21 @@
 name: edition
 
-# Membangun dua image edisi dan membuktikan modul yang tidak dibeli tidak ada di dalamnya.
+# Membangun image dan membuktikan yang tidak boleh dikirim tidak ada di dalamnya.
 #
 # Alur ini terpisah dari `tests.yml` dengan sengaja. Ia membangun image — pekerjaan yang jauh
 # lebih lambat daripada suite test — dan yang dijaganya juga berbeda jenisnya: `tests.yml`
-# menjawab "apakah kodenya benar", alur ini menjawab "apakah yang dikirim ke pelanggan hanya
-# yang dibayarnya". Menggabungkannya membuat setiap perubahan satu baris PHP ikut menunggu dua
-# image selesai dibangun.
+# menjawab "apakah kodenya benar", alur ini menjawab "apakah yang dikirim ke klien memang hanya
+# yang boleh dikirim". Menggabungkannya membuat setiap perubahan satu baris PHP ikut menunggu
+# sebuah image selesai dibangun.
 #
-# Dua edisi dibangun, bukan satu, dan itu bukan kelengkapan: `praktek-dr-budi` tidak membeli
-# satu pun modul, sehingga **apa pun** jejak modul di dalam image-nya adalah cacat tanpa perlu
-# diperdebatkan. `apotek-sejahtera` menjadi pembandingnya, tempat jejak itu justru wajib ada.
+# **Satu image dibangun, bukan dua.** Sampai 18 September 2026 alur ini membangun dua edisi
+# pelanggan — satu yang membeli modul aset, satu yang tidak membeli apa pun — dan pasangan itu
+# yang membuat pemeriksa kebocoran berarti. Edisi per pelanggan dicabut: yang dibagikan satu
+# image berisi seluruh modul, dan modul dikunci lisensi dari admin.erp.
+#
+# Yang tersisa untuk dijaga adalah modul bahan uji, dan ia tidak menuntut edisi kedua untuk
+# dibuktikan. Bahan uji itu sendiri pindah ke `apps/core/tests/Fixtures/modules` di hari yang
+# sama, jadi jejaknya di dalam image berarti tiga penjaga sekaligus gagal — bukan satu.
 
 on:
   pull_request:
@@ -48,13 +53,13 @@ jobs:
     # SATU blok `env`, dan bukan kerapian. Commit 282e730 (11 September 2026) menambahkan blok
     # kedua di atas `services`, dan YAML dengan kunci ganda ditolak GitHub sebelum satu langkah pun
     # berjalan: setiap push sesudahnya berakhir "workflow file issue" dalam 0 detik, dan
-    # pemeriksa kebocoran edisi tidak menjaga satu PR pun sejak itu. Parser YAML yang longgar —
+    # pemeriksa kebocoran image tidak menjaga satu PR pun sejak itu. Parser YAML yang longgar —
     # termasuk `yaml.safe_load` Python — diam-diam memakai blok terakhir, jadi berkasnya terlihat sah.
     env:
       # OTEL_PHP_DISABLED_INSTRUMENTATIONS: alasannya ditulis lengkap di alur tests.
       #
       # `PASANG_OTEL: '0'` melewatkan kompilasi ekstensi `opentelemetry` saat membangun image.
-      # Alur ini membangun dua image pada setiap PR hanya untuk membuktikan pemangkasan module
+      # Alur ini membangun image pada setiap PR hanya untuk membuktikan pemangkasan module
       # bekerja, lalu membuangnya. Konsekuensinya disadari dan diterima: image yang diverifikasi
       # di sini bukan image yang dikirim ke pelanggan. Yang dikirim dirakit perakit dari
       # `deploy/perakit/Dockerfile` (alur `rilis.yml`), yang selalu mengompilasi ekstensinya.
@@ -72,8 +77,8 @@ jobs:
         with:
           persist-credentials: false
 
-      # PHP dibutuhkan di runner, bukan hanya di dalam image: daftar modul sebuah edisi dihitung
-      # `edition:resolve` di luar image. Menghitungnya dari dalam image berarti image yang bocor
+      # PHP dibutuhkan di runner, bukan hanya di dalam image: daftar modul yang ikut dihitung
+      # `edition:modules` di luar image. Menghitungnya dari dalam image berarti image yang bocor
       # menilai dirinya sendiri.
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
@@ -99,25 +104,20 @@ jobs:
         run: |
           echo "APP_KEY=$(grep '^APP_KEY=' apps/core/.env | cut -d= -f2-)" >> "$GITHUB_ENV"
 
-      # Ditanam sebelum kedua image dibangun, dan diperiksa sesudahnya. Runner melakukan checkout
+      # Ditanam sebelum image dibangun, dan diperiksa sesudahnya. Runner melakukan checkout
       # bersih, jadi sisa mesin pembangun tidak pernah ada di sini dengan sendirinya — sebuah
       # pemeriksa yang hanya lulus karena keadaannya tidak pernah terjadi tidak memeriksa apa pun.
       # Langkah ini yang membuat keadaannya terjadi.
       - name: Tanam penanda sisa mesin pembangun
         run: bash scripts/periksa-sisa-mesin.sh tanam
 
-      - name: Bangun edisi apotek-sejahtera
-        run: bash scripts/build-edition.sh apotek-sejahtera coreerp-edisi:apotek-sejahtera
+      - name: Bangun image
+        run: bash scripts/build-edition.sh coreerp-edisi:uji
 
-      - name: Bangun edisi praktek-dr-budi
-        run: bash scripts/build-edition.sh praktek-dr-budi coreerp-edisi:praktek-dr-budi
+      - name: Periksa sisa mesin pembangun
+        run: bash scripts/periksa-sisa-mesin.sh periksa coreerp-edisi:uji
 
-      - name: Periksa sisa mesin pembangun, kedua edisi
-        run: |
-          bash scripts/periksa-sisa-mesin.sh periksa coreerp-edisi:apotek-sejahtera
-          bash scripts/periksa-sisa-mesin.sh periksa coreerp-edisi:praktek-dr-budi
-
-      # Pasangan merah untuk pemeriksaan di atas, dan ia tidak membangun ulang image edisi: satu
+      # Pasangan merah untuk pemeriksaan di atas, dan ia tidak membangun ulang image: satu
       # image sekali pakai berisi tiga baris sudah cukup untuk membuktikan pemeriksanya bisa gagal.
       - name: Buktikan pemeriksa sisa mesin bisa merah
         run: bash scripts/periksa-sisa-mesin.sh buktikan-merah
@@ -126,45 +126,43 @@ jobs:
         if: always()
         run: bash scripts/periksa-sisa-mesin.sh bersihkan
 
-      - name: Periksa kebocoran, edisi apotek-sejahtera
-        run: bash scripts/verify-edition.sh apotek-sejahtera coreerp-edisi:apotek-sejahtera
+      - name: Periksa kebocoran
+        run: bash scripts/verify-edition.sh coreerp-edisi:uji
 
-      # Database dibuang dan dibuat ulang di antara dua pemeriksaan. Tanpa itu, tabel yang
-      # dibuat pemeriksaan pertama masih ada saat yang kedua berjalan, dan edisi Core-saja akan
-      # dinyatakan bocor karena tabel milik pemeriksaan sebelumnya.
+      # Database dibuang dan dibuat ulang sebelum pemeriksaan berikutnya. Tanpa itu, tabel yang
+      # dibuat pemeriksaan di atas masih ada saat pasangan merahnya berjalan, dan modul yang
+      # diperlakukan terlarang akan dinyatakan bocor karena tabel milik pemeriksaan sebelumnya —
+      # merah karena alasan yang salah, yaitu merah yang tidak membuktikan apa pun.
       - name: Kosongkan database
         run: |
           PGPASSWORD=$DB_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d postgres \
             -c "drop database if exists $DB_DATABASE" -c "create database $DB_DATABASE"
 
-      - name: Periksa kebocoran, edisi praktek-dr-budi
-        run: bash scripts/verify-edition.sh praktek-dr-budi coreerp-edisi:praktek-dr-budi
-
       # Langkah ini yang membuat kedua langkah di atas berarti. Sebuah pemeriksa kebocoran yang
       # belum pernah gagal tidak dapat dibedakan dari pemeriksa yang tidak memeriksa apa pun,
       # dan yang kedua jauh lebih berbahaya karena ia mengakhiri pencarian.
       #
-      # Modul yang **memang dibeli** edisi apotek diperlakukan seolah tidak dibeli. Pemeriksanya
-      # harus merah; kalau ia hijau, alur ini gagal di sini.
+      # Modul yang **memang dikirim** diperlakukan seolah terlarang. Pemeriksanya harus merah;
+      # kalau ia hijau, alur ini gagal di sini.
       - name: Buktikan pemeriksanya bisa merah
         run: |
           set +e
-          keluaran="$(bash scripts/verify-edition.sh apotek-sejahtera coreerp-edisi:apotek-sejahtera --anggap-tidak-dibeli management-aset 2>&1)"
+          keluaran="$(bash scripts/verify-edition.sh coreerp-edisi:uji --anggap-terlarang management-aset 2>&1)"
           kode=$?
           set -e
           echo "$keluaran"
           if [ "$kode" -eq 0 ]; then
-            echo "::error::Pemeriksa kebocoran hijau padahal modul yang dibeli diperlakukan sebagai terlarang. Ia tidak memeriksa apa pun."
+            echo "::error::Pemeriksa kebocoran hijau padahal modul yang dikirim diperlakukan sebagai terlarang. Ia tidak memeriksa apa pun."
             exit 1
           fi
           echo "Pemeriksa gagal seperti yang diharapkan, dengan kode keluar $kode."
 
       # Pasangan merah untuk jalur 1 — folder aplikasi di dalam image — dan ia berdiri sendiri
-      # karena jalur itu berdiri sendiri. `--anggap-tidak-dibeli` di langkah atas hanya
-      # menggerakkan ketiga jalur modul: pemeriksaan folder aplikasi boleh rusak sepenuhnya tanpa
-      # satu langkah pun di alur ini berubah warna.
+      # karena jalur itu berdiri sendiri. `--anggap-terlarang` di langkah atas hanya menggerakkan
+      # ketiga jalur modul: pemeriksaan folder aplikasi boleh rusak sepenuhnya tanpa satu langkah
+      # pun di alur ini berubah warna.
       #
-      # Tidak ada image edisi yang dibangun ulang di sini. Dua image sekali pakai berisi dua baris
+      # Tidak ada image sungguhan yang dibangun ulang di sini. Dua image sekali pakai berisi dua baris
       # sudah cukup: satu hanya memuat `apps/core`, satu lagi ditambah `apps/control-plane`.
       # Skripnya yang gagal sendiri bila pemeriksanya tetap hijau pada image yang bocor — atau
       # bila ia justru merah pada image yang bersih, karena pemeriksa yang selalu merah akan

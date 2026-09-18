@@ -1,11 +1,11 @@
 id: contoh-b
 name: Contoh B
-description: Module contoh untuk menguji penjaga batas. Bukan produk, dan tidak pernah ikut ke edisi pelanggan.
+description: Module contoh untuk menguji penjaga batas. Bukan produk, dan tidak pernah ikut ke image yang dibagikan ke klien.
 publisher: apperp
 version: 0.1.0
 
 # internal-fixture, bukan business-app. Module contoh hidup di repo sampai fase 7, jadi ia
-# ada saat bundle edisi dibangun. Tanda inilah yang dipakai F5-04 untuk menolaknya, beserta
+# ada saat image dibangun. Tanda inilah yang dipakai F5-04 untuk menolaknya, beserta
 # test yang membuktikan penolakannya.
 kind: internal-fixture
 

@@ -207,10 +207,21 @@ class ModuleLifecycleTest extends TestCase
      */
     private function jadikanBergantung(string $moduleId, string $bergantungPada): void
     {
-        $akarAsli = dirname(base_path(), 2).'/modules';
+        // Seluruh akar yang dipindai registry, bukan hanya `modules/`. Bahan uji penjaga batas
+        // pindah ke `tests/Fixtures/modules` pada 18 September 2026, dan menyalin dari satu akar
+        // saja membuat folder sementara ini kehilangan `contoh-a` dan `contoh-b` — dua module yang
+        // justru dipakai kedua test dependency di atas.
         $akarSementara = sys_get_temp_dir().'/coreerp-lifecycle-'.bin2hex(random_bytes(6));
 
-        foreach (glob($akarAsli.'/*/*/app.yaml') ?: [] as $manifest) {
+        $manifestAsli = [];
+
+        foreach (config()->array('modules.akar') as $akar) {
+            $manifestAsli = [...$manifestAsli, ...(glob($akar.'/*/*/app.yaml') ?: [])];
+        }
+
+        $this->assertNotSame([], $manifestAsli, 'Tidak satu pun manifest module terbaca; pemindaiannya salah alamat.');
+
+        foreach ($manifestAsli as $manifest) {
             $folder = dirname($manifest);
             $tujuan = $akarSementara.'/'.basename(dirname($folder)).'/'.basename($folder);
 

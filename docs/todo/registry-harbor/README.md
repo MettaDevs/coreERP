@@ -451,11 +451,30 @@ pendaftaran (menunggu CP-04), PK-03, dan PK-04. Rilis `0.2.0` dari commit `cbda6
 pertama: image 112 MB, manifest v2 bertanda tangan di `/var/lib/coreerp-perakit/rilis/0.2.0`. Dua hal yang
 dipelajari saat merakitnya:
 
-- **Nomor rilis diberikan operator** (`--rilis`), bukan dibaca dari `editions/*.yaml`, karena berkas edisi
-  menyimpan nomor per pelanggan sedangkan image dipakai semua klien.
+- **Nomor rilis diberikan operator** (`--rilis`), bukan dibaca dari berkas apa pun di repo, karena berkas
+  yang ikut menyimpan nomor rilis akan menyimpang dari tag yang benar-benar ada di Harbor. Folder
+  `editions/` yang dulu menyimpannya per pelanggan sudah dihapus seluruhnya pada 18 September 2026;
+  `scripts/build-bundle.sh` dan `scripts/build-release-files.sh` ikut memakai `--rilis` sejak itu.
 - **Image pendamping jauh lebih besar dari image aplikasi**: gotenberg 702 MB dan postgres 116 MB
   terkompres. Pemasangan pertama di server yang mengunduh ±0,13 MB/s — seperti server kedua — menarik
   ±930 MB, sekitar dua jam. Keduanya hanya ditarik ulang saat versinya berubah.
+
+### Edisi per pelanggan sudah dicabut
+
+Selesai 18 September 2026, di luar urutan PK di atas. Folder `editions/` dihapus, `edition:resolve`
+diganti `edition:modules` yang menghitung seluruh modul dikurangi bahan uji, dan `edition.yml`
+membangun satu image alih-alih satu per pelanggan.
+
+Bahan uji penjaga batas — `contoh-a` dan `contoh-b` — ikut pindah ke `apps/core/tests/Fixtures/modules`
+pada hari yang sama. Sebabnya ditemukan saat mengerjakan ini: `deploy/perakit/Dockerfile` sengaja tidak
+memangkas apa pun, jadi keduanya **ikut ke image yang dikirim** dan `uji-image.sh` tidak memeriksanya.
+Sekarang tiga hal menahannya, dan tidak satu pun berupa pemangkasan: `config('modules.akar')` hanya
+menyebut akar bahan uji saat `APP_ENV=testing`, autoload-nya hidup di `autoload-dev`, dan tahap akhir
+Dockerfile membuang `apps/core/tests`.
+
+Yang **belum** ikut berubah dan tetap menjadi CP-04: kolom `edition` di admin.erp. Selama kolom itu ada,
+`scripts/build-release-files.sh` dan `scripts/build-bundle.sh` menulis `"edisi": "coreerp"` sebagai nilai
+tetap — membuangnya lebih dulu membuat setiap situs yang sudah berjalan menolak pembaruan berikutnya.
 
 ### Agen — `deploy/agent/`, `scripts/update.sh`, `deploy/compose.edition.yaml`
 
@@ -520,9 +539,13 @@ volume databasenya dihapus oleh pemilik produk sendiri.
 - **Tabel baru milik sisi pusat** butuh model penanda `OwnedByControlPlane` di `apps/core/app/Models` dan
   dicatat di `tests/Feature/Boundary/BatasPusatTest.php`. Jalankan `tests/Feature/Boundary` setiap kali
   menambah migration.
-- **Perintah uji di laptop Windows**: `php vendor/phpunit/phpunit/phpunit` (bukan `php artisan test`),
+- **Perintah uji di laptop Windows**: suite Core paralel dua tahap seperti CI
+  (`php artisan test --parallel --exclude-group=serial` lalu `php artisan test --group=serial`, atau
+  `composer test:fast`) — bukan phpunit polos atas seluruh suite, yang memuat grup `serial` bersama
+  sisanya. Phpunit langsung (`php vendor/phpunit/phpunit/phpunit`) tetap yang benar untuk satu berkas,
+  satu folder, atau `--filter`, dan untuk suite konsol yang memang tidak memasang ParaTest. Selebihnya:
   `node node_modules/<alat>/bin/...` (bukan `npx`), suite konsol dengan `DB_TEST_SCHEMA=coreerp_test_konsol`,
-  suite agen di container `ubuntu:24.04`. Setiap putaran test dibatasi paling lama sepuluh menit.
+  suite agen di container `ubuntu:24.04`. Aturan lengkapnya di `AGENTS.md`.
 - **Server**: tidak mengubah setelan keamanan server — SSH, firewall, setelan statis Traefik — tanpa
   persetujuan pemilik produk. Rahasia tidak pernah dicetak di terminal, log, atau percakapan.
 - **Bukti**: setiap penjaga baru dibuktikan dapat merah, dengan mencabut penjaganya di salinan dan

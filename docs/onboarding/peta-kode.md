@@ -15,7 +15,7 @@ Semua path relatif terhadap `apps/core` kecuali disebutkan lain.
 | `app/Support/Modules/ModuleRegistry.php`, `ModuleManifest.php` | [Standar module](/dev/02-module-standard) — pembacaan `app.yaml` |
 | `app/Support/Modules/ModuleMigrator.php`, `ModuleMigrationRepository.php` | [Development stack lokal](/dev/11-local-docker-development) |
 | `app/Support/Modules/TenantScope.php` dan trait `MilikTenant` | [Standar module](/dev/02-module-standard#penyaringan-tenant) |
-| `app/Support/Modules/EditionResolver.php`, `editions/` (root repo) | [Release dan on-prem](/dev/03-release-and-on-prem#dua-bentuk-rilis) |
+| `app/Support/Modules/EditionModules.php`, `config/modules.php` | [Release dan on-prem](/dev/03-release-and-on-prem#dua-bentuk-rilis) |
 | `tests/Feature/Boundary/` | [Definition of done](/onboarding/definition-of-done) — penjaga batas yang memindai `modules/` |
 | `app/Console/Commands/Module*.php`, `RegisterAppManifestCommand.php` | [Mendaftarkan katalog produk](/dev/13-publishing-an-app-release) |
 | `resources/js/lib/halaman-module.tsx` | Tuan rumah halaman module di dalam shell |

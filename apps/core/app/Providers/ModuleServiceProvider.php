@@ -32,8 +32,14 @@ final class ModuleServiceProvider extends ServiceProvider
         // menambah barisnya adalah keputusan arsitektur, bukan kenyamanan.
         CoreServices::daftarkan($this->app);
 
+        // Akarnya dibaca dari config, bukan dihitung di sini. Bahan uji penjaga batas hidup di
+        // akar kedua yang hanya disebut saat `APP_ENV=testing`, sehingga ia tidak bergantung pada
+        // pemangkasan image untuk tidak sampai ke klien. Alasan lengkapnya di `config/modules.php`.
+        // Disaring `is_string`, bukan dioper apa adanya. Config adalah berkas yang boleh disunting
+        // siapa pun, dan sebuah entri yang bukan string akan berakhir sebagai pola `glob` yang
+        // diam-diam tidak cocok dengan apa pun — module hilang tanpa satu pun kesalahan.
         $this->app->singleton(ModuleRegistry::class, static fn (): ModuleRegistry => new ModuleRegistry(
-            dirname(base_path(), 2).'/modules',
+            array_values(array_filter(config()->array('modules.akar'), 'is_string')),
         ));
 
         // Penyedia layanan didaftarkan untuk **semua** module, termasuk yang sedang dipindah

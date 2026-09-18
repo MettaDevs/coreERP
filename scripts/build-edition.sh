@@ -1,19 +1,29 @@
 #!/usr/bin/env bash
 #
-# Bangun satu image untuk satu edisi pelanggan.
+# Bangun image yang dibagikan ke klien.
 #
-#   scripts/build-edition.sh <edisi> [tag]
-#   scripts/build-edition.sh apotek-sejahtera
-#   scripts/build-edition.sh praktek-dr-budi coreerp-praktek:uji
+#   scripts/build-edition.sh [tag]
+#   scripts/build-edition.sh
+#   scripts/build-edition.sh coreerp-edisi:uji
 #
-# Daftar module tidak dibaca langsung dari manifest edisi. `php artisan edition:resolve` yang
-# menghitungnya, karena daftar di manifest hanya menyebut yang dibeli pelanggan — dependency
-# transitif, module penghubung, dan penolakan bahan uji seluruhnya ditambahkan di sana. Skrip
-# ini hanya meneruskan hasilnya ke `docker build`.
+# **Satu image untuk seluruh klien, bukan satu image per pelanggan.** Sampai 18 September 2026
+# skrip ini menuntut nama edisi sebagai argumen, membaca `editions/<edisi>.yaml`, lalu memangkas
+# image mengikuti daftar modul yang dibeli pelanggan itu. Bentuk itu dicabut: image yang dibagikan
+# sekarang satu per rilis dan berisi seluruh modul, dan yang menentukan modul mana yang boleh
+# dibuka sebuah tenant adalah lisensi yang diterbitkan admin.erp. Alasannya di
+# `docs/todo/registry-harbor/README.md`.
+#
+# Yang tersisa dari pemangkasan justru bagian yang tidak pernah berurusan dengan pelanggan: modul
+# ber-`kind: internal-fixture` tetap tidak ikut. Daftarnya tidak ditulis di sini melainkan dihitung
+# `php artisan edition:modules`, karena daftar yang ditulis tangan akan ketinggalan pada hari
+# sebuah modul mendarat — dan ketinggalannya muncul sebagai menu yang hilang di layar klien.
+#
+# Tag tidak lagi dihitung dari nomor rilis. Nomor rilis dipegang operator dan diberikan kepada
+# perakit lewat `--rilis`; skrip ini hanya membangun, jadi tag-nya disebut pemanggil atau jatuh ke
+# `coreerp-edisi:local`.
 #
 # Aman dijalankan dua kali: ia tidak mengubah satu berkas pun di repo, dan `docker build` yang
-# diulang menghasilkan image yang sama dengan tag yang sama. Pembaruan on-prem dijalankan admin
-# di tempat pelanggan, jadi bentuk ini memang harus tahan diulang.
+# diulang menghasilkan image yang sama dengan tag yang sama.
 
 set -euo pipefail
 
@@ -24,55 +34,25 @@ gagal() {
     exit 1
 }
 
-# Daftar edisi yang ada, untuk ditempelkan pada pesan galat. Sebuah pesan "edisi tidak
-# ditemukan" yang tidak menyebut apa saja yang ada memaksa orang membuka folder sendiri.
-edisi_yang_ada() {
-    local berkas nama daftar=()
+tag="${1:-}"
 
-    for berkas in "$akar"/editions/*.yaml; do
-        [ -e "$berkas" ] || continue
-        nama="$(basename "$berkas" .yaml)"
-        daftar+=("$nama")
-    done
-
-    if [ ${#daftar[@]} -eq 0 ]; then
-        printf '(tidak ada satu pun di %s/editions)' "$akar"
-    else
-        printf '%s' "${daftar[*]}"
-    fi
-}
-
-edisi="${1:-}"
-tag="${2:-}"
-
-if [ -z "$edisi" ]; then
-    gagal \
-        'Edisi belum disebut.' \
-        '' \
-        'Pemakaian: scripts/build-edition.sh <edisi> [tag]' \
-        "Edisi yang ada: $(edisi_yang_ada)"
-fi
-
-manifest="$akar/editions/$edisi.yaml"
-
-if [ ! -f "$manifest" ]; then
-    gagal \
-        "Edisi \"$edisi\" tidak ada: $manifest tidak ditemukan." \
-        "Edisi yang ada: $(edisi_yang_ada)"
-fi
+[ "$#" -le 1 ] || gagal \
+    'Terlalu banyak argumen.' \
+    '' \
+    'Pemakaian: scripts/build-edition.sh [tag]' \
+    'Nama edisi sudah tidak dipakai: yang dibangun satu image untuk seluruh klien.'
 
 for perintah in php docker; do
     command -v "$perintah" >/dev/null 2>&1 \
-        || gagal "Perintah \`$perintah\` tidak ada di PATH; ia dibutuhkan untuk membangun image edisi."
+        || gagal "Perintah \`$perintah\` tidak ada di PATH; ia dibutuhkan untuk membangun image."
 done
 
-# `edition:resolve --daftar` mencetak satu id module per baris dan tidak mencetak apa pun untuk
-# edisi Core saja. Keluarannya ditangkap, bukan dibiarkan mengalir, supaya bisa diperiksa
-# bentuknya sebelum dipakai; kalau perintahnya gagal, pesannya dicetak ulang apa adanya karena
-# di sanalah sebab kegagalannya dijelaskan.
-if ! keluaran="$(cd "$akar/apps/core" && php artisan edition:resolve "$edisi" --daftar 2>&1)"; then
+# `edition:modules --daftar` mencetak satu id modul per baris. Keluarannya ditangkap, bukan
+# dibiarkan mengalir, supaya bisa diperiksa bentuknya sebelum dipakai; kalau perintahnya gagal,
+# pesannya dicetak ulang apa adanya karena di sanalah sebab kegagalannya dijelaskan.
+if ! keluaran="$(cd "$akar/apps/core" && php artisan edition:modules --daftar 2>&1)"; then
     printf '%s\n' "$keluaran" >&2
-    gagal "Daftar module edisi \"$edisi\" gagal dihitung."
+    gagal 'Daftar modul yang ikut ke dalam image gagal dihitung.'
 fi
 
 modul=()
@@ -83,46 +63,49 @@ while IFS= read -r baris; do
 
     [ -n "$baris" ] || continue
 
-    # Bentuk id module dikunci di sini, bukan dipercaya begitu saja. Baris yang bukan id — sisa
-    # hiasan, peringatan, apa pun — akan diteruskan ke `docker build` sebagai nama module dan
+    # Bentuk id modul dikunci di sini, bukan dipercaya begitu saja. Baris yang bukan id — sisa
+    # hiasan, peringatan, apa pun — akan diteruskan ke `docker build` sebagai nama modul dan
     # baru ketahuan sebagai kegagalan yang membingungkan jauh di dalam bangunan.
     case "$baris" in
-        [a-z0-9]*[!a-z0-9-]*) gagal "Keluaran \`edition:resolve\` tidak berbentuk id module: \"$baris\"" ;;
+        [a-z0-9]*[!a-z0-9-]*) gagal "Keluaran \`edition:modules\` tidak berbentuk id modul: \"$baris\"" ;;
         [a-z0-9]*) modul+=("$baris") ;;
-        *) gagal "Keluaran \`edition:resolve\` tidak berbentuk id module: \"$baris\"" ;;
+        *) gagal "Keluaran \`edition:modules\` tidak berbentuk id modul: \"$baris\"" ;;
     esac
 done <<< "$keluaran"
 
-daftar="${modul[*]:-}"
+# Nol modul berarti penghitungnya salah alamat, dan image yang dibangun dari situ berisi Core saja.
+# Image itu lulus setiap pemeriksaan kebocoran karena memang tidak ada yang bocor, jadi tidak ada
+# langkah sesudah ini yang akan menangkapnya. `edition:modules` sendiri sudah menolak folder modul
+# yang kosong; baris ini menjaga jalur yang tersisa — keluaran yang habis tersaring pemeriksa
+# bentuk di atas.
+[ ${#modul[@]} -gt 0 ] || gagal \
+    'Tidak satu pun modul terbaca dari `edition:modules`.' \
+    'Image yang dibangun dari daftar kosong berisi Core saja, dan tidak ada pemeriksaan sesudah' \
+    'ini yang dapat membedakannya dari image yang benar.'
 
-if [ -z "$tag" ]; then
-    # Nomor rilis dibaca dari satu kunci di kolom paling kiri manifest. Bentuknya dijaga
-    # `editions/README.md`; bila tidak ada, tag jatuh ke `local` daripada membangun image tanpa
-    # penanda versi sama sekali.
-    rilis="$(sed -n 's/^rilis:[[:space:]]*//p' "$manifest" | head -n 1 | tr -d '[:space:]"'"'")"
-    tag="coreerp-$edisi:${rilis:-local}"
-fi
+daftar="${modul[*]}"
 
-if [ ${#modul[@]} -eq 0 ]; then
-    printf 'Edisi "%s" tidak membeli satu module pun; image berisi Core saja.\n' "$edisi"
-else
-    printf 'Edisi "%s" memuat %d module: %s\n' "$edisi" "${#modul[@]}" "$daftar"
-fi
+# Tag bawaan sengaja tidak memuat nomor rilis. Nomor rilis dipegang operator dan diberikan kepada
+# `deploy/perakit/rakit.sh --rilis`; sebuah angka yang diambil skrip ini dari tempat lain akan
+# menyimpang dari tag yang benar-benar ada di registry, dan menyimpangnya baru terlihat saat sebuah
+# situs menarik rilis yang tidak pernah dirakit.
+tag="${tag:-coreerp-edisi:local}"
 
+printf 'Image memuat %d modul: %s\n' "${#modul[@]}" "$daftar"
 printf 'Tag image: %s\n\n' "$tag"
 
 # Konteks pembangunan adalah akar repo, bukan folder app. Alasannya ada di komentar paling atas
 # `apps/core/Dockerfile`.
 #
 # `PASANG_OTEL` diteruskan apa adanya dari lingkungan dan bawaannya `1`, jadi siapa pun yang
-# menjalankan skrip ini dengan tangan — termasuk pelanggan yang membangun dari sumber —
-# mendapat image utuh tanpa perlu tahu variabel ini ada. Yang menyetelnya ke `0` hanya alur
-# `edition.yml`, yang membangun untuk memverifikasi lalu membuang hasilnya.
+# menjalankan skrip ini dengan tangan mendapat image utuh tanpa perlu tahu variabel ini ada. Yang
+# menyetelnya ke `0` hanya alur `edition.yml`, yang membangun untuk memverifikasi lalu membuang
+# hasilnya.
 docker build \
     --file "$akar/apps/core/Dockerfile" \
-    --build-arg "MODUL=$daftar" \
-    --build-arg "PASANG_OTEL=${PASANG_OTEL:-1}" \
+    --build-arg MODUL="$daftar" \
+    --build-arg PASANG_OTEL="${PASANG_OTEL:-1}" \
     --tag "$tag" \
     "$akar"
 
-printf '\nImage edisi "%s" selesai dibangun sebagai %s.\n' "$edisi" "$tag"
+printf '\nImage selesai dibangun sebagai %s.\n' "$tag"

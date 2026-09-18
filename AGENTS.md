@@ -29,6 +29,20 @@
 - Sebelum membuat app, master, transaksi, workflow, atau integrasi baru, wajib gunakan `.agents/skills/module-discovery/SKILL.md`: cari referensi resmi Dynamics 365, buat proposal keputusan, dan tunggu persetujuan untuk pilihan material. Jika tidak ada padanan Dynamics, nyatakan dengan jelas.
 - SaaS dikelola control plane; on-prem perpetual berdiri sendiri, memakai update bertanda tangan, dan tanpa telemetry wajib.
 - Pertahankan perubahan user yang tidak terkait. Verifikasi hanya scope yang berubah dengan script Composer/NPM yang tersedia.
+- **Suite Core dijalankan paralel, dua tahap, persis seperti CI.** Dari `apps/core`:
+
+  ```bash
+  php artisan test --parallel --exclude-group=serial --exclude-group=lambat
+  php artisan test --group=serial
+  ```
+
+  Atau `composer test:fast`, yang menjalankan keduanya berurutan. Tambahkan `--exclude-group=lambat` hanya untuk putaran cepat saat mengerjakan; sebelum menyatakan sesuatu hijau, jalankan tanpa mengecualikannya, karena itu yang dilakukan CI di luar pull request.
+
+  **Jangan menjalankan `php vendor/phpunit/phpunit/phpunit` polos atas seluruh suite Core.** Ia serial dan memuat grup `serial` bersama sisanya — kombinasi yang tidak pernah dijalankan repo ini maupun CI, dan grup itu bernama `serial` justru karena isinya tidak boleh berjalan berbarengan dengan yang lain. Hasilnya bukan "lebih aman, cuma lambat", melainkan kegagalan yang tidak dapat dibedakan dari cacat kode. Phpunit langsung tetap yang benar untuk **satu berkas, satu folder, atau `--filter`** saat menelusuri kegagalan.
+
+  Dua alasan memilih paralel, dan keduanya berlaku setiap saat. Ia memakai seluruh inti mesin alih-alih satu — suite Core yang serial memakan puluhan menit. Dan ia membuat satu database per proses (`core_erp_test_1`, `_2`, …), sehingga putaran test tidak berebut `core_erp_test` dengan sesi atau worktree lain yang kebetulan berjalan di mesin yang sama.
+
+  **Suite `apps/control-plane` berbeda dan memang serial**: ia tidak memasang ParaTest dan tidak punya grup `serial`, jadi `php artisan test` atau phpunit langsung adalah yang benar di sana. Jangan menyeragamkannya tanpa memasang ParaTest lebih dulu.
 - Sebuah modul belum selesai hanya karena test feature lulus. Modul baru wajib melewati load test: 1000+ VU serentak, 100+ tenant, 2+ instance API di belakang load balancer, database asli (bukan SQLite), 90 detik pada beban penuh. Gate kebenaran—0 pelanggaran lintas tenant, 0 nomor ganda, 0 eskalasi hak, 0 error 5xx aplikasi—berlaku di perangkat keras apa pun dan diverifikasi lewat SQL langsung ke database, bukan lewat API yang sedang diuji. Gate latensi diukur pada concurrency yang masih tertahan, bukan pada titik jenuh. Rinciannya ada pada skill `coreerp-architecture`; contoh implementasi ada di `modules/apperp/management-aset/loadtest/`.
 
 Rules:

@@ -403,7 +403,7 @@ function tulisPenanda(string $akar, array $dibeli): void
 {
     buatFolder($akar.'/modules');
 
-    $isi = "# Module yang ikut di dalam image ini. Dihitung `php artisan edition:resolve`.\n";
+    $isi = "# Module yang ikut di dalam image ini. Dihitung `php artisan edition:modules`.\n";
 
     foreach ($dibeli as $id) {
         $isi .= $id."\n";
@@ -417,7 +417,7 @@ function tulisPenanda(string $akar, array $dibeli): void
  *
  * `app.yaml` dibaca dengan pola sederhana, bukan dengan `symfony/yaml`: tahap `pasang` berjalan
  * sebelum `composer install`, jadi belum ada satu pun paket yang terpasang. Yang dibutuhkan
- * hanya satu kunci di kolom paling kiri, dan bentuk itu dijaga `editions/README.md`.
+ * hanya satu kunci di kolom paling kiri.
  *
  * @return list<array{id: string, folder: string, relatif: string, paket: string}>
  */
@@ -480,7 +480,7 @@ function bacaId(string $manifest): ?string
  * Module yang dibeli tapi tidak ada di repo adalah kesalahan, bukan hal yang disaring diam-diam.
  *
  * Menyaringnya tanpa suara menghasilkan image yang berhasil dibangun dan kekurangan module yang
- * dibayar pelanggan — kegagalan yang baru terlihat di server pelanggan. `edition:resolve` sudah
+ * dibayar pelanggan — kegagalan yang baru terlihat di server pelanggan. `edition:modules` sudah
  * menolaknya lebih dulu; pemeriksaan ini menangkap daftar yang sampai ke sini lewat jalan lain.
  *
  * @param  list<array{id: string, folder: string, relatif: string, paket: string}>  $module

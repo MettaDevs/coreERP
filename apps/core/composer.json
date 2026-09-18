@@ -19,8 +19,6 @@
     ],
     "require": {
         "php": "^8.4",
-        "apperp/contoh-a": "@dev",
-        "apperp/contoh-b": "@dev",
         "apperp/human-resources": "@dev",
         "apperp/management-aset": "@dev",
         "dedoc/scramble": "^0.13.35",
@@ -63,7 +61,11 @@
         "psr-4": {
             "Tests\\": "tests/",
             "Modules\\Apperp\\ManagementAset\\Tests\\": "../../modules/apperp/management-aset/tests/",
-            "Modules\\Apperp\\HumanResources\\Tests\\": "../../modules/apperp/human-resources/tests/"
+            "Modules\\Apperp\\HumanResources\\Tests\\": "../../modules/apperp/human-resources/tests/",
+            "Modules\\Apperp\\ContohA\\": "tests/Fixtures/modules/apperp/contoh-a/src/",
+            "Modules\\Apperp\\ContohA\\Database\\Seeders\\": "tests/Fixtures/modules/apperp/contoh-a/database/seeders/",
+            "Modules\\Apperp\\ContohB\\": "tests/Fixtures/modules/apperp/contoh-b/src/",
+            "Modules\\Apperp\\ContohB\\Database\\Seeders\\": "tests/Fixtures/modules/apperp/contoh-b/database/seeders/"
         }
     },
     "scripts": {
