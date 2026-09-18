@@ -85,12 +85,6 @@ parameters:
 			path: app/Http/Controllers/Access/AccessController.php
 
 		-
-			message: '#^Method App\\Http\\Controllers\\Access\\AccessController\:\:hierarchies\(\) should return Illuminate\\Support\\Collection\<int, array\{id\: string, name\: string, version_id\: string\|null, nodes\: array\<int, array\{organization_id\: string, parent_organization_id\: string\|null\}\>\}\> but returns Illuminate\\Support\\Collection\<int, array\{id\: string, name\: string, version_id\: string\|null, nodes\: array\<int, array\{organization_id\: string, parent_organization_id\: string\|null\}\>\}\>\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Http/Controllers/Access/AccessController.php
-
-		-
 			message: '#^Method App\\Http\\Controllers\\Access\\AccessController\:\:invitations\(\) should return Illuminate\\Support\\Collection\<int, array\<string, mixed\>\> but returns Illuminate\\Support\\Collection\<int, array\{id\: string, redeemed_count\: int\<0, max\>, system_role\: string, label\: string\|null, roles\: Illuminate\\Support\\Collection\<int, mixed\>, assignments\: Illuminate\\Support\\Collection\<int, array\{role_id\: string, role_name\: string, policy_scopes\: Illuminate\\Support\\Collection\<int, array\{policy_code\: mixed, legal_entity_id\: mixed, organization_id\: mixed, hierarchy_id\: mixed, include_descendants\: bool, unrestricted\: bool\}\>\}\>, code\: string\|null, expires_at\: Illuminate\\Support\\Carbon\|null, \.\.\.\}\>\.$#'
 			identifier: return.type
 			count: 1
