@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetPlacement;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
@@ -135,7 +134,7 @@ final class AssetMutationReport implements ReportDefinition
         }
 
         // Subquery untuk lokasi asal dari penempatan sebelumnya untuk aset yang sama
-        $lokasiAsalSub = DB::table('aset_tr_penempatan_aset as p_prev')
+        $lokasiAsalSub = AssetPlacement::from('aset_tr_penempatan_aset as p_prev')
             ->leftJoin('aset_m_lokasi_aset as loc_prev', function ($join): void {
                 $join->on('loc_prev.id', '=', 'p_prev.asset_location_id')
                     ->on('loc_prev.tenant_id', '=', 'p_prev.tenant_id');
@@ -161,7 +160,7 @@ final class AssetMutationReport implements ReportDefinition
             ->limit(1);
 
         // Subquery untuk penanggung jawab asal (custodian penempatan sebelumnya)
-        $custodianAsalSub = DB::table('aset_tr_penempatan_aset as p_prev')
+        $custodianAsalSub = AssetPlacement::from('aset_tr_penempatan_aset as p_prev')
             ->select('p_prev.custodian_user_id')
             ->whereColumn('p_prev.asset_id', 'aset_tr_penempatan_aset.asset_id')
             ->whereColumn('p_prev.tenant_id', 'aset_tr_penempatan_aset.tenant_id')
