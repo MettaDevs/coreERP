@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Console\Commands;
 
 use Illuminate\Console\Command;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
@@ -41,6 +42,7 @@ class BangunLayoutLaporanBawaan extends Command
 
         $this->workOrderDocx($laporan.'/work-order/standar.docx');
         $this->workOrderListXlsx($laporan.'/daftar-work-order/standar.xlsx');
+        $this->penyusutanAsetXlsx($laporan.'/laporan-penyusutan-aset/standar.xlsx');
         $this->info('Layout bawaan dibangun ulang.');
 
         return self::SUCCESS;
@@ -213,6 +215,129 @@ class BangunLayoutLaporanBawaan extends Command
         (new XlsxWriter($spreadsheet))->save($path);
         $spreadsheet->disconnectWorksheets();
         $this->line("  ditulis: {$path}");
+    }
+
+    private function penyusutanAsetXlsx(string $path): void
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Penyusutan Aset');
+
+        $headings = [
+            'No.', 'Kode aset', 'Nama aset', 'Spesifikasi', 'Group aset', 'Golongan aset', 'Jenis aset',
+            'Bulan perolehan', 'Tahun perolehan', 'UE (Tahun)', 'UE (Bulan)', 'UE Saat Ini', 'Sisa UE (Bulan)',
+            'Persentase penyusutan', 'Nilai perolehan', 'Penyusutan per tahun', 'Penyusutan per bulan',
+            'Akumulasi penyusutan', 'Nilai buku akhir',
+        ];
+        $macros = [
+            'nomor', 'kode', 'nama', 'spesifikasi', 'group', 'golongan', 'jenis',
+            'bulan_perolehan', 'tahun_perolehan', 'umur_ekonomis_tahun', 'umur_ekonomis_bulan',
+            'umur_ekonomis_saat_ini', 'sisa_umur_ekonomis_bulan', 'persentase_penyusutan',
+            'nilai_perolehan', 'penyusutan_per_tahun', 'penyusutan_per_bulan',
+            'akumulasi_penyusutan', 'nilai_buku_akhir',
+        ];
+
+        $this->pasangKopSheet($sheet, count($headings));
+
+        $sheet->setCellValue('A5', 'Laporan Penyusutan Aset');
+        $sheet->getStyle('A5')->getFont()->setBold(true)->setSize(14);
+        $sheet->setCellValue('A6', 'Group Aset');
+        $sheet->setCellValue('B6', '${filter_group}');
+        $sheet->setCellValue('C6', 'Golongan');
+        $sheet->setCellValue('D6', '${filter_golongan}');
+        $sheet->setCellValue('E6', 'Jenis Aset');
+        $sheet->setCellValue('F6', '${filter_jenis}');
+        $sheet->setCellValue('A7', 'Nama Aset');
+        $sheet->setCellValue('B7', '${filter_aset}');
+        $sheet->setCellValue('C7', 'Periode');
+        $sheet->setCellValue('D7', '${filter_periode}');
+        $sheet->setCellValue('E7', 'Buku');
+        $sheet->setCellValue('F7', '${filter_buku}');
+        $sheet->setCellValue('A8', 'Jumlah Aset');
+        $sheet->setCellValue('B8', '${jumlah_aset}');
+        $sheet->setCellValue('C8', 'Dicetak');
+        $sheet->setCellValue('D8', '${dicetak_pada}');
+
+        $this->isiTabelXlsx($sheet, 10, $headings, $macros);
+
+        // Baris Total
+        $sheet->setCellValue('A12', 'Total');
+        $sheet->mergeCells('A12:N12');
+        $sheet->setCellValue('O12', '${total_nilai_perolehan}');
+        $sheet->setCellValue('P12', '${total_penyusutan_tahun}');
+        $sheet->setCellValue('Q12', '${total_penyusutan_bulan}');
+        $sheet->setCellValue('R12', '${total_akumulasi_penyusutan}');
+        $sheet->setCellValue('S12', '${total_nilai_buku_akhir}');
+        $totalStyle = $sheet->getStyle('A12:S12');
+        $totalStyle->getFont()->setBold(true);
+        $totalStyle->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');
+        $totalStyle->getBorders()->getTop()->setBorderStyle(Border::BORDER_THIN);
+        $totalStyle->getBorders()->getBottom()->setBorderStyle(Border::BORDER_DOUBLE);
+        $sheet->getStyle('O12:S12')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+        $this->ensureDirectory($path);
+        (new XlsxWriter($spreadsheet))->save($path);
+        $spreadsheet->disconnectWorksheets();
+        $this->line("  ditulis: {$path}");
+    }
+
+    private function pasangKopSheet($sheet, int $totalCols): void
+    {
+        $lastLetter = Coordinate::stringFromColumnIndex($totalCols);
+        $midEndLetter = Coordinate::stringFromColumnIndex(max(2, $totalCols - 1));
+
+        $sheet->setCellValue('A1', '${kop.logo_kiri}');
+        $sheet->mergeCells('A1:A3');
+        $sheet->setCellValue('B1', '${kop.induk}');
+        $sheet->mergeCells("B1:{$midEndLetter}1");
+        $sheet->setCellValue('B2', '${kop.nama}');
+        $sheet->mergeCells("B2:{$midEndLetter}2");
+        $sheet->setCellValue('B3', '${kop.alamat_baris}  ${kop.telepon}  ${kop.email}');
+        $sheet->mergeCells("B3:{$midEndLetter}3");
+        $sheet->setCellValue("{$lastLetter}1", '${kop.logo_kanan}');
+        $sheet->mergeCells("{$lastLetter}1:{$lastLetter}3");
+
+        $sheet->getStyle("B1:{$midEndLetter}3")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('B2')->getFont()->setBold(true)->setSize(13);
+        $sheet->getRowDimension(1)->setRowHeight(22);
+        $sheet->getRowDimension(2)->setRowHeight(24);
+        $sheet->getRowDimension(3)->setRowHeight(22);
+        $sheet->getStyle("A3:{$lastLetter}3")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_MEDIUM);
+    }
+
+    private function isiTabelXlsx($sheet, int $startRow, array $headings, array $macros): void
+    {
+        $lastCol = count($headings);
+        $lastLetter = Coordinate::stringFromColumnIndex($lastCol);
+
+        foreach ($headings as $index => $heading) {
+            $colNum = $index + 1;
+            $macro = $macros[$index];
+            $sheet->setCellValue([$colNum, $startRow], $heading);
+            $sheet->setCellValue([$colNum, $startRow + 1], '${baris.'.$macro.'}');
+
+            $width = match ($macro) {
+                'nomor' => 8,
+                'nama', 'nama_aset', 'item_aset' => 28,
+                'spesifikasi' => 26,
+                'keterangan' => 36,
+                'nilai_perolehan', 'nilai_buku_akhir',
+                'penyusutan_per_tahun', 'penyusutan_per_bulan', 'akumulasi_penyusutan' => 20,
+                default => 16,
+            };
+            $sheet->getColumnDimensionByColumn($colNum)->setWidth($width);
+        }
+
+        $headerRange = "A{$startRow}:{$lastLetter}{$startRow}";
+        $header = $sheet->getStyle($headerRange);
+        $header->getFont()->setBold(true);
+        $header->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E7E6E6');
+        $header->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
+        $header->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+        $nextRow = $startRow + 1;
+        $sheet->freezePane("A{$nextRow}");
+        $sheet->setAutoFilter($headerRange);
     }
 
     private function ensureDirectory(string $path): void
