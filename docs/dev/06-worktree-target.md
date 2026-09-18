@@ -33,7 +33,6 @@ CoreERP/                            # repository platform yang sekarang ini
 │   ├── provider-console/           # operasi provider, memakai Control Plane API
 │   └── web-shell/                  # host UI tenant dan launcher (belum ada, lihat tabel di atas)
 ├── modules/<penerbit>/<module>/    # module bisnis, berjalan di runtime Core
-├── editions/                       # satu berkas per pelanggan
 ├── deploy/                         # deployment platform
 └── README.md
 

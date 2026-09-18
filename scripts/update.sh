@@ -3,7 +3,7 @@
 # Memasang atau memutakhirkan satu edisi CoreERP dari sebuah bundle, di server pelanggan.
 #
 #   ./update.sh                     # memakai bundle di folder yang sama dengan skrip ini
-#   ./update.sh /opt/coreerp/agent/releases/apotek-sejahtera-0.2.0
+#   ./update.sh /opt/coreerp/agent/releases/coreerp-0.2.0
 #
 # Tiga bentuk folder diterima, dan ketiganya melewati pemeriksaan tanda tangan dan checksum yang sama:
 #

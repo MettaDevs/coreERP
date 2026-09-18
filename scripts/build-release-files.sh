@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Menyusun berkas rilis yang ditarik agen situs untuk satu edisi: bundle tanpa arsip image.
+# Menyusun berkas rilis yang ditarik agen situs: bundle tanpa arsip image.
 #
-#   scripts/build-release-files.sh <edisi> <image@sha256:digest> <folder keluaran> [--kunci <kunci privat>]
+#   scripts/build-release-files.sh --rilis <nomor> <image@sha256:digest> <folder keluaran> [--kunci <kunci privat>]
 #
 # Isinya:
 #
@@ -21,8 +21,26 @@
 # berkas yang disebut tetapi tidak ada akan menggagalkan pembaruan di server klien. admin.erp menolak
 # SHA256SUMS yang menyebutnya.
 #
-# Image yang dirujuk harus sudah ada di mesin ini — alur rilis menjalankan skrip ini sesudah image
-# didorong, jadi id image dibaca dari image yang sama persis dengan yang ada di registry.
+# Image yang dirujuk harus sudah ada di mesin ini — skrip ini dijalankan sesudah image didorong,
+# jadi id image dibaca dari image yang sama persis dengan yang ada di registry.
+#
+# ## Kenapa manifest masih menyebut `edisi`, padahal edisi per pelanggan sudah dicabut
+#
+# Nilainya tetap — `coreerp` — dan itu jembatan yang disengaja. Folder `editions/` dihapus pada
+# 18 September 2026: yang dibagikan satu image berisi seluruh modul, dan modul yang boleh dibuka
+# sebuah tenant dikunci lisensi dari admin.erp. Tetapi admin.erp masih menyimpan rilis berkunci
+# (edisi, rilis), dan agen di server klien menolak berkas rilis yang `edisi`-nya berbeda dari yang
+# terpasang. Membuang bidangnya di sini lebih dulu berarti setiap situs yang sudah berjalan menolak
+# pembaruan berikutnya. Bidang itu hilang bersama CP-04 di `docs/todo/registry-harbor/README.md`,
+# yang mengubah kedua sisi sekaligus.
+#
+# ## Kenapa nomor rilis diminta, bukan dibaca
+#
+# Sama dengan `deploy/perakit/rakit.sh --rilis`, dan sengaja: satu angka, satu sumber, yaitu
+# operator. Berkas apa pun di repo yang ikut menyimpan nomor rilis akan menyimpang dari tag yang
+# benar-benar ada di Harbor, dan menyimpangnya baru terlihat saat sebuah situs menarik rilis yang
+# tidak pernah dirakit.
+
 set -euo pipefail
 
 akar="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,35 +50,51 @@ gagal() {
     exit 1
 }
 
-[ "$#" -ge 3 ] || gagal 'Pemakaian: scripts/build-release-files.sh <edisi> <image@sha256:digest> <folder keluaran> [--kunci <kunci privat>]'
+PAKAI='Pemakaian: scripts/build-release-files.sh --rilis <nomor> <image@sha256:digest> <folder keluaran> [--kunci <kunci privat>]'
 
-edisi="$1"
-image="$2"
-keluaran="$3"
-shift 3
-kunci=""
+rilis=''
+kunci=''
+posisi=()
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --rilis)
+            [ "$#" -ge 2 ] || gagal '--rilis menuntut satu nomor rilis.' "$PAKAI"
+            rilis="$2"
+            shift 2
+            ;;
         --kunci)
-            [ "$#" -ge 2 ] || gagal '--kunci menuntut satu berkas kunci privat.'
+            [ "$#" -ge 2 ] || gagal '--kunci menuntut satu berkas kunci privat.' "$PAKAI"
             kunci="$2"
             shift 2
             ;;
-        *) gagal "Argumen tidak dikenal: $1" ;;
+        -*) gagal "Argumen tidak dikenal: $1" "$PAKAI" ;;
+        *) posisi+=("$1"); shift ;;
     esac
 done
 
-manifest_edisi="$akar/editions/$edisi.yaml"
-[ -f "$manifest_edisi" ] || gagal "Edisi \"$edisi\" tidak ada: $manifest_edisi tidak ditemukan."
+[ "${#posisi[@]}" -eq 2 ] || gagal 'Image dan folder keluaran wajib disebut, keduanya.' "$PAKAI"
+
+image="${posisi[0]}"
+keluaran="${posisi[1]}"
+
+# Bentuknya dikunci di sini, bukan dipercaya begitu saja. Nomor rilis yang salah bentuk berakhir
+# sebagai nama tag di registry dan sebagai kunci baris di admin.erp; keduanya tidak dapat diperbaiki
+# tanpa menyentuh data yang sudah terkirim.
+case "$rilis" in
+    '') gagal 'Nomor rilis belum disebut.' "$PAKAI" ;;
+    *[!0-9.]*|.*|*.) gagal "Nomor rilis \"$rilis\" bukan angka bertitik." "$PAKAI" ;;
+esac
+
+# Tetap `coreerp`, dan alasannya di komentar paling atas berkas ini.
+edisi='coreerp'
+
 
 case "$image" in
     *@sha256:*) ;;
     *) gagal "Image harus disebut lewat digest registry (…@sha256:…), bukan tag: $image" ;;
 esac
 
-rilis="$(sed -n 's/^rilis:[[:space:]]*//p' "$manifest_edisi" | head -n 1 | tr -d '[:space:]"'"'")"
-[ -n "$rilis" ] || gagal "Manifest edisi \"$edisi\" tidak menyebut \`rilis:\`."
 
 id_image="$(docker image inspect "$image" --format '{{.Id}}')"
 [ -n "$id_image" ] || gagal "Image $image tidak ada di mesin ini."

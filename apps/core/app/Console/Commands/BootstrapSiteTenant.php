@@ -345,7 +345,7 @@ final class BootstrapSiteTenant extends Command
     /**
      * Seluruh modul yang ada di image ini.
      *
-     * Image edisi dibangun dari manifest edisi — `edition:resolve` memilih folder modul yang disalin,
+     * Image dibangun dengan modul yang dipilih `edition:modules` — folder modul yang disalin,
      * beserta dependency dan penghubungnya — jadi isi `modules/` di server pelanggan adalah persis
      * yang dibeli. Registry yang dibaca, bukan berkas edisi, karena registry-lah yang dimuat runtime:
      * modul yang diberikan tetapi tidak ada di image tidak dapat dipasang, dan modul yang ada tetapi

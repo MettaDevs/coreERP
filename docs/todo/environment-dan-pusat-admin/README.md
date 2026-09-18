@@ -64,7 +64,7 @@ Kata **demo** tidak muncul satu kali pun di seluruh `docs/`. Halaman ini yang pe
 | Registry module dari berkas, tanpa daftar yang ditulis tangan | Ada | `App\Support\Modules\ModuleRegistry` |
 | Scope tenant yang gagal tertutup pada baca **dan** tulis | Ada | `TenantScope`, `MilikTenant` |
 | Konteks aktif per permintaan, dimemoisasi | Ada | `CurrentWorkspace`, `ResolveModuleContext` |
-| Menghitung modul sebuah edisi | Ada | `php artisan edition:resolve` |
+| Menghitung modul yang ikut ke dalam image | Ada | `php artisan edition:modules` |
 | Membuktikan modul yang tidak dibeli tidak ada di image | Ada, dijaga CI | `scripts/verify-edition.sh` |
 | Bundle on-prem beserta pemasangan dan jalur mundurnya | Ada, sudah dijalankan | [bundle on-prem](../bundle-on-prem/README.md) |
 | Identitas operator vendor | Ada, tetapi hanya dua izin | tabel `provider_access` |

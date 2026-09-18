@@ -414,9 +414,8 @@ class SusunanManifestModulTest extends TestCase
      * `ModuleRegistry` mengambil **nilai**-nya dan katalog provider membaca `dependsOn` berisi
      * **peta**. Daftar kosong tidak dapat dibedakan dari peta kosong, jadi tidak ada yang gagal.
      * Begitu sebuah module benar-benar menyatakan dependency, katalog mencatatnya sementara
-     * runtime membaca kosong: `InstallModule` berhenti menuntut prasyaratnya, dan
-     * `EditionResolver` berhenti menariknya ke dalam image edisi. Pelanggan menerima image yang
-     * kekurangan module yang dibutuhkan module lain, tanpa satu pun kesalahan.
+     * runtime membaca kosong: `InstallModule` berhenti menuntut prasyaratnya. Tenant memakai
+     * module yang kekurangan module lain yang dibutuhkannya, tanpa satu pun kesalahan.
      */
     public function test_dependency_memakai_satu_kunci_dan_satu_bentuk(): void
     {

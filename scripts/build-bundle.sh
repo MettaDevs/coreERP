@@ -7,13 +7,21 @@
 # menyinkronkan repo lewat git lalu `docker build`, sehingga menuntut keempat hal di atas. Bundle
 # menghapus keempatnya dengan membawa image yang sudah jadi.
 #
-#   scripts/build-bundle.sh <edisi> [--keluaran <folder>] [--kunci <berkas kunci privat>]
-#   scripts/build-bundle.sh apotek-sejahtera
-#   scripts/build-bundle.sh apotek-sejahtera --kunci ~/.coreerp/rilis.key
+#   scripts/build-bundle.sh --rilis <nomor> [--keluaran <folder>] [--kunci <berkas kunci privat>]
+#   scripts/build-bundle.sh --rilis 0.2.1
+#   scripts/build-bundle.sh --rilis 0.2.1 --kunci ~/.coreerp/rilis.key
+#
+# **Nama edisi sudah tidak diminta.** Folder `editions/` dihapus pada 18 September 2026: yang
+# dibagikan ke klien satu image berisi seluruh modul, dan modul yang boleh dibuka sebuah tenant
+# dikunci lisensi dari admin.erp — bukan dipangkas dari image.
+#
+# Nomor rilis diminta lewat `--rilis`, sama dengan `deploy/perakit/rakit.sh`, dan itu satu-satunya
+# sumbernya. Berkas apa pun di repo yang ikut menyimpan nomor rilis akan menyimpang dari tag yang
+# benar-benar ada di registry, dan menyimpangnya baru terlihat di tangan admin yang memasang.
 #
 # Isi bundle:
 #
-#   coreerp-<edisi>-<rilis>/
+#   coreerp-<rilis>/
 #     manifest.json     keterangan rilis: edisi, nomor rilis, tag dan digest image, daftar module
 #     images.tar.gz     **seluruh** image yang dibutuhkan runtime, hasil `docker save`
 #     compose.yaml      berkas compose yang ikut, bukan yang ditarik dari repo lain
@@ -21,7 +29,7 @@
 #     SHA256SUMS        checksum seluruh berkas di atas
 #     SHA256SUMS.sig    tanda tangan atas SHA256SUMS, bila kunci privat disebut
 #
-# **Seluruh** image, bukan hanya image edisi. Runtime-nya juga membutuhkan PostgreSQL dan perender
+# **Seluruh** image, bukan hanya image CoreERP. Runtime-nya juga membutuhkan PostgreSQL dan perender
 # PDF, dan keduanya datang dari registry publik. Bundle yang hanya membawa image edisi masih harus
 # menarik keduanya saat dipasang — dan bila tarikan itu gagal, gagalnya pada langkah menyalakan
 # container, sesudah admin mengira pemasangannya berhasil. Ongkosnya nyata: bundle menjadi ratusan
@@ -46,62 +54,45 @@ gagal() {
     exit 1
 }
 
-edisi_yang_ada() {
-    local berkas nama daftar=()
+PAKAI='Pemakaian: scripts/build-bundle.sh --rilis <nomor> [--keluaran <folder>] [--kunci <berkas kunci privat>]'
 
-    for berkas in "$akar"/editions/*.yaml; do
-        [ -e "$berkas" ] || continue
-        nama="$(basename "$berkas" .yaml)"
-        daftar+=("$nama")
-    done
-
-    if [ ${#daftar[@]} -eq 0 ]; then
-        printf '(tidak ada satu pun di %s/editions)' "$akar"
-    else
-        printf '%s' "${daftar[*]}"
-    fi
-}
-
-edisi=""
+rilis=""
 keluaran=""
 kunci=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --rilis)
+            [ "$#" -ge 2 ] || gagal '--rilis menuntut satu nomor rilis.' "$PAKAI"
+            rilis="$2"
+            shift 2
+            ;;
         --keluaran)
-            [ "$#" -ge 2 ] || gagal '--keluaran menuntut satu folder.'
+            [ "$#" -ge 2 ] || gagal '--keluaran menuntut satu folder.' "$PAKAI"
             keluaran="$2"
             shift 2
             ;;
         --kunci)
-            [ "$#" -ge 2 ] || gagal '--kunci menuntut satu berkas kunci privat.'
+            [ "$#" -ge 2 ] || gagal '--kunci menuntut satu berkas kunci privat.' "$PAKAI"
             kunci="$2"
             shift 2
             ;;
-        -*)
-            gagal "Argumen tidak dikenal: $1"
-            ;;
         *)
-            [ -z "$edisi" ] || gagal "Edisi sudah disebut sebagai \"$edisi\"; tidak dapat menerima \"$1\" juga."
-            edisi="$1"
-            shift
+            gagal \
+                "Argumen tidak dikenal: $1" \
+                '' \
+                "$PAKAI" \
+                'Nama edisi sudah tidak diminta: yang dibangun satu bundle untuk seluruh klien.'
             ;;
     esac
 done
 
-if [ -z "$edisi" ]; then
-    gagal \
-        'Edisi belum disebut.' \
-        '' \
-        'Pemakaian: scripts/build-bundle.sh <edisi> [--keluaran <folder>] [--kunci <berkas kunci privat>]' \
-        "Edisi yang ada: $(edisi_yang_ada)"
-fi
-
-manifest_edisi="$akar/editions/$edisi.yaml"
-
-[ -f "$manifest_edisi" ] || gagal \
-    "Edisi \"$edisi\" tidak ada: $manifest_edisi tidak ditemukan." \
-    "Edisi yang ada: $(edisi_yang_ada)"
+# Bentuknya dikunci di sini, bukan dipercaya begitu saja. Nomor rilis ikut menjadi nama folder
+# bundle dan tag image di dalamnya; yang salah bentuk baru ketahuan di folder unduhan admin.
+case "$rilis" in
+    '') gagal 'Nomor rilis belum disebut.' '' "$PAKAI" ;;
+    *[!0-9.]*|.*|*.) gagal "Nomor rilis \"$rilis\" bukan angka bertitik." '' "$PAKAI" ;;
+esac
 
 for perintah in docker php sha256sum tar gzip; do
     command -v "$perintah" >/dev/null 2>&1 \
@@ -121,18 +112,7 @@ berkas_compose="$akar/deploy/compose.edition.yaml"
     'Bundle harus membawa berkas compose-nya sendiri; menarik dari repo lain berarti pemasangan' \
     'menuntut akses yang justru hendak dihapus bundle ini.'
 
-# Nomor rilis dibaca dari manifest edisi, sama seperti yang dilakukan `build-edition.sh`. Bundle
-# tanpa nomor rilis tidak dapat dibedakan dari bundle lain di folder unduhan admin, dan admin yang
-# tidak dapat membedakannya akan memasang yang salah.
-rilis="$(sed -n 's/^rilis:[[:space:]]*//p' "$manifest_edisi" | head -n 1 | tr -d '[:space:]"'"'")"
-
-[ -n "$rilis" ] || gagal \
-    "Manifest edisi \"$edisi\" tidak menyebut \`rilis:\`." \
-    'Bentuk manifest edisi dijelaskan di editions/README.md.'
-
-pelanggan="$(sed -n 's/^pelanggan:[[:space:]]*//p' "$manifest_edisi" | head -n 1 | sed 's/[[:space:]]*$//' | tr -d '"'"'")"
-
-nama_bundle="coreerp-$edisi-$rilis"
+nama_bundle="coreerp-$rilis"
 keluaran="${keluaran:-$akar/dist}"
 tujuan="$keluaran/$nama_bundle"
 
@@ -147,18 +127,17 @@ if [ -e "$tujuan" ]; then
         'Hapus foldernya sendiri bila memang ingin menyusun ulang.'
 fi
 
-image="coreerp-edisi:$edisi-$rilis"
+image="coreerp-edisi:$rilis"
 
-printf 'Membangun image edisi "%s" sebagai %s...\n\n' "$edisi" "$image"
-bash "$akar/scripts/build-edition.sh" "$edisi" "$image"
+printf 'Membangun image sebagai %s...\n\n' "$image"
+bash "$akar/scripts/build-edition.sh" "$image"
 
-# Daftar module dihitung ulang di sini, bukan dibaca dari manifest edisi. Manifest hanya menyebut
-# yang dibeli pelanggan; dependency, module penghubung, dan penolakan bahan uji seluruhnya
-# ditambahkan `edition:resolve`. Manifest rilis harus menyebut apa yang benar-benar ada di dalam
-# image, bukan apa yang diminta.
-if ! daftar_module="$(cd "$akar/apps/core" && php artisan edition:resolve "$edisi" --daftar 2>&1)"; then
+# Daftar module dihitung ulang di sini, bukan disalin dari langkah di atas. Manifest rilis harus
+# menyebut apa yang benar-benar ada di dalam image, dan `edition:modules` adalah satu-satunya tempat
+# penolakan modul bahan uji ditulis.
+if ! daftar_module="$(cd "$akar/apps/core" && php artisan edition:modules --daftar 2>&1)"; then
     printf '%s\n' "$daftar_module" >&2
-    gagal "Daftar module edisi \"$edisi\" gagal dihitung."
+    gagal 'Daftar module yang ikut ke dalam image gagal dihitung.'
 fi
 
 module_json=""
@@ -217,10 +196,13 @@ for satu in "${pendamping[@]}"; do
     pendamping_json="$pendamping_json${pendamping_json:+, }\"$satu\""
 done
 
+# `edisi` tetap ditulis, dan nilainya tetap `coreerp`. Tidak ada lagi edisi per pelanggan, tetapi
+# `update.sh` di server klien membacanya dan mencetaknya, dan agen menolak berkas rilis yang
+# `edisi`-nya berbeda dari yang terpasang. Bidangnya hilang bersama CP-04 di
+# `docs/todo/registry-harbor/README.md`, yang mengubah kedua sisi sekaligus.
 cat > "$tujuan/manifest.json" <<JSON
 {
-  "edisi": "$edisi",
-  "pelanggan": "$pelanggan",
+  "edisi": "coreerp",
   "rilis": "$rilis",
   "image": "$image",
   "digest": "$digest",
@@ -249,7 +231,7 @@ fi
 ukuran="$(du -sh "$tujuan" | cut -f1)"
 
 printf '\nBundle selesai: %s (%s)\n' "$tujuan" "$ukuran"
-printf 'Edisi "%s" rilis %s, image %s\n' "$edisi" "$rilis" "$image"
+printf 'Rilis %s, image %s\n' "$rilis" "$image"
 
 if [ -n "$module_json" ]; then
     printf 'Module di dalamnya: %s\n' "$(printf '%s' "$module_json" | tr -d '"')"

@@ -207,10 +207,10 @@ masuk, dan tahap akhir tetap hanya menyalin `apps/core`, jadi jalur pertama di a
 menagihnya. Kalau kelak ada berkas kedua yang ingin dikecualikan, pertanyaannya bukan "apakah berkas
 ini aman" melainkan "kenapa image pelanggan membutuhkan sesuatu dari perkakas vendor".
 
-Bukti-bisa-merahnya terpisah dari milik ketiga jalur lain. `--anggap-tidak-dibeli` hanya
-menggeser daftar modul, jadi pemeriksaan aplikasi dapat rusak total tanpa satu pun langkah CI
-berubah warna; karena itu ia punya modenya sendiri, `--buktikan-aplikasi-bisa-merah`, yang
-membangun dua image alpine sekali pakai alih-alih membangun ulang image edisi.
+Bukti-bisa-merahnya terpisah dari milik ketiga jalur lain. `--anggap-terlarang` hanya menggeser
+daftar modul, jadi pemeriksaan aplikasi dapat rusak total tanpa satu pun langkah CI berubah warna;
+karena itu ia punya modenya sendiri, `--buktikan-aplikasi-bisa-merah`, yang membangun dua image
+alpine sekali pakai alih-alih membangun ulang image yang sesungguhnya.
 
 Pemangkasan per edisi hari ini hanya dibuktikan `edition.yml` pada setiap pull request. Image yang
 dikirim ke server klien tidak lagi dipangkas per edisi: satu image rilis membawa seluruh module, dan

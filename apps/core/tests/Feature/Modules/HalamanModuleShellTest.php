@@ -127,13 +127,29 @@ class HalamanModuleShellTest extends TestCase
 
         // Aturan yang sama dengan `resources/js/app.tsx`: penerbit tidak ikut disebut nama
         // halaman, jadi yang dicocokkan adalah akhiran jalurnya.
+        //
+        // Dua akar dicari, bukan satu, dan itu mengikuti `config('modules.akar')`. Bahan uji
+        // penjaga batas pindah ke `tests/Fixtures/modules` pada 18 September 2026, dan folder itu
+        // sengaja **tidak** ikut pola glob `app.tsx` — UI bahan uji tidak boleh masuk bundel yang
+        // dikirim. Yang dibuktikan test ini karena itu aturan penerjemahannya, bukan bahwa bundel
+        // produksi memuat halaman bahan uji: untuk module sungguhan kedua hal itu sama, karena
+        // foldernya memang yang dipindai `app.tsx`.
         // tests/Feature/Modules -> tests -> core -> apps -> akar repo
-        $berkas = glob(dirname(__DIR__, 5).'/modules/*/'.$modul.'/ui/Pages/'.$halaman.'.tsx');
+        $akar = [
+            dirname(__DIR__, 5).'/modules',
+            dirname(__DIR__, 2).'/Fixtures/modules',
+        ];
+
+        $berkas = [];
+
+        foreach ($akar as $satu) {
+            $berkas = [...$berkas, ...(glob($satu.'/*/'.$modul.'/ui/Pages/'.$halaman.'.tsx') ?: [])];
+        }
 
         $this->assertNotEmpty(
             $berkas,
             'Nama halaman "'.$komponen.'" tidak menunjuk berkas mana pun di bawah '
-            .'modules/<penerbit>/'.$modul.'/ui/Pages. Pemilih halaman shell akan melempar '
+            .'<akar module>/<penerbit>/'.$modul.'/ui/Pages. Pemilih halaman shell akan melempar '
             .'"Halaman module tidak ditemukan" di peramban, jauh dari sini.',
         );
     }
@@ -191,7 +207,7 @@ class HalamanModuleShellTest extends TestCase
         // berkas yang tidak terbaca" lolos sebagai bukti, padahal ia bukan bukti apa pun.
         foreach ([
             $akar.'/resources/js/lib/halaman-module.tsx' => 'export',
-            dirname($akar, 2).'/modules/apperp/contoh-a/ui/Pages/Daftar.tsx' => 'export default',
+            $akar.'/tests/Fixtures/modules/apperp/contoh-a/ui/Pages/Daftar.tsx' => 'export default',
         ] as $berkas => $penanda) {
             $isi = (string) file_get_contents($berkas);
 
