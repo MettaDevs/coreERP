@@ -94,6 +94,7 @@ export default function LaporanPenyusutanAsetPage() {
                 cell: (row) => {
                     const bln = row.bulan_perolehan ?? '';
                     const thn = row.tahun_perolehan ?? '';
+
                     return bln || thn ? `${bln} ${thn}`.trim() : '-';
                 },
                 align: 'center',
