@@ -7,9 +7,9 @@ use Illuminate\Http\Request;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\master\JenisAsetAtribut;
-use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeAssetType;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeJenisAset;
 use Modules\Apperp\ManagementAset\Models\master\ModelAset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use stdClass;
 
@@ -42,13 +42,13 @@ class JenisAsetDetailController extends Controller
         abort_unless(JenisAset::query()->whereKey($jenisAsetId)->exists(), 404);
 
         $mayReadModels = in_array('management-aset.model-aset.read', $permissions, true);
-        $mayReadAssets = in_array('management-aset.aset.read', $permissions, true);
+        $mayReadAset = in_array('management-aset.aset.read', $permissions, true);
 
         return response()->json(['data' => [
             'atribut_count' => JenisAsetAtribut::query()
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->count(),
-            'maintenance_job_type_count' => MaintenanceJobTypeAssetType::query()
+            'maintenance_job_type_count' => MaintenanceJobTypeJenisAset::query()
                 ->where('jenis_aset_id', $jenisAsetId)
                 ->count(),
             'model_count' => $mayReadModels
@@ -66,9 +66,9 @@ class JenisAsetDetailController extends Controller
             // wajib melewati penyaring yang sama dengan jalur baca aset biasa; kalau tidak,
             // angka ini menjadi jalan pintas untuk mengetahui keberadaan aset di unit kerja
             // yang tidak boleh dilihat pemanggil.
-            'asset_count' => $mayReadAssets
-                ? $scope->assetQuery(
-                    Asset::query()->where('jenis_aset_id', $jenisAsetId),
+            'aset_count' => $mayReadAset
+                ? $scope->asetQuery(
+                    Aset::query()->where('jenis_aset_id', $jenisAsetId),
                     $request,
                 )->count()
                 : null,

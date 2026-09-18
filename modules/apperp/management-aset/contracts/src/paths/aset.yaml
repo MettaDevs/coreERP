@@ -1,4 +1,8 @@
 # Register aset, penempatan, perencanaan, dan dokumen lifecycle.
+#
+# Tidak ada `POST /api/v1/aset`. Ia dibuang 18 September 2026: aset hanya lahir dari
+# dokumen penerimaan, yang membawa nomor, jumlah per baris, rujukan permintaan pembelian,
+# dan peringatan ambang kapitalisasi sebelum nomornya terbit. Lihat `penerimaan-aset.yaml`.
 /api/v1/aset:
   get:
     tags:
@@ -8,20 +12,6 @@
     responses:
       '200':
         description: Register aset
-  post:
-    tags:
-    - Lifecycle aset
-    operationId: receiveAset
-    summary: Mencatat penerimaan aset dan penempatan awal; plan atau permintaan bersifat opsional
-    parameters:
-    - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
-    responses:
-      '201':
-        description: Aset diterima
-      '403':
-        $ref: '#/components/responses/Forbidden'
-      '503':
-        $ref: '#/components/responses/NumberSequenceUnavailable'
 /api/v1/aset/{id}:
   get:
     tags:
@@ -59,7 +49,7 @@
   get:
     tags:
     - Lifecycle aset
-    operationId: assetHistory
+    operationId: asetHistory
     summary: Membaca histori penempatan efektif aset tanpa mengubah histori lama
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -68,24 +58,11 @@
         description: Aset dan histori penempatan
       '404':
         $ref: '#/components/responses/NotFound'
-/api/v1/aset/{id}/penempatan:
-  post:
-    tags:
-    - Lifecycle aset
-    operationId: placeAsset
-    summary: Menambah mutasi penggunaan, PIC, atau lokasi aset
-    parameters:
-    - $ref: '#/components/parameters/RecordId'
-    responses:
-      '200':
-        description: Mutasi dicatat
-      '409':
-        description: Aset yang dilepas tidak dapat dimutasi
 /api/v1/perencanaan-aset:
   get:
     tags:
     - Perencanaan aset
-    operationId: listAssetPlans
+    operationId: listAsetPlans
     summary: Menampilkan rencana aset tenant aktif
     responses:
       '200':
@@ -97,7 +74,7 @@
   post:
     tags:
     - Perencanaan aset
-    operationId: createAssetPlan
+    operationId: createAsetPlan
     summary: Membuat header dan rincian perencanaan aset; spesifikasi adalah snapshot pada rincian transaksi
     parameters:
     - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
@@ -106,7 +83,7 @@
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/AssetPlanningWrite'
+            $ref: '#/components/schemas/AsetPlanningWrite'
     responses:
       '200':
         description: Permintaan yang sama diulang
@@ -124,7 +101,7 @@
   get:
     tags:
     - Perencanaan aset
-    operationId: showAssetPlan
+    operationId: showAsetPlan
     summary: Menampilkan satu rencana aset beserta rinciannya
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -140,7 +117,7 @@
   patch:
     tags:
     - Perencanaan aset
-    operationId: updateAssetPlan
+    operationId: updateAsetPlan
     summary: Mengubah rencana draf dengan version saat ini
     parameters:
     - $ref: '#/components/parameters/RecordId'
@@ -150,7 +127,7 @@
         application/json:
           schema:
             allOf:
-            - $ref: '#/components/schemas/AssetPlanningWrite'
+            - $ref: '#/components/schemas/AsetPlanningWrite'
             - type: object
               required:
               - version
@@ -170,7 +147,7 @@
   delete:
     tags:
     - Perencanaan aset
-    operationId: archiveAssetPlan
+    operationId: archiveAsetPlan
     summary: Mengarsipkan rencana draf tanpa menghapus data fisik
     parameters:
     - $ref: '#/components/parameters/RecordId'

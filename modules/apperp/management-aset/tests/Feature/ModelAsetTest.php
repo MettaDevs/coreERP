@@ -85,7 +85,7 @@ class ModelAsetTest extends TestCase
     {
         $pabrikan = $this->pabrikan();
         $model = $this->model($pabrikan);
-        $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
 
         $permissions = [
             'management-aset.pabrikan-aset.read',
@@ -97,25 +97,25 @@ class ModelAsetTest extends TestCase
             ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
             ->assertJsonPath('data.model_count', 1)
-            ->assertJsonPath('data.asset_count', 1);
+            ->assertJsonPath('data.aset_count', 1);
 
         $this->sebagaiPengguna($this->tenantId, $permissions)
             ->getJson('/api/modules/management-aset/v1/model-aset?pabrikan_aset_id='.$pabrikan)
             ->assertOk()
-            ->assertJsonPath('data.0.asset_count', 1);
+            ->assertJsonPath('data.0.aset_count', 1);
     }
 
     public function test_pabrikan_detail_menyembunyikan_angka_yang_tidak_boleh_dibaca(): void
     {
         $pabrikan = $this->pabrikan();
         $model = $this->model($pabrikan);
-        $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
 
         $this->sebagaiPengguna($this->tenantId, ['management-aset.pabrikan-aset.read'])
             ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
             ->assertJsonPath('data.model_count', null)
-            ->assertJsonPath('data.asset_count', null);
+            ->assertJsonPath('data.aset_count', null);
     }
 
     public function test_pabrikan_detail_dan_daftar_model_menghormati_scope_dan_arsip(): void
@@ -124,14 +124,14 @@ class ModelAsetTest extends TestCase
         $model = $this->model($pabrikan);
         $legalEntity = (string) Str::ulid();
         $operatingUnit = (string) Str::ulid();
-        $asset = $this->asset($pabrikan, $model, $legalEntity, $operatingUnit);
+        $aset = $this->aset($pabrikan, $model, $legalEntity, $operatingUnit);
         $permissions = [
             'management-aset.pabrikan-aset.read',
             'management-aset.model-aset.read',
             'management-aset.aset.read',
         ];
         $outsideScope = [[
-            'policy_code' => 'management-aset.asset-responsibility',
+            'policy_code' => 'management-aset.aset-responsibility',
             'legal_entity_id' => (string) Str::ulid(),
             'organization_id' => (string) Str::ulid(),
         ]];
@@ -140,29 +140,29 @@ class ModelAsetTest extends TestCase
             ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
             ->assertJsonPath('data.model_count', 1)
-            ->assertJsonPath('data.asset_count', 0);
+            ->assertJsonPath('data.aset_count', 0);
 
         $this->sebagaiPengguna($this->tenantId, $permissions, $outsideScope)
             ->getJson('/api/modules/management-aset/v1/model-aset?pabrikan_aset_id='.$pabrikan)
             ->assertOk()
-            ->assertJsonPath('data.0.asset_count', 0);
+            ->assertJsonPath('data.0.aset_count', 0);
 
-        DB::table('aset_tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
+        DB::table('aset_tr_aset')->where('id', $aset)->update(['deleted_at' => now()]);
         $this->sebagaiPengguna($this->tenantId, $permissions)
             ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
-            ->assertJsonPath('data.asset_count', 0);
+            ->assertJsonPath('data.aset_count', 0);
     }
 
     public function test_jumlah_aset_hanya_menghitung_aset_yang_masih_aktif(): void
     {
         $pabrikan = $this->pabrikan();
         $model = $this->model($pabrikan);
-        $active = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
-        $decommissioned = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
-        $disposed = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
-        DB::table('aset_tr_penerimaan_aset')->where('id', $decommissioned)->update(['lifecycle_state' => 'decommissioned']);
-        DB::table('aset_tr_penerimaan_aset')->where('id', $disposed)->update(['lifecycle_state' => 'disposed']);
+        $active = $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $decommissioned = $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $disposed = $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        DB::table('aset_tr_aset')->where('id', $decommissioned)->update(['lifecycle_state' => 'decommissioned']);
+        DB::table('aset_tr_aset')->where('id', $disposed)->update(['lifecycle_state' => 'disposed']);
 
         $permissions = [
             'management-aset.pabrikan-aset.read',
@@ -174,28 +174,28 @@ class ModelAsetTest extends TestCase
         $this
             ->getJson('/api/modules/management-aset/v1/pabrikan-aset/'.$pabrikan.'/detail')
             ->assertOk()
-            ->assertJsonPath('data.asset_count', 1);
+            ->assertJsonPath('data.aset_count', 1);
 
         $this
             ->getJson('/api/modules/management-aset/v1/model-aset?pabrikan_aset_id='.$pabrikan)
             ->assertOk()
-            ->assertJsonPath('data.0.asset_count', 1);
+            ->assertJsonPath('data.0.aset_count', 1);
 
-        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $active, 'lifecycle_state' => 'received']);
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $active, 'lifecycle_state' => 'received']);
     }
 
     public function test_model_tidak_dapat_diarsipkan_saat_masih_dipakai_aset(): void
     {
         $pabrikan = $this->pabrikan();
         $model = $this->model($pabrikan);
-        $asset = $this->asset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
+        $aset = $this->aset($pabrikan, $model, (string) Str::ulid(), (string) Str::ulid());
 
         $this->withContext(['management-aset.model-aset.archive'])
             ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$model)
             ->assertStatus(409)
             ->assertJsonPath('error.code', 'referenced_by_children');
 
-        DB::table('aset_tr_penerimaan_aset')->where('id', $asset)->update(['deleted_at' => now()]);
+        DB::table('aset_tr_aset')->where('id', $aset)->update(['deleted_at' => now()]);
 
         $this->withContext(['management-aset.model-aset.archive'])
             ->deleteJson('/api/modules/management-aset/v1/model-aset/'.$model)
@@ -274,15 +274,15 @@ class ModelAsetTest extends TestCase
         return $id;
     }
 
-    private function asset(string $pabrikanId, string $modelId, string $legalEntityId, string $operatingUnitId): string
+    private function aset(string $pabrikanId, string $modelId, string $legalEntityId, string $operatingUnitId): string
     {
         $group = $this->reference('aset_m_group_aset', 'group');
         $jenis = $this->reference('aset_m_jenis_aset', 'jenis');
         $id = (string) Str::ulid();
-        DB::table('aset_tr_penerimaan_aset')->insert([
+        DB::table('aset_tr_aset')->insert([
             'id' => $id,
             'tenant_id' => $this->tenantId,
-            'creation_key' => 'asset-'.Str::ulid(),
+            'creation_key' => 'aset-'.Str::ulid(),
             'kode' => 'AST'.Str::random(6),
             'nama' => 'Aset model uji',
             'legal_entity_id' => $legalEntityId,

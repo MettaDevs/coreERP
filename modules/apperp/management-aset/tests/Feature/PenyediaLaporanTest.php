@@ -45,7 +45,7 @@ class PenyediaLaporanTest extends TestCase
 
         $this->assertSame(['id'], $definisi['parameters']);
         $this->assertContains(
-            ['key' => 'baris.asset_kode', 'label' => 'Kode aset', 'table' => 'baris'],
+            ['key' => 'baris.aset_kode', 'label' => 'Kode aset', 'table' => 'baris'],
             $definisi['fields'],
         );
 
@@ -75,7 +75,7 @@ class PenyediaLaporanTest extends TestCase
 
         $this->assertSame('PMHA-000001', $data['fields']['kode']);
         $this->assertSame('Korektif', $data['fields']['tipe_work_order']);
-        $this->assertSame('AST-WO-1', $data['tables']['baris'][0]['asset_kode']);
+        $this->assertSame('AST-WO-1', $data['tables']['baris'][0]['aset_kode']);
         $this->assertSame('Ganti ban', $data['tables']['baris'][0]['jenis_pekerjaan']);
         $this->assertSame('PMHA-000001', $data['file_name']);
 
@@ -115,10 +115,111 @@ class PenyediaLaporanTest extends TestCase
         $this->assertSame([], $ditutup['tables']['baris']);
     }
 
+    public function test_berita_acara_hanya_dapat_dicetak_setelah_mutasi_diselesaikan(): void
+    {
+        $mutasi = $this->mutasi();
+        $konteks = $this->konteks(['management-aset.mutasi-aset.read']);
+
+        // Berita acara adalah bukti bahwa sesuatu sudah terjadi. Mencetaknya dari draf
+        // menghasilkan lembar bertanda tangan untuk perpindahan yang belum berlangsung,
+        // dan lembar itu tidak bisa ditarik kembali setelah ditandatangani.
+        $this->assertGagalDengan(
+            'Berita acara hanya dapat dicetak setelah mutasi diselesaikan.',
+            fn () => $this->penyedia()->dataset('berita-acara-serah-terima', $konteks, ['id' => $mutasi]),
+        );
+
+        $this->selesaikanMutasi($mutasi);
+        $data = $this->penyedia()->dataset('berita-acara-serah-terima', $konteks, ['id' => $mutasi]);
+
+        $this->assertSame('MUTA-000001', $data['fields']['kode']);
+        // Tanggal pada dokumen bertanda tangan ditulis dalam bahasa Indonesia, bukan d/m/Y.
+        $this->assertSame('17 September 2026', $data['fields']['tanggal']);
+        $this->assertSame(1, $data['fields']['jumlah_aset']);
+        $this->assertSame('AST-MUT-1', $data['tables']['baris'][0]['aset_kode']);
+        $this->assertSame('Gudang Cakung', $data['tables']['baris'][0]['asal_lokasi']);
+        $this->assertSame('bast-MUTA-000001', $data['file_name']);
+
+        $this->assertGagalDengan(
+            'Mutasi tidak ditemukan atau berada di luar unit kerja yang dapat Anda akses.',
+            fn () => $this->penyedia()->dataset(
+                'berita-acara-serah-terima',
+                $this->konteks(['management-aset.mutasi-aset.read'], lingkupLain: true),
+                ['id' => $mutasi],
+            ),
+        );
+    }
+
+    public function test_daftar_mutasi_satu_baris_per_aset_dan_hanya_yang_selesai(): void
+    {
+        $mutasi = $this->mutasi();
+        $konteks = $this->konteks(['management-aset.mutasi-aset.read']);
+
+        // Bawaannya hanya dokumen selesai: draf belum memindahkan apa pun, dan
+        // memasukkannya membuat total laporan tidak cocok dengan keadaan aset.
+        $kosong = $this->penyedia()->dataset('daftar-mutasi-aset', $konteks, []);
+        $this->assertSame(0, $kosong['fields']['jumlah_baris']);
+
+        $this->selesaikanMutasi($mutasi);
+        $data = $this->penyedia()->dataset('daftar-mutasi-aset', $konteks, []);
+
+        $this->assertSame(1, $data['fields']['jumlah_baris']);
+        $baris = $data['tables']['baris'][0];
+        $this->assertSame('MUTA-000001', $baris['kode']);
+        $this->assertSame('AST-MUT-1', $baris['aset_kode']);
+        $this->assertSame('Gudang Cakung', $baris['asal_lokasi']);
+        $this->assertSame('Ruang Implementor', $baris['tujuan_lokasi']);
+        $this->assertSame('17/09/2026', $baris['tanggal']);
+    }
+
     /** @param list<string> $permissions */
     private function headers(array $permissions): static
     {
         return $this->sebagaiPengguna($this->tenantId, $permissions);
+    }
+
+    /** Draf mutasi satu aset, dibuat lewat API seperti pengguna. */
+    private function mutasi(): string
+    {
+        $seed = [
+            'group' => $this->master('aset_m_group_aset', 'Elektronik', 'GRPA-M1'),
+            'jenis' => $this->master('aset_m_jenis_aset', 'Laptop', 'JNSA-M1'),
+            'tipeLokasi' => $this->master('aset_m_tipe_lokasi_aset', 'Ruang', 'TLKA-M1'),
+        ];
+        $asal = $this->master('aset_m_lokasi_aset', 'Gudang Cakung', 'LOCA-M1', ['tipe_lokasi_id' => $seed['tipeLokasi']]);
+        $tujuan = $this->master('aset_m_lokasi_aset', 'Ruang Implementor', 'LOCA-M2', ['tipe_lokasi_id' => $seed['tipeLokasi']]);
+
+        $asetId = (string) Str::ulid();
+        DB::table('aset_tr_aset')->insert([
+            'id' => $asetId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => 'AST-MUT-1',
+            'nama' => 'Laptop MSI', 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
+            'group_aset_id' => $seed['group'], 'jenis_aset_id' => $seed['jenis'], 'lokasi_aset_id' => $asal,
+            'acquired_on' => '2026-08-01', 'acquisition_value' => 20000000, 'currency_code' => 'IDR',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return (string) $this->headers(['management-aset.mutasi-aset.create'])
+            ->withHeader('Idempotency-Key', 'mutasi-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/mutasi-aset', [
+                'legal_entity_id' => $this->legalEntityId,
+                'responsible_org_unit_id' => $this->orgUnitId,
+                'tanggal' => '2026-09-17',
+                'tujuan_lokasi_id' => $tujuan,
+                'tujuan_org_unit_id' => (string) Str::ulid(),
+                'diserahkan_oleh_user_id' => 'eva',
+                'diterima_oleh_user_id' => 'diva',
+                'alasan' => 'Pindah penugasan',
+                'details' => [['aset_id' => $asetId]],
+            ])
+            ->assertCreated()
+            ->json('data.id');
+    }
+
+    private function selesaikanMutasi(string $mutasiId): void
+    {
+        $version = (int) DB::table('aset_tr_mutasi_aset')->where('id', $mutasiId)->value('version');
+        $this->headers(['management-aset.aset.mutate', 'management-aset.mutasi-aset.read'])
+            ->postJson('/api/modules/management-aset/v1/mutasi-aset/'.$mutasiId.'/selesaikan', ['version' => $version])
+            ->assertOk();
     }
 
     /**
@@ -162,7 +263,7 @@ class PenyediaLaporanTest extends TestCase
             'org_unit_id' => $this->orgUnitId,
             'user_id' => (string) Str::ulid(),
             'permissions' => $izin,
-            'data_policies' => ['management-aset.asset-responsibility' => $kebijakan],
+            'data_policies' => ['management-aset.aset-responsibility' => $kebijakan],
         ];
     }
 
@@ -198,11 +299,11 @@ class PenyediaLaporanTest extends TestCase
             'kode' => 'LOCA-1', 'nama' => 'Gudang Cakung', 'tipe_lokasi_id' => $seed['tipeLokasi'], 'aktif' => true,
             'created_at' => now(), 'updated_at' => now(),
         ]);
-        $assetId = (string) Str::ulid();
-        DB::table('aset_tr_penerimaan_aset')->insert([
-            'id' => $assetId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => 'AST-WO-1',
+        $asetId = (string) Str::ulid();
+        DB::table('aset_tr_aset')->insert([
+            'id' => $asetId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => 'AST-WO-1',
             'nama' => 'Forklift 1', 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
-            'group_aset_id' => $seed['group'], 'jenis_aset_id' => $seed['jenis'], 'asset_location_id' => $locationId,
+            'group_aset_id' => $seed['group'], 'jenis_aset_id' => $seed['jenis'], 'lokasi_aset_id' => $locationId,
             'acquired_on' => '2026-08-01', 'acquisition_value' => 250000000, 'currency_code' => 'IDR',
             'created_at' => now(), 'updated_at' => now(),
         ]);
@@ -218,7 +319,7 @@ class PenyediaLaporanTest extends TestCase
                 'diharapkan_mulai' => '2026-08-15 08:00:00',
                 'diharapkan_selesai' => '2026-08-15 12:00:00',
                 'details' => [[
-                    'asset_id' => $assetId, 'maintenance_job_type_id' => $seed['jobType'], 'trade_id' => $seed['trade'],
+                    'aset_id' => $asetId, 'maintenance_job_type_id' => $seed['jobType'], 'trade_id' => $seed['trade'],
                     'ditugaskan_ke_user_id' => 'montir-1', 'estimasi_jam' => 1.5,
                 ]],
             ])

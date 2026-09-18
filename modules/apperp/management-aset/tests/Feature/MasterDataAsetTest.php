@@ -387,12 +387,12 @@ class MasterDataAsetTest extends TestCase
         $created = $this->createRecord('group-aset', [
             'nama' => 'Bangunan',
             'kelompok_harta_fiskal_id' => $reference,
-            'property_type' => 'fixed_asset',
+            'property_type' => 'fixed_aset',
             'capitalization_threshold' => 1000,
         ])->assertCreated();
 
         $created->assertJsonPath('data.kelompok_harta_fiskal_id', $reference);
-        $created->assertJsonPath('data.property_type', 'fixed_asset');
+        $created->assertJsonPath('data.property_type', 'fixed_aset');
         $created->assertJsonPath('data.capitalization_threshold', '1000.00');
 
         $this->request('group-aset', 'patch', '/api/modules/management-aset/v1/group-aset/'.$created->json('data.id'), ['capitalization_threshold' => 2500])
@@ -439,9 +439,9 @@ class MasterDataAsetTest extends TestCase
     /** Lokasi bawaan harus milik tenant yang sama; ULID asing tidak boleh lolos. */
     public function test_lokasi_bawaan_group_tidak_boleh_lintas_tenant(): void
     {
-        $this->createRecord('group-aset', ['nama' => 'Salah', 'asset_location_id' => (string) Str::ulid()])
+        $this->createRecord('group-aset', ['nama' => 'Salah', 'lokasi_aset_id' => (string) Str::ulid()])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('asset_location_id');
+            ->assertJsonValidationErrors('lokasi_aset_id');
     }
 
     /**

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Modules\Apperp\ManagementAset\Support\StatusAset;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -42,7 +43,7 @@ class WorkOrderTest extends TestCase
         // Lokasi aset disalin ke baris, bukan dibaca ulang lewat aset saat ditampilkan.
         $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', [
             'pemeliharaan_aset_id' => $workOrder['id'], 'line_number' => 1,
-            'asset_id' => $seed['asset'], 'asset_location_id' => $seed['location'],
+            'aset_id' => $seed['aset'], 'lokasi_aset_id' => $seed['location'],
             'maintenance_job_type_id' => $seed['jobType'], 'trade_id' => $seed['trade'],
         ]);
         $this->assertSame(1, $this->jumlahNomorTerbit(), 'Penerbitan nomor tidak terjadi.');
@@ -52,7 +53,7 @@ class WorkOrderTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.tipe_work_order_nama', 'Korektif')
             ->assertJsonPath('data.details.0.job_type_nama', 'Ganti ban')
-            ->assertJsonPath('data.details.0.asset_kode', 'AST-WO-1');
+            ->assertJsonPath('data.details.0.aset_kode', 'AST-WO-1');
     }
 
     public function test_menolak_aset_milik_tenant_lain_sebelum_menerbitkan_nomor(): void
@@ -61,7 +62,7 @@ class WorkOrderTest extends TestCase
         // Aset tenant lain wajib menunjuk klasifikasi milik tenant itu sendiri; foreign key
         // komposit menolak induk lintas tenant sebelum validasi aplikasi sempat berbicara.
         $asing = (string) Str::ulid();
-        $seed['asset'] = $this->asset($asing, [
+        $seed['aset'] = $this->aset($asing, [
             'group' => $this->master('aset_m_group_aset', 'Kendaraan', 'GRPA-X', tenant: $asing),
             'jenis' => $this->master('aset_m_jenis_aset', 'Roda 4', 'JNSA-X', tenant: $asing),
         ], 'AST-LAIN');
@@ -121,7 +122,7 @@ class WorkOrderTest extends TestCase
         $this->create($seed)->assertCreated();
 
         $asing = [[
-            'policy_code' => 'management-aset.asset-responsibility',
+            'policy_code' => 'management-aset.aset-responsibility',
             'legal_entity_id' => (string) Str::ulid(),
             'organization_id' => (string) Str::ulid(),
         ]];
@@ -155,6 +156,43 @@ class WorkOrderTest extends TestCase
         $this->create($this->seedMasters())->assertCreated();
         $this->assertDatabaseCount('aset_tr_dokumen_siklus_aset', 0);
         $this->assertDatabaseCount('aset_tr_pemeliharaan_aset', 1);
+    }
+
+    /**
+     * Work order tidak boleh dibuat untuk aset yang sudah berhenti dipakai.
+     *
+     * Padanan penanda **Active** pada `Asset lifecycle state` di Dynamics 365 Aset
+     * Management. Sampai 18 September 2026 pemeriksaan ini tidak ada: work order dapat
+     * dijadwalkan untuk aset yang sudah dijual atau dimusnahkan.
+     */
+    public function test_work_order_ditolak_untuk_aset_yang_dihentikan_atau_dilepas(): void
+    {
+        // Master disemai sekali: kodenya tetap, jadi memanggil `seedMasters()` dua kali
+        // menabrak `unique (tenant_id, kode)` dan menggagalkan test karena sebab yang
+        // tidak ada hubungannya dengan yang diuji.
+        $seed = $this->seedMasters();
+
+        foreach ([StatusAset::DIHENTIKAN, StatusAset::DILEPAS] as $status) {
+            DB::table('aset_tr_aset')
+                ->where('id', $seed['aset'])
+                ->update(['lifecycle_state' => $status]);
+
+            $this->create($seed)
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('details');
+        }
+
+        $this->assertDatabaseCount('aset_tr_pemeliharaan_aset', 0);
+    }
+
+    public function test_work_order_tetap_boleh_untuk_aset_yang_masih_beredar(): void
+    {
+        $seed = $this->seedMasters();
+        DB::table('aset_tr_aset')
+            ->where('id', $seed['aset'])
+            ->update(['lifecycle_state' => StatusAset::DITERIMA]);
+
+        $this->create($seed)->assertCreated();
     }
 
     /**
@@ -198,7 +236,7 @@ class WorkOrderTest extends TestCase
             'diharapkan_mulai' => '2026-08-15 08:00:00',
             'diharapkan_selesai' => '2026-08-15 12:00:00',
             'details' => [[
-                'asset_id' => $seed['asset'],
+                'aset_id' => $seed['aset'],
                 'maintenance_job_type_id' => $seed['jobType'],
                 'trade_id' => $seed['trade'],
                 'ditugaskan_ke_user_id' => 'montir-1',
@@ -220,7 +258,7 @@ class WorkOrderTest extends TestCase
             'tipeLokasi' => $this->master('aset_m_tipe_lokasi_aset', 'Gudang', 'TLKA-1'),
         ];
         $seed['location'] = $this->location($seed['tipeLokasi']);
-        $seed['asset'] = $this->asset($this->tenantId, $seed, 'AST-WO-1');
+        $seed['aset'] = $this->aset($this->tenantId, $seed, 'AST-WO-1');
 
         return $seed;
     }
@@ -255,15 +293,15 @@ class WorkOrderTest extends TestCase
     }
 
     /** @param array<string, string> $seed */
-    private function asset(string $tenant, array $seed, string $kode): string
+    private function aset(string $tenant, array $seed, string $kode): string
     {
         $id = (string) Str::ulid();
-        DB::table('aset_tr_penerimaan_aset')->insert([
+        DB::table('aset_tr_aset')->insert([
             'id' => $id, 'tenant_id' => $tenant, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $kode,
             'nama' => 'Aset work order '.$kode,
             'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
             'group_aset_id' => $seed['group'], 'jenis_aset_id' => $seed['jenis'],
-            'asset_location_id' => $tenant === $this->tenantId ? $seed['location'] : null,
+            'lokasi_aset_id' => $tenant === $this->tenantId ? $seed['location'] : null,
             'acquired_on' => '2026-08-01', 'acquisition_value' => 250000000, 'currency_code' => 'IDR',
             'created_at' => now(), 'updated_at' => now(),
         ]);

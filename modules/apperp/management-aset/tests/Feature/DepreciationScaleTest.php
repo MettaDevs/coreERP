@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -41,7 +42,7 @@ use Tests\TestCase;
 #[Group('lambat')]
 class DepreciationScaleTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, MenerimaAset, RefreshDatabase;
 
     /** Beberapa tenant dipakai bergiliran supaya volume tidak menumpuk di satu tenant. */
     private const TENANTS = 4;
@@ -246,18 +247,16 @@ class DepreciationScaleTest extends TestCase
                 'convention' => 'full_month',
             ]]])->assertOk();
 
-        $asset = $this->sebagaiPengguna($tenant, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => $this->legalEntityId,
-                'nama' => 'Aset skala penyusutan',
-                'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
-                'acquired_on' => '2026-06-01', 'placed_in_service_on' => '2026-06-15',
-                'acquisition_value' => $acquisition, 'residual_value' => $residual,
-                'currency_code' => 'IDR', 'usage_org_unit_id' => $this->orgUnitId,
-            ])->assertCreated()->json('data.id');
+        $aset = $this->terimaAset($tenant, [
+            'legal_entity_id' => $this->legalEntityId,
+            'nama' => 'Aset skala penyusutan',
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
+            'acquired_on' => '2026-06-01', 'placed_in_service_on' => '2026-06-15',
+            'acquisition_value' => $acquisition, 'residual_value' => $residual,
+            'currency_code' => 'IDR', 'usage_org_unit_id' => $this->orgUnitId,
+        ]);
 
-        return (string) DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
+        return (string) DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->value('id');
     }
 
     /** @return TestResponse<Response> */
@@ -267,7 +266,7 @@ class DepreciationScaleTest extends TestCase
 
         return $this->sebagaiPengguna($tenant, ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', array_filter([
-                'asset_book_id' => $book,
+                'buku_aset_id' => $book,
                 'period_starts_on' => $start->toDateString(),
                 'period_ends_on' => $start->copy()->endOfMonth()->toDateString(),
                 'consumption_amount' => $consumption,

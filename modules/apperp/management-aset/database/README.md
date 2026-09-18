@@ -28,7 +28,7 @@ Database ini hanya dimiliki Management Aset. Referensi tenant dan unit organisas
 | `m_jenis_aset_atribut` | `(tenant_id, jenis_aset_id)` → `m_jenis_aset`, `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut` |
 
 Maintenance setup menambah tabel `m_maintenance_job_type`, `m_maintenance_job_type_variant`,
-`m_maintenance_job_type_default`, `m_maintenance_job_type_asset_type`,
+`m_maintenance_job_type_default`, `m_maintenance_job_type_jenis_aset`,
 `m_maintenance_checklist_variable`, `m_maintenance_checklist_variable_value`,
 `m_maintenance_checklist_template`, dan `m_maintenance_checklist_template_line`. Semua tabel
 ini tenant-scoped dan memakai foreign key gabungan dengan `tenant_id` untuk mencegah
@@ -71,17 +71,17 @@ Seed katalog Indonesia–Asia pada `m_pabrikan_aset` dan `m_model_aset` memakai 
 model menunjuk pabrikan yang sama tenant, sementara `jenis_aset_id` dan `model_number`
 dibiarkan `NULL` agar tenant dapat mengaitkannya kemudian.
 
-Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `asset_location_id`, `capitalization_threshold`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
+Sebagian master membawa kolom tambahan di luar bentuk dasar: `m_group_aset` menyimpan perlakuan finansial (`kelompok_harta_fiskal_id`, `property_type`, `lokasi_aset_id`, `capitalization_threshold`), `m_kelompok_harta_fiskal` menyimpan referensi regulasi berversi, `m_model_aset` menyimpan `model_number`, `m_lokasi_aset` menyimpan `org_unit_id`, dan `m_profil_penyusutan` menyimpan aturan penyusutannya.
 
 `m_tipe_atribut.data_type` menyimpan tipe dasar `string`, `decimal`, `integer`, `date`, atau `boolean`. Values aktif berada terpisah di `m_tipe_atribut_nilai`; min/max opsional berada pada tipe atribut dan wajib berpasangan untuk angka. `data_type_locked` menjadi benar saat nilai pertama berhasil ditulis ke `tr_aset_atribut` dan tidak dibuka kembali saat nilai aset dikoreksi atau dihapus.
 
 `m_kelompok_harta_fiskal` memiliki `template_key`, yurisdiksi, label, metadata regulasi,
 tanggal berlaku, umur manfaat, tarif penyusutan, dan penanda aktif. `template_key` hanya
-untuk seed idempoten; ia bukan nomor bisnis. `tr_penerimaan_aset.kelompok_harta_fiskal_id`
+untuk seed idempoten; ia bukan nomor bisnis. `tr_aset.kelompok_harta_fiskal_id`
 adalah snapshot versi yang dipakai ketika aset diterima, sehingga perubahan referensi group
 tidak menulis ulang histori aset.
 
-`m_lokasi_aset.org_unit_id` dan `tr_penerimaan_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
+`m_lokasi_aset.org_unit_id` dan `tr_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
 
 Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation_key`, `kode`, `nama`, `keterangan`, `aktif`, `deleted_at`, dan timestamps. Constraint yang berlaku pada semuanya:
 
@@ -92,8 +92,12 @@ Setiap tabel master memakai kolom yang sama: `id` (ULID), `tenant_id`, `creation
 
 | Tabel | Fungsi |
 | --- | --- |
-| `tr_penerimaan_aset` | Register yang terbentuk saat aset diterima. |
-| `tr_penempatan_aset` | Riwayat unit pengguna, PIC, dan lokasi aset. |
+| `tr_aset` | Register aset: satu baris satu aset, selama aset itu hidup. |
+| `tr_penerimaan_aset` | Dokumen penerimaan: satu kedatangan barang. |
+| `tr_penerimaan_aset_details` | Baris penerimaan, dengan `jumlah` yang menentukan berapa aset lahir darinya. |
+| `tr_penempatan_aset` | Riwayat unit pengguna, PIC, dan lokasi aset. `mutasi_aset_id` menyebut berita acara yang melahirkannya; baris dari penerimaan aset mengosongkannya. |
+| `tr_mutasi_aset` | Header berita acara serah terima: tanggal, tujuan, kedua pihak, dan alasan. |
+| `tr_mutasi_aset_details` | Satu aset per baris. `asal_*` kosong selama draf dan dibekukan saat dokumen diselesaikan. |
 | `tr_buku_aset` | Nilai buku aset untuk penyusutan, termasuk snapshot kelipatan pembulatan dari Book/matriks. |
 | `tr_penyusutan_aset` | Proposal, finalisasi, dan reversal penyusutan per periode. |
 | `tr_export_penyusutan` | Bukti export penyusutan ke backoffice. |
@@ -117,7 +121,7 @@ Master klasifikasi mengikuti model Dynamics 365 F&O: **datar dan saling lepas**.
 
 `m_model_aset` adalah katalog barang per pabrikan (padanan "Manufacturers and models"), dengan dua induk yang saling lepas: pabrikan wajib, jenis opsional.
 
-Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr_penerimaan_aset.parent_asset_id` menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya struktur domain milik app ini, bukan organization hierarchy CoreERP, jadi `parent_id` permanen di sini tidak melanggar aturan hierarchy pada `docs/dev/01a-tenant-and-org-hierarchy.md`.
+Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr_aset.induk_aset_id` menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya struktur domain milik app ini, bukan organization hierarchy CoreERP, jadi `parent_id` permanen di sini tidak melanggar aturan hierarchy pada `docs/dev/01a-tenant-and-org-hierarchy.md`.
 # Dekomisioning dan event workflow
 
 `tr_dokumen_siklus_aset` menyimpan `workflow_instance_id` untuk usulan dekomisioning. `processed_core_events` adalah inbox idempoten: satu event keputusan Core hanya dapat mengubah status aset satu kali.

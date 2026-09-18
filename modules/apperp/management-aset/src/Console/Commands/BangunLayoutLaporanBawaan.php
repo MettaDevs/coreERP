@@ -41,6 +41,8 @@ class BangunLayoutLaporanBawaan extends Command
 
         $this->workOrderDocx($laporan.'/work-order/standar.docx');
         $this->workOrderListXlsx($laporan.'/daftar-work-order/standar.xlsx');
+        $this->beritaAcaraDocx($laporan.'/berita-acara-serah-terima/standar.docx');
+        $this->daftarMutasiXlsx($laporan.'/daftar-mutasi-aset/standar.xlsx');
         $this->info('Layout bawaan dibangun ulang.');
 
         return self::SUCCESS;
@@ -88,7 +90,7 @@ class BangunLayoutLaporanBawaan extends Command
         }
         $lines->addRow();
         $lines->addCell(500)->addText('${baris.nomor}');
-        $lines->addCell(2200)->addText('${baris.asset_kode} ${baris.asset_nama}');
+        $lines->addCell(2200)->addText('${baris.aset_kode} ${baris.aset_nama}');
         $lines->addCell(1500)->addText('${baris.lokasi}');
         $lines->addCell(1800)->addText('${baris.jenis_pekerjaan} ${baris.varian}');
         $lines->addCell(1200)->addText('${baris.bidang_keahlian}');
@@ -208,6 +210,154 @@ class BangunLayoutLaporanBawaan extends Command
         $sheet->getStyle('F10:H10')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $sheet->freezePane('A10');
         $sheet->setAutoFilter('A9:N9');
+
+        $this->ensureDirectory($path);
+        (new XlsxWriter($spreadsheet))->save($path);
+        $spreadsheet->disconnectWorksheets();
+        $this->line("  ditulis: {$path}");
+    }
+
+    /**
+     * Berita acara serah terima aset.
+     *
+     * Bentuknya mengikuti berita acara yang dipakai di Indonesia, bukan Dynamics: kop,
+     * kalimat pembuka, identitas kedua pihak berdampingan, tabel barang, kalimat penutup,
+     * lalu dua blok tanda tangan. Urutan itu bukan selera — tanda tangan harus berada
+     * sesudah kalimat penutup supaya yang ditandatangani adalah seluruh isi halaman.
+     */
+    private function beritaAcaraDocx(string $path): void
+    {
+        $word = new PhpWord;
+        $word->setDefaultFontName('Calibri');
+        $word->setDefaultFontSize(10);
+        $word->addTableStyle('grid', new TableStyle(['borderSize' => 4, 'borderColor' => '999999', 'cellMargin' => 60]), ['bgColor' => 'E7E6E6']);
+
+        $section = $word->addSection(['marginTop' => 900, 'marginBottom' => 900, 'marginLeft' => 1000, 'marginRight' => 1000]);
+        $this->kop($section);
+        $section->addText('BERITA ACARA SERAH TERIMA ASET', ['bold' => true, 'size' => 14], ['alignment' => Jc::CENTER, 'spaceAfter' => 0]);
+        $section->addText('Nomor: ${kode}', ['size' => 11], ['alignment' => Jc::CENTER]);
+        $section->addTextBreak();
+
+        $section->addText('Pada hari ini, ${tanggal}, telah dilakukan serah terima aset dengan alasan ${alasan}, dengan rincian sebagai berikut:');
+        $section->addTextBreak();
+
+        // Kedua pihak berdampingan supaya terbaca sebagai satu peristiwa, bukan dua daftar.
+        $pihakTabel = $section->addTable(['cellMargin' => 60]);
+        $pihakTabel->addRow();
+        $kiri = $pihakTabel->addCell(4800);
+        $kiri->addText('YANG MENYERAHKAN', ['bold' => true, 'size' => 9]);
+        $kiri->addText('Nama     : ${diserahkan_oleh}');
+        $kiri->addText('Jabatan  : ');
+        $kiri->addText('Unit     : ');
+        $kanan = $pihakTabel->addCell(4800);
+        $kanan->addText('YANG MENERIMA', ['bold' => true, 'size' => 9]);
+        $kanan->addText('Nama     : ${diterima_oleh}');
+        $kanan->addText('Jabatan  : ');
+        $kanan->addText('Unit     : ');
+        $section->addTextBreak();
+
+        $section->addText('Lokasi tujuan: ${tujuan_lokasi}    Unit kerja tujuan: ${tujuan_unit_kerja}    Jumlah aset: ${jumlah_aset}', ['size' => 9, 'color' => '555555']);
+        $section->addTextBreak();
+
+        $daftar = $section->addTable('grid');
+        $daftar->addRow(null, ['tblHeader' => true]);
+        // Kolom "Unit asal" ikut dicetak, bukan hanya lokasi: yang dipersoalkan saat
+        // audit serah terima adalah dari unit mana barang itu berpindah, dan lokasi fisik
+        // tidak selalu menjawabnya — satu ruangan dapat dipakai dua unit.
+        $lebar = [450, 1400, 2200, 1300, 1600, 1500, 1050, 1700];
+        foreach (['No', 'Kode aset', 'Nama aset', 'Nomor seri', 'Lokasi asal', 'Unit asal', 'Kondisi', 'Catatan'] as $index => $heading) {
+            $daftar->addCell($lebar[$index])->addText($heading, ['bold' => true]);
+        }
+        $daftar->addRow();
+        foreach ([
+            '${baris.nomor}', '${baris.aset_kode}', '${baris.aset_nama}', '${baris.serial_number}',
+            '${baris.asal_lokasi}', '${baris.asal_unit_kerja}', '${baris.kondisi}', '${baris.catatan}',
+        ] as $index => $makro) {
+            $daftar->addCell($lebar[$index])->addText($makro);
+        }
+        $section->addTextBreak();
+
+        $section->addText('Keterangan', ['bold' => true]);
+        $section->addText('${keterangan}');
+        $section->addTextBreak();
+        $section->addText('Demikian berita acara serah terima aset ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.');
+        $section->addTextBreak(2);
+
+        $ttd = $section->addTable(['cellMargin' => 40]);
+        $ttd->addRow();
+        foreach ([['Yang menyerahkan', '${diserahkan_oleh}'], ['Yang menerima', '${diterima_oleh}']] as [$peran, $nama]) {
+            $cell = $ttd->addCell(4800);
+            $cell->addText($peran, ['color' => '555555'], ['alignment' => Jc::CENTER]);
+            $cell->addTextBreak(4);
+            $cell->addText('( '.$nama.' )', null, ['alignment' => Jc::CENTER]);
+        }
+        $section->addFooter()->addText('${kop.footer}', ['size' => 8, 'color' => '555555'], ['alignment' => Jc::CENTER]);
+
+        $this->ensureDirectory($path);
+        IOFactory::createWriter($word, 'Word2007')->save($path);
+        $this->line("  ditulis: {$path}");
+    }
+
+    private function daftarMutasiXlsx(string $path): void
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Mutasi aset');
+
+        $sheet->setCellValue('A1', '${kop.logo_kiri}');
+        $sheet->mergeCells('A1:A3');
+        $sheet->setCellValue('B1', '${kop.induk}');
+        $sheet->mergeCells('B1:N1');
+        $sheet->setCellValue('B2', '${kop.nama}');
+        $sheet->mergeCells('B2:N2');
+        $sheet->setCellValue('B3', '${kop.alamat_baris}  ${kop.telepon}  ${kop.email}');
+        $sheet->mergeCells('B3:N3');
+        $sheet->setCellValue('O1', '${kop.logo_kanan}');
+        $sheet->mergeCells('O1:O3');
+        $sheet->getStyle('B1:N3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('B2')->getFont()->setBold(true)->setSize(13);
+        $sheet->getRowDimension(1)->setRowHeight(22);
+        $sheet->getRowDimension(2)->setRowHeight(24);
+        $sheet->getRowDimension(3)->setRowHeight(22);
+        $sheet->getStyle('A3:O3')->getBorders()->getBottom()->setBorderStyle(Border::BORDER_MEDIUM);
+
+        $sheet->setCellValue('A5', 'Daftar mutasi aset');
+        $sheet->getStyle('A5')->getFont()->setBold(true)->setSize(14);
+        $sheet->setCellValue('A6', 'Filter status');
+        $sheet->setCellValue('B6', '${filter_status}');
+        $sheet->setCellValue('C6', 'Dari');
+        $sheet->setCellValue('D6', '${filter_dari}');
+        $sheet->setCellValue('E6', 'Sampai');
+        $sheet->setCellValue('F6', '${filter_sampai}');
+        $sheet->setCellValue('A7', 'Jumlah aset berpindah');
+        $sheet->setCellValue('B7', '${jumlah_baris}');
+        $sheet->setCellValue('C7', 'Dicetak');
+        $sheet->setCellValue('D7', '${dicetak_pada}');
+
+        $headings = [
+            'Tanggal mutasi', 'No. bukti', 'Status', 'Kode aset', 'Nama aset', 'Nomor seri',
+            'Lokasi asal', 'Lokasi tujuan', 'Unit asal', 'Unit tujuan', 'Diserahkan oleh',
+            'PIC penerima', 'Kondisi', 'Alasan mutasi', 'Keterangan',
+        ];
+        $macros = [
+            'tanggal', 'kode', 'status', 'aset_kode', 'aset_nama', 'serial_number',
+            'asal_lokasi', 'tujuan_lokasi', 'asal_unit_kerja', 'tujuan_unit_kerja', 'diserahkan_oleh',
+            'diterima_oleh', 'kondisi', 'alasan', 'keterangan',
+        ];
+        foreach ($headings as $index => $heading) {
+            $sheet->setCellValue([$index + 1, 9], $heading);
+            $sheet->setCellValue([$index + 1, 10], '${baris.'.$macros[$index].'}');
+            $sheet->getColumnDimensionByColumn($index + 1)->setWidth(
+                in_array($macros[$index], ['aset_nama', 'alasan', 'keterangan'], true) ? 36 : 18,
+            );
+        }
+        $header = $sheet->getStyle('A9:O9');
+        $header->getFont()->setBold(true);
+        $header->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E7E6E6');
+        $header->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
+        $header->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->freezePane('A10');
+        $sheet->setAutoFilter('A9:O9');
 
         $this->ensureDirectory($path);
         (new XlsxWriter($spreadsheet))->save($path);

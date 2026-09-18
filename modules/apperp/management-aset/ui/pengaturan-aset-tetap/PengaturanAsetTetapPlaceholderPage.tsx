@@ -32,11 +32,11 @@ const CONTENT: Record<
             'Tempat untuk menyiapkan pemetaan transaksi aset sebelum modul Finance tersedia.',
         emptyTitle: 'Pemetaan akun belum tersedia',
         emptyDescription:
-            'Belum ada akun atau posting yang disimpan di app Asset. Pemetaan akun akan dibuat bersama modul Finance.',
+            'Belum ada akun atau posting yang disimpan di app Aset. Pemetaan akun akan dibuat bersama modul Finance.',
     },
 };
 
-export default function FixedAssetSetupPlaceholderPage({
+export default function PengaturanAsetTetapPlaceholderPage({
     kind,
 }: {
     kind: SetupKind;
@@ -45,13 +45,13 @@ export default function FixedAssetSetupPlaceholderPage({
 
     return (
         <Card
-            aria-labelledby="fixed-asset-setup-title"
+            aria-labelledby="fixed-aset-setup-title"
             className="min-h-full rounded-none border-0 shadow-none"
         >
             <CardHeader className="border-b px-5 py-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <CardTitle id="fixed-asset-setup-title">
+                        <CardTitle id="fixed-aset-setup-title">
                             {content.title}
                         </CardTitle>
                         <p className="text-muted-foreground mt-1 text-sm">

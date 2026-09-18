@@ -4,7 +4,7 @@
     tags:
     - Penyusutan
     operationId: proposeDepreciation
-    summary: Membuat proposal penyusutan satu Asset Book tanpa jurnal GL
+    summary: Membuat proposal penyusutan satu Aset Book tanpa jurnal GL
     responses:
       '201':
         description: Proposal dibuat
@@ -13,7 +13,7 @@
     tags:
     - Penyusutan
     operationId: proposeDepreciationBulk
-    summary: Membuat proposal penyusutan seluruh Asset Book aktif satu periode sekaligus tanpa jurnal GL
+    summary: Membuat proposal penyusutan seluruh Aset Book aktif satu periode sekaligus tanpa jurnal GL
     requestBody:
       required: true
       content:
@@ -60,11 +60,11 @@
   get:
     tags:
     - Penyusutan
-    operationId: listAssetBooksForDepreciation
-    summary: Menampilkan Asset Book aktif yang dapat dihitung penyusutannya
+    operationId: listAsetBooksForDepreciation
+    summary: Menampilkan Aset Book aktif yang dapat dihitung penyusutannya
     responses:
       '200':
-        description: Daftar Asset Book
+        description: Daftar Aset Book
 /api/v1/penyusutan/{id}/finalisasi:
   post:
     tags:

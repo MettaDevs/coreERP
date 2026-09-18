@@ -22,8 +22,8 @@ use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
 use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
 use Modules\Apperp\ManagementAset\Models\MasterData;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetBook;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PenerbitNomorAset;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
@@ -73,8 +73,8 @@ abstract class MasterDataController extends Controller
         'aset_m_maintenance_job_type_variant' => MaintenanceJobTypeVariant::class,
         'aset_m_model_aset' => ModelAset::class,
         'aset_m_tipe_atribut_nilai' => TipeAtributNilai::class,
-        'aset_tr_buku_aset' => AssetBook::class,
-        'aset_tr_penerimaan_aset' => Asset::class,
+        'aset_tr_buku_aset' => BukuAset::class,
+        'aset_tr_aset' => Aset::class,
     ];
 
     /** Slug resource pada route, kode permission, dan reference nomor. */

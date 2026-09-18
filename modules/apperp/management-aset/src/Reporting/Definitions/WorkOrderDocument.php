@@ -76,8 +76,8 @@ final class WorkOrderDocument implements ReportDefinition
         ];
         $lines = [
             'baris.nomor' => 'Nomor baris',
-            'baris.asset_kode' => 'Kode aset',
-            'baris.asset_nama' => 'Nama aset',
+            'baris.aset_kode' => 'Kode aset',
+            'baris.aset_nama' => 'Nama aset',
             'baris.lokasi' => 'Lokasi aset',
             'baris.jenis_pekerjaan' => 'Jenis pekerjaan',
             'baris.varian' => 'Varian pekerjaan',
@@ -135,8 +135,8 @@ final class WorkOrderDocument implements ReportDefinition
         }
 
         $lines = PemeliharaanAsetDetail::query()
-            ->leftJoin('aset_tr_penerimaan_aset as aset', fn ($join) => $join->on('aset.id', '=', 'aset_tr_pemeliharaan_aset_details.asset_id')->on('aset.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id'))
-            ->leftJoin('aset_m_lokasi_aset as lokasi', fn ($join) => $join->on('lokasi.id', '=', 'aset_tr_pemeliharaan_aset_details.asset_location_id')->on('lokasi.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id'))
+            ->leftJoin('aset_tr_aset as aset', fn ($join) => $join->on('aset.id', '=', 'aset_tr_pemeliharaan_aset_details.aset_id')->on('aset.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id'))
+            ->leftJoin('aset_m_lokasi_aset as lokasi', fn ($join) => $join->on('lokasi.id', '=', 'aset_tr_pemeliharaan_aset_details.lokasi_aset_id')->on('lokasi.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id'))
             ->leftJoin('aset_m_maintenance_job_type as pekerjaan', fn ($join) => $join->on('pekerjaan.id', '=', 'aset_tr_pemeliharaan_aset_details.maintenance_job_type_id')->on('pekerjaan.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id'))
             ->leftJoin('aset_m_maintenance_job_type_variant as varian', fn ($join) => $join->on('varian.id', '=', 'aset_tr_pemeliharaan_aset_details.variant_id')->on('varian.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id'))
             ->leftJoin('aset_m_trade as keahlian', fn ($join) => $join->on('keahlian.id', '=', 'aset_tr_pemeliharaan_aset_details.trade_id')->on('keahlian.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id'))
@@ -147,7 +147,7 @@ final class WorkOrderDocument implements ReportDefinition
             ->toBase()
             ->get([
                 'aset_tr_pemeliharaan_aset_details.*',
-                'aset.kode as asset_kode', 'aset.nama as asset_nama',
+                'aset.kode as aset_kode', 'aset.nama as aset_nama',
                 'lokasi.nama as lokasi_nama',
                 'pekerjaan.nama as pekerjaan_nama', 'varian.nama as varian_nama',
                 'keahlian.nama as keahlian_nama',
@@ -185,8 +185,8 @@ final class WorkOrderDocument implements ReportDefinition
             tables: [
                 'baris' => array_values($lines->map(fn (object $line): array => [
                     'nomor' => (int) $line->line_number,
-                    'asset_kode' => $line->asset_kode,
-                    'asset_nama' => $line->asset_nama,
+                    'aset_kode' => $line->aset_kode,
+                    'aset_nama' => $line->aset_nama,
                     'lokasi' => $line->lokasi_nama,
                     'jenis_pekerjaan' => $line->pekerjaan_nama,
                     'varian' => $line->varian_nama,

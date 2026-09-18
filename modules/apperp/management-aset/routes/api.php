@@ -35,10 +35,12 @@ use Modules\Apperp\ManagementAset\Http\Controllers\master\TradeController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\ValidasiStatusWorkOrderController;
 use Modules\Apperp\ManagementAset\Http\Controllers\ReferenceDataController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\DokumenSiklusAsetController;
-use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\AssetController;
+use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\AsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\DepreciationController;
+use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\MutasiAset\MutasiAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset\PelaksanaanController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset\PemeliharaanAsetController;
+use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAset\PenerimaanAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PerencanaanAset\PerencanaanAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetController;
 
@@ -84,14 +86,49 @@ Route::prefix('v1')->middleware('konteks-module:management-aset')->group(functio
     // sebelum tahu tombol mana yang boleh tampil. Dibuang pada F4-06 bersama controllernya.
     Route::get('reference-data/units-of-measure', [ReferenceDataController::class, 'unitsOfMeasure']);
     Route::get('reference-data/kelompok-harta-fiskal', [ReferenceDataController::class, 'fiscalClassifications']);
+    // Unit kerja dan orang milik Core, supaya layar menampilkan nama dan bukan ULID.
+    Route::get('reference-data/unit-kerja', [ReferenceDataController::class, 'operatingUnits']);
+    Route::get('reference-data/anggota', [ReferenceDataController::class, 'members']);
 
-    Route::get('aset', [AssetController::class, 'index']);
-    Route::post('aset', [AssetController::class, 'store']);
-    // Rute spesifik didahulukan agar `{id}` tidak menelan `history` dan `penempatan`.
-    Route::get('aset/{id}/history', [AssetController::class, 'history']);
-    Route::post('aset/{id}/penempatan', [AssetController::class, 'place']);
-    Route::get('aset/{id}', [AssetController::class, 'show']);
-    Route::patch('aset/{id}', [AssetController::class, 'update']);
+    Route::get('aset', [AsetController::class, 'index']);
+    // Rute spesifik didahulukan agar `{id}` tidak menelan `history`.
+    //
+    // `POST aset` dibuang 18 September 2026. Aset kini hanya lahir dari dokumen
+    // penerimaan: satu berkas untuk satu kedatangan, dengan jumlah per baris, rujukan
+    // permintaan pembelian, dan peringatan ambang kapitalisasi sebelum nomornya terbit.
+    // Selama dua pintu masih terbuka, "inventarisasi aset adalah penerimaan" tidak benar
+    // — dan izin `management-aset.aset.create` sekarang berarti menyelesaikan penerimaan.
+    //
+    // `POST aset/{id}/penempatan` dibuang 17 September 2026. Ia satu-satunya yang pernah
+    // menulis `lifecycle_state = 'in_use'` — nilai yang tidak pernah dibaca logika mana pun
+    // — dan seluruh pekerjaannya kini dikerjakan dokumen mutasi, yang membawa nomor,
+    // berita acara, dan riwayat penempatan yang menyebut buktinya.
+    Route::get('aset/{id}/history', [AsetController::class, 'history']);
+    Route::get('aset/{id}', [AsetController::class, 'show']);
+    Route::patch('aset/{id}', [AsetController::class, 'update']);
+    // Mutasi aset. `selesaikan` didahulukan agar `{id}` tidak menelannya, dan ia POST
+    // bukan PATCH karena menyelesaikan serah terima menciptakan penempatan baru untuk
+    // setiap aset pada dokumen — perintah, bukan penyuntingan field.
+    Route::get('mutasi-aset', [MutasiAsetController::class, 'index']);
+    Route::post('mutasi-aset', [MutasiAsetController::class, 'store']);
+    Route::post('mutasi-aset/{id}/selesaikan', [MutasiAsetController::class, 'selesaikan']);
+    Route::get('mutasi-aset/{id}', [MutasiAsetController::class, 'show']);
+    Route::patch('mutasi-aset/{id}', [MutasiAsetController::class, 'update']);
+    Route::delete('mutasi-aset/{id}', [MutasiAsetController::class, 'destroy']);
+
+    // Dokumen penerimaan: satu kedatangan, banyak aset.
+    //
+    // `ringkasan` dan `aset` didahulukan dari `{id}` supaya keduanya tidak ditelan
+    // parameter — urutan yang sama seperti `aset/{id}/history`.
+    Route::get('penerimaan-aset', [PenerimaanAsetController::class, 'index']);
+    Route::post('penerimaan-aset', [PenerimaanAsetController::class, 'store']);
+    Route::post('penerimaan-aset/{id}/selesaikan', [PenerimaanAsetController::class, 'selesaikan']);
+    Route::get('penerimaan-aset/{id}/ringkasan', [PenerimaanAsetController::class, 'ringkasan']);
+    Route::get('penerimaan-aset/{id}/aset', [PenerimaanAsetController::class, 'asetTerbit']);
+    Route::put('penerimaan-aset/{id}/aset', [PenerimaanAsetController::class, 'isiNomorSeri']);
+    Route::get('penerimaan-aset/{id}', [PenerimaanAsetController::class, 'show']);
+    Route::patch('penerimaan-aset/{id}', [PenerimaanAsetController::class, 'update']);
+    Route::delete('penerimaan-aset/{id}', [PenerimaanAsetController::class, 'destroy']);
     Route::get('perencanaan-aset', [PerencanaanAsetController::class, 'index']);
     Route::post('perencanaan-aset', [PerencanaanAsetController::class, 'store']);
     Route::get('perencanaan-aset/{id}', [PerencanaanAsetController::class, 'show']);
@@ -106,7 +143,7 @@ Route::prefix('v1')->middleware('konteks-module:management-aset')->group(functio
     Route::get('validasi-status-work-order', [ValidasiStatusWorkOrderController::class, 'index']);
     Route::put('validasi-status-work-order', [ValidasiStatusWorkOrderController::class, 'replace']);
     Route::get('pemeliharaan-aset', [PemeliharaanAsetController::class, 'index']);
-    Route::get('pemeliharaan-aset/referensi/job-types', [PemeliharaanAsetController::class, 'jobTypesForAsset']);
+    Route::get('pemeliharaan-aset/referensi/job-types', [PemeliharaanAsetController::class, 'jobTypesForAset']);
     Route::post('pemeliharaan-aset', [PemeliharaanAsetController::class, 'store']);
     // Rute spesifik didahulukan agar `{id}` tidak menelan `saya`.
     Route::get('pemeliharaan-aset/saya', [PelaksanaanController::class, 'pekerjaanSaya']);
@@ -133,11 +170,11 @@ Route::prefix('v1')->middleware('konteks-module:management-aset')->group(functio
     // yang sedang dibuka yang membutuhkannya, dan tiap angka menegakkan izin resource-nya
     // sendiri.
     Route::get('jenis-aset/{id}/detail', JenisAsetDetailController::class);
-    Route::get('jenis-aset/{id}/maintenance-job-types', [MaintenanceSetupLinkController::class, 'jenisAsetAssetTypes']);
-    Route::put('jenis-aset/{id}/maintenance-job-types', [MaintenanceSetupLinkController::class, 'replaceJenisAsetAssetTypes']);
+    Route::get('jenis-aset/{id}/maintenance-job-types', [MaintenanceSetupLinkController::class, 'jenisAsetAsetTypes']);
+    Route::put('jenis-aset/{id}/maintenance-job-types', [MaintenanceSetupLinkController::class, 'replaceJenisAsetAsetTypes']);
     Route::get('maintenance-job-types/{id}/variants', [MaintenanceSetupLinkController::class, 'jobTypeVariants']);
-    Route::get('maintenance-job-types/{id}/asset-types', [MaintenanceSetupLinkController::class, 'jobTypeAssetTypes']);
-    Route::put('maintenance-job-types/{id}/asset-types', [MaintenanceSetupLinkController::class, 'replaceJobTypeAssetTypes']);
+    Route::get('maintenance-job-types/{id}/jenis-aset', [MaintenanceSetupLinkController::class, 'jobTypeAsetTypes']);
+    Route::put('maintenance-job-types/{id}/jenis-aset', [MaintenanceSetupLinkController::class, 'replaceJobTypeAsetTypes']);
     Route::get('maintenance-checklist-variables/{id}/values', [MaintenanceSetupLinkController::class, 'variableValues']);
     Route::put('maintenance-checklist-variables/{id}/values', [MaintenanceSetupLinkController::class, 'replaceVariableValues']);
     Route::get('maintenance-checklist-templates/{id}/lines', [MaintenanceSetupLinkController::class, 'templateLines']);

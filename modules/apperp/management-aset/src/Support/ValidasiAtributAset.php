@@ -34,7 +34,7 @@ use Modules\Apperp\ManagementAset\Models\master\TipeAtributNilai;
  *     nilai_pilihan: list<array{id: string, nilai: string}>,
  * }
  */
-final class AssetAttributeValidator
+final class ValidasiAtributAset
 {
     /**
      * Definisi atribut satu jenis aset, terurut sesuai tampilan.

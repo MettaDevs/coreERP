@@ -19,11 +19,11 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
-class MaintenanceJobTypeAssetType extends Model
+class MaintenanceJobTypeJenisAset extends Model
 {
     use MilikTenant;
 
-    protected $table = 'aset_m_maintenance_job_type_asset_type';
+    protected $table = 'aset_m_maintenance_job_type_jenis_aset';
 
     protected $primaryKey = null;
 

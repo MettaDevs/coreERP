@@ -26,9 +26,10 @@ final class DirektoriOrganisasiCore implements DirektoriOrganisasi
             ->where('memberships.tenant_id', $tenantId)
             ->where('memberships.status', 'active')
             ->orderBy('users.name')
-            ->get(['memberships.id', 'users.name', 'users.email'])
+            ->get(['memberships.id', 'memberships.user_id', 'users.name', 'users.email'])
             ->map(static fn (object $baris): array => [
                 'id' => (string) $baris->id,
+                'user_id' => (string) $baris->user_id,
                 'nama' => (string) $baris->name,
                 'email' => (string) $baris->email,
             ])
@@ -41,7 +42,7 @@ final class DirektoriOrganisasiCore implements DirektoriOrganisasi
             ->join('users', 'users.id', '=', 'memberships.user_id')
             ->where('memberships.tenant_id', $tenantId)
             ->where('memberships.id', $membershipId)
-            ->first(['memberships.id', 'users.name', 'users.email']);
+            ->first(['memberships.id', 'memberships.user_id', 'users.name', 'users.email']);
 
         if ($baris === null) {
             return null;
@@ -49,6 +50,7 @@ final class DirektoriOrganisasiCore implements DirektoriOrganisasi
 
         return [
             'id' => (string) $baris->id,
+            'user_id' => (string) $baris->user_id,
             'nama' => (string) $baris->name,
             'email' => (string) $baris->email,
         ];

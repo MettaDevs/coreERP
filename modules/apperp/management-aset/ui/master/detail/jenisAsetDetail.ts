@@ -9,7 +9,7 @@ export type JenisAsetModelSummary = {
 export type JenisAsetDetail = {
     atribut_count: number | null;
     model_count: number | null;
-    asset_count: number | null;
+    aset_count: number | null;
     maintenance_job_type_count: number | null;
     models: JenisAsetModelSummary[] | null;
     available_models: JenisAsetModelSummary[] | null;

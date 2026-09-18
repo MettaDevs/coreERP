@@ -30,7 +30,7 @@ class GroupAsetController extends MasterDataController
         // yang dipakai aset, jadi mengarsipkannya selagi ada aset aktif akan memutus
         // dasar penyusutan aset tersebut.
         return [
-            new MasterChild(table: 'aset_tr_penerimaan_aset', column: 'group_aset_id', label: 'aset'),
+            new MasterChild(table: 'aset_tr_aset', column: 'group_aset_id', label: 'aset'),
         ];
     }
 
@@ -63,7 +63,7 @@ class GroupAsetController extends MasterDataController
             'posting_layers' => ['prohibited'],
             'property_type' => ['sometimes', 'nullable', Rule::in(GroupAset::PROPERTY_TYPE)],
             // Lokasi bawaan; hanya nilai awal saat aset diterima, bukan lokasi yang berlaku.
-            'asset_location_id' => [
+            'lokasi_aset_id' => [
                 'sometimes', 'nullable', 'ulid',
                 Rule::exists('aset_m_lokasi_aset', 'id')
                     ->where('tenant_id', $tenantId)
@@ -76,7 +76,7 @@ class GroupAsetController extends MasterDataController
     protected function extraPayload(array $data): array
     {
         $payload = [];
-        foreach (['kelompok_harta_fiskal_id', 'property_type', 'asset_location_id', 'capitalization_threshold'] as $column) {
+        foreach (['kelompok_harta_fiskal_id', 'property_type', 'lokasi_aset_id', 'capitalization_threshold'] as $column) {
             if (array_key_exists($column, $data)) {
                 $payload[$column] = $data[$column];
             }
@@ -90,7 +90,7 @@ class GroupAsetController extends MasterDataController
         return [
             'kelompok_harta_fiskal_id' => $record->kelompok_harta_fiskal_id,
             'property_type' => $record->property_type,
-            'asset_location_id' => $record->asset_location_id,
+            'lokasi_aset_id' => $record->lokasi_aset_id,
             'capitalization_threshold' => $record->capitalization_threshold,
         ];
     }

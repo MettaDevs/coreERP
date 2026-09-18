@@ -21,7 +21,7 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $tenant_id
- * @property string $asset_id
+ * @property string $aset_id
  * @property string $tipe_atribut_id
  * @property ?string $nilai_text
  * @property ?string $nilai_number
@@ -31,7 +31,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
-class AssetAttribute extends Model
+class AtributAset extends Model
 {
     use HasUlids;
     use MilikTenant;
@@ -39,7 +39,7 @@ class AssetAttribute extends Model
     protected $table = 'aset_tr_aset_atribut';
 
     protected $fillable = [
-        'tenant_id', 'asset_id', 'tipe_atribut_id',
+        'tenant_id', 'aset_id', 'tipe_atribut_id',
         'nilai_text', 'nilai_number', 'nilai_boolean', 'nilai_date', 'tipe_atribut_nilai_id',
     ];
 
@@ -53,9 +53,9 @@ class AssetAttribute extends Model
         ];
     }
 
-    /** @return BelongsTo<Asset, $this> */
-    public function asset(): BelongsTo
+    /** @return BelongsTo<Aset, $this> */
+    public function aset(): BelongsTo
     {
-        return $this->belongsTo(Asset::class, 'asset_id');
+        return $this->belongsTo(Aset::class, 'aset_id');
     }
 }

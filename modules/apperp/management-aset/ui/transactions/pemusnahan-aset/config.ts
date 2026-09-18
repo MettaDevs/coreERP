@@ -4,6 +4,6 @@ export const config: LifecycleConfig = {
     resource: 'pemusnahan-aset',
     title: 'Pemusnahan aset',
     action: 'Buat usulan pemusnahan',
-    needsAsset: true,
+    needsAset: true,
     financial: false,
 };

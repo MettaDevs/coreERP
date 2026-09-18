@@ -74,6 +74,75 @@ Mengubah `placed_in_service_on` menghitung ulang `depreciation_start_on` tiap bu
 
 Membuat dokumen **Penjualan aset** atau **Pemusnahan aset** melepas asetnya: `lifecycle_state` menjadi `disposed` dan seluruh buku asetnya ditutup (`status = closed`, `closed_on` diisi tanggal dokumen). Buku yang tertutup tidak lagi menerima proposal penyusutan. Ini murni subledger; tidak ada jurnal yang dibuat.
 
+## Mutasi aset
+
+Mutasi adalah **dokumen**, bukan aksi pada satu aset: satu berita acara serah terima
+memuat beberapa aset yang berpindah bersama, karena memang begitu barang berpindah tangan
+di lapangan. Nomornya memakai reference `management-aset.mutasi-aset` (prefix `MUTA`) per
+badan hukum.
+
+Alurnya dua langkah. `POST /api/v1/mutasi-aset` membuat **draf** — nomor terbit, tetapi
+tidak satu aset pun berpindah. `POST /api/v1/mutasi-aset/{id}/selesaikan` yang benar-benar
+memindahkannya: untuk tiap baris ia membekukan keadaan asal, menambah satu baris riwayat
+penempatan yang menyebut dokumennya, lalu memperbarui lokasi, unit penanggung jawab, dan
+dimensi keuangan asetnya. Dokumen yang sudah selesai tidak dapat disunting maupun
+diarsipkan; koreksi dikerjakan dengan mutasi balik, bukan dengan menyunting bukti.
+
+Menyusun dokumen dan memindahkan aset adalah dua wewenang terpisah. Yang pertama
+`management-aset.mutasi-aset.{read,create,update,archive}`; yang kedua
+`management-aset.aset.mutate`. Juru tulis boleh menyiapkan berkasnya tanpa berwenang
+menyelesaikan serah terimanya.
+
+### Apa yang dipindahkan, dan apa yang tidak
+
+| Sumbu | Padanan Dynamics 365 | Di modul ini |
+| --- | --- | --- |
+| Fisik dan tanggung jawab | `Install asset at location` (Asset Management) | Dibangun |
+| Dimensi keuangan per buku | `Transfer fixed assets` (Fixed assets) | Tidak dibangun |
+
+Keduanya terpisah di F&O karena yang kedua **menerbitkan jurnal**: ia memindahkan saldo
+antar akun, dan karena tiap buku memposting ke lapisan sendiri, tiap buku memerlukan
+dimensinya sendiri. Modul ini tidak menjurnal sama sekali, sehingga dimensi per buku tidak
+memiliki arti di sini. Ketika Finance mulai menjurnal dari export penyusutan, di situlah ia
+menempel — satu tabel dimensi per buku aset, diisi dokumen ini, tanpa membongkar yang sudah
+ada. `financial_dimension_org_unit_id` tingkat aset tetap diperbarui: ia label pembebanan
+yang sudah dipelihara jalur penerimaan sejak awal, dan membiarkannya basi membuat data
+lebih salah, bukan lebih sedikit.
+
+`lifecycle_state` aset sengaja **tidak** disentuh. Di F&O, memasang aset pada functional
+location dan mengubah lifecycle state adalah dua tindakan terpisah pada action pane yang
+sama; menggabungkannya membuat aset yang dimutasi ke gudang penyimpanan ikut berstatus
+dipakai.
+
+### Nama, bukan ID
+
+Tidak ada layar maupun dokumen cetak yang menampilkan ULID unit kerja atau ULID pengguna.
+Jawaban API memulangkan id **dan** namanya berpasangan — `tujuan_org_unit_nama`,
+`diserahkan_oleh_nama`, `diterima_oleh_nama`, serta `asal_org_unit_nama` dan
+`asal_custodian_nama` pada baris — dan form memakai dropdown berisi nama, bukan kotak ketik.
+Daftarnya dibaca lewat `GET /api/v1/reference-data/unit-kerja` dan
+`GET /api/v1/reference-data/anggota`, yang keduanya berdiri di atas kontrak Core
+`DirektoriOrganisasi`; modul tidak pernah menyentuh database Core.
+
+Nama diterjemahkan **saat dibaca**, bukan dibekukan sebagai snapshot. Nama orang dan nama
+unit berubah karena sebab yang tidak ada hubungannya dengan aset — pernikahan, reorganisasi,
+pembetulan ejaan — dan dokumen yang membekukan nama akan menampilkan ejaan lama selamanya
+tanpa ada yang dapat membetulkannya. Nama bernilai `null` berarti unit atau keanggotaannya
+sudah tidak ada di Core; layar menampilkan idnya sebagai jalan terakhir supaya dokumen lama
+tetap dapat ditelusuri.
+
+### Lokasi asal tidak diketik
+
+Asal diturunkan dari asetnya, sama seperti dialog `Install asset at location` yang mengisi
+field `Functional location` sendiri begitu asetnya dipilih. Selama dokumen masih draf,
+jawaban API menyebut keadaan aset **sekarang**; sesudah diselesaikan, nilai yang dibekukan
+yang menang. Klien tidak perlu memilih di antara keduanya dan tidak boleh mengirimkannya
+kembali.
+
+Dua laporan mengikuti dokumen ini: `management-aset.berita-acara-serah-terima` (Word, satu
+dokumen, hanya untuk mutasi yang sudah selesai) dan `management-aset.daftar-mutasi-aset`
+(Excel, satu baris per aset yang berpindah).
+
 ## Penyusutan massal
 
 `POST /api/v1/penyusutan/proposal-massal` menghitung satu periode untuk seluruh buku aset aktif sekaligus, dengan penyaring opsional `group_aset_id` dan `buku_id`. Padanannya di Dynamics 365 F&O adalah *Create depreciation proposal*.
@@ -90,7 +159,7 @@ Sebagian master membawa kolom sendiri di luar `kode`/`nama`/`keterangan`/`aktif`
 | --- | --- |
 | `kelompok_harta_fiskal_id` | Referensi aturan fiskal berversi; aset menyimpan snapshot ID saat diterima |
 | `property_type` | Masuk neraca atau tidak: aset tetap, barang inventaris, atau lainnya. Padanan `Property type` di F&O |
-| `asset_location_id` | Lokasi bawaan saat aset diterima; hanya nilai awal, tidak pernah dibaca ulang |
+| `lokasi_aset_id` | Lokasi bawaan saat aset diterima; hanya nilai awal, tidak pernah dibaca ulang |
 | `capitalization_threshold` | Di bawah nilai ini aset tetap dicatat, tetapi bukunya tidak menyusut |
 
 Sifat harta — berwujud, tidak berwujud, hak guna — sengaja tidak disimpan pada group.
@@ -118,7 +187,7 @@ Kedua sumbu wajib dan sejajar; tidak ada yang menyaring pilihan yang lain, dan t
 
 Tipe atribut mengikuti model Dynamics 365 Asset Management: tipe dasar (`string`, `decimal`, `integer`, `date`, `boolean`) terpisah dari batasan yang dapat berubah. Teks tanpa Values menjadi isian bebas, sedangkan teks dengan Values menjadi dropdown. Desimal dan bilangan bulat tanpa min/max menerima angka bebas; bila kedua batas diisi, nilainya harus berada dalam rentang. Mapping Data type/Values bersifat langsung terhadap Dynamics, sementara range angka merupakan penyesuaian dengan min/max yang sudah dimiliki aplikasi ini. Setelah sebuah atribut pernah diisi pada aset, tipe dasarnya terkunci permanen agar nilai lama tetap dapat dibaca dengan benar.
 
-Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr_penerimaan_aset.parent_asset_id` menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya **struktur domain milik Management Aset**, bukan organization hierarchy CoreERP; aturan "jangan menyimpan `parent_id` permanen" pada `docs/dev/01a-tenant-and-org-hierarchy.md` berlaku untuk identitas organization di Core, bukan untuk struktur seperti ini.
+Yang hierarkis hanyalah **data**, bukan skema: `m_lokasi_aset.parent_id` dan `tr_aset.induk_aset_id` menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya **struktur domain milik Management Aset**, bukan organization hierarchy CoreERP; aturan "jangan menyimpan `parent_id` permanen" pada `docs/dev/01a-tenant-and-org-hierarchy.md` berlaku untuk identitas organization di Core, bukan untuk struktur seperti ini.
 
 ### Lokasi dan dimensi keuangan
 
@@ -172,6 +241,7 @@ Prefix di bawah adalah `default_prefix` pada `app.yaml`; `loadtest/verify.sql` m
 | `management-aset.perencanaan-aset` | `PLNA` | `legal_entity` |
 | `management-aset.permintaan-pembelian-aset` | `RPPA` | `legal_entity` |
 | `management-aset.pemeliharaan-aset` | `PMHA` | `legal_entity` |
+| `management-aset.mutasi-aset` | `MUTA` | `legal_entity` |
 | `management-aset.dekomisioning-aset` | `DKMA` | `legal_entity` |
 | `management-aset.penjualan-aset` | `PJLA` | `legal_entity` |
 | `management-aset.pemusnahan-aset` | `PMSA` | `legal_entity` |
@@ -219,7 +289,7 @@ Test berada di `api/tests/Feature`. Selain CRUD, test menjaga hal yang tidak bol
 
 ## Load test
 
-Test feature tidak cukup untuk menyatakan modul selesai. Ia menjalankan satu request pada satu proses terhadap SQLite, sehingga tidak dapat melihat koneksi database habis, nomor terbit dua kali, batas tenant yang bocor saat request saling menyela, atau idempotency key yang berlomba.
+Test feature tidak cukup untuk menyatakan modul selesai. Ia menjalankan satu request pada satu proses, sehingga tidak dapat melihat koneksi database habis, nomor terbit dua kali, batas tenant yang bocor saat request saling menyela, atau idempotency key yang berlomba.
 
 `loadtest/` berisi stack lengkap: empat instance API di belakang nginx, PostgreSQL asli, stub Number Sequence yang sekaligus mencatat setiap nomor, dan skenario k6 dengan 1000 virtual user pada 128 tenant. Cara menjalankan, hasil terukur, dan batas kejujurannya ada di [loadtest/README.md](loadtest/README.md).
 

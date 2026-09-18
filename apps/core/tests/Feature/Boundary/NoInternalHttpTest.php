@@ -286,26 +286,41 @@ class NoInternalHttpTest extends TestCase
 
         $this->assertSame([$satuanId], array_column($satuan, 'id'), 'Satuan milik tenant tidak terbaca lewat kontrak Core. Dulu daftar ini datang dari direktori satuan lewat HTTP.');
 
-        $aset = $this->sebagaiPenggunaBernama('pengaju', $tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'tanpa-jaringan-aset')
-            ->postJson('/api/modules/management-aset/v1/aset', [
+        // Aset lahir dari dokumen penerimaan sejak 18 September 2026; `POST /aset` dibuang.
+        // Dua nomor karena itu terbit di sini, bukan satu: satu untuk dokumennya, satu untuk
+        // asetnya — dan keduanya sama-sama harus datang dari Core.
+        $penerimaan = $this->sebagaiPenggunaBernama('pengaju', $tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.create'])
+            ->withHeader('Idempotency-Key', 'tanpa-jaringan-penerimaan')
+            ->postJson('/api/modules/management-aset/v1/penerimaan-aset', [
                 'legal_entity_id' => $legalEntityId,
-                'nama' => 'Aset alur tanpa jaringan',
-                ...$klasifikasi,
-                'acquired_on' => '2026-07-28',
-                'acquisition_value' => 12000000,
+                'responsible_org_unit_id' => (string) Str::ulid(),
+                'tanggal' => '2026-07-28',
                 'currency_code' => 'IDR',
-                'usage_org_unit_id' => (string) Str::ulid(),
+                'details' => [[
+                    'nama' => 'Aset alur tanpa jaringan',
+                    ...$klasifikasi,
+                    'jumlah' => 1,
+                    'nilai_per_unit' => 12000000,
+                ]],
             ])->assertCreated()->json('data');
+
+        $aset = $this->sebagaiPenggunaBernama('pengaju', $tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.aset.create'])
+            ->postJson('/api/modules/management-aset/v1/penerimaan-aset/'.$penerimaan['id'].'/selesaikan', ['version' => 1])
+            ->assertOk();
+
+        $aset = $this->sebagaiPenggunaBernama('pengaju', $tenantId, ['management-aset.penerimaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/penerimaan-aset/'.$penerimaan['id'].'/aset')
+            ->assertOk()->json('data.0');
+        $aset['responsible_org_unit_id'] = $penerimaan['responsible_org_unit_id'];
 
         $this->assertSame(
             $this->awalanNomor('management-aset.aset').'-000001',
             $aset['kode'],
             'Nomor aset tidak diterbitkan Core lewat kontrak. Nomor yang dipalsukan tidak pernah memajukan penghitung mana pun, jadi kode inilah bukti bahwa penerbitannya sungguhan.',
         );
-        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Tidak ada baris penerbitan nomor di Core, padahal asetnya terbentuk. Nomornya datang dari tempat lain.');
+        $this->assertSame(2, $this->jumlahNomorTerbit(), 'Tidak ada dua baris penerbitan nomor di Core, padahal dokumen dan asetnya sama-sama terbentuk. Salah satu nomornya datang dari tempat lain.');
 
-        $mulaiMenyusut = DB::table('aset_tr_buku_aset')->where('asset_id', $aset['id'])->value('depreciation_start_on');
+        $mulaiMenyusut = DB::table('aset_tr_buku_aset')->where('aset_id', $aset['id'])->value('depreciation_start_on');
 
         $this->assertSame('2026-12-30', (string) $mulaiMenyusut, implode("\n", [
             'Tanggal mulai menyusut tidak memakai batas tahun buku Juli–Juni milik tenant ini.',
@@ -321,11 +336,11 @@ class NoInternalHttpTest extends TestCase
                 'legal_entity_id' => $legalEntityId,
                 'responsible_org_unit_id' => $aset['responsible_org_unit_id'],
                 'tanggal' => '2026-08-03',
-                'asset_id' => $aset['id'],
+                'aset_id' => $aset['id'],
             ])->assertCreated()->json('data');
 
         $this->assertNotNull($dokumen['workflow_instance_id'], 'Dokumen tersimpan tanpa instance workflow. Sebelum pengajuan berada di dalam transaksinya, keadaan ini berarti dokumen yang menunggu persetujuan yang tidak pernah diajukan siapa pun.');
-        $this->assertSame(2, $this->jumlahNomorTerbit(), 'Dokumen dekomisioning tidak menerbitkan nomornya sendiri lewat Core.');
+        $this->assertSame(3, $this->jumlahNomorTerbit(), 'Dokumen dekomisioning tidak menerbitkan nomornya sendiri lewat Core.');
 
         $tugas = $this->tugasMenunggu($tenantId, $idPemeriksa);
         $this->assertNotNull($tugas, 'Tidak ada tugas persetujuan yang menunggu pemeriksa, jadi pengajuannya tidak pernah sampai ke workflow Core.');
@@ -335,7 +350,7 @@ class NoInternalHttpTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('aset_tr_dokumen_siklus_aset', ['id' => $dokumen['id'], 'status' => 'approved']);
-        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $aset['id'], 'lifecycle_state' => 'decommissioned']);
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $aset['id'], 'lifecycle_state' => 'decommissioned']);
 
         $this->assertSame([], $permintaanKeluar, implode("\n", [
             'Alur ini masih mengirim permintaan HTTP: '.implode(', ', $permintaanKeluar).'.',

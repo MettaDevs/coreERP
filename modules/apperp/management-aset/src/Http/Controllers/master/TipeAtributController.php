@@ -189,7 +189,7 @@ class TipeAtributController extends MasterDataController
         return [
             ...$record->only(['data_type', 'satuan_id', 'satuan', 'min_value', 'max_value']),
             'values_count' => (int) ($record->values_count ?? 0),
-            'asset_types_count' => (int) ($record->asset_types_count ?? 0),
+            'jenis_aset_count' => (int) ($record->jenis_aset_count ?? 0),
             'data_type_locked' => (bool) $record->data_type_locked,
         ];
     }
@@ -202,7 +202,7 @@ class TipeAtributController extends MasterDataController
             'values_count' => TipeAtributNilai::query()
                 ->selectRaw('count(*)')
                 ->whereColumn('aset_m_tipe_atribut_nilai.tipe_atribut_id', 'aset_m_tipe_atribut.id'),
-            'asset_types_count' => JenisAsetAtribut::query()
+            'jenis_aset_count' => JenisAsetAtribut::query()
                 ->selectRaw('count(*)')
                 ->whereColumn('aset_m_jenis_aset_atribut.tipe_atribut_id', 'aset_m_tipe_atribut.id'),
         ]);

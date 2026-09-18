@@ -40,7 +40,7 @@ export default function JenisAsetCounters({
             label: 'Model aset',
             count: detail?.model_count ?? null,
         },
-        { key: 'aset', label: 'Aset', count: detail?.asset_count ?? null },
+        { key: 'aset', label: 'Aset', count: detail?.aset_count ?? null },
         {
             key: 'maintenance',
             label: 'Jenis pekerjaan',

@@ -36,8 +36,8 @@ export type Permission =
     | `management-aset.pemeliharaan-aset.${'read' | 'create' | 'update' | 'archive' | 'schedule' | 'execute' | 'close'}`
     | `management-aset.validasi-status-work-order.${'read' | 'update'}`
     | 'management-aset.monitoring-aset.read'
-    | 'management-aset.fixed-asset-parameters.read'
-    | 'management-aset.fixed-asset-posting-profiles.read'
+    | 'management-aset.fixed-aset-parameters.read'
+    | 'management-aset.fixed-aset-posting-profiles.read'
     | `management-aset.penyusutan.${'read' | 'create' | 'finalize' | 'correct'}`;
 
 export function permission(
@@ -111,7 +111,7 @@ export const MASTERS: MasterConfig[] = [
                 type: 'select',
                 options: [
                     {
-                        value: 'fixed_asset',
+                        value: 'fixed_aset',
                         label: 'Aset tetap (masuk neraca)',
                     },
                     {
@@ -131,7 +131,7 @@ export const MASTERS: MasterConfig[] = [
                 help: 'Perolehan di bawah nilai ini tetap dicatat sebagai aset, tetapi bukunya tidak menyusut.',
             },
             {
-                name: 'asset_location_id',
+                name: 'lokasi_aset_id',
                 label: 'Lokasi bawaan',
                 type: 'reference',
                 resource: 'lokasi-aset',
@@ -331,7 +331,7 @@ export const MASTERS: MasterConfig[] = [
                 resource: 'model-aset',
             },
             {
-                name: 'asset_id',
+                name: 'aset_id',
                 label: 'Aset',
                 type: 'reference',
                 resource: 'aset',

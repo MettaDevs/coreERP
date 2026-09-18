@@ -110,7 +110,7 @@ class PermintaanPengadaanAsetController extends Controller
     private function replaceDetails(string $id, array $details): void
     {
         $names = JenisAset::query()->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
-        collect($details)->values()->each(fn ($detail, $i) => PermintaanPengadaanAsetDetail::create(['request_id' => $id, 'line_number' => $i + 1, 'planning_detail_id' => $detail['planning_detail_id'] ?? null, 'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'], 'asset_name' => $names[$detail['jenis_aset_id']], 'quantity' => $detail['quantity'], 'specification' => $detail['specification'], 'note' => $detail['note'] ?? null]));
+        collect($details)->values()->each(fn ($detail, $i) => PermintaanPengadaanAsetDetail::create(['request_id' => $id, 'line_number' => $i + 1, 'planning_detail_id' => $detail['planning_detail_id'] ?? null, 'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'], 'nama_aset' => $names[$detail['jenis_aset_id']], 'quantity' => $detail['quantity'], 'specification' => $detail['specification'], 'note' => $detail['note'] ?? null]));
     }
 
     /** @param list<array<string, mixed>> $details */

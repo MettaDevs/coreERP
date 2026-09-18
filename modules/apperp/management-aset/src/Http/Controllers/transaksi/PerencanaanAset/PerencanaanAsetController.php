@@ -251,7 +251,7 @@ class PerencanaanAsetController extends Controller
         collect($details)->values()->each(fn (array $detail, int $index) => PerencanaanAsetDetail::create([
             'planning_id' => $planId, 'line_number' => $index + 1,
             'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'],
-            'asset_name' => $types[$detail['jenis_aset_id']],
+            'nama_aset' => $types[$detail['jenis_aset_id']],
             // `unit` snapshot kode satuan untuk tampilan; `satuan_id` di atas yang menunjuk
             // satuan milik Core. Keduanya tidak saling menggantikan.
             'unit' => $units[$detail['satuan_id']]['name'],

@@ -512,15 +512,17 @@ class ReportingTest extends TestCase
         $details = [];
         foreach ([['AST-WO-1', 'Forklift 1', 1.5], ['AST-WO-2', 'Genset 1', 2]] as [$kode, $nama, $jam]) {
             $assetId = (string) Str::ulid();
-            DB::table('aset_tr_penerimaan_aset')->insert([
+            // Register aset bernama `aset_tr_aset` sejak 18 September 2026; sebelumnya
+            // `aset_tr_penerimaan_aset`, nama yang kini dipakai dokumen penerimaannya.
+            DB::table('aset_tr_aset')->insert([
                 'id' => $assetId, 'tenant_id' => $this->membership->tenant_id, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => $kode,
                 'nama' => $nama, 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
-                'group_aset_id' => $seed['group'], 'jenis_aset_id' => $seed['jenis'], 'asset_location_id' => $locationId,
+                'group_aset_id' => $seed['group'], 'jenis_aset_id' => $seed['jenis'], 'lokasi_aset_id' => $locationId,
                 'acquired_on' => '2026-08-01', 'acquisition_value' => 250000000, 'currency_code' => 'IDR',
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             $details[] = [
-                'asset_id' => $assetId, 'maintenance_job_type_id' => $seed['jobType'], 'trade_id' => $seed['trade'],
+                'aset_id' => $assetId, 'maintenance_job_type_id' => $seed['jobType'], 'trade_id' => $seed['trade'],
                 'ditugaskan_ke_user_id' => 'montir-1', 'estimasi_jam' => $jam,
             ];
         }
@@ -579,7 +581,7 @@ class ReportingTest extends TestCase
         $sheet->setCellValue('A1', 'Nomor: ${kode}');
         $sheet->setCellValue('A2', 'Aset');
         $sheet->setCellValue('B2', 'Jam');
-        $sheet->setCellValue('A3', '${baris.asset_nama}');
+        $sheet->setCellValue('A3', '${baris.aset_nama}');
         $sheet->setCellValue('B3', '${baris.estimasi_jam}');
         $sheet->setCellValue('C3', '${baris.kolom_salah}');
         $sheet->setCellValue('B4', '=SUM(B3:B3)');

@@ -35,10 +35,14 @@ Sesudah awalan, penanda berikutnya menyatakan sifat tabelnya:
 | `aset_m_` | Master — daftar pilihan yang dipakai berulang | `aset_m_jenis_aset` |
 | `aset_tr_` | Transaksi — kejadian yang tercatat | `aset_tr_penempatan_aset` |
 
-::: warning Nama yang membingungkan
-Model `Asset` menunjuk tabel `aset_tr_penerimaan_aset`. Nama tabelnya menyebut kejadian
-penerimaannya, bukan asetnya, dan itu sering menyulitkan waktu mencari. Periksa dulu nama tabel di
-modelnya.
+::: tip Register dan dokumennya dua tabel berbeda
+Model `Aset` menunjuk `aset_tr_aset` — register: satu baris satu aset, selama aset itu hidup.
+`aset_tr_penerimaan_aset` adalah dokumen penerimaannya: satu baris satu kedatangan barang,
+dan `jumlah` pada barisnya yang menentukan berapa aset lahir darinya.
+
+Sampai 18 September 2026 registerlah yang bernama `aset_tr_penerimaan_aset`, warisan masa
+ketika satu-satunya cara aset masuk adalah mengisi layar penerimaan satu per satu. Nama itu
+kini dipegang yang berhak atasnya.
 :::
 
 Daftar penggantian namanya dibaca dari katalog PostgreSQL, bukan ditulis tangan — lihat

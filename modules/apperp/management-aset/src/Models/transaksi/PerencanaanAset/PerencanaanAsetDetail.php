@@ -23,7 +23,7 @@ use Illuminate\Support\Carbon;
  * @property int $line_number
  * @property string $jenis_aset_id
  * @property ?string $satuan_id
- * @property string $asset_name
+ * @property string $nama_aset
  * @property string $unit
  * @property string $quantity
  * @property string $requested_specification
@@ -41,7 +41,7 @@ class PerencanaanAsetDetail extends Model
 
     protected $fillable = [
         'tenant_id', 'planning_id', 'line_number', 'jenis_aset_id', 'satuan_id',
-        'asset_name', 'unit', 'quantity', 'requested_specification',
+        'nama_aset', 'unit', 'quantity', 'requested_specification',
         'estimated_unit_price', 'estimated_total_price',
     ];
 

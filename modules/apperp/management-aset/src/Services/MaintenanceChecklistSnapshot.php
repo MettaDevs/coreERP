@@ -5,7 +5,7 @@ namespace Modules\Apperp\ManagementAset\Services;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
 use Modules\Apperp\ManagementAset\Models\master\Trade;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetChecklist;
 use Modules\Apperp\ManagementAset\Models\transaksi\PemeliharaanAset\PemeliharaanAsetDetail;
 
@@ -71,12 +71,12 @@ final class MaintenanceChecklistSnapshot
 
     private function defaultTemplateId(PemeliharaanAsetDetail $job): ?string
     {
-        $asset = Asset::query()
-            ->where('id', $job->asset_id)
+        $aset = Aset::query()
+            ->where('id', $job->aset_id)
             ->toBase()
-            ->first(['jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'asset_location_id']);
+            ->first(['jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'lokasi_aset_id']);
 
-        if (! $asset) {
+        if (! $aset) {
             return null;
         }
 
@@ -93,13 +93,13 @@ final class MaintenanceChecklistSnapshot
             ->toBase()
             ->get();
 
-        $matches = $defaults->filter(function (object $default) use ($asset, $job, $tradeName): bool {
+        $matches = $defaults->filter(function (object $default) use ($aset, $job, $tradeName): bool {
             return $this->matches($default->variant_id, $job->variant_id)
-                && $this->matches($default->asset_id, $job->asset_id)
-                && $this->matches($default->model_aset_id, $asset->model_aset_id)
-                && $this->matches($default->pabrikan_aset_id, $asset->pabrikan_aset_id)
-                && $this->matches($default->jenis_aset_id, $asset->jenis_aset_id)
-                && $this->matches($default->functional_location_id, $asset->asset_location_id)
+                && $this->matches($default->aset_id, $job->aset_id)
+                && $this->matches($default->model_aset_id, $aset->model_aset_id)
+                && $this->matches($default->pabrikan_aset_id, $aset->pabrikan_aset_id)
+                && $this->matches($default->jenis_aset_id, $aset->jenis_aset_id)
+                && $this->matches($default->functional_location_id, $aset->lokasi_aset_id)
                 && ($default->trade === null || ($tradeName !== null && mb_strtolower($default->trade) === mb_strtolower($tradeName)));
         });
 
@@ -108,7 +108,7 @@ final class MaintenanceChecklistSnapshot
                 'id' => $default->id,
                 'template_id' => $default->checklist_template_id,
                 'rank' => collect([
-                    $default->asset_id,
+                    $default->aset_id,
                     $default->model_aset_id,
                     $default->pabrikan_aset_id,
                     $default->jenis_aset_id,

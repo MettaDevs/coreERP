@@ -7,14 +7,14 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 
 /**
  * Dokumen siklus hidup aset: mutasi, pemusnahan, penjualan, dan sejenisnya dalam satu tabel,
  * dibedakan oleh `jenis_dokumen`.
  *
  * Tabelnya tidak memakai soft delete — dokumen siklus dibatalkan lewat `status`, tidak pernah
- * dihapus. `asset_id` boleh kosong karena dokumen dapat dibuat sebelum asetnya tercatat.
+ * dihapus. `aset_id` boleh kosong karena dokumen dapat dibuat sebelum asetnya tercatat.
  *
  * `nilai` di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai string, bukan float.
  *
@@ -25,7 +25,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
  * @property string $kode
  * @property string $legal_entity_id
  * @property ?string $responsible_org_unit_id
- * @property ?string $asset_id
+ * @property ?string $aset_id
  * @property Carbon $tanggal
  * @property string $status
  * @property ?string $workflow_instance_id
@@ -43,7 +43,7 @@ class DokumenSiklusAset extends Model
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'jenis_dokumen', 'kode', 'legal_entity_id',
-        'responsible_org_unit_id', 'asset_id', 'tanggal', 'status', 'workflow_instance_id',
+        'responsible_org_unit_id', 'aset_id', 'tanggal', 'status', 'workflow_instance_id',
         'nilai', 'keterangan',
     ];
 
@@ -56,9 +56,9 @@ class DokumenSiklusAset extends Model
         ];
     }
 
-    /** @return BelongsTo<Asset, $this> */
-    public function asset(): BelongsTo
+    /** @return BelongsTo<Aset, $this> */
+    public function aset(): BelongsTo
     {
-        return $this->belongsTo(Asset::class, 'asset_id');
+        return $this->belongsTo(Aset::class, 'aset_id');
     }
 }

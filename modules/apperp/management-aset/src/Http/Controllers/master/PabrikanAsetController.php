@@ -25,7 +25,7 @@ class PabrikanAsetController extends MasterDataController
     {
         return [
             new MasterChild(table: 'aset_m_model_aset', column: 'pabrikan_aset_id', label: 'model aset'),
-            new MasterChild(table: 'aset_tr_penerimaan_aset', column: 'pabrikan_aset_id', label: 'aset'),
+            new MasterChild(table: 'aset_tr_aset', column: 'pabrikan_aset_id', label: 'aset'),
         ];
     }
 }

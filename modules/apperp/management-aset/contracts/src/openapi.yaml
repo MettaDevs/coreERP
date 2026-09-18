@@ -5,7 +5,7 @@ info:
   version: 0.1.0
   description: |
     Master data aset. Seluruh endpoint dibatasi tenant dan policy
-    `management-aset.asset-responsibility` pada token konteks yang ditandatangani
+    `management-aset.aset-responsibility` pada token konteks yang ditandatangani
     Core; `tenant_id` tidak pernah diterima dari request browser. Claim policy
     berisi pasangan legal entity dan operating unit (`scope_grants`), sehingga
     dua grant tidak dapat membentuk kombinasi organisasi baru.
@@ -20,7 +20,7 @@ info:
     pabrikan. Tidak ada rantai berjenjang yang wajib diisi, sehingga tenant dengan
     kedalaman klasifikasi berbeda tidak dipaksa mengisi tingkat yang tidak mereka punya.
 
-    Yang hierarkis hanya data, bukan skema: lokasi aset dan komposisi aset (`parent_asset_id`)
+    Yang hierarkis hanya data, bukan skema: lokasi aset dan komposisi aset (`induk_aset_id`)
     menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya struktur domain milik
     app ini, bukan organization hierarchy CoreERP.
 servers:
@@ -32,6 +32,10 @@ tags:
   description: Master aset dan master maintenance.
 - name: Lifecycle aset
   description: Dokumen lifecycle aset, register, mutasi, dan pelepasan tanpa jurnal GL.
+- name: Penerimaan aset
+  description: Dokumen penerimaan aset; satu kedatangan barang, banyak aset. Satu-satunya pintu masuk ke register.
+- name: Mutasi aset
+  description: Berita acara serah terima aset; memindahkan lokasi dan tanggung jawab, bukan dimensi keuangan per buku.
 - name: Penyusutan
   description: Proposal dan finalisasi penyusutan beserta bridge internal tanpa posting GL.
 - name: Reference data
@@ -44,6 +48,8 @@ x-bundle:
   - paths/master-data.yaml
   - paths/maintenance.yaml
   - paths/aset.yaml
+  - paths/penerimaan-aset.yaml
+  - paths/mutasi-aset.yaml
   - paths/pemeliharaan-aset.yaml
   - paths/penyusutan.yaml
   - paths/laporan.yaml

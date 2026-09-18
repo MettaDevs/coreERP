@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Models\support\ProcessedCoreEvent;
 use Modules\Apperp\ManagementAset\Models\transaksi\DokumenSiklusAset\DokumenSiklusAset;
-use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Support\StatusAset;
 
 /**
  * Menerapkan keputusan dekomisioning ke dokumen dan asetnya.
@@ -46,9 +47,9 @@ class TerapkanKeputusanDekomisioning
         $keputusan = $data['decision'] ?? null;
         $instanceId = $data['workflow_instance_id'] ?? null;
         $documentId = $data['source_document_id'] ?? null;
-        $assetId = $data['decision_context']['asset_id'] ?? null;
+        $asetId = $data['decision_context']['aset_id'] ?? null;
 
-        if (! in_array($keputusan, ['approved', 'rejected'], true) || ! is_string($instanceId) || ! is_string($documentId) || ! is_string($assetId)) {
+        if (! in_array($keputusan, ['approved', 'rejected'], true) || ! is_string($instanceId) || ! is_string($documentId) || ! is_string($asetId)) {
             Log::warning('Keputusan workflow dekomisioning datang tanpa data yang lengkap.', [
                 'event_id' => $event->idEvent,
                 'tenant_id' => $event->tenantId,
@@ -81,7 +82,7 @@ class TerapkanKeputusanDekomisioning
         $instanceCocok = $dokumen !== null
             && ($dokumen->workflow_instance_id === $instanceId || $dokumen->workflow_instance_id === null);
 
-        if ($dokumen === null || ! $instanceCocok || $dokumen->asset_id !== $assetId) {
+        if ($dokumen === null || ! $instanceCocok || $dokumen->aset_id !== $asetId) {
             Log::warning('Keputusan workflow dekomisioning tidak cocok dengan dokumen mana pun.', [
                 'event_id' => $event->idEvent,
                 'tenant_id' => $event->tenantId,
@@ -119,9 +120,9 @@ class TerapkanKeputusanDekomisioning
 
         // Aset yang sudah dilepas tidak ditarik kembali menjadi terdekomisioning: pelepasan
         // adalah akhir masa hidupnya, dan persetujuan yang datang belakangan tidak membatalkannya.
-        Asset::query()
-            ->whereKey($dokumen->asset_id)
-            ->whereNotIn('lifecycle_state', ['disposed'])
-            ->update(['lifecycle_state' => 'decommissioned', 'updated_at' => now()]);
+        Aset::query()
+            ->whereKey($dokumen->aset_id)
+            ->whereNotIn('lifecycle_state', [StatusAset::DILEPAS])
+            ->update(['lifecycle_state' => StatusAset::DIHENTIKAN, 'updated_at' => now()]);
     }
 }

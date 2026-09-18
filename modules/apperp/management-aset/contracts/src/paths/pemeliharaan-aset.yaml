@@ -53,10 +53,10 @@
   get:
     tags:
     - Pemeliharaan aset
-    operationId: listWorkOrderJobTypesForAsset
+    operationId: listWorkOrderJobTypesForAset
     summary: Menampilkan jenis pekerjaan yang boleh dipilih untuk aset
     parameters:
-    - name: asset_id
+    - name: aset_id
       in: query
       required: true
       schema:
