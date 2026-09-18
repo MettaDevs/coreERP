@@ -135,6 +135,41 @@ class PenyediaLaporanTest extends TestCase
         $this->assertGreaterThanOrEqual(1, count($response['data']['tables']['baris']));
     }
 
+    public function test_laporan_penyusutan_aset_dataset(): void
+    {
+        $this->workOrder();
+        $konteks = $this->konteks(['management-aset.penyusutan.read']);
+
+        $asset = DB::table('aset_tr_penerimaan_aset')->where('kode', 'AST-WO-1')->first();
+        $this->assertNotNull($asset);
+
+        // Pasang buku aset
+        $bookId = (string) Str::ulid();
+        DB::table('aset_tr_buku_aset')->insert([
+            'id' => $bookId,
+            'tenant_id' => $this->tenantId,
+            'asset_id' => $asset->id,
+            'book_code' => 'KOMERSIAL',
+            'useful_life_periods' => 48,
+            'acquisition_value' => 250000000,
+            'accumulated_depreciation' => 0,
+            'net_book_value' => 250000000,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $data = $this->penyedia()->dataset('laporan-penyusutan-aset', $konteks, ['periode' => '2026-08']);
+        $this->assertGreaterThanOrEqual(1, $data['fields']['jumlah_aset']);
+        $this->assertSame('AST-WO-1', $data['tables']['baris'][0]['kode']);
+
+        // User tanpa hak ditolak
+        $this->assertGagalDengan(
+            'Anda tidak berhak membaca data laporan ini.',
+            fn () => $this->penyedia()->dataset('laporan-penyusutan-aset', $this->konteks(['management-aset.aset.read']), []),
+        );
+    }
+
     /** @param list<string> $permissions */
     private function headers(array $permissions): static
     {
