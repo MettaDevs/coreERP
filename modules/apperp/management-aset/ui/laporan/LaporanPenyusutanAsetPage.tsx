@@ -116,9 +116,7 @@ export default function LaporanPenyusutanAsetPage() {
                 id: 'ue_saat_ini',
                 header: 'UE Berjalan',
                 cell: (row) =>
-                    Number(
-                        row.ue_saat_ini ?? row.umur_ekonomis_saat_ini ?? 0,
-                    ),
+                    Number(row.ue_saat_ini ?? row.umur_ekonomis_saat_ini ?? 0),
                 align: 'right',
             },
             {
@@ -147,9 +145,7 @@ export default function LaporanPenyusutanAsetPage() {
                 header: 'Susut / Thn',
                 cell: (row) =>
                     String(
-                        row.penyusutan_tahun ??
-                            row.penyusutan_per_tahun ??
-                            '-',
+                        row.penyusutan_tahun ?? row.penyusutan_per_tahun ?? '-',
                     ),
                 align: 'right',
             },
@@ -158,9 +154,7 @@ export default function LaporanPenyusutanAsetPage() {
                 header: 'Susut / Bln',
                 cell: (row) =>
                     String(
-                        row.penyusutan_bulan ??
-                            row.penyusutan_per_bulan ??
-                            '-',
+                        row.penyusutan_bulan ?? row.penyusutan_per_bulan ?? '-',
                     ),
                 align: 'right',
             },
