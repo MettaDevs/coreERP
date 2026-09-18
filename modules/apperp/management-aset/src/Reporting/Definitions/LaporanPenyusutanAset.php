@@ -117,7 +117,7 @@ final class LaporanPenyusutanAset implements ReportDefinition
             ->leftJoin('aset_m_profil_penyusutan as profil', fn ($j) => $j->on('profil.id', '=', 'buku.depreciation_profile_id')->on('profil.tenant_id', '=', 'buku.tenant_id'))
             ->leftJoin('aset_m_buku_penyusutan as master_buku', fn ($j) => $j->on('master_buku.id', '=', 'buku.buku_id')->on('master_buku.tenant_id', '=', 'buku.tenant_id'));
 
-        app(OrganizationScope::class)->assetQuery($query, $context->request(), 'aset_tr_penerimaan_aset.legal_entity_id', 'aset_tr_penerimaan_aset.responsible_org_unit_id');
+        app(OrganizationScope::class)->query($query, $context->request(), 'aset_tr_penerimaan_aset.legal_entity_id', 'aset_tr_penerimaan_aset.responsible_org_unit_id');
 
         if (! empty($parameters['group_aset_id'])) {
             $query->where('aset_tr_penerimaan_aset.group_aset_id', $parameters['group_aset_id']);
