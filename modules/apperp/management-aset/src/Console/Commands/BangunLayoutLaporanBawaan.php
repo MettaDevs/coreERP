@@ -291,7 +291,7 @@ class BangunLayoutLaporanBawaan extends Command
         foreach ($headings as $index => $heading) {
             $sheet->setCellValue([$index + 1, 10], $heading);
             $sheet->setCellValue([$index + 1, 11], '${baris.'.$macros[$index].'}');
-            $sheet->getColumnDimensionByColumn($index + 1)->setWidth($columnWidths[$macros[$index]] ?? 18);
+            $sheet->getColumnDimensionByColumn($index + 1)->setWidth($columnWidths[$macros[$index]]);
         }
 
         $header = $sheet->getStyle('A10:L10');
