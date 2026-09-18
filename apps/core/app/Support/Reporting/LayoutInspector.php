@@ -53,6 +53,10 @@ final class LayoutInspector
      * disimpan — tetapi dilaporkan supaya salah ketik ketahuan sebelum dokumen dicetak
      * kosong di bagian itu.
      *
+     * Satu keadaan tetap ditolak: berkas yang sah sebagai zip Office tetapi isinya tidak
+     * terbaca. Daftar kosong yang lahir dari kegagalan membaca berbunyi sama persis dengan
+     * layout yang memang bersih, dan perbedaan itu tidak dapat ditemukan lagi setelahnya.
+     *
      * @param  list<string>  $knownKeys
      * @return list<string>
      */
@@ -69,7 +73,19 @@ final class LayoutInspector
         try {
             $variables = (new TemplateProcessor($path))->getVariables();
         } catch (Throwable) {
-            return [];
+            /*
+             * Bukan "tidak ada placeholder yang asing".
+             *
+             * `format()` sudah membuktikan berkasnya zip Word yang sah beberapa baris sebelumnya,
+             * jadi gagal di sini berarti isinya tidak terbaca. Daftar kosong dari `catch` tidak
+             * dapat dibedakan dari layout yang memang bersih: berkasnya lolos tanpa peringatan,
+             * lalu tercetak kosong tepat di bagian yang seharusnya terisi, dan yang tersisa untuk
+             * ditelusuri hanyalah dokumen jadi yang salah.
+             *
+             * Penolakan sampai ke orang yang baru saja mengunggahnya dan masih memegang berkas
+             * aslinya — satu-satunya saat perbaikannya murah.
+             */
+            $this->reject('Isi berkas Word ini tidak terbaca meskipun berkasnya sah. Simpan ulang dari Word lalu unggah lagi.');
         }
 
         return array_map(fn (string $variable): string => preg_replace('/#\d+$/', '', $variable) ?? $variable, $variables);
@@ -81,7 +97,9 @@ final class LayoutInspector
         try {
             $spreadsheet = IOFactory::load($path);
         } catch (Throwable) {
-            return [];
+            // Sama seperti `docxPlaceholders()`: workbook yang sah tetapi tidak terbaca bukan
+            // workbook tanpa placeholder asing, dan hanya penolakan yang membedakan keduanya.
+            $this->reject('Isi berkas Excel ini tidak terbaca meskipun berkasnya sah. Simpan ulang dari Excel lalu unggah lagi.');
         }
 
         $found = [];
