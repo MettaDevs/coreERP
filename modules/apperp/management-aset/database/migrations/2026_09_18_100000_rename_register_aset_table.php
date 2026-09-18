@@ -25,6 +25,10 @@ use Illuminate\Support\Facades\Schema;
  * pada database yang sudah besar.
  *
  * Penjaganya `hasTable` di kedua sisi supaya perintah pemasangan aman diulang.
+ *
+ * @kontrak Modul ini belum terpasang di satu pun klien on-prem, jadi tidak ada rilis
+ * sebelumnya yang membaca nama tabel lama di server mana pun. Sesudah klien pertama
+ * terpasang, penggantian nama tabel wajib menempuh expand/contract.
  */
 return new class extends Migration
 {

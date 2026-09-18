@@ -17,6 +17,7 @@ use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PenerimaanAset\PenerimaanAsetDetail;
+use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
 use Modules\Apperp\ManagementAset\Services\DirektoriAset;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Services\PembuatAset;
@@ -403,8 +404,12 @@ class PenerimaanAsetController extends Controller
             if (! $line->permintaan_pembelian_detail_id) {
                 continue;
             }
-            $diminta = (float) DB::table('aset_tr_permintaan_pengadaan_aset_details')
+            // Lewat model, bukan query builder mentah: yang mentah melewati global scope
+            // tenant, dan baris permintaan pembelian milik tenant lain akan terbaca tanpa
+            // ada yang memberi tahu. Penjaganya `TenantScopeBoundaryTest`.
+            $diminta = (float) PermintaanPengadaanAsetDetail::query()
                 ->where('id', $line->permintaan_pembelian_detail_id)
+                ->toBase()
                 ->value('quantity');
             // Aset milik dokumen ini belum ada saat pemeriksaan berjalan, jadi yang
             // dihitung adalah penerimaan sebelumnya; baris ini ditambahkan sendiri.

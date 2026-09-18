@@ -21,6 +21,11 @@ use Illuminate\Support\Facades\Schema;
  * yang sudah diterapkan, bukan nama yang dibaca siapa pun di produk. Mengubahnya membuat
  * Laravel menganggapnya migrasi baru dan menjalankannya ulang di setiap database yang
  * sudah ada.
+ *
+ * @kontrak Modul ini belum terpasang di satu pun klien on-prem, jadi tidak ada rilis
+ * sebelumnya yang membaca nama kolom lama di server mana pun. Itu alasan yang sama yang
+ * membuat daftar beku pada `MigrasiKompatibelMundurTest` ada. Begitu modul ini terpasang
+ * di klien pertama, penggantian nama berikutnya wajib menempuh expand/contract.
  */
 return new class extends Migration
 {

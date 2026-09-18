@@ -38,9 +38,9 @@ use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset\D
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\AsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\DepreciationController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\MutasiAset\MutasiAsetController;
-use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAset\PenerimaanAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset\PelaksanaanController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset\PemeliharaanAsetController;
+use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAset\PenerimaanAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PerencanaanAset\PerencanaanAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetController;
 
