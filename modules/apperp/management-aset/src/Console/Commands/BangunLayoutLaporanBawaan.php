@@ -273,17 +273,25 @@ class BangunLayoutLaporanBawaan extends Command
             'lokasi_asal', 'lokasi_tujuan', 'penanggung_jawab', 'pic_penerima', 'kondisi_aset', 'keterangan',
         ];
 
+        $columnWidths = [
+            'nomor' => 6,
+            'tanggal_mutasi' => 16,
+            'nomor_bukti' => 16,
+            'kode_aset' => 16,
+            'nama_aset' => 22,
+            'spesifikasi' => 22,
+            'lokasi_asal' => 22,
+            'lokasi_tujuan' => 22,
+            'penanggung_jawab' => 22,
+            'pic_penerima' => 22,
+            'kondisi_aset' => 16,
+            'keterangan' => 35,
+        ];
+
         foreach ($headings as $index => $heading) {
             $sheet->setCellValue([$index + 1, 10], $heading);
             $sheet->setCellValue([$index + 1, 11], '${baris.'.$macros[$index].'}');
-            $width = match ($macros[$index]) {
-                'nomor' => 6,
-                'tanggal_mutasi', 'nomor_bukti', 'kode_aset', 'kondisi_aset' => 16,
-                'nama_aset', 'spesifikasi', 'lokasi_asal', 'lokasi_tujuan', 'penanggung_jawab', 'pic_penerima' => 22,
-                'keterangan' => 35,
-                default => 18,
-            };
-            $sheet->getColumnDimensionByColumn($index + 1)->setWidth($width);
+            $sheet->getColumnDimensionByColumn($index + 1)->setWidth($columnWidths[$macros[$index]] ?? 18);
         }
 
         $header = $sheet->getStyle('A10:L10');
