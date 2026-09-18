@@ -103,7 +103,7 @@ final class LaporanPemusnahanAset implements ReportDefinition
             ->leftJoin('aset_m_buku_penyusutan as master_buku', fn ($j) => $j->on('master_buku.id', '=', 'buku.buku_id')->on('master_buku.tenant_id', '=', 'buku.tenant_id'))
             ->where(function ($q): void {
                 $q->where('master_buku.posting_layer', 'current')
-                    ->orWhereNull('buku.id');
+                    ->orWhereNull('master_buku.id');
             });
 
         app(OrganizationScope::class)->query($query, $context->request(), 'aset_tr_dokumen_siklus_aset.legal_entity_id', 'aset_tr_dokumen_siklus_aset.responsible_org_unit_id');

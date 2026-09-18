@@ -8,6 +8,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\IOFactory;
@@ -273,7 +274,7 @@ class BangunLayoutLaporanBawaan extends Command
         $this->line("  ditulis: {$path}");
     }
 
-    private function pasangKopSheet($sheet, int $totalCols): void
+    private function pasangKopSheet(Worksheet $sheet, int $totalCols): void
     {
         $lastLetter = Coordinate::stringFromColumnIndex($totalCols);
         $midEndLetter = Coordinate::stringFromColumnIndex(max(2, $totalCols - 1));
@@ -297,7 +298,11 @@ class BangunLayoutLaporanBawaan extends Command
         $sheet->getStyle("A3:{$lastLetter}3")->getBorders()->getBottom()->setBorderStyle(Border::BORDER_MEDIUM);
     }
 
-    private function isiTabelXlsx($sheet, int $startRow, array $headings, array $macros): void
+    /**
+     * @param  list<string>  $headings
+     * @param  list<string>  $macros
+     */
+    private function isiTabelXlsx(Worksheet $sheet, int $startRow, array $headings, array $macros): void
     {
         $lastCol = count($headings);
         $lastLetter = Coordinate::stringFromColumnIndex($lastCol);
