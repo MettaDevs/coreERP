@@ -7,6 +7,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Worksheet\PageSetup;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use PhpOffice\PhpWord\Element\Section;
 use PhpOffice\PhpWord\IOFactory;
@@ -41,6 +42,7 @@ class BangunLayoutLaporanBawaan extends Command
 
         $this->workOrderDocx($laporan.'/work-order/standar.docx');
         $this->workOrderListXlsx($laporan.'/daftar-work-order/standar.xlsx');
+        $this->assetMutationReportXlsx($laporan.'/laporan-mutasi-aset/standar.xlsx');
         $this->info('Layout bawaan dibangun ulang.');
 
         return self::SUCCESS;
@@ -208,6 +210,104 @@ class BangunLayoutLaporanBawaan extends Command
         $sheet->getStyle('F10:H10')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $sheet->freezePane('A10');
         $sheet->setAutoFilter('A9:N9');
+
+        $this->ensureDirectory($path);
+        (new XlsxWriter($spreadsheet))->save($path);
+        $spreadsheet->disconnectWorksheets();
+        $this->line("  ditulis: {$path}");
+    }
+
+    private function assetMutationReportXlsx(string $path): void
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Mutasi aset');
+
+        // Kop identitas
+        $sheet->setCellValue('A1', '${kop.logo_kiri}');
+        $sheet->mergeCells('A1:A3');
+        $sheet->setCellValue('B1', '${kop.induk}');
+        $sheet->mergeCells('B1:K1');
+        $sheet->setCellValue('B2', '${kop.nama}');
+        $sheet->mergeCells('B2:K2');
+        $sheet->setCellValue('B3', '${kop.alamat_baris}  ${kop.telepon}  ${kop.email}');
+        $sheet->mergeCells('B3:K3');
+        $sheet->setCellValue('L1', '${kop.logo_kanan}');
+        $sheet->mergeCells('L1:L3');
+        $sheet->getStyle('B1:K3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('B2')->getFont()->setBold(true)->setSize(13);
+        $sheet->getRowDimension(1)->setRowHeight(22);
+        $sheet->getRowDimension(2)->setRowHeight(24);
+        $sheet->getRowDimension(3)->setRowHeight(22);
+        $sheet->getStyle('A3:L3')->getBorders()->getBottom()->setBorderStyle(Border::BORDER_MEDIUM);
+
+        // Judul & Filter
+        $sheet->setCellValue('A5', 'Laporan mutasi aset');
+        $sheet->getStyle('A5')->getFont()->setBold(true)->setSize(14);
+
+        $sheet->setCellValue('A6', 'Group aset');
+        $sheet->setCellValue('B6', '${filter_group_aset}');
+        $sheet->setCellValue('D6', 'Golongan aset');
+        $sheet->setCellValue('E6', '${filter_golongan_aset}');
+        $sheet->setCellValue('G6', 'Jenis aset');
+        $sheet->setCellValue('H6', '${filter_jenis_aset}');
+
+        $sheet->setCellValue('A7', 'Nama aset');
+        $sheet->setCellValue('B7', '${filter_nama_aset}');
+        $sheet->setCellValue('D7', 'Dari');
+        $sheet->setCellValue('E7', '${filter_dari}');
+        $sheet->setCellValue('G7', 'Sampai');
+        $sheet->setCellValue('H7', '${filter_sampai}');
+
+        $sheet->setCellValue('A8', 'Jumlah mutasi');
+        $sheet->setCellValue('B8', '${jumlah_mutasi}');
+        $sheet->setCellValue('D8', 'Dicetak');
+        $sheet->setCellValue('E8', '${dicetak_pada}');
+
+        $headings = [
+            'No', 'Tanggal mutasi', 'No bukti mutasi', 'Kode aset', 'Nama aset', 'Spesifikasi',
+            'Lokasi asal', 'Lokasi tujuan', 'Penanggung jawab', 'PIC penerima', 'Kondisi aset', 'Keterangan',
+        ];
+        $macros = [
+            'nomor', 'tanggal_mutasi', 'nomor_bukti', 'kode_aset', 'nama_aset', 'spesifikasi',
+            'lokasi_asal', 'lokasi_tujuan', 'penanggung_jawab', 'pic_penerima', 'kondisi_aset', 'keterangan',
+        ];
+
+        $columnWidths = [
+            'nomor' => 6,
+            'tanggal_mutasi' => 16,
+            'nomor_bukti' => 16,
+            'kode_aset' => 16,
+            'nama_aset' => 22,
+            'spesifikasi' => 22,
+            'lokasi_asal' => 22,
+            'lokasi_tujuan' => 22,
+            'penanggung_jawab' => 22,
+            'pic_penerima' => 22,
+            'kondisi_aset' => 16,
+            'keterangan' => 35,
+        ];
+
+        foreach ($headings as $index => $heading) {
+            $sheet->setCellValue([$index + 1, 10], $heading);
+            $sheet->setCellValue([$index + 1, 11], '${baris.'.$macros[$index].'}');
+            $sheet->getColumnDimensionByColumn($index + 1)->setWidth($columnWidths[$macros[$index]]);
+        }
+
+        $header = $sheet->getStyle('A10:L10');
+        $header->getFont()->setBold(true);
+        $header->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('E7E6E6');
+        $header->getBorders()->getBottom()->setBorderStyle(Border::BORDER_THIN);
+        $header->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A11')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->freezePane('A11');
+        $sheet->setAutoFilter('A10:L10');
+
+        $sheet->getPageSetup()->setOrientation(PageSetup::ORIENTATION_LANDSCAPE);
+        $sheet->getPageSetup()->setPaperSize(PageSetup::PAPERSIZE_A4);
+        $sheet->getPageSetup()->setFitToPage(true);
+        $sheet->getPageSetup()->setFitToWidth(1);
+        $sheet->getPageSetup()->setFitToHeight(0);
 
         $this->ensureDirectory($path);
         (new XlsxWriter($spreadsheet))->save($path);
