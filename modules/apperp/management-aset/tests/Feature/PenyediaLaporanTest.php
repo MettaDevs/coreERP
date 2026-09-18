@@ -135,6 +135,39 @@ class PenyediaLaporanTest extends TestCase
         $this->assertGreaterThanOrEqual(1, count($response['data']['tables']['baris']));
     }
 
+    public function test_laporan_monitoring_aset_dataset(): void
+    {
+        $this->workOrder();
+        $konteks = $this->konteks(['management-aset.monitoring-aset.read']);
+
+        $asset = DB::table('aset_tr_penerimaan_aset')->where('kode', 'AST-WO-1')->first();
+        $this->assertNotNull($asset);
+
+        // Pasang buku aset
+        $bookId = (string) Str::ulid();
+        DB::table('aset_tr_buku_aset')->insert([
+            'id' => $bookId,
+            'tenant_id' => $this->tenantId,
+            'asset_id' => $asset->id,
+            'book_code' => 'KOMERSIAL',
+            'useful_life_periods' => 60,
+            'acquisition_value' => 150000000,
+            'accumulated_depreciation' => 30000000,
+            'net_book_value' => 120000000,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $dataset = $this->penyedia()->dataset('laporan-monitoring-aset', $konteks, []);
+
+        $this->assertArrayHasKey('fields', $dataset);
+        $this->assertArrayHasKey('tables', $dataset);
+        $this->assertArrayHasKey('baris', $dataset['tables']);
+        $this->assertGreaterThanOrEqual(1, count($dataset['tables']['baris']));
+        $this->assertGreaterThan(0, $dataset['fields']['jumlah_aset']);
+    }
+
     /** @param list<string> $permissions */
     private function headers(array $permissions): static
     {

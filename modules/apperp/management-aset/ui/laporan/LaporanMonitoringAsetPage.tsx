@@ -9,7 +9,9 @@ export type MonitoringReportRow = {
     tgl_monitoring?: string;
     no_bukti?: string;
     asset_kode?: string;
+    kode_aset?: string;
     asset_nama?: string;
+    nama_aset?: string;
     spesifikasi?: string;
     satuan?: string;
     jumlah?: number;
@@ -20,6 +22,7 @@ export type MonitoringReportRow = {
     nilai_perolehan?: string | number;
     akumulasi_penyusutan?: string | number;
     nilai_buku_akhir?: string | number;
+    nilai_akhir_buku?: string | number;
     penanggung_jawab?: string;
     unit_organisasi?: string;
 } & Record<string, unknown>;
@@ -46,7 +49,7 @@ export default function LaporanMonitoringAsetPage() {
                 id: 'no_bukti',
                 header: 'No. Bukti',
                 cell: (row) => (
-                    <span className="font-mono text-xs font-semibold">
+                    <span className="text-primary font-mono text-xs font-semibold">
                         {String(row.no_bukti ?? '-')}
                     </span>
                 ),
@@ -56,14 +59,35 @@ export default function LaporanMonitoringAsetPage() {
                 header: 'Kode Aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
-                        {String(row.asset_kode ?? '-')}
+                        {String(row.asset_kode ?? row.kode_aset ?? '-')}
                     </span>
                 ),
             },
             {
                 id: 'asset_nama',
                 header: 'Nama Aset',
-                cell: (row) => String(row.asset_nama ?? '-'),
+                cell: (row) => String(row.asset_nama ?? row.nama_aset ?? '-'),
+            },
+            {
+                id: 'spesifikasi',
+                header: 'Spesifikasi',
+                cell: (row) => (
+                    <span className="text-muted-foreground text-xs">
+                        {String(row.spesifikasi ?? '-')}
+                    </span>
+                ),
+            },
+            {
+                id: 'satuan',
+                header: 'Satuan',
+                cell: (row) => String(row.satuan ?? 'Unit'),
+                align: 'center',
+            },
+            {
+                id: 'jumlah',
+                header: 'Jumlah',
+                cell: (row) => Number(row.jumlah ?? 1),
+                align: 'right',
             },
             {
                 id: 'kondisi_sistem',
@@ -84,6 +108,39 @@ export default function LaporanMonitoringAsetPage() {
                     </span>
                 ),
                 align: 'center',
+            },
+            {
+                id: 'keterangan',
+                header: 'Keterangan',
+                cell: (row) => (
+                    <span className="text-muted-foreground text-xs">
+                        {String(row.keterangan ?? '-')}
+                    </span>
+                ),
+            },
+            {
+                id: 'nilai_perolehan',
+                header: 'Nilai Perolehan',
+                cell: (row) => String(row.nilai_perolehan ?? '-'),
+                align: 'right',
+            },
+            {
+                id: 'akumulasi_penyusutan',
+                header: 'Akum. Penyusutan',
+                cell: (row) => String(row.akumulasi_penyusutan ?? '-'),
+                align: 'right',
+            },
+            {
+                id: 'nilai_buku_akhir',
+                header: 'Nilai Buku Akhir',
+                cell: (row) => (
+                    <span className="text-primary font-semibold">
+                        {String(
+                            row.nilai_buku_akhir ?? row.nilai_akhir_buku ?? '-',
+                        )}
+                    </span>
+                ),
+                align: 'right',
             },
             {
                 id: 'penanggung_jawab',
