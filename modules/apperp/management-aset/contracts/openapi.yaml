@@ -6,7 +6,7 @@ info:
   version: 0.1.0
   description: |
     Master data aset. Seluruh endpoint dibatasi tenant dan policy
-    `management-aset.aset-responsibility` pada token konteks yang ditandatangani
+    `management-aset.asset-responsibility` pada token konteks yang ditandatangani
     Core; `tenant_id` tidak pernah diterima dari request browser. Claim policy
     berisi pasangan legal entity dan operating unit (`scope_grants`), sehingga
     dua grant tidak dapat membentuk kombinasi organisasi baru.

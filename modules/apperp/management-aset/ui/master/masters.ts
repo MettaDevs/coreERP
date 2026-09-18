@@ -36,8 +36,8 @@ export type Permission =
     | `management-aset.pemeliharaan-aset.${'read' | 'create' | 'update' | 'archive' | 'schedule' | 'execute' | 'close'}`
     | `management-aset.validasi-status-work-order.${'read' | 'update'}`
     | 'management-aset.monitoring-aset.read'
-    | 'management-aset.fixed-aset-parameters.read'
-    | 'management-aset.fixed-aset-posting-profiles.read'
+    | 'management-aset.fixed-asset-parameters.read'
+    | 'management-aset.fixed-asset-posting-profiles.read'
     | `management-aset.penyusutan.${'read' | 'create' | 'finalize' | 'correct'}`;
 
 export function permission(

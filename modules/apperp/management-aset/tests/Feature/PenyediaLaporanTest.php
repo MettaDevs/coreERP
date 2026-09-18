@@ -263,7 +263,7 @@ class PenyediaLaporanTest extends TestCase
             'org_unit_id' => $this->orgUnitId,
             'user_id' => (string) Str::ulid(),
             'permissions' => $izin,
-            'data_policies' => ['management-aset.aset-responsibility' => $kebijakan],
+            'data_policies' => ['management-aset.asset-responsibility' => $kebijakan],
         ];
     }
 
