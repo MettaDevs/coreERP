@@ -64,7 +64,7 @@ trait BerinteraksiDenganKonteksCore
 
     private const TIPE_WORKFLOW_DEKOMISIONING = 'management-aset.dekomisioning-aset-verification';
 
-    private const KEBIJAKAN_TANGGUNG_JAWAB = 'management-aset.aset-responsibility';
+    private const KEBIJAKAN_TANGGUNG_JAWAB = 'management-aset.asset-responsibility';
 
     /**
      * Tenant untuk test ini.

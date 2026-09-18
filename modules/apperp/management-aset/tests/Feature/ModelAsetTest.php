@@ -131,7 +131,7 @@ class ModelAsetTest extends TestCase
             'management-aset.aset.read',
         ];
         $outsideScope = [[
-            'policy_code' => 'management-aset.aset-responsibility',
+            'policy_code' => 'management-aset.asset-responsibility',
             'legal_entity_id' => (string) Str::ulid(),
             'organization_id' => (string) Str::ulid(),
         ]];

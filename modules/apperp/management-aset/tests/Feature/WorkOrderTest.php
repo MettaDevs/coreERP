@@ -122,7 +122,7 @@ class WorkOrderTest extends TestCase
         $this->create($seed)->assertCreated();
 
         $asing = [[
-            'policy_code' => 'management-aset.aset-responsibility',
+            'policy_code' => 'management-aset.asset-responsibility',
             'legal_entity_id' => (string) Str::ulid(),
             'organization_id' => (string) Str::ulid(),
         ]];

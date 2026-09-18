@@ -60,10 +60,10 @@ ui:
           permission: management-aset.profil-penyusutan.read
         - id: fixed-aset-parameters
           label: Parameter aset tetap
-          permission: management-aset.fixed-aset-parameters.read
+          permission: management-aset.fixed-asset-parameters.read
         - id: fixed-aset-posting-profiles
           label: Profil posting aset
-          permission: management-aset.fixed-aset-posting-profiles.read
+          permission: management-aset.fixed-asset-posting-profiles.read
       maintenance:
         # Urutan ini adalah alur setup awal: dasar pekerjaan, checklist dan
         # bawaan pekerjaan, lalu aturan work order. Dua master legacy tetap
@@ -153,7 +153,13 @@ workflow_types:
       required: [document_id, aset_id]
 security:
   data_policies:
-    - code: management-aset.aset-responsibility
+    # Ejaan `asset` pada kode di bawah disengaja, dan berlaku untuk seluruh kode kebijakan,
+    # permission, entry point, dan duty pada berkas ini. Semuanya pengenal yang tercatat di
+    # katalog Core dan pada peran serta hibah lingkup milik tenant; menggantinya membuat
+    # `app:register-manifest` menolak pembaruan selama masih ada peran yang memakainya, dan
+    # membuat hibah lingkup yang sudah ada tidak lagi cocok. Yang dibaca orang adalah label
+    # dan id menu, dan keduanya memang sudah berbahasa Indonesia.
+    - code: management-aset.asset-responsibility
       name: Akses aset menurut unit penanggung jawab
       protected_permissions:
         - management-aset.aset.read
@@ -397,10 +403,10 @@ security:
     - code: management-aset.profil-penyusutan.api
       name: API profil penyusutan
       type: api
-    - code: management-aset.fixed-aset-parameters.form
+    - code: management-aset.fixed-asset-parameters.form
       name: Layar parameter aset tetap
       type: form
-    - code: management-aset.fixed-aset-posting-profiles.form
+    - code: management-aset.fixed-asset-posting-profiles.form
       name: Layar profil posting aset
       type: form
   permissions:
@@ -914,13 +920,13 @@ security:
       name: Arsipkan profil penyusutan
       entry_point: management-aset.profil-penyusutan.api
       access: delete
-    - code: management-aset.fixed-aset-parameters.read
+    - code: management-aset.fixed-asset-parameters.read
       name: Lihat parameter aset tetap
-      entry_point: management-aset.fixed-aset-parameters.form
+      entry_point: management-aset.fixed-asset-parameters.form
       access: read
-    - code: management-aset.fixed-aset-posting-profiles.read
+    - code: management-aset.fixed-asset-posting-profiles.read
       name: Lihat profil posting aset
-      entry_point: management-aset.fixed-aset-posting-profiles.form
+      entry_point: management-aset.fixed-asset-posting-profiles.form
       access: read
   privileges:
     - code: management-aset.model-aset.maintain
@@ -1242,14 +1248,14 @@ security:
       name: Arsipkan profil penyusutan
       permissions:
         - management-aset.profil-penyusutan.archive
-    - code: management-aset.fixed-aset-parameters.view
+    - code: management-aset.fixed-asset-parameters.view
       name: Lihat parameter aset tetap
       permissions:
-        - management-aset.fixed-aset-parameters.read
-    - code: management-aset.fixed-aset-posting-profiles.view
+        - management-aset.fixed-asset-parameters.read
+    - code: management-aset.fixed-asset-posting-profiles.view
       name: Lihat profil posting aset
       permissions:
-        - management-aset.fixed-aset-posting-profiles.read
+        - management-aset.fixed-asset-posting-profiles.read
   duties:
     - code: management-aset.model-aset.manage
       name: Kelola model aset
@@ -1407,11 +1413,11 @@ security:
       privileges:
         - management-aset.profil-penyusutan.maintain
         - management-aset.profil-penyusutan.retire
-    - code: management-aset.fixed-aset-setup.view
+    - code: management-aset.fixed-assets-setup.view
       name: Lihat pengaturan aset tetap
       privileges:
-        - management-aset.fixed-aset-parameters.view
-        - management-aset.fixed-aset-posting-profiles.view
+        - management-aset.fixed-asset-parameters.view
+        - management-aset.fixed-asset-posting-profiles.view
 number_sequences:
   references:
     - code: management-aset.model-aset

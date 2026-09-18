@@ -156,7 +156,7 @@ export default function App({
 
     if (
         view === 'fixed-aset-parameters' &&
-        permissions.includes('management-aset.fixed-aset-parameters.read')
+        permissions.includes('management-aset.fixed-asset-parameters.read')
     ) {
         return (
             <main>
@@ -167,7 +167,9 @@ export default function App({
 
     if (
         view === 'fixed-aset-posting-profiles' &&
-        permissions.includes('management-aset.fixed-aset-posting-profiles.read')
+        permissions.includes(
+            'management-aset.fixed-asset-posting-profiles.read',
+        )
     ) {
         return (
             <main>

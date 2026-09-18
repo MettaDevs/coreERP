@@ -6,7 +6,16 @@ use Illuminate\Http\Request;
 
 final class OrganizationScope
 {
-    private const POLICY_CODE = 'management-aset.aset-responsibility';
+    /**
+     * Ejaannya `asset`, dan itu disengaja.
+     *
+     * Kode kebijakan adalah pengenal, bukan tulisan yang dibaca siapa pun di produk. Ia
+     * tercatat pada hibah lingkup milik tenant, jadi menggantinya membuat hibah yang sudah
+     * ada tidak lagi cocok dengan kebijakan yang mencarinya — dan pengguna kehilangan akses
+     * ke asetnya sendiri tanpa satu pun kesalahan yang terlihat. Sapuan KBBI 18 September
+     * 2026 sempat menggantinya dan dikembalikan pada hari yang sama.
+     */
+    private const POLICY_CODE = 'management-aset.asset-responsibility';
 
     public function allows(Request $request, ?string $legalEntityId, ?string $operatingUnitId): bool
     {

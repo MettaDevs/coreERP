@@ -197,7 +197,7 @@ class AtributAsetTest extends TestCase
         // Lingkup kebijakan yang menunjuk organisasi lain: pengguna punya izinnya, tetapi
         // tidak atas organisasi yang memiliki datanya.
         $this->sebagaiPengguna($this->tenantId, $permissions, [[
-            'policy_code' => 'management-aset.aset-responsibility',
+            'policy_code' => 'management-aset.asset-responsibility',
             'legal_entity_id' => (string) Str::ulid(),
             'organization_id' => (string) Str::ulid(),
         ]])

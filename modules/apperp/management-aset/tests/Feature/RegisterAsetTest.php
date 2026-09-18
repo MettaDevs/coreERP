@@ -106,8 +106,8 @@ class RegisterAsetTest extends TestCase
             ['id' => $crossSecond, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-d', 'kode' => 'AST-SCOPE-D', 'nama' => 'Aset scope D', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
         ]);
         $lingkup = [
-            ['policy_code' => 'management-aset.aset-responsibility', 'legal_entity_id' => $firstLegalEntity, 'organization_id' => $firstUnit],
-            ['policy_code' => 'management-aset.aset-responsibility', 'legal_entity_id' => $secondLegalEntity, 'organization_id' => $secondUnit],
+            ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $firstLegalEntity, 'organization_id' => $firstUnit],
+            ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $secondLegalEntity, 'organization_id' => $secondUnit],
         ];
         $data = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'], $lingkup)->getJson('/api/modules/management-aset/v1/aset')->assertOk()->json('data');
         $this->assertEqualsCanonicalizing([$first, $second], array_column($data, 'id'));
