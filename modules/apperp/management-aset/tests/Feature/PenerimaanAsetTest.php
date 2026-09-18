@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 /**
@@ -257,6 +258,7 @@ class PenerimaanAsetTest extends TestCase
             ->json('data.id');
     }
 
+    /** @return TestResponse<Response> */
     private function selesaikan(string $id, int $version = 1): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.aset.create'])

@@ -7,6 +7,7 @@ namespace Modules\Apperp\ManagementAset\Tests\Concerns;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Satu-satunya cara test menambah aset ke register: lewat dokumen penerimaan.
@@ -45,18 +46,19 @@ trait MenerimaAset
         $id = $this->drafPenerimaan($tenantId, $payload, $jumlah)->assertCreated()->json('data.id');
         $this->selesaikanPenerimaan($tenantId, (string) $id)->assertOk();
 
-        return DB::table('aset_tr_aset')
+        return array_values(DB::table('aset_tr_aset')
             ->where('penerimaan_aset_id', $id)
             ->orderBy('kode')
             ->pluck('id')
             ->map(static fn ($nilai): string => (string) $nilai)
-            ->all();
+            ->all());
     }
 
     /**
      * Draf penerimaan yang belum diselesaikan, untuk test yang memeriksa penolakan.
      *
      * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
      */
     protected function drafPenerimaan(string $tenantId, array $payload, int $jumlah = 1): TestResponse
     {
@@ -92,6 +94,7 @@ trait MenerimaAset
             ]);
     }
 
+    /** @return TestResponse<Response> */
     protected function selesaikanPenerimaan(string $tenantId, string $penerimaanId, int $version = 1): TestResponse
     {
         return $this->sebagaiPengguna($tenantId, [
