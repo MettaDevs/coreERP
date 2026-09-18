@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
+use Modules\Apperp\ManagementAset\Models\master\GroupAset;
+use Modules\Apperp\ManagementAset\Models\master\JenisAset;
+use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AssetPlacement;
 use Modules\Apperp\ManagementAset\Reporting\Layouts\BuiltinLayout;
 use Modules\Apperp\ManagementAset\Reporting\ReportContext;
@@ -202,19 +206,19 @@ final class AssetMutationReport implements ReportDefinition
             ->get();
 
         $groupLabel = ! empty($parameters['group_aset_id'])
-            ? (DB::table('aset_m_group_aset')->where('id', $parameters['group_aset_id'])->value('nama') ?? 'Semua group aset')
+            ? (GroupAset::where('id', $parameters['group_aset_id'])->value('nama') ?? 'Semua group aset')
             : 'Semua group aset';
 
         $golonganLabel = ! empty($parameters['kelompok_harta_fiskal_id'])
-            ? (DB::table('aset_m_kelompok_harta_fiskal')->where('id', $parameters['kelompok_harta_fiskal_id'])->value('nama') ?? 'Semua golongan')
+            ? (KelompokHartaFiskal::where('id', $parameters['kelompok_harta_fiskal_id'])->value('nama') ?? 'Semua golongan')
             : 'Semua golongan';
 
         $jenisLabel = ! empty($parameters['jenis_aset_id'])
-            ? (DB::table('aset_m_jenis_aset')->where('id', $parameters['jenis_aset_id'])->value('nama') ?? 'Semua jenis')
+            ? (JenisAset::where('id', $parameters['jenis_aset_id'])->value('nama') ?? 'Semua jenis')
             : 'Semua jenis';
 
         $asetLabel = ! empty($parameters['asset_id'])
-            ? (DB::table('aset_tr_penerimaan_aset')->where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
+            ? (Asset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
             : 'Semua aset';
 
         $nomor = 1;
