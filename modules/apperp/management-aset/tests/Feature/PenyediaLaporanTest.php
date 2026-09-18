@@ -135,6 +135,53 @@ class PenyediaLaporanTest extends TestCase
         $this->assertGreaterThanOrEqual(1, count($response['data']['tables']['baris']));
     }
 
+    public function test_laporan_pemusnahan_aset_dataset(): void
+    {
+        $this->workOrder();
+        $asset = DB::table('aset_tr_penerimaan_aset')->where('kode', 'AST-WO-1')->first();
+        $this->assertNotNull($asset);
+
+        // Pasang buku aset
+        $bookId = (string) Str::ulid();
+        DB::table('aset_tr_buku_aset')->insert([
+            'id' => $bookId,
+            'tenant_id' => $this->tenantId,
+            'asset_id' => $asset->id,
+            'book_code' => 'KOMERSIAL',
+            'useful_life_periods' => 48,
+            'acquisition_value' => 250000000,
+            'accumulated_depreciation' => 50000000,
+            'net_book_value' => 200000000,
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Pasang dokumen pemusnahan
+        DB::table('aset_tr_dokumen_siklus_aset')->insert([
+            'id' => (string) Str::ulid(),
+            'tenant_id' => $this->tenantId,
+            'creation_key' => 'seed-'.Str::ulid(),
+            'jenis_dokumen' => 'pemusnahan-aset',
+            'kode' => 'PMS-000001',
+            'legal_entity_id' => $this->legalEntityId,
+            'responsible_org_unit_id' => $this->orgUnitId,
+            'asset_id' => $asset->id,
+            'tanggal' => '2026-08-25',
+            'status' => 'approved',
+            'nilai' => 200000000,
+            'keterangan' => 'Peralatan rusak berat',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $konteks = $this->konteks(['management-aset.pemusnahan-aset.read']);
+        $data = $this->penyedia()->dataset('laporan-pemusnahan-aset', $konteks, []);
+        $this->assertSame(1, $data['fields']['jumlah_dokumen']);
+        $this->assertSame('PMS-000001', $data['tables']['baris'][0]['no_bukti']);
+        $this->assertSame('AST-WO-1', $data['tables']['baris'][0]['kode_aset']);
+    }
+
     /** @param list<string> $permissions */
     private function headers(array $permissions): static
     {

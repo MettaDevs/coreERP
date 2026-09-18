@@ -7,14 +7,18 @@ import { useReportData } from './_shared/useReportData';
 export type DisposalReportRow = {
     nomor?: number;
     no_bukti?: string;
+    tanggal?: string;
     tanggal_pemusnahan?: string;
     asset_kode?: string;
+    kode_aset?: string;
     asset_nama?: string;
+    item_aset?: string;
     spesifikasi?: string;
     kondisi_aset?: string;
     nilai_perolehan?: string | number;
     nilai_buku_akhir?: string | number;
     keterangan?: string;
+    status?: string;
     status_dokumen?: string;
 } & Record<string, unknown>;
 
@@ -35,7 +39,7 @@ export default function LaporanPemusnahanAsetPage() {
                 id: 'no_bukti',
                 header: 'No. Bukti',
                 cell: (row) => (
-                    <span className="font-mono text-xs font-semibold">
+                    <span className="text-primary font-mono text-xs font-semibold">
                         {String(row.no_bukti ?? '-')}
                     </span>
                 ),
@@ -43,26 +47,31 @@ export default function LaporanPemusnahanAsetPage() {
             {
                 id: 'tanggal_pemusnahan',
                 header: 'Tgl Pemusnahan',
-                cell: (row) => String(row.tanggal_pemusnahan ?? '-'),
+                cell: (row) =>
+                    String(row.tanggal_pemusnahan ?? row.tanggal ?? '-'),
             },
             {
                 id: 'asset_kode',
                 header: 'Kode Aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
-                        {String(row.asset_kode ?? '-')}
+                        {String(row.asset_kode ?? row.kode_aset ?? '-')}
                     </span>
                 ),
             },
             {
                 id: 'asset_nama',
                 header: 'Item Aset',
-                cell: (row) => String(row.asset_nama ?? '-'),
+                cell: (row) => String(row.asset_nama ?? row.item_aset ?? '-'),
             },
             {
                 id: 'spesifikasi',
                 header: 'Spesifikasi',
-                cell: (row) => String(row.spesifikasi ?? '-'),
+                cell: (row) => (
+                    <span className="text-muted-foreground text-xs">
+                        {String(row.spesifikasi ?? '-')}
+                    </span>
+                ),
             },
             {
                 id: 'kondisi_aset',
@@ -100,7 +109,7 @@ export default function LaporanPemusnahanAsetPage() {
                 header: 'Status Dokumen',
                 cell: (row) => (
                     <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                        {String(row.status_dokumen ?? '-')}
+                        {String(row.status_dokumen ?? row.status ?? '-')}
                     </span>
                 ),
                 align: 'center',
