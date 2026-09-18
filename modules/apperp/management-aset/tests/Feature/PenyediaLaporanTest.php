@@ -135,6 +135,95 @@ class PenyediaLaporanTest extends TestCase
         $this->assertGreaterThanOrEqual(1, count($response['data']['tables']['baris']));
     }
 
+    public function test_definisi_laporan_mutasi_aset_menyebut_placeholder_dan_parameter(): void
+    {
+        $definisi = $this->penyedia()->definisi('laporan-mutasi-aset', $this->konteks(['management-aset.mutasi-aset.read']));
+
+        $this->assertSame(
+            ['group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'asset_id', 'dari', 'sampai'],
+            $definisi['parameters'],
+        );
+        $this->assertContains(
+            ['key' => 'baris.tanggal_mutasi', 'label' => 'Tanggal mutasi', 'table' => 'baris'],
+            $definisi['fields'],
+        );
+        $this->assertContains(
+            ['key' => 'baris.lokasi_asal', 'label' => 'Lokasi asal', 'table' => 'baris'],
+            $definisi['fields'],
+        );
+    }
+
+    public function test_dataset_laporan_mutasi_aset_mengembalikan_riwayat_penempatan(): void
+    {
+        $group = $this->master('aset_m_group_aset', 'Kendaraan', 'GRPA-M1');
+        $jenis = $this->master('aset_m_jenis_aset', 'Kendaraan roda 4', 'JNSA-M1');
+        $tipeLokasi = $this->master('aset_m_tipe_lokasi_aset', 'Gudang', 'TLKA-M1');
+
+        $locAsal = (string) Str::ulid();
+        DB::table('aset_m_lokasi_aset')->insert([
+            'id' => $locAsal, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(),
+            'kode' => 'LOCA-M1', 'nama' => 'Gudang Utama', 'tipe_lokasi_id' => $tipeLokasi, 'aktif' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $locTujuan = (string) Str::ulid();
+        DB::table('aset_m_lokasi_aset')->insert([
+            'id' => $locTujuan, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(),
+            'kode' => 'LOCA-M2', 'nama' => 'Kantor Cabang', 'tipe_lokasi_id' => $tipeLokasi, 'aktif' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $assetId = (string) Str::ulid();
+        DB::table('aset_tr_penerimaan_aset')->insert([
+            'id' => $assetId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => 'AST-MUT-1',
+            'nama' => 'Mobil Operasional', 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenis, 'asset_location_id' => $locAsal,
+            'model_number' => 'Avanza', 'serial_number' => 'B 1234 CD',
+            'acquired_on' => '2026-01-01', 'acquisition_value' => 200000000, 'currency_code' => 'IDR',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Penempatan pertama (awal)
+        DB::table('aset_tr_penempatan_aset')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'asset_id' => $assetId,
+            'asset_location_id' => $locAsal, 'custodian_user_id' => 'user-lama',
+            'effective_on' => '2026-01-01', 'reason' => 'Penerimaan awal',
+            'created_at' => '2026-01-01 10:00:00', 'updated_at' => '2026-01-01 10:00:00',
+        ]);
+
+        // Penempatan kedua (mutasi)
+        DB::table('aset_tr_penempatan_aset')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'asset_id' => $assetId,
+            'asset_location_id' => $locTujuan, 'custodian_user_id' => 'user-baru',
+            'effective_on' => '2026-06-01', 'reason' => 'Pindah tugas ke cabang',
+            'created_at' => '2026-06-01 10:00:00', 'updated_at' => '2026-06-01 10:00:00',
+        ]);
+
+        // Cek tanpa izin ditolak
+        $this->assertGagalDengan(
+            'Anda tidak berhak membaca data laporan ini.',
+            fn () => $this->penyedia()->dataset('laporan-mutasi-aset', $this->konteks(['management-aset.pemeliharaan-aset.read']), []),
+        );
+
+        // Cek dengan izin sukses
+        $data = $this->penyedia()->dataset('laporan-mutasi-aset', $this->konteks(['management-aset.mutasi-aset.read']), []);
+
+        $this->assertSame(2, $data['fields']['jumlah_mutasi']);
+        $latest = $data['tables']['baris'][0];
+        $this->assertSame('AST-MUT-1', $latest['kode_aset']);
+        $this->assertSame('Mobil Operasional', $latest['nama_aset']);
+        $this->assertSame('Kantor Cabang', $latest['lokasi_tujuan']);
+        $this->assertSame('Gudang Utama', $latest['lokasi_asal']);
+        $this->assertSame('user-lama', $latest['penanggung_jawab']);
+        $this->assertSame('user-baru', $latest['pic_penerima']);
+
+        // Cek endpoint preview API
+        $this->headers(['management-aset.mutasi-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/laporan-mutasi-aset')
+            ->assertOk()
+            ->assertJsonPath('data.fields.jumlah_mutasi', 2);
+    }
+
     /** @param list<string> $permissions */
     private function headers(array $permissions): static
     {
