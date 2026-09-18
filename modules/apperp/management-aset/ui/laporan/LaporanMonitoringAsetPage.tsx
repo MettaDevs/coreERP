@@ -66,8 +66,7 @@ export default function LaporanMonitoringAsetPage() {
             {
                 id: 'asset_nama',
                 header: 'Nama Aset',
-                cell: (row) =>
-                    String(row.asset_nama ?? row.nama_aset ?? '-'),
+                cell: (row) => String(row.asset_nama ?? row.nama_aset ?? '-'),
             },
             {
                 id: 'spesifikasi',
@@ -137,9 +136,7 @@ export default function LaporanMonitoringAsetPage() {
                 cell: (row) => (
                     <span className="text-primary font-semibold">
                         {String(
-                            row.nilai_buku_akhir ??
-                                row.nilai_akhir_buku ??
-                                '-',
+                            row.nilai_buku_akhir ?? row.nilai_akhir_buku ?? '-',
                         )}
                     </span>
                 ),
