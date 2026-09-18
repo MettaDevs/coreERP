@@ -4,14 +4,12 @@ namespace App\Http\Controllers\Access;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppDataPolicy;
-use App\Models\CoreApp;
 use App\Models\InvitationCode;
 use App\Models\Organization;
 use App\Models\OrganizationHierarchy;
 use App\Models\Role;
 use App\Models\RoleAssignment;
 use App\Models\TenantMembership;
-use App\Support\RoleHierarchy;
 use App\Support\Sso\TenantSso;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -69,11 +67,21 @@ class AccessController extends Controller
                         'can_edit_access' => $member->system_role !== 'owner' || $member->id === $membership->id,
                     ];
                 }),
-            'apps' => CoreApp::query()
-                ->whereIn('id', $entitledAppIds)
-                ->whereHas('duties')
-                ->with(['duties.privileges.permissions'])
-                ->get(['id', 'name']),
+            /*
+             * Katalog izin dikirim **ditunda**, dan kolomnya dipilih satu per satu.
+             *
+             * Ia hanya dibaca di dalam dialog rincian role — tidak ada satu piksel pun
+             * dari halaman pertama yang membutuhkannya. Dikirim eager, ia menahan cat
+             * pertama demi layar yang mungkin tidak pernah dibuka.
+             *
+             * Bentuk sebelumnya `->with(['duties.privileges.permissions'])->get(['id','name'])`
+             * memulangkan **baris model utuh** untuk setiap simpul pohon — `created_at`,
+             * `updated_at`, `tenant_id`, `source`, `status`, `published_at` ikut ke peramban
+             * padahal tidak satu pun dibaca UI. Untuk dua module hasilnya 109 KB; ia tumbuh
+             * mengikuti jumlah module, bukan jumlah data tenant, jadi ia memburuk pada setiap
+             * module baru yang dijual.
+             */
+            'apps' => Inertia::defer(fn (): array => $this->katalogIzin(self::daftarString($entitledAppIds))),
             'roles' => $this->roles($tenantId),
             'dataPolicies' => AppDataPolicy::query()
                 ->whereIn('app_id', $entitledAppIds)
@@ -93,13 +101,133 @@ class AccessController extends Controller
                 ->leftJoin('operating_units', 'operating_units.organization_id', '=', 'organizations.id')
                 ->orderBy('organizations.name')
                 ->get(['organizations.id', 'organizations.name', 'organizations.classification', 'operating_units.type as unit_type']),
-            'hierarchies' => $this->hierarchies($tenantId),
+            /*
+             * Sama seperti katalog izin: pohon susunan organisasi hanya dipakai pemilih batas
+             * data di dalam dialog. Ditunda, bukan dihapus — yang membukanya tetap mendapatkannya.
+             */
+            'hierarchies' => Inertia::defer(fn (): array => $this->hierarchies($tenantId)),
             'invitations' => $this->invitations($tenantId, $membership->canManageAccess()),
             'newInvitationCodes' => $request->session()->pull('new_invitation_codes', []),
             // Kolom "Diundang" hanya berarti bila tenant ini memang memakai SSO; tanpa itu, yang
             // muncul adalah kotak email yang setiap isinya pasti ditolak.
             'ssoAvailable' => app(TenantSso::class)->availableFor($tenantId),
         ]);
+    }
+
+    /**
+     * Pohon izin per app: duty -> privilege -> permission, dengan kolom yang benar-benar
+     * dibaca layar dan tidak satu pun selain itu.
+     *
+     * Ia disusun dari satu query datar, bukan dari `with()` bertingkat. Bedanya bukan gaya:
+     * relasi bertingkat memulangkan objek model, dan objek model diserialisasi **utuh** oleh
+     * Inertia — termasuk stempel waktu, `tenant_id`, `source`, `status`, dan `published_at`
+     * yang tidak pernah dibaca siapa pun di peramban.
+     *
+     * @param  list<string>  $appIds
+     * @return list<array{id:string,name:string,duties:list<array<string,mixed>>}>
+     */
+    private function katalogIzin(array $appIds): array
+    {
+        if ($appIds === []) {
+            return [];
+        }
+
+        $baris = DB::table('security_duties as duty')
+            ->join('apps as app', 'app.id', '=', 'duty.app_id')
+            ->join('security_duty_privileges as jembatanPrivilege', 'jembatanPrivilege.duty_code', '=', 'duty.code')
+            ->join('security_privileges as privilege', 'privilege.code', '=', 'jembatanPrivilege.privilege_code')
+            ->leftJoin('security_privilege_permissions as jembatanPermission', 'jembatanPermission.privilege_code', '=', 'privilege.code')
+            ->leftJoin('permissions as permission', 'permission.code', '=', 'jembatanPermission.permission_code')
+            ->whereIn('duty.app_id', $appIds)
+            ->orderBy('app.name')
+            ->orderBy('duty.code')
+            ->orderBy('privilege.code')
+            ->orderBy('permission.code')
+            ->get([
+                'app.id as app_id',
+                'app.name as app_name',
+                'duty.code as duty_code',
+                'duty.name as duty_name',
+                'privilege.code as privilege_code',
+                'privilege.name as privilege_name',
+                'permission.code as permission_code',
+                'permission.name as permission_name',
+                'permission.access_level as permission_access_level',
+            ]);
+
+        /** @var array<string, string> $namaApp */
+        $namaApp = [];
+        /** @var array<string, array<string, array{code:string,app_id:string,name:string}>> $dutyPerApp */
+        $dutyPerApp = [];
+        /** @var array<string, array<string, array{code:string,name:string}>> $privilegePerDuty */
+        $privilegePerDuty = [];
+        /** @var array<string, array<string, array{code:string,name:string,access_level:string}>> $permissionPerPrivilege */
+        $permissionPerPrivilege = [];
+
+        foreach ($baris as $satu) {
+            $appId = (string) $satu->app_id;
+            $dutyCode = (string) $satu->duty_code;
+            $privilegeCode = (string) $satu->privilege_code;
+
+            $namaApp[$appId] = (string) $satu->app_name;
+            $dutyPerApp[$appId][$dutyCode] = [
+                'code' => $dutyCode,
+                'app_id' => $appId,
+                'name' => (string) $satu->duty_name,
+            ];
+            $privilegePerDuty[$dutyCode][$privilegeCode] = [
+                'code' => $privilegeCode,
+                'name' => (string) $satu->privilege_name,
+            ];
+
+            // `leftJoin` memulangkan privilege tanpa permission sebagai satu baris ber-null.
+            // Barisnya tetap dibutuhkan — privilegenya nyata — tetapi permission-nya tidak ada.
+            if ($satu->permission_code !== null) {
+                $permissionPerPrivilege[$privilegeCode][(string) $satu->permission_code] = [
+                    'code' => (string) $satu->permission_code,
+                    'name' => (string) $satu->permission_name,
+                    'access_level' => (string) $satu->permission_access_level,
+                ];
+            }
+        }
+
+        $hasil = [];
+
+        foreach ($namaApp as $appId => $nama) {
+            $duties = [];
+
+            foreach ($dutyPerApp[$appId] ?? [] as $dutyCode => $duty) {
+                $privileges = [];
+
+                foreach ($privilegePerDuty[$dutyCode] ?? [] as $privilegeCode => $privilege) {
+                    $privileges[] = [
+                        ...$privilege,
+                        'permissions' => array_values($permissionPerPrivilege[$privilegeCode] ?? []),
+                    ];
+                }
+
+                $duties[] = [...$duty, 'privileges' => $privileges];
+            }
+
+            $hasil[] = ['id' => $appId, 'name' => $nama, 'duties' => $duties];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Isi sebuah collection sebagai daftar string yang benar-benar berurut dari nol.
+     *
+     * `pluck()->all()` memulangkan `array<mixed>`, dan itu bukan sekadar soal anotasi: kunci
+     * collection tidak dijamin berurut, sehingga hasilnya bisa bukan list — bentuk yang membuat
+     * placeholder `?` pada query di bawah tidak lagi sejajar dengan nilainya.
+     *
+     * @param  Collection<int|string, mixed>  $nilai
+     * @return list<string>
+     */
+    private static function daftarString(Collection $nilai): array
+    {
+        return array_values(array_map(static fn (mixed $satu): string => (string) $satu, $nilai->all()));
     }
 
     /**
@@ -182,11 +310,15 @@ class AccessController extends Controller
      * Yang dipakai hanya versi published yang sedang berlaku — versi itu juga
      * yang nanti dicatat pada grant.
      *
-     * @return Collection<int, array{id:string,name:string,version_id:?string,nodes:array<int, array{organization_id:string,parent_organization_id:?string}>}>
+     * Memulangkan daftar, bukan `Collection`: nilainya berakhir sebagai JSON, dan `TValue` pada
+     * `Collection` tidak kovarian — sebuah closure yang memulangkannya tidak dapat diberi tipe
+     * tanpa membuat PHPStan menuntut kesamaan yang tidak pernah ia akui.
+     *
+     * @return list<array{id:string,name:string,version_id:?string,nodes:array<int, array{organization_id:string,parent_organization_id:?string}>}>
      */
-    private function hierarchies(string $tenantId): Collection
+    private function hierarchies(string $tenantId): array
     {
-        return OrganizationHierarchy::query()
+        $hierarchies = OrganizationHierarchy::query()
             ->where('tenant_id', $tenantId)
             ->where('status', 'active')
             ->with(['versions' => fn ($query) => $query
@@ -216,40 +348,133 @@ class AccessController extends Controller
                         ->values()
                         ->all(),
                 ];
-            });
+            })
+            ->all();
+
+        return array_values($hierarchies);
     }
 
-    /** @return Collection<int, array{id:string,name:string,duties:Collection<int, mixed>,data_policy_codes:list<string>}> */
+    /**
+     * @return Collection<int, array{id:string,name:string,duties:Collection<int, mixed>,data_policy_codes:list<string>}>
+     *
+     * Dua query tetap, bukan dua query **per role**.
+     *
+     * Bentuk sebelumnya memanggil `RoleHierarchy::effectiveRoleIds()` — sebuah CTE rekursif —
+     * lalu satu join tiga tabel, **di dalam perulangan role**. Dengan tiga role di mesin
+     * pengembangan biayanya tidak terlihat; sebuah tenant dengan lima puluh role membayar
+     * seratus query untuk satu kali membuka halaman, dan tidak ada satu pun yang berubah di
+     * kode ketika itu terjadi. Yang tumbuh adalah datanya, dan itulah bentuk kegagalan yang
+     * tidak pernah muncul di lingkungan tempat ia ditulis.
+     */
     private function roles(string $tenantId): Collection
     {
         $policies = AppDataPolicy::query()->get(['code', 'protected_permissions']);
 
-        return Role::query()
+        $roles = Role::query()
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->with('duties:code,name,app_id')
             ->orderBy('name')
-            ->get()
-            ->map(function (Role $role) use ($tenantId, $policies): array {
-                $roleIds = app(RoleHierarchy::class)->effectiveRoleIds($tenantId, [$role->id]);
-                $permissionCodes = DB::table('security_role_duties as role_duties')
-                    ->join('security_duty_privileges as duty_privileges', 'duty_privileges.duty_code', '=', 'role_duties.duty_code')
-                    ->join('security_privilege_permissions as privilege_permissions', 'privilege_permissions.privilege_code', '=', 'duty_privileges.privilege_code')
-                    ->whereIn('role_duties.role_id', $roleIds)
-                    ->pluck('privilege_permissions.permission_code')
-                    ->unique()
-                    ->all();
+            ->get();
 
-                return [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                    'duties' => $role->duties->map(fn ($duty) => $duty->only(['code', 'app_id', 'name']))->values(),
-                    'data_policy_codes' => $policies
-                        ->filter(fn (AppDataPolicy $policy): bool => array_intersect($policy->protected_permissions, $permissionCodes) !== [])
-                        ->pluck('code')
-                        ->values()
-                        ->all(),
-                ];
-            });
+        if ($roles->isEmpty()) {
+            return collect();
+        }
+
+        $turunan = $this->turunanRole($tenantId, self::daftarString($roles->pluck('id')));
+        $permissionPerRole = $this->permissionPerRole(array_values(array_unique(array_merge(...array_values($turunan)))));
+
+        return $roles->map(function (Role $role) use ($policies, $turunan, $permissionPerRole): array {
+            $permissionCodes = array_values(array_unique(array_merge(
+                ...array_map(
+                    static fn (string $id): array => $permissionPerRole[$id] ?? [],
+                    $turunan[$role->id] ?? [$role->id],
+                ),
+            )));
+
+            return [
+                'id' => $role->id,
+                'name' => $role->name,
+                'duties' => $role->duties->map(fn ($duty) => $duty->only(['code', 'app_id', 'name']))->values(),
+                'data_policy_codes' => $policies
+                    ->filter(fn (AppDataPolicy $policy): bool => array_intersect($policy->protected_permissions, $permissionCodes) !== [])
+                    ->pluck('code')
+                    ->values()
+                    ->all(),
+            ];
+        });
+    }
+
+    /**
+     * Peta role -> dirinya sendiri beserta seluruh turunannya, untuk semua role sekaligus.
+     *
+     * CTE yang sama seperti `RoleHierarchy::effectiveRoleIds()`, tetapi membawa serta role
+     * asalnya pada tiap baris sehingga satu penelusuran menjawab seluruh daftar. Penjaga
+     * siklusnya sama: `union` (bukan `union all`) menghentikan jalur yang bertemu kembali.
+     *
+     * @param  list<string>  $roleIds
+     * @return array<string, list<string>>
+     */
+    private function turunanRole(string $tenantId, array $roleIds): array
+    {
+        if ($roleIds === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($roleIds), '?'));
+
+        $rows = DB::select(
+            <<<SQL
+            with recursive reachable(root_id, role_id) as (
+                select r.id, r.id
+                from roles r
+                where r.tenant_id = ? and r.is_active = true and r.id in ({$placeholders})
+              union
+                select reachable.root_id, link.child_role_id
+                from security_role_children link
+                join reachable on reachable.role_id = link.parent_role_id
+                join roles child on child.id = link.child_role_id and child.is_active = true
+                where link.tenant_id = ?
+            )
+            select root_id, role_id from reachable
+            SQL,
+            [$tenantId, ...$roleIds, $tenantId],
+        );
+
+        $peta = [];
+
+        foreach ($rows as $row) {
+            $peta[(string) $row->root_id][] = (string) $row->role_id;
+        }
+
+        return $peta;
+    }
+
+    /**
+     * Peta role -> permission code yang datang dari duty-nya sendiri, untuk semua role sekaligus.
+     *
+     * @param  list<string>  $roleIds
+     * @return array<string, list<string>>
+     */
+    private function permissionPerRole(array $roleIds): array
+    {
+        if ($roleIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('security_role_duties as role_duties')
+            ->join('security_duty_privileges as duty_privileges', 'duty_privileges.duty_code', '=', 'role_duties.duty_code')
+            ->join('security_privilege_permissions as privilege_permissions', 'privilege_permissions.privilege_code', '=', 'duty_privileges.privilege_code')
+            ->whereIn('role_duties.role_id', $roleIds)
+            ->distinct()
+            ->get(['role_duties.role_id', 'privilege_permissions.permission_code']);
+
+        $peta = [];
+
+        foreach ($rows as $row) {
+            $peta[(string) $row->role_id][] = (string) $row->permission_code;
+        }
+
+        return $peta;
     }
 }
