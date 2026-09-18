@@ -59,6 +59,7 @@ Target yang dikunci:
 | [30-registry-harbor.md](30-registry-harbor.md) | Registry Harbor: isi, robot, kredensial per operasi, penarikan lewat digest, immutability dan retensi, dan jebakan yang terukur |
 | [31-admin-erp-control-plane.md](31-admin-erp-control-plane.md) | admin.erp (`apps/control-plane`): batas datanya, percakapan ke Core dan ke agen, layar dan rutenya, rahasia, jejak audit, dan aturan yang dijaga |
 | [32-sso.md](32-sso.md) | SSO: upacara tiga kaki di Core, upacara satu alamat di konsol, yang diperiksa sebelum sesi berdiri, logout back-channel, dan setelannya |
+| [33-muatan-halaman-dan-paginasi.md](33-muatan-halaman-dan-paginasi.md) | Batas muatan satu halaman: paginasi sisi server, prop `Inertia::defer()`, bentuk yang dikirim bukan baris model, dan query yang tidak tumbuh mengikuti baris |
 
 ## Referensi utama
 

@@ -86,7 +86,6 @@ import { useInitials } from '@/hooks/use-initials';
 type Permission = {
     code: string;
     name: string;
-    entry_point_code: string;
     access_level: string;
 };
 type Privilege = { code: string; name: string; permissions: Permission[] };
@@ -174,15 +173,22 @@ type Props = {
     tenant: { id: string; name: string };
     canManage: boolean;
     members: Member[];
-    apps: App[];
     roles: Role[];
     dataPolicies: DataPolicy[];
     organizations: Organization[];
-    hierarchies: Hierarchy[];
     invitations: Invitation[];
     newInvitationCodes: string[];
     /** Tenant ini memakai SSO bersama, sehingga undangan lewat email mungkin dibuat. */
     ssoAvailable: boolean;
+    /*
+     * Dua prop berikut dikirim `Inertia::defer()`: ia **tidak ada** pada respons pertama dan
+     * tiba pada permintaan susulan yang dikirim Inertia sendiri sesudah halaman tercat.
+     * Karena itu tipenya opsional — bukan karena backend kadang tidak punya, melainkan karena
+     * memang ada satu jendela waktu ketika halaman hidup tanpa keduanya. Keduanya hanya dibaca
+     * di dalam dialog, jadi jendela itu tidak terlihat siapa pun.
+     */
+    apps?: App[];
+    hierarchies?: Hierarchy[];
 };
 
 const unrestrictedScope = (policyCode: string): PolicyScope => ({
@@ -1142,7 +1148,9 @@ function InviteForm({
     roles,
     dataPolicies,
     organizations,
-    hierarchies,
+    // Ditunda di server, jadi ia kosong sampai permintaan susulan tiba. Pemilih batas data
+    // yang membacanya berada di dalam dialog; ketika dialog itu dapat dibuka, ia sudah ada.
+    hierarchies = [],
     invitations,
     ssoAvailable,
 }: Pick<
@@ -2004,11 +2012,11 @@ export default function Access({
     tenant,
     canManage,
     members,
-    apps,
+    apps = [],
     roles,
     dataPolicies,
     organizations,
-    hierarchies,
+    hierarchies = [],
     invitations = [],
     newInvitationCodes = [],
     ssoAvailable = false,

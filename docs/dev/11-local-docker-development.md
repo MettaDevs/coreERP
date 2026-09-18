@@ -109,8 +109,14 @@ Windows, ia kembali ke ukuran normal. Selisihnya terukur **99 detik lawan 5,5 de
 konfigurasi yang persis sama.
 
 Jalankan `npx vite --host 127.0.0.1 --port 5173` dari `apps/core` di Windows, dan biarkan
-sisa stack tetap di container. PHP, database, worker, penjadwal, dan perender tidak membaca ratusan
-berkas per perubahan, jadi keduanya tidak terganggu bind mount.
+sisa stack tetap di container.
+
+> **Koreksi 18 September 2026.** Baris ini dulu berlanjut dengan "PHP, database, worker, penjadwal,
+> dan perender tidak membaca ratusan berkas per perubahan, jadi keduanya tidak terganggu bind
+> mount". Bagian pertamanya benar dan kesimpulannya salah, karena satuannya salah: PHP memang tidak
+> membaca ratusan berkas **per perubahan** — ia membacanya **per permintaan**. Penyakit yang sama
+> dengan Tailwind, pada sumbu yang berbeda, dan karena itu ia luput selama ini. Angkanya di
+> [bagian 5](#_5-kode-php-membayar-bind-mount-yang-sama-per-permintaan-bukan-per-perubahan).
 
 ### 2. Yang dipantau pengawas berkas dibatasi
 
@@ -150,6 +156,66 @@ Selama menit itu server pengembangan berhenti menjawab, dan gejalanya menyamar s
 sama sekali: aset gagal dimuat, halaman kosong, pembaruan tidak sampai — berubah-ubah tergantung
 kapan sebuah permintaan kebetulan jatuh. `inertia({ ssr: false })` mematikannya; waktu nyala Vite
 turun dari puluhan detik menjadi 1,4 detik.
+
+### 5. Kode PHP membayar bind mount yang sama — per permintaan, bukan per perubahan
+
+Diukur 18 September 2026 pada stack `-HotReload` yang sedang berjalan, dengan repo di `D:\`.
+
+Pertama, harga satu operasi berkas di dalam container, diukur atas 298 berkas PHP yang sama:
+
+| Tempat berkas berada | `stat()` per berkas | `read()` per berkas |
+| --- | --- | --- |
+| Bind mount dari `D:\` (yang dipakai `-HotReload` sekarang) | **1,4–2,1 ms** | **4,9–6,6 ms** |
+| Bind mount dari sistem berkas WSL2 (ext4) | **0,0018 ms** | **0,30 ms** |
+| Volume Docker / lapisan image | 0,0015 ms | 0,04–0,25 ms |
+
+`stat` pada bind mount Windows **seribu kali lebih mahal**. Itu bukan sekadar angka besar: opcache
+memeriksa ulang stempel waktu setiap berkas yang pernah ia kompilasi (`opcache.validate_timestamps`
+menyala, `revalidate_freq=2`), dan satu permintaan Laravel menyentuh ratusan berkas. Pemeriksaan
+yang gratis di Linux menjadi pekerjaan utama permintaan di Windows.
+
+Kedua, akibatnya pada permintaan sungguhan. Diukur bergantian (interleaved) supaya beban mesin
+mengenai semua varian sama rata, medianya, `time_starttransfer`, sesi dan data yang sama:
+
+| Halaman | Repo di `D:\` (sekarang) | Repo di WSL2 ext4 | |
+| --- | --- | --- | --- |
+| `/dashboard` | 248 ms | **63 ms** | 3,9× |
+| `/settings/organization` | 288 ms | **81 ms** | 3,6× |
+| `/settings/units-of-measure` | 258 ms | **77 ms** | 3,4× |
+| `/workflow-inbox` | 259 ms | **69 ms** | 3,8× |
+| `/reports/exports` | 282 ms | **76 ms** | 3,7× |
+
+Kolom kanan **bukan** kompromi: container itu memakai bind mount sungguhan dengan
+`opcache.validate_timestamps` tetap menyala. Diuji langsung — satu baris di
+`HandleInertiaRequests::share()` diubah dari sisi host, permintaan berikutnya sudah memulangkan
+nilai baru tanpa satu pun container di-restart. Muat-ulang-panas PHP utuh; yang hilang hanya
+ongkosnya.
+
+**Perbaikannya: taruh checkout yang dipakai container di sistem berkas WSL2, bukan di `D:\`.**
+Yang benar-benar menyembuhkan bukan setelan PHP, melainkan sistem berkasnya:
+
+```bash
+# di dalam WSL (Ubuntu)
+cd ~ && mkdir -p Kerja && cd Kerja
+git clone <remote> CoreERP
+```
+
+Lalu jalankan stack dari sisi WSL, dan sunting lewat VS Code Remote-WSL. Vite pun ikut pindah ke
+dalam WSL — di sana ia membaca ext4, jadi alasan bagian 1 (Vite di host Windows) tidak berlaku lagi
+dan justru berbalik: menjalankannya dari Windows kembali berarti membaca `\wsl$` lewat 9p.
+
+**Kalau checkout harus tetap di `D:\`**, yang tersisa hanyalah menyuruh opcache berhenti memeriksa:
+
+| Setelan pada container | `/dashboard` | Muat-ulang-panas PHP |
+| --- | --- | --- |
+| `revalidate_freq=2` (bawaan sekarang) | 248–319 ms | seketika |
+| `revalidate_freq=60` | 160 ms | tertunda sampai 60 detik |
+| `validate_timestamps=0` | 138–150 ms | mati sampai container di-restart |
+
+Menaikkan `opcache.memory_consumption`, `opcache.max_accelerated_files`, `realpath_cache_size`, dan
+`opcache.interned_strings_buffer` **tidak** membantu: diukur, 297 ms lawan 312 ms — selisih di
+dalam derau. opcache lokal sudah sehat apa adanya (1.680 skrip, hit rate 99,89%, nol restart). Yang
+mahal semata-mata `stat` ke `D:\`, jadi hanya yang mengurangi jumlah `stat` yang berpengaruh.
 
 ### Kalau mengukurnya sendiri, jangan memakai `?t=` buatan
 
