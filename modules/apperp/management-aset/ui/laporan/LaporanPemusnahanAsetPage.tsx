@@ -48,9 +48,7 @@ export default function LaporanPemusnahanAsetPage() {
                 id: 'tanggal_pemusnahan',
                 header: 'Tgl Pemusnahan',
                 cell: (row) =>
-                    String(
-                        row.tanggal_pemusnahan ?? row.tanggal ?? '-',
-                    ),
+                    String(row.tanggal_pemusnahan ?? row.tanggal ?? '-'),
             },
             {
                 id: 'asset_kode',
@@ -64,8 +62,7 @@ export default function LaporanPemusnahanAsetPage() {
             {
                 id: 'asset_nama',
                 header: 'Item Aset',
-                cell: (row) =>
-                    String(row.asset_nama ?? row.item_aset ?? '-'),
+                cell: (row) => String(row.asset_nama ?? row.item_aset ?? '-'),
             },
             {
                 id: 'spesifikasi',
@@ -112,9 +109,7 @@ export default function LaporanPemusnahanAsetPage() {
                 header: 'Status Dokumen',
                 cell: (row) => (
                     <span className="bg-muted text-muted-foreground inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize">
-                        {String(
-                            row.status_dokumen ?? row.status ?? '-',
-                        )}
+                        {String(row.status_dokumen ?? row.status ?? '-')}
                     </span>
                 ),
                 align: 'center',
