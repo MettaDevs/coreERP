@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
  * pola hapus-lalu-sisip saat dokumen disunting: ia memikul hasil checklist, jam aktual,
  * penugasan, sebab, dan tindakan. Penggantian massal hanya sah selama status masih `draft`.
  *
- * `asset_location_id` disalin saat baris dibuat, bukan dibaca dari aset, supaya riwayat tetap
+ * `lokasi_aset_id` disalin saat baris dibuat, bukan dibaca dari aset, supaya riwayat tetap
  * menunjukkan tempat pekerjaan dikerjakan meski asetnya kemudian dipindahkan.
  *
  * `estimasi_jam` dan `aktual_jam` di-cast `decimal:2`, jadi Eloquent memulangkannya sebagai
@@ -26,8 +26,8 @@ use Illuminate\Support\Carbon;
  * @property string $tenant_id
  * @property string $pemeliharaan_aset_id
  * @property int $line_number
- * @property string $asset_id
- * @property ?string $asset_location_id
+ * @property string $aset_id
+ * @property ?string $lokasi_aset_id
  * @property string $maintenance_job_type_id
  * @property ?string $variant_id
  * @property ?string $trade_id
@@ -53,7 +53,7 @@ class PemeliharaanAsetDetail extends Model
     protected $table = 'aset_tr_pemeliharaan_aset_details';
 
     protected $fillable = [
-        'tenant_id', 'pemeliharaan_aset_id', 'line_number', 'asset_id', 'asset_location_id',
+        'tenant_id', 'pemeliharaan_aset_id', 'line_number', 'aset_id', 'lokasi_aset_id',
         'maintenance_job_type_id', 'variant_id', 'trade_id', 'ditugaskan_ke_user_id',
         'dijadwalkan_mulai', 'dijadwalkan_selesai', 'estimasi_jam', 'aktual_jam', 'hasil',
         'sebab_kerusakan_id', 'sebab_kerusakan_keterangan',

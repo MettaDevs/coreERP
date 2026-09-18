@@ -64,7 +64,7 @@ trait BerinteraksiDenganKonteksCore
 
     private const TIPE_WORKFLOW_DEKOMISIONING = 'management-aset.dekomisioning-aset-verification';
 
-    private const KEBIJAKAN_TANGGUNG_JAWAB = 'management-aset.asset-responsibility';
+    private const KEBIJAKAN_TANGGUNG_JAWAB = 'management-aset.aset-responsibility';
 
     /**
      * Tenant untuk test ini.
@@ -493,7 +493,7 @@ trait BerinteraksiDenganKonteksCore
 
         // Tanpa lingkup yang disebut test, pengguna diberi tanggung jawab atas **seluruh**
         // organisasi tenantnya. Itu bentuk yang sama dengan token lama, yang selalu membawa
-        // `asset-responsibility` dengan `all => true` kecuali test menyebut lain. Lingkup
+        // `aset-responsibility` dengan `all => true` kecuali test menyebut lain. Lingkup
         // kosong akan menolak hampir semua permintaan dengan 403, dan test yang sebenarnya
         // menguji hal lain akan gagal karena sebab yang tidak ada hubungannya.
         $lingkup = $kebijakanData === []
@@ -693,7 +693,7 @@ trait BerinteraksiDenganKonteksCore
                 // Sama dengan yang dinyatakan `app.yaml` module. Field yang diwajibkan di sini
                 // diperiksa Core sebelum instance dibuat, jadi menuliskannya berbeda akan
                 // membuat test lulus atas skema yang tidak pernah dipasang di produksi.
-                'decision_context_schema' => json_encode(['required' => ['document_id', 'asset_id']], JSON_THROW_ON_ERROR),
+                'decision_context_schema' => json_encode(['required' => ['document_id', 'aset_id']], JSON_THROW_ON_ERROR),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

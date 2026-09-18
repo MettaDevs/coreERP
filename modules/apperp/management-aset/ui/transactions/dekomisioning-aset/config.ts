@@ -4,6 +4,6 @@ export const config: LifecycleConfig = {
     resource: 'dekomisioning-aset',
     title: 'Dekomisioning aset',
     action: 'Buat usulan dekomisioning',
-    needsAsset: true,
+    needsAset: true,
     financial: false,
 };

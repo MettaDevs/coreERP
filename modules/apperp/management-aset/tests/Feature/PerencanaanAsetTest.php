@@ -11,7 +11,7 @@ use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
-class AssetPlanningTest extends TestCase
+class PerencanaanAsetTest extends TestCase
 {
     use BerinteraksiDenganKonteksCore, RefreshDatabase;
 
@@ -39,7 +39,7 @@ class AssetPlanningTest extends TestCase
         });
     }
 
-    public function test_planning_uses_asset_type_lookup_and_saves_specification_on_transaction_detail(): void
+    public function test_planning_uses_aset_type_lookup_and_saves_specification_on_transaction_detail(): void
     {
         $jenis = $this->jenis($this->tenantId);
         $response = $this->create($jenis)->assertCreated()->assertJsonPath('data.kode', 'PLNA-000001');
@@ -50,7 +50,7 @@ class AssetPlanningTest extends TestCase
             'planning_type' => 'regular',
         ]);
         $this->assertDatabaseHas('aset_tr_perencanaan_aset_details', [
-            'planning_id' => $planId, 'jenis_aset_id' => $jenis, 'asset_name' => 'Laptop kerja',
+            'planning_id' => $planId, 'jenis_aset_id' => $jenis, 'nama_aset' => 'Laptop kerja',
             'requested_specification' => 'RAM 16 GB, SSD 512 GB', 'quantity' => 2,
         ]);
         // Dulu memeriksa entitas legal yang dikirim ke Core lewat kabel; sekarang memeriksa
@@ -62,7 +62,7 @@ class AssetPlanningTest extends TestCase
             ->assertOk()->assertJsonPath('data.details.0.jenis_aset_nama', 'Laptop kerja');
     }
 
-    public function test_rejects_asset_type_from_another_tenant_before_issuing_a_number(): void
+    public function test_rejects_aset_type_from_another_tenant_before_issuing_a_number(): void
     {
         $otherTenantType = $this->jenis((string) Str::ulid());
         $this->create($otherTenantType)->assertUnprocessable()->assertJsonValidationErrors('details');

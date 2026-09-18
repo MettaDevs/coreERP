@@ -71,19 +71,19 @@ induk_lintas_tenant as (
       + (select count(*) from aset_m_group_buku_penyusutan m join aset_m_group_aset g on g.id = m.group_aset_id where g.tenant_id <> m.tenant_id)
       + (select count(*) from aset_m_group_buku_penyusutan m join aset_m_buku_penyusutan b on b.id = m.buku_id where b.tenant_id <> m.tenant_id)
       + (select count(*) from aset_tr_buku_aset k join aset_m_buku_penyusutan b on b.id = k.buku_id where b.tenant_id <> k.tenant_id)
-      + (select count(*) from aset_tr_penerimaan_aset a join aset_m_group_aset p on p.id = a.group_aset_id where p.tenant_id <> a.tenant_id)
-      + (select count(*) from aset_tr_penerimaan_aset a join aset_m_jenis_aset p on p.id = a.jenis_aset_id where p.tenant_id <> a.tenant_id)
+      + (select count(*) from aset_tr_aset a join aset_m_group_aset p on p.id = a.group_aset_id where p.tenant_id <> a.tenant_id)
+      + (select count(*) from aset_tr_aset a join aset_m_jenis_aset p on p.id = a.jenis_aset_id where p.tenant_id <> a.tenant_id)
       -- Tabel penghubung yang disunting dari dua arah: inilah yang dijaga skenario link-race.
-      + (select count(*) from aset_m_maintenance_job_type_asset_type l join aset_m_maintenance_job_type j on j.id = l.job_type_id where j.tenant_id <> l.tenant_id)
-      + (select count(*) from aset_m_maintenance_job_type_asset_type l join aset_m_jenis_aset t on t.id = l.jenis_aset_id where t.tenant_id <> l.tenant_id) as n
+      + (select count(*) from aset_m_maintenance_job_type_jenis_aset l join aset_m_maintenance_job_type j on j.id = l.job_type_id where j.tenant_id <> l.tenant_id)
+      + (select count(*) from aset_m_maintenance_job_type_jenis_aset l join aset_m_jenis_aset t on t.id = l.jenis_aset_id where t.tenant_id <> l.tenant_id) as n
 ),
 induk_hilang as (
     select
         (select count(*) from aset_m_model_aset c left join aset_m_pabrikan_aset p on p.id = c.pabrikan_aset_id where p.id is null)
       + (select count(*) from aset_m_model_aset c left join aset_m_jenis_aset p on p.id = c.jenis_aset_id where c.jenis_aset_id is not null and p.id is null)
-      + (select count(*) from aset_tr_penerimaan_aset a left join aset_m_group_aset p on p.id = a.group_aset_id where p.id is null)
-      + (select count(*) from aset_m_maintenance_job_type_asset_type l left join aset_m_maintenance_job_type j on j.id = l.job_type_id where j.id is null)
-      + (select count(*) from aset_m_maintenance_job_type_asset_type l left join aset_m_jenis_aset t on t.id = l.jenis_aset_id where t.id is null) as n
+      + (select count(*) from aset_tr_aset a left join aset_m_group_aset p on p.id = a.group_aset_id where p.id is null)
+      + (select count(*) from aset_m_maintenance_job_type_jenis_aset l left join aset_m_maintenance_job_type j on j.id = l.job_type_id where j.id is null)
+      + (select count(*) from aset_m_maintenance_job_type_jenis_aset l left join aset_m_jenis_aset t on t.id = l.jenis_aset_id where t.id is null) as n
 ),
 prefix_salah as (
     -- Prefix kode berasal dari reference Number Sequence yang berbeda per master. Prefix yang
@@ -119,7 +119,7 @@ nomor_tanpa_terbitan as (
       + (select count(*) from aset_m_buku_penyusutan t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.buku-penyusutan' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_profil_penyusutan t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.profil-penyusutan' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_tipe_atribut t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.tipe-atribut' and i.formatted_value = t.kode))
-      + (select count(*) from aset_tr_penerimaan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.aset' and i.formatted_value = t.kode))
+      + (select count(*) from aset_tr_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.aset' and i.formatted_value = t.kode))
       + (select count(*) from aset_tr_perencanaan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.perencanaan-aset' and i.formatted_value = t.kode))
       + (select count(*) from aset_tr_pemeliharaan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.pemeliharaan-aset' and i.formatted_value = t.kode)) as n
 ),
@@ -135,7 +135,7 @@ nomor_dipakai_dua_record as (
     select count(*) as n from (
         select tenant_id, kode from aset_m_group_aset group by 1, 2 having count(*) > 1
         union all select tenant_id, kode from aset_m_maintenance_job_type group by 1, 2 having count(*) > 1
-        union all select tenant_id, kode from aset_tr_penerimaan_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, kode from aset_tr_aset group by 1, 2 having count(*) > 1
         union all select tenant_id, kode from aset_tr_perencanaan_aset group by 1, 2 having count(*) > 1
     ) d
 ),
@@ -151,20 +151,20 @@ tenant_tak_dikenal as (
     -- pemindahan karena tiap tenant punya databasenya sendiri; mungkin sekarang.
     select
         (select count(*) from aset_m_group_aset t left join tenants c on c.id = t.tenant_id where c.id is null)
-      + (select count(*) from aset_tr_penerimaan_aset t left join tenants c on c.id = t.tenant_id where c.id is null)
+      + (select count(*) from aset_tr_aset t left join tenants c on c.id = t.tenant_id where c.id is null)
       + (select count(*) from aset_m_maintenance_job_type t left join tenants c on c.id = t.tenant_id where c.id is null) as n
 ),
 aset_duplikat as (
     select count(*) as n from (
-        select tenant_id, kode from aset_tr_penerimaan_aset group by 1, 2 having count(*) > 1
-        union all select tenant_id, creation_key from aset_tr_penerimaan_aset group by 1, 2 having count(*) > 1
+        select tenant_id, kode from aset_tr_aset group by 1, 2 having count(*) > 1
+        union all select tenant_id, creation_key from aset_tr_aset group by 1, 2 having count(*) > 1
     ) d
 ),
 penempatan_lintas_tenant as (
-    select count(*) as n from aset_tr_penempatan_aset p join aset_tr_penerimaan_aset a on a.id = p.asset_id where p.tenant_id <> a.tenant_id
+    select count(*) as n from aset_tr_penempatan_aset p join aset_tr_aset a on a.id = p.aset_id where p.tenant_id <> a.tenant_id
 ),
 dokumen_lintas_tenant as (
-    select count(*) as n from aset_tr_dokumen_siklus_aset d join aset_tr_penerimaan_aset a on a.id = d.asset_id where d.asset_id is not null and d.tenant_id <> a.tenant_id
+    select count(*) as n from aset_tr_dokumen_siklus_aset d join aset_tr_aset a on a.id = d.aset_id where d.aset_id is not null and d.tenant_id <> a.tenant_id
 ),
 perencanaan_duplikat as (
     select count(*) as n from (
@@ -195,7 +195,7 @@ depreciation_nbv_below_residual as (
 ),
 depreciation_final_ganda as (
     select count(*) as n from (
-        select tenant_id, asset_book_id, period_ends_on
+        select tenant_id, buku_aset_id, period_ends_on
         from aset_tr_penyusutan_aset
         where reverses_period_id is null and status = 'final'
         group by 1, 2, 3 having count(*) > 1
@@ -259,7 +259,7 @@ saldo_buku_tidak_cocok_periode as (
     from aset_tr_buku_aset b
     where b.accumulated_depreciation <> coalesce((
         select sum(p.amount) from aset_tr_penyusutan_aset p
-        where p.asset_book_id = b.id and p.status = 'final'
+        where p.buku_aset_id = b.id and p.status = 'final'
     ), 0)
 ),
 work_order_child_tidak_sah as (
@@ -313,9 +313,9 @@ union all select 'aset_m_pabrikan_aset', count(*), count(distinct tenant_id) fro
 union all select 'aset_m_item_checklist_maintenance', count(*), count(distinct tenant_id) from aset_m_item_checklist_maintenance
 union all select 'aset_m_analisa_maintenance', count(*), count(distinct tenant_id) from aset_m_analisa_maintenance
 union all select 'aset_m_maintenance_job_type', count(*), count(distinct tenant_id) from aset_m_maintenance_job_type
-union all select 'aset_m_maintenance_job_type_asset_type', count(*), count(distinct tenant_id) from aset_m_maintenance_job_type_asset_type
+union all select 'aset_m_maintenance_job_type_jenis_aset', count(*), count(distinct tenant_id) from aset_m_maintenance_job_type_jenis_aset
 union all select 'aset_m_maintenance_checklist_variable', count(*), count(distinct tenant_id) from aset_m_maintenance_checklist_variable
-union all select 'aset_tr_penerimaan_aset', count(*), count(distinct tenant_id) from aset_tr_penerimaan_aset
+union all select 'aset_tr_aset', count(*), count(distinct tenant_id) from aset_tr_aset
 union all select 'aset_tr_penempatan_aset', count(*), count(distinct tenant_id) from aset_tr_penempatan_aset
 union all select 'aset_tr_perencanaan_aset', count(*), count(distinct tenant_id) from aset_tr_perencanaan_aset
 union all select 'aset_tr_perencanaan_aset_details', count(*), count(distinct tenant_id) from aset_tr_perencanaan_aset_details

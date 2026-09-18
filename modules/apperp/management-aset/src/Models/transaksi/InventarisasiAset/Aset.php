@@ -27,8 +27,10 @@ use Illuminate\Support\Carbon;
  * @property ?string $kondisi_aset_id
  * @property ?string $pabrikan_aset_id
  * @property ?string $model_aset_id
- * @property ?string $parent_asset_id
- * @property ?string $asset_location_id
+ * @property ?string $induk_aset_id
+ * @property ?string $lokasi_aset_id
+ * @property ?string $penerimaan_aset_id
+ * @property ?string $penerimaan_aset_detail_id
  * @property ?string $financial_dimension_org_unit_id
  * @property ?string $serial_number
  * @property ?string $model_number
@@ -42,19 +44,20 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
-class Asset extends Model
+class Aset extends Model
 {
     use HasUlids, SoftDeletes;
     use MilikTenant;
 
-    protected $table = 'aset_tr_penerimaan_aset';
+    protected $table = 'aset_tr_aset';
 
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id',
         'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id',
-        'parent_asset_id', 'asset_location_id', 'financial_dimension_org_unit_id',
+        'induk_aset_id', 'lokasi_aset_id', 'financial_dimension_org_unit_id',
         'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on',
         'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan',
+        'penerimaan_aset_id', 'penerimaan_aset_detail_id',
     ];
 
     /** @return array<string, string> */

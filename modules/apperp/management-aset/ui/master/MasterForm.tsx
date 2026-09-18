@@ -77,7 +77,7 @@ export default function MasterForm({
         () => config.extraFields ?? [],
         [config.extraFields],
     );
-    const isAssetLocation = config.resource === 'lokasi-aset';
+    const isAsetLocation = config.resource === 'lokasi-aset';
     const [extra, setExtra] = useState<Record<string, FieldValue>>(() =>
         Object.fromEntries(
             extraFields.map((field) => [field.name, valueFrom(value, field)]),
@@ -242,7 +242,7 @@ export default function MasterForm({
                             </Field>
                             {/* Induk dirender sejajar: tidak ada yang menyaring pilihan yang lain. */}
                             {parents.map(parentField)}
-                            {isAssetLocation && (
+                            {isAsetLocation && (
                                 <Field>
                                     <FieldTitle>Dimensi keuangan</FieldTitle>
                                     <div

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
@@ -19,9 +20,9 @@ use Tests\TestCase;
  * membuat aset baru, dan `lifecycle_state` tidak pernah menjadi `disposed` sehingga aset
  * yang sudah dijual masih menerima proposal penyusutan.
  */
-class AssetLifecycleTest extends TestCase
+class SiklusHidupAsetTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, MenerimaAset, RefreshDatabase;
 
     private string $tenantId;
 
@@ -53,13 +54,13 @@ class AssetLifecycleTest extends TestCase
             'nama' => 'Group fiskal',
             'kelompok_harta_fiskal_id' => $reference,
         ]);
-        $asset = $this->receive(['group_aset_id' => $group]);
+        $aset = $this->receive(['group_aset_id' => $group]);
 
-        $this->assertDatabaseHas('aset_tr_penerimaan_aset', [
-            'id' => $asset,
+        $this->assertDatabaseHas('aset_tr_aset', [
+            'id' => $aset,
             'kelompok_harta_fiskal_id' => $reference,
         ]);
-        $this->show($asset)->assertOk()->assertJsonPath('data.kelompok_harta_fiskal_id', $reference);
+        $this->show($aset)->assertOk()->assertJsonPath('data.kelompok_harta_fiskal_id', $reference);
     }
 
     public function test_nilai_atribut_dapat_dibaca_kembali_lewat_detail_aset(): void
@@ -68,12 +69,12 @@ class AssetLifecycleTest extends TestCase
         $daya = $this->master('tipe-atribut', ['nama' => 'Daya', 'data_type' => 'decimal', 'satuan_id' => $this->unitId]);
         $garansi = $this->master('tipe-atribut', ['nama' => 'Bergaransi', 'data_type' => 'boolean']);
         $this->attach($jenis, [['tipe_atribut_id' => $daya], ['tipe_atribut_id' => $garansi]])->assertOk();
-        $asset = $this->receive(['jenis_aset_id' => $jenis, 'atribut' => [
+        $aset = $this->receive(['jenis_aset_id' => $jenis, 'atribut' => [
             ['tipe_atribut_id' => $daya, 'nilai' => 75.5],
             ['tipe_atribut_id' => $garansi, 'nilai' => true],
         ]]);
 
-        $detail = $this->show($asset)->assertOk();
+        $detail = $this->show($aset)->assertOk();
 
         // Nilai disimpan di kolom bertipe, tetapi disajikan kembali sebagai satu kunci
         // `nilai` sehingga klien tidak perlu tahu kolom mana yang terpakai. Dicari
@@ -97,9 +98,9 @@ class AssetLifecycleTest extends TestCase
         $this->attach($jenis, [['tipe_atribut_id' => $daya]])->assertOk();
         $pabrikan = $this->master('pabrikan-aset', ['nama' => 'Yanmar']);
         $model = $this->master('model-aset', ['nama' => 'YM-200', 'pabrikan_aset_id' => $pabrikan]);
-        $asset = $this->receive(['jenis_aset_id' => $jenis, 'atribut' => [['tipe_atribut_id' => $daya, 'nilai' => 10]]]);
+        $aset = $this->receive(['jenis_aset_id' => $jenis, 'atribut' => [['tipe_atribut_id' => $daya, 'nilai' => 10]]]);
 
-        $this->correct($asset, [
+        $this->correct($aset, [
             'pabrikan_aset_id' => $pabrikan,
             'model_aset_id' => $model,
             'serial_number' => 'SN-9',
@@ -112,7 +113,7 @@ class AssetLifecycleTest extends TestCase
             ->assertJsonPath('data.atribut.0.nilai', fn ($nilai): bool => (float) $nilai === 90.0);
 
         // Atribut diganti, bukan ditumpuk: satu aset tetap satu nilai per atribut.
-        $this->assertSame(1, DB::table('aset_tr_aset_atribut')->where('asset_id', $asset)->count());
+        $this->assertSame(1, DB::table('aset_tr_aset_atribut')->where('aset_id', $aset)->count());
     }
 
     public function test_kombinasi_jenis_pabrikan_dan_model_harus_sesuai_konfigurasi(): void
@@ -135,19 +136,19 @@ class AssetLifecycleTest extends TestCase
             'jenis_aset_id' => $jenisA,
             'pabrikan_aset_id' => $pabrikanB,
             'model_aset_id' => $modelA,
-        ])->assertStatus(422)->assertJsonValidationErrors('model_aset_id');
+        ])->assertStatus(422)->assertJsonValidationErrors('details.0.model_aset_id');
 
         $this->receiveResponse([
             'jenis_aset_id' => $jenisB,
             'pabrikan_aset_id' => $pabrikanA,
             'model_aset_id' => $modelA,
-        ])->assertStatus(422)->assertJsonValidationErrors('model_aset_id');
+        ])->assertStatus(422)->assertJsonValidationErrors('details.0.model_aset_id');
 
         $this->receiveResponse([
             'jenis_aset_id' => $jenisA,
             'pabrikan_aset_id' => $pabrikanA,
             'model_aset_id' => $modelBebas,
-        ])->assertStatus(422)->assertJsonValidationErrors('model_aset_id');
+        ])->assertStatus(422)->assertJsonValidationErrors('details.0.model_aset_id');
 
         $this->receive([
             'jenis_aset_id' => $jenisB,
@@ -155,79 +156,40 @@ class AssetLifecycleTest extends TestCase
             'model_aset_id' => $modelBebas,
         ]);
 
-        $asset = $this->receive([
+        $aset = $this->receive([
             'jenis_aset_id' => $jenisA,
             'pabrikan_aset_id' => $pabrikanA,
             'model_aset_id' => $modelA,
         ]);
-        $this->correct($asset, ['jenis_aset_id' => $jenisB])
+        $this->correct($aset, ['jenis_aset_id' => $jenisB])
             ->assertStatus(422)
             ->assertJsonValidationErrors('model_aset_id');
     }
 
     public function test_group_aset_tidak_dapat_diganti_karena_buku_sudah_terbentuk(): void
     {
-        $asset = $this->receive();
+        $aset = $this->receive();
         $lain = $this->master('group-aset', ['nama' => 'Group lain']);
 
-        $this->correct($asset, ['group_aset_id' => $lain])
+        $this->correct($aset, ['group_aset_id' => $lain])
             ->assertStatus(422)
             ->assertJsonValidationErrors('group_aset_id');
-    }
-
-    public function test_aset_tidak_dapat_ditempatkan_tanpa_buku_dan_profil_efektif(): void
-    {
-        $asset = $this->receive();
-
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
-            ->postJson('/api/modules/management-aset/v1/aset/'.$asset.'/penempatan', [
-                'effective_on' => '2026-06-15',
-                'reason' => 'Mulai dipakai',
-                'usage_org_unit_id' => $this->orgUnitId,
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('group_aset_id');
-
-        $this->assertSame('received', DB::table('aset_tr_penerimaan_aset')->where('id', $asset)->value('lifecycle_state'));
-        $this->assertSame(0, DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->count());
-    }
-
-    public function test_profil_yang_belum_berlaku_menolak_penempatan(): void
-    {
-        $group = $this->master('group-aset', ['nama' => 'Group versi masa depan']);
-        $jenis = $this->master('jenis-aset', ['nama' => 'Jenis versi masa depan']);
-        $profil = $this->master('profil-penyusutan', [
-            'nama' => 'Profil mulai 2027', 'method' => 'straight_line', 'frequency' => 'monthly',
-            'year_basis' => 'calendar', 'useful_life_periods' => 12, 'effective_from' => '2027-01-01',
-        ]);
-        $buku = $this->master('buku-penyusutan', ['nama' => 'Buku versi masa depan', 'depreciation_profile_id' => $profil]);
-        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'))
-            ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [['buku_id' => $buku]]])
-            ->assertOk();
-        $asset = $this->receive(['group_aset_id' => $group, 'jenis_aset_id' => $jenis]);
-
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
-            ->postJson('/api/modules/management-aset/v1/aset/'.$asset.'/penempatan', [
-                'effective_on' => '2026-06-15', 'reason' => 'Mulai dipakai', 'usage_org_unit_id' => $this->orgUnitId,
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('effective_on');
     }
 
     public function test_aset_tidak_dapat_menjadi_induk_dirinya_sendiri(): void
     {
-        $asset = $this->receive();
+        $aset = $this->receive();
 
-        $this->correct($asset, ['parent_asset_id' => $asset])->assertStatus(422);
+        $this->correct($aset, ['induk_aset_id' => $aset])->assertStatus(422);
     }
 
     public function test_tanggal_mulai_digunakan_menggeser_awal_penyusutan_selama_belum_ada_periode(): void
     {
-        $book = $this->bookedAsset(convention: 'full_month');
-        $asset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('asset_id');
+        $book = $this->bookedAset(convention: 'full_month');
+        $aset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('aset_id');
         $this->assertSame('2026-06-01', $this->startDate($book));
 
-        $this->correct($asset, ['placed_in_service_on' => '2026-09-20'])->assertOk();
+        $this->correct($aset, ['placed_in_service_on' => '2026-09-20'])->assertOk();
 
         // Konvensi bulan penuh menarik tanggalnya ke awal bulan pemakaian.
         $this->assertSame('2026-09-01', $this->startDate($book));
@@ -235,28 +197,28 @@ class AssetLifecycleTest extends TestCase
 
     public function test_nilai_perolehan_tidak_dapat_diubah_setelah_ada_periode_penyusutan(): void
     {
-        $book = $this->bookedAsset();
-        $asset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('asset_id');
+        $book = $this->bookedAset();
+        $aset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('aset_id');
         $this->propose($book, '2026-07-01', '2026-07-31')->assertCreated();
 
-        $this->correct($asset, ['acquisition_value' => 5_000_000])->assertStatus(409);
+        $this->correct($aset, ['acquisition_value' => 5_000_000])->assertStatus(409);
 
         // Sebelum ada periode, koreksi nilai ikut menyesuaikan buku asetnya.
-        $lain = $this->bookedAsset();
-        $asetLain = (string) DB::table('aset_tr_buku_aset')->where('id', $lain)->value('asset_id');
+        $lain = $this->bookedAset();
+        $asetLain = (string) DB::table('aset_tr_buku_aset')->where('id', $lain)->value('aset_id');
         $this->correct($asetLain, ['acquisition_value' => 2_400_000])->assertOk();
         $this->assertSame(2_400_000.0, (float) DB::table('aset_tr_buku_aset')->where('id', $lain)->value('net_book_value'));
     }
 
     public function test_penjualan_melepas_aset_dan_menutup_bukunya(): void
     {
-        $book = $this->bookedAsset();
-        $asset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('asset_id');
-        $this->decommission($asset);
+        $book = $this->bookedAset();
+        $aset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('aset_id');
+        $this->decommission($aset);
 
-        $this->document('penjualan-aset', $asset, '2026-08-31')->assertCreated();
+        $this->document('penjualan-aset', $aset, '2026-08-31')->assertCreated();
 
-        $this->assertSame('disposed', DB::table('aset_tr_penerimaan_aset')->where('id', $asset)->value('lifecycle_state'));
+        $this->assertSame('disposed', DB::table('aset_tr_aset')->where('id', $aset)->value('lifecycle_state'));
         $this->assertSame('closed', DB::table('aset_tr_buku_aset')->where('id', $book)->value('status'));
         $this->assertSame('2026-08-31', substr((string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('closed_on'), 0, 10));
 
@@ -266,20 +228,20 @@ class AssetLifecycleTest extends TestCase
 
     public function test_aset_yang_sudah_dilepas_tidak_dapat_dikoreksi(): void
     {
-        $book = $this->bookedAsset();
-        $asset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('asset_id');
-        $this->decommission($asset);
-        $this->document('pemusnahan-aset', $asset, '2026-08-31')->assertCreated();
+        $book = $this->bookedAset();
+        $aset = (string) DB::table('aset_tr_buku_aset')->where('id', $book)->value('aset_id');
+        $this->decommission($aset);
+        $this->document('pemusnahan-aset', $aset, '2026-08-31')->assertCreated();
 
-        $this->correct($asset, ['serial_number' => 'SN-baru'])->assertStatus(409);
+        $this->correct($aset, ['serial_number' => 'SN-baru'])->assertStatus(409);
     }
 
     public function test_proposal_massal_membuat_periode_untuk_seluruh_buku_aktif(): void
     {
-        $books = [$this->bookedAsset(), $this->bookedAsset(), $this->bookedAsset()];
+        $books = [$this->bookedAset(), $this->bookedAset(), $this->bookedAset()];
         // Satu buku sudah diusulkan lebih dahulu, satu lagi asetnya sudah dilepas.
         $this->propose($books[0], '2026-07-01', '2026-07-31')->assertCreated();
-        $dilepas = (string) DB::table('aset_tr_buku_aset')->where('id', $books[2])->value('asset_id');
+        $dilepas = (string) DB::table('aset_tr_buku_aset')->where('id', $books[2])->value('aset_id');
         $this->decommission($dilepas);
         $this->document('penjualan-aset', $dilepas, '2026-06-30')->assertCreated();
 
@@ -291,17 +253,17 @@ class AssetLifecycleTest extends TestCase
         // Hanya buku kedua yang tersisa; yang sudah punya periode dilewati dengan alasan,
         // yang sudah ditutup tidak ikut terpilih sama sekali.
         $this->assertSame(1, $response->json('data.dibuat'));
-        $this->assertSame($books[1], $response->json('data.periode.0.asset_book_id'));
+        $this->assertSame($books[1], $response->json('data.periode.0.buku_aset_id'));
         $this->assertSame('sudah_ada', $response->json('data.rincian_dilewati.0.reason'));
         $this->assertSame(2, DB::table('aset_tr_penyusutan_aset')->count());
     }
 
     public function test_proposal_massal_dapat_disaring_per_group(): void
     {
-        $satu = $this->bookedAsset();
-        $dua = $this->bookedAsset();
-        $group = (string) DB::table('aset_tr_penerimaan_aset')
-            ->where('id', DB::table('aset_tr_buku_aset')->where('id', $satu)->value('asset_id'))
+        $satu = $this->bookedAset();
+        $dua = $this->bookedAset();
+        $group = (string) DB::table('aset_tr_aset')
+            ->where('id', DB::table('aset_tr_buku_aset')->where('id', $satu)->value('aset_id'))
             ->value('group_aset_id');
 
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
@@ -309,13 +271,13 @@ class AssetLifecycleTest extends TestCase
                 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31', 'group_aset_id' => $group,
             ])->assertCreated()->assertJsonPath('data.dibuat', 1);
 
-        $this->assertSame(1, DB::table('aset_tr_penyusutan_aset')->where('asset_book_id', $satu)->count());
-        $this->assertSame(0, DB::table('aset_tr_penyusutan_aset')->where('asset_book_id', $dua)->count());
+        $this->assertSame(1, DB::table('aset_tr_penyusutan_aset')->where('buku_aset_id', $satu)->count());
+        $this->assertSame(0, DB::table('aset_tr_penyusutan_aset')->where('buku_aset_id', $dua)->count());
     }
 
     public function test_proposal_massal_tidak_menyentuh_tenant_lain(): void
     {
-        $this->bookedAsset();
+        $this->bookedAset();
 
         $this->sebagaiPengguna((string) Str::ulid(), ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal-massal', [
@@ -328,7 +290,7 @@ class AssetLifecycleTest extends TestCase
     // ---- penyusun skenario -------------------------------------------------
 
     /** Aset lengkap dengan satu buku penyusutan; mengembalikan id buku asetnya. */
-    private function bookedAsset(string $convention = 'full_month'): string
+    private function bookedAset(string $convention = 'full_month'): string
     {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(6)]);
         $jenis = $this->master('jenis-aset', ['nama' => 'Jenis '.Str::random(6)]);
@@ -341,15 +303,18 @@ class AssetLifecycleTest extends TestCase
             ->putJson('/api/modules/management-aset/v1/group-aset/'.$group.'/buku-penyusutan', ['rows' => [[
                 'buku_id' => $buku, 'useful_life_periods' => 12, 'convention' => $convention,
             ]]])->assertOk();
-        $asset = $this->receive(['group_aset_id' => $group, 'jenis_aset_id' => $jenis]);
+        $aset = $this->receive(['group_aset_id' => $group, 'jenis_aset_id' => $jenis]);
 
-        return (string) DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
+        return (string) DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->value('id');
     }
 
     /** @param array<string, mixed> $overrides */
     private function receive(array $overrides = []): string
     {
-        return (string) $this->receiveResponse($overrides)->assertCreated()->json('data.id');
+        $penerimaan = (string) $this->receiveResponse($overrides)->assertCreated()->json('data.id');
+        $this->selesaikanPenerimaan($this->tenantId, $penerimaan)->assertOk();
+
+        return (string) DB::table('aset_tr_aset')->where('penerimaan_aset_id', $penerimaan)->value('id');
     }
 
     /**
@@ -364,20 +329,18 @@ class AssetLifecycleTest extends TestCase
         $group = $overrides['group_aset_id'] ?? $this->master('group-aset', ['nama' => 'Group '.Str::random(6)]);
         $jenis = $overrides['jenis_aset_id'] ?? $this->master('jenis-aset', ['nama' => 'Jenis '.Str::random(6)]);
 
-        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => $this->legalEntityId,
-                'nama' => $overrides['nama'] ?? 'Aset lifecycle uji',
-                'group_aset_id' => $group,
-                'jenis_aset_id' => $jenis,
-                'pabrikan_aset_id' => $overrides['pabrikan_aset_id'] ?? null,
-                'model_aset_id' => $overrides['model_aset_id'] ?? null,
-                'acquired_on' => '2026-06-01', 'placed_in_service_on' => '2026-06-15',
-                'acquisition_value' => 1_200_000, 'currency_code' => 'IDR',
-                'usage_org_unit_id' => $this->orgUnitId,
-                'atribut' => $overrides['atribut'] ?? [],
-            ]);
+        return $this->drafPenerimaan($this->tenantId, [
+            'legal_entity_id' => $this->legalEntityId,
+            'nama' => $overrides['nama'] ?? 'Aset lifecycle uji',
+            'group_aset_id' => $group,
+            'jenis_aset_id' => $jenis,
+            'pabrikan_aset_id' => $overrides['pabrikan_aset_id'] ?? null,
+            'model_aset_id' => $overrides['model_aset_id'] ?? null,
+            'acquired_on' => '2026-06-01', 'placed_in_service_on' => '2026-06-15',
+            'acquisition_value' => 1_200_000, 'currency_code' => 'IDR',
+            'usage_org_unit_id' => $this->orgUnitId,
+            'atribut' => $overrides['atribut'] ?? [],
+        ]);
     }
 
     private function fiscalReference(): string
@@ -386,7 +349,7 @@ class AssetLifecycleTest extends TestCase
         DB::table('aset_m_kelompok_harta_fiskal')->insert([
             'id' => $id,
             'tenant_id' => $this->tenantId,
-            'template_key' => 'test:asset-fiscal-'.Str::ulid(),
+            'template_key' => 'test:aset-fiscal-'.Str::ulid(),
             'jurisdiction' => 'ID',
             'label' => 'Kelompok aset uji',
             'effective_from' => '2023-07-17',
@@ -404,20 +367,20 @@ class AssetLifecycleTest extends TestCase
     }
 
     /** @return TestResponse<Response> */
-    private function show(string $assetId): TestResponse
+    private function show(string $asetId): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'])
-            ->getJson('/api/modules/management-aset/v1/aset/'.$assetId);
+            ->getJson('/api/modules/management-aset/v1/aset/'.$asetId);
     }
 
     /**
      * @param  array<string, mixed>  $payload
      * @return TestResponse<Response>
      */
-    private function correct(string $assetId, array $payload): TestResponse
+    private function correct(string $asetId, array $payload): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.update'])
-            ->patchJson('/api/modules/management-aset/v1/aset/'.$assetId, $payload);
+            ->patchJson('/api/modules/management-aset/v1/aset/'.$asetId, $payload);
     }
 
     /** @return TestResponse<Response> */
@@ -425,25 +388,25 @@ class AssetLifecycleTest extends TestCase
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', [
-                'asset_book_id' => $bookId, 'period_starts_on' => $start, 'period_ends_on' => $end,
+                'buku_aset_id' => $bookId, 'period_starts_on' => $start, 'period_ends_on' => $end,
             ]);
     }
 
     /** Melewati workflow Core: penjualan mensyaratkan aset sudah terdekomisioning. */
-    private function decommission(string $assetId): void
+    private function decommission(string $asetId): void
     {
-        DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->update(['lifecycle_state' => 'decommissioned']);
+        DB::table('aset_tr_aset')->where('id', $asetId)->update(['lifecycle_state' => 'decommissioned']);
     }
 
     /** @return TestResponse<Response> */
-    private function document(string $type, string $assetId, string $tanggal): TestResponse
+    private function document(string $type, string $asetId, string $tanggal): TestResponse
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.'.$type.'.create'])
             ->withHeader('Idempotency-Key', $type.'-'.Str::ulid())
             ->postJson('/api/modules/management-aset/v1/'.$type, [
                 'legal_entity_id' => $this->legalEntityId,
                 'responsible_org_unit_id' => $this->orgUnitId,
-                'asset_id' => $assetId, 'tanggal' => $tanggal,
+                'aset_id' => $asetId, 'tanggal' => $tanggal,
             ]);
     }
 

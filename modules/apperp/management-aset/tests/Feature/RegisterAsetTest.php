@@ -7,13 +7,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
 use Tests\TestCase;
 
-class AssetRegisterTest extends TestCase
+class RegisterAsetTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, MenerimaAset, RefreshDatabase;
 
     private string $tenantId;
+
+    /** Badan hukum aset uji; dokumen mutasi harus menyebut yang sama. */
+    private string $legalEntityId;
 
     protected function setUp(): void
     {
@@ -34,39 +38,54 @@ class AssetRegisterTest extends TestCase
         $receiver = (string) Str::ulid();
         $custodian = (string) Str::ulid();
 
-        $response = $this->sebagaiPengguna($this->tenantId, [
-            'management-aset.aset.read', 'management-aset.aset.create', 'management-aset.aset.mutate',
-        ])->withHeader('Idempotency-Key', 'receipt-1')->postJson('/api/modules/management-aset/v1/aset', [
+        $asetId = $this->terimaAset($this->tenantId, [
             'legal_entity_id' => $legalEntity, 'nama' => 'Aset uji penerimaan', ...$classification,
             'acquired_on' => '2026-07-28', 'acquisition_value' => 12000000,
             'currency_code' => 'IDR', 'receiving_org_unit_id' => $receivingUnit,
             'usage_org_unit_id' => $usageUnit, 'received_by_user_id' => $receiver,
             'custodian_user_id' => $custodian,
-        ])->assertCreated()->assertJsonPath('data.kode', $this->awalanNomor('management-aset.aset').'-000001');
+        ]);
 
-        $assetId = $response->json('data.id');
+        // Kode aset tetap dari number sequence `management-aset.aset`, bukan diturunkan
+        // dari nomor dokumennya: ia kunci alami yang dipakai seumur hidup aset.
+        $this->assertDatabaseHas('aset_tr_aset', [
+            'id' => $asetId, 'kode' => $this->awalanNomor('management-aset.aset').'-000001',
+        ]);
         $this->assertDatabaseHas('aset_tr_penempatan_aset', [
-            'tenant_id' => $this->tenantId, 'asset_id' => $assetId,
+            'tenant_id' => $this->tenantId, 'aset_id' => $asetId,
             'receiving_org_unit_id' => $receivingUnit, 'usage_org_unit_id' => $usageUnit,
             'received_by_user_id' => $receiver, 'custodian_user_id' => $custodian,
         ]);
-        $this->assertSame(1, $this->jumlahNomorTerbit(), 'Penerbitan nomor tidak terjadi.');
+        // Dua nomor, bukan satu: satu untuk dokumen penerimaannya, satu untuk asetnya.
+        $this->assertSame(2, $this->jumlahNomorTerbit(), 'Penerbitan nomor tidak terjadi.');
     }
 
     public function test_mutation_adds_history_instead_of_rewriting_receipt(): void
     {
-        $assetId = $this->receive();
+        $asetId = $this->receive();
         $newUnit = (string) Str::ulid();
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
-            ->postJson('/api/modules/management-aset/v1/aset/'.$assetId.'/penempatan', [
-                'effective_on' => '2026-08-01', 'reason' => 'Pindah pengguna', 'usage_org_unit_id' => $newUnit,
-            ])->assertOk();
+
+        // Lewat dokumen mutasi sejak `POST /aset/{id}/penempatan` dipensiunkan. Yang dijaga
+        // tetap sama: penerimaan tidak ditulis ulang, riwayatnya bertambah satu baris.
+        $mutasi = (string) $this->sebagaiPengguna($this->tenantId, ['management-aset.mutasi-aset.create'])
+            ->withHeader('Idempotency-Key', 'mutasi-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/mutasi-aset', [
+                'legal_entity_id' => $this->legalEntityId,
+                'responsible_org_unit_id' => $newUnit,
+                'tanggal' => '2026-08-01',
+                'tujuan_org_unit_id' => $newUnit,
+                'alasan' => 'Pindah pengguna',
+                'details' => [['aset_id' => $asetId]],
+            ])->assertCreated()->json('data.id');
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate', 'management-aset.mutasi-aset.read'])
+            ->postJson('/api/modules/management-aset/v1/mutasi-aset/'.$mutasi.'/selesaikan', ['version' => 1])
+            ->assertOk();
 
         $this->assertDatabaseCount('aset_tr_penempatan_aset', 2);
-        $this->assertDatabaseHas('aset_tr_penempatan_aset', ['asset_id' => $assetId, 'usage_org_unit_id' => $newUnit, 'effective_on' => '2026-08-01']);
+        $this->assertDatabaseHas('aset_tr_penempatan_aset', ['aset_id' => $asetId, 'usage_org_unit_id' => $newUnit, 'effective_on' => '2026-08-01']);
     }
 
-    public function test_register_hides_assets_outside_the_signed_operating_unit_scope(): void
+    public function test_register_hides_aset_outside_the_signed_operating_unit_scope(): void
     {
         $firstLegalEntity = (string) Str::ulid();
         $secondLegalEntity = (string) Str::ulid();
@@ -80,15 +99,15 @@ class AssetRegisterTest extends TestCase
         // Klasifikasi tidak diuji di sini; satu pasang dipakai bersama agar yang tersaring
         // benar-benar berasal dari legal entity dan operating unit.
         $scopeClassification = $this->classification();
-        DB::table('aset_tr_penerimaan_aset')->insert([
+        DB::table('aset_tr_aset')->insert([
             ['id' => $first, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-a', 'kode' => 'AST-SCOPE-A', 'nama' => 'Aset scope A', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
             ['id' => $second, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-b', 'kode' => 'AST-SCOPE-B', 'nama' => 'Aset scope B', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
             ['id' => $crossFirst, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-c', 'kode' => 'AST-SCOPE-C', 'nama' => 'Aset scope C', 'legal_entity_id' => $firstLegalEntity, 'responsible_org_unit_id' => $secondUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
             ['id' => $crossSecond, 'tenant_id' => $this->tenantId, 'creation_key' => 'scope-d', 'kode' => 'AST-SCOPE-D', 'nama' => 'Aset scope D', 'legal_entity_id' => $secondLegalEntity, 'responsible_org_unit_id' => $firstUnit, ...$scopeClassification, 'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'created_at' => $now, 'updated_at' => $now],
         ]);
         $lingkup = [
-            ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $firstLegalEntity, 'organization_id' => $firstUnit],
-            ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $secondLegalEntity, 'organization_id' => $secondUnit],
+            ['policy_code' => 'management-aset.aset-responsibility', 'legal_entity_id' => $firstLegalEntity, 'organization_id' => $firstUnit],
+            ['policy_code' => 'management-aset.aset-responsibility', 'legal_entity_id' => $secondLegalEntity, 'organization_id' => $secondUnit],
         ];
         $data = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read'], $lingkup)->getJson('/api/modules/management-aset/v1/aset')->assertOk()->json('data');
         $this->assertEqualsCanonicalizing([$first, $second], array_column($data, 'id'));
@@ -122,16 +141,16 @@ class AssetRegisterTest extends TestCase
         $this->sebagaiPenggunaBernama('pemeriksa', $this->tenantId, []);
         $idPemeriksa = $this->idKeanggotaan('pemeriksa', $this->tenantId);
 
-        $assetId = $this->receive();
-        $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
-        $this->siapkanWorkflowDekomisioning($this->tenantId, (string) $asset->legal_entity_id, $idPemeriksa);
+        $asetId = $this->receive();
+        $aset = DB::table('aset_tr_aset')->where('id', $asetId)->first();
+        $this->siapkanWorkflowDekomisioning($this->tenantId, (string) $aset->legal_entity_id, $idPemeriksa);
 
         $dokumen = $this->sebagaiPenggunaBernama('pengaju', $this->tenantId, ['management-aset.dekomisioning-aset.create'])
             ->withHeader('Idempotency-Key', 'decommission-1')
             ->postJson('/api/modules/management-aset/v1/dekomisioning-aset', [
-                'legal_entity_id' => $asset->legal_entity_id,
-                'responsible_org_unit_id' => $asset->responsible_org_unit_id,
-                'tanggal' => '2026-08-03', 'asset_id' => $assetId,
+                'legal_entity_id' => $aset->legal_entity_id,
+                'responsible_org_unit_id' => $aset->responsible_org_unit_id,
+                'tanggal' => '2026-08-03', 'aset_id' => $asetId,
             ])->assertCreated()->json('data');
 
         // Dokumen dan instance lahir bersama-sama. Sebelum F3-09 keduanya bisa terpisah:
@@ -148,7 +167,7 @@ class AssetRegisterTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseHas('aset_tr_dokumen_siklus_aset', ['id' => $dokumen['id'], 'status' => 'approved']);
-        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $assetId, 'lifecycle_state' => 'decommissioned']);
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $asetId, 'lifecycle_state' => 'decommissioned']);
         $this->assertDatabaseHas('workflow_instances', ['id' => $dokumen['workflow_instance_id'], 'status' => 'approved']);
         $this->assertDatabaseCount('aset_processed_core_events', 1);
     }
@@ -170,21 +189,21 @@ class AssetRegisterTest extends TestCase
     {
         Http::preventStrayRequests();
 
-        $assetId = $this->receive();
-        $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
-        $this->siapkanWorkflowDekomisioning($this->tenantId, (string) $asset->legal_entity_id, null);
+        $asetId = $this->receive();
+        $aset = DB::table('aset_tr_aset')->where('id', $asetId)->first();
+        $this->siapkanWorkflowDekomisioning($this->tenantId, (string) $aset->legal_entity_id, null);
 
         $dokumen = $this->sebagaiPengguna($this->tenantId, ['management-aset.dekomisioning-aset.create'])
             ->withHeader('Idempotency-Key', 'decommission-langsung')
             ->postJson('/api/modules/management-aset/v1/dekomisioning-aset', [
-                'legal_entity_id' => $asset->legal_entity_id,
-                'responsible_org_unit_id' => $asset->responsible_org_unit_id,
-                'tanggal' => '2026-08-03', 'asset_id' => $assetId,
+                'legal_entity_id' => $aset->legal_entity_id,
+                'responsible_org_unit_id' => $aset->responsible_org_unit_id,
+                'tanggal' => '2026-08-03', 'aset_id' => $asetId,
             ])->assertCreated()->json('data');
 
         $this->assertSame('approved', $dokumen['status']);
         $this->assertNotNull($dokumen['workflow_instance_id']);
-        $this->assertDatabaseHas('aset_tr_penerimaan_aset', ['id' => $assetId, 'lifecycle_state' => 'decommissioned']);
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $asetId, 'lifecycle_state' => 'decommissioned']);
     }
 
     /**
@@ -201,16 +220,16 @@ class AssetRegisterTest extends TestCase
     {
         Http::preventStrayRequests();
 
-        $assetId = $this->receive();
-        $asset = DB::table('aset_tr_penerimaan_aset')->where('id', $assetId)->first();
+        $asetId = $this->receive();
+        $aset = DB::table('aset_tr_aset')->where('id', $asetId)->first();
         $sebelum = $this->jumlahNomorTerbit();
 
         $this->sebagaiPengguna($this->tenantId, ['management-aset.dekomisioning-aset.create'])
             ->withHeader('Idempotency-Key', 'decommission-tanpa-workflow')
             ->postJson('/api/modules/management-aset/v1/dekomisioning-aset', [
-                'legal_entity_id' => $asset->legal_entity_id,
-                'responsible_org_unit_id' => $asset->responsible_org_unit_id,
-                'tanggal' => '2026-08-03', 'asset_id' => $assetId,
+                'legal_entity_id' => $aset->legal_entity_id,
+                'responsible_org_unit_id' => $aset->responsible_org_unit_id,
+                'tanggal' => '2026-08-03', 'aset_id' => $asetId,
             ])->assertStatus(422);
 
         $this->assertSame(0, DB::table('aset_tr_dokumen_siklus_aset')->count(), 'Dokumen tersimpan padahal pengajuannya gagal.');
@@ -221,33 +240,27 @@ class AssetRegisterTest extends TestCase
      * Group yang sengaja tidak disusutkan: buku tetap terbentuk sebagai baris subledger,
      * tetapi tidak menuntut profil apa pun dan tidak menahan aset di status `received`.
      */
-    public function test_group_without_depreciation_still_lets_the_asset_be_placed(): void
+    public function test_group_without_depreciation_still_lets_the_aset_be_placed(): void
     {
         $classification = $this->classification();
         $this->configureNonDepreciatingBook($classification['group_aset_id']);
 
-        $assetId = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'receipt-register-only')->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset tanpa penyusutan', ...$classification,
-                'acquired_on' => '2026-07-28', 'acquisition_value' => 9000000,
-                'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
-            ])->assertCreated()->json('data.id');
-
-        $this->assertDatabaseHas('aset_tr_buku_aset', [
-            'asset_id' => $assetId, 'depreciate' => false, 'depreciation_profile_id' => null,
+        $asetId = $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset tanpa penyusutan', ...$classification,
+            'acquired_on' => '2026-07-28', 'acquisition_value' => 9000000,
+            'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
         ]);
 
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
-            ->postJson('/api/modules/management-aset/v1/aset/'.$assetId.'/penempatan', [
-                'effective_on' => '2026-08-01', 'reason' => 'Penempatan awal', 'usage_org_unit_id' => (string) Str::ulid(),
-            ])->assertOk();
+        $this->assertDatabaseHas('aset_tr_buku_aset', [
+            'aset_id' => $asetId, 'depreciate' => false, 'depreciation_profile_id' => null,
+        ]);
     }
 
     /**
      * Ambang kapitalisasi memakai jalur yang sama: aset murah tidak menyusut, dan
      * karenanya juga tidak boleh dituntut punya profil yang berlaku saat ditempatkan.
      */
-    public function test_asset_below_capitalization_threshold_is_placed_without_a_profile(): void
+    public function test_aset_below_capitalization_threshold_is_placed_without_a_profile(): void
     {
         $classification = $this->classification();
         $this->configureNonDepreciatingBook($classification['group_aset_id'], depreciate: true);
@@ -255,19 +268,13 @@ class AssetRegisterTest extends TestCase
             ->where(['tenant_id' => $this->tenantId, 'id' => $classification['group_aset_id']])
             ->update(['capitalization_threshold' => 1000000]);
 
-        $assetId = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'receipt-below-threshold')->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset di bawah ambang', ...$classification,
-                'acquired_on' => '2026-07-28', 'acquisition_value' => 400000,
-                'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
-            ])->assertCreated()->json('data.id');
+        $asetId = $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset di bawah ambang', ...$classification,
+            'acquired_on' => '2026-07-28', 'acquisition_value' => 400000,
+            'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
+        ]);
 
-        $this->assertDatabaseHas('aset_tr_buku_aset', ['asset_id' => $assetId, 'depreciate' => false]);
-
-        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate'])
-            ->postJson('/api/modules/management-aset/v1/aset/'.$assetId.'/penempatan', [
-                'effective_on' => '2026-08-01', 'reason' => 'Penempatan awal', 'usage_org_unit_id' => (string) Str::ulid(),
-            ])->assertOk();
+        $this->assertDatabaseHas('aset_tr_buku_aset', ['aset_id' => $asetId, 'depreciate' => false]);
     }
 
     /** Buku tanpa profil yang memang menghitung tetap ditolak; pagar itu tidak ikut dilepas. */
@@ -276,14 +283,16 @@ class AssetRegisterTest extends TestCase
         $classification = $this->classification();
         $this->configureNonDepreciatingBook($classification['group_aset_id'], depreciate: true);
 
-        $assetId = $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'receipt-missing-profile')->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset tanpa profil', ...$classification,
-                'acquired_on' => '2026-07-28', 'acquisition_value' => 9000000,
-                'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
-            ])->assertStatus(422)->json('data.id');
+        // Draf tetap boleh tersimpan: buku dan profil baru dituntut saat aset benar-benar
+        // lahir, dan di situlah penolakannya jatuh.
+        $penerimaan = $this->drafPenerimaan($this->tenantId, [
+            'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset tanpa profil', ...$classification,
+            'acquired_on' => '2026-07-28', 'acquisition_value' => 9000000,
+            'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
+        ])->assertCreated()->json('data.id');
 
-        $this->assertNull($assetId);
+        $this->selesaikanPenerimaan($this->tenantId, (string) $penerimaan)->assertStatus(422);
+        $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $penerimaan)->count());
     }
 
     private function receive(): string
@@ -291,11 +300,12 @@ class AssetRegisterTest extends TestCase
         $classification = $this->classification();
         $this->configureReadyBook($classification['group_aset_id']);
 
-        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'receipt-test')->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => (string) Str::ulid(), 'nama' => 'Aset uji', ...$classification,
-                'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
-            ])->assertCreated()->json('data.id');
+        $this->legalEntityId = (string) Str::ulid();
+
+        return $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => $this->legalEntityId, 'nama' => 'Aset uji', ...$classification,
+            'acquired_on' => '2026-07-28', 'acquisition_value' => 1, 'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
+        ]);
     }
 
     /**

@@ -350,7 +350,7 @@ export default function RecordDetailPane({
                     canArchive={permissions.includes(
                         permission('model-aset', 'archive'),
                     )}
-                    canReadAssets={permissions.includes(
+                    canReadAset={permissions.includes(
                         'management-aset.aset.read',
                     )}
                     onChanged={() =>

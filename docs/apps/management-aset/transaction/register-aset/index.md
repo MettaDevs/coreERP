@@ -8,7 +8,7 @@ Register aset adalah **catatan satu barang fisik milik perusahaan**, sejak diter
 
 ```mermaid
 graph TD
-    subgraph ASET["Satu Baris Aset (tr_penerimaan_aset)"]
+    subgraph ASET["Satu Baris Aset (tr_aset)"]
         KODE["Kode Aset (Number Sequence Core)"]
         NAMA["Nama Aset (Identitas Deskriptif)"]
         STATE["Lifecycle State: received, in_use, decommissioned, disposed"]
@@ -47,23 +47,29 @@ Dulu keduanya tersusun sebagai rantai `group → kategori → jenis`. Susunan it
 
 ## Perjalanan hidup satu aset
 
-Kolomnya `lifecycle_state`. Hanya empat nilai, dan hanya kode tertentu yang boleh mengubahnya:
+Kolomnya `lifecycle_state`. Tiga nilai yang hidup, dan hanya kode tertentu yang boleh mengubahnya:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> received: POST /aset (Penerimaan)
-    received --> in_use: POST /aset/{id}/penempatan (Mutasi Pertama)
-    in_use --> decommissioned: Persetujuan Workflow Core (core.workflow.decision.v2)
+    [*] --> received: POST /penerimaan-aset/{id}/selesaikan
+    received --> decommissioned: Persetujuan Workflow Core (core.workflow.decision.v2)
     decommissioned --> disposed: Dokumen Penjualan / Pemusnahan
     disposed --> [*]
 ```
 
 | Status | Artinya | Diubah oleh |
 | --- | --- | --- |
-| `received` | Sudah tercatat, belum ditempatkan | Otomatis saat aset dibuat |
-| `in_use` | Sudah ditempatkan di unit kerja dan aktif dipakai | `POST /aset/{id}/penempatan` |
+| `received` | Sudah tercatat sebagai aset | Otomatis saat aset dibuat |
 | `decommissioned` | Disetujui untuk dihentikan pemakaiannya | Keputusan workflow dari Core |
 | `disposed` | Sudah dijual atau dimusnahkan | Dokumen penjualan / pemusnahan |
+
+::: warning `in_use` tidak lagi ditulis
+Sampai 17 September 2026 ada nilai keempat, `in_use`, dan diagram di halaman ini menggambarkan `in_use --> decommissioned` seolah aset harus dipakai dulu sebelum boleh didekomisioning. **Itu tidak pernah benar.** Tidak satu pun pemeriksaan di kode menyebut `in_use`; ketujuh pembaca `lifecycle_state` hanya menanyakan `decommissioned` atau `disposed`, dan aset `received` selalu bisa langsung didekomisioning.
+
+Yang menulis `in_use` hanya `POST /aset/{id}/penempatan`, sehingga nilainya juga terbalik dari namanya: aset yang dipakai harian tetapi tidak pernah dimutasi selamanya `received`, sedangkan aset yang dimutasi ke gudang penyimpanan berlabel "Digunakan". Endpoint itu dan penulisan `in_use` sama-sama dibuang.
+
+Pertanyaan "aset ini sudah dipakai atau belum" dijawab `placed_in_service_on`, yang memang dibaca — ia menentukan `depreciation_start_on` tiap buku. Baris lama yang terlanjur bernilai `in_use` dibiarkan apa adanya dan tetap punya labelnya di layar.
+:::
 
 Arahnya satu jalan. Yang perlu diingat saat menulis kode baru:
 - Aset `decommissioned` atau `disposed` **tidak bisa dimutasi** lagi.
@@ -76,7 +82,7 @@ Status `decommissioned` tidak diputuskan app ini. Ia datang dari keputusan workf
 
 ## Data yang disimpan
 
-Tabel utamanya `aset_tr_penerimaan_aset`, dan model PHP-nya `Asset`. Namanya menyebut kejadian penerimaannya, bukan asetnya — peninggalan penggantian nama tabel yang belum dirapikan, dan sering menyulitkan waktu mencari.
+Tabel utamanya `aset_tr_aset`, dan model PHP-nya `Aset`. Sampai 18 September 2026 tabel itu bernama `aset_tr_penerimaan_aset`: namanya menyebut kejadian penerimaannya, bukan asetnya. Nama itu kini dipakai dokumen penerimaan yang memang berhak atasnya, dan registernya memakai nama bendanya.
 
 Kolom yang perlu Anda kenali:
 
@@ -110,67 +116,130 @@ Semuanya di bawah `/api/v1`:
 | Endpoint | Gunanya | Permission |
 | --- | --- | --- |
 | `GET /aset` | Daftar aset, mendukung `?q=` (kode, nama, serial), filter status | `aset.read` |
-| `POST /aset` | Menerima aset baru (wajib `Idempotency-Key`) | `aset.create` |
+| `POST /penerimaan-aset` | Draf dokumen penerimaan (wajib `Idempotency-Key`) | `penerimaan-aset.create` |
+| `POST /penerimaan-aset/{id}/selesaikan` | Melahirkan asetnya; satu unit satu aset bernomor | `aset.create` |
+| `GET /penerimaan-aset/{id}/ringkasan` | Berapa aset yang akan lahir, dan mana yang tak akan disusutkan | `penerimaan-aset.read` |
+| `PUT /penerimaan-aset/{id}/aset` | Mengisi nomor seri seluruh aset dokumen sekaligus | `aset.update` |
 | `GET /aset/{id}` | Detail aset lengkap dengan nilai atribut dan bukunya | `aset.read` |
 | `PATCH /aset/{id}` | Koreksi data aset | `aset.update` |
 | `GET /aset/{id}/history` | Riwayat penempatan dan mutasi | `aset.read` |
-| `POST /aset/{id}/penempatan` | Memindahkan aset ke lokasi atau unit lain | `aset.mutate` |
+| `POST /mutasi-aset/{id}/selesaikan` | Memindahkan aset ke lokasi atau unit lain | `aset.mutate` |
 
 ---
 
 ## Contoh Permintaan dan Respons
 
-### 1. Menerima Aset Baru dengan Atribut Dinamis
+### 1. Menerima Aset: Satu Dokumen, Dua Puluh Kursi
+
+Dua langkah, seperti mutasi: susun dokumennya, lalu selesaikan. Draf belum melahirkan aset
+apa pun, dan itulah kesempatan terakhir memperbaikinya — nomor aset tidak dapat ditarik
+kembali setelah terbit.
+
+Nilai diisi **per unit**, bukan total. Ambang kapitalisasi dibandingkan terhadap nilai satu
+aset: dua puluh kursi lima ratus ribu tidak melewati ambang sepuluh juta hanya karena datang
+bersamaan.
 
 ```http
-POST /api/modules/management-aset/v1/aset HTTP/1.1
+POST /api/modules/management-aset/v1/penerimaan-aset HTTP/1.1
 Host: localhost:8000
 Idempotency-Key: f47ac10b-58cc-4372-a567-0e02b2c3d479
 Content-Type: application/json
 
 {
-  "nama": "Generator Diesel 50kVA Cummins",
-  "group_aset_id": "01JMB8W3Z9E4T0K1M9P5A2Q3R1",
-  "jenis_aset_id": "01JMB8W4A1B2C3D4E5F6G7H8J9",
-  "kondisi_aset_id": "01JMB8W5P8Q7R6S5T4U3V2W1X0",
-  "pabrikan_aset_id": "01JMB8W6M1N2P3Q4R5S6T7U8V9",
-  "model_aset_id": "01JMB8W7A9B8C7D6E5F4G3H2J1",
-  "serial_number": "CUM-2026-99182",
-  "acquired_on": "2026-03-01",
-  "placed_in_service_on": "2026-03-15",
-  "acquisition_value": 150000000.00,
-  "residual_value": 15000000.00,
+  "legal_entity_id": "01JMB8LE0001",
+  "responsible_org_unit_id": "01JMB8W8K2L3M4N5P6Q7R8S9T0",
+  "tanggal": "2026-03-01",
+  "tanggal_siap_pakai": "2026-03-15",
+  "lokasi_aset_id": "01JMB8W9A1B2C3D4E5F6G7H8J9",
   "currency_code": "IDR",
-  "receiving_org_unit_id": "01JMB8W8K2L3M4N5P6Q7R8S9T0",
-  "asset_location_id": "01JMB8W9A1B2C3D4E5F6G7H8J9",
-  "atribut": [
+  "details": [
     {
-      "tipe_atribut_id": "01JMB8ATRIB001",
-      "nilai": 50.0
+      "nama": "Kursi tunggu tiga dudukan",
+      "group_aset_id": "01JMB8W3Z9E4T0K1M9P5A2Q3R1",
+      "jenis_aset_id": "01JMB8W4A1B2C3D4E5F6G7H8J9",
+      "jumlah": 20,
+      "nilai_per_unit": 500000.00,
+      "residu_per_unit": 0
     },
     {
-      "tipe_atribut_id": "01JMB8ATRIB002",
-      "nilai": "Solar / HSD"
+      "nama": "Generator Diesel 50kVA Cummins",
+      "group_aset_id": "01JMB8W3Z9E4T0K1M9P5A2Q3R1",
+      "jenis_aset_id": "01JMB8W4A1B2C3D4E5F6G7H8J9",
+      "pabrikan_aset_id": "01JMB8W6M1N2P3Q4R5S6T7U8V9",
+      "model_aset_id": "01JMB8W7A9B8C7D6E5F4G3H2J1",
+      "jumlah": 1,
+      "nilai_per_unit": 150000000.00,
+      "residu_per_unit": 15000000.00,
+      "atribut": [
+        { "tipe_atribut_id": "01JMB8ATRIB001", "nilai": 50.0 },
+        { "tipe_atribut_id": "01JMB8ATRIB002", "nilai": "Solar / HSD" }
+      ]
     }
+  ]
+}
+```
+
+Lalu diselesaikan. Dua puluh satu aset lahir, masing-masing dengan kodenya sendiri dari
+number sequence `management-aset.aset` — bukan diturunkan dari nomor dokumen, karena kode
+aset adalah kunci alami yang dipakai seumur hidup aset dan tidak boleh bergantung pada
+dokumen yang masih dapat dikoreksi.
+
+```http
+POST /api/modules/management-aset/v1/penerimaan-aset/01JMB8PNR0001/selesaikan HTTP/1.1
+Content-Type: application/json
+
+{ "version": 1 }
+```
+
+Nomor seri sengaja kosong saat penerimaan — kardusnya belum dibuka. Ia diisi sesudahnya,
+sekaligus untuk seluruh dokumen:
+
+```http
+PUT /api/modules/management-aset/v1/penerimaan-aset/01JMB8PNR0001/aset HTTP/1.1
+Content-Type: application/json
+
+{
+  "serial": [
+    { "aset_id": "01JMB8AST0001", "serial_number": "CUM-2026-99182" },
+    { "aset_id": "01JMB8AST0002", "serial_number": null }
   ]
 }
 ```
 
 ### 2. Memindahkan / Mutasi Aset
 
+Dua langkah: susun berita acaranya, lalu selesaikan serah terimanya. Draf belum memindahkan apa pun.
+
 ```http
-POST /api/modules/management-aset/v1/aset/01JMB8W9A1B2C3D4E5F6G7H8J9/penempatan HTTP/1.1
+POST /api/modules/management-aset/v1/mutasi-aset HTTP/1.1
+Host: localhost:8000
+Content-Type: application/json
+Idempotency-Key: 6f1a2b3c-4d5e-6f70-8192-a3b4c5d6e7f8
+
+{
+  "legal_entity_id": "01JMB8LE_METTA",
+  "responsible_org_unit_id": "01JMB8ORG_ENGINEER",
+  "tanggal": "2026-06-01",
+  "tujuan_lokasi_id": "01JMB8LOC_GEDUNG_B",
+  "tujuan_org_unit_id": "01JMB8ORG_MAINTENANCE",
+  "diserahkan_oleh_user_id": "01JMB8USR_EVA",
+  "diterima_oleh_user_id": "01JMB8USR_DIVA",
+  "alasan": "Relokasi ke Gedung Workshop B",
+  "details": [
+    { "asset_id": "01JMB8W9A1B2C3D4E5F6G7H8J9" }
+  ]
+}
+```
+
+```http
+POST /api/modules/management-aset/v1/mutasi-aset/01JMB8MUT0001/selesaikan HTTP/1.1
 Host: localhost:8000
 Content-Type: application/json
 
-{
-  "effective_on": "2026-06-01",
-  "reason": "Relokasi ke Gedung Workshop B",
-  "asset_location_id": "01JMB8LOC_GEDUNG_B",
-  "usage_org_unit_id": "01JMB8ORG_MAINTENANCE",
-  "receiving_org_unit_id": "01JMB8ORG_MAINTENANCE"
-}
+{ "version": 1 }
 ```
+
+Lokasi asal tidak dikirim: ia dibaca dari asetnya dan dibekukan pada baris dokumen saat serah terima diselesaikan.
 
 ---
 
@@ -256,8 +325,9 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 
 | Berkas | Isinya |
 | --- | --- |
-| `src/Http/Controllers/transaksi/InventarisasiAset/AssetController.php` | Seluruh logika register aset, penempatan, dan history |
-| `src/Models/transaksi/InventarisasiAset/Asset.php` | Model `Asset` (tabel `aset_tr_penerimaan_aset`) |
+| `src/Http/Controllers/transaksi/InventarisasiAset/AssetController.php` | Register aset, koreksi, dan history |
+| `src/Http/Controllers/transaksi/MutasiAset/MutasiAsetController.php` | Dokumen mutasi dan penyelesaian serah terima |
+| `src/Models/transaksi/InventarisasiAset/Aset.php` | Model `Aset` (tabel `aset_tr_aset`) |
 | `src/Support/OrganizationScope.php` | Penyaringan berdasarkan tanggung jawab organisasi |
 | `src/Support/AssetAttributeValidator.php` | Validasi nilai atribut |
 | `src/Services/PenerbitNomorAset.php` | Permintaan nomor ke Core |

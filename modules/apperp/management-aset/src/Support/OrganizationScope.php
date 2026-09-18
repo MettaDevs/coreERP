@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 
 final class OrganizationScope
 {
-    private const POLICY_CODE = 'management-aset.asset-responsibility';
+    private const POLICY_CODE = 'management-aset.aset-responsibility';
 
     public function allows(Request $request, ?string $legalEntityId, ?string $operatingUnitId): bool
     {
@@ -23,7 +23,7 @@ final class OrganizationScope
         abort_unless($this->allows($request, $legalEntityId, $operatingUnitId), 403, 'Data ini berada di luar unit kerja yang dapat Anda akses.');
     }
 
-    public function assetQuery(mixed $query, Request $request, string $alias = 'aset_tr_penerimaan_aset'): mixed
+    public function asetQuery(mixed $query, Request $request, string $alias = 'aset_tr_aset'): mixed
     {
         return $this->query($query, $request, "{$alias}.legal_entity_id", "{$alias}.responsible_org_unit_id");
     }

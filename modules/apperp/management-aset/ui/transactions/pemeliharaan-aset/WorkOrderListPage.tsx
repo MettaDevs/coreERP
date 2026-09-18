@@ -178,8 +178,8 @@ export default function WorkOrderListPage({
         {
             id: 'aset',
             header: 'Aset',
-            cell: (job) => String(job.asset_kode ?? '—'),
-            sortValue: (job) => String(job.asset_kode ?? ''),
+            cell: (job) => String(job.aset_kode ?? '—'),
+            sortValue: (job) => String(job.aset_kode ?? ''),
             width: 150,
         },
         {

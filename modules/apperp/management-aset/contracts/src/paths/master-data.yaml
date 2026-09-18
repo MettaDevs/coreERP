@@ -401,10 +401,10 @@
       resource-nya sendiri.
 
       `atribut_count` memakai permission jenis aset karena atribut memang milik jenis aset
-      dan disunting di dalam formnya. `model_count` dan `asset_count` adalah isi resource
+      dan disunting di dalam formnya. `model_count` dan `aset_count` adalah isi resource
       lain, jadi keduanya bernilai `null` bila pemanggil tidak memegang
       `management-aset.model-aset.read` / `management-aset.aset.read` — `null`, bukan 0,
-      karena 0 adalah pernyataan bahwa tidak ada. `asset_count` juga dibatasi tanggung
+      karena 0 adalah pernyataan bahwa tidak ada. `aset_count` juga dibatasi tanggung
       jawab organisasi pemanggil, sama seperti jalur baca aset lainnya.
     responses:
       '200':
@@ -1797,7 +1797,7 @@
     summary: Menampilkan jumlah model dan aset pada satu pabrikan
     description: |
       Angka untuk panel detail pabrikan dan model. `model_count` bernilai `null` bila
-      pemanggil tidak memegang `management-aset.model-aset.read`. `asset_count` bernilai
+      pemanggil tidak memegang `management-aset.model-aset.read`. `aset_count` bernilai
       `null` bila pemanggil tidak memegang `management-aset.aset.read`; bila boleh dibaca,
       angka tersebut tetap dibatasi tanggung jawab organisasi yang sama dengan daftar aset.
     responses:

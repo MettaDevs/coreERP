@@ -35,13 +35,21 @@ class RegisterAppManifestModuleTest extends TestCase
      * adalah `app.yaml` module — dan perubahan itu harus disengaja, bukan efek samping.
      */
     private const JUMLAH_SEBELUM_PEMINDAHAN = [
-        'entry_points' => 65,
-        'permissions' => 122,
-        'privileges' => 64,
+        // 17 September 2026, mutasi aset: +1 entry point (`mutasi-aset.api`), +3 permission
+        // (create/update/archive), +2 privilege (maintain/retire), +1 reference nomor
+        // (`MUTA`), dan +2 laporan (berita acara serah terima dan daftar mutasi).
+        //
+        // 18 September 2026, penerimaan aset: +2 entry point (`penerimaan-aset.form` dan
+        // `.api`), +4 permission (read/create/update/archive), +2 privilege
+        // (maintain/retire), dan +1 reference nomor (`PNRA`). Duty tidak bertambah:
+        // keduanya menempel pada `management-aset.aset.manage` yang sudah ada.
+        'entry_points' => 68,
+        'permissions' => 129,
+        'privileges' => 68,
         'duties' => 36,
-        'number_sequence_references' => 29,
+        'number_sequence_references' => 31,
         'workflow_types' => 2,
-        'reports' => 2,
+        'reports' => 4,
     ];
 
     private string $akarSementara;

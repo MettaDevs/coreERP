@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
@@ -18,7 +19,7 @@ use Tests\TestCase;
  */
 class DepreciationBookTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, MenerimaAset, RefreshDatabase;
 
     private string $tenantId;
 
@@ -52,9 +53,9 @@ class DepreciationBookTest extends TestCase
             ['buku_id' => $bukuFiskal, 'useful_life_periods' => 48, 'convention' => 'full_month'],
         ])->assertOk()->assertJsonCount(2, 'data');
 
-        $asset = $this->receive($group, $jenis, ['acquisition_value' => 240000000, 'placed_in_service_on' => '2026-03-20']);
+        $aset = $this->receive($group, $jenis, ['acquisition_value' => 240000000, 'placed_in_service_on' => '2026-03-20']);
 
-        $books = DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->orderBy('useful_life_periods')->get();
+        $books = DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->orderBy('useful_life_periods')->get();
         $this->assertCount(2, $books, 'satu baris matriks menghasilkan satu buku');
         $this->assertSame([48, 60], $books->pluck('useful_life_periods')->map(fn ($v) => (int) $v)->all());
         // Konvensi `full_month` menarik awal penyusutan ke hari pertama bulan itu.
@@ -79,8 +80,8 @@ class DepreciationBookTest extends TestCase
         $murah = $this->receive($group, $jenis, ['acquisition_value' => 500000]);
         $mahal = $this->receive($group, $jenis, ['acquisition_value' => 5000000]);
 
-        $this->assertFalse((bool) DB::table('aset_tr_buku_aset')->where('asset_id', $murah)->value('depreciate'));
-        $this->assertTrue((bool) DB::table('aset_tr_buku_aset')->where('asset_id', $mahal)->value('depreciate'));
+        $this->assertFalse((bool) DB::table('aset_tr_buku_aset')->where('aset_id', $murah)->value('depreciate'));
+        $this->assertTrue((bool) DB::table('aset_tr_buku_aset')->where('aset_id', $mahal)->value('depreciate'));
     }
 
     public function test_buku_yang_tidak_disusutkan_menolak_proposal(): void
@@ -90,12 +91,12 @@ class DepreciationBookTest extends TestCase
         $profil = $this->profil('Garis lurus', 'straight_line', 48);
         $buku = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'depreciation_profile_id' => $profil]);
         $this->matrix($group, [['buku_id' => $buku, 'useful_life_periods' => 48]])->assertOk();
-        $asset = $this->receive($group, $jenis, ['acquisition_value' => 500000]);
-        $bookId = DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
+        $aset = $this->receive($group, $jenis, ['acquisition_value' => 500000]);
+        $bookId = DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->value('id');
 
         $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', [
-                'asset_book_id' => $bookId, 'period_starts_on' => '2026-04-01', 'period_ends_on' => '2026-04-30',
+                'buku_aset_id' => $bookId, 'period_starts_on' => '2026-04-01', 'period_ends_on' => '2026-04-30',
             ])->assertStatus(422);
     }
 
@@ -172,17 +173,17 @@ class DepreciationBookTest extends TestCase
             'useful_life_periods' => 3,
             'round_off_depreciation' => 100,
         ]])->assertOk();
-        $assetOverride = $this->receive($groupDenganOverride, $jenis, ['acquisition_value' => 1000]);
+        $asetOverride = $this->receive($groupDenganOverride, $jenis, ['acquisition_value' => 1000]);
 
         $groupDenganFallback = $this->master('group-aset', ['nama' => 'Group fallback']);
         $this->matrix($groupDenganFallback, [[
             'buku_id' => $buku,
             'useful_life_periods' => 3,
         ]])->assertOk();
-        $assetFallback = $this->receive($groupDenganFallback, $jenis, ['acquisition_value' => 1000]);
+        $asetFallback = $this->receive($groupDenganFallback, $jenis, ['acquisition_value' => 1000]);
 
-        $this->assertSame(100.0, (float) DB::table('aset_tr_buku_aset')->where('asset_id', $assetOverride)->value('round_off_depreciation'));
-        $this->assertSame(10.0, (float) DB::table('aset_tr_buku_aset')->where('asset_id', $assetFallback)->value('round_off_depreciation'));
+        $this->assertSame(100.0, (float) DB::table('aset_tr_buku_aset')->where('aset_id', $asetOverride)->value('round_off_depreciation'));
+        $this->assertSame(10.0, (float) DB::table('aset_tr_buku_aset')->where('aset_id', $asetFallback)->value('round_off_depreciation'));
     }
 
     /** @param array<string, mixed> $payload */
@@ -216,17 +217,15 @@ class DepreciationBookTest extends TestCase
     /** @param array<string, mixed> $overrides */
     private function receive(string $group, string $jenis, array $overrides = []): string
     {
-        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => $this->legalEntityId,
-                'nama' => 'Aset buku penyusutan uji',
-                'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
-                'acquired_on' => '2026-03-20', 'currency_code' => 'IDR',
-                'usage_org_unit_id' => $this->orgUnitId,
-                'acquisition_value' => 1000000,
-                ...$overrides,
-            ])->assertCreated()->json('data.id');
+        return $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => $this->legalEntityId,
+            'nama' => 'Aset buku penyusutan uji',
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
+            'acquired_on' => '2026-03-20', 'currency_code' => 'IDR',
+            'usage_org_unit_id' => $this->orgUnitId,
+            'acquisition_value' => 1000000,
+            ...$overrides,
+        ]);
     }
 
     /** @return list<string> */

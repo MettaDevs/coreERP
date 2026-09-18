@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
@@ -16,9 +17,9 @@ use Tests\TestCase;
  * membedakan aset lebih rinci menambah atribut, bukan tabel. Karena definisinya dibuat
  * tenant saat berjalan, aturannya harus ditegakkan dari database, bukan dari kode.
  */
-class AssetAttributeTest extends TestCase
+class AtributAsetTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, MenerimaAset, RefreshDatabase;
 
     private string $tenantId;
 
@@ -116,7 +117,7 @@ class AssetAttributeTest extends TestCase
             ['tipe_atribut_id' => $dipasang],
         ])->assertOk()->assertJsonCount(3, 'data');
 
-        $asset = $this->receive($jenis, [
+        $aset = $this->receive($jenis, [
             ['tipe_atribut_id' => $kapasitas, 'nilai' => 100.5],
             ['tipe_atribut_id' => $bergaransi, 'nilai' => true],
             ['tipe_atribut_id' => $dipasang, 'nilai' => '2026-03-20'],
@@ -125,9 +126,9 @@ class AssetAttributeTest extends TestCase
         // Tiap tipe mendarat di kolom yang benar, bukan semuanya jadi teks.
         // Dibandingkan sebagai angka: PostgreSQL mengembalikan decimal sebagai string
         // ("100.500000") sedangkan SQLite sebagai float.
-        $this->assertSame(100.5, (float) DB::table('aset_tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $kapasitas])->value('nilai_number'));
-        $this->assertTrue((bool) DB::table('aset_tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $bergaransi])->value('nilai_boolean'));
-        $this->assertSame('2026-03-20', substr((string) DB::table('aset_tr_aset_atribut')->where(['asset_id' => $asset, 'tipe_atribut_id' => $dipasang])->value('nilai_date'), 0, 10));
+        $this->assertSame(100.5, (float) DB::table('aset_tr_aset_atribut')->where(['aset_id' => $aset, 'tipe_atribut_id' => $kapasitas])->value('nilai_number'));
+        $this->assertTrue((bool) DB::table('aset_tr_aset_atribut')->where(['aset_id' => $aset, 'tipe_atribut_id' => $bergaransi])->value('nilai_boolean'));
+        $this->assertSame('2026-03-20', substr((string) DB::table('aset_tr_aset_atribut')->where(['aset_id' => $aset, 'tipe_atribut_id' => $dipasang])->value('nilai_date'), 0, 10));
     }
 
     public function test_detail_jenis_aset_menghitung_atribut_model_dan_aset(): void
@@ -142,7 +143,7 @@ class AssetAttributeTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.atribut_count', 2)
             ->assertJsonPath('data.model_count', 1)
-            ->assertJsonPath('data.asset_count', 1)
+            ->assertJsonPath('data.aset_count', 1)
             ->assertJsonPath('data.models.0.manufacturer', 'Komatsu')
             ->assertJsonPath('data.models.0.model', 'PC200-8')
             ->assertJsonPath('data.models.0.description', null)
@@ -161,7 +162,7 @@ class AssetAttributeTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.atribut_count', 2)
             ->assertJsonPath('data.model_count', null)
-            ->assertJsonPath('data.asset_count', null)
+            ->assertJsonPath('data.aset_count', null)
             ->assertJsonPath('data.models', null)
             ->assertJsonPath('data.available_models', null);
     }
@@ -196,13 +197,13 @@ class AssetAttributeTest extends TestCase
         // Lingkup kebijakan yang menunjuk organisasi lain: pengguna punya izinnya, tetapi
         // tidak atas organisasi yang memiliki datanya.
         $this->sebagaiPengguna($this->tenantId, $permissions, [[
-            'policy_code' => 'management-aset.asset-responsibility',
+            'policy_code' => 'management-aset.aset-responsibility',
             'legal_entity_id' => (string) Str::ulid(),
             'organization_id' => (string) Str::ulid(),
         ]])
             ->getJson('/api/modules/management-aset/v1/jenis-aset/'.$jenis.'/detail')
             ->assertOk()
-            ->assertJsonPath('data.asset_count', 0)
+            ->assertJsonPath('data.aset_count', 0)
             // Atribut milik jenis aset, bukan aset, jadi ia tidak ikut dibatasi scope.
             ->assertJsonPath('data.atribut_count', 2);
     }
@@ -226,7 +227,7 @@ class AssetAttributeTest extends TestCase
             ->assertOk()
             ->assertJsonMissingPath('data.0.atribut_count')
             ->assertJsonMissingPath('data.0.model_count')
-            ->assertJsonMissingPath('data.0.asset_count');
+            ->assertJsonMissingPath('data.0.aset_count');
     }
 
     public function test_atribut_wajib_yang_kosong_ditolak(): void
@@ -235,8 +236,8 @@ class AssetAttributeTest extends TestCase
         $kapasitas = $this->master('tipe-atribut', ['nama' => 'Kapasitas', 'data_type' => 'decimal']);
         $this->attach($jenis, [['tipe_atribut_id' => $kapasitas, 'wajib' => true]])->assertOk();
 
-        $this->receiveRaw($jenis, [])->assertStatus(422)->assertJsonValidationErrors('atribut.'.$kapasitas);
-        $this->assertDatabaseCount('aset_tr_penerimaan_aset', 0);
+        $this->receiveRaw($jenis, [])->assertStatus(422)->assertJsonValidationErrors('details.0.atribut.'.$kapasitas);
+        $this->assertDatabaseCount('aset_tr_aset', 0);
     }
 
     public function test_atribut_yang_tidak_terdaftar_pada_jenis_ditolak(): void
@@ -247,7 +248,7 @@ class AssetAttributeTest extends TestCase
         // Tidak di-attach ke jenis mana pun, jadi mengirimnya hampir pasti salah jenis.
         $this->receiveRaw($jenis, [['tipe_atribut_id' => $liar, 'nilai' => 'Merah']])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('atribut.0.tipe_atribut_id');
+            ->assertJsonValidationErrors('details.0.atribut.0.tipe_atribut_id');
     }
 
     public function test_daftar_tetap_hanya_menerima_nilai_dari_daftarnya(): void
@@ -260,11 +261,11 @@ class AssetAttributeTest extends TestCase
 
         $this->receiveRaw($jenis, [['tipe_atribut_id' => $bahanBakar, 'nilai' => 'Nuklir']])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('atribut.'.$bahanBakar);
+            ->assertJsonValidationErrors('details.0.atribut.'.$bahanBakar);
 
-        $asset = $this->receive($jenis, [['tipe_atribut_id' => $bahanBakar, 'nilai' => 'Solar']]);
+        $aset = $this->receive($jenis, [['tipe_atribut_id' => $bahanBakar, 'nilai' => 'Solar']]);
         // Nilai terpilih ditautkan ke barisnya, bukan sekadar disalin sebagai teks.
-        $row = DB::table('aset_tr_aset_atribut')->where('asset_id', $asset)->first();
+        $row = DB::table('aset_tr_aset_atribut')->where('aset_id', $aset)->first();
         $this->assertNotNull($row->tipe_atribut_nilai_id);
         $this->assertSame('Solar', $row->nilai_text);
     }
@@ -277,10 +278,10 @@ class AssetAttributeTest extends TestCase
 
         $this->receiveRaw($jenis, [['tipe_atribut_id' => $daya, 'nilai' => 250]])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('atribut.'.$daya);
+            ->assertJsonValidationErrors('details.0.atribut.'.$daya);
         $this->receiveRaw($jenis, [['tipe_atribut_id' => $daya, 'nilai' => 'bukan angka']])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('atribut.'.$daya);
+            ->assertJsonValidationErrors('details.0.atribut.'.$daya);
 
         $this->receive($jenis, [['tipe_atribut_id' => $daya, 'nilai' => 50]]);
     }
@@ -332,7 +333,7 @@ class AssetAttributeTest extends TestCase
         $this->receiveRaw($jenis, [
             ['tipe_atribut_id' => $desimal, 'nilai' => 1.5],
             ['tipe_atribut_id' => $bulat, 'nilai' => 2.5],
-        ])->assertStatus(422)->assertJsonValidationErrors('atribut.'.$bulat);
+        ])->assertStatus(422)->assertJsonValidationErrors('details.0.atribut.'.$bulat);
 
         $this->receive($jenis, [
             ['tipe_atribut_id' => $desimal, 'nilai' => 1.5],
@@ -389,7 +390,7 @@ class AssetAttributeTest extends TestCase
         $this->values($warna, [['nilai' => 'Biru khusus'], ['nilai' => 'Merah']])->assertOk();
         $this->receiveRaw($jenis, [['tipe_atribut_id' => $warna, 'nilai' => 'Hijau']])
             ->assertStatus(422)
-            ->assertJsonValidationErrors('atribut.'.$warna);
+            ->assertJsonValidationErrors('details.0.atribut.'.$warna);
 
         $this->values($warna, [])->assertOk()->assertJsonCount(0, 'data');
         $this->receive($jenis, [['tipe_atribut_id' => $warna, 'nilai' => 'Hijau']]);
@@ -406,7 +407,7 @@ class AssetAttributeTest extends TestCase
             ->getJson('/api/modules/management-aset/v1/tipe-atribut')
             ->assertOk()
             ->assertJsonPath('data.0.values_count', 2)
-            ->assertJsonPath('data.0.asset_types_count', 1);
+            ->assertJsonPath('data.0.jenis_aset_count', 1);
     }
 
     public function test_tipe_atribut_yang_masih_dipakai_tidak_dapat_diarsipkan(): void
@@ -490,7 +491,16 @@ class AssetAttributeTest extends TestCase
     /** @param list<array<string, mixed>> $atribut */
     private function receive(string $jenisId, array $atribut): string
     {
-        return $this->receiveRaw($jenisId, $atribut)->assertCreated()->json('data.id');
+        $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(5)]);
+
+        return $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => (string) Str::ulid(),
+            'nama' => 'Aset atribut uji',
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenisId,
+            'acquired_on' => '2026-03-20', 'acquisition_value' => 1000000,
+            'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
+            'atribut' => $atribut,
+        ]);
     }
 
     /**
@@ -501,16 +511,14 @@ class AssetAttributeTest extends TestCase
     {
         $group = $this->master('group-aset', ['nama' => 'Group '.Str::random(5)]);
 
-        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => (string) Str::ulid(),
-                'nama' => 'Aset atribut uji',
-                'group_aset_id' => $group, 'jenis_aset_id' => $jenisId,
-                'acquired_on' => '2026-03-20', 'acquisition_value' => 1000000,
-                'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
-                'atribut' => $atribut,
-            ]);
+        return $this->drafPenerimaan($this->tenantId, [
+            'legal_entity_id' => (string) Str::ulid(),
+            'nama' => 'Aset atribut uji',
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenisId,
+            'acquired_on' => '2026-03-20', 'acquisition_value' => 1000000,
+            'currency_code' => 'IDR', 'usage_org_unit_id' => (string) Str::ulid(),
+            'atribut' => $atribut,
+        ]);
     }
 
     /** @return list<string> */

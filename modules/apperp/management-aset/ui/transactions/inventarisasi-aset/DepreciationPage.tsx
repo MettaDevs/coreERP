@@ -26,7 +26,7 @@ import { api, errorMessage } from '../../api';
 
 type Book = {
     id: string;
-    asset_code: string;
+    aset_code: string;
     book_code: string;
     profile_name: string;
     method: string;
@@ -36,7 +36,7 @@ type Book = {
 };
 type Period = {
     id: string;
-    asset_code: string;
+    aset_code: string;
     book_code: string;
     period_starts_on: string;
     period_ends_on: string;
@@ -116,7 +116,7 @@ export default function DepreciationPage({
             await api('/penyusutan/proposal', {
                 method: 'POST',
                 body: JSON.stringify({
-                    asset_book_id: selected.id,
+                    buku_aset_id: selected.id,
                     period_starts_on: data.get('period_starts_on'),
                     period_ends_on: data.get('period_ends_on'),
                     consumption_amount: data.get('consumption_amount') || null,
@@ -168,7 +168,7 @@ export default function DepreciationPage({
     const finalize = async (period: Period) => {
         if (
             !window.confirm(
-                `Finalisasi penyusutan ${period.asset_code} untuk periode ini? Nilai final tidak dapat diubah.`,
+                `Finalisasi penyusutan ${period.aset_code} untuk periode ini? Nilai final tidak dapat diubah.`,
             )
         ) {
             return;
@@ -207,7 +207,7 @@ export default function DepreciationPage({
         <div className="space-y-4">
             <Card className="rounded-none border-x-0 shadow-none">
                 <CardHeader className="border-b px-5 py-3">
-                    <CardTitle>Asset Book aktif</CardTitle>
+                    <CardTitle>Aset Book aktif</CardTitle>
                     <CardAction>
                         {canCreate && (
                             <Button
@@ -235,7 +235,7 @@ export default function DepreciationPage({
                         <Empty>
                             <EmptyHeader>
                                 <EmptyTitle>
-                                    Belum ada Asset Book aktif
+                                    Belum ada Aset Book aktif
                                 </EmptyTitle>
                                 <EmptyDescription>
                                     Terima aset dengan profil penyusutan agar
@@ -252,7 +252,7 @@ export default function DepreciationPage({
                                 >
                                     <div>
                                         <p className="font-medium">
-                                            {book.asset_code} · {book.book_code}
+                                            {book.aset_code} · {book.book_code}
                                         </p>
                                         <p className="text-muted-foreground text-sm">
                                             {book.profile_name} · {book.method}{' '}
@@ -294,8 +294,8 @@ export default function DepreciationPage({
                                     Belum ada proposal penyusutan
                                 </EmptyTitle>
                                 <EmptyDescription>
-                                    Buat proposal dari Asset Book setelah
-                                    periode siap dihitung.
+                                    Buat proposal dari Aset Book setelah periode
+                                    siap dihitung.
                                 </EmptyDescription>
                             </EmptyHeader>
                         </Empty>
@@ -308,7 +308,7 @@ export default function DepreciationPage({
                                 >
                                     <div>
                                         <p className="font-medium">
-                                            {period.asset_code} ·{' '}
+                                            {period.aset_code} ·{' '}
                                             {period.book_code}
                                         </p>
                                         <p className="text-muted-foreground text-sm">
@@ -423,7 +423,7 @@ export default function DepreciationPage({
                             }}
                         >
                             <p className="text-muted-foreground text-sm">
-                                {selected.asset_code} · {selected.book_code} ·{' '}
+                                {selected.aset_code} · {selected.book_code} ·{' '}
                                 {selected.profile_name}
                             </p>
                             <Field>

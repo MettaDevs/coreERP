@@ -62,14 +62,14 @@ class PelaksanaanController extends Controller
             ->join('aset_tr_pemeliharaan_aset as wo', function ($join): void {
                 $join->on('wo.id', '=', self::TABEL_BARIS.'.pemeliharaan_aset_id')->on('wo.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
             })
-            ->leftJoin('aset_tr_penerimaan_aset as aset', function ($join): void {
-                $join->on('aset.id', '=', self::TABEL_BARIS.'.asset_id')->on('aset.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
+            ->leftJoin('aset_tr_aset as aset', function ($join): void {
+                $join->on('aset.id', '=', self::TABEL_BARIS.'.aset_id')->on('aset.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
             })
             ->leftJoin('aset_m_maintenance_job_type as pekerjaan', function ($join): void {
                 $join->on('pekerjaan.id', '=', self::TABEL_BARIS.'.maintenance_job_type_id')->on('pekerjaan.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
             })
             ->leftJoin('aset_m_lokasi_aset as lokasi', function ($join): void {
-                $join->on('lokasi.id', '=', self::TABEL_BARIS.'.asset_location_id')->on('lokasi.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
+                $join->on('lokasi.id', '=', self::TABEL_BARIS.'.lokasi_aset_id')->on('lokasi.tenant_id', '=', self::TABEL_BARIS.'.tenant_id');
             })
             ->where(self::TABEL_BARIS.'.ditugaskan_ke_user_id', $userId)
             ->whereNull('wo.deleted_at')
@@ -85,7 +85,7 @@ class PelaksanaanController extends Controller
                 self::TABEL_BARIS.'.id', self::TABEL_BARIS.'.pemeliharaan_aset_id', self::TABEL_BARIS.'.line_number', self::TABEL_BARIS.'.hasil',
                 self::TABEL_BARIS.'.dijadwalkan_mulai', self::TABEL_BARIS.'.dijadwalkan_selesai', self::TABEL_BARIS.'.aktual_jam',
                 'wo.kode as work_order_kode', 'wo.status', 'wo.keterangan',
-                'aset.kode as asset_kode',
+                'aset.kode as aset_kode',
                 'pekerjaan.nama as job_type_nama',
                 'lokasi.nama as lokasi_nama',
             ])]);

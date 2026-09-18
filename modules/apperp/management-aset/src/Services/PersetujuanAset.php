@@ -46,7 +46,7 @@ class PersetujuanAset
      *
      * @throws RuntimeException bila alur persetujuannya belum bisa dijalankan untuk tenant ini
      */
-    public function ajukanDekomisioning(string $tenantId, string $legalEntityId, string $kunciIdempoten, string $documentId, string $assetId): string
+    public function ajukanDekomisioning(string $tenantId, string $legalEntityId, string $kunciIdempoten, string $documentId, string $asetId): string
     {
         try {
             $hasil = $this->mesin->ajukan(
@@ -60,7 +60,7 @@ class PersetujuanAset
                     'legal_entity_id' => $legalEntityId,
                     'source_document_type' => 'dekomisioning-aset',
                     'source_document_id' => $documentId,
-                    'decision_context' => ['document_id' => $documentId, 'asset_id' => $assetId],
+                    'decision_context' => ['document_id' => $documentId, 'aset_id' => $asetId],
                 ],
             );
         } catch (ValidationException $kegagalan) {

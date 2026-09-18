@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $planning_detail_id
  * @property string $jenis_aset_id
  * @property string $satuan_id
- * @property string $asset_name
+ * @property string $nama_aset
  * @property string $quantity
  * @property string $specification
  * @property ?string $note
@@ -40,7 +40,7 @@ class PermintaanPengadaanAsetDetail extends Model
 
     protected $fillable = [
         'tenant_id', 'request_id', 'line_number', 'planning_detail_id', 'jenis_aset_id',
-        'satuan_id', 'asset_name', 'quantity', 'specification', 'note',
+        'satuan_id', 'nama_aset', 'quantity', 'specification', 'note',
     ];
 
     /** @return array<string, string> */

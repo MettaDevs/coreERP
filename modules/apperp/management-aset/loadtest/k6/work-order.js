@@ -158,7 +158,7 @@ function badanWorkOrder(tenant, keterangan) {
         dijadwalkan_mulai: '2026-01-01 08:00:00',
         dijadwalkan_selesai: '2026-01-01 10:00:00',
         details: [{
-            asset_id: tenant.assetId,
+            aset_id: tenant.asetId,
             maintenance_job_type_id: tenant.jobTypeId,
             estimasi_jam: 1,
             catatan: 'load test work order',
@@ -190,7 +190,7 @@ export function setup() {
     // bukan yang diukur di sini.
     const jobTypeIds = tahap('maintenance-job-types', semua((tenant, index) => ['POST', ASET('maintenance-job-types'), JSON.stringify({ nama: `WO job type ${index}` }), params(tenant, kunci('job', index))]));
 
-    const assetIds = tahap(
+    const asetIds = tahap(
         'aset',
         semua((tenant, index) => [
             'POST',
@@ -215,7 +215,7 @@ export function setup() {
         jenisAsetId: jenisIds[index],
         tipeWorkOrderId: tipeIds[index],
         jobTypeId: jobTypeIds[index],
-        assetId: assetIds[index],
+        asetId: asetIds[index],
     }));
 
     // Satu work order tetap per tenant, dipakai probe baca lintas tenant dan pembacaan `show`.

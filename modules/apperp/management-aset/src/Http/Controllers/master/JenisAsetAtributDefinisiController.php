@@ -5,7 +5,7 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Support\AssetAttributeValidator;
+use Modules\Apperp\ManagementAset\Support\ValidasiAtributAset;
 
 /**
  * Definisi atribut satu jenis aset, siap dipakai form penerimaan aset untuk merender
@@ -14,7 +14,7 @@ use Modules\Apperp\ManagementAset\Support\AssetAttributeValidator;
  */
 class JenisAsetAtributDefinisiController extends Controller
 {
-    public function __invoke(Request $request, string $jenisAsetId, AssetAttributeValidator $attributes): JsonResponse
+    public function __invoke(Request $request, string $jenisAsetId, ValidasiAtributAset $attributes): JsonResponse
     {
         abort_unless(
             in_array('management-aset.jenis-aset.read', $request->attributes->get('coreerp.permissions', []), true),

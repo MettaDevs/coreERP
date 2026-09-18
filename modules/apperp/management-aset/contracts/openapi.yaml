@@ -6,7 +6,7 @@ info:
   version: 0.1.0
   description: |
     Master data aset. Seluruh endpoint dibatasi tenant dan policy
-    `management-aset.asset-responsibility` pada token konteks yang ditandatangani
+    `management-aset.aset-responsibility` pada token konteks yang ditandatangani
     Core; `tenant_id` tidak pernah diterima dari request browser. Claim policy
     berisi pasangan legal entity dan operating unit (`scope_grants`), sehingga
     dua grant tidak dapat membentuk kombinasi organisasi baru.
@@ -21,7 +21,7 @@ info:
     pabrikan. Tidak ada rantai berjenjang yang wajib diisi, sehingga tenant dengan
     kedalaman klasifikasi berbeda tidak dipaksa mengisi tingkat yang tidak mereka punya.
 
-    Yang hierarkis hanya data, bukan skema: lokasi aset dan komposisi aset (`parent_asset_id`)
+    Yang hierarkis hanya data, bukan skema: lokasi aset dan komposisi aset (`induk_aset_id`)
     menunjuk dirinya sendiri sedalam yang dibutuhkan tenant. Keduanya struktur domain milik
     app ini, bukan organization hierarchy CoreERP.
 servers:
@@ -33,6 +33,10 @@ tags:
   description: Master aset dan master maintenance.
 - name: Lifecycle aset
   description: Dokumen lifecycle aset, register, mutasi, dan pelepasan tanpa jurnal GL.
+- name: Penerimaan aset
+  description: Dokumen penerimaan aset; satu kedatangan barang, banyak aset. Satu-satunya pintu masuk ke register.
+- name: Mutasi aset
+  description: Berita acara serah terima aset; memindahkan lokasi dan tanggung jawab, bukan dimensi keuangan per buku.
 - name: Penyusutan
   description: Proposal dan finalisasi penyusutan beserta bridge internal tanpa posting GL.
 - name: Reference data
@@ -110,6 +114,38 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/v1/reference-data/unit-kerja:
+    get:
+      tags:
+      - Reference data
+      operationId: listOperatingUnits
+      summary: Unit kerja tenant milik Core, untuk dropdown yang menampilkan nama
+      description: |
+        Modul menyimpan id unit kerja sebagai teks opaque dan tidak pernah menanyakannya
+        ke database Core; daftar ini dibaca lewat kontrak `DirektoriOrganisasi` di dalam
+        proses yang sama. Ia ada supaya layar berhenti meminta pengguna mengetik ULID.
+
+        Izinnya menumpang izin layar yang memakainya — mutasi, register aset, atau
+        pemeliharaan — sama seperti daftar satuan.
+      responses:
+        '200':
+          description: Daftar unit kerja; `kode` disamakan dengan `nama` karena Core tidak memulangkan kode unit
+        '403':
+          description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
+  /api/v1/reference-data/anggota:
+    get:
+      tags:
+      - Reference data
+      operationId: listTenantMembers
+      summary: Anggota tenant milik Core, berkunci id pengguna
+      description: |
+        `id` adalah id **pengguna**, bukan id keanggotaan, karena itulah yang dibawa
+        konteks permintaan dan yang tersimpan pada kolom penanggung jawab modul ini.
+      responses:
+        '200':
+          description: Daftar anggota dengan nama dan email
+        '403':
+          description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
   /api/v1/analisa-maintenance:
     get:
       tags:
@@ -512,10 +548,10 @@ paths:
         resource-nya sendiri.
 
         `atribut_count` memakai permission jenis aset karena atribut memang milik jenis aset
-        dan disunting di dalam formnya. `model_count` dan `asset_count` adalah isi resource
+        dan disunting di dalam formnya. `model_count` dan `aset_count` adalah isi resource
         lain, jadi keduanya bernilai `null` bila pemanggil tidak memegang
         `management-aset.model-aset.read` / `management-aset.aset.read` — `null`, bukan 0,
-        karena 0 adalah pernyataan bahwa tidak ada. `asset_count` juga dibatasi tanggung
+        karena 0 adalah pernyataan bahwa tidak ada. `aset_count` juga dibatasi tanggung
         jawab organisasi pemanggil, sama seperti jalur baca aset lainnya.
       responses:
         '200':
@@ -1908,7 +1944,7 @@ paths:
       summary: Menampilkan jumlah model dan aset pada satu pabrikan
       description: |
         Angka untuk panel detail pabrikan dan model. `model_count` bernilai `null` bila
-        pemanggil tidak memegang `management-aset.model-aset.read`. `asset_count` bernilai
+        pemanggil tidak memegang `management-aset.model-aset.read`. `aset_count` bernilai
         `null` bila pemanggil tidak memegang `management-aset.aset.read`; bila boleh dibaca,
         angka tersebut tetap dibatasi tanggung jawab organisasi yang sama dengan daftar aset.
       responses:
@@ -2766,13 +2802,13 @@ paths:
             application/json:
               schema:
                 type: object
-  /api/v1/maintenance-job-types/{id}/asset-types:
+  /api/v1/maintenance-job-types/{id}/jenis-aset:
     parameters:
     - $ref: '#/components/parameters/RecordId'
     get:
       tags:
       - Master data
-      operationId: getJobTypeAssetTypes
+      operationId: getJobTypeAsetTypes
       responses:
         '200':
           description: Relasi jenis aset
@@ -2783,7 +2819,7 @@ paths:
     put:
       tags:
       - Master data
-      operationId: replaceJobTypeAssetTypes
+      operationId: replaceJobTypeAsetTypes
       requestBody:
         required: true
         content:
@@ -2979,20 +3015,6 @@ paths:
       responses:
         '200':
           description: Register aset
-    post:
-      tags:
-      - Lifecycle aset
-      operationId: receiveAset
-      summary: Mencatat penerimaan aset dan penempatan awal; plan atau permintaan bersifat opsional
-      parameters:
-      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
-      responses:
-        '201':
-          description: Aset diterima
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '503':
-          $ref: '#/components/responses/NumberSequenceUnavailable'
   /api/v1/aset/{id}:
     get:
       tags:
@@ -3030,7 +3052,7 @@ paths:
     get:
       tags:
       - Lifecycle aset
-      operationId: assetHistory
+      operationId: asetHistory
       summary: Membaca histori penempatan efektif aset tanpa mengubah histori lama
       parameters:
       - $ref: '#/components/parameters/RecordId'
@@ -3039,24 +3061,11 @@ paths:
           description: Aset dan histori penempatan
         '404':
           $ref: '#/components/responses/NotFound'
-  /api/v1/aset/{id}/penempatan:
-    post:
-      tags:
-      - Lifecycle aset
-      operationId: placeAsset
-      summary: Menambah mutasi penggunaan, PIC, atau lokasi aset
-      parameters:
-      - $ref: '#/components/parameters/RecordId'
-      responses:
-        '200':
-          description: Mutasi dicatat
-        '409':
-          description: Aset yang dilepas tidak dapat dimutasi
   /api/v1/perencanaan-aset:
     get:
       tags:
       - Perencanaan aset
-      operationId: listAssetPlans
+      operationId: listAsetPlans
       summary: Menampilkan rencana aset tenant aktif
       responses:
         '200':
@@ -3068,7 +3077,7 @@ paths:
     post:
       tags:
       - Perencanaan aset
-      operationId: createAssetPlan
+      operationId: createAsetPlan
       summary: Membuat header dan rincian perencanaan aset; spesifikasi adalah snapshot pada rincian transaksi
       parameters:
       - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
@@ -3077,7 +3086,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AssetPlanningWrite'
+              $ref: '#/components/schemas/AsetPlanningWrite'
       responses:
         '200':
           description: Permintaan yang sama diulang
@@ -3095,7 +3104,7 @@ paths:
     get:
       tags:
       - Perencanaan aset
-      operationId: showAssetPlan
+      operationId: showAsetPlan
       summary: Menampilkan satu rencana aset beserta rinciannya
       parameters:
       - $ref: '#/components/parameters/RecordId'
@@ -3111,7 +3120,7 @@ paths:
     patch:
       tags:
       - Perencanaan aset
-      operationId: updateAssetPlan
+      operationId: updateAsetPlan
       summary: Mengubah rencana draf dengan version saat ini
       parameters:
       - $ref: '#/components/parameters/RecordId'
@@ -3121,7 +3130,7 @@ paths:
           application/json:
             schema:
               allOf:
-              - $ref: '#/components/schemas/AssetPlanningWrite'
+              - $ref: '#/components/schemas/AsetPlanningWrite'
               - type: object
                 required:
                 - version
@@ -3141,7 +3150,7 @@ paths:
     delete:
       tags:
       - Perencanaan aset
-      operationId: archiveAssetPlan
+      operationId: archiveAsetPlan
       summary: Mengarsipkan rencana draf tanpa menghapus data fisik
       parameters:
       - $ref: '#/components/parameters/RecordId'
@@ -3207,6 +3216,408 @@ paths:
       responses:
         '201':
           description: Dokumen dibuat
+  /api/v1/penerimaan-aset:
+    get:
+      tags:
+      - Penerimaan aset
+      operationId: listAsetReceipts
+      summary: Menampilkan dokumen penerimaan dalam jangkauan organisasi pengguna
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - selesai
+      - name: dari
+        in: query
+        required: false
+        description: Batas bawah tanggal terima, `YYYY-MM-DD`.
+        schema:
+          type: string
+          format: date
+      - name: sampai
+        in: query
+        required: false
+        description: Batas atas tanggal terima, `YYYY-MM-DD`.
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: |
+            Daftar penerimaan. `jumlah_baris` adalah banyaknya baris barang, `jumlah_aset`
+            adalah total unit yang datang — angka kedua itulah yang dicocokkan dengan surat
+            jalan, dan keduanya berbeda begitu satu baris berjumlah lebih dari satu.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Penerimaan aset
+      operationId: createAsetReceipt
+      summary: Membuat draf penerimaan; belum ada aset yang lahir sampai diselesaikan
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      responses:
+        '200':
+          description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
+        '201':
+          description: Draf penerimaan dibuat, nomor diterbitkan Number Sequence Core
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          description: |
+            Master di luar tenant, kombinasi pabrikan x model x jenis tidak sah, atau nilai
+            atribut tidak sesuai definisi jenis asetnya. Atribut diperiksa sudah di sini,
+            bukan menunggu penyelesaian: draf yang lolos padahal mustahil diselesaikan adalah
+            jebakan yang baru terbuka setelah tombol terakhir ditekan.
+  /api/v1/penerimaan-aset/{id}:
+    get:
+      tags:
+      - Penerimaan aset
+      operationId: showAsetReceipt
+      summary: Membaca satu dokumen penerimaan beserta barisnya
+      description: |
+        Setiap id unit kerja dan id pengguna dipulangkan berpasangan dengan namanya
+        (`responsible_org_unit_nama`, `receiving_org_unit_nama`, `diterima_oleh_nama`,
+        `penanggung_jawab_nama`), dan tiap baris membawa nama master yang dirujuknya. Nama
+        dibaca dari Core saat permintaan dilayani, bukan disimpan sebagai snapshot. Nama
+        bernilai `null` berarti unit atau keanggotaannya sudah tidak ada di Core.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Penerimaan beserta barisnya
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Penerimaan aset
+      operationId: updateAsetReceipt
+      summary: Mengubah draf penerimaan; seluruh baris diganti
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Penerimaan setelah diubah
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        '422':
+          description: Penerimaan yang sudah selesai tidak dapat diubah; asetnya sudah terdaftar dan bernomor
+    delete:
+      tags:
+      - Penerimaan aset
+      operationId: archiveAsetReceipt
+      summary: Mengarsipkan draf penerimaan
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '204':
+          description: Draf diarsipkan
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        '422':
+          description: Penerimaan yang sudah selesai tidak dapat diarsipkan; aset sudah terbentuk karenanya
+  /api/v1/penerimaan-aset/{id}/ringkasan:
+    get:
+      tags:
+      - Penerimaan aset
+      operationId: asetReceiptSummary
+      summary: Berapa aset yang akan lahir, dan baris mana yang tidak akan disusutkan
+      description: |
+        Menjawab pertanyaan yang berbeda dari `GET /penerimaan-aset/{id}`: bukan "apa isi
+        dokumen ini" melainkan "apa yang terjadi bila saya menyelesaikannya".
+
+        `peringatan` berisi satu entri per baris yang nilai per unitnya di bawah ambang
+        kapitalisasi group. Unitnya tetap tercatat sebagai aset, tetapi bukunya tidak akan
+        pernah menyusut — keputusan yang jauh lebih murah diketahui sekarang daripada setelah
+        nomor asetnya terbit dan tidak dapat ditarik kembali.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Jumlah baris, jumlah aset, dan daftar peringatan ambang kapitalisasi
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/penerimaan-aset/{id}/selesaikan:
+    post:
+      tags:
+      - Penerimaan aset
+      operationId: completeAsetReceipt
+      summary: Menyelesaikan penerimaan; setiap unit menjadi satu aset bernomor
+      description: |
+        Memerlukan permission `management-aset.aset.create`, bukan permission dokumen ini:
+        menyusun berkas penerimaan dan benar-benar menambah aset ke register adalah dua
+        wewenang berbeda — pemisahan yang sama yang dipakai mutasi.
+
+        Untuk setiap unit pada setiap baris dibuat satu aset, satu penempatan pertama, dan
+        buku penyusutan dari matriks group x book. Kodenya diambil berurutan dari number
+        sequence `management-aset.aset`, **tidak** diturunkan dari nomor dokumen: kode aset
+        adalah kunci alami yang dipakai seumur hidup aset dan tidak boleh bergantung pada
+        dokumen yang masih dapat dikoreksi.
+
+        Seluruh nomor diterbitkan lebih dulu dengan kunci idempoten yang diturunkan dari id
+        dokumen dan nomor urut, jadi percobaan ulang setelah jaringan putus memulangkan nomor
+        yang sama alih-alih deret baru.
+
+        Nomor seri dibiarkan kosong: kardusnya belum dibuka. Ia diisi sesudahnya lewat
+        `PUT /penerimaan-aset/{id}/aset`.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Penerimaan setelah diselesaikan, beserta barisnya
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        '422':
+          description: |
+            Dokumen tanpa baris, sudah selesai, melebihi sisa permintaan pembelian yang
+            dirujuknya (pesannya menyebut sisanya), atau groupnya belum memiliki profil
+            penyusutan yang dapat dihitung.
+        '503':
+          $ref: '#/components/responses/NumberSequenceUnavailable'
+  /api/v1/penerimaan-aset/{id}/aset:
+    get:
+      tags:
+      - Penerimaan aset
+      operationId: listAsetFromReceipt
+      summary: Aset yang lahir dari dokumen ini
+      description: |
+        Daftar yang menyempit ke satu dokumen, bukan seluruh register: yang mengetik nomor
+        seri sedang memegang setumpuk stiker dari satu kiriman dan membacanya berurutan.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Aset dokumen ini, terurut kode
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Penerimaan aset
+      operationId: setSerialNumbersFromReceipt
+      summary: Mengisi nomor seri seluruh aset dokumen ini sekaligus
+      description: |
+        Satu permintaan, bukan satu per aset: kegagalan di tengah pengiriman berulang
+        meninggalkan separuh terisi tanpa ada yang tahu separuh mana.
+
+        Memerlukan `management-aset.aset.update` — yang diubah adalah aset, bukan dokumennya.
+        Dokumen yang sudah selesai memang tidak dapat disunting, dan ini bukan pengecualian
+        terhadapnya: nomor seri tidak pernah menjadi bagian dokumen. Nilai kosong menghapus
+        nomor seri yang sudah ada.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Aset dokumen ini setelah nomor serinya disimpan
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Ada aset yang bukan berasal dari penerimaan ini
+  /api/v1/mutasi-aset:
+    get:
+      tags:
+      - Mutasi aset
+      operationId: listAsetTransfers
+      summary: Menampilkan berita acara serah terima dalam jangkauan organisasi pengguna
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - draft
+          - selesai
+      - name: dari
+        in: query
+        required: false
+        description: Batas bawah tanggal serah terima, `YYYY-MM-DD`.
+        schema:
+          type: string
+          format: date
+      - name: sampai
+        in: query
+        required: false
+        description: Batas atas tanggal serah terima, `YYYY-MM-DD`.
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Daftar mutasi aset beserta jumlah baris dan nama lokasi tujuan
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Mutasi aset
+      operationId: createAsetTransfer
+      summary: Membuat draf berita acara serah terima; aset belum berpindah sampai diselesaikan
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsetTransferWrite'
+      responses:
+        '200':
+          description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
+        '201':
+          description: Draf mutasi dibuat, nomor diterbitkan Number Sequence Core
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          description: Aset di luar jangkauan organisasi, sudah dilepas, atau muncul dua kali
+  /api/v1/mutasi-aset/{id}:
+    get:
+      tags:
+      - Mutasi aset
+      operationId: showAsetTransfer
+      summary: Membaca satu berita acara beserta barisnya dan keadaan asal tiap aset
+      description: |
+        Keadaan asal tiap baris (`asal_lokasi_efektif_id`, `asal_org_unit_efektif_id`,
+        `asal_custodian_efektif_id`) adalah nilai beku bila dokumen sudah selesai, dan
+        keadaan aset **sekarang** selama dokumen masih draf. Klien tidak perlu memilih
+        sendiri di antara keduanya, dan tidak boleh mengirimkannya kembali saat menyimpan.
+
+        Setiap id unit kerja dan id pengguna dipulangkan berpasangan dengan namanya
+        (`tujuan_org_unit_nama`, `diserahkan_oleh_nama`, `diterima_oleh_nama`, dan pada
+        baris `asal_org_unit_nama` serta `asal_custodian_nama`). Nama dibaca dari Core
+        saat permintaan dilayani, bukan disimpan sebagai snapshot: nama orang dan nama
+        unit berubah karena sebab di luar aset, dan dokumen yang membekukannya akan
+        menampilkan ejaan lama selamanya. Nama bernilai `null` berarti unit atau
+        keanggotaannya sudah tidak ada di Core.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      responses:
+        '200':
+          description: Mutasi beserta barisnya
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Mutasi aset
+      operationId: updateAsetTransfer
+      summary: Mengubah draf berita acara; seluruh baris diganti
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/AsetTransferWrite'
+              - type: object
+                required:
+                - version
+                properties:
+                  version:
+                    type: integer
+                    minimum: 1
+      responses:
+        '200':
+          description: Mutasi setelah diubah
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        '422':
+          description: Mutasi yang sudah selesai tidak dapat diubah
+    delete:
+      tags:
+      - Mutasi aset
+      operationId: archiveAsetTransfer
+      summary: Mengarsipkan draf berita acara
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - version
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '204':
+          description: Draf diarsipkan
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        '422':
+          description: Mutasi yang sudah selesai tidak dapat diarsipkan
+  /api/v1/mutasi-aset/{id}/selesaikan:
+    post:
+      tags:
+      - Mutasi aset
+      operationId: completeAsetTransfer
+      summary: Menyelesaikan serah terima; penempatan setiap aset pada dokumen berpindah
+      description: |
+        Memerlukan permission `management-aset.aset.mutate`, bukan permission dokumen ini:
+        menyusun berita acara dan benar-benar memindahkan aset adalah dua wewenang berbeda.
+
+        Untuk setiap baris: keadaan asal dibekukan, satu baris riwayat penempatan dibuat
+        dengan `mutasi_aset_id` menunjuk dokumen ini, dan aset diperbarui lokasi, unit
+        penanggung jawab, serta dimensi keuangannya. `lifecycle_state` aset **tidak**
+        disentuh — di Dynamics 365 memasang aset pada functional location dan mengubah
+        lifecycle state juga dua tindakan terpisah.
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - version
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Mutasi setelah diselesaikan, beserta barisnya
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+        '422':
+          description: Dokumen tanpa baris, sudah selesai, atau salah satu asetnya sudah dilepas
   /api/v1/pemeliharaan-aset:
     get:
       tags:
@@ -3260,10 +3671,10 @@ paths:
     get:
       tags:
       - Pemeliharaan aset
-      operationId: listWorkOrderJobTypesForAsset
+      operationId: listWorkOrderJobTypesForAset
       summary: Menampilkan jenis pekerjaan yang boleh dipilih untuk aset
       parameters:
-      - name: asset_id
+      - name: aset_id
         in: query
         required: true
         schema:
@@ -3576,7 +3987,7 @@ paths:
       tags:
       - Penyusutan
       operationId: proposeDepreciation
-      summary: Membuat proposal penyusutan satu Asset Book tanpa jurnal GL
+      summary: Membuat proposal penyusutan satu Aset Book tanpa jurnal GL
       responses:
         '201':
           description: Proposal dibuat
@@ -3585,7 +3996,7 @@ paths:
       tags:
       - Penyusutan
       operationId: proposeDepreciationBulk
-      summary: Membuat proposal penyusutan seluruh Asset Book aktif satu periode sekaligus tanpa jurnal GL
+      summary: Membuat proposal penyusutan seluruh Aset Book aktif satu periode sekaligus tanpa jurnal GL
       requestBody:
         required: true
         content:
@@ -3631,11 +4042,11 @@ paths:
     get:
       tags:
       - Penyusutan
-      operationId: listAssetBooksForDepreciation
-      summary: Menampilkan Asset Book aktif yang dapat dihitung penyusutannya
+      operationId: listAsetBooksForDepreciation
+      summary: Menampilkan Aset Book aktif yang dapat dihitung penyusutannya
       responses:
         '200':
-          description: Daftar Asset Book
+          description: Daftar Aset Book
   /api/v1/penyusutan/{id}/finalisasi:
     post:
       tags:
@@ -3862,7 +4273,7 @@ components:
     Ulid:
       type: string
       pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
-    AssetPlanningDetailWrite:
+    AsetPlanningDetailWrite:
       type: object
       required:
       - jenis_aset_id
@@ -3886,7 +4297,7 @@ components:
         estimated_unit_price:
           type: number
           minimum: 0
-    AssetPlanningWrite:
+    AsetPlanningWrite:
       type: object
       required:
       - legal_entity_id
@@ -3924,7 +4335,72 @@ components:
           type: array
           minItems: 1
           items:
-            $ref: '#/components/schemas/AssetPlanningDetailWrite'
+            $ref: '#/components/schemas/AsetPlanningDetailWrite'
+    AsetTransferWrite:
+      type: object
+      description: |
+        Tujuan berada di header dan aset di baris: satu serah terima adalah satu perpindahan
+        antara dua pihak. Keadaan asal tidak dikirim klien — server membacanya dari aset saat
+        dokumen diselesaikan.
+      required:
+      - legal_entity_id
+      - responsible_org_unit_id
+      - tanggal
+      - tujuan_org_unit_id
+      - alasan
+      - details
+      properties:
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          description: Unit kerja pemilik dokumen, yaitu pihak yang menyerahkan.
+          $ref: '#/components/schemas/Ulid'
+        tanggal:
+          type: string
+          format: date
+        tujuan_lokasi_id:
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        tujuan_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        diserahkan_oleh_user_id:
+          type: string
+          maxLength: 64
+          nullable: true
+        diterima_oleh_user_id:
+          description: Menjadi penanggung jawab aset pada riwayat penempatan setelah diselesaikan.
+          type: string
+          maxLength: 64
+          nullable: true
+        alasan:
+          type: string
+          maxLength: 250
+        keterangan:
+          type: string
+          maxLength: 2000
+          nullable: true
+        details:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/AsetTransferDetailWrite'
+    AsetTransferDetailWrite:
+      type: object
+      required:
+      - aset_id
+      properties:
+        aset_id:
+          $ref: '#/components/schemas/Ulid'
+        kondisi_aset_id:
+          description: Kondisi yang disaksikan saat serah terima; ikut memperbarui kondisi aset.
+          oneOf:
+          - $ref: '#/components/schemas/Ulid'
+          - type: 'null'
+        catatan:
+          type: string
+          maxLength: 2000
+          nullable: true
     WorkOrderWrite:
       type: object
       description: Work order pemeliharaan. Aset tidak berada di header melainkan pada setiap baris pekerjaan, sehingga satu
@@ -3979,10 +4455,10 @@ components:
       type: object
       description: Satu baris pekerjaan; lokasi aset disalin server sebagai snapshot saat baris dibuat.
       required:
-      - asset_id
+      - aset_id
       - maintenance_job_type_id
       properties:
-        asset_id:
+        aset_id:
           $ref: '#/components/schemas/Ulid'
         maintenance_job_type_id:
           $ref: '#/components/schemas/Ulid'
@@ -4256,7 +4732,7 @@ components:
         required:
         - pabrikan_aset_id
         - pabrikan_aset
-        - asset_count
+        - aset_count
         properties:
           pabrikan_aset_id:
             $ref: '#/components/schemas/Ulid'
@@ -4277,7 +4753,7 @@ components:
             - string
             - 'null'
             maxLength: 150
-          asset_count:
+          aset_count:
             description: Aset yang memakai model ini, dibatasi tanggung jawab organisasi pemanggil.
             type:
             - integer
@@ -4294,7 +4770,7 @@ components:
           kode: PBRA-000001
           nama: Pabrikan contoh
         model_number: PK-100
-        asset_count: 3
+        aset_count: 3
         aktif: true
         created_at: '2026-07-26T02:00:00.000000Z'
         updated_at: '2026-07-26T02:00:00.000000Z'
@@ -4381,11 +4857,11 @@ components:
           - string
           - 'null'
           enum:
-          - fixed_asset
+          - fixed_aset
           - inventory_item
           - other
           - null
-        asset_location_id:
+        lokasi_aset_id:
           description: |
             Lokasi bawaan saat aset diterima. Hanya nilai awal; lokasi yang berlaku tetap
             hidup pada aset dan penempatannya, dan tidak pernah dibaca ulang dari group.
@@ -4532,14 +5008,14 @@ components:
           type: object
           required:
           - model_count
-          - asset_count
+          - aset_count
           properties:
             model_count:
               description: Model yang belum diarsipkan pada pabrikan ini.
               type: integer
               minimum: 0
               nullable: true
-            asset_count:
+            aset_count:
               description: Aset yang memakai pabrikan ini, dibatasi tanggung jawab organisasi pemanggil.
               type: integer
               minimum: 0
@@ -5575,7 +6051,7 @@ components:
           readOnly: true
           type: integer
           minimum: 0
-        asset_types_count:
+        jenis_aset_count:
           description: Jumlah jenis aset yang masih memasang atribut ini. Hanya keluaran.
           readOnly: true
           type: integer
@@ -5600,7 +6076,7 @@ components:
         - min_value
         - max_value
         - values_count
-        - asset_types_count
+        - jenis_aset_count
         - data_type_locked
     TipeAtributCreate:
       allOf:
@@ -5731,7 +6207,7 @@ components:
           required:
           - atribut_count
           - model_count
-          - asset_count
+          - aset_count
           properties:
             atribut_count:
               description: Tipe atribut yang terpasang pada jenis aset ini.
@@ -5744,7 +6220,7 @@ components:
               type: integer
               minimum: 0
               nullable: true
-            asset_count:
+            aset_count:
               description: |
                 Aset yang memakai jenis ini, dibatasi tanggung jawab organisasi pemanggil.
                 `null` bila pemanggil tidak memegang `management-aset.aset.read`.

@@ -18,18 +18,23 @@ Kalau riwayat ditimpa, pembebanan periode lama ikut berubah tiap kali aset pinda
 
 | Endpoint | Gunanya |
 | --- | --- |
-| `POST /api/v1/aset/{id}/penempatan` | Memindahkan aset |
+| `POST /api/v1/mutasi-aset` | Menyusun berita acara serah terima; belum memindahkan apa pun |
+| `POST /api/v1/mutasi-aset/{id}/selesaikan` | Serah terima terjadi; penempatan setiap aset berpindah |
 | `GET /api/v1/aset/{id}/history` | Riwayat penempatan, urut tanggal berlaku |
 
-Butuh permission `management-aset.aset.mutate` — terpisah dari `update`. Orang yang boleh mengoreksi data aset belum tentu boleh memindahkannya.
+Menyelesaikan serah terima butuh permission `management-aset.aset.mutate` — terpisah dari `update`, dan terpisah pula dari izin menyusun dokumennya (`management-aset.mutasi-aset.*`). Orang yang boleh mengoreksi data aset belum tentu boleh memindahkannya, dan juru tulis yang menyiapkan berkasnya belum tentu berwenang menyerahkan barangnya.
+
+::: info `POST /api/v1/aset/{id}/penempatan` sudah tidak ada
+Endpoint itu dibuang pada 17 September 2026. Ia memindahkan aset tanpa nomor dokumen dan tanpa bukti serah terima, dan ia satu-satunya yang menulis `lifecycle_state = 'in_use'` — nilai yang tidak pernah dibaca logika mana pun. Seluruh pekerjaannya kini dikerjakan [Mutasi aset](/apps/management-aset/transaction/mutasi-aset/).
+:::
 
 ## Yang berubah saat mutasi
 
 1. Baris baru di `aset_tr_penempatan_aset` dengan tanggal berlaku dan alasannya.
 2. Unit penanggung jawab pada aset ikut berubah.
 3. Lokasi ikut berubah kalau disebut.
-4. **Dimensi keuangan ikut dihitung ulang** — dari unit yang dipetakan pada lokasi baru, atau kalau tidak ada, dari unit pemakai.
-5. Status aset menjadi `in_use`.
+4. **Dimensi keuangan ikut dihitung ulang** — dari unit yang dipetakan pada lokasi baru, atau kalau tidak ada, dari unit tujuan pada dokumennya.
+5. `lifecycle_state` aset **tidak** berubah. Di Dynamics 365, memasang aset pada functional location dan mengubah lifecycle state adalah dua tindakan terpisah; menggabungkannya membuat aset yang dimutasi ke gudang penyimpanan ikut berstatus dipakai.
 
 Poin 4 sering terlewat: memindahkan aset ke lokasi yang dipetakan ke unit lain berarti pembebanan biayanya juga pindah. Lihat [Lokasi aset dan dimensi keuangan](/apps/management-aset/master/lokasi/).
 

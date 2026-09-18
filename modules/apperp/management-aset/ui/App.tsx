@@ -48,8 +48,8 @@ export type PropsModul = {
  */
 const MasterPage = lazy(() => import('./master/MasterPage'));
 const MasterDetailPage = lazy(() => import('./master/detail/MasterDetailPage'));
-const AssetPage = lazy(
-    () => import('./transactions/inventarisasi-aset/AssetPage'),
+const AsetPage = lazy(
+    () => import('./transactions/inventarisasi-aset/AsetPage'),
 );
 const DepreciationPage = lazy(
     () => import('./transactions/inventarisasi-aset/DepreciationPage'),
@@ -72,8 +72,8 @@ const StatusValidationPage = lazy(
 const WorkOrderPage = lazy(
     () => import('./transactions/pemeliharaan-aset/WorkOrderPage'),
 );
-const FixedAssetSetupPlaceholderPage = lazy(
-    () => import('./fixed-assets-setup/FixedAssetSetupPlaceholderPage'),
+const PengaturanAsetTetapPlaceholderPage = lazy(
+    () => import('./pengaturan-aset-tetap/PengaturanAsetTetapPlaceholderPage'),
 );
 
 /**
@@ -117,12 +117,17 @@ export default function App({
         permissions.includes('management-aset.aset.read')
     ) {
         return (
-            <main>
-                <AssetPage
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <AsetPage
                     context={konteks}
                     canUpdate={permissions.includes(
                         'management-aset.aset.update',
                     )}
+                    permissions={permissions}
+                    segments={segments}
                 />
             </main>
         );
@@ -150,25 +155,23 @@ export default function App({
     }
 
     if (
-        view === 'fixed-asset-parameters' &&
-        permissions.includes('management-aset.fixed-asset-parameters.read')
+        view === 'fixed-aset-parameters' &&
+        permissions.includes('management-aset.fixed-aset-parameters.read')
     ) {
         return (
             <main>
-                <FixedAssetSetupPlaceholderPage kind="parameters" />
+                <PengaturanAsetTetapPlaceholderPage kind="parameters" />
             </main>
         );
     }
 
     if (
-        view === 'fixed-asset-posting-profiles' &&
-        permissions.includes(
-            'management-aset.fixed-asset-posting-profiles.read',
-        )
+        view === 'fixed-aset-posting-profiles' &&
+        permissions.includes('management-aset.fixed-aset-posting-profiles.read')
     ) {
         return (
             <main>
-                <FixedAssetSetupPlaceholderPage kind="posting-profiles" />
+                <PengaturanAsetTetapPlaceholderPage kind="posting-profiles" />
             </main>
         );
     }
@@ -178,8 +181,15 @@ export default function App({
         permissions.includes('management-aset.mutasi-aset.read')
     ) {
         return (
-            <main>
-                <MutationPage />
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
+                <MutationPage
+                    context={konteks}
+                    permissions={permissions}
+                    segments={segments}
+                />
             </main>
         );
     }

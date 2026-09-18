@@ -44,7 +44,7 @@ export default function PabrikanAsetCounters({
             <Input
                 id="jumlah-aset"
                 label="Aset"
-                value={detail.asset_count ?? '–'}
+                value={detail.aset_count ?? '–'}
                 disabled
             />
         </div>

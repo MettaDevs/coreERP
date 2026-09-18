@@ -6,7 +6,7 @@ namespace Modules\Apperp\ManagementAset\Reporting;
  * Hasil dataset satu laporan, dalam bentuk yang dimengerti semua renderer.
  *
  * `fields` adalah nilai tunggal yang muncul sekali pada dokumen (`${kode}`); `tables`
- * adalah kumpulan baris yang diulang (`${baris.asset_kode}`). Nilai sudah berupa teks
+ * adalah kumpulan baris yang diulang (`${baris.aset_kode}`). Nilai sudah berupa teks
  * atau angka siap tampil — pemformatan tanggal dan angka adalah urusan dataset, bukan
  * layout, supaya semua layout satu laporan menampilkan tanggal dengan cara yang sama.
  */

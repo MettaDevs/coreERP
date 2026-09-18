@@ -2,7 +2,7 @@
 Ulid:
   type: string
   pattern: ^[0-9A-HJKMNP-TV-Z]{26}$
-AssetPlanningDetailWrite:
+AsetPlanningDetailWrite:
   type: object
   required:
   - jenis_aset_id
@@ -26,7 +26,7 @@ AssetPlanningDetailWrite:
     estimated_unit_price:
       type: number
       minimum: 0
-AssetPlanningWrite:
+AsetPlanningWrite:
   type: object
   required:
   - legal_entity_id
@@ -64,7 +64,72 @@ AssetPlanningWrite:
       type: array
       minItems: 1
       items:
-        $ref: '#/components/schemas/AssetPlanningDetailWrite'
+        $ref: '#/components/schemas/AsetPlanningDetailWrite'
+AsetTransferWrite:
+  type: object
+  description: |
+    Tujuan berada di header dan aset di baris: satu serah terima adalah satu perpindahan
+    antara dua pihak. Keadaan asal tidak dikirim klien — server membacanya dari aset saat
+    dokumen diselesaikan.
+  required:
+  - legal_entity_id
+  - responsible_org_unit_id
+  - tanggal
+  - tujuan_org_unit_id
+  - alasan
+  - details
+  properties:
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_id:
+      description: Unit kerja pemilik dokumen, yaitu pihak yang menyerahkan.
+      $ref: '#/components/schemas/Ulid'
+    tanggal:
+      type: string
+      format: date
+    tujuan_lokasi_id:
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    tujuan_org_unit_id:
+      $ref: '#/components/schemas/Ulid'
+    diserahkan_oleh_user_id:
+      type: string
+      maxLength: 64
+      nullable: true
+    diterima_oleh_user_id:
+      description: Menjadi penanggung jawab aset pada riwayat penempatan setelah diselesaikan.
+      type: string
+      maxLength: 64
+      nullable: true
+    alasan:
+      type: string
+      maxLength: 250
+    keterangan:
+      type: string
+      maxLength: 2000
+      nullable: true
+    details:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/components/schemas/AsetTransferDetailWrite'
+AsetTransferDetailWrite:
+  type: object
+  required:
+  - aset_id
+  properties:
+    aset_id:
+      $ref: '#/components/schemas/Ulid'
+    kondisi_aset_id:
+      description: Kondisi yang disaksikan saat serah terima; ikut memperbarui kondisi aset.
+      oneOf:
+      - $ref: '#/components/schemas/Ulid'
+      - type: 'null'
+    catatan:
+      type: string
+      maxLength: 2000
+      nullable: true
 WorkOrderWrite:
   type: object
   description: >-
@@ -121,10 +186,10 @@ WorkOrderJobWrite:
   type: object
   description: Satu baris pekerjaan; lokasi aset disalin server sebagai snapshot saat baris dibuat.
   required:
-  - asset_id
+  - aset_id
   - maintenance_job_type_id
   properties:
-    asset_id:
+    aset_id:
       $ref: '#/components/schemas/Ulid'
     maintenance_job_type_id:
       $ref: '#/components/schemas/Ulid'
@@ -393,7 +458,7 @@ ModelAset:
     required:
     - pabrikan_aset_id
     - pabrikan_aset
-    - asset_count
+    - aset_count
     properties:
       pabrikan_aset_id:
         $ref: '#/components/schemas/Ulid'
@@ -414,7 +479,7 @@ ModelAset:
         - string
         - 'null'
         maxLength: 150
-      asset_count:
+      aset_count:
         description: Aset yang memakai model ini, dibatasi tanggung jawab organisasi pemanggil.
         type:
         - integer
@@ -431,7 +496,7 @@ ModelAset:
       kode: PBRA-000001
       nama: Pabrikan contoh
     model_number: PK-100
-    asset_count: 3
+    aset_count: 3
     aktif: true
     created_at: '2026-07-26T02:00:00.000000Z'
     updated_at: '2026-07-26T02:00:00.000000Z'
@@ -517,11 +582,11 @@ GroupAsetFields:
       - string
       - 'null'
       enum:
-      - fixed_asset
+      - fixed_aset
       - inventory_item
       - other
       - null
-    asset_location_id:
+    lokasi_aset_id:
       description: |
         Lokasi bawaan saat aset diterima. Hanya nilai awal; lokasi yang berlaku tetap
         hidup pada aset dan penempatannya, dan tidak pernah dibaca ulang dari group.
@@ -665,14 +730,14 @@ PabrikanAsetDetail:
   properties:
     data:
       type: object
-      required: [model_count, asset_count]
+      required: [model_count, aset_count]
       properties:
         model_count:
           description: Model yang belum diarsipkan pada pabrikan ini.
           type: integer
           minimum: 0
           nullable: true
-        asset_count:
+        aset_count:
           description: Aset yang memakai pabrikan ini, dibatasi tanggung jawab organisasi pemanggil.
           type: integer
           minimum: 0
@@ -1385,7 +1450,7 @@ TipeAtributFields:
       readOnly: true
       type: integer
       minimum: 0
-    asset_types_count:
+    jenis_aset_count:
       description: Jumlah jenis aset yang masih memasang atribut ini. Hanya keluaran.
       readOnly: true
       type: integer
@@ -1403,7 +1468,7 @@ TipeAtribut:
   - $ref: '#/components/schemas/MasterRecord'
   - $ref: '#/components/schemas/TipeAtributFields'
   - type: object
-    required: [data_type, satuan_id, satuan, min_value, max_value, values_count, asset_types_count, data_type_locked]
+    required: [data_type, satuan_id, satuan, min_value, max_value, values_count, jenis_aset_count, data_type_locked]
 TipeAtributCreate:
   allOf:
   - $ref: '#/components/schemas/MasterCreate'
@@ -1512,7 +1577,7 @@ JenisAsetDetail:
   properties:
     data:
       type: object
-      required: [atribut_count, model_count, asset_count]
+      required: [atribut_count, model_count, aset_count]
       properties:
         atribut_count:
           description: Tipe atribut yang terpasang pada jenis aset ini.
@@ -1525,7 +1590,7 @@ JenisAsetDetail:
           type: integer
           minimum: 0
           nullable: true
-        asset_count:
+        aset_count:
           description: |
             Aset yang memakai jenis ini, dibatasi tanggung jawab organisasi pemanggil.
             `null` bila pemanggil tidak memegang `management-aset.aset.read`.

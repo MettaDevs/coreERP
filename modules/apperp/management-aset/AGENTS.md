@@ -28,7 +28,7 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 - Format, status, dan counter nomor adalah keputusan owner/admin tenant di Control Plane. Manifest hanya mendeklarasikan reference dan allowed scope.
 - Arsip adalah soft delete. Jangan mengganti dengan hard delete: record lama masih direferensikan data turunan.
 - Master klasifikasi **datar dan saling lepas**, mengikuti model Dynamics 365 F&O: aset menunjuk `group_aset_id` (sumbu finansial) dan `jenis_aset_id` (sumbu teknis) secara langsung dan sejajar. Jangan menambah tingkat klasifikasi baru sebagai tabel; pembedaan yang lebih rinci diselesaikan lewat atribut.
-- Yang hierarkis hanya data, bukan skema: `m_lokasi_aset.parent_id` dan `tr_penerimaan_aset.parent_asset_id` menunjuk dirinya sendiri. Keduanya struktur domain app ini, bukan organization hierarchy CoreERP; foreign key permanen di sini sah, di identitas organization Core tidak.
+- Yang hierarkis hanya data, bukan skema: `m_lokasi_aset.parent_id` dan `tr_aset.induk_aset_id` menunjuk dirinya sendiri. Keduanya struktur domain app ini, bukan organization hierarchy CoreERP; foreign key permanen di sini sah, di identitas organization Core tidak.
 
 ## Menambah atau mengubah master
 
@@ -42,23 +42,31 @@ App bisnis mandiri di bawah platform CoreERP (`D:\Kerja\CoreERP`). Repo ini memi
 
 Urutannya penting: yang murah lebih dulu, tetapi tidak boleh berhenti sebelum yang terakhir.
 
+Perintahnya ditulis dari akar repo. Sebelumnya blok ini menyuruh `cd api` dan `cd ui`,
+peninggalan masa modul ini dua aplikasi tersendiri. `ui/` memang masih ada — itu sumber
+layarnya — dan `api/` menyisakan satu `Dockerfile`, tetapi tidak satu pun dari keduanya
+punya `artisan` atau `package.json` lagi. Keduanya dijalankan dari `apps/core`.
+
+Satu run test pada satu waktu: `core_erp_test` dipakai bersama, dan dua run serentak saling
+menjatuhkan tabel sehingga gagalnya menyamar jadi regresi kode.
+
 ```bash
-cd api && php artisan test
+cd apps/core && php artisan test --testsuite=Module
 ```
 
 ```bash
-cd api && vendor/bin/pint --test && vendor/bin/pint --test ../database
+cd apps/core && php vendor/laravel/pint/builds/pint --test ../../modules/apperp/management-aset
 ```
 
 ```bash
-python loadtest/check-manifest.py app.yaml
+cd modules/apperp/management-aset/loadtest && python check-manifest.py
 ```
 
 ```bash
-cd ui && npm run build
+cd apps/core && npm run types:check && npm run lint:check && npm run build
 ```
 
-Lalu **load test wajib** — lihat `loadtest/README.md`. Sebuah modul belum selesai hanya karena test feature lulus. Test feature berjalan satu request pada satu proses terhadap SQLite; ia tidak dapat melihat koneksi habis, nomor ganda, batas tenant yang bocor saat request saling menyela, atau idempotency key yang berlomba.
+Lalu **load test wajib** — lihat `loadtest/README.md`. Sebuah modul belum selesai hanya karena test feature lulus. Test feature berjalan satu request pada satu proses; ia tidak dapat melihat koneksi habis, nomor ganda, batas tenant yang bocor saat request saling menyela, atau idempotency key yang berlomba.
 
 Minimum yang harus dipenuhi: 1000+ VU serentak, 100+ tenant, 2+ instance API di belakang load balancer, PostgreSQL asli, 90 detik pada beban penuh. Gate kebenaran (0 pelanggaran, 0 error aplikasi) berlaku di perangkat keras apa pun. Gate latensi diukur pada concurrency yang masih tertahan, bukan pada titik jenuh.
 

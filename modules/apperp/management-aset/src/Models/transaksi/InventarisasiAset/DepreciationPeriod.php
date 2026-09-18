@@ -20,7 +20,7 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $tenant_id
- * @property string $asset_book_id
+ * @property string $buku_aset_id
  * @property string $legal_entity_id
  * @property ?string $usage_org_unit_id
  * @property Carbon $period_starts_on
@@ -39,7 +39,7 @@ class DepreciationPeriod extends Model
     protected $table = 'aset_tr_penyusutan_aset';
 
     protected $fillable = [
-        'tenant_id', 'asset_book_id', 'legal_entity_id', 'usage_org_unit_id',
+        'tenant_id', 'buku_aset_id', 'legal_entity_id', 'usage_org_unit_id',
         'period_starts_on', 'period_ends_on', 'amount', 'status', 'reverses_period_id',
     ];
 
@@ -53,9 +53,9 @@ class DepreciationPeriod extends Model
         ];
     }
 
-    /** @return BelongsTo<AssetBook, $this> */
-    public function assetBook(): BelongsTo
+    /** @return BelongsTo<BukuAset, $this> */
+    public function asetBook(): BelongsTo
     {
-        return $this->belongsTo(AssetBook::class, 'asset_book_id');
+        return $this->belongsTo(BukuAset::class, 'buku_aset_id');
     }
 }

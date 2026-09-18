@@ -79,7 +79,7 @@ class MaintenanceSetupTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('aset_m_maintenance_job_type_variant', ['id' => $variant, 'maintenance_job_type_id' => $jobType]);
-        $this->assertDatabaseHas('aset_m_maintenance_job_type_asset_type', ['job_type_id' => $jobType, 'jenis_aset_id' => $jenisAset]);
+        $this->assertDatabaseHas('aset_m_maintenance_job_type_jenis_aset', ['job_type_id' => $jobType, 'jenis_aset_id' => $jenisAset]);
     }
 
     public function test_baris_pengukuran_boleh_disimpan_tanpa_satuan(): void

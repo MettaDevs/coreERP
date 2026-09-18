@@ -44,7 +44,7 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
             'jenis_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_jenis_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'pabrikan_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_pabrikan_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
             'model_aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_model_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
-            'asset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_tr_penerimaan_aset', 'id')->where('tenant_id', $tenantId)],
+            'aset_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_tr_aset', 'id')->where('tenant_id', $tenantId)],
             'hours' => ['sometimes', 'numeric', 'min:0', 'max:999999999.99'],
             'items_count' => ['sometimes', 'integer', 'min:0'],
             'expenses_count' => ['sometimes', 'integer', 'min:0'],
@@ -67,7 +67,7 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
     protected function extraPayload(array $data): array
     {
         $payload = [];
-        foreach (['trade', 'functional_location_id', 'jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'asset_id', 'hours', 'items_count', 'expenses_count', 'fees_count'] as $key) {
+        foreach (['trade', 'functional_location_id', 'jenis_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'aset_id', 'hours', 'items_count', 'expenses_count', 'fees_count'] as $key) {
             if (! array_key_exists($key, $data)) {
                 continue;
             }
@@ -85,7 +85,7 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
             'jenis_aset_id' => $record->jenis_aset_id,
             'pabrikan_aset_id' => $record->pabrikan_aset_id,
             'model_aset_id' => $record->model_aset_id,
-            'asset_id' => $record->asset_id,
+            'aset_id' => $record->aset_id,
             'hours' => $record->hours,
             'items_count' => (int) $record->items_count,
             'expenses_count' => (int) $record->expenses_count,

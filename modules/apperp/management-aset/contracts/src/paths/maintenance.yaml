@@ -128,10 +128,10 @@
 /api/v1/maintenance-job-types/{id}/variants:
   parameters: [$ref: '#/components/parameters/RecordId']
   get: {tags: [Master data], operationId: listJobTypeVariants, responses: {'200': {description: Varian job type, content: {application/json: {schema: {type: object}}}}}}
-/api/v1/maintenance-job-types/{id}/asset-types:
+/api/v1/maintenance-job-types/{id}/jenis-aset:
   parameters: [$ref: '#/components/parameters/RecordId']
-  get: {tags: [Master data], operationId: getJobTypeAssetTypes, responses: {'200': {description: Relasi jenis aset, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
-  put: {tags: [Master data], operationId: replaceJobTypeAssetTypes, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [jenis_aset_ids], properties: {jenis_aset_ids: {type: array, items: {$ref: '#/components/schemas/Ulid'}}}}}}}, responses: {'200': {description: Relasi disimpan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
+  get: {tags: [Master data], operationId: getJobTypeAsetTypes, responses: {'200': {description: Relasi jenis aset, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
+  put: {tags: [Master data], operationId: replaceJobTypeAsetTypes, requestBody: {required: true, content: {application/json: {schema: {type: object, required: [jenis_aset_ids], properties: {jenis_aset_ids: {type: array, items: {$ref: '#/components/schemas/Ulid'}}}}}}}, responses: {'200': {description: Relasi disimpan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}
 /api/v1/jenis-aset/{id}/maintenance-job-types:
   parameters: [$ref: '#/components/parameters/RecordId']
   get: {tags: [Master data], operationId: getJenisAsetMaintenanceJobTypes, responses: {'200': {description: Relasi jenis pekerjaan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceTransferResponse'}}}}}}

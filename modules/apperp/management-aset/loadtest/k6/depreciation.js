@@ -230,33 +230,61 @@ export function setup() {
         [200],
     );
 
-    const aset = tahap(
-        'aset',
+    // Aset lahir dari dokumen penerimaan, bukan dari `POST /aset` — endpoint itu dibuang
+    // 18 September 2026. Dua tahap karena itu: draf dulu, lalu diselesaikan.
+    const penerimaan = tahap(
+        'penerimaan',
         semua((tenant, index) => [
             'POST',
-            ASET('aset'),
+            ASET('penerimaan-aset'),
             JSON.stringify({
-                nama: `Aset susut ${index}`,
                 legal_entity_id: tenant.legalEntityId,
-                usage_org_unit_id: tenant.orgUnitId,
-                group_aset_id: groupIds[index],
-                jenis_aset_id: jenisIds[index],
-                acquired_on: '2026-01-01',
-                placed_in_service_on: '2026-01-01',
-                acquisition_value: 1000,
-                residual_value: 0,
+                responsible_org_unit_id: tenant.orgUnitId,
+                tanggal: '2026-01-01',
+                tanggal_siap_pakai: '2026-01-01',
                 currency_code: 'IDR',
+                details: [
+                    {
+                        nama: `Aset susut ${index}`,
+                        group_aset_id: groupIds[index],
+                        jenis_aset_id: jenisIds[index],
+                        jumlah: 1,
+                        nilai_per_unit: 1000,
+                        residu_per_unit: 0,
+                    },
+                ],
             }),
-            params(tenant, kunci('aset', index)),
+            params(tenant, kunci('penerimaan', index)),
         ]),
     );
-    const kodeAset = aset.map((response) => String(response.json('data.kode')));
+    const penerimaanIds = idDari(penerimaan);
+    tahap(
+        'selesaikan penerimaan',
+        semua((tenant, index) => [
+            'POST',
+            `${ASET('penerimaan-aset')}/${penerimaanIds[index]}/selesaikan`,
+            JSON.stringify({ version: 1 }),
+            params(tenant),
+        ]),
+        [200],
+    );
+    const aset = tahap(
+        'aset dokumen',
+        semua((tenant, index) => [
+            'GET',
+            `${ASET('penerimaan-aset')}/${penerimaanIds[index]}/aset`,
+            null,
+            params(tenant),
+        ]),
+        [200],
+    );
+    const kodeAset = aset.map((response) => String(response.json('data.0.kode')));
 
     // Buku aset dibentuk matriks saat aset diterima, bukan diminta terpisah. Ia dicari lewat
     // kode asetnya, bukan diambil `data.0`: tenant ini mungkin dipakai skenario lain dan
     // memiliki buku aset lainnya, dan `data.0` akan menunjuk baris yang salah.
     const bukuAset = tahap('buku aset', semua((tenant) => ['GET', ASET('penyusutan/buku'), null, params(tenant)]), [200]).map((response, index) => {
-        const baris = (response.json('data') || []).find((row) => row.asset_code === kodeAset[index]);
+        const baris = (response.json('data') || []).find((row) => row.aset_code === kodeAset[index]);
 
         if (!baris) {
             fail(`setup buku aset tenant ${index} tidak terbentuk untuk aset ${kodeAset[index]}`);
@@ -275,7 +303,7 @@ export function setup() {
             semua((tenant, index) => [
                 'POST',
                 ASET('penyusutan/proposal'),
-                JSON.stringify({ asset_book_id: bukuAset[index].id, period_starts_on: mulai, period_ends_on: selesai }),
+                JSON.stringify({ buku_aset_id: bukuAset[index].id, period_starts_on: mulai, period_ends_on: selesai }),
                 params(tenant),
             ]),
         );
@@ -306,7 +334,7 @@ export function setup() {
     }
 
     tahap('saldo akhir', semua((tenant) => ['GET', ASET('penyusutan/buku'), null, params(tenant)]), [200]).forEach((response, index) => {
-        const baris = (response.json('data') || []).find((row) => row.asset_code === kodeAset[index]);
+        const baris = (response.json('data') || []).find((row) => row.aset_code === kodeAset[index]);
 
         if (Number(baris.net_book_value) !== NILAI_BUKU_AKHIR || Number(baris.accumulated_depreciation) !== AKUMULASI_AKHIR) {
             fail(`saldo akhir tenant ${index} bukan NBV ${NILAI_BUKU_AKHIR} dengan akumulasi ${AKUMULASI_AKHIR}: ${baris.net_book_value}/${baris.accumulated_depreciation}`);
@@ -318,8 +346,8 @@ export function setup() {
     return {
         tenants: tenants.map((tenant, index) => ({
             ...tenant,
-            assetCode: kodeAset[index],
-            assetBookId: bukuAset[index].id,
+            asetCode: kodeAset[index],
+            asetBookId: bukuAset[index].id,
             periodeIds: periodeIds.map((periode) => periode[index]),
             postingIds: postingIds.map((posting) => posting[index]),
         })),
@@ -359,7 +387,7 @@ function tersedia(response) {
 function mintaProposal(tenant, mulai, selesai, extra) {
     return http.post(
         ASET('penyusutan/proposal'),
-        JSON.stringify({ asset_book_id: tenant.assetBookId, period_starts_on: mulai, period_ends_on: selesai }),
+        JSON.stringify({ buku_aset_id: tenant.asetBookId, period_starts_on: mulai, period_ends_on: selesai }),
         paramsUntuk(tenant, { tags: { op: 'proposal', resource: 'penyusutan' }, ...extra }),
     );
 }
@@ -496,7 +524,7 @@ function bacaSaldo(tenant) {
         return;
     }
 
-    const baris = (response.json('data') || []).find((row) => row.asset_code === tenant.assetCode);
+    const baris = (response.json('data') || []).find((row) => row.aset_code === tenant.asetCode);
 
     if (!baris) {
         violation('buku_aset_hilang_dari_daftar');
@@ -523,8 +551,8 @@ function bacaDaftar(data, tenant) {
     const korban = data.tenants[(tenant.index + 1) % data.tenants.length];
     // SELFTEST mencari buku milik sendiri, yang memang ada di daftar ini, dan baris di bawahnya
     // wajib membacanya sebagai kebocoran.
-    const dicari = SELFTEST ? tenant.assetBookId : korban.assetBookId;
-    const asing = (response.json('data') || []).filter((row) => String(row.asset_book_id) === String(dicari));
+    const dicari = SELFTEST ? tenant.asetBookId : korban.asetBookId;
+    const asing = (response.json('data') || []).filter((row) => String(row.buku_aset_id) === String(dicari));
 
     if (asing.length > 0) {
         violation('daftar_penyusutan_memuat_buku_tenant_lain', { baris: asing.length });

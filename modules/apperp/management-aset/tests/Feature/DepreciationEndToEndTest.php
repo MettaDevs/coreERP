@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
@@ -23,7 +24,7 @@ use Tests\TestCase;
  */
 class DepreciationEndToEndTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, MenerimaAset, RefreshDatabase;
 
     private string $tenantId;
 
@@ -157,9 +158,9 @@ class DepreciationEndToEndTest extends TestCase
             ['buku_id' => $bukuK, 'useful_life_periods' => 10, 'convention' => 'full_month'],
             ['buku_id' => $bukuF, 'useful_life_periods' => 5, 'convention' => 'full_month'],
         ])->assertOk();
-        $asset = $this->receive($group, $jenis, 1000);
+        $aset = $this->receive($group, $jenis, 1000);
 
-        $books = DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->orderBy('useful_life_periods')->pluck('id', 'useful_life_periods');
+        $books = DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->orderBy('useful_life_periods')->pluck('id', 'useful_life_periods');
         $this->fastForward($books[5], 5);
         $this->fastForward($books[10], 5);
 
@@ -170,7 +171,7 @@ class DepreciationEndToEndTest extends TestCase
         // Buku fiskal tidak diekspor, jadi backoffice tidak menjurnal dua kali.
         $exported = DB::table('aset_tr_export_penyusutan as e')
             ->join('aset_tr_penyusutan_aset as p', 'p.id', '=', 'e.depreciation_period_id')
-            ->pluck('p.asset_book_id')->unique();
+            ->pluck('p.buku_aset_id')->unique();
         $this->assertTrue($exported->contains($books[10]));
         $this->assertFalse($exported->contains($books[5]));
     }
@@ -238,7 +239,7 @@ class DepreciationEndToEndTest extends TestCase
         // Buku milik tenant lain tidak dapat dipakai membuat proposal.
         $this->sebagaiPengguna($tenantLain, ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', [
-                'asset_book_id' => $milikKita, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31',
+                'buku_aset_id' => $milikKita, 'period_starts_on' => '2026-07-01', 'period_ends_on' => '2026-07-31',
             ])->assertNotFound();
 
         $this->assertSame(3, DB::table('aset_tr_penyusutan_aset')->where('tenant_id', $this->tenantId)->count());
@@ -294,9 +295,9 @@ class DepreciationEndToEndTest extends TestCase
             'convention' => $convention,
         ]])->assertOk();
 
-        $asset = $this->receive($group, $jenis, $acquisition, $residual, $placedInService);
+        $aset = $this->receive($group, $jenis, $acquisition, $residual, $placedInService);
 
-        return (string) DB::table('aset_tr_buku_aset')->where('asset_id', $asset)->value('id');
+        return (string) DB::table('aset_tr_buku_aset')->where('aset_id', $aset)->value('id');
     }
 
     /**
@@ -327,7 +328,7 @@ class DepreciationEndToEndTest extends TestCase
     {
         return $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.create'])
             ->postJson('/api/modules/management-aset/v1/penyusutan/proposal', array_filter([
-                'asset_book_id' => $bookId,
+                'buku_aset_id' => $bookId,
                 'period_starts_on' => $start,
                 'period_ends_on' => $end,
                 'consumption_amount' => $consumption,
@@ -398,16 +399,14 @@ class DepreciationEndToEndTest extends TestCase
 
     private function receive(string $group, string $jenis, float $acquisition, float $residual = 0, string $placedInService = '2026-06-15'): string
     {
-        return $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
-            ->withHeader('Idempotency-Key', 'aset-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => $this->legalEntityId,
-                'nama' => 'Aset penyusutan ujung ke ujung',
-                'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
-                'acquired_on' => '2026-06-01', 'placed_in_service_on' => $placedInService,
-                'acquisition_value' => $acquisition, 'residual_value' => $residual,
-                'currency_code' => 'IDR', 'usage_org_unit_id' => $this->orgUnitId,
-            ])->assertCreated()->json('data.id');
+        return $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => $this->legalEntityId,
+            'nama' => 'Aset penyusutan ujung ke ujung',
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
+            'acquired_on' => '2026-06-01', 'placed_in_service_on' => $placedInService,
+            'acquisition_value' => $acquisition, 'residual_value' => $residual,
+            'currency_code' => 'IDR', 'usage_org_unit_id' => $this->orgUnitId,
+        ]);
     }
 
     /** @return list<string> */

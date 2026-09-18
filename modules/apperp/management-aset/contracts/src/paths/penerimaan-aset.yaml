@@ -1,0 +1,227 @@
+# Dokumen penerimaan aset — satu kedatangan barang, banyak aset.
+#
+# Sejak 18 September 2026 ini satu-satunya pintu masuk ke register: `POST /api/v1/aset`
+# dibuang. Selama dua pintu terbuka, aset masih bisa lahir tanpa dokumen, tanpa rujukan
+# permintaan pembelian, dan tanpa peringatan ambang kapitalisasi.
+#
+# Nilai pada baris selalu **per unit**, bukan total. Ambang kapitalisasi dibandingkan
+# terhadap nilai satu aset, sama seperti di Dynamics 365 F&O: dua puluh kursi lima ratus
+# ribu tetap dua puluh aset lima ratus ribu, dan tidak melewati ambang sepuluh juta hanya
+# karena datang bersamaan.
+#
+# Vendor sengaja tidak ada. Menyalin namanya sebagai teks bebas akan menjadi kolom yang
+# harus dibersihkan kemudian.
+/api/v1/penerimaan-aset:
+  get:
+    tags:
+    - Penerimaan aset
+    operationId: listAsetReceipts
+    summary: Menampilkan dokumen penerimaan dalam jangkauan organisasi pengguna
+    parameters:
+    - name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [draft, selesai]
+    - name: dari
+      in: query
+      required: false
+      description: Batas bawah tanggal terima, `YYYY-MM-DD`.
+      schema:
+        type: string
+        format: date
+    - name: sampai
+      in: query
+      required: false
+      description: Batas atas tanggal terima, `YYYY-MM-DD`.
+      schema:
+        type: string
+        format: date
+    responses:
+      '200':
+        description: |
+          Daftar penerimaan. `jumlah_baris` adalah banyaknya baris barang, `jumlah_aset`
+          adalah total unit yang datang — angka kedua itulah yang dicocokkan dengan surat
+          jalan, dan keduanya berbeda begitu satu baris berjumlah lebih dari satu.
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+  post:
+    tags:
+    - Penerimaan aset
+    operationId: createAsetReceipt
+    summary: Membuat draf penerimaan; belum ada aset yang lahir sampai diselesaikan
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    responses:
+      '200':
+        description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
+      '201':
+        description: Draf penerimaan dibuat, nomor diterbitkan Number Sequence Core
+      '401':
+        $ref: '#/components/responses/Unauthenticated'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '409':
+        $ref: '#/components/responses/IdempotencyConflict'
+      '422':
+        description: |
+          Master di luar tenant, kombinasi pabrikan x model x jenis tidak sah, atau nilai
+          atribut tidak sesuai definisi jenis asetnya. Atribut diperiksa sudah di sini,
+          bukan menunggu penyelesaian: draf yang lolos padahal mustahil diselesaikan adalah
+          jebakan yang baru terbuka setelah tombol terakhir ditekan.
+/api/v1/penerimaan-aset/{id}:
+  get:
+    tags:
+    - Penerimaan aset
+    operationId: showAsetReceipt
+    summary: Membaca satu dokumen penerimaan beserta barisnya
+    description: |
+      Setiap id unit kerja dan id pengguna dipulangkan berpasangan dengan namanya
+      (`responsible_org_unit_nama`, `receiving_org_unit_nama`, `diterima_oleh_nama`,
+      `penanggung_jawab_nama`), dan tiap baris membawa nama master yang dirujuknya. Nama
+      dibaca dari Core saat permintaan dilayani, bukan disimpan sebagai snapshot. Nama
+      bernilai `null` berarti unit atau keanggotaannya sudah tidak ada di Core.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Penerimaan beserta barisnya
+      '404':
+        $ref: '#/components/responses/NotFound'
+  patch:
+    tags:
+    - Penerimaan aset
+    operationId: updateAsetReceipt
+    summary: Mengubah draf penerimaan; seluruh baris diganti
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Penerimaan setelah diubah
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+      '422':
+        description: Penerimaan yang sudah selesai tidak dapat diubah; asetnya sudah terdaftar dan bernomor
+  delete:
+    tags:
+    - Penerimaan aset
+    operationId: archiveAsetReceipt
+    summary: Mengarsipkan draf penerimaan
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '204':
+        description: Draf diarsipkan
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+      '422':
+        description: Penerimaan yang sudah selesai tidak dapat diarsipkan; aset sudah terbentuk karenanya
+/api/v1/penerimaan-aset/{id}/ringkasan:
+  get:
+    tags:
+    - Penerimaan aset
+    operationId: asetReceiptSummary
+    summary: Berapa aset yang akan lahir, dan baris mana yang tidak akan disusutkan
+    description: |
+      Menjawab pertanyaan yang berbeda dari `GET /penerimaan-aset/{id}`: bukan "apa isi
+      dokumen ini" melainkan "apa yang terjadi bila saya menyelesaikannya".
+
+      `peringatan` berisi satu entri per baris yang nilai per unitnya di bawah ambang
+      kapitalisasi group. Unitnya tetap tercatat sebagai aset, tetapi bukunya tidak akan
+      pernah menyusut — keputusan yang jauh lebih murah diketahui sekarang daripada setelah
+      nomor asetnya terbit dan tidak dapat ditarik kembali.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Jumlah baris, jumlah aset, dan daftar peringatan ambang kapitalisasi
+      '404':
+        $ref: '#/components/responses/NotFound'
+/api/v1/penerimaan-aset/{id}/selesaikan:
+  post:
+    tags:
+    - Penerimaan aset
+    operationId: completeAsetReceipt
+    summary: Menyelesaikan penerimaan; setiap unit menjadi satu aset bernomor
+    description: |
+      Memerlukan permission `management-aset.aset.create`, bukan permission dokumen ini:
+      menyusun berkas penerimaan dan benar-benar menambah aset ke register adalah dua
+      wewenang berbeda — pemisahan yang sama yang dipakai mutasi.
+
+      Untuk setiap unit pada setiap baris dibuat satu aset, satu penempatan pertama, dan
+      buku penyusutan dari matriks group x book. Kodenya diambil berurutan dari number
+      sequence `management-aset.aset`, **tidak** diturunkan dari nomor dokumen: kode aset
+      adalah kunci alami yang dipakai seumur hidup aset dan tidak boleh bergantung pada
+      dokumen yang masih dapat dikoreksi.
+
+      Seluruh nomor diterbitkan lebih dulu dengan kunci idempoten yang diturunkan dari id
+      dokumen dan nomor urut, jadi percobaan ulang setelah jaringan putus memulangkan nomor
+      yang sama alih-alih deret baru.
+
+      Nomor seri dibiarkan kosong: kardusnya belum dibuka. Ia diisi sesudahnya lewat
+      `PUT /penerimaan-aset/{id}/aset`.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Penerimaan setelah diselesaikan, beserta barisnya
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        description: Versi sudah tidak mutakhir; kode kesalahan `stale_version`
+      '422':
+        description: |
+          Dokumen tanpa baris, sudah selesai, melebihi sisa permintaan pembelian yang
+          dirujuknya (pesannya menyebut sisanya), atau groupnya belum memiliki profil
+          penyusutan yang dapat dihitung.
+      '503':
+        $ref: '#/components/responses/NumberSequenceUnavailable'
+/api/v1/penerimaan-aset/{id}/aset:
+  get:
+    tags:
+    - Penerimaan aset
+    operationId: listAsetFromReceipt
+    summary: Aset yang lahir dari dokumen ini
+    description: |
+      Daftar yang menyempit ke satu dokumen, bukan seluruh register: yang mengetik nomor
+      seri sedang memegang setumpuk stiker dari satu kiriman dan membacanya berurutan.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Aset dokumen ini, terurut kode
+      '404':
+        $ref: '#/components/responses/NotFound'
+  put:
+    tags:
+    - Penerimaan aset
+    operationId: setSerialNumbersFromReceipt
+    summary: Mengisi nomor seri seluruh aset dokumen ini sekaligus
+    description: |
+      Satu permintaan, bukan satu per aset: kegagalan di tengah pengiriman berulang
+      meninggalkan separuh terisi tanpa ada yang tahu separuh mana.
+
+      Memerlukan `management-aset.aset.update` — yang diubah adalah aset, bukan dokumennya.
+      Dokumen yang sudah selesai memang tidak dapat disunting, dan ini bukan pengecualian
+      terhadapnya: nomor seri tidak pernah menjadi bagian dokumen. Nilai kosong menghapus
+      nomor seri yang sudah ada.
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    responses:
+      '200':
+        description: Aset dokumen ini setelah nomor serinya disimpan
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '422':
+        description: Ada aset yang bukan berasal dari penerimaan ini

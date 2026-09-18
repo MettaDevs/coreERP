@@ -17,18 +17,18 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $tenant_id
- * @property string $asset_id
+ * @property string $aset_id
  * @property ?string $receiving_org_unit_id
  * @property ?string $usage_org_unit_id
  * @property ?string $received_by_user_id
  * @property ?string $custodian_user_id
- * @property ?string $asset_location_id
+ * @property ?string $lokasi_aset_id
  * @property Carbon $effective_on
  * @property ?string $reason
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
-class AssetPlacement extends Model
+class PenempatanAset extends Model
 {
     use HasUlids;
     use MilikTenant;
@@ -36,8 +36,8 @@ class AssetPlacement extends Model
     protected $table = 'aset_tr_penempatan_aset';
 
     protected $fillable = [
-        'tenant_id', 'asset_id', 'receiving_org_unit_id', 'usage_org_unit_id',
-        'received_by_user_id', 'custodian_user_id', 'asset_location_id', 'effective_on', 'reason',
+        'tenant_id', 'aset_id', 'receiving_org_unit_id', 'usage_org_unit_id',
+        'received_by_user_id', 'custodian_user_id', 'lokasi_aset_id', 'effective_on', 'reason',
     ];
 
     /** @return array<string, string> */
@@ -46,9 +46,9 @@ class AssetPlacement extends Model
         return ['effective_on' => 'date'];
     }
 
-    /** @return BelongsTo<Asset, $this> */
-    public function asset(): BelongsTo
+    /** @return BelongsTo<Aset, $this> */
+    public function aset(): BelongsTo
     {
-        return $this->belongsTo(Asset::class, 'asset_id');
+        return $this->belongsTo(Aset::class, 'aset_id');
     }
 }

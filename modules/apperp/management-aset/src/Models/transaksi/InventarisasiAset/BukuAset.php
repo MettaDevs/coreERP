@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
  *
  * @property string $id
  * @property string $tenant_id
- * @property string $asset_id
+ * @property string $aset_id
  * @property ?string $buku_id
  * @property ?string $depreciation_profile_id
  * @property ?string $alternative_profile_id
@@ -35,7 +35,7 @@ use Illuminate\Support\Carbon;
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
-class AssetBook extends Model
+class BukuAset extends Model
 {
     use HasUlids;
     use MilikTenant;
@@ -43,7 +43,7 @@ class AssetBook extends Model
     protected $table = 'aset_tr_buku_aset';
 
     protected $fillable = [
-        'tenant_id', 'asset_id', 'buku_id', 'depreciation_profile_id', 'alternative_profile_id', 'book_code',
+        'tenant_id', 'aset_id', 'buku_id', 'depreciation_profile_id', 'alternative_profile_id', 'book_code',
         'useful_life_periods', 'convention', 'depreciation_start_on', 'depreciate', 'round_off_depreciation',
         'acquisition_value', 'residual_value', 'accumulated_depreciation',
         'net_book_value', 'status',

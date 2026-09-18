@@ -8,12 +8,13 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
+use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
-class AssetLocationTest extends TestCase
+class LokasiAsetTest extends TestCase
 {
-    use BerinteraksiDenganKonteksCore, RefreshDatabase;
+    use BerinteraksiDenganKonteksCore, MenerimaAset, RefreshDatabase;
 
     private string $tenantId;
 
@@ -97,35 +98,60 @@ class AssetLocationTest extends TestCase
 
         $classification = $this->classification();
         $this->configureReadyBook($classification['group_aset_id']);
-        $assetPermissions = ['management-aset.aset.read', 'management-aset.aset.create', 'management-aset.aset.mutate'];
-
-        $asset = $this->sebagaiPengguna($this->tenantId, $assetPermissions)
-            ->withHeader('Idempotency-Key', 'terima-1')
-            ->postJson('/api/modules/management-aset/v1/aset', [
-                'legal_entity_id' => $legalEntity, 'nama' => 'Aset lokasi uji', ...$classification,
-                'asset_location_id' => $gudang, 'acquired_on' => '2026-08-01',
-                'acquisition_value' => 1000, 'currency_code' => 'IDR',
-                'usage_org_unit_id' => $unitPengguna,
-            ])->assertCreated()
-            // Dimensi diambil dari lokasi, bukan dari unit pengguna.
-            ->assertJsonPath('data.financial_dimension_org_unit_id', $unitGudang)
-            ->json('data.id');
+        $aset = $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => $legalEntity, 'nama' => 'Aset lokasi uji', ...$classification,
+            'lokasi_aset_id' => $gudang, 'acquired_on' => '2026-08-01',
+            'acquisition_value' => 1000, 'currency_code' => 'IDR',
+            'usage_org_unit_id' => $unitPengguna,
+        ]);
+        // Dimensi diambil dari lokasi, bukan dari unit pengguna.
+        $this->assertDatabaseHas('aset_tr_aset', [
+            'id' => $aset, 'financial_dimension_org_unit_id' => $unitGudang,
+        ]);
 
         // Pindah ke lokasi yang dipetakan ke unit lain: pembebanannya ikut pindah.
-        $this->sebagaiPengguna($this->tenantId, $assetPermissions)
-            ->postJson('/api/modules/management-aset/v1/aset/'.$asset.'/penempatan', [
-                'effective_on' => '2026-09-01', 'reason' => 'Mulai dipakai produksi',
-                'usage_org_unit_id' => $unitPengguna, 'asset_location_id' => $produksi,
-            ])->assertOk()
-            ->assertJsonPath('data.financial_dimension_org_unit_id', $unitProduksi);
+        $this->mutasikan($aset, $legalEntity, $unitPengguna, $produksi, '2026-09-01', 'Mulai dipakai produksi');
+        $this->assertDatabaseHas('aset_tr_aset', [
+            'id' => $aset, 'financial_dimension_org_unit_id' => $unitProduksi,
+        ]);
 
-        // Lokasi tanpa pemetaan: aset jatuh kembali ke unit penggunanya sendiri.
-        $this->sebagaiPengguna($this->tenantId, $assetPermissions)
-            ->postJson('/api/modules/management-aset/v1/aset/'.$asset.'/penempatan', [
-                'effective_on' => '2026-10-01', 'reason' => 'Dipindah ke koridor',
-                'usage_org_unit_id' => $unitPengguna, 'asset_location_id' => $tanpaUnit,
-            ])->assertOk()
-            ->assertJsonPath('data.financial_dimension_org_unit_id', $unitPengguna);
+        // Lokasi tanpa pemetaan: aset jatuh kembali ke unit tujuan pada dokumennya.
+        $this->mutasikan($aset, $legalEntity, $unitPengguna, $tanpaUnit, '2026-10-01', 'Dipindah ke koridor');
+        $this->assertDatabaseHas('aset_tr_aset', [
+            'id' => $aset, 'financial_dimension_org_unit_id' => $unitPengguna,
+        ]);
+    }
+
+    /**
+     * Satu dokumen mutasi, dibuat lalu langsung diselesaikan.
+     *
+     * Dulu pemindahan di test ini satu permintaan ke `POST /aset/{id}/penempatan`. Endpoint
+     * itu dipensiunkan 17 September 2026; yang diuji tetap sama — pembebanan mengikuti unit
+     * yang dipetakan pada lokasi tujuan — hanya pintunya yang berubah.
+     */
+    private function mutasikan(
+        string $asetId,
+        string $legalEntity,
+        string $unitTujuan,
+        string $lokasiTujuan,
+        string $tanggal,
+        string $alasan,
+    ): void {
+        $mutasi = (string) $this->sebagaiPengguna($this->tenantId, ['management-aset.mutasi-aset.create'])
+            ->withHeader('Idempotency-Key', 'mutasi-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/mutasi-aset', [
+                'legal_entity_id' => $legalEntity,
+                'responsible_org_unit_id' => $unitTujuan,
+                'tanggal' => $tanggal,
+                'tujuan_lokasi_id' => $lokasiTujuan,
+                'tujuan_org_unit_id' => $unitTujuan,
+                'alasan' => $alasan,
+                'details' => [['aset_id' => $asetId]],
+            ])->assertCreated()->json('data.id');
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.mutate', 'management-aset.mutasi-aset.read'])
+            ->postJson('/api/modules/management-aset/v1/mutasi-aset/'.$mutasi.'/selesaikan', ['version' => 1])
+            ->assertOk();
     }
 
     /** @return array{group_aset_id: string, jenis_aset_id: string} */
