@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Asset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\DepreciationPeriod;
