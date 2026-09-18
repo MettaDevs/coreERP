@@ -61,7 +61,7 @@ final class ReportHelper
         $bln = (int) date('n', $time);
         $thn = date('Y', $time);
 
-        return sprintf('%d %s %s', $tgl, self::BULAN[$bln] ?? '', $thn);
+        return sprintf('%d %s %s', $tgl, self::BULAN[$bln], $thn);
     }
 
     /**
