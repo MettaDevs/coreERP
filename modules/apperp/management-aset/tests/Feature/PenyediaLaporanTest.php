@@ -135,6 +135,57 @@ class PenyediaLaporanTest extends TestCase
         $this->assertGreaterThanOrEqual(1, count($response['data']['tables']['baris']));
     }
 
+    public function test_asset_maintenance_report_definition_and_dataset(): void
+    {
+        $definisi = $this->penyedia()->definisi(
+            'laporan-pemeliharaan-aset',
+            $this->konteks(['management-aset.pemeliharaan-aset.read']),
+        );
+
+        $this->assertSame(
+            ['group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'asset_id', 'dari', 'sampai'],
+            $definisi['parameters'],
+        );
+        $this->assertContains(
+            ['key' => 'baris.no_bukti', 'label' => 'No bukti work order', 'table' => 'baris'],
+            $definisi['fields'],
+        );
+        $this->assertContains(
+            ['key' => 'baris.analisa_perbaikan', 'label' => 'Analisa perbaikan', 'table' => 'baris'],
+            $definisi['fields'],
+        );
+
+        $this->workOrder();
+
+        // Izin salah ditolak
+        $this->assertGagalDengan(
+            'Anda tidak berhak membaca data laporan ini.',
+            fn () => $this->penyedia()->dataset('laporan-pemeliharaan-aset', $this->konteks(['management-aset.mutasi-aset.read']), []),
+        );
+
+        // Izin benar sukses
+        $data = $this->penyedia()->dataset(
+            'laporan-pemeliharaan-aset',
+            $this->konteks(['management-aset.pemeliharaan-aset.read']),
+            [],
+        );
+
+        $this->assertSame(1, $data['fields']['jumlah_pekerjaan']);
+        $row = $data['tables']['baris'][0];
+        $this->assertNotEmpty($row['no_bukti']);
+        $this->assertSame('AST-WO-1', $row['asset_kode']);
+        $this->assertSame('Forklift 1', $row['asset_nama']);
+        $this->assertSame('Unit', $row['satuan']);
+        $this->assertSame(1, $row['jumlah']);
+        $this->assertSame('Ganti ban', $row['jenis_pemeliharaan']);
+
+        // Cek endpoint preview API
+        $this->headers(['management-aset.pemeliharaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/laporan-pemeliharaan-aset')
+            ->assertOk()
+            ->assertJsonPath('data.fields.jumlah_pekerjaan', 1);
+    }
+
     /** @param list<string> $permissions */
     private function headers(array $permissions): static
     {
