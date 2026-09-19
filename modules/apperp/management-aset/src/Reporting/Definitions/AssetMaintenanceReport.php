@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Reporting\Definitions;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\JenisAset;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
@@ -130,6 +129,10 @@ final class AssetMaintenanceReport implements ReportDefinition
             ->leftJoin('aset_m_tindakan_perbaikan as tindakan', function ($join): void {
                 $join->on('tindakan.id', '=', 'aset_tr_pemeliharaan_aset_details.tindakan_perbaikan_id')
                     ->on('tindakan.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id');
+            })
+            ->leftJoin('organizations as org', function ($join): void {
+                $join->on('org.id', '=', 'wo.responsible_org_unit_id')
+                    ->on('org.tenant_id', '=', 'aset_tr_pemeliharaan_aset_details.tenant_id');
             });
 
         app(OrganizationScope::class)->query(
@@ -169,6 +172,7 @@ final class AssetMaintenanceReport implements ReportDefinition
                 'wo.created_at as wo_created_at',
                 'wo.dijadwalkan_mulai as wo_dijadwalkan_mulai',
                 'wo.responsible_org_unit_id as wo_org_unit_id',
+                'org.name as org_unit_nama',
                 'aset.kode as asset_kode',
                 'aset.nama as asset_nama',
                 'aset.model_number as asset_model_number',
@@ -216,14 +220,8 @@ final class AssetMaintenanceReport implements ReportDefinition
             ? (Asset::where('id', $parameters['asset_id'])->value('nama') ?? 'Semua aset')
             : 'Semua aset';
 
-        // Resolusi label unit organisasi
-        $orgNames = DB::table('organizations')
-            ->where('tenant_id', $context->tenantId)
-            ->pluck('name', 'id')
-            ->all();
-
         $nomor = 1;
-        $tableRows = $rows->map(function (object $row) use (&$nomor, $checklistMap, $orgNames): array {
+        $tableRows = $rows->map(function (object $row) use (&$nomor, $checklistMap): array {
             $spesifikasi = trim(($row->asset_model_number ?? '').' '.($row->asset_serial_number ?? ''));
 
             $analisaParts = array_filter([
@@ -259,7 +257,7 @@ final class AssetMaintenanceReport implements ReportDefinition
                 'checklist' => $checklistSummary,
                 'analisa_perbaikan' => $analisaPerbaikan,
                 'jenis_pemeliharaan' => (string) ($row->job_type_nama ?? $row->tipe_wo_nama ?? '—'),
-                'unit_organisasi' => (string) ($orgNames[$row->wo_org_unit_id] ?? $row->wo_org_unit_id ?? '—'),
+                'unit_organisasi' => (string) ($row->org_unit_nama ?? $row->wo_org_unit_id ?? '—'),
                 'pic' => (string) ($row->ditugaskan_ke_user_id ?? '—'),
                 'status' => $statusLabel,
             ];
