@@ -113,6 +113,28 @@ export default function LaporanPenjualanAsetPage() {
         [],
     );
 
+    const totalNilaiPenjualan = useMemo(() => {
+        const total = rows.reduce((acc, row) => {
+            const val =
+                typeof row.nilai_penjualan_raw === 'number'
+                    ? row.nilai_penjualan_raw
+                    : parseFloat(
+                          String(row.nilai_penjualan ?? 0).replace(
+                              /[^\d.-]/g,
+                              '',
+                          ),
+                      ) || 0;
+
+            return acc + val;
+        }, 0);
+
+        return new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            maximumFractionDigits: 0,
+        }).format(total);
+    }, [rows]);
+
     return (
         <ReportPageLayout<SaleReportRow>
             title="Laporan Penjualan Aset"
@@ -132,6 +154,12 @@ export default function LaporanPenjualanAsetPage() {
             rows={rows}
             loading={loading}
             error={error}
+            totalSummary={
+                <div className="flex items-center justify-between text-sm font-semibold">
+                    <span>Total Nilai Penjualan ({rows.length} transaksi)</span>
+                    <span className="font-mono">{totalNilaiPenjualan}</span>
+                </div>
+            }
             onRefresh={refetch}
         />
     );

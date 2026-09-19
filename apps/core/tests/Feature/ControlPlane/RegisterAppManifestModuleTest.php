@@ -41,7 +41,7 @@ class RegisterAppManifestModuleTest extends TestCase
         'duties' => 36,
         'number_sequence_references' => 29,
         'workflow_types' => 2,
-        'reports' => 2,
+        'reports' => 3,
     ];
 
     private string $akarSementara;

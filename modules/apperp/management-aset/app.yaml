@@ -1515,3 +1515,13 @@ reports:
         name: Daftar work order standar (Excel)
         description: Satu lembar dengan kolom identitas, jadwal, dan ringkasan jam.
         format: xlsx
+  - code: management-aset.laporan-penjualan-aset
+    name: Laporan penjualan aset
+    description: Daftar transaksi penjualan aset lengkap dengan nomor bukti, tanggal penjualan, keterangan, dan nilai penjualan.
+    permission: management-aset.penjualan-aset.read
+    parameters: [group_aset_id, kelompok_harta_fiskal_id, jenis_aset_id, asset_id, dari, sampai]
+    builtin_layouts:
+      - key: standar
+        name: Laporan penjualan aset standar (Excel)
+        description: Daftar transaksi penjualan aset lengkap dengan nomor bukti, tanggal penjualan, keterangan, dan nilai penjualan.
+        format: xlsx
