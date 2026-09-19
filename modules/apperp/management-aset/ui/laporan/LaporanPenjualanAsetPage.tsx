@@ -124,6 +124,7 @@ export default function LaporanPenjualanAsetPage() {
                               '',
                           ),
                       ) || 0;
+
             return acc + val;
         }, 0);
 
