@@ -1515,3 +1515,13 @@ reports:
         name: Daftar work order standar (Excel)
         description: Satu lembar dengan kolom identitas, jadwal, dan ringkasan jam.
         format: xlsx
+  - code: management-aset.laporan-pemeliharaan-aset
+    name: Laporan pemeliharaan aset
+    description: Daftar pelaksanaan perawatan berkala dan perbaikan aset beserta riwayat checklist dan teknisi.
+    permission: management-aset.pemeliharaan-aset.read
+    parameters: [group_aset_id, kelompok_harta_fiskal_id, jenis_aset_id, asset_id, dari, sampai]
+    builtin_layouts:
+      - key: standar
+        name: Laporan pemeliharaan aset standar (Excel)
+        description: Daftar rincian pemeliharaan aset per baris pekerjaan lengkap dengan checklist, analisa perbaikan, dan teknisi.
+        format: xlsx
