@@ -135,6 +135,75 @@ class PenyediaLaporanTest extends TestCase
         $this->assertGreaterThanOrEqual(1, count($response['data']['tables']['baris']));
     }
 
+    public function test_asset_disposal_sale_report_definition_and_dataset(): void
+    {
+        $definisi = $this->penyedia()->definisi(
+            'laporan-penjualan-aset',
+            $this->konteks(['management-aset.penjualan-aset.read']),
+        );
+
+        $this->assertSame(
+            ['group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'asset_id', 'dari', 'sampai'],
+            $definisi['parameters'],
+        );
+        $this->assertContains(
+            ['key' => 'baris.nilai_penjualan', 'label' => 'Nilai penjualan', 'table' => 'baris'],
+            $definisi['fields'],
+        );
+
+        $group = $this->master('aset_m_group_aset', 'Kendaraan', 'GRPA-S1');
+        $jenis = $this->master('aset_m_jenis_aset', 'Kendaraan roda 4', 'JNSA-S1');
+
+        $assetId = (string) Str::ulid();
+        DB::table('aset_tr_penerimaan_aset')->insert([
+            'id' => $assetId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(), 'kode' => 'AST-SL-1',
+            'nama' => 'Mobil Dinas Operasional', 'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
+            'group_aset_id' => $group, 'jenis_aset_id' => $jenis,
+            'model_number' => 'Innova', 'serial_number' => 'B 9999 ZZ',
+            'acquired_on' => '2025-01-01', 'acquisition_value' => 350000000, 'currency_code' => 'IDR',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $dokumenId = (string) Str::ulid();
+        DB::table('aset_tr_dokumen_siklus_aset')->insert([
+            'id' => $dokumenId, 'tenant_id' => $this->tenantId, 'creation_key' => 'seed-'.Str::ulid(),
+            'jenis_dokumen' => 'penjualan-aset', 'kode' => 'PJLA-000001',
+            'legal_entity_id' => $this->legalEntityId, 'responsible_org_unit_id' => $this->orgUnitId,
+            'asset_id' => $assetId, 'tanggal' => '2026-08-15', 'status' => 'disetujui',
+            'nilai' => 210000000, 'keterangan' => 'Penjualan aset via lelang',
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // Izin salah ditolak
+        $this->assertGagalDengan(
+            'Anda tidak berhak membaca data laporan ini.',
+            fn () => $this->penyedia()->dataset('laporan-penjualan-aset', $this->konteks(['management-aset.mutasi-aset.read']), []),
+        );
+
+        // Izin benar sukses
+        $data = $this->penyedia()->dataset(
+            'laporan-penjualan-aset',
+            $this->konteks(['management-aset.penjualan-aset.read']),
+            [],
+        );
+
+        $this->assertSame(1, $data['fields']['jumlah_penjualan']);
+        $this->assertSame('Rp 210.000.000', $data['fields']['total_nilai_penjualan']);
+        $row = $data['tables']['baris'][0];
+        $this->assertSame('PJLA-000001', $row['no_bukti']);
+        $this->assertSame('AST-SL-1', $row['asset_kode']);
+        $this->assertSame('Mobil Dinas Operasional', $row['asset_nama']);
+        $this->assertSame('Rp 210.000.000', $row['nilai_penjualan']);
+        $this->assertSame('Penjualan aset via lelang', $row['keterangan']);
+        $this->assertSame('Disetujui', $row['status_dokumen']);
+
+        // Cek endpoint preview API
+        $this->headers(['management-aset.penjualan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/laporan/laporan-penjualan-aset')
+            ->assertOk()
+            ->assertJsonPath('data.fields.jumlah_penjualan', 1);
+    }
+
     /** @param list<string> $permissions */
     private function headers(array $permissions): static
     {
