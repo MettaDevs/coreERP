@@ -10,6 +10,8 @@ use App\Services\Modules\KalenderFiskalCore;
 use App\Services\Modules\KonteksTenantPermintaan;
 use App\Services\Modules\MesinWorkflowCore;
 use App\Services\Modules\PenerbitNomorCore;
+use App\Services\Modules\PresisiMataUangCore;
+use App\Services\Modules\SetelanPostingFinanceCore;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\DaftarSatuan;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
@@ -19,6 +21,8 @@ use App\Support\Modules\Contracts\KonteksTenant;
 use App\Support\Modules\Contracts\MesinWorkflow;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Support\Modules\Contracts\PresisiMataUang;
+use App\Support\Modules\Contracts\SetelanPostingFinance;
 use App\Support\Reporting\DaftarLaporanModul;
 use Illuminate\Contracts\Foundation\Application;
 
@@ -54,6 +58,11 @@ final class CoreServices
         // Tanpa ini module harus menyebut kelas Core yang menyimpan tenant aktif, dan
         // batas yang berbunyi satu kalimat langsung runtuh.
         PelaksanaUntukTenant::class => PelaksanaTenant::class,
+        // Feed posting finance: module yang menyusun jurnal membaca kebijakan penyelesaian
+        // dan cutover entitas legal, dan membulatkan nilai dengan presisi yang sama dengan
+        // yang dipakai penerbit posting.
+        SetelanPostingFinance::class => SetelanPostingFinanceCore::class,
+        PresisiMataUang::class => PresisiMataUangCore::class,
     ];
 
     /**
