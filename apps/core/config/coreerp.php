@@ -86,6 +86,10 @@ return [
     // Permintaan per menit per klien integrasi (sistem di luar CoreERP, misalnya aplikasi finance
     // yang menarik feed posting). Tarikan wajar sekali per beberapa detik; ini batas kewarasan.
     'integration_api_rate_limit' => env('COREERP_INTEGRATION_API_RATE_LIMIT', 120),
+    // Berapa jam posting finance terus dicoba dikirim ke klien mode push yang sedang tidak dapat
+    // dijangkau (408, 429, 5xx, atau tidak menjawab) sebelum ditandai gagal dan menunggu tangan
+    // manusia di layar pantau. Jedanya 1, 2, 4, … sampai 60 menit.
+    'finance_push_retry_hours' => env('COREERP_FINANCE_PUSH_RETRY_HOURS', 24),
     'registration_rate_limit' => env('COREERP_REGISTRATION_RATE_LIMIT', 5),
     'password_breach_check' => env('COREERP_PASSWORD_BREACH_CHECK', true),
 

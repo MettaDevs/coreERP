@@ -194,59 +194,59 @@ terbaca per mata uang (K-10, K-16, K-20).
 
 ---
 
-### 6. [ ] Core: feed posting
+### 6. [x] Core: feed posting
 
 **Tempat:** `apps/core` · **Setelah:** 1, 3, 4, 5 · **Selesai bila:** module bisa menerbitkan
 posting dalam transaksinya sendiri, pembaca bisa menarik dan ack sesuai kontrak di PRD, dan
 tidak ada posting yang hilang atau dobel.
 
-- [ ] 6.1 Migration `finance_postings`.
-  - [ ] 6.1.1 Kolom: `id`, `tenant_id`, `legal_entity_id`, `posting_id` (unik per tenant), `posting_type`, `source_module`, `source_type`, `source_number`, `posting_date`, `settlement_mode` (nullable), `status`, `held_reason`, `payload` (json, bentuk kontrak lengkap), `total_debit`, `total_credit`, `reverses_posting_id`, `adjusts_posting_id`, `external_reference`, `reason_code`, `reason`, `acknowledged_at`, `served_count`, `last_served_at`, timestamps.
-  - [ ] 6.1.2 Indeks (`tenant_id`, `status`, `posting_date`) untuk penarikan.
-- [ ] 6.2 Kontrak `PenerbitPosting` di `apps/core/app/Support/Modules/Contracts/`.
-  - [ ] 6.2.1 `terbitkan(array $posting)` menerima jenis, entitas legal, tanggal, dokumen sumber, vendor, dan baris jurnal dengan `account_id` referensi + `org_unit_id` sumber dimensi.
-  - [ ] 6.2.2 Dipanggil **di dalam** transaksi pemanggil. Tidak membuka transaksi sendiri.
-  - [ ] 6.2.3 Idempoten: `posting_id` yang sama mengembalikan posting yang sudah ada.
-  - [ ] 6.2.4 Bind di `CoreServices.php`, dan buat pembungkus di sisi module mengikuti pola `KalenderFiskalAset`.
-- [ ] 6.3 Validasi dan pembentukan payload.
-  - [ ] 6.3.1 Seimbang, dan setiap baris hanya debit atau hanya kredit.
-  - [ ] 6.3.2 Akun ada dan aktif. Snapshot `external_id`, `code`, `name` ke payload.
-  - [ ] 6.3.3 Dimensi: akun neraca → `BUSINESS_UNIT`, akun laba rugi → `BUSINESS_UNIT` + `DEPARTMENT`, dari org unit lewat area 1.4. Bentuk per dimensi `{code, display_name, value_code, value_display_name, value_id}`, disejajarkan dengan `dimensionSetLines` BC. Snapshot nomor dan nama saat terbit.
-  - [ ] 6.3.4 Vendor wajib untuk `direct_payable` + pembelian.
-  - [ ] 6.3.5 Tanggal sebelum cutover → `manual`. Entitas legal dengan feed tidak aktif → `manual`.
-  - [ ] 6.3.6 Gagal di 6.3.2 atau 6.3.3 → `held` dengan alasan terstruktur (kode masalah, objek yang bermasalah, dan tautan perbaikan), supaya bisa ditampilkan per baris (7.6). Gagal di 6.3.1 → exception yang dilaporkan ke SigNoz lewat pelapor kesalahan yang sudah ada, karena itu bug penerbit.
-  - [ ] 6.3.7 Nilai uang disimpan dan dikirim sebagai string desimal dengan jumlah desimal persis presisi mata uang (5.5). Tolak nilai yang skalanya lebih halus. Header membawa `currency: {code, decimals}`.
-  - [ ] 6.3.8 Empat waktu (K-21): `posting_date` dan `document_date` dari pemanggil (tanggal saja); `occurred_at` dari pemanggil (jam + offset); `published_at` diisi Core saat terbit.
-  - [ ] 6.3.9 Kolom dimensi global di tabel baris (`business_unit_code`, `department_code`) untuk laporan cepat, di samping payload JSON.
-- [ ] 6.4 `GET /internal/v1/finance-postings` (mode `pull`, satu endpoint untuk semua jenis, K-23).
-  - [ ] 6.4.1 Hanya `pending`, urut `posting_date` lalu waktu terbit, `limit` maksimal 500.
-  - [ ] 6.4.4 Filter `posting_type` (mendukung awalan seperti `asset.*`) dan `legal_entity`, selalu dipersempit oleh `posting_type_prefixes` milik klien.
-  - [ ] 6.4.2 Naikkan `served_count` dan `last_served_at`, dan catat waktu tarikan terakhir per klien.
-  - [ ] 6.4.3 Posting disajikan ulang sampai di-ack.
-- [ ] 6.5 `POST /internal/v1/finance-postings/{posting_id}/ack`.
-  - [ ] 6.5.1 `posted` wajib `external_reference`. `rejected` wajib `reason_code` dari daftar di PRD, plus `reason`.
-  - [ ] 6.5.2 Ack sama yang diulang → 200 tanpa perubahan. Ack yang bertentangan dengan status akhir → 409.
-  - [ ] 6.5.3 `posting_id` tidak dikenal atau milik tenant lain → 404.
-- [ ] 6.6 Validasi ulang posting `held` setelah pemetaan diperbaiki. Payload dibentuk ulang, dan `posting_id` tetap.
-- [ ] 6.7 Kontrak.
-  - [ ] 6.7.1 Tulis ketiga rute di `apps/core/contracts/openapi-internal.yaml`, dengan skema `FinancePosting`, `JournalLine`, `FinancialDimension`, dan `Ack`.
-  - [ ] 6.7.2 Pastikan `apps/core/contracts/check-contract-coverage.py` lulus. Rute ditulis sebagai path literal berkutip tunggal.
-- [ ] 6.8 Test.
-  - [ ] 6.8.1 Penerbitan di dalam transaksi yang di-rollback tidak meninggalkan posting.
-  - [ ] 6.8.2 Posting yang terbit selama penarikan berlangsung tetap tersaji di tarikan berikutnya.
-  - [ ] 6.8.3 Ack ganda aman. Ack bertentangan menghasilkan 409.
-  - [ ] 6.8.4 `held` → perbaiki pemetaan → validasi ulang → `pending`.
-  - [ ] 6.8.5 Dimensi sesuai jenis akun.
-  - [ ] 6.8.6 Tenant terisolasi.
-  - [ ] 6.8.7 Nilai dengan skala lebih halus dari presisi mata uang ditolak.
-  - [ ] 6.8.8 Klien dengan awalan `asset.` tidak pernah menerima jenis lain.
-- [ ] 6.10 Mode `push` (K-03).
-  - [ ] 6.10.1 Job antrean yang mengirim posting `pending` milik klien `push` ke `push_url`, dengan header `X-CoreERP-Event-Timestamp` dan `X-CoreERP-Event-Signature` (HMAC-SHA256), mengikuti pola `apps/core/app/Console/Commands/PublishWorkflowEvents.php`.
-  - [ ] 6.10.2 Respons 2xx + body ack → diproses sama dengan `POST .../ack`.
-  - [ ] 6.10.3 408, 429, 5xx, atau timeout → kirim ulang dengan jeda yang makin panjang, dengan batas waktu total yang dicatat di setelan. 4xx lain → tandai gagal kirim, tampil di layar pantau.
-  - [ ] 6.10.4 Urutan kirim per klien sama dengan urutan `pull`. Satu posting yang gagal tidak menahan posting lain milik klien lain.
-  - [ ] 6.10.5 Tidak mengirim apa pun kalau `ActiveEnvironment::outboundAllowed()` false.
-  - [ ] 6.10.6 Test: tanda tangan benar, retry pada 5xx, berhenti pada 4xx, dan tidak ada kiriman di sandbox.
+- [x] 6.1 Migration `finance_postings`.
+  - [x] 6.1.1 Kolom: `id`, `tenant_id`, `legal_entity_id`, `posting_id` (unik per tenant), `posting_type`, `source_module`, `source_type`, `source_number`, `posting_date`, `settlement_mode` (nullable), `status`, `held_reason`, `payload` (json, bentuk kontrak lengkap), `total_debit`, `total_credit`, `reverses_posting_id`, `adjusts_posting_id`, `external_reference`, `reason_code`, `reason`, `acknowledged_at`, `served_count`, `last_served_at`, timestamps. `held_reason` menjadi `hold_reasons` (daftar masalah per baris), ditambah `manual_reason`, `input` (permintaan asli module, untuk membentuk ulang posting yang tertahan), dan `input_hash`. Tiga tabel pendamping: `finance_posting_lines`, `finance_posting_deliveries` (mode push), `finance_posting_events` (riwayat).
+  - [x] 6.1.2 Indeks (`tenant_id`, `status`, `posting_date`) untuk penarikan, ditambah `published_at` sesuai urutan tarikan.
+- [x] 6.2 Kontrak `PenerbitPosting` di `apps/core/app/Support/Modules/Contracts/`.
+  - [x] 6.2.1 `terbitkan(array $posting)` menerima jenis, entitas legal, tanggal, dokumen sumber, vendor, dan baris jurnal dengan `account_id` referensi + `org_unit_id` sumber dimensi. Ditambah `pratinjau()` (pemeriksaan sama tanpa menyimpan, untuk K-22) dan `status()`.
+  - [x] 6.2.2 Dipanggil **di dalam** transaksi pemanggil. Tidak membuka transaksi sendiri; dipanggil di luar transaksi dilempar sebagai `LogicException`.
+  - [x] 6.2.3 Idempoten: `posting_id` yang sama mengembalikan posting yang sudah ada. `posting_id` sama dengan isi jurnal berbeda dilempar sebagai `PostingTidakSah`.
+  - [x] 6.2.4 Bind di `CoreServices.php`. Pembungkus sisi module dibuat bersama pemanggil pertamanya (9.7), supaya bentuknya mengikuti kebutuhan penerimaan aset.
+- [x] 6.3 Validasi dan pembentukan payload (`App\Support\Finance\PostingPublisher`).
+  - [x] 6.3.1 Seimbang, dan setiap baris hanya debit atau hanya kredit.
+  - [x] 6.3.2 Akun ada dan aktif. Snapshot `external_id`, `code`, `name` ke payload.
+  - [x] 6.3.3 Dimensi: akun neraca → `BUSINESS_UNIT`, akun laba rugi → `BUSINESS_UNIT` + `DEPARTMENT`, dari org unit lewat area 1.4. Bentuk per dimensi `{code, display_name, value_code, value_display_name, value_id}`, disejajarkan dengan `dimensionSetLines` BC. Snapshot nomor dan nama saat terbit.
+  - [x] 6.3.4 Vendor wajib untuk `direct_payable` + pembelian (module mengirim `requires_vendor`). Vendor kosong atau milik entitas lain dilempar sebagai bug penerbit, bukan ditahan.
+  - [x] 6.3.5 Tanggal sebelum cutover → `manual`. Entitas legal dengan feed tidak aktif → `manual`. Mengubah setelan feed menilai ulang posting yang belum pernah sampai ke pembaca.
+  - [x] 6.3.6 Gagal di 6.3.2 atau 6.3.3 → `held` dengan alasan terstruktur `{line_no, code, message, object, fix}`, supaya bisa ditampilkan per baris (7.6). Gagal di 6.3.1 → `PostingTidakSah`, yang membatalkan dokumen dan sampai ke SigNoz lewat pelapor kesalahan biasa.
+  - [x] 6.3.7 Nilai uang disimpan dan dikirim sebagai string desimal dengan jumlah desimal persis presisi mata uang (5.5). Tolak nilai yang skalanya lebih halus. Header membawa `currency: {code, decimals}`.
+  - [x] 6.3.8 Empat waktu (K-21): `posting_date` dan `document_date` dari pemanggil (tanggal saja); `occurred_at` dari pemanggil (jam + offset); `published_at` diisi Core saat terbit.
+  - [x] 6.3.9 Kolom dimensi global di tabel baris (`business_unit_code`, `department_code`) untuk laporan cepat, di samping payload JSON.
+- [x] 6.4 `GET /internal/v1/finance-postings` (mode `pull`, satu endpoint untuk semua jenis, K-23).
+  - [x] 6.4.1 Hanya `pending`, urut `posting_date` lalu waktu terbit, `limit` maksimal 500.
+  - [x] 6.4.4 Filter `posting_type` (mendukung awalan seperti `asset.*`) dan `legal_entity`, selalu dipersempit oleh `posting_type_prefixes` milik klien.
+  - [x] 6.4.2 Naikkan `served_count` dan `last_served_at`, dan catat waktu tarikan terakhir per klien.
+  - [x] 6.4.3 Posting disajikan ulang sampai di-ack.
+- [x] 6.5 `POST /internal/v1/finance-postings/{posting_id}/ack`.
+  - [x] 6.5.1 `posted` wajib `external_reference`. `rejected` wajib `reason_code` dari daftar di PRD, plus `reason`.
+  - [x] 6.5.2 Ack sama yang diulang → 200 tanpa perubahan. Ack yang bertentangan dengan status akhir → 409.
+  - [x] 6.5.3 `posting_id` tidak dikenal atau milik tenant lain → 404.
+- [x] 6.6 Validasi ulang posting `held` setelah pemetaan diperbaiki. Payload dibentuk ulang, dan `posting_id` tetap. Tombol "Validasi ulang" di layar pantau (7.3.1).
+- [x] 6.7 Kontrak.
+  - [x] 6.7.1 Tulis ketiga rute di `apps/core/contracts/openapi-internal.yaml`, dengan skema `FinancePosting`, `JournalLine`, `FinancialDimension`, dan `Ack`. Mode push ditulis sebagai `webhooks.financePosting`, lengkap dengan tanda tangan dan aturan jawaban.
+  - [x] 6.7.2 Pastikan `apps/core/contracts/check-contract-coverage.py` lulus. Rute ditulis sebagai path literal berkutip tunggal. Ditambah `ContractYamlTest`: kontrak harus terbaca parser YAML yang ketat, karena PyYAML diam-diam menerima deskripsi berkoma di dalam `{ … }`.
+- [x] 6.8 Test (`FinancePostingFeedTest`, 22 test; payload dicocokkan dengan skema OpenAPI).
+  - [x] 6.8.1 Penerbitan di dalam transaksi yang di-rollback tidak meninggalkan posting.
+  - [x] 6.8.2 Posting yang terbit selama penarikan berlangsung tetap tersaji di tarikan berikutnya.
+  - [x] 6.8.3 Ack ganda aman. Ack bertentangan menghasilkan 409.
+  - [x] 6.8.4 `held` → perbaiki pemetaan → validasi ulang → `pending`.
+  - [x] 6.8.5 Dimensi sesuai jenis akun.
+  - [x] 6.8.6 Tenant terisolasi.
+  - [x] 6.8.7 Nilai dengan skala lebih halus dari presisi mata uang ditolak.
+  - [x] 6.8.8 Klien dengan awalan `asset.` tidak pernah menerima jenis lain.
+- [x] 6.10 Mode `push` (K-03), `finance-postings:push` setiap menit.
+  - [x] 6.10.1 Job antrean yang mengirim posting `pending` milik klien `push` ke `push_url`, dengan header `X-CoreERP-Event-Timestamp` dan `X-CoreERP-Event-Signature` (HMAC-SHA256), mengikuti pola `apps/core/app/Console/Commands/PublishWorkflowEvents.php`.
+  - [x] 6.10.2 Respons 2xx + body ack → diproses sama dengan `POST .../ack`. 2xx tanpa ack: terkirim, tetap `pending` sampai di-ack lewat API.
+  - [x] 6.10.3 408, 429, 5xx, atau timeout → kirim ulang dengan jeda yang makin panjang, dengan batas waktu total yang dicatat di setelan (`coreerp.finance_push_retry_hours`). 4xx lain dan 3xx (redirect tidak diikuti) → tandai gagal kirim, tampil di layar pantau.
+  - [x] 6.10.4 Urutan kirim per klien sama dengan urutan `pull`. Satu posting yang gagal tidak menahan posting lain milik klien lain.
+  - [x] 6.10.5 Tidak mengirim apa pun kalau `ActiveEnvironment::outboundAllowed()` false.
+  - [x] 6.10.6 Test: tanda tangan benar, retry pada 5xx, berhenti pada 4xx, dan tidak ada kiriman di sandbox.
 
 ---
 
@@ -331,6 +331,7 @@ dan PPN, untuk kedua mode.
   - [ ] 9.4.3 `posting_date` = `tanggal` penerimaan, **bukan** tanggal siap pakai. `document_date` = tanggal faktur vendor kalau diisi, selain itu `tanggal` penerimaan. `occurred_at` = jam penerimaan diselesaikan.
   - [ ] 9.4.4 `details.assets` berisi kode aset, group, buku, nilai, dan PPN.
   - [ ] 9.4.5 Hanya buku yang boleh di-post (bukan `none`) yang menghasilkan baris.
+- [ ] 9.7 Pembungkus `PenerbitPosting` di sisi module, mengikuti pola `KalenderFiskalAset` (dipindah dari 6.2.4): menyusun masukan dari penerimaan dan menerjemahkan `PostingTidakSah` menjadi pesan "dokumen gagal disimpan karena kesalahan sistem".
 - [ ] 9.5 Test.
   - [ ] 9.5.1 Mode `direct_payable`: jurnal seperti di PRD, seimbang, dengan vendor.
   - [ ] 9.5.2 Mode `clearing`: kredit ke perantara, vendor boleh kosong.

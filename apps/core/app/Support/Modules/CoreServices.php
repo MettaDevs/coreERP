@@ -12,6 +12,7 @@ use App\Services\Modules\KalenderFiskalCore;
 use App\Services\Modules\KonteksTenantPermintaan;
 use App\Services\Modules\MesinWorkflowCore;
 use App\Services\Modules\PenerbitNomorCore;
+use App\Services\Modules\PenerbitPostingCore;
 use App\Services\Modules\PresisiMataUangCore;
 use App\Services\Modules\SetelanPostingFinanceCore;
 use App\Support\Modules\Contracts\DaftarAkun;
@@ -25,6 +26,7 @@ use App\Support\Modules\Contracts\KonteksTenant;
 use App\Support\Modules\Contracts\MesinWorkflow;
 use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use App\Support\Modules\Contracts\PenerbitNomor;
+use App\Support\Modules\Contracts\PenerbitPosting;
 use App\Support\Modules\Contracts\PresisiMataUang;
 use App\Support\Modules\Contracts\SetelanPostingFinance;
 use App\Support\Reporting\DaftarLaporanModul;
@@ -73,6 +75,9 @@ final class CoreServices
         // Vendor milik Core (party berperan vendor per entitas legal), dipilih di dokumen
         // penerimaan module dan disalin nomor serta namanya ke posting saat terbit.
         DaftarVendor::class => DaftarVendorCore::class,
+        // Feed posting finance: module menerbitkan jurnalnya di dalam transaksi dokumen sumbernya,
+        // dan memakai pratinjau yang sama untuk menampilkan masalah sebelum konfirmasi.
+        PenerbitPosting::class => PenerbitPostingCore::class,
     ];
 
     /**

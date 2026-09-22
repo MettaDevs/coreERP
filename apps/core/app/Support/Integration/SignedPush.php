@@ -56,7 +56,10 @@ final class SignedPush
 
         $tanda = self::sign($client->signing_secret, $body);
 
+        // Redirect tidak diikuti: tujuan yang sudah lolos PushDestination bisa mengalihkan ke
+        // jaringan privat, dan pengalihan itu tidak pernah diperiksa. Jawaban 3xx dihitung gagal.
         return Http::acceptJson()
+            ->withOptions(['allow_redirects' => false])
             ->connectTimeout(3)
             ->timeout(10)
             ->withBody($body, 'application/json')
