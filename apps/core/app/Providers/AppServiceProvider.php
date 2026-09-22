@@ -141,6 +141,10 @@ class AppServiceProvider extends ServiceProvider
         );
         Gate::define('monitor-identities', fn (User $user): bool => $user->providerAccess()->where('role', 'provider_admin')->exists());
         Gate::define('manage-app-catalog', fn (User $user): bool => $user->providerAccess()->where('role', 'provider_admin')->exists());
+        // Dokumen API internal di portal `/docs`: referensi Scramble untuk layar CoreERP dan
+        // kontrak app serta pusat admin. Nama gate ditentukan Scramble (`RestrictedDocsAccess`).
+        // Kontrak integrasi untuk sistem luar tidak dijaga gate ini; ia terbit tanpa login.
+        Gate::define('viewApiDocs', fn (?User $user): bool => $user?->providerAccess()->where('role', 'provider_admin')->exists() ?? false);
 
         Event::listen(Login::class, function (Login $event): void {
             $event->user->forceFill(['last_login_at' => now()])->saveQuietly();

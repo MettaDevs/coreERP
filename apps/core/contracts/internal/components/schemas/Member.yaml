@@ -1,0 +1,6 @@
+type: object
+required: [membership_id, name, email]
+properties:
+  membership_id: { type: string, format: ulid }
+  name: { type: string }
+  email: { type: string, format: email }

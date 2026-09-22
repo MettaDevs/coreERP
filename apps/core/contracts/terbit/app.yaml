@@ -1,0 +1,1061 @@
+# Berkas hasil `python contracts/bundle.py` dari `contracts/internal/`.
+# Jangan diedit tangan: suntingan di sini hilang pada perakitan berikutnya, dan CI menolaknya.
+openapi: 3.1.0
+info:
+  title: CoreERP — API untuk app module
+  version: 1.0.0
+  description: |
+    Endpoint `internal/v1` yang dipanggil app bisnis memakai kredensial app (`appId` +
+    `serviceToken` + `tenantHeader`), diverifikasi `AuthenticateAppService`.
+
+    Module yang berjalan di dalam runtime Core memanggil Core lewat kontrak in-process di
+    `App\Support\Modules\Contracts`, bukan lewat endpoint ini. Yang tersisa di sini adalah pintu
+    untuk app yang masih berjalan sebagai proses tersendiri dan addon pihak ketiga.
+
+    - `tenant_id` **tidak pernah** diterima dari URL, query, atau body; ia berasal dari header
+      kredensial yang diverifikasi.
+    - App hanya menerima referensi opaque milik Core.
+    - Seluruh response sukses memakai envelope `data`.
+servers:
+- url: /api/internal/v1
+  description: Relatif terhadap host Core; path lengkapnya `/api/internal/v1/...`.
+security:
+- appId: []
+  serviceToken: []
+  tenantHeader: []
+tags:
+- name: Directory
+  description: Data referensi Core yang boleh dibaca app. Hanya baca.
+- name: Human Resources
+  description: Sinkronisasi workforce. Terbatas pada app `human-resources`.
+- name: Number sequence
+  description: Penerbitan nomor dokumen. Counter dimiliki Core, tidak pernah app.
+- name: Workflow
+  description: Pengajuan workflow. Keputusannya kembali sebagai event, bukan response.
+paths:
+  /members:
+    get:
+      tags:
+      - Directory
+      operationId: internal.members.index
+      summary: Cari anggota tenant yang aktif
+      description: |
+        Terbatas pada app `human-resources`; app lain menerima 403. Hasil dibatasi
+        20 baris dan tidak mendukung pagination — ini pencarian pemilih, bukan export.
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Cocokkan sebagian nama atau email, tidak peka huruf besar-kecil.
+      responses:
+        '200':
+          description: Daftar anggota aktif.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /members/{membership}:
+    get:
+      tags:
+      - Directory
+      operationId: internal.members.show
+      summary: Ambil satu anggota tenant
+      description: Terbatas pada app `human-resources`. Anggota non-aktif dianggap tidak ada.
+      parameters:
+      - name: membership
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+      responses:
+        '200':
+          description: Anggota ditemukan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /operating-units:
+    get:
+      tags:
+      - Directory
+      operationId: internal.operating-units.index
+      summary: Daftar operating unit, beserta nomor dan tipenya
+      security:
+      - appId: []
+        serviceToken: []
+        tenantHeader: []
+      description: |
+        Dua pemanggil: app `human-resources` (app lain menerima 403), dan klien integrasi dengan
+        cakupan `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
+        legal entity tidak dikembalikan di sini.
+
+        Tanpa `updated_since`: seluruh operating unit **aktif**. Dengan `updated_since`:
+        **setiap** operating unit yang berubah pada atau sesudah saat itu, termasuk yang sudah
+        dinonaktifkan (`status` bukan `active`), supaya pembaca yang menyinkronkan tabel
+        penerjemahnya tahu unit mana yang berhenti dipakai.
+
+        `number` adalah nomor unit, kode stabil yang dipakai sebagai nilai dimensi keuangan
+        `BUSINESS_UNIT` dan `DEPARTMENT` pada feed posting finance. `null` berarti belum diisi.
+
+        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari tarikan terakhir, kirim
+        sebagai `updated_since` pada tarikan berikutnya, dan simpan dengan upsert berdasarkan
+        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Tarikan penuh tanpa
+        `updated_since` sesekali tetap dianjurkan sebagai jaring pengaman.
+      parameters:
+      - name: updated_since
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
+      responses:
+        '200':
+          description: Daftar operating unit, diurutkan menurut nama.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OperatingUnit'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /fiscal-periods:
+    get:
+      tags:
+      - Directory
+      operationId: internal.fiscal-periods.resolve
+      summary: Tahun buku dan periode yang memuat satu tanggal
+      description: |
+        Untuk app yang perhitungannya bergantung pada batas tahun buku, misalnya
+        penyusutan aset dengan dasar tahun fiskal. Kalender melekat pada legal entity,
+        jadi app cukup menyebut legal entity dan tanggal yang ditanyakan.
+
+        Fakta kalender tetap dimiliki Core. App tidak boleh menyalin bulan awal tahun
+        buku ke databasenya sendiri, karena salinan itu akan menyimpang saat tenant
+        mengubah kalendernya.
+      parameters:
+      - name: legal_entity_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: ulid
+      - name: date
+        in: query
+        required: true
+        description: Tanggal yang dicari periodenya, format `YYYY-MM-DD`.
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Kalender, tahun buku, dan periode yang memuat tanggal tersebut.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - calendar
+                    - year
+                    - period
+                    properties:
+                      calendar:
+                        type: object
+                        required:
+                        - id
+                        - code
+                        - name
+                        properties:
+                          id:
+                            type: string
+                            format: ulid
+                          code:
+                            type: string
+                          name:
+                            type: string
+                      year:
+                        type: object
+                        required:
+                        - id
+                        - name
+                        - starts_on
+                        - ends_on
+                        properties:
+                          id:
+                            type: string
+                            format: ulid
+                          name:
+                            type: string
+                          starts_on:
+                            type: string
+                            format: date
+                          ends_on:
+                            type: string
+                            format: date
+                      period:
+                        type: object
+                        required:
+                        - id
+                        - ordinal
+                        - name
+                        - starts_on
+                        - ends_on
+                        properties:
+                          id:
+                            type: string
+                            format: ulid
+                          ordinal:
+                            type: integer
+                          name:
+                            type: string
+                          starts_on:
+                            type: string
+                            format: date
+                          ends_on:
+                            type: string
+                            format: date
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Legal entity belum punya kalender tahun buku, atau tanggal belum tercakup periodenya.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /units-of-measure:
+    get:
+      tags:
+      - Directory
+      operationId: internal.units-of-measure.index
+      summary: Daftar satuan aktif tenant
+      description: Terbuka untuk semua app yang punya credential aktif dan entitlement `ready`.
+      responses:
+        '200':
+          description: Daftar satuan, diurutkan menurut nama.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UnitOfMeasure'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /units-of-measure/resolve:
+    post:
+      tags:
+      - Directory
+      operationId: internal.units-of-measure.resolve
+      summary: Resolusi sekumpulan ID satuan
+      description: |
+        Dipakai app untuk memvalidasi satuan yang disimpannya masih sah. Bersifat
+        semua-atau-tidak: satu ID yang tidak ditemukan atau tidak aktif menggagalkan
+        seluruh permintaan dengan 422, bukan mengembalikan sebagian hasil.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - unit_ids
+              properties:
+                unit_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  uniqueItems: true
+                  items:
+                    type: string
+                    format: ulid
+      responses:
+        '200':
+          description: Seluruh satuan ditemukan dan aktif.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UnitOfMeasure'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /units-of-measure/convert:
+    post:
+      tags:
+      - Directory
+      operationId: internal.units-of-measure.convert
+      summary: Konversi nilai antar satuan
+      description: |
+        Kedua satuan harus aktif dan berada dalam kelas yang sama. Konversi khusus
+        produk (misalnya box-ke-pcs) bukan milik endpoint ini; itu milik PIM/Inventory
+        ketika module tersebut memiliki produk.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - from_unit_id
+              - to_unit_id
+              - value
+              properties:
+                from_unit_id:
+                  type: string
+                  format: ulid
+                to_unit_id:
+                  type: string
+                  format: ulid
+                  description: Harus berbeda dari `from_unit_id`.
+                value:
+                  type: string
+                  description: Dikirim sebagai string agar presisi desimal tidak hilang.
+      responses:
+        '200':
+          description: Hasil konversi.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - value
+                    - unit_id
+                    properties:
+                      value:
+                        type: string
+                      unit_id:
+                        type: string
+                        format: ulid
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Satuan tidak aktif, beda kelas, atau aturan konversi belum dikonfigurasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /human-resources/position-assignments:
+    post:
+      tags:
+      - Human Resources
+      operationId: internal.hr.position-assignments.store
+      summary: Sinkronkan perubahan penugasan posisi
+      description: |
+        Terbatas pada app `human-resources`.
+
+        Ini **perintah REST, bukan event**. Ia menyatakan keadaan penugasan saat ini
+        dan Core memakainya untuk memateralisasi role otomatis; ia bukan fakta masa
+        lalu yang disiarkan. Jangan mencarinya di `asyncapi.yaml`.
+
+        Efeknya idempoten terhadap `assignment_id`: `active: true` membuat atau
+        mempertahankan role assignment otomatis untuk setiap rule posisi yang cocok,
+        `active: false` mencabutnya. Assignment manual tidak pernah tersentuh.
+
+        Rule role otomatis hanya boleh memakai data policy yang membutuhkan operating
+        unit dan tidak membutuhkan legal entity; kombinasi lain ditolak 422.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - membership_id
+              - position_id
+              - operating_unit_id
+              - assignment_id
+              - active
+              properties:
+                membership_id:
+                  type: string
+                  format: ulid
+                  description: Harus anggota aktif pada tenant yang sama.
+                position_id:
+                  type: string
+                  format: ulid
+                operating_unit_id:
+                  type: string
+                  format: ulid
+                  description: Menjadi scope data policy pada role otomatis yang dibuat.
+                assignment_id:
+                  type: string
+                  format: ulid
+                  description: Identitas penugasan milik HR; dipakai sebagai kunci pencabutan.
+                active:
+                  type: boolean
+                  description: '`false` mencabut role otomatis yang berasal dari penugasan ini.'
+      responses:
+        '204':
+          description: Sinkronisasi diterima. Tidak ada body.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Anggota tidak tersedia, atau rule role otomatis memakai kebijakan data
+            yang tidak sah untuk penugasan posisi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /number-sequences/{reference}/issue:
+    post:
+      tags:
+      - Number sequence
+      operationId: internal.number-sequences.issue
+      summary: Terbitkan satu nomor dokumen
+      description: |
+        Hanya untuk sequence **non-continuous**. Sequence berkelanjutan wajib memakai
+        `reserve` lalu `confirm`, karena hanya jalur itu yang menjamin tidak ada lompatan
+        nomor; memanggil `issue` padanya menghasilkan 422.
+
+        Pengulangan dengan `idempotency_key` yang sama pada app dan sequence yang sama
+        mengembalikan nomor yang sama, bukan nomor kedua.
+      parameters:
+      - $ref: '#/components/parameters/SequenceReference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/NumberSequenceContext'
+              - type: object
+                required:
+                - idempotency_key
+                properties:
+                  idempotency_key:
+                    $ref: '#/components/schemas/IdempotencyKey'
+                  manual_value:
+                    type:
+                    - string
+                    - 'null'
+                    maxLength: 255
+                    description: |
+                      Hanya sah bila sequence mengizinkan nilai manual. Sequence
+                      berkelanjutan tidak pernah mengizinkannya.
+      responses:
+        '200':
+          description: Nomor diterbitkan, atau pemutaran ulang idempotency key yang sama.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/IssuedNumber'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: |
+            Sequence berkelanjutan, sequence tidak aktif untuk scope yang dikirim,
+            atau field tidak valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /number-sequences/{reference}/reserve:
+    post:
+      tags:
+      - Number sequence
+      operationId: internal.number-sequences.reserve
+      summary: Pesan nomor untuk sequence berkelanjutan
+      description: |
+        Hanya untuk sequence **continuous**; sequence non-continuous menghasilkan 422.
+
+        Reservation menahan nomor sampai `confirm` atau `cancel`. Nomor yang dibatalkan
+        kembali ke pool dan dapat dipakai transaksi lain, sehingga reservation yang sudah
+        dibatalkan tidak pernah diputar ulang oleh idempotency key yang sama.
+      parameters:
+      - $ref: '#/components/parameters/SequenceReference'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/NumberSequenceContext'
+              - type: object
+                required:
+                - idempotency_key
+                properties:
+                  idempotency_key:
+                    $ref: '#/components/schemas/IdempotencyKey'
+      responses:
+        '201':
+          description: Nomor dipesan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Sequence tidak memakai reservation, atau field tidak valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /number-sequence-reservations/{reservation}/confirm:
+    post:
+      tags:
+      - Number sequence
+      operationId: internal.number-sequence-reservations.confirm
+      summary: Konfirmasi nomor yang dipesan
+      description: |
+        Dipanggil setelah dokumen app benar-benar tersimpan. Reservation yang sudah
+        `confirmed` mengembalikan hasil yang sama tanpa efek tambahan.
+      parameters:
+      - $ref: '#/components/parameters/ReservationId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NumberSequenceContext'
+      responses:
+        '200':
+          description: Reservation dikonfirmasi.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Reservation sudah dibatalkan atau tidak dalam status yang dapat dikonfirmasi.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /number-sequence-reservations/{reservation}/cancel:
+    post:
+      tags:
+      - Number sequence
+      operationId: internal.number-sequence-reservations.cancel
+      summary: Batalkan nomor yang dipesan
+      description: |
+        Mengembalikan nomor ke pool sehingga tidak ada lompatan pada sequence
+        berkelanjutan. Reservation yang sudah `cancelled` mengembalikan hasil yang sama.
+        Reservation yang sudah dikonfirmasi tidak dapat dibatalkan.
+      parameters:
+      - $ref: '#/components/parameters/ReservationId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NumberSequenceContext'
+      responses:
+        '200':
+          description: Reservation dibatalkan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Reservation sudah dikonfirmasi dan tidak dapat dibatalkan.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /workflow-instances:
+    post:
+      tags:
+      - Workflow
+      operationId: internal.workflow-instances.store
+      summary: Ajukan dokumen ke workflow Core
+      description: |
+        App mengajukan dokumennya; Core menjalankan konfigurasi workflow milik tenant.
+
+        Keputusannya **tidak** dikembalikan pada response ini. Ia tiba kemudian sebagai
+        event `core.workflow.decision.v2` ke endpoint webhook app — lihat
+        `contracts/asyncapi.yaml`. Response ini hanya menyatakan pengajuan diterima.
+
+        `workflow_type` harus terdaftar untuk app pemanggil; jenis milik app lain
+        menghasilkan 404, bukan 403, agar keberadaan workflow app lain tidak bocor.
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          $ref: '#/components/schemas/IdempotencyKey'
+        description: |
+          Wajib. Pengulangan dengan kunci yang sama mengembalikan instance yang sama
+          dengan status 200 dan header `Idempotent-Replayed: true`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - workflow_type
+              - source_document_type
+              - source_document_id
+              - initiator_membership_id
+              - decision_context
+              properties:
+                workflow_type:
+                  type: string
+                  maxLength: 120
+                  description: Kode `workflow_types` milik app pemanggil.
+                source_document_type:
+                  type: string
+                  maxLength: 120
+                  description: Jenis dokumen milik app, mis. `dekomisioning-aset`.
+                source_document_id:
+                  type: string
+                  format: ulid
+                legal_entity_id:
+                  type:
+                  - string
+                  - 'null'
+                  format: ulid
+                  description: |
+                    Wajib bila jenis workflow ber-scope `legal_entity`; dikosongkan bila
+                    ber-scope `tenant`.
+                initiator_membership_id:
+                  type: string
+                  format: ulid
+                  description: Harus anggota aktif pada tenant yang sama.
+                decision_context:
+                  type: object
+                  description: |
+                    Konteks keputusan. Field wajibnya ditentukan
+                    `decision_context_schema` pada jenis workflow, bukan oleh file ini.
+                    Nilainya dikembalikan apa adanya pada event keputusan.
+      responses:
+        '201':
+          description: Workflow instance dibuat.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WorkflowInstance'
+        '200':
+          description: Pemutaran ulang idempotency key yang sama.
+          headers:
+            Idempotent-Replayed:
+              schema:
+                type: string
+                const: 'true'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WorkflowInstance'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Jenis workflow tidak terdaftar untuk app ini.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: |
+            Belum ada konfigurasi workflow aktif dan terbit untuk dokumen ini, atau
+            permintaan dengan kunci yang sama sedang diproses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Pengaju tidak valid, atau `decision_context` kurang field wajib.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  securitySchemes:
+    appId:
+      type: apiKey
+      in: header
+      name: X-CoreERP-App-Id
+      description: Identitas app pemanggil, mis. `human-resources`.
+    serviceToken:
+      type: apiKey
+      in: header
+      name: X-CoreERP-Service-Token
+      description: |
+        Service credential berbentuk `<credential_id>.<secret>`. Token lama tanpa
+        `credential_id` masih diterima tetapi memaksa pemindaian bcrypt per credential;
+        terbitkan ulang.
+    tenantHeader:
+      type: apiKey
+      in: header
+      name: X-CoreERP-Tenant-Id
+      description: |
+        Tenant yang menjadi konteks request. Credential yang terikat tenant hanya sah
+        untuk tenant itu. Nilai ini adalah **satu-satunya** sumber `tenant_id`; body dan
+        query tidak pernah dipercaya.
+  parameters:
+    ReservationId:
+      name: reservation
+      in: path
+      required: true
+      schema:
+        type: string
+        format: ulid
+    SequenceReference:
+      name: reference
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Kode reference number sequence yang dideklarasikan manifest app.
+  responses:
+    Forbidden:
+      description: |
+        Credential tidak sah untuk app/tenant ini, entitlement tidak aktif, placement
+        belum `ready`, atau endpoint terbatas pada app lain. Keempatnya sengaja tidak
+        dibedakan agar pemanggil tidak dapat memetakan keadaan tenant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource tidak ada dalam scope tenant ini.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    OutboundRefused:
+      description: |
+        Salinan non-produksi (sandbox atau demo) tidak menyajikan data ke sistem luar. Tanpa
+        penolakan ini, salinan produksi akan menyajikan posting yang dibukukan finance produksi.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: |
+        Batas dilampaui. Kuota di-key per pasangan app dan tenant (default 600 request
+        per menit, `coreerp.internal_api_rate_limit`), sehingga satu app yang berisik
+        tidak dapat menghabiskan kuota app lain.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthenticated:
+      description: Header kredensial atau konteks tenant tidak lengkap.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Field request tidak valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+  schemas:
+    Error:
+      type: object
+      required:
+      - message
+      properties:
+        message:
+          type: string
+          description: Pesan untuk operator app. Tidak pernah memuat data tenant lain.
+    IdempotencyKey:
+      type: string
+      maxLength: 160
+      pattern: ^[A-Za-z0-9._:-]+$
+    IssuedNumber:
+      type: object
+      required:
+      - id
+      - number
+      - status
+      properties:
+        id:
+          type: string
+          format: ulid
+        number:
+          type: string
+          description: Nilai terformat sesuai segmen format sequence.
+        status:
+          const: issued
+    Member:
+      type: object
+      required:
+      - membership_id
+      - name
+      - email
+      properties:
+        membership_id:
+          type: string
+          format: ulid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+    NumberSequenceContext:
+      type: object
+      description: |
+        Scope organisasi permintaan. Keduanya opsional pada tingkat schema karena
+        sequence ber-scope tenant tidak memerlukannya, tetapi sequence dengan reset
+        fiskal wajib menyertakan `legal_entity_id` — kalender fiskal milik legal entity
+        dan tidak pernah milik operating unit.
+      properties:
+        legal_entity_id:
+          type:
+          - string
+          - 'null'
+          format: ulid
+        org_unit_id:
+          type:
+          - string
+          - 'null'
+          format: ulid
+    OperatingUnit:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      - number
+      - status
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: ulid
+        name:
+          type: string
+        type:
+          type:
+          - string
+          - 'null'
+          description: |
+            Tipe operating unit dari setelan `coreerp.operating_unit_types`, misalnya
+            `business_unit` atau `department`. Daftar tipe dapat bertambah; pembaca harus
+            menerima nilai yang belum dikenalnya.
+        number:
+          type:
+          - string
+          - 'null'
+          maxLength: 30
+          pattern: ^[A-Z0-9]+(-[A-Z0-9]+)*$
+          description: |
+            Nomor unit, unik per tenant. Boleh diganti; posting yang sudah terbit menyimpan
+            nomor pada saat terbit.
+        status:
+          type: string
+          description: '`active` atau status nonaktif lain.'
+        updated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Waktu perubahan terakhir, dari nama maupun nomor dan tipe.
+    Reservation:
+      type: object
+      required:
+      - id
+      - number
+      - status
+      - expires_at
+      properties:
+        id:
+          type: string
+          format: ulid
+        number:
+          type: string
+        status:
+          enum:
+          - reserved
+          - reconciliation_pending
+          - confirmed
+          - cancelled
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    UnitOfMeasure:
+      type: object
+      required:
+      - id
+      - code
+      - name
+      - symbol
+      - decimal_places
+      properties:
+        id:
+          type: string
+          format: ulid
+        code:
+          type: string
+        name:
+          type: string
+        symbol:
+          type:
+          - string
+          - 'null'
+        decimal_places:
+          type: integer
+    ValidationError:
+      type: object
+      required:
+      - message
+      - errors
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    WorkflowInstance:
+      type: object
+      required:
+      - id
+      - status
+      - source_document_type
+      - source_document_id
+      properties:
+        id:
+          type: string
+          format: ulid
+        status:
+          type: string
+        source_document_type:
+          type: string
+        source_document_id:
+          type: string
+          format: ulid

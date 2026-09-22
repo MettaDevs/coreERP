@@ -1,0 +1,145 @@
+post:
+  tags: [Pusat admin]
+  operationId: internal.tenants.store
+  summary: Lahirkan tenant beserta admin pertamanya
+  description: |
+    **Pemanggilnya pusat admin, bukan app module.** Satu-satunya endpoint di berkas ini
+    yang tidak memakai kredensial app, dan satu-satunya yang bekerja pada tenant yang
+    belum ada — jadi tiga header kredensial itu memang tidak dapat dipakai di sini.
+    Penjaganya token bersama pada `Authorization: Bearer`; alasannya di
+    `App\Http\Middleware\ControlPlaneOnly`.
+
+    Di belakangnya berjalan `App\Actions\Onboarding\RegisterBusiness` — aksi yang sama
+    persis yang dipakai layar pendaftaran mandiri, bukan salinannya. Yang lahir karena
+    itu bukan hanya baris `tenants`: client, environment produksi, keanggotaan owner,
+    role Owner beserta seluruh duty app yang dibeli, entitlement, satuan bawaan, dan
+    pemasangan tiap module yang ada di edisi ini.
+
+    Kata sandi sementara **dibuat Core**, tidak pernah dikirim pemanggil, dan dipulangkan
+    **sekali** di balasan ini. Ia tidak dapat dibaca lagi setelahnya; yang tersimpan hanya
+    hash-nya. Pemiliknya wajib menggantinya saat masuk pertama — sampai itu terjadi, satu
+    satunya halaman yang dapat dicapainya adalah layar ganti kata sandi.
+
+    Nama fieldnya bahasa Indonesia karena pembaca dan penulisnya operator, bukan app.
+
+    Balasannya sengaja **tanpa envelope `data`** — berbeda dari seluruh endpoint lain di
+    berkas ini. Aturan envelope itu milik permukaan app-ke-Core; yang ini perintah
+    vendor-ke-vendor dengan satu pemanggil yang diketahui namanya.
+  security:
+    - controlPlaneToken: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [legal_name, admin_name, admin_email, app_ids]
+          properties:
+            legal_name:
+              type: string
+              maxLength: 255
+              description: |
+                Nama pelanggan — perusahaan atau grupnya. Menjadi nama tenant dan dasar
+                slug-nya, dan slug itulah yang muncul sebagai label pertama pada alamat
+                lingkungannya.
+
+                **Bukan** nama badan hukum tertentu: satu tenant boleh memuat beberapa badan
+                hukum sekaligus, dan masing-masing didaftarkan di dalam ERP sebagai organisasi
+                berjenis legal entity, lengkap dengan kode perusahaan dan kode negaranya.
+            first_environment:
+              type: string
+              enum: [production, demo, none]
+              default: production
+              description: |
+                Jenis tempat kerja pertama tenant ini.
+
+                Bawaannya `production`, dan itu yang dipakai pendaftaran mandiri: orang yang
+                mendaftar sendiri memang datang untuk bekerja. Operator yang melahirkan tenant
+                bagi calon pelanggan biasanya memilih `demo` — produksi yang terlanjur lahir
+                adalah tempat kerja kosong yang tidak pernah dipakai siapa pun sekaligus alamat
+                yang sudah terpakai.
+
+                `none` melahirkan tenant tanpa satu pun lingkungan. Entitlement-nya tetap
+                tercatat, jadi lingkungan yang dibuat kemudian memasang module yang sama persis.
+            first_environment_expires_at:
+              type: string
+              format: date
+              description: |
+                Tanggal berakhir, **wajib bila `first_environment` bernilai `demo`** dan
+                diabaikan selainnya. Demo tanpa tanggal berakhir tinggal selamanya, dan tidak
+                ada yang menyadarinya sampai disknya penuh.
+            first_environment_hosting:
+              type: string
+              enum: [provider, client_server]
+              default: provider
+              description: |
+                Tempat lingkungan pertama berjalan.
+
+                `provider` — di server kami, persis seperti sebelum field ini ada.
+
+                `client_server` — produksi tenant ini dipasang di server milik klien lewat satu
+                perintah pasang dari admin.erp. **Hanya sah bersama `first_environment`
+                `production`** (atau tanpa `first_environment`, yang berarti produksi); selainnya
+                ditolak 422 pada field ini. Lingkungannya lahir dengan `hosting = client_server`
+                dan status `provisioning` — belum berjalan sampai perintah pasangnya dijalankan —
+                tanpa database di server ini, dan tanpa satu pun module terpasang di sini.
+                Entitlement app-nya tetap tercatat; dari situlah edisi paketnya diturunkan.
+
+                Core di server ini tidak pernah merutekan, menyiapkan, menyalin, memperbarui,
+                atau memasang module ke lingkungan seperti itu: alamatnya dijawab 404, dan
+                perintah atas lingkungan itu ditolak 409.
+            admin_name:
+              type: string
+              maxLength: 255
+              description: Nama orang yang menjadi owner pertama tenant ini.
+            admin_email:
+              type: string
+              format: email
+              maxLength: 255
+              description: |
+                Dirapikan menjadi huruf kecil sebelum diperiksa, lalu wajib belum terdaftar.
+                Email yang sudah punya akun ditolak 422 — sampai "satu orang banyak tenant"
+                dikerjakan, tidak ada jalur menambahkan orang yang sudah punya akun ke tenant
+                kedua.
+            app_ids:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items: { type: string }
+              description: |
+                App yang dibeli pelanggan. Tiap id wajib ada di katalog dengan status
+                `available`; app yang belum tersedia ditolak 422. Prerequisite transitifnya
+                ikut ditambahkan sendiri oleh graph dependency.
+  responses:
+    '201':
+      description: Tenant lahir. `temporary_password` hanya muncul di sini, sekali.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [tenant_id, environment_id, email, temporary_password]
+            properties:
+              tenant_id: { type: string, format: ulid }
+              environment_id:
+                type: string
+                format: ulid
+                description: Environment `production` pertama tenant ini.
+              email: { type: string, format: email }
+              temporary_password:
+                type: string
+                description: Dibuat Core, tidak dapat dibaca lagi setelah balasan ini.
+    '401':
+      description: |
+        Token pusat admin salah, tidak dikirim, atau pemasangan ini memang tidak menyetel
+        token sama sekali — dan yang terakhir juga 401, bukan terbuka.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    '422':
+      description: |
+        Email sudah terdaftar, app tidak tersedia, field wajib kurang, atau
+        `first_environment_hosting` `client_server` bersama jenis selain produksi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }

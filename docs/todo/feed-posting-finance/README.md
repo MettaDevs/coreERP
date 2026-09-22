@@ -197,7 +197,8 @@ Aturan bentuk:
 ### Endpoint
 
 Semua endpoint ada di bawah `/api/internal/v1`, dijaga klien integrasi (lihat Keamanan), dan
-dicatat di `apps/core/contracts/openapi-internal.yaml`.
+ditulis di `apps/core/contracts/internal/` (akar `integrasi-finance.yaml`). Tim pembaca membacanya,
+beserta panduan langkah demi langkah, di portal `/docs` tanpa login.
 
 | Endpoint | Guna |
 | --- | --- |

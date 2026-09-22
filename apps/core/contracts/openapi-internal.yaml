@@ -1,22 +1,30 @@
+# Berkas hasil `python contracts/bundle.py` dari `contracts/internal/`.
+# Jangan diedit tangan: suntingan di sini hilang pada perakitan berikutnya, dan CI menolaknya.
 openapi: 3.1.0
 info:
   title: CoreERP Control Plane internal API
   version: 1.0.0
   description: |
     Permukaan **app-ke-Core**: seluruh route dengan prefix `/internal/v1`, dipanggil
-    aplikasi bisnis memakai service credential, bukan session browser.
+    aplikasi bisnis dan sistem luar memakai kredensial layanan, bukan session browser.
 
-    File ini **ditulis tangan dan merupakan sumber kebenaran**. Ia sengaja terpisah
-    dari `openapi.json`, yang di-generate Scramble dan hanya mencakup surface browser
-    Control Plane (`/api/v1`, session cookie). Generator tidak pernah memindai prefix
-    ini, sehingga dua belas endpoint di bawah tidak berkontrak sama sekali sampai
-    file ini dibuat. Jangan pindahkan isinya ke output generator.
+    Berkas ini **hasil perakitan** dari sumber tulisan tangan di `contracts/internal/`: satu
+    berkas per path dan per komponen, dan satu akar per pembaca. Sunting sumbernya, lalu jalankan
+    `python contracts/bundle.py` dari `apps/core`; CI menolak berkas hasil yang tidak sama dengan
+    sumbernya. Selain berkas gabungan ini, perakit juga menulis satu spesifikasi per pembaca di
+    `contracts/terbit/`: satu per domain integrasi (misalnya `integrasi-finance`, terbit di portal
+    `/docs`), ditambah `app` dan `pusat-admin`.
 
-    Aturan yang mengikat file ini ada pada **Contract decision gate** di
+    Kontrak ini sengaja terpisah dari `openapi.json`, yang di-generate Scramble dan hanya
+    mencakup surface browser Control Plane (`/api/v1`, session cookie). Generator tidak pernah
+    memindai prefix ini. Jangan pindahkan isinya ke output generator: kontrak yang dibuat dari
+    kode ikut berubah diam-diam saat kodenya berubah.
+
+    Aturan yang mengikat kontrak ini ada pada **Contract decision gate** di
     `.agents/skills/coreerp-architecture/SKILL.md`. Menambah route pada
     `routes/api.php` tanpa menambahkannya di sini adalah perubahan yang belum selesai.
 
-    Dua jenis pemanggil, masing-masing dengan kredensialnya sendiri:
+    Tiga jenis pemanggil, masing-masing dengan kredensialnya sendiri:
 
     - **App module** (`appId` + `serviceToken` + `tenantHeader`), diverifikasi
       `AuthenticateAppService`.
@@ -25,6 +33,7 @@ info:
       tenant, dengan cakupan sempit, diverifikasi `AuthenticateIntegrationClient`. Endpoint yang
       menerimanya menyebutnya di `security` beserta cakupan yang dibutuhkan. Di salinan sandbox
       seluruh endpoint klien integrasi menjawab 503.
+    - **Pusat admin** (`controlPlaneToken`): perintah dari konsol operator vendor.
 
     Batas yang berlaku di seluruh endpoint:
 
@@ -34,153 +43,289 @@ info:
     - App hanya menerima referensi opaque milik Core. Tidak ada akses database lintas
       module, tidak ada foreign key lintas database.
     - Seluruh response sukses memakai envelope `data`.
-
 servers:
-  - url: /api/internal/v1
-    description: |
-      Relatif terhadap host Control Plane. Prefix `/api` ditambahkan Laravel melalui
-      `withRouting(api: ...)`, sedangkan `internal/v1` berasal dari grup di
-      `routes/api.php` — jadi path lengkapnya `/api/internal/v1/...`, bukan
-      `/internal/v1/...`.
-
+- url: /api/internal/v1
+  description: |
+    Relatif terhadap host Control Plane. Prefix `/api` ditambahkan Laravel melalui
+    `withRouting(api: ...)`, sedangkan `internal/v1` berasal dari grup di
+    `routes/api.php` — jadi path lengkapnya `/api/internal/v1/...`, bukan
+    `/internal/v1/...`.
 security:
-  - appId: []
-    serviceToken: []
-    tenantHeader: []
-
+- appId: []
+  serviceToken: []
+  tenantHeader: []
 tags:
-  - name: Directory
-    description: Data referensi Core yang boleh dibaca app. Hanya baca.
-  - name: Human Resources
-    description: Sinkronisasi workforce. Terbatas pada app `human-resources`.
-  - name: Number sequence
-    description: Penerbitan nomor dokumen. Counter dimiliki Core, tidak pernah app.
-  - name: Workflow
-    description: Pengajuan workflow. Keputusannya kembali sebagai event, bukan response.
-  - name: Finance feed
-    description: |
-      Feed posting finance untuk aplikasi finance pelanggan (docs/todo/feed-posting-finance).
-      Hanya klien integrasi; module di dalam CoreERP menerbitkan posting lewat kontrak in-process.
-  - name: Pusat admin
-    description: |
-      Perintah dari konsol operator vendor. Satu-satunya tag di berkas ini yang pemanggilnya
-      bukan app module, dan karena itu satu-satunya yang tidak memakai kredensial app.
-
+- name: Directory
+  description: Data referensi Core yang boleh dibaca app. Hanya baca.
+- name: Human Resources
+  description: Sinkronisasi workforce. Terbatas pada app `human-resources`.
+- name: Number sequence
+  description: Penerbitan nomor dokumen. Counter dimiliki Core, tidak pernah app.
+- name: Workflow
+  description: Pengajuan workflow. Keputusannya kembali sebagai event, bukan response.
+- name: Finance feed
+  description: |
+    Feed posting finance untuk aplikasi finance pelanggan (docs/todo/feed-posting-finance).
+    Hanya klien integrasi; module di dalam CoreERP menerbitkan posting lewat kontrak in-process.
+- name: Pusat admin
+  description: |
+    Perintah dari konsol operator vendor. Satu-satunya tag di berkas ini yang pemanggilnya
+    bukan app module, dan karena itu satu-satunya yang tidak memakai kredensial app.
 paths:
-  /members:
+  /finance-postings:
     get:
-      tags: [Directory]
-      operationId: internal.members.index
-      summary: Cari anggota tenant yang aktif
-      description: |
-        Terbatas pada app `human-resources`; app lain menerima 403. Hasil dibatasi
-        20 baris dan tidak mendukung pagination — ini pencarian pemilih, bukan export.
-      parameters:
-        - name: q
-          in: query
-          required: false
-          schema: { type: string }
-          description: Cocokkan sebagian nama atau email, tidak peka huruf besar-kecil.
-      responses:
-        '200':
-          description: Daftar anggota aktif.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    type: array
-                    items: { $ref: '#/components/schemas/Member' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
-  /members/{membership}:
-    get:
-      tags: [Directory]
-      operationId: internal.members.show
-      summary: Ambil satu anggota tenant
-      description: Terbatas pada app `human-resources`. Anggota non-aktif dianggap tidak ada.
-      parameters:
-        - name: membership
-          in: path
-          required: true
-          schema: { type: string, format: ulid }
-      responses:
-        '200':
-          description: Anggota ditemukan.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data]
-                properties:
-                  data: { $ref: '#/components/schemas/Member' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
-  /operating-units:
-    get:
-      tags: [Directory]
-      operationId: internal.operating-units.index
-      summary: Daftar operating unit, beserta nomor dan tipenya
+      tags:
+      - Finance feed
+      operationId: internal.finance-postings.index
+      summary: Posting finance yang siap dibukukan (mode pull)
       security:
-        - appId: []
-          serviceToken: []
-          tenantHeader: []
-        - integrationClient: []
+      - integrationClient: []
       description: |
-        Dua pemanggil: app `human-resources` (app lain menerima 403), dan klien integrasi dengan
-        cakupan `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
-        legal entity tidak dikembalikan di sini.
+        Cakupan `finance-postings.read`. Satu endpoint untuk semua jenis posting, dipersempit oleh
+        awalan jenis milik klien (`posting_type_prefixes`) sebelum parameter apa pun diterapkan.
 
-        Tanpa `updated_since`: seluruh operating unit **aktif**. Dengan `updated_since`:
-        **setiap** operating unit yang berubah pada atau sesudah saat itu, termasuk yang sudah
-        dinonaktifkan (`status` bukan `active`), supaya pembaca yang menyinkronkan tabel
-        penerjemahnya tahu unit mana yang berhenti dipakai.
+        Hanya posting `pending`, urut `posting_date`, lalu jam terbit, lalu id. Posting disajikan
+        ulang pada **setiap** tarikan sampai di-ack lewat `POST /finance-postings/{posting_id}/ack`,
+        jadi tidak ada kursor: posting yang sudah di-ack keluar dari daftar dengan sendirinya, dan
+        posting yang terbit di tengah tarikan muncul pada tarikan berikutnya di tempat urutannya.
 
-        `number` adalah nomor unit, kode stabil yang dipakai sebagai nilai dimensi keuangan
-        `BUSINESS_UNIT` dan `DEPARTMENT` pada feed posting finance. `null` berarti belum diisi.
-
-        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari tarikan terakhir, kirim
-        sebagai `updated_since` pada tarikan berikutnya, dan simpan dengan upsert berdasarkan
-        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Tarikan penuh tanpa
-        `updated_since` sesekali tetap dianjurkan sebagai jaring pengaman.
+        Pembaca wajib menyimpan dengan `UNIQUE(posting_id)`: posting yang sama bisa diterima lebih
+        dari sekali, dan menerimanya lagi tidak boleh menghasilkan jurnal kedua. Kode akun, dimensi,
+        vendor, atau entitas legal yang tidak dikenal pembaca berarti posting ditolak lewat ack,
+        tidak pernah dijurnal ke akun cadangan (K-18).
       parameters:
-        - name: updated_since
-          in: query
-          required: false
-          schema: { type: string, format: date-time }
-          description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+        description: Hanya `pending` yang disajikan. Disediakan supaya URL pembaca dapat menyebutnya.
+      - name: posting_type
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 80
+          pattern: ^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*(\.\*)?$
+        description: Jenis lengkap (`asset.acquisition`) atau awalan dengan `.*` (`asset.*`).
+      - name: legal_entity
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 50
+        description: Kode perusahaan (`company_code`) atau id entitas legal.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
       responses:
         '200':
-          description: Daftar operating unit, diurutkan menurut nama.
+          description: Posting yang belum di-ack, dalam urutan pembukuan.
           content:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
+                - meta
                 properties:
                   data:
                     type: array
-                    items: { $ref: '#/components/schemas/OperatingUnit' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { $ref: '#/components/responses/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/OutboundRefused' }
+                    items:
+                      $ref: '#/components/schemas/FinancePosting'
+                  meta:
+                    type: object
+                    required:
+                    - count
+                    - has_more
+                    properties:
+                      count:
+                        type: integer
+                      has_more:
+                        type: boolean
+                        description: Masih ada posting `pending` sesudah halaman ini. Ack yang ini, lalu
+                          tarik lagi.
+              examples:
+                perolehan:
+                  summary: Satu penerimaan ambulans, langsung ke hutang
+                  value:
+                    data:
+                    - contract_version: 1
+                      posting_id: AST-ACQ-01J9Z3Q7K2M4N6P8R0S2T4V6X8
+                      posting_type: asset.acquisition
+                      settlement_mode: direct_payable
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-09-28'
+                      document_date: '2026-09-28'
+                      occurred_at: '2026-09-28T23:50:00+07:00'
+                      published_at: '2026-09-28T16:50:04+00:00'
+                      source_document:
+                        module: management-aset
+                        type: penerimaan-aset
+                        number: PNA-2026-09-0007
+                        description: Penerimaan ambulans
+                      vendor:
+                        id: 01J9Z2BBBBBBBBBBBBBBBBBBBB
+                        number: VND-000123
+                        name: PT Karoseri Sehat
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1452'
+                          code: 1-2300
+                          name: Aset Tetap - Kendaraan
+                        debit: '500000000.00'
+                        credit: '0.00'
+                        description: KEND-0012 Ambulans
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '1501'
+                          code: 1-1500
+                          name: PPN Masukan
+                        debit: '55000000.00'
+                        credit: '0.00'
+                        description: PPN KEND-0012
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 3
+                        account:
+                          external_id: '2110'
+                          code: 2-1100
+                          name: Hutang Usaha
+                        debit: '0.00'
+                        credit: '555000000.00'
+                        description: PT Karoseri Sehat
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '555000000.00'
+                        credit: '555000000.00'
+                      reverses_posting_id: null
+                      adjusts_posting_id: null
+                      details:
+                        assets:
+                        - asset_code: KEND-0012
+                          asset_group: KENDARAAN
+                          book: KOMERSIAL
+                          acquisition_value: '500000000.00'
+                          tax_amount: '55000000.00'
+                    meta:
+                      count: 1
+                      has_more: false
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /finance-postings/{posting_id}/ack:
+    post:
+      tags:
+      - Finance feed
+      operationId: internal.finance-postings.ack
+      summary: Hasil pembukuan satu posting di aplikasi finance
+      security:
+      - integrationClient: []
+      description: |
+        Cakupan `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
+        finance; `rejected` membawa kode alasan dan penjelasannya. Keduanya status akhir.
 
+        Idempoten: ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab 200
+        tanpa perubahan. Ack yang bertentangan dengan status akhir, atau ack atas posting yang tidak
+        pernah disajikan (ditahan atau manual), menjawab 409. Posting yang ditolak diperbaiki dengan
+        posting koreksi di periode yang masih terbuka, tidak diberi tanggal ulang (K-17).
+
+        Posting yang tidak ada, milik tenant lain, atau jenisnya di luar awalan klien menjawab 404.
+      parameters:
+      - name: posting_id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 120
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancePostingAck'
+      responses:
+        '200':
+          description: Ack diterapkan, atau ack yang sama sudah tercatat.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FinancePostingAckResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Ack bertentangan dengan status posting. `data` membawa status yang tercatat.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                - data
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/FinancePostingAckResult'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
   /vendors:
     get:
-      tags: [Directory]
+      tags:
+      - Directory
       operationId: internal.vendors.index
       summary: Vendor per entitas legal, untuk tabel penerjemah sistem finance
       security:
-        - integrationClient: []
+      - integrationClient: []
       description: |
         Hanya klien integrasi dengan cakupan `vendors.read`. Module di dalam CoreERP membaca
         vendor lewat kontrak in-process, bukan lewat rute ini.
@@ -204,25 +349,37 @@ paths:
         terbesar dari sinkron terakhir, kirim sebagai `updated_since` berikutnya. Batasnya
         inklusif.
       parameters:
-        - name: updated_since
-          in: query
-          required: false
-          schema: { type: string, format: date-time }
-          description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
-        - name: legal_entity
-          in: query
-          required: false
-          schema: { type: string, maxLength: 50 }
-          description: Kode perusahaan (`company_code`) atau id entitas legal. Kode yang tidak dikenal menghasilkan daftar kosong.
-        - name: cursor
-          in: query
-          required: false
-          schema: { type: string, maxLength: 200 }
-          description: Nilai `meta.next_cursor` dari halaman sebelumnya. Kursor yang tidak dikenal menghasilkan 422.
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+      - name: updated_since
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
+      - name: legal_entity
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 50
+        description: Kode perusahaan (`company_code`) atau id entitas legal. Kode yang tidak dikenal menghasilkan
+          daftar kosong.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 200
+        description: Nilai `meta.next_cursor` dari halaman sebelumnya. Kursor yang tidak dikenal menghasilkan
+          422.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 500
       responses:
         '200':
           description: Satu halaman vendor.
@@ -230,147 +387,168 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data, meta]
+                required:
+                - data
+                - meta
                 properties:
                   data:
                     type: array
-                    items: { $ref: '#/components/schemas/Vendor' }
+                    items:
+                      $ref: '#/components/schemas/Vendor'
                   meta:
                     type: object
-                    required: [next_cursor]
+                    required:
+                    - next_cursor
                     properties:
                       next_cursor:
-                        type: [string, 'null']
+                        type:
+                        - string
+                        - 'null'
                         description: '`null` berarti halaman terakhir.'
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { $ref: '#/components/responses/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/OutboundRefused' }
-
-  /finance-postings:
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /operating-units:
     get:
-      tags: [Finance feed]
-      operationId: internal.finance-postings.index
-      summary: Posting finance yang siap dibukukan (mode pull)
+      tags:
+      - Directory
+      operationId: internal.operating-units.index
+      summary: Daftar operating unit, beserta nomor dan tipenya
       security:
-        - integrationClient: []
+      - appId: []
+        serviceToken: []
+        tenantHeader: []
+      - integrationClient: []
       description: |
-        Cakupan `finance-postings.read`. Satu endpoint untuk semua jenis posting, dipersempit oleh
-        awalan jenis milik klien (`posting_type_prefixes`) sebelum parameter apa pun diterapkan.
+        Dua pemanggil: app `human-resources` (app lain menerima 403), dan klien integrasi dengan
+        cakupan `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
+        legal entity tidak dikembalikan di sini.
 
-        Hanya posting `pending`, urut `posting_date`, lalu jam terbit, lalu id. Posting disajikan
-        ulang pada **setiap** tarikan sampai di-ack lewat `POST /finance-postings/{posting_id}/ack`,
-        jadi tidak ada kursor: posting yang sudah di-ack keluar dari daftar dengan sendirinya, dan
-        posting yang terbit di tengah tarikan muncul pada tarikan berikutnya di tempat urutannya.
+        Tanpa `updated_since`: seluruh operating unit **aktif**. Dengan `updated_since`:
+        **setiap** operating unit yang berubah pada atau sesudah saat itu, termasuk yang sudah
+        dinonaktifkan (`status` bukan `active`), supaya pembaca yang menyinkronkan tabel
+        penerjemahnya tahu unit mana yang berhenti dipakai.
 
-        Pembaca wajib menyimpan dengan `UNIQUE(posting_id)`: posting yang sama bisa diterima lebih
-        dari sekali, dan menerimanya lagi tidak boleh menghasilkan jurnal kedua. Kode akun, dimensi,
-        vendor, atau entitas legal yang tidak dikenal pembaca berarti posting ditolak lewat ack,
-        tidak pernah dijurnal ke akun cadangan (K-18).
+        `number` adalah nomor unit, kode stabil yang dipakai sebagai nilai dimensi keuangan
+        `BUSINESS_UNIT` dan `DEPARTMENT` pada feed posting finance. `null` berarti belum diisi.
+
+        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari tarikan terakhir, kirim
+        sebagai `updated_since` pada tarikan berikutnya, dan simpan dengan upsert berdasarkan
+        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Tarikan penuh tanpa
+        `updated_since` sesekali tetap dianjurkan sebagai jaring pengaman.
       parameters:
-        - name: status
-          in: query
-          required: false
-          schema: { type: string, enum: [pending] }
-          description: Hanya `pending` yang disajikan. Disediakan supaya URL pembaca dapat menyebutnya.
-        - name: posting_type
-          in: query
-          required: false
-          schema: { type: string, maxLength: 80, pattern: '^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*(\.\*)?$' }
-          description: Jenis lengkap (`asset.acquisition`) atau awalan dengan `.*` (`asset.*`).
-        - name: legal_entity
-          in: query
-          required: false
-          schema: { type: string, maxLength: 50 }
-          description: Kode perusahaan (`company_code`) atau id entitas legal.
-        - name: limit
-          in: query
-          required: false
-          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      - name: updated_since
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
       responses:
         '200':
-          description: Posting yang belum di-ack, dalam urutan pembukuan.
+          description: Daftar operating unit, diurutkan menurut nama.
           content:
             application/json:
               schema:
                 type: object
-                required: [data, meta]
+                required:
+                - data
                 properties:
                   data:
                     type: array
-                    items: { $ref: '#/components/schemas/FinancePosting' }
-                  meta:
-                    type: object
-                    required: [count, has_more]
-                    properties:
-                      count: { type: integer }
-                      has_more:
-                        type: boolean
-                        description: Masih ada posting `pending` sesudah halaman ini. Ack yang ini, lalu tarik lagi.
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { $ref: '#/components/responses/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/OutboundRefused' }
-
-  /finance-postings/{posting_id}/ack:
-    post:
-      tags: [Finance feed]
-      operationId: internal.finance-postings.ack
-      summary: Hasil pembukuan satu posting di aplikasi finance
-      security:
-        - integrationClient: []
+                    items:
+                      $ref: '#/components/schemas/OperatingUnit'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /members:
+    get:
+      tags:
+      - Directory
+      operationId: internal.members.index
+      summary: Cari anggota tenant yang aktif
       description: |
-        Cakupan `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
-        finance; `rejected` membawa kode alasan dan penjelasannya. Keduanya status akhir.
-
-        Idempoten: ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab 200
-        tanpa perubahan. Ack yang bertentangan dengan status akhir, atau ack atas posting yang tidak
-        pernah disajikan (ditahan atau manual), menjawab 409. Posting yang ditolak diperbaiki dengan
-        posting koreksi di periode yang masih terbuka, tidak diberi tanggal ulang (K-17).
-
-        Posting yang tidak ada, milik tenant lain, atau jenisnya di luar awalan klien menjawab 404.
+        Terbatas pada app `human-resources`; app lain menerima 403. Hasil dibatasi
+        20 baris dan tidak mendukung pagination — ini pencarian pemilih, bukan export.
       parameters:
-        - name: posting_id
-          in: path
-          required: true
-          schema: { type: string, maxLength: 120 }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/FinancePostingAck' }
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+        description: Cocokkan sebagian nama atau email, tidak peka huruf besar-kecil.
       responses:
         '200':
-          description: Ack diterapkan, atau ack yang sama sudah tercatat.
+          description: Daftar anggota aktif.
           content:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
-                  data: { $ref: '#/components/schemas/FinancePostingAckResult' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: Ack bertentangan dengan status posting. `data` membawa status yang tercatat.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /members/{membership}:
+    get:
+      tags:
+      - Directory
+      operationId: internal.members.show
+      summary: Ambil satu anggota tenant
+      description: Terbatas pada app `human-resources`. Anggota non-aktif dianggap tidak ada.
+      parameters:
+      - name: membership
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+      responses:
+        '200':
+          description: Anggota ditemukan.
           content:
             application/json:
               schema:
                 type: object
-                required: [message, data]
+                required:
+                - data
                 properties:
-                  message: { type: string }
-                  data: { $ref: '#/components/schemas/FinancePostingAckResult' }
-        '422': { $ref: '#/components/responses/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-        '503': { $ref: '#/components/responses/OutboundRefused' }
-
+                  data:
+                    $ref: '#/components/schemas/Member'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /fiscal-periods:
     get:
-      tags: [Directory]
+      tags:
+      - Directory
       operationId: internal.fiscal-periods.resolve
       summary: Tahun buku dan periode yang memuat satu tanggal
       description: |
@@ -382,15 +560,19 @@ paths:
         buku ke databasenya sendiri, karena salinan itu akan menyimpang saat tenant
         mengubah kalendernya.
       parameters:
-        - name: legal_entity_id
-          in: query
-          required: true
-          schema: { type: string, format: ulid }
-        - name: date
-          in: query
-          required: true
-          description: Tanggal yang dicari periodenya, format `YYYY-MM-DD`.
-          schema: { type: string, format: date }
+      - name: legal_entity_id
+        in: query
+        required: true
+        schema:
+          type: string
+          format: ulid
+      - name: date
+        in: query
+        required: true
+        description: Tanggal yang dicari periodenya, format `YYYY-MM-DD`.
+        schema:
+          type: string
+          format: date
       responses:
         '200':
           description: Kalender, tahun buku, dan periode yang memuat tanggal tersebut.
@@ -398,46 +580,85 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: object
-                    required: [calendar, year, period]
+                    required:
+                    - calendar
+                    - year
+                    - period
                     properties:
                       calendar:
                         type: object
-                        required: [id, code, name]
+                        required:
+                        - id
+                        - code
+                        - name
                         properties:
-                          id: { type: string, format: ulid }
-                          code: { type: string }
-                          name: { type: string }
+                          id:
+                            type: string
+                            format: ulid
+                          code:
+                            type: string
+                          name:
+                            type: string
                       year:
                         type: object
-                        required: [id, name, starts_on, ends_on]
+                        required:
+                        - id
+                        - name
+                        - starts_on
+                        - ends_on
                         properties:
-                          id: { type: string, format: ulid }
-                          name: { type: string }
-                          starts_on: { type: string, format: date }
-                          ends_on: { type: string, format: date }
+                          id:
+                            type: string
+                            format: ulid
+                          name:
+                            type: string
+                          starts_on:
+                            type: string
+                            format: date
+                          ends_on:
+                            type: string
+                            format: date
                       period:
                         type: object
-                        required: [id, ordinal, name, starts_on, ends_on]
+                        required:
+                        - id
+                        - ordinal
+                        - name
+                        - starts_on
+                        - ends_on
                         properties:
-                          id: { type: string, format: ulid }
-                          ordinal: { type: integer }
-                          name: { type: string }
-                          starts_on: { type: string, format: date }
-                          ends_on: { type: string, format: date }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                          id:
+                            type: string
+                            format: ulid
+                          ordinal:
+                            type: integer
+                          name:
+                            type: string
+                          starts_on:
+                            type: string
+                            format: date
+                          ends_on:
+                            type: string
+                            format: date
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: Legal entity belum punya kalender tahun buku, atau tanggal belum tercakup periodenya.
-        '422': { $ref: '#/components/responses/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /units-of-measure:
     get:
-      tags: [Directory]
+      tags:
+      - Directory
       operationId: internal.units-of-measure.index
       summary: Daftar satuan aktif tenant
       description: Terbuka untuk semua app yang punya credential aktif dan entitlement `ready`.
@@ -448,18 +669,23 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: array
-                    items: { $ref: '#/components/schemas/UnitOfMeasure' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+                    items:
+                      $ref: '#/components/schemas/UnitOfMeasure'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /units-of-measure/resolve:
     post:
-      tags: [Directory]
+      tags:
+      - Directory
       operationId: internal.units-of-measure.resolve
       summary: Resolusi sekumpulan ID satuan
       description: |
@@ -472,14 +698,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [unit_ids]
+              required:
+              - unit_ids
               properties:
                 unit_ids:
                   type: array
                   minItems: 1
                   maxItems: 100
                   uniqueItems: true
-                  items: { type: string, format: ulid }
+                  items:
+                    type: string
+                    format: ulid
       responses:
         '200':
           description: Seluruh satuan ditemukan dan aktif.
@@ -487,19 +716,25 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: array
-                    items: { $ref: '#/components/schemas/UnitOfMeasure' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '422': { $ref: '#/components/responses/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+                    items:
+                      $ref: '#/components/schemas/UnitOfMeasure'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /units-of-measure/convert:
     post:
-      tags: [Directory]
+      tags:
+      - Directory
       operationId: internal.units-of-measure.convert
       summary: Konversi nilai antar satuan
       description: |
@@ -512,9 +747,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [from_unit_id, to_unit_id, value]
+              required:
+              - from_unit_id
+              - to_unit_id
+              - value
               properties:
-                from_unit_id: { type: string, format: ulid }
+                from_unit_id:
+                  type: string
+                  format: ulid
                 to_unit_id:
                   type: string
                   format: ulid
@@ -529,27 +769,37 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
                   data:
                     type: object
-                    required: [value, unit_id]
+                    required:
+                    - value
+                    - unit_id
                     properties:
-                      value: { type: string }
-                      unit_id: { type: string, format: ulid }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                      value:
+                        type: string
+                      unit_id:
+                        type: string
+                        format: ulid
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           description: |
             Satuan tidak aktif, beda kelas, atau aturan konversi belum dikonfigurasi.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /human-resources/position-assignments:
     post:
-      tags: [Human Resources]
+      tags:
+      - Human Resources
       operationId: internal.hr.position-assignments.store
       summary: Sinkronkan perubahan penugasan posisi
       description: |
@@ -571,13 +821,20 @@ paths:
           application/json:
             schema:
               type: object
-              required: [membership_id, position_id, operating_unit_id, assignment_id, active]
+              required:
+              - membership_id
+              - position_id
+              - operating_unit_id
+              - assignment_id
+              - active
               properties:
                 membership_id:
                   type: string
                   format: ulid
                   description: Harus anggota aktif pada tenant yang sama.
-                position_id: { type: string, format: ulid }
+                position_id:
+                  type: string
+                  format: ulid
                 operating_unit_id:
                   type: string
                   format: ulid
@@ -592,20 +849,24 @@ paths:
       responses:
         '204':
           description: Sinkronisasi diterima. Tidak ada body.
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           description: |
             Anggota tidak tersedia, atau rule role otomatis memakai kebijakan data
             yang tidak sah untuk penugasan posisi.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /number-sequences/{reference}/issue:
     post:
-      tags: [Number sequence]
+      tags:
+      - Number sequence
       operationId: internal.number-sequences.issue
       summary: Terbitkan satu nomor dokumen
       description: |
@@ -616,24 +877,28 @@ paths:
         Pengulangan dengan `idempotency_key` yang sama pada app dan sequence yang sama
         mengembalikan nomor yang sama, bukan nomor kedua.
       parameters:
-        - $ref: '#/components/parameters/SequenceReference'
+      - $ref: '#/components/parameters/SequenceReference'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               allOf:
-                - $ref: '#/components/schemas/NumberSequenceContext'
-                - type: object
-                  required: [idempotency_key]
-                  properties:
-                    idempotency_key: { $ref: '#/components/schemas/IdempotencyKey' }
-                    manual_value:
-                      type: [string, 'null']
-                      maxLength: 255
-                      description: |
-                        Hanya sah bila sequence mengizinkan nilai manual. Sequence
-                        berkelanjutan tidak pernah mengizinkannya.
+              - $ref: '#/components/schemas/NumberSequenceContext'
+              - type: object
+                required:
+                - idempotency_key
+                properties:
+                  idempotency_key:
+                    $ref: '#/components/schemas/IdempotencyKey'
+                  manual_value:
+                    type:
+                    - string
+                    - 'null'
+                    maxLength: 255
+                    description: |
+                      Hanya sah bila sequence mengizinkan nilai manual. Sequence
+                      berkelanjutan tidak pernah mengizinkannya.
       responses:
         '200':
           description: Nomor diterbitkan, atau pemutaran ulang idempotency key yang sama.
@@ -641,23 +906,29 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
-                  data: { $ref: '#/components/schemas/IssuedNumber' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                  data:
+                    $ref: '#/components/schemas/IssuedNumber'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           description: |
             Sequence berkelanjutan, sequence tidak aktif untuk scope yang dikirim,
             atau field tidak valid.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /number-sequences/{reference}/reserve:
     post:
-      tags: [Number sequence]
+      tags:
+      - Number sequence
       operationId: internal.number-sequences.reserve
       summary: Pesan nomor untuk sequence berkelanjutan
       description: |
@@ -667,18 +938,20 @@ paths:
         kembali ke pool dan dapat dipakai transaksi lain, sehingga reservation yang sudah
         dibatalkan tidak pernah diputar ulang oleh idempotency key yang sama.
       parameters:
-        - $ref: '#/components/parameters/SequenceReference'
+      - $ref: '#/components/parameters/SequenceReference'
       requestBody:
         required: true
         content:
           application/json:
             schema:
               allOf:
-                - $ref: '#/components/schemas/NumberSequenceContext'
-                - type: object
-                  required: [idempotency_key]
-                  properties:
-                    idempotency_key: { $ref: '#/components/schemas/IdempotencyKey' }
+              - $ref: '#/components/schemas/NumberSequenceContext'
+              - type: object
+                required:
+                - idempotency_key
+                properties:
+                  idempotency_key:
+                    $ref: '#/components/schemas/IdempotencyKey'
       responses:
         '201':
           description: Nomor dipesan.
@@ -686,33 +959,40 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
-                  data: { $ref: '#/components/schemas/Reservation' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                  data:
+                    $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           description: Sequence tidak memakai reservation, atau field tidak valid.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /number-sequence-reservations/{reservation}/confirm:
     post:
-      tags: [Number sequence]
+      tags:
+      - Number sequence
       operationId: internal.number-sequence-reservations.confirm
       summary: Konfirmasi nomor yang dipesan
       description: |
         Dipanggil setelah dokumen app benar-benar tersimpan. Reservation yang sudah
         `confirmed` mengembalikan hasil yang sama tanpa efek tambahan.
       parameters:
-        - $ref: '#/components/parameters/ReservationId'
+      - $ref: '#/components/parameters/ReservationId'
       requestBody:
         required: false
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/NumberSequenceContext' }
+            schema:
+              $ref: '#/components/schemas/NumberSequenceContext'
       responses:
         '200':
           description: Reservation dikonfirmasi.
@@ -720,21 +1000,27 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
-                  data: { $ref: '#/components/schemas/Reservation' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                  data:
+                    $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           description: Reservation sudah dibatalkan atau tidak dalam status yang dapat dikonfirmasi.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /number-sequence-reservations/{reservation}/cancel:
     post:
-      tags: [Number sequence]
+      tags:
+      - Number sequence
       operationId: internal.number-sequence-reservations.cancel
       summary: Batalkan nomor yang dipesan
       description: |
@@ -742,12 +1028,13 @@ paths:
         berkelanjutan. Reservation yang sudah `cancelled` mengembalikan hasil yang sama.
         Reservation yang sudah dikonfirmasi tidak dapat dibatalkan.
       parameters:
-        - $ref: '#/components/parameters/ReservationId'
+      - $ref: '#/components/parameters/ReservationId'
       requestBody:
         required: false
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/NumberSequenceContext' }
+            schema:
+              $ref: '#/components/schemas/NumberSequenceContext'
       responses:
         '200':
           description: Reservation dibatalkan.
@@ -755,21 +1042,27 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
-                  data: { $ref: '#/components/schemas/Reservation' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                  data:
+                    $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           description: Reservation sudah dikonfirmasi dan tidak dapat dibatalkan.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /workflow-instances:
     post:
-      tags: [Workflow]
+      tags:
+      - Workflow
       operationId: internal.workflow-instances.store
       summary: Ajukan dokumen ke workflow Core
       description: |
@@ -782,13 +1075,14 @@ paths:
         `workflow_type` harus terdaftar untuk app pemanggil; jenis milik app lain
         menghasilkan 404, bukan 403, agar keberadaan workflow app lain tidak bocor.
       parameters:
-        - name: Idempotency-Key
-          in: header
-          required: true
-          schema: { $ref: '#/components/schemas/IdempotencyKey' }
-          description: |
-            Wajib. Pengulangan dengan kunci yang sama mengembalikan instance yang sama
-            dengan status 200 dan header `Idempotent-Replayed: true`.
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          $ref: '#/components/schemas/IdempotencyKey'
+        description: |
+          Wajib. Pengulangan dengan kunci yang sama mengembalikan instance yang sama
+          dengan status 200 dan header `Idempotent-Replayed: true`.
       requestBody:
         required: true
         content:
@@ -796,7 +1090,11 @@ paths:
             schema:
               type: object
               required:
-                [workflow_type, source_document_type, source_document_id, initiator_membership_id, decision_context]
+              - workflow_type
+              - source_document_type
+              - source_document_id
+              - initiator_membership_id
+              - decision_context
               properties:
                 workflow_type:
                   type: string
@@ -806,9 +1104,13 @@ paths:
                   type: string
                   maxLength: 120
                   description: Jenis dokumen milik app, mis. `dekomisioning-aset`.
-                source_document_id: { type: string, format: ulid }
+                source_document_id:
+                  type: string
+                  format: ulid
                 legal_entity_id:
-                  type: [string, 'null']
+                  type:
+                  - string
+                  - 'null'
                   format: ulid
                   description: |
                     Wajib bila jenis workflow ber-scope `legal_entity`; dikosongkan bila
@@ -830,45 +1132,57 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
-                  data: { $ref: '#/components/schemas/WorkflowInstance' }
+                  data:
+                    $ref: '#/components/schemas/WorkflowInstance'
         '200':
           description: Pemutaran ulang idempotency key yang sama.
           headers:
             Idempotent-Replayed:
-              schema: { type: string, const: 'true' }
+              schema:
+                type: string
+                const: 'true'
           content:
             application/json:
               schema:
                 type: object
-                required: [data]
+                required:
+                - data
                 properties:
-                  data: { $ref: '#/components/schemas/WorkflowInstance' }
-        '401': { $ref: '#/components/responses/Unauthenticated' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+                  data:
+                    $ref: '#/components/schemas/WorkflowInstance'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: Jenis workflow tidak terdaftar untuk app ini.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '409':
           description: |
             Belum ada konfigurasi workflow aktif dan terbit untuk dokumen ini, atau
             permintaan dengan kunci yang sama sedang diproses.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: Pengaju tidak valid, atau `decision_context` kurang field wajib.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /tenants:
     post:
-      tags: [Pusat admin]
+      tags:
+      - Pusat admin
       operationId: internal.tenants.store
       summary: Lahirkan tenant beserta admin pertamanya
       description: |
@@ -895,14 +1209,18 @@ paths:
         berkas ini. Aturan envelope itu milik permukaan app-ke-Core; yang ini perintah
         vendor-ke-vendor dengan satu pemanggil yang diketahui namanya.
       security:
-        - controlPlaneToken: []
+      - controlPlaneToken: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [legal_name, admin_name, admin_email, app_ids]
+              required:
+              - legal_name
+              - admin_name
+              - admin_email
+              - app_ids
               properties:
                 legal_name:
                   type: string
@@ -917,7 +1235,10 @@ paths:
                     berjenis legal entity, lengkap dengan kode perusahaan dan kode negaranya.
                 first_environment:
                   type: string
-                  enum: [production, demo, none]
+                  enum:
+                  - production
+                  - demo
+                  - none
                   default: production
                   description: |
                     Jenis tempat kerja pertama tenant ini.
@@ -939,7 +1260,9 @@ paths:
                     ada yang menyadarinya sampai disknya penuh.
                 first_environment_hosting:
                   type: string
-                  enum: [provider, client_server]
+                  enum:
+                  - provider
+                  - client_server
                   default: provider
                   description: |
                     Tempat lingkungan pertama berjalan.
@@ -974,7 +1297,8 @@ paths:
                   type: array
                   minItems: 1
                   uniqueItems: true
-                  items: { type: string }
+                  items:
+                    type: string
                   description: |
                     App yang dibeli pelanggan. Tiap id wajib ada di katalog dengan status
                     `available`; app yang belum tersedia ditolak 422. Prerequisite transitifnya
@@ -986,14 +1310,22 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [tenant_id, environment_id, email, temporary_password]
+                required:
+                - tenant_id
+                - environment_id
+                - email
+                - temporary_password
                 properties:
-                  tenant_id: { type: string, format: ulid }
+                  tenant_id:
+                    type: string
+                    format: ulid
                   environment_id:
                     type: string
                     format: ulid
                     description: Environment `production` pertama tenant ini.
-                  email: { type: string, format: email }
+                  email:
+                    type: string
+                    format: email
                   temporary_password:
                     type: string
                     description: Dibuat Core, tidak dapat dibaca lagi setelah balasan ini.
@@ -1003,19 +1335,22 @@ paths:
             token sama sekali — dan yang terakhir juga 401, bukan terbuka.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: |
             Email sudah terdaftar, app tidak tersedia, field wajib kurang, atau
             `first_environment_hosting` `client_server` bersama jenis selain produksi.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ValidationError' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /tenants/{tenant}/entitlements:
     get:
-      tags: [Pusat admin]
+      tags:
+      - Pusat admin
       operationId: internal.tenants.entitlements.show
       summary: App yang sedang berhak dipakai sebuah tenant
       description: |
@@ -1036,13 +1371,15 @@ paths:
         **Kegagalan endpoint ini tidak boleh menggagalkan laporan agen** di sisi pusat admin:
         laporan tetap diterima dan penerbitan lisensi dicoba lagi setelah jeda.
       security:
-        - controlPlaneToken: []
+      - controlPlaneToken: []
       parameters:
-        - name: tenant
-          in: path
-          required: true
-          schema: { type: string, format: ulid }
-          description: Id baris `tenants`.
+      - name: tenant
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+        description: Id baris `tenants`.
       responses:
         '200':
           description: Hak app tenant itu saat ini. Daftar kosong sah — tenant yang hanya memakai Core.
@@ -1050,36 +1387,45 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [tenant_id, apps]
+                required:
+                - tenant_id
+                - apps
                 properties:
-                  tenant_id: { type: string, format: ulid }
+                  tenant_id:
+                    type: string
+                    format: ulid
                   apps:
                     type: array
                     uniqueItems: true
                     items:
                       type: string
-                      pattern: '^[a-z0-9][a-z0-9-]*$'
+                      pattern: ^[a-z0-9][a-z0-9-]*$
                     description: |
                       Id app, unik dan terurut naik. Bentuknya sama dengan yang diterima pembaca
                       lisensi di Core; id lain membuat lisensi yang memuatnya ditolak seluruhnya.
               example:
                 tenant_id: 01j9zq3v6n8m2k4h7g5f3d1c0b
-                apps: [human-resources, management-aset]
+                apps:
+                - human-resources
+                - management-aset
         '401':
           description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Tenant itu tidak ada di Core.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /environments/{environment}/provision:
     post:
-      tags: [Pusat admin]
+      tags:
+      - Pusat admin
       operationId: internal.environments.provision
       summary: Siapkan database sebuah lingkungan, lalu pasang module yang dibeli tenantnya
       description: |
@@ -1104,13 +1450,15 @@ paths:
 
         Balasannya tanpa envelope `data`, dengan alasan yang sama seperti `/tenants`.
       security:
-        - controlPlaneToken: []
+      - controlPlaneToken: []
       parameters:
-        - name: environment
-          in: path
-          required: true
-          schema: { type: string, format: ulid }
-          description: Id baris `environments` yang disiapkan.
+      - name: environment
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+        description: Id baris `environments` yang disiapkan.
       requestBody:
         required: false
         content:
@@ -1133,7 +1481,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [status, database, modules]
+                required:
+                - status
+                - database
+                - modules
                 properties:
                   status:
                     type: string
@@ -1151,13 +1502,22 @@ paths:
                       menggagalkan penyiapan yang sudah berhasil.
                     items:
                       type: object
-                      required: [id, version, status, seeded]
+                      required:
+                      - id
+                      - version
+                      - status
+                      - seeded
                       properties:
-                        id: { type: string }
-                        version: { type: string }
+                        id:
+                          type: string
+                        version:
+                          type: string
                         status:
                           type: string
-                          enum: [installed, disabled, uninstalled]
+                          enum:
+                          - installed
+                          - disabled
+                          - uninstalled
                         seeded:
                           type: boolean
                           description: Data awal module ini sudah pernah diisi.
@@ -1168,12 +1528,14 @@ paths:
           description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Lingkungan itu tidak ada di registry, atau sudah dihapus lunak.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '409':
           description: |
             Statusnya bukan `provisioning` maupun `degraded`. Menyiapkan ulang lingkungan yang
@@ -1185,7 +1547,8 @@ paths:
             pasang. Ditolak apa pun statusnya — produksi server klien memang lahir `provisioning`.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '422':
           description: |
             Penyiapannya berjalan dan gagal. Lingkungannya turun ke `degraded`, dan `message`
@@ -1193,12 +1556,14 @@ paths:
             karena yang tercatat itulah yang masih dapat dibaca besok.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /fleet:
     get:
-      tags: [Pusat admin]
+      tags:
+      - Pusat admin
       operationId: internal.fleet.index
       summary: Keadaan seluruh armada dalam satu jawaban
       description: |
@@ -1219,7 +1584,7 @@ paths:
         server ini; server klien diperbarui agennya dengan paket edisinya sendiri, dan sidiknya
         tidak dapat dibandingkan dengan image di sini.
       security:
-        - controlPlaneToken: []
+      - controlPlaneToken: []
       responses:
         '200':
           description: Keadaan armada.
@@ -1227,7 +1592,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [platform_fingerprint, counts, environments]
+                required:
+                - platform_fingerprint
+                - counts
+                - environments
                 properties:
                   platform_fingerprint:
                     type: string
@@ -1239,24 +1607,47 @@ paths:
                     type: object
                     description: Hitungan per keadaan, untuk kepala halaman.
                     properties:
-                      current: { type: integer }
-                      behind: { type: integer }
-                      failed: { type: integer }
-                      unknown: { type: integer }
+                      current:
+                        type: integer
+                      behind:
+                        type: integer
+                      failed:
+                        type: integer
+                      unknown:
+                        type: integer
                   environments:
                     type: array
                     items:
                       type: object
-                      required: [id, tenant, name, slug, kind, status, database, fingerprint, state, last_operation]
+                      required:
+                      - id
+                      - tenant
+                      - name
+                      - slug
+                      - kind
+                      - status
+                      - database
+                      - fingerprint
+                      - state
+                      - last_operation
                       properties:
-                        id: { type: string, format: ulid }
-                        tenant: { type: string }
-                        name: { type: string }
-                        slug: { type: string }
+                        id:
+                          type: string
+                          format: ulid
+                        tenant:
+                          type: string
+                        name:
+                          type: string
+                        slug:
+                          type: string
                         kind:
                           type: string
-                          enum: [production, sandbox, demo]
-                        status: { type: string }
+                          enum:
+                          - production
+                          - sandbox
+                          - demo
+                        status:
+                          type: string
                         database:
                           type: string
                           nullable: true
@@ -1269,7 +1660,11 @@ paths:
                             yang dikirim sidik database pusat — karena di sanalah ia tinggal.
                         state:
                           type: string
-                          enum: [current, behind, failed, unknown]
+                          enum:
+                          - current
+                          - behind
+                          - failed
+                          - unknown
                           description: |
                             Satu kata yang dapat dijadikan lencana. `unknown` mencakup dua keadaan
                             yang keduanya bukan "tertinggal": sedang dikerjakan, dan belum pernah
@@ -1278,14 +1673,26 @@ paths:
                           type: object
                           nullable: true
                           properties:
-                            kind: { type: string }
+                            kind:
+                              type: string
                             status:
                               type: string
-                              enum: [running, succeeded, failed]
-                            step: { type: string, nullable: true }
-                            reason: { type: string, nullable: true }
-                            started_at: { type: string, nullable: true }
-                            finished_at: { type: string, nullable: true }
+                              enum:
+                              - running
+                              - succeeded
+                              - failed
+                            step:
+                              type: string
+                              nullable: true
+                            reason:
+                              type: string
+                              nullable: true
+                            started_at:
+                              type: string
+                              nullable: true
+                            finished_at:
+                              type: string
+                              nullable: true
                             requested_by:
                               type: string
                               nullable: true
@@ -1294,12 +1701,14 @@ paths:
           description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /environments/upgrade:
     post:
-      tags: [Pusat admin]
+      tags:
+      - Pusat admin
       operationId: internal.fleet.upgrade
       summary: Antrekan pembaruan untuk setiap lingkungan yang tertinggal
       description: |
@@ -1315,7 +1724,7 @@ paths:
         Sasarannya dihitung **saat eksekusi**, jadi lingkungan yang lahir semenit sesudah ini
         dipanggil ikut pada panggilan berikutnya tanpa didaftarkan ke mana pun.
       security:
-        - controlPlaneToken: []
+      - controlPlaneToken: []
       requestBody:
         required: false
         content:
@@ -1341,22 +1750,29 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [queued, queued_count]
+                required:
+                - queued
+                - queued_count
                 properties:
                   queued:
                     type: array
-                    items: { type: string, format: ulid }
-                  queued_count: { type: integer }
+                    items:
+                      type: string
+                      format: ulid
+                  queued_count:
+                    type: integer
         '401':
           description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /environments/{environment}/upgrade:
     post:
-      tags: [Pusat admin]
+      tags:
+      - Pusat admin
       operationId: internal.environments.upgrade
       summary: Antrekan pembaruan untuk satu lingkungan
       description: |
@@ -1368,13 +1784,15 @@ paths:
         ia disebut dengan id-nya, dan jawaban kosong akan terbaca seperti pembaruan yang tidak
         perlu.
       security:
-        - controlPlaneToken: []
+      - controlPlaneToken: []
       parameters:
-        - name: environment
-          in: path
-          required: true
-          schema: { type: string, format: ulid }
-          description: Id baris `environments` yang diperbarui.
+      - name: environment
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+        description: Id baris `environments` yang diperbarui.
       requestBody:
         required: false
         content:
@@ -1382,8 +1800,10 @@ paths:
             schema:
               type: object
               properties:
-                force: { type: boolean }
-                requested_by: { type: integer }
+                force:
+                  type: boolean
+                requested_by:
+                  type: integer
       responses:
         '202':
           description: Job sudah diantrekan, atau tidak ada yang perlu dikerjakan.
@@ -1391,35 +1811,44 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [queued, queued_count]
+                required:
+                - queued
+                - queued_count
                 properties:
                   queued:
                     type: array
-                    items: { type: string, format: ulid }
-                  queued_count: { type: integer }
+                    items:
+                      type: string
+                      format: ulid
+                  queued_count:
+                    type: integer
         '401':
           description: Token pusat admin salah, tidak dikirim, atau memang tidak disetel.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Lingkungan itu tidak ada di registry, atau sudah diarsipkan.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                $ref: '#/components/schemas/Error'
         '409':
           description: |
             Lingkungan itu berjalan di server klien. Pembaruannya dikerjakan agen di server itu,
             bukan rilis server ini.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '429': { $ref: '#/components/responses/RateLimited' }
-
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 webhooks:
   financePosting:
     post:
-      tags: [Finance feed]
+      tags:
+      - Finance feed
       operationId: webhook.finance-posting
       summary: Posting finance yang dikirim ke klien mode push
       description: |
@@ -1439,41 +1868,48 @@ webhooks:
         4xx lain dan 3xx (redirect tidak diikuti): ditandai gagal kirim dan tampil di layar pantau.
         Pembaca tetap wajib menjaga `UNIQUE(posting_id)`, karena kiriman ulang bisa terjadi.
       parameters:
-        - name: X-CoreERP-Event-Timestamp
-          in: header
-          required: true
-          description: Detik Unix saat dikirim.
-          schema: { type: string }
-        - name: X-CoreERP-Event-Signature
-          in: header
-          required: true
-          schema: { type: string, pattern: '^[0-9a-f]{64}$' }
-        - name: X-CoreERP-Client-Id
-          in: header
-          required: true
-          schema: { type: string, format: ulid }
+      - name: X-CoreERP-Event-Timestamp
+        in: header
+        required: true
+        description: Detik Unix saat dikirim.
+        schema:
+          type: string
+      - name: X-CoreERP-Event-Signature
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+      - name: X-CoreERP-Client-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          format: ulid
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/FinancePosting' }
+            schema:
+              $ref: '#/components/schemas/FinancePosting'
       responses:
         '200':
           description: Diterima. Badan opsional; bila berupa ack yang sah, posting berstatus akhir.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/FinancePostingAck' }
-
+              schema:
+                $ref: '#/components/schemas/FinancePostingAck'
 components:
   securitySchemes:
-    controlPlaneToken:
+    integrationClient:
       type: http
       scheme: bearer
       description: |
-        Token bersama yang dipegang pusat admin dan Core (`COREERP_CONTROL_PLANE_TOKEN`).
-        Ia menyatakan **proses mana** yang memanggil, bukan operator mana — jejak audit per
-        orang tetap harus datang dari sisi konsol. Kosong di sisi Core berarti pemasangan itu
-        menolak setiap perintah pusat admin.
+        Token klien integrasi berbentuk `<id klien>.<rahasia>`, diterbitkan admin tenant di
+        Identity & access › Klien integrasi dan ditampilkan sekali. Token menentukan tenant;
+        header tenant yang dikirim bersamanya diabaikan. Klien yang dicabut, alamat asal di luar
+        allowlist, atau cakupan yang kurang ditolak. Batas laju per klien
+        (`coreerp.integration_api_rate_limit`, bawaan 120 per menit).
     appId:
       type: apiKey
       in: header
@@ -1487,15 +1923,6 @@ components:
         Service credential berbentuk `<credential_id>.<secret>`. Token lama tanpa
         `credential_id` masih diterima tetapi memaksa pemindaian bcrypt per credential;
         terbitkan ulang.
-    integrationClient:
-      type: http
-      scheme: bearer
-      description: |
-        Token klien integrasi berbentuk `<id klien>.<rahasia>`, diterbitkan admin tenant di
-        Identity & access › Klien integrasi dan ditampilkan sekali. Token menentukan tenant;
-        header tenant yang dikirim bersamanya diabaikan. Klien yang dicabut, alamat asal di luar
-        allowlist, atau cakupan yang kurang ditolak. Batas laju per klien
-        (`coreerp.integration_api_rate_limit`, bawaan 120 per menit).
     tenantHeader:
       type: apiKey
       in: header
@@ -1504,140 +1931,113 @@ components:
         Tenant yang menjadi konteks request. Credential yang terikat tenant hanya sah
         untuk tenant itu. Nilai ini adalah **satu-satunya** sumber `tenant_id`; body dan
         query tidak pernah dipercaya.
-
+    controlPlaneToken:
+      type: http
+      scheme: bearer
+      description: |
+        Token bersama yang dipegang pusat admin dan Core (`COREERP_CONTROL_PLANE_TOKEN`).
+        Ia menyatakan **proses mana** yang memanggil, bukan operator mana — jejak audit per
+        orang tetap harus datang dari sisi konsol. Kosong di sisi Core berarti pemasangan itu
+        menolak setiap perintah pusat admin.
   parameters:
-    SequenceReference:
-      name: reference
-      in: path
-      required: true
-      schema: { type: string }
-      description: Kode reference number sequence yang dideklarasikan manifest app.
     ReservationId:
       name: reservation
       in: path
       required: true
-      schema: { type: string, format: ulid }
-
+      schema:
+        type: string
+        format: ulid
+    SequenceReference:
+      name: reference
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Kode reference number sequence yang dideklarasikan manifest app.
+  responses:
+    Forbidden:
+      description: |
+        Credential tidak sah untuk app/tenant ini, entitlement tidak aktif, placement
+        belum `ready`, atau endpoint terbatas pada app lain. Keempatnya sengaja tidak
+        dibedakan agar pemanggil tidak dapat memetakan keadaan tenant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource tidak ada dalam scope tenant ini.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    OutboundRefused:
+      description: |
+        Salinan non-produksi (sandbox atau demo) tidak menyajikan data ke sistem luar. Tanpa
+        penolakan ini, salinan produksi akan menyajikan posting yang dibukukan finance produksi.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: |
+        Batas dilampaui. Kuota di-key per pasangan app dan tenant (default 600 request
+        per menit, `coreerp.internal_api_rate_limit`), sehingga satu app yang berisik
+        tidak dapat menghabiskan kuota app lain.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthenticated:
+      description: Header kredensial atau konteks tenant tidak lengkap.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Field request tidak valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
   schemas:
-    Member:
+    Error:
       type: object
-      required: [membership_id, name, email]
+      required:
+      - message
       properties:
-        membership_id: { type: string, format: ulid }
-        name: { type: string }
-        email: { type: string, format: email }
-
-    OperatingUnit:
-      type: object
-      required: [id, name, type, number, status, updated_at]
-      properties:
-        id: { type: string, format: ulid }
-        name: { type: string }
-        type:
-          type: [string, 'null']
-          description: |
-            Tipe operating unit dari setelan `coreerp.operating_unit_types`, misalnya
-            `business_unit` atau `department`. Daftar tipe dapat bertambah; pembaca harus
-            menerima nilai yang belum dikenalnya.
-        number:
-          type: [string, 'null']
-          maxLength: 30
-          pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$'
-          description: |
-            Nomor unit, unik per tenant. Boleh diganti; posting yang sudah terbit menyimpan
-            nomor pada saat terbit.
-        status: { type: string, description: '`active` atau status nonaktif lain.' }
-        updated_at:
-          type: [string, 'null']
-          format: date-time
-          description: Waktu perubahan terakhir, dari nama maupun nomor dan tipe.
-
-    Vendor:
-      type: object
-      additionalProperties: false
-      required: [id, number, name, party_type, tax_number, status, legal_entity, updated_at]
-      properties:
-        id: { type: string, format: ulid }
-        number:
+        message:
           type: string
-          maxLength: 40
-          description: |
-            Nomor vendor, unik per entitas legal dan tidak pernah berubah. Diterbitkan urutan
-            nomor Core (bawaan `VND-000001`) atau diketik manual saat memindahkan pemasok lama.
-        name: { type: string, maxLength: 200, description: Nama party saat ini. }
-        party_type: { type: string, enum: [organization, person] }
-        tax_number: { type: [string, 'null'], maxLength: 32, description: 'NPWP, bila diisi.' }
-        status: { type: string, enum: [active, inactive] }
-        legal_entity:
-          type: object
-          additionalProperties: false
-          required: [id, code]
-          properties:
-            id: { type: string, format: ulid }
-            code: { type: [string, 'null'], description: Kode perusahaan entitas legal. }
-        updated_at:
-          type: string
-          format: date-time
-          description: Waktu perubahan terakhir, dari vendor maupun nama party-nya.
-
-    Money:
-      type: string
-      pattern: '^[0-9]+(\.[0-9]+)?$'
-      description: |
-        Nilai uang sebagai string desimal tanpa tanda dan tanpa pemisah ribuan, dengan jumlah
-        desimal **persis** `currency.decimals` (`"500000000.00"` untuk 2, `"500000000"` untuk 0).
-        Tidak pernah float (K-20).
-
-    FinancialDimension:
-      type: object
-      additionalProperties: false
-      required: [code, display_name, value_code, value_display_name, value_id]
-      description: |
-        Sejajar dengan `dimensionSetLines` Business Central (K-07). Akun neraca membawa
-        `BUSINESS_UNIT`; akun laba rugi membawa `BUSINESS_UNIT` dan `DEPARTMENT` (K-09). Nilai
-        disalin pada saat terbit. Kode dimensi yang tidak dikenal pembaca berarti posting ditolak
-        dengan `UNKNOWN_DIMENSION`.
-      properties:
-        code: { type: string, description: '`BUSINESS_UNIT` atau `DEPARTMENT`.' }
-        display_name: { type: string }
-        value_code: { type: string, maxLength: 30, description: Nomor operating unit (lihat `/operating-units`). }
-        value_display_name: { type: string }
-        value_id: { type: string, format: ulid, description: Id operating unit. }
-
-    JournalLine:
-      type: object
-      additionalProperties: false
-      required: [line_no, account, debit, credit, description, financial_dimensions]
-      description: Tepat satu dari `debit` dan `credit` bernilai lebih dari nol.
-      properties:
-        line_no: { type: integer, minimum: 1 }
-        account:
-          type: object
-          additionalProperties: false
-          required: [external_id, code, name]
-          description: Akun di aplikasi finance, disalin saat terbit. Pembaca mencocokkan lewat `external_id`.
-          properties:
-            external_id: { type: string, maxLength: 64 }
-            code: { type: string, maxLength: 50 }
-            name: { type: string, maxLength: 200 }
-        debit: { $ref: '#/components/schemas/Money' }
-        credit: { $ref: '#/components/schemas/Money' }
-        description: { type: [string, 'null'], maxLength: 255 }
-        financial_dimensions:
-          type: array
-          items: { $ref: '#/components/schemas/FinancialDimension' }
-
+          description: Pesan untuk operator app. Tidak pernah memuat data tenant lain.
     FinancePosting:
       type: object
       additionalProperties: false
-      required: [contract_version, posting_id, posting_type, settlement_mode, legal_entity, currency,
-        posting_date, document_date, occurred_at, published_at, source_document, vendor,
-        vendor_invoice_reference, journal_lines, totals, reverses_posting_id, adjusts_posting_id, details]
+      required:
+      - contract_version
+      - posting_id
+      - posting_type
+      - settlement_mode
+      - legal_entity
+      - currency
+      - posting_date
+      - document_date
+      - occurred_at
+      - published_at
+      - source_document
+      - vendor
+      - vendor_invoice_reference
+      - journal_lines
+      - totals
+      - reverses_posting_id
+      - adjusts_posting_id
+      - details
       description: |
         Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai tarikan dan
         dorongan (`webhooks.financePosting`).
       properties:
-        contract_version: { type: integer, enum: [1] }
+        contract_version:
+          type: integer
+          enum:
+          - 1
         posting_id:
           type: string
           maxLength: 120
@@ -1651,101 +2051,325 @@ components:
             (misalnya `cashier.receipt`) di bawah awalan yang diizinkan klien; pembaca menolak jenis
             yang belum dikenalnya dengan `INVALID`, tidak mengabaikannya.
         settlement_mode:
-          type: [string, 'null']
-          enum: [direct_payable, clearing, null]
+          type:
+          - string
+          - 'null'
+          enum:
+          - direct_payable
+          - clearing
+          - null
           description: Kebijakan jurnal perolehan (K-10). Koreksi selalu membawa mode posting aslinya.
         legal_entity:
           type: object
           additionalProperties: false
-          required: [id, code]
+          required:
+          - id
+          - code
           properties:
-            id: { type: string, format: ulid }
-            code: { type: [string, 'null'], description: Kode perusahaan entitas legal. }
+            id:
+              type: string
+              format: ulid
+            code:
+              type:
+              - string
+              - 'null'
+              description: Kode perusahaan entitas legal.
         currency:
           type: object
           additionalProperties: false
-          required: [code, decimals]
+          required:
+          - code
+          - decimals
           properties:
-            code: { type: string, pattern: '^[A-Z]{3}$' }
-            decimals: { type: integer, minimum: 0, maximum: 4, description: Jumlah desimal setiap nilai uang di posting ini. }
-        posting_date: { type: string, format: date, description: 'Tanggal akuntansi, dari dokumen.' }
-        document_date: { type: string, format: date }
-        occurred_at: { type: string, format: date-time, description: Jam kejadian dengan offset zona waktu (K-21). }
-        published_at: { type: string, format: date-time, description: 'Jam posting terbit di CoreERP, dengan offset.' }
+            code:
+              type: string
+              pattern: ^[A-Z]{3}$
+            decimals:
+              type: integer
+              minimum: 0
+              maximum: 4
+              description: Jumlah desimal setiap nilai uang di posting ini.
+        posting_date:
+          type: string
+          format: date
+          description: Tanggal akuntansi, dari dokumen.
+        document_date:
+          type: string
+          format: date
+        occurred_at:
+          type: string
+          format: date-time
+          description: Jam kejadian dengan offset zona waktu (K-21).
+        published_at:
+          type: string
+          format: date-time
+          description: Jam posting terbit di CoreERP, dengan offset.
         source_document:
           type: object
           additionalProperties: false
-          required: [module, type, number, description]
+          required:
+          - module
+          - type
+          - number
+          - description
           properties:
-            module: { type: string }
-            type: { type: string }
-            number: { type: [string, 'null'] }
-            description: { type: [string, 'null'] }
+            module:
+              type: string
+            type:
+              type: string
+            number:
+              type:
+              - string
+              - 'null'
+            description:
+              type:
+              - string
+              - 'null'
         vendor:
-          type: [object, 'null']
+          type:
+          - object
+          - 'null'
           additionalProperties: false
-          required: [id, number, name]
+          required:
+          - id
+          - number
+          - name
           description: Vendor disalin saat terbit; sinkronkan tabel penerjemahnya dari `/vendors`.
           properties:
-            id: { type: string, format: ulid }
-            number: { type: string, maxLength: 40 }
-            name: { type: string }
-        vendor_invoice_reference: { type: [string, 'null'], maxLength: 80 }
+            id:
+              type: string
+              format: ulid
+            number:
+              type: string
+              maxLength: 40
+            name:
+              type: string
+        vendor_invoice_reference:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
         journal_lines:
           type: array
           minItems: 2
-          items: { $ref: '#/components/schemas/JournalLine' }
+          items:
+            $ref: '#/components/schemas/JournalLine'
         totals:
           type: object
           additionalProperties: false
-          required: [debit, credit]
+          required:
+          - debit
+          - credit
           description: Selalu sama; jurnal yang tidak seimbang tidak pernah terbit.
           properties:
-            debit: { $ref: '#/components/schemas/Money' }
-            credit: { $ref: '#/components/schemas/Money' }
-        reverses_posting_id: { type: [string, 'null'], description: '`posting_id` yang dibalik posting ini.' }
-        adjusts_posting_id: { type: [string, 'null'], description: '`posting_id` yang dikoreksi posting ini.' }
+            debit:
+              $ref: '#/components/schemas/Money'
+            credit:
+              $ref: '#/components/schemas/Money'
+        reverses_posting_id:
+          type:
+          - string
+          - 'null'
+          description: '`posting_id` yang dibalik posting ini.'
+        adjusts_posting_id:
+          type:
+          - string
+          - 'null'
+          description: '`posting_id` yang dikoreksi posting ini.'
         details:
           type: object
-          description: Informasi untuk pelacakan dan laporan, misalnya rincian per aset. Pembaca tidak boleh menjurnal dari sini.
-
+          description: Informasi untuk pelacakan dan laporan, misalnya rincian per aset. Pembaca tidak
+            boleh menjurnal dari sini.
     FinancePostingAck:
       type: object
-      required: [status]
+      required:
+      - status
       properties:
-        status: { type: string, enum: [posted, rejected] }
+        status:
+          type: string
+          enum:
+          - posted
+          - rejected
         external_reference:
-          type: [string, 'null']
+          type:
+          - string
+          - 'null'
           maxLength: 120
           description: Wajib untuk `posted`. Nomor voucher atau faktur di aplikasi finance.
         reason_code:
-          type: [string, 'null']
-          enum: [PERIOD_CLOSED, UNKNOWN_ACCOUNT, UNKNOWN_DIMENSION, UNKNOWN_VENDOR, UNKNOWN_LEGAL_ENTITY, INVALID, null]
+          type:
+          - string
+          - 'null'
+          enum:
+          - PERIOD_CLOSED
+          - UNKNOWN_ACCOUNT
+          - UNKNOWN_DIMENSION
+          - UNKNOWN_VENDOR
+          - UNKNOWN_LEGAL_ENTITY
+          - INVALID
+          - null
           description: Wajib untuk `rejected`.
-        reason: { type: [string, 'null'], maxLength: 1000, description: Wajib untuk `rejected`. }
-
+        reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 1000
+          description: Wajib untuk `rejected`.
     FinancePostingAckResult:
       type: object
       additionalProperties: false
-      required: [posting_id, status, external_reference, reason_code, reason, acknowledged_at]
+      required:
+      - posting_id
+      - status
+      - external_reference
+      - reason_code
+      - reason
+      - acknowledged_at
       properties:
-        posting_id: { type: string }
-        status: { type: string, enum: [held, pending, posted, rejected, manual] }
-        external_reference: { type: [string, 'null'] }
-        reason_code: { type: [string, 'null'] }
-        reason: { type: [string, 'null'] }
-        acknowledged_at: { type: [string, 'null'], format: date-time }
-
-    UnitOfMeasure:
+        posting_id:
+          type: string
+        status:
+          type: string
+          enum:
+          - held
+          - pending
+          - posted
+          - rejected
+          - manual
+        external_reference:
+          type:
+          - string
+          - 'null'
+        reason_code:
+          type:
+          - string
+          - 'null'
+        reason:
+          type:
+          - string
+          - 'null'
+        acknowledged_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    FinancialDimension:
       type: object
-      required: [id, code, name, symbol, decimal_places]
+      additionalProperties: false
+      required:
+      - code
+      - display_name
+      - value_code
+      - value_display_name
+      - value_id
+      description: |
+        Sejajar dengan `dimensionSetLines` Business Central (K-07). Akun neraca membawa
+        `BUSINESS_UNIT`; akun laba rugi membawa `BUSINESS_UNIT` dan `DEPARTMENT` (K-09). Nilai
+        disalin pada saat terbit. Kode dimensi yang tidak dikenal pembaca berarti posting ditolak
+        dengan `UNKNOWN_DIMENSION`.
       properties:
-        id: { type: string, format: ulid }
-        code: { type: string }
-        name: { type: string }
-        symbol: { type: [string, 'null'] }
-        decimal_places: { type: integer }
-
+        code:
+          type: string
+          description: '`BUSINESS_UNIT` atau `DEPARTMENT`.'
+        display_name:
+          type: string
+        value_code:
+          type: string
+          maxLength: 30
+          description: Nomor operating unit (lihat `/operating-units`).
+        value_display_name:
+          type: string
+        value_id:
+          type: string
+          format: ulid
+          description: Id operating unit.
+    IdempotencyKey:
+      type: string
+      maxLength: 160
+      pattern: ^[A-Za-z0-9._:-]+$
+    IssuedNumber:
+      type: object
+      required:
+      - id
+      - number
+      - status
+      properties:
+        id:
+          type: string
+          format: ulid
+        number:
+          type: string
+          description: Nilai terformat sesuai segmen format sequence.
+        status:
+          const: issued
+    JournalLine:
+      type: object
+      additionalProperties: false
+      required:
+      - line_no
+      - account
+      - debit
+      - credit
+      - description
+      - financial_dimensions
+      description: Tepat satu dari `debit` dan `credit` bernilai lebih dari nol.
+      properties:
+        line_no:
+          type: integer
+          minimum: 1
+        account:
+          type: object
+          additionalProperties: false
+          required:
+          - external_id
+          - code
+          - name
+          description: Akun di aplikasi finance, disalin saat terbit. Pembaca mencocokkan lewat `external_id`.
+          properties:
+            external_id:
+              type: string
+              maxLength: 64
+            code:
+              type: string
+              maxLength: 50
+            name:
+              type: string
+              maxLength: 200
+        debit:
+          $ref: '#/components/schemas/Money'
+        credit:
+          $ref: '#/components/schemas/Money'
+        description:
+          type:
+          - string
+          - 'null'
+          maxLength: 255
+        financial_dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinancialDimension'
+    Member:
+      type: object
+      required:
+      - membership_id
+      - name
+      - email
+      properties:
+        membership_id:
+          type: string
+          format: ulid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+    Money:
+      type: string
+      pattern: ^[0-9]+(\.[0-9]+)?$
+      description: |
+        Nilai uang sebagai string desimal tanpa tanda dan tanpa pemisah ribuan, dengan jumlah
+        desimal **persis** `currency.decimals` (`"500000000.00"` untuk 2, `"500000000"` untuk 0).
+        Tidak pernah float (K-20).
     NumberSequenceContext:
       type: object
       description: |
@@ -1754,98 +2378,193 @@ components:
         fiskal wajib menyertakan `legal_entity_id` — kalender fiskal milik legal entity
         dan tidak pernah milik operating unit.
       properties:
-        legal_entity_id: { type: [string, 'null'], format: ulid }
-        org_unit_id: { type: [string, 'null'], format: ulid }
-
-    IdempotencyKey:
-      type: string
-      maxLength: 160
-      pattern: '^[A-Za-z0-9._:-]+$'
-
-    IssuedNumber:
+        legal_entity_id:
+          type:
+          - string
+          - 'null'
+          format: ulid
+        org_unit_id:
+          type:
+          - string
+          - 'null'
+          format: ulid
+    OperatingUnit:
       type: object
-      required: [id, number, status]
+      required:
+      - id
+      - name
+      - type
+      - number
+      - status
+      - updated_at
       properties:
-        id: { type: string, format: ulid }
-        number:
+        id:
           type: string
-          description: Nilai terformat sesuai segmen format sequence.
-        status: { const: issued }
-
+          format: ulid
+        name:
+          type: string
+        type:
+          type:
+          - string
+          - 'null'
+          description: |
+            Tipe operating unit dari setelan `coreerp.operating_unit_types`, misalnya
+            `business_unit` atau `department`. Daftar tipe dapat bertambah; pembaca harus
+            menerima nilai yang belum dikenalnya.
+        number:
+          type:
+          - string
+          - 'null'
+          maxLength: 30
+          pattern: ^[A-Z0-9]+(-[A-Z0-9]+)*$
+          description: |
+            Nomor unit, unik per tenant. Boleh diganti; posting yang sudah terbit menyimpan
+            nomor pada saat terbit.
+        status:
+          type: string
+          description: '`active` atau status nonaktif lain.'
+        updated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Waktu perubahan terakhir, dari nama maupun nomor dan tipe.
     Reservation:
       type: object
-      required: [id, number, status, expires_at]
+      required:
+      - id
+      - number
+      - status
+      - expires_at
       properties:
-        id: { type: string, format: ulid }
-        number: { type: string }
+        id:
+          type: string
+          format: ulid
+        number:
+          type: string
         status:
-          enum: [reserved, reconciliation_pending, confirmed, cancelled]
-        expires_at: { type: [string, 'null'], format: date-time }
-
-    WorkflowInstance:
+          enum:
+          - reserved
+          - reconciliation_pending
+          - confirmed
+          - cancelled
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    UnitOfMeasure:
       type: object
-      required: [id, status, source_document_type, source_document_id]
+      required:
+      - id
+      - code
+      - name
+      - symbol
+      - decimal_places
       properties:
-        id: { type: string, format: ulid }
-        status: { type: string }
-        source_document_type: { type: string }
-        source_document_id: { type: string, format: ulid }
-
-    Error:
+        id:
+          type: string
+          format: ulid
+        code:
+          type: string
+        name:
+          type: string
+        symbol:
+          type:
+          - string
+          - 'null'
+        decimal_places:
+          type: integer
+    ValidationError:
       type: object
-      required: [message]
+      required:
+      - message
+      - errors
       properties:
         message:
           type: string
-          description: Pesan untuk operator app. Tidak pernah memuat data tenant lain.
-
-    ValidationError:
-      type: object
-      required: [message, errors]
-      properties:
-        message: { type: string }
         errors:
           type: object
           additionalProperties:
             type: array
-            items: { type: string }
-
-  responses:
-    Unauthenticated:
-      description: Header kredensial atau konteks tenant tidak lengkap.
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    Forbidden:
-      description: |
-        Credential tidak sah untuk app/tenant ini, entitlement tidak aktif, placement
-        belum `ready`, atau endpoint terbatas pada app lain. Keempatnya sengaja tidak
-        dibedakan agar pemanggil tidak dapat memetakan keadaan tenant.
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    NotFound:
-      description: Resource tidak ada dalam scope tenant ini.
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    ValidationError:
-      description: Field request tidak valid.
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/ValidationError' }
-    OutboundRefused:
-      description: |
-        Salinan non-produksi (sandbox atau demo) tidak menyajikan data ke sistem luar. Tanpa
-        penolakan ini, salinan produksi akan menyajikan posting yang dibukukan finance produksi.
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
-    RateLimited:
-      description: |
-        Batas dilampaui. Kuota di-key per pasangan app dan tenant (default 600 request
-        per menit, `coreerp.internal_api_rate_limit`), sehingga satu app yang berisik
-        tidak dapat menghabiskan kuota app lain.
-      content:
-        application/json:
-          schema: { $ref: '#/components/schemas/Error' }
+            items:
+              type: string
+    Vendor:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - number
+      - name
+      - party_type
+      - tax_number
+      - status
+      - legal_entity
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: ulid
+        number:
+          type: string
+          maxLength: 40
+          description: |
+            Nomor vendor, unik per entitas legal dan tidak pernah berubah. Diterbitkan urutan
+            nomor Core (bawaan `VND-000001`) atau diketik manual saat memindahkan pemasok lama.
+        name:
+          type: string
+          maxLength: 200
+          description: Nama party saat ini.
+        party_type:
+          type: string
+          enum:
+          - organization
+          - person
+        tax_number:
+          type:
+          - string
+          - 'null'
+          maxLength: 32
+          description: NPWP, bila diisi.
+        status:
+          type: string
+          enum:
+          - active
+          - inactive
+        legal_entity:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - code
+          properties:
+            id:
+              type: string
+              format: ulid
+            code:
+              type:
+              - string
+              - 'null'
+              description: Kode perusahaan entitas legal.
+        updated_at:
+          type: string
+          format: date-time
+          description: Waktu perubahan terakhir, dari vendor maupun nama party-nya.
+    WorkflowInstance:
+      type: object
+      required:
+      - id
+      - status
+      - source_document_type
+      - source_document_id
+      properties:
+        id:
+          type: string
+          format: ulid
+        status:
+          type: string
+        source_document_type:
+          type: string
+        source_document_id:
+          type: string
+          format: ulid

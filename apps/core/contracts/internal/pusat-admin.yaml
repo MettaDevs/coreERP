@@ -1,0 +1,40 @@
+# Akar pembaca: konsol pusat admin (admin.erp). Dirakit ke `contracts/terbit/pusat-admin.yaml`
+# oleh `contracts/bundle.py`. Tidak terbit di portal publik.
+x-portal:
+  judul: Pusat admin (internal)
+  publik: false
+  urutan: 90
+openapi: 3.1.0
+info:
+  title: CoreERP — perintah pusat admin
+  version: 1.0.0
+  description: |
+    Perintah dari konsol operator vendor ke Core: melahirkan tenant, menyiapkan dan memutakhirkan
+    environment, dan membaca armada. Dijaga `controlPlaneToken`, token bersama yang menyatakan
+    **proses mana** yang memanggil, bukan operator mana; jejak audit per orang datang dari konsol.
+
+    Kontrak inilah yang dibaca test pusat admin (`apps/control-plane`) untuk memastikan perintah
+    yang dikirimnya sesuai dengan yang diterima Core.
+
+servers:
+  - url: /api/internal/v1
+    description: Relatif terhadap host Core; path lengkapnya `/api/internal/v1/...`.
+
+security:
+  - controlPlaneToken: []
+
+tags:
+  - name: Pusat admin
+    description: Perintah dari konsol operator vendor.
+
+paths:
+  /tenants: { $ref: 'paths/tenants.yaml' }
+  /tenants/{tenant}/entitlements: { $ref: 'paths/tenants_tenant_entitlements.yaml' }
+  /environments/{environment}/provision: { $ref: 'paths/environments_environment_provision.yaml' }
+  /fleet: { $ref: 'paths/fleet.yaml' }
+  /environments/upgrade: { $ref: 'paths/environments_upgrade.yaml' }
+  /environments/{environment}/upgrade: { $ref: 'paths/environments_environment_upgrade.yaml' }
+
+components:
+  securitySchemes:
+    controlPlaneToken: { $ref: 'components/securitySchemes/controlPlaneToken.yaml' }

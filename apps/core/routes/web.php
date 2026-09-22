@@ -9,6 +9,7 @@ use App\Http\Controllers\AppLaunchManifestController;
 use App\Http\Controllers\Auth\SsoBackchannelLogoutController;
 use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
+use App\Http\Controllers\Docs\DocsPortalController;
 use App\Http\Controllers\Finance\CurrencyPrecisionController;
 use App\Http\Controllers\Finance\FinancePostingSettingController;
 use App\Http\Controllers\Finance\IntegrationClientController;
@@ -46,25 +47,16 @@ use Inertia\Inertia;
 Route::inertia('/', 'welcome')->name('home');
 Route::inertia('ui-playground', 'ui-playground')->name('ui-playground');
 
+/*
+ * Portal dokumentasi API. Kontrak integrasi untuk sistem di luar CoreERP terbit tanpa login;
+ * referensi internal dijaga gate `viewApiDocs`. Alasannya di DocsPortalController.
+ */
+Route::get('docs', DocsPortalController::class)->name('docs.portal');
+Route::get('docs/kontrak/{spesifikasi}.yaml', [DocsPortalController::class, 'kontrak'])
+    ->where('spesifikasi', '[a-z-]+')
+    ->name('docs.kontrak');
+
 Route::middleware(RestrictedDocsAccess::class)->group(function () {
-    Route::get('docs', function () {
-        $specifications = CoreApp::query()->where('status', 'available')->orderBy('name')->get()
-            ->map(fn (CoreApp $app): array => [
-                'id' => $app->id,
-                'name' => $app->name,
-                'url' => route('docs.openapi', $app->id),
-            ])
-            ->prepend([
-                'id' => 'control-plane',
-                'name' => config('app.name').' Control Plane',
-                'url' => route('scramble.docs.document'),
-            ])
-            ->values();
-        $selected = $specifications->firstWhere('id', request()->query('spec')) ?? $specifications->first();
-
-        return view('api-portal', compact('selected', 'specifications'));
-    })->name('docs.portal');
-
     // Contract dimiliki repository app penerbit, bukan repository platform ini.
     // Portal hanya mengarahkan ke contract yang didaftarkan app pada katalog.
     Route::get('docs/openapi/{document}', function (string $document) {

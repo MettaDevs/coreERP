@@ -1,0 +1,7 @@
+description: |
+  Credential tidak sah untuk app/tenant ini, entitlement tidak aktif, placement
+  belum `ready`, atau endpoint terbatas pada app lain. Keempatnya sengaja tidak
+  dibedakan agar pemanggil tidak dapat memetakan keadaan tenant.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/Error' }

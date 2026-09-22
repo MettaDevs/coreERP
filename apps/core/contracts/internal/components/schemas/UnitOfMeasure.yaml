@@ -1,0 +1,8 @@
+type: object
+required: [id, code, name, symbol, decimal_places]
+properties:
+  id: { type: string, format: ulid }
+  code: { type: string }
+  name: { type: string }
+  symbol: { type: [string, 'null'] }
+  decimal_places: { type: integer }

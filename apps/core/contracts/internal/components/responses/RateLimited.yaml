@@ -1,0 +1,7 @@
+description: |
+  Batas dilampaui. Kuota di-key per pasangan app dan tenant (default 600 request
+  per menit, `coreerp.internal_api_rate_limit`), sehingga satu app yang berisik
+  tidak dapat menghabiskan kuota app lain.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/Error' }

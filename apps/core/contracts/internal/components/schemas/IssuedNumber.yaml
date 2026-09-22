@@ -1,0 +1,8 @@
+type: object
+required: [id, number, status]
+properties:
+  id: { type: string, format: ulid }
+  number:
+    type: string
+    description: Nilai terformat sesuai segmen format sequence.
+  status: { const: issued }

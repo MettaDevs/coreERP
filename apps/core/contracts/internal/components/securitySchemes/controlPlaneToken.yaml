@@ -1,0 +1,7 @@
+type: http
+scheme: bearer
+description: |
+  Token bersama yang dipegang pusat admin dan Core (`COREERP_CONTROL_PLANE_TOKEN`).
+  Ia menyatakan **proses mana** yang memanggil, bukan operator mana — jejak audit per
+  orang tetap harus datang dari sisi konsol. Kosong di sisi Core berarti pemasangan itu
+  menolak setiap perintah pusat admin.

@@ -1,0 +1,76 @@
+# Kepala berkas gabungan `contracts/openapi-internal.yaml`. Isinya — path, webhook, dan
+# komponen — dirakit `contracts/bundle.py` dari seluruh akar pembaca di folder ini.
+openapi: 3.1.0
+info:
+  title: CoreERP Control Plane internal API
+  version: 1.0.0
+  description: |
+    Permukaan **app-ke-Core**: seluruh route dengan prefix `/internal/v1`, dipanggil
+    aplikasi bisnis dan sistem luar memakai kredensial layanan, bukan session browser.
+
+    Berkas ini **hasil perakitan** dari sumber tulisan tangan di `contracts/internal/`: satu
+    berkas per path dan per komponen, dan satu akar per pembaca. Sunting sumbernya, lalu jalankan
+    `python contracts/bundle.py` dari `apps/core`; CI menolak berkas hasil yang tidak sama dengan
+    sumbernya. Selain berkas gabungan ini, perakit juga menulis satu spesifikasi per pembaca di
+    `contracts/terbit/`: satu per domain integrasi (misalnya `integrasi-finance`, terbit di portal
+    `/docs`), ditambah `app` dan `pusat-admin`.
+
+    Kontrak ini sengaja terpisah dari `openapi.json`, yang di-generate Scramble dan hanya
+    mencakup surface browser Control Plane (`/api/v1`, session cookie). Generator tidak pernah
+    memindai prefix ini. Jangan pindahkan isinya ke output generator: kontrak yang dibuat dari
+    kode ikut berubah diam-diam saat kodenya berubah.
+
+    Aturan yang mengikat kontrak ini ada pada **Contract decision gate** di
+    `.agents/skills/coreerp-architecture/SKILL.md`. Menambah route pada
+    `routes/api.php` tanpa menambahkannya di sini adalah perubahan yang belum selesai.
+
+    Tiga jenis pemanggil, masing-masing dengan kredensialnya sendiri:
+
+    - **App module** (`appId` + `serviceToken` + `tenantHeader`), diverifikasi
+      `AuthenticateAppService`.
+    - **Klien integrasi** (`integrationClient`): sistem di luar CoreERP, misalnya aplikasi
+      finance pelanggan yang membaca feed posting. Token `Bearer <id klien>.<rahasia>` milik satu
+      tenant, dengan cakupan sempit, diverifikasi `AuthenticateIntegrationClient`. Endpoint yang
+      menerimanya menyebutnya di `security` beserta cakupan yang dibutuhkan. Di salinan sandbox
+      seluruh endpoint klien integrasi menjawab 503.
+    - **Pusat admin** (`controlPlaneToken`): perintah dari konsol operator vendor.
+
+    Batas yang berlaku di seluruh endpoint:
+
+    - `tenant_id` **tidak pernah** diterima dari URL, query, atau body. Ia berasal dari
+      header kredensial yang diverifikasi `AuthenticateAppService`, atau dari klien integrasi
+      pemilik token.
+    - App hanya menerima referensi opaque milik Core. Tidak ada akses database lintas
+      module, tidak ada foreign key lintas database.
+    - Seluruh response sukses memakai envelope `data`.
+
+servers:
+  - url: /api/internal/v1
+    description: |
+      Relatif terhadap host Control Plane. Prefix `/api` ditambahkan Laravel melalui
+      `withRouting(api: ...)`, sedangkan `internal/v1` berasal dari grup di
+      `routes/api.php` — jadi path lengkapnya `/api/internal/v1/...`, bukan
+      `/internal/v1/...`.
+
+security:
+  - appId: []
+    serviceToken: []
+    tenantHeader: []
+
+tags:
+  - name: Directory
+    description: Data referensi Core yang boleh dibaca app. Hanya baca.
+  - name: Human Resources
+    description: Sinkronisasi workforce. Terbatas pada app `human-resources`.
+  - name: Number sequence
+    description: Penerbitan nomor dokumen. Counter dimiliki Core, tidak pernah app.
+  - name: Workflow
+    description: Pengajuan workflow. Keputusannya kembali sebagai event, bukan response.
+  - name: Finance feed
+    description: |
+      Feed posting finance untuk aplikasi finance pelanggan (docs/todo/feed-posting-finance).
+      Hanya klien integrasi; module di dalam CoreERP menerbitkan posting lewat kontrak in-process.
+  - name: Pusat admin
+    description: |
+      Perintah dari konsol operator vendor. Satu-satunya tag di berkas ini yang pemanggilnya
+      bukan app module, dan karena itu satu-satunya yang tidak memakai kredensial app.
