@@ -50,7 +50,7 @@ class OrganizationController extends Controller
                 'purposes.allowedOrganizationTypes',
                 'versions' => fn ($query) => $query->orderByDesc('version_number'),
                 'versions.nodes.organization:id,name,classification',
-                'versions.nodes.organization.operatingUnit:organization_id,type',
+                'versions.nodes.organization.operatingUnit:organization_id,type,number',
                 'versions.nodes.parentNode:id,organization_id',
                 'versions.nodes.parentNode.organization:id,name',
             ])

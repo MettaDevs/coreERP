@@ -112,10 +112,29 @@ paths:
     get:
       tags: [Directory]
       operationId: internal.operating-units.index
-      summary: Daftar operating unit aktif
+      summary: Daftar operating unit, beserta nomor dan tipenya
       description: |
         Terbatas pada app `human-resources`. Hanya organisasi dengan klasifikasi
-        `operating_unit` dan status aktif. Legal entity tidak dikembalikan di sini.
+        `operating_unit`; legal entity tidak dikembalikan di sini.
+
+        Tanpa `updated_since`: seluruh operating unit **aktif**. Dengan `updated_since`:
+        **setiap** operating unit yang berubah pada atau sesudah saat itu, termasuk yang sudah
+        dinonaktifkan (`status` bukan `active`), supaya pembaca yang menyinkronkan tabel
+        penerjemahnya tahu unit mana yang berhenti dipakai.
+
+        `number` adalah nomor unit, kode stabil yang dipakai sebagai nilai dimensi keuangan
+        `BUSINESS_UNIT` dan `DEPARTMENT` pada feed posting finance. `null` berarti belum diisi.
+
+        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari tarikan terakhir, kirim
+        sebagai `updated_since` pada tarikan berikutnya, dan simpan dengan upsert berdasarkan
+        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Tarikan penuh tanpa
+        `updated_since` sesekali tetap dianjurkan sebagai jaring pengaman.
+      parameters:
+        - name: updated_since
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
       responses:
         '200':
           description: Daftar operating unit, diurutkan menurut nama.
@@ -127,14 +146,10 @@ paths:
                 properties:
                   data:
                     type: array
-                    items:
-                      type: object
-                      required: [id, name]
-                      properties:
-                        id: { type: string, format: ulid }
-                        name: { type: string }
+                    items: { $ref: '#/components/schemas/OperatingUnit' }
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
   /fiscal-periods:
@@ -1238,6 +1253,31 @@ components:
         membership_id: { type: string, format: ulid }
         name: { type: string }
         email: { type: string, format: email }
+
+    OperatingUnit:
+      type: object
+      required: [id, name, type, number, status, updated_at]
+      properties:
+        id: { type: string, format: ulid }
+        name: { type: string }
+        type:
+          type: [string, 'null']
+          description: |
+            Tipe operating unit dari setelan `coreerp.operating_unit_types`, misalnya
+            `business_unit` atau `department`. Daftar tipe dapat bertambah; pembaca harus
+            menerima nilai yang belum dikenalnya.
+        number:
+          type: [string, 'null']
+          maxLength: 30
+          pattern: '^[A-Z0-9]+(-[A-Z0-9]+)*$'
+          description: |
+            Nomor unit, unik per tenant. Boleh diganti; posting yang sudah terbit menyimpan
+            nomor pada saat terbit.
+        status: { type: string, description: '`active` atau status nonaktif lain.' }
+        updated_at:
+          type: [string, 'null']
+          format: date-time
+          description: Waktu perubahan terakhir, dari nama maupun nomor dan tipe.
 
     UnitOfMeasure:
       type: object

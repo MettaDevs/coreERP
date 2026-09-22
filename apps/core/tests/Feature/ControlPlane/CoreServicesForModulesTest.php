@@ -98,7 +98,7 @@ class CoreServicesForModulesTest extends TestCase
         $unit = $this->app->make(DirektoriOrganisasi::class)->unitOperasi($konteks['tenant_id']);
 
         $this->assertCount(1, $unit);
-        $this->assertSame(['id', 'nama', 'klasifikasi'], array_keys($unit[0]));
+        $this->assertSame(['id', 'nama', 'klasifikasi', 'tipe', 'nomor'], array_keys($unit[0]));
         $this->assertIsString($unit[0]['id']);
     }
 

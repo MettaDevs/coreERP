@@ -80,8 +80,12 @@ CREATE TABLE legal_entities (
 
 CREATE TABLE operating_units (
     organization_id uuid PRIMARY KEY REFERENCES organizations(id),
-    type text NOT NULL
+    tenant_id uuid,          -- salinan organizations.tenant_id, tanpa FK ke tenants
+    type text NOT NULL,
+    number varchar(30)       -- nomor unit, nilai dimensi keuangan
 );
+CREATE UNIQUE INDEX operating_units_tenant_number_unique
+    ON operating_units (tenant_id, number) WHERE number IS NOT NULL;
 
 CREATE TABLE organization_hierarchies (
     id uuid PRIMARY KEY,
