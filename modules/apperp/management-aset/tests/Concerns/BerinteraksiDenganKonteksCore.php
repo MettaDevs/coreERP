@@ -173,6 +173,25 @@ trait BerinteraksiDenganKonteksCore
     }
 
     /**
+     * Melengkapi kiriman pembuatan master berkode ketik dengan kode, bila test tidak menyebutnya.
+     *
+     * Group aset dan buku penyusutan tidak lagi diberi nomor oleh Core; kodenya diketik (K-24
+     * feed posting finance) dan wajib ada. Test yang tidak sedang menguji kode itu cukup memanggil
+     * ini, supaya setiap helper pembuat master tidak menulis ulang aturannya sendiri.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    protected function denganKodeKetik(string $resource, array $payload): array
+    {
+        if (! in_array($resource, ['group-aset', 'buku-penyusutan'], true) || array_key_exists('kode', $payload)) {
+            return $payload;
+        }
+
+        return ['kode' => 'UJI-'.strtoupper(Str::random(10)), ...$payload];
+    }
+
+    /**
      * Awalan nomor yang dijanjikan manifest untuk sebuah referensi.
      *
      * Dipakai test yang memeriksa kode yang diterbitkan. Membacanya dari manifest, bukan

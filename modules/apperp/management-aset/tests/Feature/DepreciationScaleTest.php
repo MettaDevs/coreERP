@@ -299,7 +299,7 @@ class DepreciationScaleTest extends TestCase
     {
         return $this->sebagaiPengguna($tenant, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/'.$resource, array_filter($payload, fn ($value) => $value !== null))
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, array_filter($payload, fn ($value) => $value !== null)))
             ->assertCreated()->json('data.id');
     }
 

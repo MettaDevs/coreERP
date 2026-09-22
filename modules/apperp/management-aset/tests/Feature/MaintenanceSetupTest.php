@@ -165,7 +165,7 @@ class MaintenanceSetupTest extends TestCase
     {
         return $this->withContext(array_merge($this->permissions($resource), $resource === 'jenis-aset' ? [] : []))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::lower(Str::random(12)))
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload));
     }
 
     /** @param list<string> $permissions */

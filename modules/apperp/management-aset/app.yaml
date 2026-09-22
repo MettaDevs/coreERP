@@ -1425,6 +1425,8 @@ number_sequences:
       default_prefix: MDLA
       allowed_scopes:
         - tenant
+    # Tidak lagi dipakai untuk kode baru: kodenya diketik (K-24 feed posting finance). Dibiarkan
+    # terdaftar supaya urutan nomor tenant yang sudah menyetelnya tidak rusak (N-1).
     - code: management-aset.group-aset
       name: Kode group aset
       default_prefix: GRPA
@@ -1535,6 +1537,8 @@ number_sequences:
       default_prefix: TATR
       allowed_scopes:
         - tenant
+    # Tidak lagi dipakai untuk kode baru: kodenya diketik (K-24 feed posting finance). Dibiarkan
+    # terdaftar supaya urutan nomor tenant yang sudah menyetelnya tidak rusak (N-1).
     - code: management-aset.buku-penyusutan
       name: Kode buku penyusutan
       default_prefix: BKPY

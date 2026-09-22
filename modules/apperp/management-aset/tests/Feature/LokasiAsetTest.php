@@ -198,7 +198,7 @@ class LokasiAsetTest extends TestCase
     {
         return $this->sebagaiPengguna($this->tenantId, $this->permissionsFor($resource))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload);
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload));
     }
 
     /**

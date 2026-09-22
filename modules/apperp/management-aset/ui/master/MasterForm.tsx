@@ -30,7 +30,12 @@ import type {
     MasterRecord,
     ParentSummary,
 } from './masters';
-import { parentIdOf, parentSummaryOf } from './masters';
+import {
+    MANUAL_CODE_PATTERN,
+    normalizeManualCode,
+    parentIdOf,
+    parentSummaryOf,
+} from './masters';
 
 type FormValue = { nama: string; keterangan: string; aktif: boolean };
 
@@ -86,6 +91,8 @@ export default function MasterForm({
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const creationKey = useRef(newIdempotencyKey());
+    const manualCode = !value ? config.manualCode : undefined;
+    const [kode, setKode] = useState('');
     const sheetContentRef = useRef<HTMLDivElement>(null);
 
     /**
@@ -131,6 +138,7 @@ export default function MasterForm({
                         ? undefined
                         : { 'Idempotency-Key': creationKey.current },
                     body: JSON.stringify({
+                        ...(manualCode ? { kode } : {}),
                         nama: form.nama,
                         keterangan: form.keterangan,
                         aktif: form.aktif,
@@ -213,22 +221,48 @@ export default function MasterForm({
                 >
                     <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                         <FieldGroup>
-                            <Field data-disabled="true">
-                                <Input
-                                    id="code"
-                                    label={config.kodeLabel}
-                                    value={
-                                        value?.kode ??
-                                        'Dibuat otomatis saat disimpan'
-                                    }
-                                    disabled
-                                />
-                            </Field>
+                            {manualCode ? (
+                                <Field>
+                                    <Input
+                                        id="code"
+                                        label={config.kodeLabel}
+                                        required
+                                        autoFocus
+                                        maxLength={30}
+                                        pattern={MANUAL_CODE_PATTERN}
+                                        placeholder={manualCode.placeholder}
+                                        className="font-mono"
+                                        value={kode}
+                                        onChange={(event) =>
+                                            setKode(
+                                                normalizeManualCode(
+                                                    event.target.value,
+                                                ),
+                                            )
+                                        }
+                                    />
+                                    <FieldDescription>
+                                        {manualCode.help}
+                                    </FieldDescription>
+                                </Field>
+                            ) : (
+                                <Field data-disabled="true">
+                                    <Input
+                                        id="code"
+                                        label={config.kodeLabel}
+                                        value={
+                                            value?.kode ??
+                                            'Dibuat otomatis saat disimpan'
+                                        }
+                                        disabled
+                                    />
+                                </Field>
+                            )}
                             <Field>
                                 <Input
                                     id="name"
                                     label={config.namaLabel}
-                                    autoFocus
+                                    autoFocus={!manualCode}
                                     required
                                     maxLength={150}
                                     value={form.nama}

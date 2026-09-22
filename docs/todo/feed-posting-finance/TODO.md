@@ -272,7 +272,7 @@ melihat, menelusuri, dan menindaklanjuti setiap posting tanpa membuka database.
 
 ---
 
-### 8. [ ] Modul aset: setup posting
+### 8. [~] Modul aset: setup posting
 
 **Tempat:** `modules/apperp/management-aset` · **Setelah:** 1, 3 · **Selesai bila:** setiap group
 aset bisa dipetakan ke akun referensi, buku menentukan boleh di-post atau tidak lewat satu saklar,
@@ -300,12 +300,12 @@ dan dimensi lokasi mewarisi dari induk.
   - [ ] 8.6.1 Pemetaan bertanggal berlaku terbaca sesuai tanggal posting.
   - [ ] 8.6.2 Lokasi ruang tanpa pemetaan mewarisi dari lantai.
   - [ ] 8.6.3 Buku `none` tidak pernah menghasilkan posting.
-  - [ ] 8.6.4 Kode group aset dan buku penyusutan diketik manual, unik per tenant, dan tidak bisa diubah setelah dipakai posting.
-- [ ] 8.7 Kode manual untuk group aset dan buku penyusutan (K-24). **Wajib selesai sebelum 15.1.**
-  - [ ] 8.7.1 Form group aset dan buku penyusutan menerima kode yang diketik (huruf besar, angka, `-`), misalnya `KENDARAAN`, `KOMERSIAL`.
-  - [ ] 8.7.2 Hentikan pemakaian referensi `management-aset.group-aset` dan `management-aset.buku-penyusutan` di `app.yaml` untuk kode baru. Referensinya jangan dihapus dulu, supaya tenant yang sudah menyetelnya tidak rusak (N-1).
-  - [ ] 8.7.3 Data yang sudah ada tetap memakai kode lamanya. Tidak ada penggantian kode massal.
-  - [ ] 8.7.4 Kode dikunci setelah group atau buku dipakai posting, karena kode itu tertanam di tabel penerjemah pembaca.
+  - [x] 8.6.4 Kode group aset dan buku penyusutan diketik manual, unik per tenant, dan tidak bisa diubah setelah dipakai posting (`KodeKetikMasterSetupTest`).
+- [x] 8.7 Kode manual untuk group aset dan buku penyusutan (K-24). **Wajib selesai sebelum 15.1.**
+  - [x] 8.7.1 Form group aset dan buku penyusutan menerima kode yang diketik (huruf besar, angka, `-`), misalnya `KENDARAAN`, `KOMERSIAL`. Paling panjang 30 karakter, sama dengan nomor operating unit; di form, huruf kecil dijadikan besar dan spasi menjadi `-`.
+  - [x] 8.7.2 Hentikan pemakaian referensi `management-aset.group-aset` dan `management-aset.buku-penyusutan` di `app.yaml` untuk kode baru. Referensinya jangan dihapus dulu, supaya tenant yang sudah menyetelnya tidak rusak (N-1). Buku starter kini lahir sebagai `KOMERSIAL` dan `FISKAL`.
+  - [x] 8.7.3 Data yang sudah ada tetap memakai kode lamanya. Tidak ada penggantian kode massal.
+  - [x] 8.7.4 Kode dikunci setelah group atau buku dipakai posting, karena kode itu tertanam di tabel penerjemah pembaca. Dikunci sejak disimpan, lebih ketat dari syaratnya, dan kode yang pernah dipakai (termasuk oleh data yang diarsipkan) tidak dipakai ulang. Salah ketik diperbaiki dengan mengarsipkan lalu membuat data baru.
 
 ---
 
