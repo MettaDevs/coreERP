@@ -1,0 +1,8 @@
+type: http
+scheme: bearer
+description: |
+  Token klien integrasi berbentuk `<id klien>.<rahasia>`, diterbitkan admin tenant di
+  Identity & access › Klien integrasi dan ditampilkan sekali. Token menentukan tenant;
+  header tenant yang dikirim bersamanya diabaikan. Klien yang dicabut, alamat asal di luar
+  allowlist, atau cakupan yang kurang ditolak. Batas laju per klien
+  (`coreerp.integration_api_rate_limit`, bawaan 120 per menit).

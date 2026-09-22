@@ -1,0 +1,4 @@
+type: apiKey
+in: header
+name: X-CoreERP-App-Id
+description: Identitas app pemanggil, mis. `human-resources`.

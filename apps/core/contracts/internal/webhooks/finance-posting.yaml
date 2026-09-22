@@ -1,0 +1,45 @@
+post:
+  tags: [Finance feed]
+  operationId: webhook.finance-posting
+  summary: Posting finance yang dikirim ke klien mode push
+  description: |
+    CoreERP mengirim setiap posting `pending` ke `push_url` klien integrasi mode push, dengan
+    badan yang sama persis dengan satu elemen `data` pada `GET /finance-postings`. Urutannya sama
+    dengan urutan tarikan, per klien.
+
+    **Tanda tangan.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal atas
+    `<X-CoreERP-Event-Timestamp>.<badan mentah>`, dengan rahasia penanda tangan klien sebagai
+    kunci. Pembaca wajib memverifikasinya dan menolak stempel waktu yang terlalu jauh dari jamnya
+    sendiri. `X-CoreERP-Client-Id` menyebut klien, untuk pembaca yang melayani beberapa tenant.
+
+    **Jawaban.** 2xx dihitung terkirim; bila badannya `FinancePostingAck` yang sah, ack itu
+    diterapkan seperti `POST /finance-postings/{posting_id}/ack`, dan bila tidak, posting tetap
+    `pending` sampai di-ack lewat API. 408, 429, 5xx, atau tidak menjawab: dikirim ulang dengan
+    jeda 1, 2, 4, … sampai 60 menit, selama `coreerp.finance_push_retry_hours` (bawaan 24 jam).
+    4xx lain dan 3xx (redirect tidak diikuti): ditandai gagal kirim dan tampil di layar pantau.
+    Pembaca tetap wajib menjaga `UNIQUE(posting_id)`, karena kiriman ulang bisa terjadi.
+  parameters:
+    - name: X-CoreERP-Event-Timestamp
+      in: header
+      required: true
+      description: Detik Unix saat dikirim.
+      schema: { type: string }
+    - name: X-CoreERP-Event-Signature
+      in: header
+      required: true
+      schema: { type: string, pattern: '^[0-9a-f]{64}$' }
+    - name: X-CoreERP-Client-Id
+      in: header
+      required: true
+      schema: { type: string, format: ulid }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/FinancePosting' }
+  responses:
+    '200':
+      description: Diterima. Badan opsional; bila berupa ack yang sah, posting berstatus akhir.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/FinancePostingAck' }

@@ -412,16 +412,16 @@ posting perolehan.
 
 ---
 
-### 13. [ ] Kontrak dan dokumentasi
+### 13. [~] Kontrak dan dokumentasi
 
 **Tempat:** `apps/core/contracts`, `docs/` · **Setelah:** 6, dan diperbarui di setiap area modul ·
 **Selesai bila:** pembaca baru bisa membangun konsumen hanya dari dokumen, dan `npx vitepress build
 docs` bersih.
 
-- [ ] 13.1 Contoh payload lengkap untuk kelima jenis posting, untuk kedua mode bila berbeda.
+- [~] 13.1 Contoh payload lengkap untuk kelima jenis posting, untuk kedua mode bila berbeda. `asset.acquisition` sudah ada di spesifikasi Integrasi · Finance (dicocokkan dengan skemanya oleh `DocsPortalTest`); empat lainnya menyusul bersama area modulnya.
 - [ ] 13.2 Halaman `docs/dev` untuk feed posting: penerbit, status, validasi, penahanan, dan panduan menambah jenis posting dari modul lain.
 - [ ] 13.3 Halaman `docs/apps/management-aset`: posting group, cara perolehan, saldo awal, dan "Post penyusutan".
-- [ ] 13.4 Panduan untuk pembaca: urutan sinkron (akun → vendor → unit → tarik posting → ack), tabel penerjemah, dan larangan fallback.
+- [x] 13.4 Panduan untuk pembaca: urutan sinkron (akun → vendor → unit → tarik posting → ack), tabel penerjemah, dan larangan fallback. Terbit tanpa login di portal `/docs` (spesifikasi Integrasi · Finance), ditulis di `apps/core/contracts/internal/integrasi-finance.yaml`.
 - [ ] 13.5 Daftarkan halaman di `docs/.vitepress/config.ts`, lalu build bersih.
 - [ ] 13.6 Tandai bagian "Kontrak ke backoffice" di `docs/todo/managementaset/03-penyusutan-dan-bridge-backoffice.md` sebagai digantikan.
 

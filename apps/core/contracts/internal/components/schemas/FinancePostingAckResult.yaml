@@ -1,0 +1,10 @@
+type: object
+additionalProperties: false
+required: [posting_id, status, external_reference, reason_code, reason, acknowledged_at]
+properties:
+  posting_id: { type: string }
+  status: { type: string, enum: [held, pending, posted, rejected, manual] }
+  external_reference: { type: [string, 'null'] }
+  reason_code: { type: [string, 'null'] }
+  reason: { type: [string, 'null'] }
+  acknowledged_at: { type: [string, 'null'], format: date-time }

@@ -1,0 +1,14 @@
+type: object
+additionalProperties: false
+required: [code, display_name, value_code, value_display_name, value_id]
+description: |
+  Sejajar dengan `dimensionSetLines` Business Central (K-07). Akun neraca membawa
+  `BUSINESS_UNIT`; akun laba rugi membawa `BUSINESS_UNIT` dan `DEPARTMENT` (K-09). Nilai
+  disalin pada saat terbit. Kode dimensi yang tidak dikenal pembaca berarti posting ditolak
+  dengan `UNKNOWN_DIMENSION`.
+properties:
+  code: { type: string, description: '`BUSINESS_UNIT` atau `DEPARTMENT`.' }
+  display_name: { type: string }
+  value_code: { type: string, maxLength: 30, description: Nomor operating unit (lihat `/operating-units`). }
+  value_display_name: { type: string }
+  value_id: { type: string, format: ulid, description: Id operating unit. }

@@ -1,0 +1,41 @@
+post:
+  tags: [Number sequence]
+  operationId: internal.number-sequences.reserve
+  summary: Pesan nomor untuk sequence berkelanjutan
+  description: |
+    Hanya untuk sequence **continuous**; sequence non-continuous menghasilkan 422.
+
+    Reservation menahan nomor sampai `confirm` atau `cancel`. Nomor yang dibatalkan
+    kembali ke pool dan dapat dipakai transaksi lain, sehingga reservation yang sudah
+    dibatalkan tidak pernah diputar ulang oleh idempotency key yang sama.
+  parameters:
+    - $ref: '#/components/parameters/SequenceReference'
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          allOf:
+            - $ref: '#/components/schemas/NumberSequenceContext'
+            - type: object
+              required: [idempotency_key]
+              properties:
+                idempotency_key: { $ref: '#/components/schemas/IdempotencyKey' }
+  responses:
+    '201':
+      description: Nomor dipesan.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Reservation' }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '422':
+      description: Sequence tidak memakai reservation, atau field tidak valid.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }

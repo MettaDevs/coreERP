@@ -180,10 +180,22 @@ Before adding or changing anything reachable from outside the module — any
 3. **An undocumented cross-module surface is an incomplete change.** If a route
    exists that another app calls and it is absent from the contract, the change is
    not finished. Absence is the most common failure here and it is invisible in
-   tests — nothing fails when a contract omits an endpoint. For Control Plane, the
-   app-facing surface lives in `contracts/openapi-internal.yaml` and is enforced by
-   `python contracts/check-contract-coverage.py`, which also runs in CI. Run it after
-   any change to `routes/api.php`.
+   tests — nothing fails when a contract omits an endpoint. For Core, the `internal/v1`
+   surface is written by hand in `apps/core/contracts/internal/` — one file per path and
+   per component, one root per reader — and assembled by `python contracts/bundle.py` into
+   `contracts/openapi-internal.yaml` (every reader) and `contracts/terbit/` (one spec per
+   reader). Never edit the assembled files. `python contracts/check-contract-coverage.py`
+   compares the router with the combined bundle; both it and `bundle.py --check` run in
+   CI. Run them after any change to `routes/api.php` or the contract.
+
+   **Readers outside CoreERP get one root per domain, not one root for everything.**
+   `integrasi-finance.yaml` serves the finance application; a later HR or procurement
+   integration gets its own `integrasi-<domain>.yaml`, with its own guide and version, so a
+   partner reads only what it uses. A root's `x-portal` decides whether it is published
+   without login at `/docs`; integration domains are, while the module-app and pusat-admin
+   contracts stay behind the `viewApiDocs` gate. An endpoint read by two readers is written
+   once in `paths/` and referenced from both roots; the bundler keeps only the security
+   schemes each root knows, so every reader sees its own way in.
 
    **Every app carries its own coverage check, not only Control Plane**, and it runs in
    CI — a checker no pipeline invokes is a file, not a gate. Three things decide whether
@@ -241,6 +253,8 @@ Before adding or changing anything reachable from outside the module — any
    spec into `paths/` and `components/` joined by `$ref`, and commit a bundled
    artifact next to the split source for tooling that cannot resolve cross-file
    refs. One 10k-line spec guarantees merge conflicts between unrelated features.
+   Core's `contracts/internal/` and `contracts/bundle.py` are the reference layout: a
+   bundle check in CI proves the committed artifacts match their sources.
 
 #### Envelope fields cannot be added retroactively
 

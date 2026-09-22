@@ -1,0 +1,54 @@
+post:
+  tags: [Human Resources]
+  operationId: internal.hr.position-assignments.store
+  summary: Sinkronkan perubahan penugasan posisi
+  description: |
+    Terbatas pada app `human-resources`.
+
+    Ini **perintah REST, bukan event**. Ia menyatakan keadaan penugasan saat ini
+    dan Core memakainya untuk memateralisasi role otomatis; ia bukan fakta masa
+    lalu yang disiarkan. Jangan mencarinya di `asyncapi.yaml`.
+
+    Efeknya idempoten terhadap `assignment_id`: `active: true` membuat atau
+    mempertahankan role assignment otomatis untuk setiap rule posisi yang cocok,
+    `active: false` mencabutnya. Assignment manual tidak pernah tersentuh.
+
+    Rule role otomatis hanya boleh memakai data policy yang membutuhkan operating
+    unit dan tidak membutuhkan legal entity; kombinasi lain ditolak 422.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [membership_id, position_id, operating_unit_id, assignment_id, active]
+          properties:
+            membership_id:
+              type: string
+              format: ulid
+              description: Harus anggota aktif pada tenant yang sama.
+            position_id: { type: string, format: ulid }
+            operating_unit_id:
+              type: string
+              format: ulid
+              description: Menjadi scope data policy pada role otomatis yang dibuat.
+            assignment_id:
+              type: string
+              format: ulid
+              description: Identitas penugasan milik HR; dipakai sebagai kunci pencabutan.
+            active:
+              type: boolean
+              description: '`false` mencabut role otomatis yang berasal dari penugasan ini.'
+  responses:
+    '204':
+      description: Sinkronisasi diterima. Tidak ada body.
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '422':
+      description: |
+        Anggota tidak tersedia, atau rule role otomatis memakai kebijakan data
+        yang tidak sah untuk penugasan posisi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }

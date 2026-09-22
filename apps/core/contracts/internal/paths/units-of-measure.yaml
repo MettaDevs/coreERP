@@ -1,0 +1,20 @@
+get:
+  tags: [Directory]
+  operationId: internal.units-of-measure.index
+  summary: Daftar satuan aktif tenant
+  description: Terbuka untuk semua app yang punya credential aktif dan entitlement `ready`.
+  responses:
+    '200':
+      description: Daftar satuan, diurutkan menurut nama.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                type: array
+                items: { $ref: '#/components/schemas/UnitOfMeasure' }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '429': { $ref: '#/components/responses/RateLimited' }

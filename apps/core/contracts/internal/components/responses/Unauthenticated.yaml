@@ -1,0 +1,4 @@
+description: Header kredensial atau konteks tenant tidak lengkap.
+content:
+  application/json:
+    schema: { $ref: '#/components/schemas/Error' }

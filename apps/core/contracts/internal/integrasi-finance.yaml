@@ -1,0 +1,229 @@
+# Akar domain finance untuk sistem di luar CoreERP (token klien integrasi). Dirakit ke
+# `contracts/terbit/integrasi-finance.yaml` oleh `contracts/bundle.py`, dan terbit tanpa login
+# di portal `/docs`. Satu domain satu akar: integrasi domain lain (SDM, pengadaan, …) mendapat
+# akarnya sendiri, supaya tiap pembaca hanya membaca yang ia pakai.
+#
+# Panduan di `info.description` ditulis untuk orang luar: tanpa riwayat keputusan internal
+# (K-xx) dan tanpa jalur kode.
+x-portal:
+  judul: Integrasi · Finance
+  publik: true
+  urutan: 10
+openapi: 3.1.0
+info:
+  title: CoreERP — Integrasi finance
+  version: 1.0.0
+  description: |
+    Panduan dan referensi untuk tim aplikasi finance yang membukukan jurnal dari CoreERP: **feed
+    posting finance** beserta data induk untuk tabel penerjemahnya. Panduan di bawah menjelaskan
+    cara memakainya dari awal; referensi tiap endpoint ada sesudahnya. Integrasi domain lain
+    punya halamannya sendiri — pilih di atas halaman ini.
+
+    ## Gambaran
+
+    ```text
+    Modul aset CoreERP            CoreERP                         Aplikasi finance Anda
+    ──────────────────            ─────────────────────           ─────────────────────
+    penerimaan, penyusutan  ──▶   posting berstatus pending  ──▶  tarik (pull) atau
+                                                                  terima (push)
+                                  status akhir: posted /     ◀──  ack: posted atau
+                                  rejected                        rejected
+    ```
+
+    - **Posting** adalah satu dokumen sumber, misalnya satu penerimaan aset, dengan jurnal yang
+      sudah seimbang: baris akun, debit atau kredit, dan dimensi keuangan per baris.
+    - CoreERP tidak membukukan apa pun di aplikasi finance. Anda yang membukukan, lalu melapor
+      balik lewat **ack** — nomor voucher bila dibukukan, atau kode alasan bila ditolak.
+    - Setiap posting punya `posting_id` yang tidak pernah berubah. Posting yang sama bisa sampai
+      lebih dari sekali; menerimanya lagi **tidak boleh** menghasilkan jurnal kedua. Simpan dengan
+      `UNIQUE(posting_id)`.
+
+    ## Langkah 1 — Minta klien integrasi
+
+    Admin tenant CoreERP membuatnya di **Identity & access › Klien integrasi**, lalu menyerahkan
+    tokennya kepada Anda:
+
+    | Setelan | Isi |
+    | --- | --- |
+    | Mode pengiriman | **Tarik** — sistem Anda memanggil CoreERP. **Dorong** — CoreERP memanggil URL HTTPS Anda. |
+    | Cakupan | `finance-postings.read`, `finance-postings.ack`, `vendors.read`, `operating-units.read` |
+    | Awalan jenis posting | Misalnya `asset.`: klien hanya melihat posting modul aset |
+    | Allowlist IP | Opsional, bila alamat server Anda tetap |
+
+    Token berbentuk `<id klien>.<rahasia>` dan ditampilkan **sekali** saat dibuat. Kirim di setiap
+    permintaan:
+
+    ```http
+    Authorization: Bearer <id klien>.<rahasia>
+    Accept: application/json
+    ```
+
+    Token menentukan tenant. Jangan mengirim id tenant sendiri; kalau dikirim, diabaikan.
+
+    ## Langkah 2 — Alamat
+
+    Semua endpoint berada di bawah `https://<alamat>/api/internal/v1`, dengan `<alamat>` sama
+    dengan alamat yang dipakai pengguna tenant itu untuk masuk ke CoreERP — alamat tenant di
+    layanan SaaS, atau domain server CoreERP di tempat pelanggan.
+
+    Salinan **sandbox** menjawab `503` untuk seluruh endpoint di halaman ini, supaya server uji
+    tidak pernah menyajikan posting ke aplikasi finance produksi.
+
+    ## Langkah 3 — Isi tabel penerjemah
+
+    Posting membawa kode CoreERP. Petakan ke kode di aplikasi finance Anda sebelum membukukan:
+
+    | Yang dipetakan | Di posting | Sumbernya |
+    | --- | --- | --- |
+    | Entitas legal | `legal_entity.code` | Disepakati dengan admin tenant |
+    | Akun | `journal_lines[].account.external_id` | ID akun di aplikasi finance Anda sendiri: admin tenant mengimpor ekspor daftar akun Anda (CSV `external_id,code,name,type,active`) |
+    | Business unit dan department | `journal_lines[].financial_dimensions[].value_code` | `GET /operating-units` |
+    | Vendor | `vendor.id` dan `vendor.number` | `GET /vendors` |
+
+    Sinkronkan secara berkala: simpan `updated_at` terbesar dari sinkron terakhir, kirim sebagai
+    `updated_since` berikutnya, dan simpan dengan upsert berdasarkan `id`. Batasnya inklusif, jadi
+    baris di batas bisa datang dua kali. `GET /vendors` dibaca per halaman lewat `cursor`.
+
+    ## Langkah 4 — Tarik dan bukukan (mode tarik)
+
+    Jalankan terjadwal, misalnya setiap satu sampai lima menit:
+
+    1. `GET /finance-postings?limit=100` — posting yang belum di-ack, urut tanggal akuntansi.
+    2. Untuk tiap posting, **sesuai urutan**:
+       - Bila `posting_id` sudah tersimpan, jangan bukukan lagi; kirim ulang ack-nya saja.
+       - Terjemahkan akun, dimensi, vendor, dan entitas legal. Kode yang tidak dikenal berarti
+         posting **ditolak** — jangan pernah memakai akun atau vendor cadangan.
+       - Bukukan dari `journal_lines`, dengan `posting_date` sebagai tanggal jurnal.
+       - Kirim ack (langkah 5).
+    3. Ulangi selama `meta.has_more` bernilai `true`.
+
+    Posting yang belum di-ack disajikan lagi pada tarikan berikutnya. Bila proses Anda berhenti
+    di tengah, tidak ada posting yang hilang.
+
+    ## Langkah 5 — Ack
+
+    ```http
+    POST /finance-postings/AST-ACQ-01J9Z3/ack
+
+    {"status": "posted", "external_reference": "JV-2026-0001"}
+    ```
+
+    ```http
+    POST /finance-postings/AST-ACQ-01J9Z3/ack
+
+    {"status": "rejected", "reason_code": "PERIOD_CLOSED", "reason": "Periode September sudah ditutup"}
+    ```
+
+    | Jawaban | Arti |
+    | --- | --- |
+    | `200` | Ack tercatat, atau ack yang sama sudah tercatat sebelumnya — aman diulang |
+    | `404` | `posting_id` tidak dikenal, atau jenisnya di luar awalan klien Anda |
+    | `409` | Bertentangan dengan status yang tercatat, misalnya nomor voucher berbeda |
+    | `422` | Isi ack tidak lengkap |
+
+    | Kode penolakan | Pakai bila |
+    | --- | --- |
+    | `PERIOD_CLOSED` | Periode `posting_date` sudah ditutup |
+    | `UNKNOWN_ACCOUNT` | `external_id` akun tidak dikenal |
+    | `UNKNOWN_DIMENSION` | Kode atau nilai dimensi tidak dikenal |
+    | `UNKNOWN_VENDOR` | Vendor tidak dikenal |
+    | `UNKNOWN_LEGAL_ENTITY` | Entitas legal tidak dikenal |
+    | `INVALID` | Alasan lain, termasuk `posting_type` yang belum dikenal |
+
+    Posting yang ditolak tidak dikirim ulang dan tanggalnya tidak digeser. Pengguna CoreERP
+    memperbaikinya dengan posting koreksi di periode yang masih terbuka.
+
+    ## Mode dorong (push)
+
+    Bila klien Anda memakai mode dorong, CoreERP mengirim setiap posting `pending` sebagai
+    `POST` ke URL HTTPS Anda. Badannya sama persis dengan satu posting pada `GET
+    /finance-postings`, urutannya sama, dan kiriman ulang bisa terjadi — tetap jaga
+    `UNIQUE(posting_id)`. Bentuk lengkapnya ada di bagian **Webhooks** (`financePosting`).
+
+    Verifikasi tanda tangan sebelum memproses. `X-CoreERP-Event-Signature` adalah HMAC-SHA256
+    heksadesimal atas `<X-CoreERP-Event-Timestamp>.<badan mentah>`, dengan rahasia penanda tangan
+    klien — ditampilkan sekali saat klien dibuat — sebagai kunci:
+
+    ```php
+    $stempel = $_SERVER['HTTP_X_COREERP_EVENT_TIMESTAMP'] ?? '';
+    $tanda = $_SERVER['HTTP_X_COREERP_EVENT_SIGNATURE'] ?? '';
+    $badan = file_get_contents('php://input');
+
+    $benar = hash_hmac('sha256', $stempel.'.'.$badan, $rahasiaPenandaTangan);
+    if (! hash_equals($benar, $tanda) || abs(time() - (int) $stempel) > 300) {
+        http_response_code(401);
+        exit;
+    }
+    ```
+
+    | Jawaban Anda | Yang dilakukan CoreERP |
+    | --- | --- |
+    | `2xx` dengan badan ack | Ack diterapkan, posting selesai |
+    | `2xx` tanpa badan ack | Dianggap terkirim; posting tetap `pending` sampai Anda meng-ack lewat API |
+    | `408`, `429`, `5xx`, atau tidak menjawab | Dikirim ulang dengan jeda 1, 2, 4, … sampai 60 menit, selama 24 jam |
+    | `4xx` lain atau `3xx` | Ditandai gagal kirim dan muncul di layar pantau CoreERP. Redirect tidak diikuti. |
+
+    ## Aturan data
+
+    - **Nilai uang** adalah string desimal dengan jumlah desimal persis `currency.decimals`,
+      misalnya `"500000000.00"`. Jangan membacanya sebagai float dan jangan membulatkan ulang;
+      presisi kolom di aplikasi Anda harus sama atau lebih halus.
+    - **Tanggal**: `posting_date` (tanggal jurnal) dan `document_date` hanya tanggal.
+      `occurred_at` dan `published_at` lengkap dengan offset zona waktu; simpan apa adanya.
+    - **`details`** hanya informasi untuk pelacakan, misalnya rincian per aset. Jangan menjurnal
+      dari sana.
+    - **Koreksi** membawa `adjusts_posting_id`, dan **pembalikan** membawa `reverses_posting_id`,
+      yaitu `posting_id` posting yang dikoreksi atau dibalik.
+
+    | `posting_type` | Terbit saat |
+    | --- | --- |
+    | `asset.acquisition` | Penerimaan aset diselesaikan |
+    | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi |
+    | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed |
+    | `asset.depreciation` | Proses "Post penyusutan" satu periode |
+    | `asset.depreciation_reversal` | Penyusutan satu periode dibalik |
+
+    ## Kesalahan umum
+
+    | Status | Arti |
+    | --- | --- |
+    | `401` | Token salah, belum dikirim, atau sudah dicabut |
+    | `403` | Cakupan klien kurang, atau alamat asal di luar allowlist |
+    | `422` | Parameter tidak sah; `errors` menyebut field-nya |
+    | `429` | Batas laju terlampaui (bawaan 120 permintaan per menit per klien) |
+    | `503` | Salinan sandbox, yang tidak menyajikan data ke sistem luar |
+
+    ## Versi kontrak
+
+    Setiap posting membawa `contract_version: 1`. Bentuk versi 1 tidak berubah. Perubahan yang
+    memengaruhi pembaca terbit sebagai versi baru dan diumumkan lebih dulu.
+
+servers:
+  - url: https://{alamat}/api/internal/v1
+    description: Alamat tenant CoreERP di layanan SaaS, atau domain server CoreERP di tempat pelanggan.
+    variables:
+      alamat:
+        default: alamat-tenant.contoh
+        description: Host yang dipakai pengguna tenant itu untuk masuk ke CoreERP.
+
+security:
+  - integrationClient: []
+
+tags:
+  - name: Finance feed
+    description: Posting yang harus dibukukan aplikasi finance, dan ack hasilnya.
+  - name: Directory
+    description: Data induk untuk tabel penerjemah — vendor, dan unit organisasi yang menjadi nilai dimensi.
+
+paths:
+  /finance-postings: { $ref: 'paths/finance-postings.yaml' }
+  /finance-postings/{posting_id}/ack: { $ref: 'paths/finance-postings_posting_id_ack.yaml' }
+  /vendors: { $ref: 'paths/vendors.yaml' }
+  /operating-units: { $ref: 'paths/operating-units.yaml' }
+
+webhooks:
+  financePosting: { $ref: 'webhooks/finance-posting.yaml' }
+
+components:
+  securitySchemes:
+    integrationClient: { $ref: 'components/securitySchemes/integrationClient.yaml' }

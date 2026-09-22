@@ -1,0 +1,52 @@
+post:
+  tags: [Finance feed]
+  operationId: internal.finance-postings.ack
+  summary: Hasil pembukuan satu posting di aplikasi finance
+  security:
+    - integrationClient: []
+  description: |
+    Cakupan `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
+    finance; `rejected` membawa kode alasan dan penjelasannya. Keduanya status akhir.
+
+    Idempoten: ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab 200
+    tanpa perubahan. Ack yang bertentangan dengan status akhir, atau ack atas posting yang tidak
+    pernah disajikan (ditahan atau manual), menjawab 409. Posting yang ditolak diperbaiki dengan
+    posting koreksi di periode yang masih terbuka, tidak diberi tanggal ulang (K-17).
+
+    Posting yang tidak ada, milik tenant lain, atau jenisnya di luar awalan klien menjawab 404.
+  parameters:
+    - name: posting_id
+      in: path
+      required: true
+      schema: { type: string, maxLength: 120 }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema: { $ref: '#/components/schemas/FinancePostingAck' }
+  responses:
+    '200':
+      description: Ack diterapkan, atau ack yang sama sudah tercatat.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/FinancePostingAckResult' }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '404': { $ref: '#/components/responses/NotFound' }
+    '409':
+      description: Ack bertentangan dengan status posting. `data` membawa status yang tercatat.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message, data]
+            properties:
+              message: { type: string }
+              data: { $ref: '#/components/schemas/FinancePostingAckResult' }
+    '422': { $ref: '#/components/responses/ValidationError' }
+    '429': { $ref: '#/components/responses/RateLimited' }
+    '503': { $ref: '#/components/responses/OutboundRefused' }

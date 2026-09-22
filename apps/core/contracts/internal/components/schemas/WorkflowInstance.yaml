@@ -1,0 +1,7 @@
+type: object
+required: [id, status, source_document_type, source_document_id]
+properties:
+  id: { type: string, format: ulid }
+  status: { type: string }
+  source_document_type: { type: string }
+  source_document_id: { type: string, format: ulid }

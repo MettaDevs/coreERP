@@ -1,0 +1,5 @@
+name: reference
+in: path
+required: true
+schema: { type: string }
+description: Kode reference number sequence yang dideklarasikan manifest app.

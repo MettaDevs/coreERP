@@ -1,0 +1,24 @@
+get:
+  tags: [Directory]
+  operationId: internal.members.show
+  summary: Ambil satu anggota tenant
+  description: Terbatas pada app `human-resources`. Anggota non-aktif dianggap tidak ada.
+  parameters:
+    - name: membership
+      in: path
+      required: true
+      schema: { type: string, format: ulid }
+  responses:
+    '200':
+      description: Anggota ditemukan.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { $ref: '#/components/schemas/Member' }
+    '401': { $ref: '#/components/responses/Unauthenticated' }
+    '403': { $ref: '#/components/responses/Forbidden' }
+    '404': { $ref: '#/components/responses/NotFound' }
+    '429': { $ref: '#/components/responses/RateLimited' }

@@ -1,0 +1,1169 @@
+# Berkas hasil `python contracts/bundle.py` dari `contracts/internal/`.
+# Jangan diedit tangan: suntingan di sini hilang pada perakitan berikutnya, dan CI menolaknya.
+openapi: 3.1.0
+info:
+  title: CoreERP — Integrasi finance
+  version: 1.0.0
+  description: |
+    Panduan dan referensi untuk tim aplikasi finance yang membukukan jurnal dari CoreERP: **feed
+    posting finance** beserta data induk untuk tabel penerjemahnya. Panduan di bawah menjelaskan
+    cara memakainya dari awal; referensi tiap endpoint ada sesudahnya. Integrasi domain lain
+    punya halamannya sendiri — pilih di atas halaman ini.
+
+    ## Gambaran
+
+    ```text
+    Modul aset CoreERP            CoreERP                         Aplikasi finance Anda
+    ──────────────────            ─────────────────────           ─────────────────────
+    penerimaan, penyusutan  ──▶   posting berstatus pending  ──▶  tarik (pull) atau
+                                                                  terima (push)
+                                  status akhir: posted /     ◀──  ack: posted atau
+                                  rejected                        rejected
+    ```
+
+    - **Posting** adalah satu dokumen sumber, misalnya satu penerimaan aset, dengan jurnal yang
+      sudah seimbang: baris akun, debit atau kredit, dan dimensi keuangan per baris.
+    - CoreERP tidak membukukan apa pun di aplikasi finance. Anda yang membukukan, lalu melapor
+      balik lewat **ack** — nomor voucher bila dibukukan, atau kode alasan bila ditolak.
+    - Setiap posting punya `posting_id` yang tidak pernah berubah. Posting yang sama bisa sampai
+      lebih dari sekali; menerimanya lagi **tidak boleh** menghasilkan jurnal kedua. Simpan dengan
+      `UNIQUE(posting_id)`.
+
+    ## Langkah 1 — Minta klien integrasi
+
+    Admin tenant CoreERP membuatnya di **Identity & access › Klien integrasi**, lalu menyerahkan
+    tokennya kepada Anda:
+
+    | Setelan | Isi |
+    | --- | --- |
+    | Mode pengiriman | **Tarik** — sistem Anda memanggil CoreERP. **Dorong** — CoreERP memanggil URL HTTPS Anda. |
+    | Cakupan | `finance-postings.read`, `finance-postings.ack`, `vendors.read`, `operating-units.read` |
+    | Awalan jenis posting | Misalnya `asset.`: klien hanya melihat posting modul aset |
+    | Allowlist IP | Opsional, bila alamat server Anda tetap |
+
+    Token berbentuk `<id klien>.<rahasia>` dan ditampilkan **sekali** saat dibuat. Kirim di setiap
+    permintaan:
+
+    ```http
+    Authorization: Bearer <id klien>.<rahasia>
+    Accept: application/json
+    ```
+
+    Token menentukan tenant. Jangan mengirim id tenant sendiri; kalau dikirim, diabaikan.
+
+    ## Langkah 2 — Alamat
+
+    Semua endpoint berada di bawah `https://<alamat>/api/internal/v1`, dengan `<alamat>` sama
+    dengan alamat yang dipakai pengguna tenant itu untuk masuk ke CoreERP — alamat tenant di
+    layanan SaaS, atau domain server CoreERP di tempat pelanggan.
+
+    Salinan **sandbox** menjawab `503` untuk seluruh endpoint di halaman ini, supaya server uji
+    tidak pernah menyajikan posting ke aplikasi finance produksi.
+
+    ## Langkah 3 — Isi tabel penerjemah
+
+    Posting membawa kode CoreERP. Petakan ke kode di aplikasi finance Anda sebelum membukukan:
+
+    | Yang dipetakan | Di posting | Sumbernya |
+    | --- | --- | --- |
+    | Entitas legal | `legal_entity.code` | Disepakati dengan admin tenant |
+    | Akun | `journal_lines[].account.external_id` | ID akun di aplikasi finance Anda sendiri: admin tenant mengimpor ekspor daftar akun Anda (CSV `external_id,code,name,type,active`) |
+    | Business unit dan department | `journal_lines[].financial_dimensions[].value_code` | `GET /operating-units` |
+    | Vendor | `vendor.id` dan `vendor.number` | `GET /vendors` |
+
+    Sinkronkan secara berkala: simpan `updated_at` terbesar dari sinkron terakhir, kirim sebagai
+    `updated_since` berikutnya, dan simpan dengan upsert berdasarkan `id`. Batasnya inklusif, jadi
+    baris di batas bisa datang dua kali. `GET /vendors` dibaca per halaman lewat `cursor`.
+
+    ## Langkah 4 — Tarik dan bukukan (mode tarik)
+
+    Jalankan terjadwal, misalnya setiap satu sampai lima menit:
+
+    1. `GET /finance-postings?limit=100` — posting yang belum di-ack, urut tanggal akuntansi.
+    2. Untuk tiap posting, **sesuai urutan**:
+       - Bila `posting_id` sudah tersimpan, jangan bukukan lagi; kirim ulang ack-nya saja.
+       - Terjemahkan akun, dimensi, vendor, dan entitas legal. Kode yang tidak dikenal berarti
+         posting **ditolak** — jangan pernah memakai akun atau vendor cadangan.
+       - Bukukan dari `journal_lines`, dengan `posting_date` sebagai tanggal jurnal.
+       - Kirim ack (langkah 5).
+    3. Ulangi selama `meta.has_more` bernilai `true`.
+
+    Posting yang belum di-ack disajikan lagi pada tarikan berikutnya. Bila proses Anda berhenti
+    di tengah, tidak ada posting yang hilang.
+
+    ## Langkah 5 — Ack
+
+    ```http
+    POST /finance-postings/AST-ACQ-01J9Z3/ack
+
+    {"status": "posted", "external_reference": "JV-2026-0001"}
+    ```
+
+    ```http
+    POST /finance-postings/AST-ACQ-01J9Z3/ack
+
+    {"status": "rejected", "reason_code": "PERIOD_CLOSED", "reason": "Periode September sudah ditutup"}
+    ```
+
+    | Jawaban | Arti |
+    | --- | --- |
+    | `200` | Ack tercatat, atau ack yang sama sudah tercatat sebelumnya — aman diulang |
+    | `404` | `posting_id` tidak dikenal, atau jenisnya di luar awalan klien Anda |
+    | `409` | Bertentangan dengan status yang tercatat, misalnya nomor voucher berbeda |
+    | `422` | Isi ack tidak lengkap |
+
+    | Kode penolakan | Pakai bila |
+    | --- | --- |
+    | `PERIOD_CLOSED` | Periode `posting_date` sudah ditutup |
+    | `UNKNOWN_ACCOUNT` | `external_id` akun tidak dikenal |
+    | `UNKNOWN_DIMENSION` | Kode atau nilai dimensi tidak dikenal |
+    | `UNKNOWN_VENDOR` | Vendor tidak dikenal |
+    | `UNKNOWN_LEGAL_ENTITY` | Entitas legal tidak dikenal |
+    | `INVALID` | Alasan lain, termasuk `posting_type` yang belum dikenal |
+
+    Posting yang ditolak tidak dikirim ulang dan tanggalnya tidak digeser. Pengguna CoreERP
+    memperbaikinya dengan posting koreksi di periode yang masih terbuka.
+
+    ## Mode dorong (push)
+
+    Bila klien Anda memakai mode dorong, CoreERP mengirim setiap posting `pending` sebagai
+    `POST` ke URL HTTPS Anda. Badannya sama persis dengan satu posting pada `GET
+    /finance-postings`, urutannya sama, dan kiriman ulang bisa terjadi — tetap jaga
+    `UNIQUE(posting_id)`. Bentuk lengkapnya ada di bagian **Webhooks** (`financePosting`).
+
+    Verifikasi tanda tangan sebelum memproses. `X-CoreERP-Event-Signature` adalah HMAC-SHA256
+    heksadesimal atas `<X-CoreERP-Event-Timestamp>.<badan mentah>`, dengan rahasia penanda tangan
+    klien — ditampilkan sekali saat klien dibuat — sebagai kunci:
+
+    ```php
+    $stempel = $_SERVER['HTTP_X_COREERP_EVENT_TIMESTAMP'] ?? '';
+    $tanda = $_SERVER['HTTP_X_COREERP_EVENT_SIGNATURE'] ?? '';
+    $badan = file_get_contents('php://input');
+
+    $benar = hash_hmac('sha256', $stempel.'.'.$badan, $rahasiaPenandaTangan);
+    if (! hash_equals($benar, $tanda) || abs(time() - (int) $stempel) > 300) {
+        http_response_code(401);
+        exit;
+    }
+    ```
+
+    | Jawaban Anda | Yang dilakukan CoreERP |
+    | --- | --- |
+    | `2xx` dengan badan ack | Ack diterapkan, posting selesai |
+    | `2xx` tanpa badan ack | Dianggap terkirim; posting tetap `pending` sampai Anda meng-ack lewat API |
+    | `408`, `429`, `5xx`, atau tidak menjawab | Dikirim ulang dengan jeda 1, 2, 4, … sampai 60 menit, selama 24 jam |
+    | `4xx` lain atau `3xx` | Ditandai gagal kirim dan muncul di layar pantau CoreERP. Redirect tidak diikuti. |
+
+    ## Aturan data
+
+    - **Nilai uang** adalah string desimal dengan jumlah desimal persis `currency.decimals`,
+      misalnya `"500000000.00"`. Jangan membacanya sebagai float dan jangan membulatkan ulang;
+      presisi kolom di aplikasi Anda harus sama atau lebih halus.
+    - **Tanggal**: `posting_date` (tanggal jurnal) dan `document_date` hanya tanggal.
+      `occurred_at` dan `published_at` lengkap dengan offset zona waktu; simpan apa adanya.
+    - **`details`** hanya informasi untuk pelacakan, misalnya rincian per aset. Jangan menjurnal
+      dari sana.
+    - **Koreksi** membawa `adjusts_posting_id`, dan **pembalikan** membawa `reverses_posting_id`,
+      yaitu `posting_id` posting yang dikoreksi atau dibalik.
+
+    | `posting_type` | Terbit saat |
+    | --- | --- |
+    | `asset.acquisition` | Penerimaan aset diselesaikan |
+    | `asset.acquisition_adjustment` | Nilai perolehan dikoreksi |
+    | `asset.opening_balance` | Saldo awal aset lama saat mulai memakai feed |
+    | `asset.depreciation` | Proses "Post penyusutan" satu periode |
+    | `asset.depreciation_reversal` | Penyusutan satu periode dibalik |
+
+    ## Kesalahan umum
+
+    | Status | Arti |
+    | --- | --- |
+    | `401` | Token salah, belum dikirim, atau sudah dicabut |
+    | `403` | Cakupan klien kurang, atau alamat asal di luar allowlist |
+    | `422` | Parameter tidak sah; `errors` menyebut field-nya |
+    | `429` | Batas laju terlampaui (bawaan 120 permintaan per menit per klien) |
+    | `503` | Salinan sandbox, yang tidak menyajikan data ke sistem luar |
+
+    ## Versi kontrak
+
+    Setiap posting membawa `contract_version: 1`. Bentuk versi 1 tidak berubah. Perubahan yang
+    memengaruhi pembaca terbit sebagai versi baru dan diumumkan lebih dulu.
+servers:
+- url: https://{alamat}/api/internal/v1
+  description: Alamat tenant CoreERP di layanan SaaS, atau domain server CoreERP di tempat pelanggan.
+  variables:
+    alamat:
+      default: alamat-tenant.contoh
+      description: Host yang dipakai pengguna tenant itu untuk masuk ke CoreERP.
+security:
+- integrationClient: []
+tags:
+- name: Finance feed
+  description: Posting yang harus dibukukan aplikasi finance, dan ack hasilnya.
+- name: Directory
+  description: Data induk untuk tabel penerjemah — vendor, dan unit organisasi yang menjadi nilai dimensi.
+paths:
+  /finance-postings:
+    get:
+      tags:
+      - Finance feed
+      operationId: internal.finance-postings.index
+      summary: Posting finance yang siap dibukukan (mode pull)
+      security:
+      - integrationClient: []
+      description: |
+        Cakupan `finance-postings.read`. Satu endpoint untuk semua jenis posting, dipersempit oleh
+        awalan jenis milik klien (`posting_type_prefixes`) sebelum parameter apa pun diterapkan.
+
+        Hanya posting `pending`, urut `posting_date`, lalu jam terbit, lalu id. Posting disajikan
+        ulang pada **setiap** tarikan sampai di-ack lewat `POST /finance-postings/{posting_id}/ack`,
+        jadi tidak ada kursor: posting yang sudah di-ack keluar dari daftar dengan sendirinya, dan
+        posting yang terbit di tengah tarikan muncul pada tarikan berikutnya di tempat urutannya.
+
+        Pembaca wajib menyimpan dengan `UNIQUE(posting_id)`: posting yang sama bisa diterima lebih
+        dari sekali, dan menerimanya lagi tidak boleh menghasilkan jurnal kedua. Kode akun, dimensi,
+        vendor, atau entitas legal yang tidak dikenal pembaca berarti posting ditolak lewat ack,
+        tidak pernah dijurnal ke akun cadangan (K-18).
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - pending
+        description: Hanya `pending` yang disajikan. Disediakan supaya URL pembaca dapat menyebutnya.
+      - name: posting_type
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 80
+          pattern: ^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*(\.\*)?$
+        description: Jenis lengkap (`asset.acquisition`) atau awalan dengan `.*` (`asset.*`).
+      - name: legal_entity
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 50
+        description: Kode perusahaan (`company_code`) atau id entitas legal.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+      responses:
+        '200':
+          description: Posting yang belum di-ack, dalam urutan pembukuan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FinancePosting'
+                  meta:
+                    type: object
+                    required:
+                    - count
+                    - has_more
+                    properties:
+                      count:
+                        type: integer
+                      has_more:
+                        type: boolean
+                        description: Masih ada posting `pending` sesudah halaman ini. Ack yang ini, lalu
+                          tarik lagi.
+              examples:
+                perolehan:
+                  summary: Satu penerimaan ambulans, langsung ke hutang
+                  value:
+                    data:
+                    - contract_version: 1
+                      posting_id: AST-ACQ-01J9Z3Q7K2M4N6P8R0S2T4V6X8
+                      posting_type: asset.acquisition
+                      settlement_mode: direct_payable
+                      legal_entity:
+                        id: 01J9Z2AAAAAAAAAAAAAAAAAAAA
+                        code: PT-METTA
+                      currency:
+                        code: IDR
+                        decimals: 2
+                      posting_date: '2026-09-28'
+                      document_date: '2026-09-28'
+                      occurred_at: '2026-09-28T23:50:00+07:00'
+                      published_at: '2026-09-28T16:50:04+00:00'
+                      source_document:
+                        module: management-aset
+                        type: penerimaan-aset
+                        number: PNA-2026-09-0007
+                        description: Penerimaan ambulans
+                      vendor:
+                        id: 01J9Z2BBBBBBBBBBBBBBBBBBBB
+                        number: VND-000123
+                        name: PT Karoseri Sehat
+                      vendor_invoice_reference: null
+                      journal_lines:
+                      - line_no: 1
+                        account:
+                          external_id: '1452'
+                          code: 1-2300
+                          name: Aset Tetap - Kendaraan
+                        debit: '500000000.00'
+                        credit: '0.00'
+                        description: KEND-0012 Ambulans
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 2
+                        account:
+                          external_id: '1501'
+                          code: 1-1500
+                          name: PPN Masukan
+                        debit: '55000000.00'
+                        credit: '0.00'
+                        description: PPN KEND-0012
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      - line_no: 3
+                        account:
+                          external_id: '2110'
+                          code: 2-1100
+                          name: Hutang Usaha
+                        debit: '0.00'
+                        credit: '555000000.00'
+                        description: PT Karoseri Sehat
+                        financial_dimensions:
+                        - code: BUSINESS_UNIT
+                          display_name: Business unit
+                          value_code: KLN-A
+                          value_display_name: Klinik Metta A
+                          value_id: 01J9Z2CCCCCCCCCCCCCCCCCCCC
+                      totals:
+                        debit: '555000000.00'
+                        credit: '555000000.00'
+                      reverses_posting_id: null
+                      adjusts_posting_id: null
+                      details:
+                        assets:
+                        - asset_code: KEND-0012
+                          asset_group: KENDARAAN
+                          book: KOMERSIAL
+                          acquisition_value: '500000000.00'
+                          tax_amount: '55000000.00'
+                    meta:
+                      count: 1
+                      has_more: false
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /finance-postings/{posting_id}/ack:
+    post:
+      tags:
+      - Finance feed
+      operationId: internal.finance-postings.ack
+      summary: Hasil pembukuan satu posting di aplikasi finance
+      security:
+      - integrationClient: []
+      description: |
+        Cakupan `finance-postings.ack`. `posted` membawa nomor voucher atau faktur di aplikasi
+        finance; `rejected` membawa kode alasan dan penjelasannya. Keduanya status akhir.
+
+        Idempoten: ack yang sama diulang (nomor voucher sama, atau kode alasan sama) menjawab 200
+        tanpa perubahan. Ack yang bertentangan dengan status akhir, atau ack atas posting yang tidak
+        pernah disajikan (ditahan atau manual), menjawab 409. Posting yang ditolak diperbaiki dengan
+        posting koreksi di periode yang masih terbuka, tidak diberi tanggal ulang (K-17).
+
+        Posting yang tidak ada, milik tenant lain, atau jenisnya di luar awalan klien menjawab 404.
+      parameters:
+      - name: posting_id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 120
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancePostingAck'
+      responses:
+        '200':
+          description: Ack diterapkan, atau ack yang sama sudah tercatat.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/FinancePostingAckResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Ack bertentangan dengan status posting. `data` membawa status yang tercatat.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - message
+                - data
+                properties:
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/FinancePostingAckResult'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /vendors:
+    get:
+      tags:
+      - Directory
+      operationId: internal.vendors.index
+      summary: Vendor per entitas legal, untuk tabel penerjemah sistem finance
+      security:
+      - integrationClient: []
+      description: |
+        Hanya klien integrasi dengan cakupan `vendors.read`. Module di dalam CoreERP membaca
+        vendor lewat kontrak in-process, bukan lewat rute ini.
+
+        Vendor adalah party di buku alamat yang memegang peran vendor pada satu entitas legal.
+        Party yang sama bisa menjadi vendor di beberapa entitas legal, dengan `id` dan `number`
+        berbeda di masing-masing. Posting finance menunjuk vendor lewat `id` dan membawa salinan
+        `number` serta `name` pada saat terbit.
+
+        Semua status dikembalikan, termasuk `inactive`: posting yang terbit sebelum vendor
+        dinonaktifkan tetap menunjuk vendor itu. Dengan `updated_since`, hanya vendor yang
+        berubah pada atau sesudah saat itu — vendornya sendiri atau nama party-nya.
+
+        **Halaman dibaca lewat kursor.** Urutannya waktu perubahan lalu `id`. Kirim
+        `meta.next_cursor` sebagai `cursor` bersama parameter lain yang sama sampai
+        `next_cursor` bernilai `null`. Vendor yang berubah di tengah sinkron pindah ke belakang
+        kursor, jadi bisa terbaca dua kali tetapi tidak pernah terlewat; simpan dengan upsert
+        berdasarkan `id`.
+
+        Pola sinkron yang disarankan sama dengan `/operating-units`: simpan `updated_at`
+        terbesar dari sinkron terakhir, kirim sebagai `updated_since` berikutnya. Batasnya
+        inklusif.
+      parameters:
+      - name: updated_since
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
+      - name: legal_entity
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 50
+        description: Kode perusahaan (`company_code`) atau id entitas legal. Kode yang tidak dikenal menghasilkan
+          daftar kosong.
+      - name: cursor
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 200
+        description: Nilai `meta.next_cursor` dari halaman sebelumnya. Kursor yang tidak dikenal menghasilkan
+          422.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 500
+      responses:
+        '200':
+          description: Satu halaman vendor.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vendor'
+                  meta:
+                    type: object
+                    required:
+                    - next_cursor
+                    properties:
+                      next_cursor:
+                        type:
+                        - string
+                        - 'null'
+                        description: '`null` berarti halaman terakhir.'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+  /operating-units:
+    get:
+      tags:
+      - Directory
+      operationId: internal.operating-units.index
+      summary: Daftar operating unit, beserta nomor dan tipenya
+      security:
+      - integrationClient: []
+      description: |
+        Dua pemanggil: app `human-resources` (app lain menerima 403), dan klien integrasi dengan
+        cakupan `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
+        legal entity tidak dikembalikan di sini.
+
+        Tanpa `updated_since`: seluruh operating unit **aktif**. Dengan `updated_since`:
+        **setiap** operating unit yang berubah pada atau sesudah saat itu, termasuk yang sudah
+        dinonaktifkan (`status` bukan `active`), supaya pembaca yang menyinkronkan tabel
+        penerjemahnya tahu unit mana yang berhenti dipakai.
+
+        `number` adalah nomor unit, kode stabil yang dipakai sebagai nilai dimensi keuangan
+        `BUSINESS_UNIT` dan `DEPARTMENT` pada feed posting finance. `null` berarti belum diisi.
+
+        Pola sinkron yang disarankan: simpan `updated_at` terbesar dari tarikan terakhir, kirim
+        sebagai `updated_since` pada tarikan berikutnya, dan simpan dengan upsert berdasarkan
+        `id`. Batasnya inklusif, jadi baris di batas bisa terkirim dua kali. Tarikan penuh tanpa
+        `updated_since` sesekali tetap dianjurkan sebagai jaring pengaman.
+      parameters:
+      - name: updated_since
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+        description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
+      responses:
+        '200':
+          description: Daftar operating unit, diurutkan menurut nama.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OperatingUnit'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/OutboundRefused'
+webhooks:
+  financePosting:
+    post:
+      tags:
+      - Finance feed
+      operationId: webhook.finance-posting
+      summary: Posting finance yang dikirim ke klien mode push
+      description: |
+        CoreERP mengirim setiap posting `pending` ke `push_url` klien integrasi mode push, dengan
+        badan yang sama persis dengan satu elemen `data` pada `GET /finance-postings`. Urutannya sama
+        dengan urutan tarikan, per klien.
+
+        **Tanda tangan.** `X-CoreERP-Event-Signature` adalah HMAC-SHA256 heksadesimal atas
+        `<X-CoreERP-Event-Timestamp>.<badan mentah>`, dengan rahasia penanda tangan klien sebagai
+        kunci. Pembaca wajib memverifikasinya dan menolak stempel waktu yang terlalu jauh dari jamnya
+        sendiri. `X-CoreERP-Client-Id` menyebut klien, untuk pembaca yang melayani beberapa tenant.
+
+        **Jawaban.** 2xx dihitung terkirim; bila badannya `FinancePostingAck` yang sah, ack itu
+        diterapkan seperti `POST /finance-postings/{posting_id}/ack`, dan bila tidak, posting tetap
+        `pending` sampai di-ack lewat API. 408, 429, 5xx, atau tidak menjawab: dikirim ulang dengan
+        jeda 1, 2, 4, … sampai 60 menit, selama `coreerp.finance_push_retry_hours` (bawaan 24 jam).
+        4xx lain dan 3xx (redirect tidak diikuti): ditandai gagal kirim dan tampil di layar pantau.
+        Pembaca tetap wajib menjaga `UNIQUE(posting_id)`, karena kiriman ulang bisa terjadi.
+      parameters:
+      - name: X-CoreERP-Event-Timestamp
+        in: header
+        required: true
+        description: Detik Unix saat dikirim.
+        schema:
+          type: string
+      - name: X-CoreERP-Event-Signature
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^[0-9a-f]{64}$
+      - name: X-CoreERP-Client-Id
+        in: header
+        required: true
+        schema:
+          type: string
+          format: ulid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinancePosting'
+      responses:
+        '200':
+          description: Diterima. Badan opsional; bila berupa ack yang sah, posting berstatus akhir.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancePostingAck'
+components:
+  securitySchemes:
+    integrationClient:
+      type: http
+      scheme: bearer
+      description: |
+        Token klien integrasi berbentuk `<id klien>.<rahasia>`, diterbitkan admin tenant di
+        Identity & access › Klien integrasi dan ditampilkan sekali. Token menentukan tenant;
+        header tenant yang dikirim bersamanya diabaikan. Klien yang dicabut, alamat asal di luar
+        allowlist, atau cakupan yang kurang ditolak. Batas laju per klien
+        (`coreerp.integration_api_rate_limit`, bawaan 120 per menit).
+  responses:
+    Forbidden:
+      description: |
+        Credential tidak sah untuk app/tenant ini, entitlement tidak aktif, placement
+        belum `ready`, atau endpoint terbatas pada app lain. Keempatnya sengaja tidak
+        dibedakan agar pemanggil tidak dapat memetakan keadaan tenant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource tidak ada dalam scope tenant ini.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    OutboundRefused:
+      description: |
+        Salinan non-produksi (sandbox atau demo) tidak menyajikan data ke sistem luar. Tanpa
+        penolakan ini, salinan produksi akan menyajikan posting yang dibukukan finance produksi.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: |
+        Batas dilampaui. Kuota di-key per pasangan app dan tenant (default 600 request
+        per menit, `coreerp.internal_api_rate_limit`), sehingga satu app yang berisik
+        tidak dapat menghabiskan kuota app lain.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthenticated:
+      description: Header kredensial atau konteks tenant tidak lengkap.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Field request tidak valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+  schemas:
+    Error:
+      type: object
+      required:
+      - message
+      properties:
+        message:
+          type: string
+          description: Pesan untuk operator app. Tidak pernah memuat data tenant lain.
+    FinancePosting:
+      type: object
+      additionalProperties: false
+      required:
+      - contract_version
+      - posting_id
+      - posting_type
+      - settlement_mode
+      - legal_entity
+      - currency
+      - posting_date
+      - document_date
+      - occurred_at
+      - published_at
+      - source_document
+      - vendor
+      - vendor_invoice_reference
+      - journal_lines
+      - totals
+      - reverses_posting_id
+      - adjusts_posting_id
+      - details
+      description: |
+        Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai tarikan dan
+        dorongan (`webhooks.financePosting`).
+      properties:
+        contract_version:
+          type: integer
+          enum:
+          - 1
+        posting_id:
+          type: string
+          maxLength: 120
+          description: Tetap untuk satu dokumen sumber. Pembaca wajib menjaga `UNIQUE(posting_id)`.
+        posting_type:
+          type: string
+          maxLength: 80
+          description: |
+            `asset.acquisition`, `asset.acquisition_adjustment`, `asset.opening_balance`,
+            `asset.depreciation`, atau `asset.depreciation_reversal`. Jenis baru dapat terbit
+            (misalnya `cashier.receipt`) di bawah awalan yang diizinkan klien; pembaca menolak jenis
+            yang belum dikenalnya dengan `INVALID`, tidak mengabaikannya.
+        settlement_mode:
+          type:
+          - string
+          - 'null'
+          enum:
+          - direct_payable
+          - clearing
+          - null
+          description: Kebijakan jurnal perolehan (K-10). Koreksi selalu membawa mode posting aslinya.
+        legal_entity:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - code
+          properties:
+            id:
+              type: string
+              format: ulid
+            code:
+              type:
+              - string
+              - 'null'
+              description: Kode perusahaan entitas legal.
+        currency:
+          type: object
+          additionalProperties: false
+          required:
+          - code
+          - decimals
+          properties:
+            code:
+              type: string
+              pattern: ^[A-Z]{3}$
+            decimals:
+              type: integer
+              minimum: 0
+              maximum: 4
+              description: Jumlah desimal setiap nilai uang di posting ini.
+        posting_date:
+          type: string
+          format: date
+          description: Tanggal akuntansi, dari dokumen.
+        document_date:
+          type: string
+          format: date
+        occurred_at:
+          type: string
+          format: date-time
+          description: Jam kejadian dengan offset zona waktu (K-21).
+        published_at:
+          type: string
+          format: date-time
+          description: Jam posting terbit di CoreERP, dengan offset.
+        source_document:
+          type: object
+          additionalProperties: false
+          required:
+          - module
+          - type
+          - number
+          - description
+          properties:
+            module:
+              type: string
+            type:
+              type: string
+            number:
+              type:
+              - string
+              - 'null'
+            description:
+              type:
+              - string
+              - 'null'
+        vendor:
+          type:
+          - object
+          - 'null'
+          additionalProperties: false
+          required:
+          - id
+          - number
+          - name
+          description: Vendor disalin saat terbit; sinkronkan tabel penerjemahnya dari `/vendors`.
+          properties:
+            id:
+              type: string
+              format: ulid
+            number:
+              type: string
+              maxLength: 40
+            name:
+              type: string
+        vendor_invoice_reference:
+          type:
+          - string
+          - 'null'
+          maxLength: 80
+        journal_lines:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/JournalLine'
+        totals:
+          type: object
+          additionalProperties: false
+          required:
+          - debit
+          - credit
+          description: Selalu sama; jurnal yang tidak seimbang tidak pernah terbit.
+          properties:
+            debit:
+              $ref: '#/components/schemas/Money'
+            credit:
+              $ref: '#/components/schemas/Money'
+        reverses_posting_id:
+          type:
+          - string
+          - 'null'
+          description: '`posting_id` yang dibalik posting ini.'
+        adjusts_posting_id:
+          type:
+          - string
+          - 'null'
+          description: '`posting_id` yang dikoreksi posting ini.'
+        details:
+          type: object
+          description: Informasi untuk pelacakan dan laporan, misalnya rincian per aset. Pembaca tidak
+            boleh menjurnal dari sini.
+    FinancePostingAck:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - posted
+          - rejected
+        external_reference:
+          type:
+          - string
+          - 'null'
+          maxLength: 120
+          description: Wajib untuk `posted`. Nomor voucher atau faktur di aplikasi finance.
+        reason_code:
+          type:
+          - string
+          - 'null'
+          enum:
+          - PERIOD_CLOSED
+          - UNKNOWN_ACCOUNT
+          - UNKNOWN_DIMENSION
+          - UNKNOWN_VENDOR
+          - UNKNOWN_LEGAL_ENTITY
+          - INVALID
+          - null
+          description: Wajib untuk `rejected`.
+        reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 1000
+          description: Wajib untuk `rejected`.
+    FinancePostingAckResult:
+      type: object
+      additionalProperties: false
+      required:
+      - posting_id
+      - status
+      - external_reference
+      - reason_code
+      - reason
+      - acknowledged_at
+      properties:
+        posting_id:
+          type: string
+        status:
+          type: string
+          enum:
+          - held
+          - pending
+          - posted
+          - rejected
+          - manual
+        external_reference:
+          type:
+          - string
+          - 'null'
+        reason_code:
+          type:
+          - string
+          - 'null'
+        reason:
+          type:
+          - string
+          - 'null'
+        acknowledged_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    FinancialDimension:
+      type: object
+      additionalProperties: false
+      required:
+      - code
+      - display_name
+      - value_code
+      - value_display_name
+      - value_id
+      description: |
+        Sejajar dengan `dimensionSetLines` Business Central (K-07). Akun neraca membawa
+        `BUSINESS_UNIT`; akun laba rugi membawa `BUSINESS_UNIT` dan `DEPARTMENT` (K-09). Nilai
+        disalin pada saat terbit. Kode dimensi yang tidak dikenal pembaca berarti posting ditolak
+        dengan `UNKNOWN_DIMENSION`.
+      properties:
+        code:
+          type: string
+          description: '`BUSINESS_UNIT` atau `DEPARTMENT`.'
+        display_name:
+          type: string
+        value_code:
+          type: string
+          maxLength: 30
+          description: Nomor operating unit (lihat `/operating-units`).
+        value_display_name:
+          type: string
+        value_id:
+          type: string
+          format: ulid
+          description: Id operating unit.
+    JournalLine:
+      type: object
+      additionalProperties: false
+      required:
+      - line_no
+      - account
+      - debit
+      - credit
+      - description
+      - financial_dimensions
+      description: Tepat satu dari `debit` dan `credit` bernilai lebih dari nol.
+      properties:
+        line_no:
+          type: integer
+          minimum: 1
+        account:
+          type: object
+          additionalProperties: false
+          required:
+          - external_id
+          - code
+          - name
+          description: Akun di aplikasi finance, disalin saat terbit. Pembaca mencocokkan lewat `external_id`.
+          properties:
+            external_id:
+              type: string
+              maxLength: 64
+            code:
+              type: string
+              maxLength: 50
+            name:
+              type: string
+              maxLength: 200
+        debit:
+          $ref: '#/components/schemas/Money'
+        credit:
+          $ref: '#/components/schemas/Money'
+        description:
+          type:
+          - string
+          - 'null'
+          maxLength: 255
+        financial_dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/FinancialDimension'
+    Money:
+      type: string
+      pattern: ^[0-9]+(\.[0-9]+)?$
+      description: |
+        Nilai uang sebagai string desimal tanpa tanda dan tanpa pemisah ribuan, dengan jumlah
+        desimal **persis** `currency.decimals` (`"500000000.00"` untuk 2, `"500000000"` untuk 0).
+        Tidak pernah float (K-20).
+    OperatingUnit:
+      type: object
+      required:
+      - id
+      - name
+      - type
+      - number
+      - status
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: ulid
+        name:
+          type: string
+        type:
+          type:
+          - string
+          - 'null'
+          description: |
+            Tipe operating unit dari setelan `coreerp.operating_unit_types`, misalnya
+            `business_unit` atau `department`. Daftar tipe dapat bertambah; pembaca harus
+            menerima nilai yang belum dikenalnya.
+        number:
+          type:
+          - string
+          - 'null'
+          maxLength: 30
+          pattern: ^[A-Z0-9]+(-[A-Z0-9]+)*$
+          description: |
+            Nomor unit, unik per tenant. Boleh diganti; posting yang sudah terbit menyimpan
+            nomor pada saat terbit.
+        status:
+          type: string
+          description: '`active` atau status nonaktif lain.'
+        updated_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Waktu perubahan terakhir, dari nama maupun nomor dan tipe.
+    ValidationError:
+      type: object
+      required:
+      - message
+      - errors
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    Vendor:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - number
+      - name
+      - party_type
+      - tax_number
+      - status
+      - legal_entity
+      - updated_at
+      properties:
+        id:
+          type: string
+          format: ulid
+        number:
+          type: string
+          maxLength: 40
+          description: |
+            Nomor vendor, unik per entitas legal dan tidak pernah berubah. Diterbitkan urutan
+            nomor Core (bawaan `VND-000001`) atau diketik manual saat memindahkan pemasok lama.
+        name:
+          type: string
+          maxLength: 200
+          description: Nama party saat ini.
+        party_type:
+          type: string
+          enum:
+          - organization
+          - person
+        tax_number:
+          type:
+          - string
+          - 'null'
+          maxLength: 32
+          description: NPWP, bila diisi.
+        status:
+          type: string
+          enum:
+          - active
+          - inactive
+        legal_entity:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - code
+          properties:
+            id:
+              type: string
+              format: ulid
+            code:
+              type:
+              - string
+              - 'null'
+              description: Kode perusahaan entitas legal.
+        updated_at:
+          type: string
+          format: date-time
+          description: Waktu perubahan terakhir, dari vendor maupun nama party-nya.

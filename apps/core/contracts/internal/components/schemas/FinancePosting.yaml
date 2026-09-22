@@ -1,0 +1,80 @@
+type: object
+additionalProperties: false
+required: [contract_version, posting_id, posting_type, settlement_mode, legal_entity, currency,
+  posting_date, document_date, occurred_at, published_at, source_document, vendor,
+  vendor_invoice_reference, journal_lines, totals, reverses_posting_id, adjusts_posting_id, details]
+description: |
+  Satu dokumen sumber dengan jurnal yang seimbang. Bentuk yang sama dipakai tarikan dan
+  dorongan (`webhooks.financePosting`).
+properties:
+  contract_version: { type: integer, enum: [1] }
+  posting_id:
+    type: string
+    maxLength: 120
+    description: Tetap untuk satu dokumen sumber. Pembaca wajib menjaga `UNIQUE(posting_id)`.
+  posting_type:
+    type: string
+    maxLength: 80
+    description: |
+      `asset.acquisition`, `asset.acquisition_adjustment`, `asset.opening_balance`,
+      `asset.depreciation`, atau `asset.depreciation_reversal`. Jenis baru dapat terbit
+      (misalnya `cashier.receipt`) di bawah awalan yang diizinkan klien; pembaca menolak jenis
+      yang belum dikenalnya dengan `INVALID`, tidak mengabaikannya.
+  settlement_mode:
+    type: [string, 'null']
+    enum: [direct_payable, clearing, null]
+    description: Kebijakan jurnal perolehan (K-10). Koreksi selalu membawa mode posting aslinya.
+  legal_entity:
+    type: object
+    additionalProperties: false
+    required: [id, code]
+    properties:
+      id: { type: string, format: ulid }
+      code: { type: [string, 'null'], description: Kode perusahaan entitas legal. }
+  currency:
+    type: object
+    additionalProperties: false
+    required: [code, decimals]
+    properties:
+      code: { type: string, pattern: '^[A-Z]{3}$' }
+      decimals: { type: integer, minimum: 0, maximum: 4, description: Jumlah desimal setiap nilai uang di posting ini. }
+  posting_date: { type: string, format: date, description: 'Tanggal akuntansi, dari dokumen.' }
+  document_date: { type: string, format: date }
+  occurred_at: { type: string, format: date-time, description: Jam kejadian dengan offset zona waktu (K-21). }
+  published_at: { type: string, format: date-time, description: 'Jam posting terbit di CoreERP, dengan offset.' }
+  source_document:
+    type: object
+    additionalProperties: false
+    required: [module, type, number, description]
+    properties:
+      module: { type: string }
+      type: { type: string }
+      number: { type: [string, 'null'] }
+      description: { type: [string, 'null'] }
+  vendor:
+    type: [object, 'null']
+    additionalProperties: false
+    required: [id, number, name]
+    description: Vendor disalin saat terbit; sinkronkan tabel penerjemahnya dari `/vendors`.
+    properties:
+      id: { type: string, format: ulid }
+      number: { type: string, maxLength: 40 }
+      name: { type: string }
+  vendor_invoice_reference: { type: [string, 'null'], maxLength: 80 }
+  journal_lines:
+    type: array
+    minItems: 2
+    items: { $ref: '#/components/schemas/JournalLine' }
+  totals:
+    type: object
+    additionalProperties: false
+    required: [debit, credit]
+    description: Selalu sama; jurnal yang tidak seimbang tidak pernah terbit.
+    properties:
+      debit: { $ref: '#/components/schemas/Money' }
+      credit: { $ref: '#/components/schemas/Money' }
+  reverses_posting_id: { type: [string, 'null'], description: '`posting_id` yang dibalik posting ini.' }
+  adjusts_posting_id: { type: [string, 'null'], description: '`posting_id` yang dikoreksi posting ini.' }
+  details:
+    type: object
+    description: Informasi untuk pelacakan dan laporan, misalnya rincian per aset. Pembaca tidak boleh menjurnal dari sini.

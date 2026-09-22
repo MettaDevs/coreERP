@@ -1,0 +1,6 @@
+type: string
+pattern: '^[0-9]+(\.[0-9]+)?$'
+description: |
+  Nilai uang sebagai string desimal tanpa tanda dan tanpa pemisah ribuan, dengan jumlah
+  desimal **persis** `currency.decimals` (`"500000000.00"` untuk 2, `"500000000"` untuk 0).
+  Tidak pernah float (K-20).
