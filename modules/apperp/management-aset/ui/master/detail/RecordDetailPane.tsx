@@ -15,7 +15,11 @@ import { isVisible, payloadValue, valueFrom } from '../fields';
 import GroupBookMatrix from '../GroupBookMatrix';
 import JenisAsetAtribut from '../JenisAsetAtribut';
 import type { MasterConfig, MasterRecord, Permission } from '../masters';
-import { permission } from '../masters';
+import {
+    MANUAL_CODE_PATTERN,
+    normalizeManualCode,
+    permission,
+} from '../masters';
 import JenisAsetCounters from './JenisAsetCounters';
 import type { JenisAsetDetail } from './jenisAsetDetail';
 import JenisAsetMaintenanceJobTypes from './JenisAsetMaintenanceJobTypes';
@@ -71,6 +75,8 @@ export default function RecordDetailPane({
     );
 
     const [nama, setNama] = useState(() => record?.nama ?? '');
+    const manualCode = !record ? config.manualCode : undefined;
+    const [kode, setKode] = useState('');
     const [values, setValues] = useState<Record<string, FieldValue>>(() =>
         Object.fromEntries(
             allFields.map((field) => [field.name, valueFrom(record, field)]),
@@ -247,7 +253,9 @@ export default function RecordDetailPane({
         setError('');
 
         try {
-            const payload: Record<string, unknown> = { nama };
+            const payload: Record<string, unknown> = manualCode
+                ? { kode, nama }
+                : { nama };
 
             for (const field of allFields) {
                 // Field yang sedang tersembunyi tidak dikirim, supaya mengganti satu pilihan
@@ -512,16 +520,37 @@ export default function RecordDetailPane({
             <div className="shrink-0 border-b px-6 py-4">
                 <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
                     <div className="w-60">
-                        {/* Kode diterbitkan Number Sequence, jadi memang tidak ada yang bisa
-                            disunting di sini — `disabled` tepat, tidak seperti field lain. */}
-                        <Input
-                            id="kode"
-                            label={config.kodeLabel}
-                            value={
-                                record?.kode ?? 'Dibuat otomatis saat disimpan'
-                            }
-                            disabled
-                        />
+                        {manualCode ? (
+                            <Input
+                                id="kode"
+                                label={config.kodeLabel}
+                                required
+                                maxLength={30}
+                                pattern={MANUAL_CODE_PATTERN}
+                                placeholder={manualCode.placeholder}
+                                className="font-mono"
+                                value={kode}
+                                onChange={(event) => {
+                                    markDirty();
+                                    setKode(
+                                        normalizeManualCode(event.target.value),
+                                    );
+                                }}
+                            />
+                        ) : (
+                            /* Kode diterbitkan Number Sequence, atau diketik saat membuat lalu
+                               dikunci, jadi memang tidak ada yang bisa disunting di sini —
+                               `disabled` tepat, tidak seperti field lain. */
+                            <Input
+                                id="kode"
+                                label={config.kodeLabel}
+                                value={
+                                    record?.kode ??
+                                    'Dibuat otomatis saat disimpan'
+                                }
+                                disabled
+                            />
+                        )}
                     </div>
                     <div
                         className="min-w-64 flex-1"
@@ -548,6 +577,11 @@ export default function RecordDetailPane({
                         {values.aktif ? 'Aktif' : 'Tidak aktif'}
                     </Badge>
                 </div>
+                {manualCode && (
+                    <p className="text-muted-foreground mt-2 text-sm">
+                        {manualCode.help}
+                    </p>
+                )}
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">

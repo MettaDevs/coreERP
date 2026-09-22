@@ -462,7 +462,7 @@ class MutasiAsetTest extends TestCase
             ['read', 'create', 'update', 'archive'],
         ))
             ->withHeader('Idempotency-Key', $resource.'-'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/'.$resource, $payload)
+            ->postJson('/api/modules/management-aset/v1/'.$resource, $this->denganKodeKetik($resource, $payload))
             ->assertCreated()->json('data.id');
     }
 }

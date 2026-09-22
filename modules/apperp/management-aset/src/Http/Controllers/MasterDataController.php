@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
+use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
@@ -32,8 +33,8 @@ use RuntimeException;
 
 /**
  * Perilaku bersama seluruh master Management Aset: hak akses per resource, batas
- * tenant, idempotency, kode dari Number Sequence Core, induk rantai klasifikasi,
- * dan arsip yang tidak memutus referensi aktif.
+ * tenant, idempotency, kode dari Number Sequence Core (atau diketik, lihat
+ * `manualCode()`), induk rantai klasifikasi, dan arsip yang tidak memutus referensi aktif.
  *
  * `TModel` adalah model master yang dipegang satu controller turunan. Tanda tangan PHP
  * di bawah tetap menyebut `MasterData` — kontravariansi melarang anak menyempitkannya —
@@ -51,6 +52,9 @@ abstract class MasterDataController extends Controller
      * menggeser hak akses.
      */
     protected const APP_ID = 'management-aset';
+
+    /** Sama dengan batas nomor operating unit: kode ini juga menjadi kunci tabel penerjemah finance. */
+    private const PANJANG_KODE_MANUAL = 30;
 
     /**
      * Model pemilik tiap tabel yang dapat menjadi anak sebuah master.
@@ -99,6 +103,21 @@ abstract class MasterDataController extends Controller
     protected function childMasters(): array
     {
         return [];
+    }
+
+    /**
+     * Kode diketik pengguna, bukan diterbitkan urutan nomor (K-24 feed posting finance).
+     *
+     * Hanya untuk master setup yang kodenya ikut terkirim ke aplikasi finance dan tertanam di
+     * tabel penerjemah pembacanya — group aset dan buku penyusutan. Di sana `KENDARAAN` jauh
+     * lebih berguna daripada `GRPA-00012`, sama seperti *FA Posting Group* Business Central dan
+     * *Group ID* fixed asset group F&O yang diketik tangan. Kode tidak dapat diubah sesudah
+     * disimpan, dan kode yang pernah dipakai — termasuk oleh record yang diarsipkan — tidak
+     * dipakai ulang.
+     */
+    protected function manualCode(): bool
+    {
+        return false;
     }
 
     public function index(Request $request): JsonResponse
@@ -166,6 +185,9 @@ abstract class MasterDataController extends Controller
         if ($existing = $this->creationKeyQuery($creationKey)->first()) {
             return $this->replay($existing, $payload);
         }
+        // Sesudah pemeriksaan replay: kiriman ulang dengan kunci yang sama membawa kode yang kini
+        // sudah dipegang record-nya sendiri, dan tidak boleh ditolak sebagai kode ganda.
+        $kodeManual = $this->manualCode() ? $this->kodeManual($request->input('kode')) : null;
         $this->afterWriteValidation($data, $tenantId, creating: true);
 
         try {
@@ -177,8 +199,8 @@ abstract class MasterDataController extends Controller
             //
             // Sekarang keduanya berjalan pada koneksi yang sama, jadi keduanya batal bersama.
             // Ini keuntungan yang membenarkan seluruh pemindahan ke satu runtime.
-            $record = DB::transaction(function () use ($numbers, $tenantId, $creationKey, $payload) {
-                $kode = $numbers->issue(
+            $record = DB::transaction(function () use ($numbers, $tenantId, $creationKey, $payload, $kodeManual) {
+                $kode = $kodeManual ?? $numbers->issue(
                     static::APP_ID.'.'.$this->resource(),
                     $tenantId,
                     $this->resource().':'.$creationKey,
@@ -196,6 +218,11 @@ abstract class MasterDataController extends Controller
         } catch (QueryException $exception) {
             $existing = $this->creationKeyQuery($creationKey)->first();
             if (! $existing) {
+                // Dua permintaan berbeda mengetik kode yang sama pada saat bersamaan.
+                if ($kodeManual !== null && $this->kodeDipakai($kodeManual)) {
+                    throw ValidationException::withMessages(['kode' => $this->pesanKodeDipakai($kodeManual)]);
+                }
+
                 throw $exception;
             }
 
@@ -292,6 +319,39 @@ abstract class MasterDataController extends Controller
         }
 
         return $query;
+    }
+
+    /** Kode yang diketik, dirapikan ke huruf besar lalu diperiksa bentuk dan keunikannya. */
+    private function kodeManual(mixed $masukan): string
+    {
+        // Selain teks dianggap kosong, supaya pesannya "ketik kodenya", bukan kesalahan tipe.
+        $kode = is_string($masukan) ? strtoupper(trim($masukan)) : '';
+        validator(['kode' => $kode], [
+            'kode' => ['required', 'string', 'max:'.self::PANJANG_KODE_MANUAL, 'regex:/^[A-Z0-9]+(-[A-Z0-9]+)*$/'],
+        ], [
+            'kode.required' => 'Ketik kodenya, misalnya KENDARAAN.',
+            'kode.regex' => 'Kode hanya boleh huruf besar, angka, dan tanda hubung di antaranya, misalnya KENDARAAN atau ALAT-MEDIS.',
+            'kode.max' => 'Kode paling panjang '.self::PANJANG_KODE_MANUAL.' karakter.',
+        ])->validate();
+        if ($this->kodeDipakai($kode)) {
+            throw ValidationException::withMessages(['kode' => $this->pesanKodeDipakai($kode)]);
+        }
+
+        return $kode;
+    }
+
+    /** Termasuk record yang diarsipkan: unique (tenant_id, kode) juga mencakupnya. */
+    private function kodeDipakai(string $kode): bool
+    {
+        return $this->newQuery(termasukArsip: true)->where('kode', $kode)->exists();
+    }
+
+    private function pesanKodeDipakai(string $kode): string
+    {
+        return sprintf(
+            'Kode %s sudah dipakai, termasuk oleh data yang diarsipkan. Kode yang pernah dipakai tidak dipakai ulang karena bisa sudah tercatat di aplikasi finance.',
+            $kode,
+        );
     }
 
     /**

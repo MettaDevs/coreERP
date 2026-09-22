@@ -51,9 +51,9 @@ class NumberSequenceFailureTest extends TestCase
     {
         DB::table('tenant_number_sequences')->where('tenant_id', $this->tenantId)->delete();
 
-        $this->buatGroup()->assertStatus(422);
+        $this->buatMaster()->assertStatus(422);
 
-        $this->assertSame(0, DB::table('aset_m_group_aset')->count(), 'Master tersimpan padahal nomornya gagal terbit.');
+        $this->assertSame(0, DB::table('aset_m_kondisi_aset')->count(), 'Master tersimpan padahal nomornya gagal terbit.');
         $this->assertSame(0, $this->jumlahNomorTerbit());
     }
 
@@ -73,12 +73,12 @@ class NumberSequenceFailureTest extends TestCase
             $tercatat[] = ['message' => $pesan->message, 'context' => $pesan->context];
         });
 
-        $this->buatGroup()->assertStatus(422);
+        $this->buatMaster()->assertStatus(422);
 
         $baris = collect($tercatat)->firstWhere(fn (array $item): bool => str_contains($item['message'], 'Penerbitan nomor gagal'));
 
         $this->assertNotNull($baris, 'Kegagalan penerbitan nomor harus tercatat di log.');
-        $this->assertSame('management-aset.group-aset', $baris['context']['reference']);
+        $this->assertSame('management-aset.kondisi-aset', $baris['context']['reference']);
         $this->assertSame($this->tenantId, $baris['context']['tenant_id']);
         $this->assertStringNotContainsString('service-token', json_encode($baris['context'], JSON_THROW_ON_ERROR));
     }
@@ -95,7 +95,7 @@ class NumberSequenceFailureTest extends TestCase
      */
     public function test_nomor_ikut_batal_ketika_penyimpanan_dokumen_gagal(): void
     {
-        $this->buatGroup()->assertCreated();
+        $this->buatMaster()->assertCreated();
 
         $sesudahSukses = $this->jumlahNomorTerbit();
         $this->assertSame(1, $sesudahSukses);
@@ -106,11 +106,11 @@ class NumberSequenceFailureTest extends TestCase
         // Caranya: satu baris disisipkan lebih dulu dengan kode yang akan diterbitkan
         // berikutnya. Validasi meloloskannya (kode tidak pernah datang dari klien), penerbitan
         // berjalan, lalu penyimpanan ditolak indeks unik — persis urutan yang diperlukan.
-        DB::table('aset_m_group_aset')->insert([
+        DB::table('aset_m_kondisi_aset')->insert([
             'id' => (string) Str::ulid(),
             'tenant_id' => $this->tenantId,
             'creation_key' => 'penghalang-'.Str::ulid(),
-            'kode' => $this->awalanNomor('management-aset.group-aset').'-000002',
+            'kode' => $this->awalanNomor('management-aset.kondisi-aset').'-000002',
             'nama' => 'Penghalang',
             'aktif' => true,
             'created_at' => now(),
@@ -118,23 +118,28 @@ class NumberSequenceFailureTest extends TestCase
         ]);
 
         try {
-            $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.create'])
-                ->withHeader('Idempotency-Key', 'group-aset:'.Str::ulid())
-                ->postJson('/api/modules/management-aset/v1/group-aset', ['nama' => 'Bangunan Kedua']);
+            $this->sebagaiPengguna($this->tenantId, ['management-aset.kondisi-aset.create'])
+                ->withHeader('Idempotency-Key', 'kondisi-aset:'.Str::ulid())
+                ->postJson('/api/modules/management-aset/v1/kondisi-aset', ['nama' => 'Rusak Berat']);
         } catch (\Throwable) {
             // Kegagalannya memang yang diharapkan; yang diperiksa akibatnya di bawah.
         }
 
         $this->assertSame($sesudahSukses, $this->jumlahNomorTerbit(), 'Nomor tetap terbit padahal recordnya batal.');
         // Dua baris: yang berhasil dibuat di awal, dan penghalang yang disisipkan test ini.
-        $this->assertSame(2, DB::table('aset_m_group_aset')->count());
+        $this->assertSame(2, DB::table('aset_m_kondisi_aset')->count());
     }
 
-    /** @return TestResponse<Response> */
-    private function buatGroup(): TestResponse
+    /**
+     * Master bernomor apa pun cukup; kondisi aset dipakai karena ia berdiri sendiri. Group aset
+     * tidak lagi bisa menjadi contohnya: kodenya diketik, tidak diterbitkan urutan nomor (K-24).
+     *
+     * @return TestResponse<Response>
+     */
+    private function buatMaster(): TestResponse
     {
-        return $this->sebagaiPengguna($this->tenantId, ['management-aset.group-aset.create'])
-            ->withHeader('Idempotency-Key', 'group-aset:'.Str::ulid())
-            ->postJson('/api/modules/management-aset/v1/group-aset', ['nama' => 'Bangunan']);
+        return $this->sebagaiPengguna($this->tenantId, ['management-aset.kondisi-aset.create'])
+            ->withHeader('Idempotency-Key', 'kondisi-aset:'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/kondisi-aset', ['nama' => 'Rusak Ringan']);
     }
 }

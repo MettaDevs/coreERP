@@ -85,7 +85,20 @@ export type MasterConfig = {
     parents?: MasterParentConfig[];
     /** Kolom di luar bentuk dasar master, dirender lewat `DynamicField`. */
     extraFields?: FieldConfig[];
+    /**
+     * Kode diketik pengguna saat membuat, bukan diterbitkan urutan nomor (K-24 feed posting
+     * finance). Kode ikut terkirim ke aplikasi finance, jadi tidak dapat diubah sesudah disimpan.
+     */
+    manualCode?: { placeholder: string; help: string };
 };
+
+/** Bentuk kode ketik yang diterima API: huruf besar, angka, dan tanda hubung di antaranya. */
+export const MANUAL_CODE_PATTERN = '[A-Z0-9]+(-[A-Z0-9]+)*';
+
+/** Merapikan ketikan kode: huruf besar, spasi menjadi tanda hubung. */
+export function normalizeManualCode(value: string): string {
+    return value.toUpperCase().replace(/\s+/g, '-');
+}
 
 export const MASTERS: MasterConfig[] = [
     {
@@ -97,6 +110,10 @@ export const MASTERS: MasterConfig[] = [
         kodeLabel: 'Kode group aset',
         namaLabel: 'Nama group aset',
         singular: 'group aset',
+        manualCode: {
+            placeholder: 'Contoh: KENDARAAN',
+            help: 'Huruf besar, angka, dan tanda hubung. Kode ini ikut terkirim ke aplikasi finance dan tidak dapat diubah setelah disimpan.',
+        },
         extraFields: [
             {
                 name: 'kelompok_harta_fiskal_id',
@@ -568,6 +585,10 @@ export const MASTERS: MasterConfig[] = [
         kodeLabel: 'Kode buku penyusutan',
         namaLabel: 'Nama buku penyusutan',
         singular: 'buku penyusutan',
+        manualCode: {
+            placeholder: 'Contoh: KOMERSIAL',
+            help: 'Huruf besar, angka, dan tanda hubung. Kode ini ikut terkirim ke aplikasi finance dan tidak dapat diubah setelah disimpan.',
+        },
         extraFields: [
             {
                 name: 'posting_layer',
