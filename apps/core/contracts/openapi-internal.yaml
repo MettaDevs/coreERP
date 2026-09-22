@@ -16,10 +16,21 @@ info:
     `.agents/skills/coreerp-architecture/SKILL.md`. Menambah route pada
     `routes/api.php` tanpa menambahkannya di sini adalah perubahan yang belum selesai.
 
+    Dua jenis pemanggil, masing-masing dengan kredensialnya sendiri:
+
+    - **App module** (`appId` + `serviceToken` + `tenantHeader`), diverifikasi
+      `AuthenticateAppService`.
+    - **Klien integrasi** (`integrationClient`): sistem di luar CoreERP, misalnya aplikasi
+      finance pelanggan yang membaca feed posting. Token `Bearer <id klien>.<rahasia>` milik satu
+      tenant, dengan cakupan sempit, diverifikasi `AuthenticateIntegrationClient`. Endpoint yang
+      menerimanya menyebutnya di `security` beserta cakupan yang dibutuhkan. Di salinan sandbox
+      seluruh endpoint klien integrasi menjawab 503.
+
     Batas yang berlaku di seluruh endpoint:
 
     - `tenant_id` **tidak pernah** diterima dari URL, query, atau body. Ia berasal dari
-      header kredensial yang diverifikasi `AuthenticateAppService`.
+      header kredensial yang diverifikasi `AuthenticateAppService`, atau dari klien integrasi
+      pemilik token.
     - App hanya menerima referensi opaque milik Core. Tidak ada akses database lintas
       module, tidak ada foreign key lintas database.
     - Seluruh response sukses memakai envelope `data`.
@@ -113,9 +124,15 @@ paths:
       tags: [Directory]
       operationId: internal.operating-units.index
       summary: Daftar operating unit, beserta nomor dan tipenya
+      security:
+        - appId: []
+          serviceToken: []
+          tenantHeader: []
+        - integrationClient: []
       description: |
-        Terbatas pada app `human-resources`. Hanya organisasi dengan klasifikasi
-        `operating_unit`; legal entity tidak dikembalikan di sini.
+        Dua pemanggil: app `human-resources` (app lain menerima 403), dan klien integrasi dengan
+        cakupan `operating-units.read`. Hanya organisasi dengan klasifikasi `operating_unit`;
+        legal entity tidak dikembalikan di sini.
 
         Tanpa `updated_since`: seluruh operating unit **aktif**. Dengan `updated_since`:
         **setiap** operating unit yang berubah pada atau sesudah saat itu, termasuk yang sudah
@@ -151,6 +168,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/OutboundRefused' }
 
   /fiscal-periods:
     get:
@@ -1223,6 +1241,15 @@ components:
         Service credential berbentuk `<credential_id>.<secret>`. Token lama tanpa
         `credential_id` masih diterima tetapi memaksa pemindaian bcrypt per credential;
         terbitkan ulang.
+    integrationClient:
+      type: http
+      scheme: bearer
+      description: |
+        Token klien integrasi berbentuk `<id klien>.<rahasia>`, diterbitkan admin tenant di
+        Identity & access › Klien integrasi dan ditampilkan sekali. Token menentukan tenant;
+        header tenant yang dikirim bersamanya diabaikan. Klien yang dicabut, alamat asal di luar
+        allowlist, atau cakupan yang kurang ditolak. Batas laju per klien
+        (`coreerp.integration_api_rate_limit`, bawaan 120 per menit).
     tenantHeader:
       type: apiKey
       in: header
@@ -1377,6 +1404,13 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ValidationError' }
+    OutboundRefused:
+      description: |
+        Salinan non-produksi (sandbox atau demo) tidak menyajikan data ke sistem luar. Tanpa
+        penolakan ini, salinan produksi akan menyajikan posting yang dibukukan finance produksi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     RateLimited:
       description: |
         Batas dilampaui. Kuota di-key per pasangan app dan tenant (default 600 request

@@ -155,6 +155,22 @@ class AppServiceProvider extends ServiceProvider
             $request->header('X-CoreERP-App-Id', 'unknown'),
             $request->header('X-CoreERP-Tenant-Id', 'unknown'),
         ])));
+
+        // Per klien integrasi, dikunci pada id di depan token — bukan per alamat IP, karena satu
+        // aplikasi finance biasanya memanggil dari satu alamat dan yang perlu dibatasi adalah
+        // kliennya. Permintaan tanpa token dibatasi per alamat supaya tebakan token tetap murah
+        // untuk ditolak.
+        RateLimiter::for('integration-client', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('coreerp.integration_api_rate_limit', 120)
+        )->by(self::kunciKlienIntegrasi($request)));
+
+        // Rute yang dibaca module dan sistem luar sekaligus memakai kunci milik jalur yang dipilih.
+        RateLimiter::for('internal-caller', fn (Request $request): Limit => $request->hasHeader('X-CoreERP-App-Id')
+            ? Limit::perMinute((int) config('coreerp.internal_api_rate_limit', 600))->by(implode(':', [
+                $request->header('X-CoreERP-App-Id', 'unknown'),
+                $request->header('X-CoreERP-Tenant-Id', 'unknown'),
+            ]))
+            : Limit::perMinute((int) config('coreerp.integration_api_rate_limit', 120))->by(self::kunciKlienIntegrasi($request)));
     }
 
     /**
@@ -213,5 +229,14 @@ class AppServiceProvider extends ServiceProvider
         // Kalau suatu saat CoreERP menambah pendengarnya sendiri, baris ini harus berubah
         // menjadi pelepasan yang lebih tepat sasaran.
         Event::forget(MessageLogged::class);
+    }
+
+    /** Id klien di depan token `Bearer <id>.<rahasia>`, atau alamat IP bila tidak ada token. */
+    private static function kunciKlienIntegrasi(Request $request): string
+    {
+        $token = (string) $request->bearerToken();
+        $id = str_contains($token, '.') ? strstr($token, '.', true) : '';
+
+        return is_string($id) && $id !== '' ? 'klien:'.$id : 'ip:'.$request->ip();
     }
 }

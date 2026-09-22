@@ -18,6 +18,7 @@ import {
     Map,
     MapPin,
     PhoneCall,
+    Plug,
     Ruler,
     Package,
     Palette,
@@ -229,6 +230,17 @@ export function AppSidebar() {
                               icon: ShieldCheck,
                               href: '/settings/workflows',
                           },
+                          ...(['owner', 'admin'].includes(
+                              props.auth.membership.system_role,
+                          )
+                              ? [
+                                    {
+                                        label: 'Klien integrasi',
+                                        icon: Plug,
+                                        href: '/settings/integration-clients',
+                                    },
+                                ]
+                              : []),
                       ],
                   },
                   ...(props.auth.membership &&

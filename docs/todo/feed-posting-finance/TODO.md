@@ -141,29 +141,30 @@ di sisi finance berperilaku seperti di PRD (K-05).
 
 ---
 
-### 4. [ ] Core: klien integrasi dan autentikasinya
+### 4. [~] Core: klien integrasi dan autentikasinya
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** pembaca eksternal bisa diberi token
 bercakupan sempit, dengan mode pengiriman `pull` atau `push`, dan ditolak di salinan sandbox. Letak
 jaringan pembaca tidak berpengaruh (K-03).
 
-- [ ] 4.1 Migration dan model `integration_clients`.
-  - [ ] 4.1.1 Kolom dasar: `id`, `tenant_id`, `name`, `token_digest`, `scopes` (json), `allowed_ips` (json, opsional), `status`, `last_used_at`, timestamps.
-  - [ ] 4.1.2 Kolom pengiriman: `delivery_mode` (`pull` / `push`), `push_url` (wajib HTTPS kalau `push`), `signing_secret` (terenkripsi), `posting_type_prefixes` (json, misalnya `["asset."]`).
-  - [ ] 4.1.3 Validasi: `push_url` harus `https://`, dan satu klien hanya punya satu mode.
-- [ ] 4.2 Middleware.
-  - [ ] 4.2.1 Header token berbentuk `<client_id>.<secret>`. Bandingkan digest dengan `hash_equals`, mengikuti pola `apps/core/app/Http/Middleware/AuthenticateAppService.php`.
-  - [ ] 4.2.2 Periksa status, allowlist IP, dan scope per rute.
-  - [ ] 4.2.3 Isi atribut request `coreerp.tenant_id` dari klien. Jangan pernah dari URL, query, atau body.
-  - [ ] 4.2.4 Daftarkan alias di `apps/core/bootstrap/app.php`, beserta rate limiter tersendiri.
-- [ ] 4.3 Gerbang environment: kalau `ActiveEnvironment::outboundAllowed()` false, semua rute klien integrasi menjawab 503 dengan alasan dari `refusalReason()`.
-- [ ] 4.4 Layar Core: terbitkan token (tampil sekali), cabut, ubah scope, awalan jenis, IP, dan mode pengiriman, lihat `last_used_at`. Untuk `push`: tombol "Kirim uji" ke `push_url`.
-- [ ] 4.6 Ekspos mode `pull` lewat Traefik: pastikan path `/api/internal/v1/...` terjangkau dengan TLS di domain server klien (`deploy/traefik`), tanpa membuka path lain.
-- [ ] 4.5 Test.
-  - [ ] 4.5.1 Token salah, dicabut, atau dari IP asing ditolak.
-  - [ ] 4.5.2 Scope kurang menghasilkan 403.
-  - [ ] 4.5.3 Environment sandbox menghasilkan 503.
-  - [ ] 4.5.4 Tenant tidak bisa ditimpa lewat header.
+- [x] 4.1 Migration dan model `integration_clients`.
+  - [x] 4.1.1 Kolom dasar: `id`, `tenant_id`, `name`, `token_digest`, `scopes` (json), `allowed_ips` (json, opsional), `status`, `last_used_at`, timestamps.
+  - [x] 4.1.2 Kolom pengiriman: `delivery_mode` (`pull` / `push`), `push_url` (wajib HTTPS kalau `push`), `signing_secret` (terenkripsi), `posting_type_prefixes` (json, misalnya `["asset."]`).
+  - [x] 4.1.3 Validasi: `push_url` harus `https://`, dan satu klien hanya punya satu mode. Di SaaS, URL yang menunjuk jaringan privat ditolak (SSRF); di on-prem diizinkan karena aplikasi finance lazim berada di LAN yang sama.
+- [x] 4.2 Middleware `integration-client` (dan `internal-caller` untuk rute yang juga dibaca module).
+  - [x] 4.2.1 Header `Authorization: Bearer <client_id>.<secret>`. Bandingkan digest dengan `hash_equals`, mengikuti pola `apps/core/app/Http/Middleware/AuthenticateAppService.php`.
+  - [x] 4.2.2 Periksa status, allowlist IP, dan scope per rute.
+  - [x] 4.2.3 Isi atribut request `coreerp.tenant_id` dari klien. Jangan pernah dari URL, query, atau body.
+  - [x] 4.2.4 Daftarkan alias di `apps/core/bootstrap/app.php`, beserta rate limiter tersendiri.
+- [x] 4.3 Gerbang environment: kalau `ActiveEnvironment::outboundAllowed()` false, semua rute klien integrasi menjawab 503 dengan alasan dari `refusalReason()`.
+- [~] 4.4 Layar Core (Identity & access › Klien integrasi): terbitkan token (tampil sekali), cabut, ubah scope, awalan jenis, IP, dan mode pengiriman, lihat `last_used_at`. Untuk `push`: tombol "Kirim uji" ke `push_url`.
+- [x] 4.6 Ekspos mode `pull` lewat Traefik: pastikan path `/api/internal/v1/...` terjangkau dengan TLS di domain server klien (`deploy/traefik`), tanpa membuka path lain. Diperiksa 22 September 2026, tidak perlu perubahan: di SaaS router `core` di `deploy/traefik/dynamic/coreerp.yaml` meneruskan seluruh path, dan di server klien `core-proxy` (Caddy) di `deploy/compose.edition.yaml` melakukan hal yang sama dengan sertifikat Let's Encrypt. Path internal dijaga token, cakupan, dan allowlist IP, bukan oleh proxy.
+- [x] 4.5 Test (`IntegrationClientTest`).
+  - [x] 4.5.1 Token salah, dicabut, atau dari IP asing ditolak.
+  - [x] 4.5.2 Scope kurang menghasilkan 403.
+  - [x] 4.5.3 Environment sandbox menghasilkan 503.
+  - [x] 4.5.4 Tenant tidak bisa ditimpa lewat header.
+- [ ] 4.7 Verifikasi di browser: buat klien, salin token, cabut, dan kirim uji mode push.
 
 ---
 

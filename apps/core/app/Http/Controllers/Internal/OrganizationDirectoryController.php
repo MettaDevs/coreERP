@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\AuthenticateIntegrationClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -23,7 +24,13 @@ final class OrganizationDirectoryController extends Controller
      */
     public function operatingUnits(Request $request): JsonResponse
     {
-        abort_unless($request->attributes->get('coreerp.app_id') === 'human-resources', 403);
+        // Dua pemanggil yang sah: module human-resources, dan klien integrasi yang cakupan
+        // `operating-units.read`-nya sudah diperiksa middleware sebelum sampai ke sini.
+        abort_unless(
+            $request->attributes->get('coreerp.app_id') === 'human-resources'
+                || $request->attributes->has(AuthenticateIntegrationClient::ATRIBUT),
+            403,
+        );
         $filter = $request->validate(['updated_since' => ['nullable', 'date']]);
 
         $query = DB::table('organizations')
