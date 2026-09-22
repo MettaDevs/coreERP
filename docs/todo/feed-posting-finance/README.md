@@ -217,9 +217,11 @@ Untuk pembaca yang tidak bisa atau tidak mau menarik, CoreERP mengirim setiap po
 - Body = bentuk posting yang sama persis. Header membawa `X-CoreERP-Event-Timestamp` dan
   `X-CoreERP-Event-Signature` (HMAC-SHA256), mengikuti pola yang sudah dipakai
   `PublishWorkflowEvents`.
-- Respons 2xx dengan body ack (`posted` atau `rejected`) dihitung sebagai ack. Respons 408, 429,
-  5xx, atau timeout → dikirim ulang dengan jeda yang makin panjang. Respons 4xx lain → posting
-  ditandai gagal kirim dan tampil di layar pantau.
+- Respons 2xx dengan body ack (`posted` atau `rejected`) dihitung sebagai ack. Respons 2xx tanpa
+  body ack dihitung terkirim, dan posting tetap `pending` sampai di-ack lewat API. Respons 408,
+  429, 5xx, atau timeout → dikirim ulang dengan jeda 1, 2, 4, … sampai 60 menit, paling lama
+  `coreerp.finance_push_retry_hours` (bawaan 24 jam). Respons 4xx lain dan 3xx (redirect tidak
+  diikuti) → posting ditandai gagal kirim dan tampil di layar pantau.
 - Urutan kirim sama dengan urutan `pull`. Pembaca tetap wajib menjaga `UNIQUE(posting_id)`, karena
   kiriman ulang bisa terjadi.
 

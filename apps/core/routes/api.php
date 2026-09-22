@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Internal\EnvironmentProvisioningController;
+use App\Http\Controllers\Internal\FinancePostingFeedController;
 use App\Http\Controllers\Internal\FiscalCalendarDirectoryController;
 use App\Http\Controllers\Internal\FleetController;
 use App\Http\Controllers\Internal\HrPositionAssignmentController;
@@ -46,6 +47,18 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-caller', 'internal-
  */
 Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:vendors.read'])->group(function (): void {
     Route::get('vendors', [VendorDirectoryController::class, 'index']);
+});
+
+/*
+ * Feed posting finance untuk pembaca mode `pull`. Menarik dan mengakui adalah dua cakupan berbeda:
+ * pembaca yang hanya memantau tidak perlu dapat menandai posting sudah dibukukan.
+ */
+Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.read'])->group(function (): void {
+    Route::get('finance-postings', [FinancePostingFeedController::class, 'index']);
+});
+Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:finance-postings.ack'])->group(function (): void {
+    Route::post('finance-postings/{posting_id}/ack', [FinancePostingFeedController::class, 'ack'])
+        ->where('posting_id', '[A-Za-z0-9][A-Za-z0-9._:-]*');
 });
 
 /*

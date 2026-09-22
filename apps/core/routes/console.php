@@ -19,6 +19,12 @@ Schedule::command('workflow-events:publish')
     ->onOneServer()
     ->withoutOverlapping();
 
+// Feed posting finance mode push; lihat docs/todo/feed-posting-finance dan PostingPusher.
+Schedule::command('finance-postings:push')
+    ->everyMinute()
+    ->onOneServer()
+    ->withoutOverlapping();
+
 // Hasil ekspor laporan punya masa simpan; lihat config/reporting.php.
 Schedule::command('reporting:purge-exports')
     ->hourly()

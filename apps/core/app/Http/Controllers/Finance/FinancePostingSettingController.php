@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FinancePostingSetting;
 use App\Models\FinanceSettlementMode;
 use App\Models\Organization;
+use App\Support\Finance\PostingPublisher;
 use App\Support\Finance\PostingSettings;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -32,7 +33,7 @@ final class FinancePostingSettingController extends Controller
         return response()->json(['data' => $this->present($organization)]);
     }
 
-    public function update(Request $request, Organization $organization): JsonResponse
+    public function update(Request $request, Organization $organization, PostingPublisher $penerbit): JsonResponse
     {
         $this->guard($request, $organization, manage: true);
         $data = $request->validate([
@@ -50,8 +51,11 @@ final class FinancePostingSettingController extends Controller
                 'cutover_date' => $data['cutover_date'] ?? null,
             ],
         );
+        // Posting yang sudah terbit tetapi belum pernah sampai ke pembaca mengikuti setelan baru:
+        // yang kini sesudah cutover diperiksa dan disajikan, yang sebelumnya menjadi manual.
+        $dinilaiUlang = $penerbit->reevaluateCutover($organization->tenant_id, $organization->id, $request->user()?->id);
 
-        return response()->json(['data' => $this->present($organization)]);
+        return response()->json(['data' => $this->present($organization), 'meta' => ['reevaluated_postings' => $dinilaiUlang]]);
     }
 
     public function storeMode(Request $request, Organization $organization): JsonResponse
