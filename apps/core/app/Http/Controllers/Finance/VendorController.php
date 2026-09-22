@@ -146,8 +146,10 @@ final class VendorController extends Controller
             ->where('app_id', CoreNumberSequences::APP_ID)
             ->where('code', Vendor::NUMBER_SEQUENCE)
             ->value('id');
+        // Referensi yang belum ada akan dipasang dengan bawaan Core saat vendor pertama disimpan,
+        // dan bawaan itu boleh manual.
         if ($referensi === null) {
-            return false;
+            return true;
         }
         $urutan = TenantNumberSequence::query()->where('tenant_id', $tenantId)->where('reference_id', $referensi)->first(['allow_manual']);
 

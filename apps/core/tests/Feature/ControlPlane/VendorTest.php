@@ -67,6 +67,19 @@ class VendorTest extends TestCase
         $this->assertFalse($urutan->is_continuous);
     }
 
+    public function test_referensi_nomor_core_dipasang_ulang_bila_barisnya_hilang(): void
+    {
+        // Baris app `core` dan referensinya ditulis migration, jadi ikut hilang bila tabel `apps`
+        // dikosongkan — test ber-DatabaseTruncation melakukannya dengan TRUNCATE apps CASCADE,
+        // dan kelas test sesudahnya di proses yang sama pernah gagal membuat vendor karenanya.
+        DB::table('apps')->where('id', 'core')->delete();
+
+        $this->buat(['party_name' => 'PT Sarana Medika'])->assertCreated()->assertJsonPath('data.number', 'VND-000001');
+
+        $this->assertDatabaseHas('apps', ['id' => 'core', 'status' => 'internal']);
+        $this->assertDatabaseHas('app_number_sequence_references', ['app_id' => 'core', 'code' => 'core.vendor', 'default_prefix' => 'VND']);
+    }
+
     public function test_kiriman_ulang_dengan_kunci_yang_sama_tidak_membuat_vendor_kedua(): void
     {
         $pertama = $this->buat(['party_name' => 'PT Sarana Medika'], 'kunci-vendor-0001')->assertCreated();

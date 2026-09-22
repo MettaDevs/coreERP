@@ -8,6 +8,7 @@ use App\Models\NumberSequenceReference;
 use App\Models\TenantNumberSequence;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
@@ -26,11 +27,14 @@ final class CoreNumberSequences
     public const APP_ID = 'core';
 
     /**
-     * @var array<string, array{profile: string, scope: string, segments: list<array<string, mixed>>, maximum: int}>
+     * @var array<string, array{name: string, default_prefix: string, allowed_scopes: list<string>, profile: string, scope: string, segments: list<array<string, mixed>>, maximum: int}>
      */
     private const BAWAAN = [
         // Boleh diketik manual supaya nomor pemasok lama dapat dipindahkan apa adanya.
         'core.vendor' => [
+            'name' => 'Nomor vendor',
+            'default_prefix' => 'VND',
+            'allowed_scopes' => ['legal_entity'],
             'profile' => 'manual-compatible',
             'scope' => 'legal_entity',
             'segments' => [['type' => 'constant', 'value' => 'VND-'], ['type' => 'number', 'length' => 6]],
@@ -53,13 +57,7 @@ final class CoreNumberSequences
     public function ensure(string $tenantId, string $referenceCode): void
     {
         $bawaan = self::BAWAAN[$referenceCode] ?? throw new RuntimeException('Referensi nomor Core tidak dikenal: '.$referenceCode);
-        $referensi = NumberSequenceReference::query()
-            ->where('app_id', self::APP_ID)
-            ->where('code', $referenceCode)
-            ->first();
-        if ($referensi === null) {
-            throw new RuntimeException('Referensi nomor '.$referenceCode.' belum terdaftar. Jalankan migration.');
-        }
+        $referensi = $this->referensi($referenceCode, $bawaan);
 
         if (TenantNumberSequence::query()->where('tenant_id', $tenantId)->where('reference_id', $referensi->id)->exists()) {
             return;
@@ -88,5 +86,49 @@ final class CoreNumberSequences
         } catch (UniqueConstraintViolationException) {
             // Permintaan lain membuatnya lebih dulu; itulah yang dipakai.
         }
+    }
+
+    /**
+     * Baris referensi, dipasang ulang bila hilang.
+     *
+     * Migration `create_vendors_table` sudah menulis baris app `core` dan referensinya. Tetapi
+     * keduanya data, bukan skema: apa pun yang mengosongkan tabel `apps` — test yang memakai
+     * `DatabaseTruncation` melakukannya dengan `TRUNCATE apps CASCADE` — ikut menghapusnya, dan
+     * sesudah itu vendor tidak dapat dibuat sama sekali. Karena bentuk referensinya memang milik
+     * kelas ini, kelas ini pula yang memasangnya kembali. `insertOrIgnore` tidak membatalkan
+     * transaksi pemanggil bila permintaan lain memasangnya lebih dulu.
+     *
+     * @param  array{name: string, default_prefix: string, allowed_scopes: list<string>}  $bawaan
+     */
+    private function referensi(string $referenceCode, array $bawaan): NumberSequenceReference
+    {
+        $ada = NumberSequenceReference::query()->where('app_id', self::APP_ID)->where('code', $referenceCode)->first();
+        if ($ada !== null) {
+            return $ada;
+        }
+
+        $sekarang = now();
+        DB::table('apps')->insertOrIgnore([
+            'id' => self::APP_ID,
+            'name' => 'CoreERP',
+            'version' => '1.0.0',
+            'status' => 'internal',
+            'database_name' => null,
+            'description' => 'Pemilik referensi nomor milik Core sendiri, misalnya nomor vendor. Bukan produk yang dipasang.',
+            'created_at' => $sekarang,
+            'updated_at' => $sekarang,
+        ]);
+        DB::table('app_number_sequence_references')->insertOrIgnore([
+            'id' => strtolower((string) Str::ulid()),
+            'app_id' => self::APP_ID,
+            'code' => $referenceCode,
+            'name' => $bawaan['name'],
+            'default_prefix' => $bawaan['default_prefix'],
+            'allowed_scopes' => json_encode($bawaan['allowed_scopes'], JSON_THROW_ON_ERROR),
+            'created_at' => $sekarang,
+            'updated_at' => $sekarang,
+        ]);
+
+        return NumberSequenceReference::query()->where('app_id', self::APP_ID)->where('code', $referenceCode)->firstOrFail();
     }
 }
