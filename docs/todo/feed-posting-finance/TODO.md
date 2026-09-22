@@ -82,33 +82,34 @@ dari sebuah department bisa ditemukan (K-07).
 
 ---
 
-### 2. [ ] Core: vendor master gaya Dynamics
+### 2. [~] Core: vendor master gaya Dynamics
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** vendor bisa dibuat per entitas legal
 sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan ditarik pembaca lewat
 `/internal/v1/vendors` (K-06).
 
-- [ ] 2.1 Catatan studi: halaman *Vendors* di F&O dan BC.
-  - [ ] 2.1.1 Vendor adalah party di Global Address Book dengan akun vendor per entitas legal.
-  - [ ] 2.1.2 Tentukan kolom minimal fase ini: nomor vendor, party (nama), entitas legal, NPWP (opsional), status aktif. Vendor group dan syarat bayar ditunda (`FIN-26`).
-  - [ ] 2.1.3 Tulis hasilnya sebagai bagian singkat di PRD.
-- [ ] 2.2 Migration dan model.
-  - [ ] 2.2.1 Tabel `vendors`: `id`, `tenant_id`, `legal_entity_id`, `party_id`, `number`, `tax_number` (nullable), `status`, timestamps, soft delete.
-  - [ ] 2.2.2 Unik (`tenant_id`, `legal_entity_id`, `number`).
-  - [ ] 2.2.3 Setiap vendor mendaftarkan baris di `party_role_registrations` dengan `role_code = vendor`.
-- [ ] 2.3 Nomor vendor lewat number sequence Core (referensi baru, awalan default `VND`).
-- [ ] 2.4 Layar Core.
-  - [ ] 2.4.1 Daftar vendor dengan filter entitas legal dan status.
-  - [ ] 2.4.2 Form buat/ubah. Party bisa dipilih dari yang ada atau dibuat baru.
-  - [ ] 2.4.3 Permission, privilege, dan duty vendor.
-- [ ] 2.5 Kontrak module `DaftarVendor`.
-  - [ ] 2.5.1 `aktif(legalEntityId, cari)` dan `satu(vendorId)` mengembalikan `{id, number, name, tax_number, status}`.
-  - [ ] 2.5.2 Bind di `apps/core/app/Support/Modules/CoreServices.php`.
-- [ ] 2.6 Internal API `GET /internal/v1/vendors?updated_since=…` untuk klien integrasi (scope `vendors.read`) + OpenAPI.
-- [ ] 2.7 Test.
-  - [ ] 2.7.1 Vendor terdaftar sebagai peran `vendor` di party.
-  - [ ] 2.7.2 Vendor tenant lain tidak terlihat.
-  - [ ] 2.7.3 Sinkron `updated_since` hanya mengembalikan yang berubah.
+- [x] 2.1 Catatan studi: halaman *Vendors* di F&O dan BC.
+  - [x] 2.1.1 Vendor adalah party di Global Address Book dengan akun vendor per entitas legal.
+  - [x] 2.1.2 Tentukan kolom minimal fase ini: nomor vendor, party (nama), entitas legal, NPWP (opsional), status aktif. Vendor group dan syarat bayar ditunda (`FIN-26`).
+  - [x] 2.1.3 Tulis hasilnya sebagai bagian singkat di PRD (bagian **Vendor**).
+- [x] 2.2 Migration dan model.
+  - [x] 2.2.1 Tabel `vendors`: `id`, `tenant_id`, `legal_entity_id`, `party_id`, `number`, `tax_number` (nullable), `status`, timestamps. **Tanpa soft delete**: vendor tidak punya aksi hapus, status `inactive` menggantikannya (alasannya di PRD bagian Vendor). Ditambah `creation_key` supaya kiriman ulang form tidak membuat vendor kedua.
+  - [x] 2.2.2 Unik (`tenant_id`, `legal_entity_id`, `number`), juga (`tenant_id`, `legal_entity_id`, `party_id`): satu party paling banyak satu vendor per entitas legal.
+  - [x] 2.2.3 Setiap vendor mendaftarkan baris di `party_role_registrations` dengan `role_code = vendor`.
+- [x] 2.3 Nomor vendor lewat number sequence Core: referensi `core.vendor` milik baris app `core` berstatus `internal` (tidak tampil di katalog), per entitas legal, bawaan `VND-000001`, boleh manual. Urutan tenant lahir saat vendor pertama disimpan atau saat layar Nomor dokumen dibuka, jadi formatnya bisa disesuaikan sebelum nomor pertama terbit.
+- [~] 2.4 Layar Core (Buku alamat › Vendor).
+  - [x] 2.4.1 Daftar vendor dengan filter entitas legal dan status.
+  - [x] 2.4.2 Form buat/ubah. Party bisa dipilih dari yang ada atau dibuat baru.
+  - [x] 2.4.3 Akses: semua anggota melihat, owner/admin membuat dan mengubah (keputusan pemilik produk, 22 September 2026). Permission, privilege, dan duty tersendiri menyusul bila layar ini perlu dibuka untuk peran lain.
+  - [ ] 2.4.4 Verifikasi di browser: buat vendor baru, pilih party yang sudah ada, nomor manual, ubah nama, nonaktifkan.
+- [x] 2.5 Kontrak module `DaftarVendor`.
+  - [x] 2.5.1 `aktif(tenantId, legalEntityId, cari)` dan `satu(tenantId, vendorId)` mengembalikan `{id, number, name, tax_number, status, legal_entity_id}`.
+  - [x] 2.5.2 Bind di `apps/core/app/Support/Modules/CoreServices.php`.
+- [x] 2.6 Internal API `GET /internal/v1/vendors?updated_since=…` untuk klien integrasi (scope `vendors.read`) + OpenAPI. Dibaca per halaman lewat kursor, bukan nomor halaman: vendor yang berubah di tengah sinkron tidak menggeser vendor lain keluar dari halaman yang belum dibaca.
+- [x] 2.7 Test (`VendorTest`).
+  - [x] 2.7.1 Vendor terdaftar sebagai peran `vendor` di party.
+  - [x] 2.7.2 Vendor tenant lain tidak terlihat.
+  - [x] 2.7.3 Sinkron `updated_since` hanya mengembalikan yang berubah, termasuk ganti nama party di buku alamat.
 
 ---
 

@@ -23,6 +23,7 @@ import {
     Package,
     Palette,
     ShieldCheck,
+    Truck,
     UserRound,
     Users,
 } from 'lucide-react';
@@ -202,6 +203,11 @@ export function AppSidebar() {
                               label: 'Roles',
                               icon: Briefcase,
                               href: '/settings/global-address-book?section=roles',
+                          },
+                          {
+                              label: 'Vendor',
+                              icon: Truck,
+                              href: '/settings/vendors',
                           },
                       ],
                   },

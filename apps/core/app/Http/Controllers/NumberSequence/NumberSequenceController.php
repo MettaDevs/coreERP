@@ -7,6 +7,7 @@ use App\Actions\NumberSequence\NumberSequenceService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\NumberSequence\NumberSequenceSettingsRequest;
 use App\Models\TenantNumberSequence;
+use App\Support\Finance\CoreNumberSequences;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,10 +16,11 @@ use Inertia\Response;
 
 class NumberSequenceController extends Controller
 {
-    public function index(Request $request, EnsureNumberSequenceDrafts $drafts): JsonResponse|Response
+    public function index(Request $request, EnsureNumberSequenceDrafts $drafts, CoreNumberSequences $core): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
         $drafts->forReadyTenant($membership->tenant_id);
+        $core->ensureAll($membership->tenant_id);
         $sequences = TenantNumberSequence::query()->where('tenant_id', $membership->tenant_id)->with('reference.app')->orderBy('created_at')->get()
             ->map(fn (TenantNumberSequence $sequence): array => $this->present($sequence));
 

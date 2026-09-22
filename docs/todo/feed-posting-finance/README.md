@@ -203,7 +203,7 @@ dicatat di `apps/core/contracts/openapi-internal.yaml`.
 | --- | --- |
 | `GET /finance-postings?status=pending&posting_type=asset.*&legal_entity=PT-METTA&limit=100` | Mode `pull`. Posting yang belum di-ack, urut `posting_date` lalu waktu terbit, disaring per jenis dan entitas legal sesuai scope klien. Disajikan ulang sampai di-ack. |
 | `POST /finance-postings/{posting_id}/ack` | Hasil dari pembaca: `posted` + `external_reference` (nomor voucher/faktur), atau `rejected` + `reason_code` + `reason`. Idempoten: ack yang sama boleh diulang. |
-| `GET /vendors?updated_since=…` | Sinkron vendor untuk pembaca (K-06) |
+| `GET /vendors?updated_since=…` | Sinkron vendor untuk pembaca (K-06), dibaca per halaman lewat `cursor` |
 | `GET /operating-units?updated_since=…` | Sinkron kode dimensi untuk tabel penerjemah pembaca (endpoint yang sudah ada, ditambah `number`) |
 
 Kode alasan penolakan: `PERIOD_CLOSED`, `UNKNOWN_ACCOUNT`, `UNKNOWN_DIMENSION`, `UNKNOWN_VENDOR`,
@@ -323,6 +323,33 @@ Mengikuti *Preview Posting* dan *Journal Check* di BC (K-22):
 4. **Matriks posting group menandai akun wajib yang kosong** dengan tanda merah di selnya, seperti
    *General Posting Setup* di BC, supaya kekurangan terlihat sebelum ada transaksi.
 
+## Vendor
+
+Hasil studi halaman *Vendors* di F&O dan BC (TODO 2.1), dan bentuk yang dibangun di fase ini.
+
+- **Vendor adalah peran, bukan identitas baru.** Di F&O, nama, alamat, dan kontak milik party di
+  Global Address Book dan dipakai bersama oleh semua perannya. Party yang sama bisa menjadi vendor
+  di beberapa legal entity. CoreERP mengikutinya: tabel `vendors` hanya menyimpan yang khas akun
+  vendor (nomor, NPWP, status) per entitas legal, dan setiap vendor mendaftarkan peran `vendor` di
+  buku alamat. Mengganti nama vendor berarti mengganti nama party-nya di semua entitas legal.
+- **Kolom fase ini:** nomor, party (nama dan jenis), entitas legal, NPWP (opsional), status. Vendor
+  group, syarat bayar, dan rekening bank ditunda (`FIN-26`). Alamat dan kontak sudah bisa dicatat
+  di buku alamat.
+- **Dinonaktifkan, tidak dihapus.** BC menolak menghapus vendor yang sudah punya transaksi karena
+  catatannya dibutuhkan untuk audit. Di CoreERP vendor tidak punya aksi hapus sama sekali. Status
+  `inactive` menyembunyikannya dari pilihan dokumen baru, sementara dokumen dan posting lama tetap
+  menunjuknya.
+- **Nomor dari urutan nomor milik Core** (`core.vendor`): per entitas legal, tidak berkelanjutan,
+  tidak direset, bawaan `VND-000001`, boleh diketik manual. *Manual Nos.* di BC menerima nomor
+  bebas sampai 20 karakter, sedangkan layanan nomor Core menolak nomor manual yang tidak mengikuti
+  format. Karena itu urutan vendor sudah tampil di layar Nomor dokumen sebelum vendor pertama
+  dibuat, dan formatnya bisa disesuaikan dengan nomor pemasok lama lebih dulu. Sesudah nomor
+  pertama terbit, format terkunci. Nomor lama yang tidak seragam tidak perlu dipaksakan: pembaca
+  tetap memegang tabel penerjemah vendor, jadi vendor boleh bernomor baru.
+- **Nomor dan entitas legal tidak dapat diubah** setelah vendor dibuat. Nomor sudah tertanam di
+  tabel penerjemah pembaca, dan entitas legal menentukan buku yang memegang hutangnya.
+- **Akses:** semua anggota tenant dapat melihat, owner/admin yang membuat dan mengubah.
+
 ## Keamanan
 
 - **Klien integrasi per tenant.** Guard `internal-app` yang ada mensyaratkan entitlement dan
@@ -418,6 +445,9 @@ tiruan HTTP:
 - [Business Central API v2.0: dimensionSetLines](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/api-reference/v2.0/api/dynamics_dimensionsetline_create)
 - [Set up general fixed assets information (FA posting groups)](https://learn.microsoft.com/en-us/dynamics365/business-central/fa-how-setup-general)
 - [Set up FA depreciation (G/L integration per depreciation book)](https://learn.microsoft.com/en-us/dynamics365/business-central/fa-how-setup-depreciation)
+- [Global address book overview (party, peran, dan vendor per legal entity)](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/organization-administration/overview-global-address-book)
+- [Register a new vendor (BC)](https://learn.microsoft.com/en-us/dynamics365/business-central/purchasing-how-register-new-vendors)
+- [Create number series (BC, *Manual Nos.*)](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-create-number-series)
 - [Acquire fixed assets (Business Central)](https://learn.microsoft.com/en-us/dynamics365/business-central/fa-how-acquire)
 - [Fixed assets integration (F&O)](https://learn.microsoft.com/en-us/dynamics365/finance/fixed-assets/fixed-asset-integration)
 - [Purchase order posting (accrue liability on product receipt)](https://github.com/MicrosoftDocs/Dynamics-365-Unified-Operations-Public/blob/main/articles/finance/general-ledger/purchase-order-posting.md)
