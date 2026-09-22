@@ -11,6 +11,7 @@ use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
 use App\Http\Controllers\Finance\CurrencyPrecisionController;
 use App\Http\Controllers\Finance\FinancePostingSettingController;
+use App\Http\Controllers\Finance\IntegrationClientController;
 use App\Http\Controllers\Finance\ReferenceAccountController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
@@ -250,6 +251,8 @@ Route::middleware(['auth'])->group(function () {
     // Daftar akun referensi milik aplikasi finance pelanggan; lihat docs/todo/feed-posting-finance.
     Route::get('settings/finance-accounts', [ReferenceAccountController::class, 'index'])->name('finance-accounts.index');
     Route::get('settings/finance-accounts/template', [ReferenceAccountController::class, 'template'])->name('finance-accounts.template');
+    // Klien integrasi: sistem di luar CoreERP yang membaca feed posting finance.
+    Route::get('settings/integration-clients', [IntegrationClientController::class, 'index'])->name('integration-clients.index');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
     // Didaftarkan sebelum rute ber-parameter supaya "parameters" tidak pernah terbaca sebagai id workflow.
@@ -368,6 +371,12 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('throttle:20,1')
             ->name('finance-reference-accounts.imports.store');
         Route::patch('finance-reference-accounts/{account}', [ReferenceAccountController::class, 'update'])->name('finance-reference-accounts.update');
+        Route::post('integration-clients', [IntegrationClientController::class, 'store'])->middleware('throttle:20,1')->name('integration-clients.store');
+        Route::patch('integration-clients/{integrationClient}', [IntegrationClientController::class, 'update'])->name('integration-clients.update');
+        Route::post('integration-clients/{integrationClient}/revoke', [IntegrationClientController::class, 'revoke'])->name('integration-clients.revoke');
+        Route::post('integration-clients/{integrationClient}/rotate-token', [IntegrationClientController::class, 'rotateToken'])->middleware('throttle:20,1')->name('integration-clients.rotate-token');
+        Route::post('integration-clients/{integrationClient}/rotate-signing-secret', [IntegrationClientController::class, 'rotateSigningSecret'])->middleware('throttle:20,1')->name('integration-clients.rotate-signing-secret');
+        Route::post('integration-clients/{integrationClient}/test-push', [IntegrationClientController::class, 'testPush'])->middleware('throttle:10,1')->name('integration-clients.test-push');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');

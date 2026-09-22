@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app'])->group(function (): void {
     Route::get('members', [MemberDirectoryController::class, 'index']);
     Route::get('members/{membership}', [MemberDirectoryController::class, 'show']);
-    Route::get('operating-units', [OrganizationDirectoryController::class, 'operatingUnits']);
     Route::get('fiscal-periods', [FiscalCalendarDirectoryController::class, 'resolve']);
     Route::get('units-of-measure', [UnitOfMeasureDirectoryController::class, 'index']);
     Route::post('units-of-measure/resolve', [UnitOfMeasureDirectoryController::class, 'resolve']);
@@ -27,6 +26,17 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
     Route::post('number-sequence-reservations/{reservation}/confirm', [InternalNumberSequenceController::class, 'confirm']);
     Route::post('number-sequence-reservations/{reservation}/cancel', [InternalNumberSequenceController::class, 'cancel']);
     Route::post('workflow-instances', [InternalWorkflowInstanceController::class, 'store']);
+});
+
+/*
+ * Dibaca module dan sistem di luar CoreERP sekaligus.
+ *
+ * Module human-resources memakai kredensial app seperti rute lain di atas. Pembaca feed posting
+ * finance memakai token klien integrasi dengan cakupan yang disebut di parameter middleware, dan
+ * menyinkronkan tabel penerjemahnya dari rute yang sama. Lihat AuthenticateInternalCaller.
+ */
+Route::prefix('internal/v1')->middleware(['throttle:internal-caller', 'internal-caller:operating-units.read'])->group(function (): void {
+    Route::get('operating-units', [OrganizationDirectoryController::class, 'operatingUnits']);
 });
 
 /*

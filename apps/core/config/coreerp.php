@@ -83,6 +83,9 @@ return [
     // Requests per minute per app+tenant on the internal number sequence API. Sized for normal document traffic,
     // not for a caller trying to burn a tenant's number range.
     'internal_api_rate_limit' => env('COREERP_INTERNAL_API_RATE_LIMIT', 600),
+    // Permintaan per menit per klien integrasi (sistem di luar CoreERP, misalnya aplikasi finance
+    // yang menarik feed posting). Tarikan wajar sekali per beberapa detik; ini batas kewarasan.
+    'integration_api_rate_limit' => env('COREERP_INTEGRATION_API_RATE_LIMIT', 120),
     'registration_rate_limit' => env('COREERP_REGISTRATION_RATE_LIMIT', 5),
     'password_breach_check' => env('COREERP_PASSWORD_BREACH_CHECK', true),
 
