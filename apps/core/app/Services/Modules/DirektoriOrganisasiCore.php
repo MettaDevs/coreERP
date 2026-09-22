@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Modules;
 
+use App\Support\BusinessUnitResolver;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use Illuminate\Support\Facades\DB;
 
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\DB;
  */
 final class DirektoriOrganisasiCore implements DirektoriOrganisasi
 {
+    public function __construct(private readonly BusinessUnitResolver $unitBisnis) {}
+
     public function anggota(string $tenantId): array
     {
         return array_values(DB::table('tenant_memberships as memberships')
@@ -59,15 +62,30 @@ final class DirektoriOrganisasiCore implements DirektoriOrganisasi
     public function unitOperasi(string $tenantId): array
     {
         return array_values(DB::table('organizations')
-            ->where('tenant_id', $tenantId)
-            ->where('classification', 'operating_unit')
-            ->orderBy('name')
-            ->get(['id', 'name', 'classification'])
+            ->leftJoin('operating_units as unit', 'unit.organization_id', '=', 'organizations.id')
+            ->where('organizations.tenant_id', $tenantId)
+            ->where('organizations.classification', 'operating_unit')
+            ->orderBy('organizations.name')
+            ->get(['organizations.id', 'organizations.name', 'organizations.classification', 'unit.type', 'unit.number'])
             ->map(static fn (object $baris): array => [
                 'id' => (string) $baris->id,
                 'nama' => (string) $baris->name,
                 'klasifikasi' => (string) $baris->classification,
+                'tipe' => $baris->type === null ? null : (string) $baris->type,
+                'nomor' => $baris->number === null ? null : (string) $baris->number,
             ])
             ->all());
+    }
+
+    public function unitBisnisInduk(string $tenantId, array $orgUnitIds, string $tanggal): array
+    {
+        return array_map(
+            static fn (?array $bu): ?array => $bu === null ? null : [
+                'id' => $bu['id'],
+                'nama' => $bu['name'],
+                'nomor' => $bu['number'],
+            ],
+            $this->unitBisnis->resolve($tenantId, $orgUnitIds, $tanggal),
+        );
     }
 }

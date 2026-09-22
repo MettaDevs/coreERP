@@ -53,8 +53,9 @@ legal_entities
 └── organization_id, tenant_id, company_code, country_code, registration/tax data
 
 operating_units
-└── organization_id, type
-   # business_unit | department | cost_center | value_stream | channel
+└── organization_id, tenant_id, type, number
+   # type: business_unit | department | cost_center | value_stream | channel
+   # number: nomor unit, opsional, unik per tenant
 
 organization_hierarchies
 └── id, tenant_id, name, status
@@ -92,6 +93,17 @@ Setiap legal entity wajib mempunyai `company_code` dengan aturan berikut:
 - dibuat saat legal entity dibuat dan dikunci setelah data finansial pertama tercatat.
 
 Operating unit tidak memiliki kode organisasi umum. Jika proses regulator atau integrasi membutuhkan nomor cabang/unit, simpan sebagai identifier domain yang eksplisit; jangan menjadikannya pengganti `organizations.id` atau memaksa semua operating unit memiliki kode. `company_code` bukan nomor registrasi, NPWP, atau nomor pajak.
+
+## Nomor operating unit
+
+`operating_units.number` adalah identifier domain seperti yang dimaksud paragraf di atas: nilai dimensi keuangan `BUSINESS_UNIT` dan `DEPARTMENT` yang dikirim feed posting finance, padanan *operating unit number* di Dynamics 365 F&O.
+
+- Opsional. Business unit dan department yang belum bernomor ditandai di layar organisasi, karena posting finance untuk unit itu akan tertahan.
+- Unik per tenant lewat indeks unik parsial `(tenant_id, number) WHERE number IS NOT NULL`. `tenant_id` disalin dari `organizations` tanpa foreign key ke `tenants`, karena tabel itu milik sisi pusat.
+- Huruf besar dan angka, dipisah tanda hubung tunggal, paling panjang 30 karakter.
+- Boleh diganti. Posting yang sudah terbit menyimpan nomor pada saat terbit, jadi yang berubah hanya posting berikutnya.
+
+Business unit sebuah department diturunkan dari hierarki bertujuan `management` pada versi `published` yang berlaku di tanggal posting: leluhur terdekat bertipe `business_unit`, termasuk unit itu sendiri. Dua hierarki manajemen yang menunjuk business unit berbeda tidak ditebak; hasilnya kosong. Module membacanya lewat `DirektoriOrganisasi::unitBisnisInduk()`.
 
 ## Registrasi dan setup awal
 

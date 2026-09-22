@@ -29,6 +29,35 @@ interface DirektoriOrganisasi
     /** @return array{id: string, user_id: string, nama: string, email: string}|null */
     public function anggotaSatu(string $tenantId, string $membershipId): ?array;
 
-    /** @return list<array{id: string, nama: string, klasifikasi: string}> */
+    /**
+     * Seluruh operating unit tenant, termasuk yang sudah tidak aktif.
+     *
+     * Yang tidak aktif ikut dipulangkan karena pemakai utamanya menerjemahkan id yang sudah
+     * tersimpan di dokumen lama menjadi nama; unit yang dinonaktifkan tidak boleh membuat
+     * dokumen itu kehilangan namanya.
+     *
+     * `tipe` adalah tipe operating unit (`business_unit`, `department`, dan seterusnya).
+     * `nomor` adalah nomor unit — kode stabil yang dipakai sebagai nilai dimensi keuangan —
+     * dan `null` selama belum diisi di layar organisasi.
+     *
+     * @return list<array{id: string, nama: string, klasifikasi: string, tipe: ?string, nomor: ?string}>
+     */
     public function unitOperasi(string $tenantId): array;
+
+    /**
+     * Business unit induk dari tiap operating unit, pada hierarki manajemen yang berlaku di tanggal itu.
+     *
+     * Padanan *derived dimension* Dynamics 365 F&O: department membawa business unit-nya sendiri
+     * lewat struktur organisasi, tanpa tabel aturan tambahan. Yang dicari adalah leluhur terdekat
+     * bertipe `business_unit` — termasuk unit itu sendiri, jadi business unit memulangkan dirinya.
+     *
+     * Hierarkinya adalah versi `published` yang berlaku pada `$tanggal` dari setiap hierarki aktif
+     * bertujuan `management`. Unit yang tidak ada di hierarki mana pun, atau yang di dua hierarki
+     * manajemen menunjuk business unit berbeda, memulangkan `null`: menebak di sini berarti jurnal
+     * masuk ke klinik yang salah tanpa satu pun kesalahan terlihat.
+     *
+     * @param  list<string>  $orgUnitIds
+     * @return array<string, array{id: string, nama: string, nomor: ?string}|null> Berkunci id operating unit yang ditanyakan.
+     */
+    public function unitBisnisInduk(string $tenantId, array $orgUnitIds, string $tanggal): array;
 }

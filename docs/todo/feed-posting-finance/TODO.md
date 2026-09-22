@@ -48,35 +48,37 @@ bentuk dimensi BC (6.3.3), mode `push` (4.1, 6.10), tampilan masalah ala Journal
 
 ---
 
-### 1. [ ] Core: nomor operating unit sebagai kode dimensi
+### 1. [~] Core: nomor operating unit sebagai kode dimensi
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** setiap operating unit bisa diberi
 nomor unik, nomor itu terbaca lewat kontrak module dan `/internal/v1/operating-units`, dan BU induk
 dari sebuah department bisa ditemukan (K-07).
 
-- [ ] 1.1 Migration: tambah kolom `number` pada `operating_units`.
-  - [ ] 1.1.1 `string(30)`, nullable dulu supaya data lama tidak patah.
-  - [ ] 1.1.2 Unik per tenant. Tenant dibaca lewat `organizations.tenant_id`, jadi pertimbangkan menyalin `tenant_id` ke `operating_units`, atau indeks unik gabungan lewat kolom baru.
-  - [ ] 1.1.3 Pastikan lolos `MigrasiKompatibelMundurTest` (aturan N-1). Kolom nullable baru aman untuk rilis sebelumnya.
-- [ ] 1.2 Model dan validasi.
-  - [ ] 1.2.1 Tambah `number` ke `$fillable` di `apps/core/app/Models/OperatingUnit.php`.
-  - [ ] 1.2.2 Format: huruf besar, angka, `-`. Tanpa spasi.
-  - [ ] 1.2.3 Nomor boleh diubah. Riwayat posting menyimpan nomor pada saat terbit (snapshot).
-- [ ] 1.3 Layar organisasi (`apps/core/resources/js/pages/settings/organization.tsx`).
-  - [ ] 1.3.1 Field "Nomor unit" pada form operating unit.
-  - [ ] 1.3.2 Tampilkan nomor di pohon hierarki.
-  - [ ] 1.3.3 Tanda peringatan pada BU/department yang belum bernomor, karena posting untuk unit itu akan tertahan.
-- [ ] 1.4 Kontrak module `DirektoriOrganisasi` (`apps/core/app/Support/Modules/Contracts/`).
-  - [ ] 1.4.1 `unitOperasi()` mengembalikan `number` dan `type` selain `id` dan `name`.
-  - [ ] 1.4.2 Metode baru: BU induk dari sebuah org unit, lewat `organization_hierarchy_closures` pada versi hierarki yang berlaku untuk purpose `management`. Pola kuerinya ada di `apps/core/app/Support/DataPolicyAccessResolver.php`.
-  - [ ] 1.4.3 Tetapkan perilaku kalau tidak ada BU induk: kembalikan `null`, dan penerbit posting menjadikannya alasan `held`.- [ ] 1.5 Internal API `/internal/v1/operating-units`.
-  - [ ] 1.5.1 Tambah `number`, `type`, dan `updated_since` untuk sinkron.
-  - [ ] 1.5.2 Perbarui `apps/core/contracts/openapi-internal.yaml`.
-- [ ] 1.6 Test.
-  - [ ] 1.6.1 Nomor unik per tenant, dan boleh sama di tenant lain.
-  - [ ] 1.6.2 BU induk ditemukan untuk department dua tingkat di bawahnya.
-  - [ ] 1.6.3 Department tanpa BU induk menghasilkan `null`.
-  - [ ] 1.6.4 Anggaran query `AnggaranQueryPermintaanModuleTest` tetap lolos.
+- [x] 1.1 Migration: tambah kolom `number` pada `operating_units`.
+  - [x] 1.1.1 `string(30)`, nullable dulu supaya data lama tidak patah.
+  - [x] 1.1.2 Unik per tenant. `tenant_id` disalin ke `operating_units` tanpa foreign key ke `tenants` (tabel sisi pusat, dijaga `FkMenyeberangBatasTest`), dengan indeks unik parsial `(tenant_id, number) WHERE number IS NOT NULL`.
+  - [x] 1.1.3 Pastikan lolos `MigrasiKompatibelMundurTest` (aturan N-1). Kolom nullable baru aman untuk rilis sebelumnya.
+- [x] 1.2 Model dan validasi.
+  - [x] 1.2.1 Tambah `number` ke `$fillable` di `apps/core/app/Models/OperatingUnit.php`.
+  - [x] 1.2.2 Format: huruf besar, angka, `-`. Tanpa spasi.
+  - [x] 1.2.3 Nomor boleh diubah. Riwayat posting menyimpan nomor pada saat terbit (snapshot).
+- [~] 1.3 Layar organisasi (`apps/core/resources/js/pages/settings/organization.tsx`).
+  - [~] 1.3.1 Field "Nomor unit" pada form operating unit.
+  - [~] 1.3.2 Tampilkan nomor di pohon hierarki.
+  - [~] 1.3.3 Tanda peringatan pada BU/department yang belum bernomor, karena posting untuk unit itu akan tertahan.
+  - [ ] 1.3.4 Verifikasi di browser: buat unit bernomor, ubah nomor, dan lihat tanda di daftar dan pohon hierarki.
+- [x] 1.4 Kontrak module `DirektoriOrganisasi` (`apps/core/app/Support/Modules/Contracts/`).
+  - [x] 1.4.1 `unitOperasi()` mengembalikan `tipe` dan `nomor` selain `id` dan `nama`.
+  - [x] 1.4.2 Metode baru `unitBisnisInduk(tenant, orgUnitIds, tanggal)`: BU induk dari org unit, lewat `organization_hierarchy_closures` pada versi hierarki yang berlaku untuk purpose `management`. Pola kuerinya ada di `apps/core/app/Support/DataPolicyAccessResolver.php`.
+  - [x] 1.4.3 Tetapkan perilaku kalau tidak ada BU induk: kembalikan `null`, dan penerbit posting menjadikannya alasan `held`. Dua hierarki manajemen yang tidak sepakat juga `null`.
+- [x] 1.5 Internal API `/internal/v1/operating-units`.
+  - [x] 1.5.1 Tambah `number`, `type`, dan `updated_since` untuk sinkron.
+  - [x] 1.5.2 Perbarui `apps/core/contracts/openapi-internal.yaml`.
+- [x] 1.6 Test (`OperatingUnitNumberTest`).
+  - [x] 1.6.1 Nomor unik per tenant, dan boleh sama di tenant lain.
+  - [x] 1.6.2 BU induk ditemukan untuk department dua tingkat di bawahnya.
+  - [x] 1.6.3 Department tanpa BU induk menghasilkan `null`.
+  - [x] 1.6.4 Anggaran query `AnggaranQueryPermintaanModuleTest` tetap lolos.
 
 ---
 
