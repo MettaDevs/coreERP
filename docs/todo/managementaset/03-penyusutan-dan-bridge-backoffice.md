@@ -35,6 +35,10 @@ atau prorata berdasarkan tanggal efektif. Jangan menetapkan salah satunya diam-d
 
 ## [ ] Kontrak ke backoffice
 
+> **Digantikan** oleh [Feed posting finance](/todo/feed-posting-finance/) (21 September 2026).
+> Keputusan di bawah, bahwa V1 tidak mengirim debit, kredit, maupun akun, sudah dibalik di sana
+> (K-04). Bagian ini dibiarkan sebagai riwayat.
+
 Export memuat `posting_id`, versi kontrak, tenant, legal entity, asset dan book,
 periode/tanggal, unit pengguna efektif, nilai penyusutan, currency, nilai
 perolehan, akumulasi, NBV, status, dan referensi correction/reversal bila ada.
