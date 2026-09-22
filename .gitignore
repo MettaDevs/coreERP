@@ -33,3 +33,4 @@ docs/.vitepress/cache/
 # pembangunan lalu menghapusnya; baris ini menjaga agar satu jalan yang terhenti di tengah tidak
 # meninggalkan berkas yang ikut ter-commit.
 apps/core/resources/penanda-kendali.txt
+docs/references/Screenshot
