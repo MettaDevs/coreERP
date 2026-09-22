@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Modules;
 
+use App\Services\Modules\DaftarAkunCore;
 use App\Services\Modules\DaftarSatuanCore;
 use App\Services\Modules\DirektoriOrganisasiCore;
 use App\Services\Modules\KalenderFiskalCore;
@@ -12,6 +13,7 @@ use App\Services\Modules\MesinWorkflowCore;
 use App\Services\Modules\PenerbitNomorCore;
 use App\Services\Modules\PresisiMataUangCore;
 use App\Services\Modules\SetelanPostingFinanceCore;
+use App\Support\Modules\Contracts\DaftarAkun;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\DaftarSatuan;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
@@ -63,6 +65,9 @@ final class CoreServices
         // yang dipakai penerbit posting.
         SetelanPostingFinance::class => SetelanPostingFinanceCore::class,
         PresisiMataUang::class => PresisiMataUangCore::class,
+        // Feed posting finance: akun milik aplikasi finance pelanggan, dipilih di pemetaan
+        // posting module dan dibaca ulang setiap kali posting terbit.
+        DaftarAkun::class => DaftarAkunCore::class,
     ];
 
     /**
