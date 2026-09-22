@@ -25,7 +25,7 @@ Kalau riwayat ditimpa, pembebanan periode lama ikut berubah tiap kali aset pinda
 Menyelesaikan serah terima butuh permission `management-aset.aset.mutate` — terpisah dari `update`, dan terpisah pula dari izin menyusun dokumennya (`management-aset.mutasi-aset.*`). Orang yang boleh mengoreksi data aset belum tentu boleh memindahkannya, dan juru tulis yang menyiapkan berkasnya belum tentu berwenang menyerahkan barangnya.
 
 ::: info `POST /api/v1/aset/{id}/penempatan` sudah tidak ada
-Endpoint itu dibuang pada 17 September 2026. Ia memindahkan aset tanpa nomor dokumen dan tanpa bukti serah terima, dan ia satu-satunya yang menulis `lifecycle_state = 'in_use'` — nilai yang tidak pernah dibaca logika mana pun. Seluruh pekerjaannya kini dikerjakan [Mutasi aset](/apps/management-aset/transaction/mutasi-aset/).
+Endpoint itu dibuang pada 17 September 2026. Ia memindahkan aset tanpa nomor dokumen dan tanpa bukti serah terima, dan ia satu-satunya yang menulis `lifecycle_state = 'in_use'` — nilai yang tidak pernah dibaca logika mana pun. Seluruh pekerjaannya kini dikerjakan [mutasi aset](#endpoint).
 :::
 
 ## Yang berubah saat mutasi

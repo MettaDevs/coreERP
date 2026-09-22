@@ -3,7 +3,7 @@
 Dokumen ini mengatur **berapa banyak data yang boleh dibawa satu halaman**. Ia berlaku untuk setiap
 layar Inertia — milik Core maupun milik module — dan untuk setiap endpoint yang memberinya makan.
 
-Tampilannya diatur [standar halaman](../../.claude/skills/coreerp-page-standard/SKILL.md); yang di
+Tampilannya diatur standar halaman (`.agents/skills/coreerp-page-standard/SKILL.md`); yang di
 bawah ini mengatur isinya.
 
 ## Kenapa aturan ini ada
