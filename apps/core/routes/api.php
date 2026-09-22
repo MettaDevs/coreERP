@@ -9,6 +9,7 @@ use App\Http\Controllers\Internal\OrganizationDirectoryController;
 use App\Http\Controllers\Internal\TenantEntitlementController;
 use App\Http\Controllers\Internal\TenantProvisioningController;
 use App\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
+use App\Http\Controllers\Internal\VendorDirectoryController;
 use App\Http\Controllers\NumberSequence\InternalNumberSequenceController;
 use App\Http\Controllers\Workflow\InternalWorkflowInstanceController;
 use Illuminate\Support\Facades\Route;
@@ -37,6 +38,14 @@ Route::prefix('internal/v1')->middleware(['throttle:internal-app', 'internal-app
  */
 Route::prefix('internal/v1')->middleware(['throttle:internal-caller', 'internal-caller:operating-units.read'])->group(function (): void {
     Route::get('operating-units', [OrganizationDirectoryController::class, 'operatingUnits']);
+});
+
+/*
+ * Hanya untuk sistem di luar CoreERP. Module di runtime ini membaca vendor lewat kontrak DaftarVendor,
+ * bukan lewat HTTP, jadi rute ini tidak menerima kredensial app.
+ */
+Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integration-client:vendors.read'])->group(function (): void {
+    Route::get('vendors', [VendorDirectoryController::class, 'index']);
 });
 
 /*

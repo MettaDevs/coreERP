@@ -4,7 +4,7 @@ Halaman ini untuk developer yang menyentuh alamat atau kontak sebuah pihak: orga
 
 ## Mengapa alamat ada di Core
 
-Mengikuti Global Address Book Dynamics 365, yang tinggal di lapisan platform dan bukan sebuah modul. **Party** adalah identitas satu pihak, orang atau organisasi, beserta alamat pos dan kontak elektroniknya. Perannya (pelanggan, pemasok, pegawai) dimiliki app dan berlaku per legal entity; Core hanya menyimpan registry perannya.
+Mengikuti Global Address Book Dynamics 365, yang tinggal di lapisan platform dan bukan sebuah modul. **Party** adalah identitas satu pihak, orang atau organisasi, beserta alamat pos dan kontak elektroniknya. Perannya (pelanggan, pemasok, pegawai) berlaku per legal entity dan dimiliki app, kecuali vendor yang dimiliki Core sendiri (lihat **Vendor** di bawah); Core menyimpan registry semua peran.
 
 Legal entity dan operating unit ikut menjadi party karena keduanya punya nama dan alamat yang tercetak pada dokumen resmi. Identitas organisasi sudah di Core, dan memisahkan alamatnya berarti membelah satu identitas ke dua database. Ini juga yang menutup godaan setiap fitur menambah kolom alamatnya sendiri: identitas cetak pernah menyimpan alamat dan telepon, lalu dibongkar pada 2026-09-05 supaya alamat hanya pernah diubah di satu tempat.
 
@@ -40,9 +40,19 @@ Aturan yang ditegakkan kode, dan alasannya:
 
 **Identitas cetak** ([Dokumen cetak, layout, dan ekspor](23-document-rendering.md)) mengisi `kop.alamat*` dari alamat utama dan `kop.telepon`, `kop.whatsapp`, `kop.fax`, `kop.email`, `kop.laman` dari kontak utama tiap jenis. Ringkasan itu dibaca lewat `OrganizationAddressBook::summary()` tanpa membuat party, supaya sekadar mencetak tidak menulis apa pun. Halaman identitas cetak hanya menampilkan alamat dan kontak yang akan tercetak; mengubahnya dilakukan di dua bagian di atas.
 
+## Vendor
+
+Peran pertama yang benar-benar didaftarkan, dan dimiliki Core, bukan app: feed posting finance membutuhkan vendor sebelum ada modul hutang ([PRD](../todo/feed-posting-finance/README.md), K-06). Layarnya di **Buku alamat › Vendor** (`settings/vendors`).
+
+- Tabel `vendors` menyimpan akun vendor per legal entity: nomor, NPWP, dan status. Nama, alamat, dan kontak tetap milik party, jadi mengganti nama vendor mengganti nama party-nya di semua legal entity.
+- Menyimpan vendor baru menulis party (bila baru), akun vendor, dan baris `party_role_registrations` berperan `vendor` dengan `owning_app_id = core` dalam satu transaksi.
+- Satu party paling banyak satu vendor per legal entity; database menolak yang kedua.
+- Nomor dari reference `core.vendor` ([Number sequences](14-number-sequences.md#reference-milik-core-sendiri)); nomor dan legal entity tidak dapat diubah sesudah disimpan.
+- Module membaca vendor lewat kontrak `DaftarVendor`, sistem di luar CoreERP lewat `GET /api/internal/v1/vendors` dengan token klien integrasi.
+
 ## Yang belum ada
 
-Party untuk pelanggan, pemasok, dan pegawai belum punya API. Saat app pertama membutuhkannya, endpoint-nya masuk di `api/v1/parties` dengan aturan "satu utama" yang sama, dan app menulis registry perannya lewat API internal, bukan menyalin alamat ke databasenya sendiri.
+Party untuk pelanggan dan pegawai belum punya API. Saat app pertama membutuhkannya, endpoint-nya masuk di `api/v1/parties` dengan aturan "satu utama" yang sama, dan app menulis registry perannya lewat API internal, bukan menyalin alamat ke databasenya sendiri.
 
 ## Di mana kodenya
 
@@ -54,6 +64,8 @@ Party untuk pelanggan, pemasok, dan pegawai belum punya API. Saat app pertama me
 | `apps/core/app/Http/Controllers/GlobalAddressBook/` | Endpoint alamat dan kontak organisasi |
 | `apps/core/resources/js/components/organization/address-book-section.tsx` | Dua bagian pada kartu organisasi |
 | `apps/core/tests/Feature/ControlPlane/OrganizationAddressBookTest.php` | Utama otomatis dan berpindah, satu utama per jenis, kop membaca buku alamat, hak akses |
+| `apps/core/app/Actions/Finance/SaveVendor.php`, `apps/core/app/Models/Vendor.php` | Vendor: party, akun vendor per legal entity, dan registry perannya |
+| `apps/core/tests/Feature/ControlPlane/VendorTest.php` | Nomor vendor, satu vendor per party per legal entity, isolasi tenant, sinkron `updated_since` |
 
 ## Halaman terkait
 

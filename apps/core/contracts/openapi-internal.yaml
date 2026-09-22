@@ -170,6 +170,80 @@ paths:
         '429': { $ref: '#/components/responses/RateLimited' }
         '503': { $ref: '#/components/responses/OutboundRefused' }
 
+  /vendors:
+    get:
+      tags: [Directory]
+      operationId: internal.vendors.index
+      summary: Vendor per entitas legal, untuk tabel penerjemah sistem finance
+      security:
+        - integrationClient: []
+      description: |
+        Hanya klien integrasi dengan cakupan `vendors.read`. Module di dalam CoreERP membaca
+        vendor lewat kontrak in-process, bukan lewat rute ini.
+
+        Vendor adalah party di buku alamat yang memegang peran vendor pada satu entitas legal.
+        Party yang sama bisa menjadi vendor di beberapa entitas legal, dengan `id` dan `number`
+        berbeda di masing-masing. Posting finance menunjuk vendor lewat `id` dan membawa salinan
+        `number` serta `name` pada saat terbit.
+
+        Semua status dikembalikan, termasuk `inactive`: posting yang terbit sebelum vendor
+        dinonaktifkan tetap menunjuk vendor itu. Dengan `updated_since`, hanya vendor yang
+        berubah pada atau sesudah saat itu — vendornya sendiri atau nama party-nya.
+
+        **Halaman dibaca lewat kursor.** Urutannya waktu perubahan lalu `id`. Kirim
+        `meta.next_cursor` sebagai `cursor` bersama parameter lain yang sama sampai
+        `next_cursor` bernilai `null`. Vendor yang berubah di tengah sinkron pindah ke belakang
+        kursor, jadi bisa terbaca dua kali tetapi tidak pernah terlewat; simpan dengan upsert
+        berdasarkan `id`.
+
+        Pola sinkron yang disarankan sama dengan `/operating-units`: simpan `updated_at`
+        terbesar dari sinkron terakhir, kirim sebagai `updated_since` berikutnya. Batasnya
+        inklusif.
+      parameters:
+        - name: updated_since
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Waktu dengan offset zona waktu, misalnya `2026-09-22T10:00:00+07:00`.
+        - name: legal_entity
+          in: query
+          required: false
+          schema: { type: string, maxLength: 50 }
+          description: Kode perusahaan (`company_code`) atau id entitas legal. Kode yang tidak dikenal menghasilkan daftar kosong.
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string, maxLength: 200 }
+          description: Nilai `meta.next_cursor` dari halaman sebelumnya. Kursor yang tidak dikenal menghasilkan 422.
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+      responses:
+        '200':
+          description: Satu halaman vendor.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Vendor' }
+                  meta:
+                    type: object
+                    required: [next_cursor]
+                    properties:
+                      next_cursor:
+                        type: [string, 'null']
+                        description: '`null` berarti halaman terakhir.'
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/OutboundRefused' }
+
   /fiscal-periods:
     get:
       tags: [Directory]
@@ -1305,6 +1379,34 @@ components:
           type: [string, 'null']
           format: date-time
           description: Waktu perubahan terakhir, dari nama maupun nomor dan tipe.
+
+    Vendor:
+      type: object
+      additionalProperties: false
+      required: [id, number, name, party_type, tax_number, status, legal_entity, updated_at]
+      properties:
+        id: { type: string, format: ulid }
+        number:
+          type: string
+          maxLength: 40
+          description: |
+            Nomor vendor, unik per entitas legal dan tidak pernah berubah. Diterbitkan urutan
+            nomor Core (bawaan `VND-000001`) atau diketik manual saat memindahkan pemasok lama.
+        name: { type: string, maxLength: 200, description: Nama party saat ini. }
+        party_type: { type: string, enum: [organization, person] }
+        tax_number: { type: [string, 'null'], maxLength: 32, description: NPWP, bila diisi. }
+        status: { type: string, enum: [active, inactive] }
+        legal_entity:
+          type: object
+          additionalProperties: false
+          required: [id, code]
+          properties:
+            id: { type: string, format: ulid }
+            code: { type: [string, 'null'], description: Kode perusahaan entitas legal. }
+        updated_at:
+          type: string
+          format: date-time
+          description: Waktu perubahan terakhir, dari vendor maupun nama party-nya.
 
     UnitOfMeasure:
       type: object

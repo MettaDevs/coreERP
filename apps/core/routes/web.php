@@ -13,6 +13,7 @@ use App\Http\Controllers\Finance\CurrencyPrecisionController;
 use App\Http\Controllers\Finance\FinancePostingSettingController;
 use App\Http\Controllers\Finance\IntegrationClientController;
 use App\Http\Controllers\Finance\ReferenceAccountController;
+use App\Http\Controllers\Finance\VendorController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;
@@ -253,6 +254,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/finance-accounts/template', [ReferenceAccountController::class, 'template'])->name('finance-accounts.template');
     // Klien integrasi: sistem di luar CoreERP yang membaca feed posting finance.
     Route::get('settings/integration-clients', [IntegrationClientController::class, 'index'])->name('integration-clients.index');
+    // Vendor: party berperan vendor per entitas legal, dipakai dokumen penerimaan dan feed posting.
+    Route::get('settings/vendors', [VendorController::class, 'index'])->name('vendors.index');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
     // Didaftarkan sebelum rute ber-parameter supaya "parameters" tidak pernah terbaca sebagai id workflow.
@@ -377,6 +380,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('integration-clients/{integrationClient}/rotate-token', [IntegrationClientController::class, 'rotateToken'])->middleware('throttle:20,1')->name('integration-clients.rotate-token');
         Route::post('integration-clients/{integrationClient}/rotate-signing-secret', [IntegrationClientController::class, 'rotateSigningSecret'])->middleware('throttle:20,1')->name('integration-clients.rotate-signing-secret');
         Route::post('integration-clients/{integrationClient}/test-push', [IntegrationClientController::class, 'testPush'])->middleware('throttle:10,1')->name('integration-clients.test-push');
+        Route::get('vendors/party-options', [VendorController::class, 'partyOptions'])->name('vendors.party-options');
+        Route::post('vendors', [VendorController::class, 'store'])->middleware('throttle:60,1')->name('vendors.store');
+        Route::patch('vendors/{vendor}', [VendorController::class, 'update'])->name('vendors.update');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');

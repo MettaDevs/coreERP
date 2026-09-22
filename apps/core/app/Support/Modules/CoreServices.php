@@ -6,6 +6,7 @@ namespace App\Support\Modules;
 
 use App\Services\Modules\DaftarAkunCore;
 use App\Services\Modules\DaftarSatuanCore;
+use App\Services\Modules\DaftarVendorCore;
 use App\Services\Modules\DirektoriOrganisasiCore;
 use App\Services\Modules\KalenderFiskalCore;
 use App\Services\Modules\KonteksTenantPermintaan;
@@ -16,6 +17,7 @@ use App\Services\Modules\SetelanPostingFinanceCore;
 use App\Support\Modules\Contracts\DaftarAkun;
 use App\Support\Modules\Contracts\DaftarLaporan;
 use App\Support\Modules\Contracts\DaftarSatuan;
+use App\Support\Modules\Contracts\DaftarVendor;
 use App\Support\Modules\Contracts\DirektoriOrganisasi;
 use App\Support\Modules\Contracts\KalenderFiskal;
 use App\Support\Modules\Contracts\KonteksPermintaan;
@@ -68,6 +70,9 @@ final class CoreServices
         // Feed posting finance: akun milik aplikasi finance pelanggan, dipilih di pemetaan
         // posting module dan dibaca ulang setiap kali posting terbit.
         DaftarAkun::class => DaftarAkunCore::class,
+        // Vendor milik Core (party berperan vendor per entitas legal), dipilih di dokumen
+        // penerimaan module dan disalin nomor serta namanya ke posting saat terbit.
+        DaftarVendor::class => DaftarVendorCore::class,
     ];
 
     /**
