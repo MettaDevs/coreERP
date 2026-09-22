@@ -16,8 +16,16 @@ Urutan kerja yang disarankan:
    ├─▶ 4 ─┤    │
    └─▶ 5 ─┘    ├─▶ 8 ─▶ 9 ─▶ 10 ─▶ 11 ─▶ 12
                │
-               └─▶ 13, 14        15 (tim old-finance, paralel sejak 6 selesai) ─▶ 16
+               └─▶ 13, 14        15 (tim old-finance, paralel sejak 6 selesai) ─▶ 16 ─▶ 17
 ```
+
+Area 8.7 (kode manual untuk group aset dan buku penyusutan) harus selesai **sebelum** tim
+old-finance mengisi tabel penerjemahnya (15.1). Area 17 (kode manual untuk master setup lain)
+sengaja ditaruh **setelah** uji terima (K-24).
+
+Revisi 22 September 2026 menambahkan: presisi per mata uang (5.5, 6.3.7), empat waktu (6.3.8),
+bentuk dimensi BC (6.3.3), mode `push` (4.1, 6.10), tampilan masalah ala Journal Check (7.6,
+8.1.5, 9.3, 11.2.7), dan area 17.
 
 ---
 
@@ -35,6 +43,8 @@ Urutan kerja yang disarankan:
 - [ ] 0.4 Tetapkan pemilik dan jadwal pekerjaan di sisi old-finance (area 15).
 - [ ] 0.5 Tetapkan tanggal cutover per entitas legal.
 - [ ] 0.6 Siapkan instance dev old-finance yang bisa dijangkau server dev CoreERP, untuk area 16.
+- [ ] 0.7 Konfirmasi ke konsultan: presisi nilai IDR (0 atau 2 desimal) dan presisi harga satuan (K-20). Pastikan presisi kolom nilai di old-finance sama atau lebih halus.
+- [ ] 0.8 Minta tim old-finance menyiapkan kode group aset dan buku penyusutan versi manual bersama konsultan (misalnya `KENDARAAN`, `ALKES`, `KOMERSIAL`), untuk dipakai di 8.7.
 
 ---
 
@@ -59,8 +69,7 @@ dari sebuah department bisa ditemukan (K-07).
 - [ ] 1.4 Kontrak module `DirektoriOrganisasi` (`apps/core/app/Support/Modules/Contracts/`).
   - [ ] 1.4.1 `unitOperasi()` mengembalikan `number` dan `type` selain `id` dan `name`.
   - [ ] 1.4.2 Metode baru: BU induk dari sebuah org unit, lewat `organization_hierarchy_closures` pada versi hierarki yang berlaku untuk purpose `management`. Pola kuerinya ada di `apps/core/app/Support/DataPolicyAccessResolver.php`.
-  - [ ] 1.4.3 Tetapkan perilaku kalau tidak ada BU induk: kembalikan `null`, dan penerbit posting menjadikannya alasan `held`.
-- [ ] 1.5 Internal API `/internal/v1/operating-units`.
+  - [ ] 1.4.3 Tetapkan perilaku kalau tidak ada BU induk: kembalikan `null`, dan penerbit posting menjadikannya alasan `held`.- [ ] 1.5 Internal API `/internal/v1/operating-units`.
   - [ ] 1.5.1 Tambah `number`, `type`, dan `updated_since` untuk sinkron.
   - [ ] 1.5.2 Perbarui `apps/core/contracts/openapi-internal.yaml`.
 - [ ] 1.6 Test.
@@ -132,16 +141,21 @@ di sisi finance berperilaku seperti di PRD (K-05).
 ### 4. [ ] Core: klien integrasi dan autentikasinya
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** pembaca eksternal bisa diberi token
-bercakupan sempit, hanya dari IP yang diizinkan, dan ditolak di salinan sandbox.
+bercakupan sempit, dengan mode pengiriman `pull` atau `push`, dan ditolak di salinan sandbox. Letak
+jaringan pembaca tidak berpengaruh (K-03).
 
-- [ ] 4.1 Migration dan model `integration_clients`: `id`, `tenant_id`, `name`, `token_digest`, `scopes` (json), `allowed_ips` (json), `status`, `last_used_at`, timestamps.
+- [ ] 4.1 Migration dan model `integration_clients`.
+  - [ ] 4.1.1 Kolom dasar: `id`, `tenant_id`, `name`, `token_digest`, `scopes` (json), `allowed_ips` (json, opsional), `status`, `last_used_at`, timestamps.
+  - [ ] 4.1.2 Kolom pengiriman: `delivery_mode` (`pull` / `push`), `push_url` (wajib HTTPS kalau `push`), `signing_secret` (terenkripsi), `posting_type_prefixes` (json, misalnya `["asset."]`).
+  - [ ] 4.1.3 Validasi: `push_url` harus `https://`, dan satu klien hanya punya satu mode.
 - [ ] 4.2 Middleware.
   - [ ] 4.2.1 Header token berbentuk `<client_id>.<secret>`. Bandingkan digest dengan `hash_equals`, mengikuti pola `apps/core/app/Http/Middleware/AuthenticateAppService.php`.
   - [ ] 4.2.2 Periksa status, allowlist IP, dan scope per rute.
   - [ ] 4.2.3 Isi atribut request `coreerp.tenant_id` dari klien. Jangan pernah dari URL, query, atau body.
   - [ ] 4.2.4 Daftarkan alias di `apps/core/bootstrap/app.php`, beserta rate limiter tersendiri.
 - [ ] 4.3 Gerbang environment: kalau `ActiveEnvironment::outboundAllowed()` false, semua rute klien integrasi menjawab 503 dengan alasan dari `refusalReason()`.
-- [ ] 4.4 Layar Core: terbitkan token (tampil sekali), cabut, ubah scope dan IP, lihat `last_used_at`.
+- [ ] 4.4 Layar Core: terbitkan token (tampil sekali), cabut, ubah scope, awalan jenis, IP, dan mode pengiriman, lihat `last_used_at`. Untuk `push`: tombol "Kirim uji" ke `push_url`.
+- [ ] 4.6 Ekspos mode `pull` lewat Traefik: pastikan path `/api/internal/v1/...` terjangkau dengan TLS di domain server klien (`deploy/traefik`), tanpa membuka path lain.
 - [ ] 4.5 Test.
   - [ ] 4.5.1 Token salah, dicabut, atau dari IP asing ditolak.
   - [ ] 4.5.2 Scope kurang menghasilkan 403.
@@ -153,7 +167,8 @@ bercakupan sempit, hanya dari IP yang diizinkan, dan ditolak di salinan sandbox.
 ### 5. [ ] Core: setelan posting per entitas legal
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** feed bisa diaktifkan per entitas
-legal dengan tanggal cutover, dan mode penyelesaian perolehan terbaca per tanggal (K-10, K-16).
+legal dengan tanggal cutover, mode penyelesaian perolehan terbaca per tanggal, dan presisi mata uang
+terbaca per mata uang (K-10, K-16, K-20).
 
 - [ ] 5.1 Migration.
   - [ ] 5.1.1 `finance_posting_settings`: `legal_entity_id` (unik), `tenant_id`, `enabled`, `cutover_date`.
@@ -164,6 +179,12 @@ legal dengan tanggal cutover, dan mode penyelesaian perolehan terbaca per tangga
   - [ ] 5.4.1 Mode terbaca sesuai tanggal berlaku.
   - [ ] 5.4.2 Entitas tanpa baris mode menghasilkan default `direct_payable`.
   - [ ] 5.4.3 Tanggal berlaku tidak boleh ganda.
+- [ ] 5.5 Presisi mata uang (K-20). Padanannya *Currency Card* BC. Master mata uang penuh tetap `FIN-20`.
+  - [ ] 5.5.1 Tabel `currency_precisions`: `tenant_id`, `currency_code` (ISO 4217), `amount_decimals`, `unit_amount_decimals`. Unik (`tenant_id`, `currency_code`).
+  - [ ] 5.5.2 Default IDR: `amount_decimals = 2` sampai konsultan memutuskan (0 atau 2), `unit_amount_decimals = 3`.
+  - [ ] 5.5.3 Layar Core untuk mengubahnya. Perubahan hanya berlaku untuk posting yang terbit sesudahnya.
+  - [ ] 5.5.4 Kontrak module `PresisiMataUang`: `nilai(currencyCode)`, `hargaSatuan(currencyCode)`, dan `bulatkan(nilai, currencyCode)`. Pembulatan setengah ke atas (*nearest*), seperti default BC.
+  - [ ] 5.5.5 Test: pembulatan 0 dan 2 desimal, nilai negatif, dan tiga baris 333.333,333 yang dijumlah tetap seimbang.
 
 ---
 
@@ -184,13 +205,16 @@ tidak ada posting yang hilang atau dobel.
 - [ ] 6.3 Validasi dan pembentukan payload.
   - [ ] 6.3.1 Seimbang, dan setiap baris hanya debit atau hanya kredit.
   - [ ] 6.3.2 Akun ada dan aktif. Snapshot `external_id`, `code`, `name` ke payload.
-  - [ ] 6.3.3 Dimensi: akun neraca → `BUSINESS_UNIT`, akun laba rugi → `BUSINESS_UNIT` + `DEPARTMENT`, dari org unit lewat area 1.4. Snapshot nomor dan nama.
+  - [ ] 6.3.3 Dimensi: akun neraca → `BUSINESS_UNIT`, akun laba rugi → `BUSINESS_UNIT` + `DEPARTMENT`, dari org unit lewat area 1.4. Bentuk per dimensi `{code, display_name, value_code, value_display_name, value_id}`, disejajarkan dengan `dimensionSetLines` BC. Snapshot nomor dan nama saat terbit.
   - [ ] 6.3.4 Vendor wajib untuk `direct_payable` + pembelian.
   - [ ] 6.3.5 Tanggal sebelum cutover → `manual`. Entitas legal dengan feed tidak aktif → `manual`.
-  - [ ] 6.3.6 Gagal di 6.3.2 atau 6.3.3 → `held` dengan alasan. Gagal di 6.3.1 → exception, karena itu bug penerbit.
-  - [ ] 6.3.7 Nilai uang disimpan dan dikirim sebagai string desimal dua angka.
-- [ ] 6.4 `GET /internal/v1/finance-postings`.
+  - [ ] 6.3.6 Gagal di 6.3.2 atau 6.3.3 → `held` dengan alasan terstruktur (kode masalah, objek yang bermasalah, dan tautan perbaikan), supaya bisa ditampilkan per baris (7.6). Gagal di 6.3.1 → exception yang dilaporkan ke SigNoz lewat pelapor kesalahan yang sudah ada, karena itu bug penerbit.
+  - [ ] 6.3.7 Nilai uang disimpan dan dikirim sebagai string desimal dengan jumlah desimal persis presisi mata uang (5.5). Tolak nilai yang skalanya lebih halus. Header membawa `currency: {code, decimals}`.
+  - [ ] 6.3.8 Empat waktu (K-21): `posting_date` dan `document_date` dari pemanggil (tanggal saja); `occurred_at` dari pemanggil (jam + offset); `published_at` diisi Core saat terbit.
+  - [ ] 6.3.9 Kolom dimensi global di tabel baris (`business_unit_code`, `department_code`) untuk laporan cepat, di samping payload JSON.
+- [ ] 6.4 `GET /internal/v1/finance-postings` (mode `pull`, satu endpoint untuk semua jenis, K-23).
   - [ ] 6.4.1 Hanya `pending`, urut `posting_date` lalu waktu terbit, `limit` maksimal 500.
+  - [ ] 6.4.4 Filter `posting_type` (mendukung awalan seperti `asset.*`) dan `legal_entity`, selalu dipersempit oleh `posting_type_prefixes` milik klien.
   - [ ] 6.4.2 Naikkan `served_count` dan `last_served_at`, dan catat waktu tarikan terakhir per klien.
   - [ ] 6.4.3 Posting disajikan ulang sampai di-ack.
 - [ ] 6.5 `POST /internal/v1/finance-postings/{posting_id}/ack`.
@@ -208,6 +232,15 @@ tidak ada posting yang hilang atau dobel.
   - [ ] 6.8.4 `held` → perbaiki pemetaan → validasi ulang → `pending`.
   - [ ] 6.8.5 Dimensi sesuai jenis akun.
   - [ ] 6.8.6 Tenant terisolasi.
+  - [ ] 6.8.7 Nilai dengan skala lebih halus dari presisi mata uang ditolak.
+  - [ ] 6.8.8 Klien dengan awalan `asset.` tidak pernah menerima jenis lain.
+- [ ] 6.10 Mode `push` (K-03).
+  - [ ] 6.10.1 Job antrean yang mengirim posting `pending` milik klien `push` ke `push_url`, dengan header `X-CoreERP-Event-Timestamp` dan `X-CoreERP-Event-Signature` (HMAC-SHA256), mengikuti pola `apps/core/app/Console/Commands/PublishWorkflowEvents.php`.
+  - [ ] 6.10.2 Respons 2xx + body ack → diproses sama dengan `POST .../ack`.
+  - [ ] 6.10.3 408, 429, 5xx, atau timeout → kirim ulang dengan jeda yang makin panjang, dengan batas waktu total yang dicatat di setelan. 4xx lain → tandai gagal kirim, tampil di layar pantau.
+  - [ ] 6.10.4 Urutan kirim per klien sama dengan urutan `pull`. Satu posting yang gagal tidak menahan posting lain milik klien lain.
+  - [ ] 6.10.5 Tidak mengirim apa pun kalau `ActiveEnvironment::outboundAllowed()` false.
+  - [ ] 6.10.6 Test: tanda tangan benar, retry pada 5xx, berhenti pada 4xx, dan tidak ada kiriman di sandbox.
 
 ---
 
@@ -224,6 +257,12 @@ melihat, menelusuri, dan menindaklanjuti setiap posting tanpa membuka database.
   - [ ] 7.3.3 Tidak ada aksi ubah tanggal atau ubah nilai (K-17).
 - [ ] 7.4 Permission, privilege, dan duty: lihat, dan tindak lanjut.
 - [ ] 7.5 Test: aksi tercatat dengan pelaku dan alasan, dan posting `posted` tidak bisa ditandai manual.
+- [ ] 7.6 Komponen "pemeriksaan posting" bersama, gaya *Journal Check* BC (K-22). Dipakai di layar pantau, pratinjau penerimaan (9.3), dan pratinjau "Post penyusutan" (11.2.7).
+  - [ ] 7.6.1 Tiga angka: baris diperiksa, baris bermasalah, total masalah. Tombol "Tampilkan baris bermasalah saja".
+  - [ ] 7.6.2 Tabel baris jurnal: akun, debit, kredit, dimensi, dan saldo berjalan di bawahnya.
+  - [ ] 7.6.3 Masalah per baris dari alasan terstruktur 6.3.6: objek yang bermasalah, pesannya, dan tombol jalan pintas ke layar perbaikannya.
+  - [ ] 7.6.4 Tombol "Validasi ulang" setelah perbaikan.
+  - [ ] 7.6.5 Endpoint pratinjau di Core: bentuk posting dari data yang belum disimpan, dengan validasi yang sama dengan 6.3, tanpa menulis apa pun.
 
 ---
 
@@ -238,7 +277,7 @@ dan dimensi lokasi mewarisi dari induk.
   - [ ] 8.1.2 Unik (`tenant_id`, `group_aset_id`, `effective_from`).
   - [ ] 8.1.3 Controller + rute, dengan akun dipilih lewat kontrak `DaftarAkun`.
   - [ ] 8.1.4 UI tabel matriks gaya FA Posting Groups BC: baris group, kolom akun, dan riwayat tanggal berlaku.
-  - [ ] 8.1.5 Tanda di group yang belum dipetakan.
+  - [ ] 8.1.5 Tanda merah di setiap sel akun wajib yang masih kosong, seperti *General Posting Setup* BC, plus ringkasan jumlah group yang belum lengkap di atas matriks.
 - [ ] 8.2 Cara perolehan (K-12).
   - [ ] 8.2.1 Konstanta `pembelian`, `hibah`, `saldo_awal`.
   - [ ] 8.2.2 Untuk sekarang, semua cara memakai kolom akun yang sama. Tulis titik perluasannya di kode supaya akun per cara bisa ditambah nanti.
@@ -255,6 +294,12 @@ dan dimensi lokasi mewarisi dari induk.
   - [ ] 8.6.1 Pemetaan bertanggal berlaku terbaca sesuai tanggal posting.
   - [ ] 8.6.2 Lokasi ruang tanpa pemetaan mewarisi dari lantai.
   - [ ] 8.6.3 Buku `none` tidak pernah menghasilkan posting.
+  - [ ] 8.6.4 Kode group aset dan buku penyusutan diketik manual, unik per tenant, dan tidak bisa diubah setelah dipakai posting.
+- [ ] 8.7 Kode manual untuk group aset dan buku penyusutan (K-24). **Wajib selesai sebelum 15.1.**
+  - [ ] 8.7.1 Form group aset dan buku penyusutan menerima kode yang diketik (huruf besar, angka, `-`), misalnya `KENDARAAN`, `KOMERSIAL`.
+  - [ ] 8.7.2 Hentikan pemakaian referensi `management-aset.group-aset` dan `management-aset.buku-penyusutan` di `app.yaml` untuk kode baru. Referensinya jangan dihapus dulu, supaya tenant yang sudah menyetelnya tidak rusak (N-1).
+  - [ ] 8.7.3 Data yang sudah ada tetap memakai kode lamanya. Tidak ada penggantian kode massal.
+  - [ ] 8.7.4 Kode dikunci setelah group atau buku dipakai posting, karena kode itu tertanam di tabel penerjemah pembaca.
 
 ---
 
@@ -270,11 +315,14 @@ dan PPN, untuk kedua mode.
 - [ ] 9.2 Validasi saat selesai.
   - [ ] 9.2.1 Vendor wajib kalau mode pada tanggal penerimaan adalah `direct_payable` dan caranya `pembelian`.
   - [ ] 9.2.2 PPN tidak boleh negatif.
-- [ ] 9.3 UI `ui/transactions/inventarisasi-aset/PenerimaanDetailPage.tsx`: pilih vendor (dari `DaftarVendor`), cara perolehan, referensi faktur, dan PPN per baris.
+- [ ] 9.3 UI `ui/transactions/inventarisasi-aset/PenerimaanDetailPage.tsx`.
+  - [ ] 9.3.1 Pilih vendor (dari `DaftarVendor`), cara perolehan, referensi faktur, dan PPN per baris.
+  - [ ] 9.3.2 Pratinjau posting sebelum tombol "Selesaikan", memakai komponen 7.6: baris jurnal yang akan terbit, dimensinya, dan masalahnya (misalnya group belum dipetakan) beserta jalan pintas perbaikannya.
+- [ ] 9.6 Pembulatan di sumber (K-20): nilai per baris = bulat(`nilai_per_unit` × `jumlah`) ke presisi nilai mata uang (5.5.4), begitu juga PPN per baris. Jurnal disusun dari nilai yang sudah bulat. `nilai_per_unit` boleh memakai presisi harga satuan.
 - [ ] 9.4 Penerbitan di `PenerimaanAsetController::selesaikan`.
   - [ ] 9.4.1 Satu posting per penerimaan, dengan `posting_id` deterministik dari ID penerimaan.
   - [ ] 9.4.2 Baris: Dr harga perolehan per group + BU, Dr PPN Masukan per BU, Cr hutang atau perantara sesuai mode.
-  - [ ] 9.4.3 `posting_date` = `tanggal` penerimaan, **bukan** tanggal siap pakai.
+  - [ ] 9.4.3 `posting_date` = `tanggal` penerimaan, **bukan** tanggal siap pakai. `document_date` = tanggal faktur vendor kalau diisi, selain itu `tanggal` penerimaan. `occurred_at` = jam penerimaan diselesaikan.
   - [ ] 9.4.4 `details.assets` berisi kode aset, group, buku, nilai, dan PPN.
   - [ ] 9.4.5 Hanya buku yang boleh di-post (bukan `none`) yang menghasilkan baris.
 - [ ] 9.5 Test.
@@ -283,6 +331,7 @@ dan PPN, untuk kedua mode.
   - [ ] 9.5.3 Group belum dipetakan → penerimaan tetap selesai, posting `held`.
   - [ ] 9.5.4 Gagal di tengah transaksi → tidak ada aset dan tidak ada posting.
   - [ ] 9.5.5 Selesai diulang → tetap satu posting.
+  - [ ] 9.5.6 Harga satuan berdesimal (3 × 333.333,333) → jurnal seimbang di presisi mata uang.
 
 ---
 
@@ -324,7 +373,8 @@ reversal menghasilkan jurnal balik, dan ekspor lama berhenti ditulis.
   - [ ] 11.2.4 Satu posting. `posting_id` deterministik dari entitas + buku + tanggal akhir + nomor urut proses.
   - [ ] 11.2.5 Isi `posted_posting_id` pada semua periode yang ikut.
   - [ ] 11.2.6 Buku `none` ditolak dengan pesan jelas.
-  - [ ] 11.2.7 Rute, permission, dan UI tombol di layar penyusutan, dengan ringkasan sebelum konfirmasi.
+  - [ ] 11.2.7 Rute, permission, dan UI tombol di layar penyusutan. Sebelum konfirmasi, tampilkan pratinjau dengan komponen 7.6: jurnal ringkas, jumlah aset yang ikut, total yang harus sama dengan register, dan masalahnya.
+  - [ ] 11.2.8 `posting_date` = `period_ends_on`, `document_date` = `period_ends_on`, `occurred_at` = jam proses dijalankan.
 - [ ] 11.3 Reversal (`DepreciationController::reverse`).
   - [ ] 11.3.1 Kalau periode asal sudah di-post → terbitkan `asset.depreciation_reversal` yang merujuk posting asal, dengan baris balik untuk porsi aset itu saja.
   - [ ] 11.3.2 Kalau periode asal belum di-post → tidak ada posting.
@@ -385,8 +435,8 @@ site di admin.erp menampilkan kesehatan feed tiap server klien.
 
 ### 15. [ ] Old-finance (dependensi, dikerjakan tim old-finance)
 
-**Tempat:** repo old-finance · **Setelah:** 6 (kontrak stabil) · **Selesai bila:** skenario area
-16 lulus. Kontrak CoreERP yang menjadi acuan (K-01).
+**Tempat:** repo old-finance · **Setelah:** 6 (kontrak stabil) dan 8.7 (kode group dan buku sudah
+manual) · **Selesai bila:** skenario area 16 lulus. Kontrak CoreERP yang menjadi acuan (K-01).
 
 - [ ] 15.1 Tabel penerjemah.
   - [ ] 15.1.1 Entitas legal (`legal_entity.code`) → buku/database Back Office.
@@ -398,7 +448,8 @@ site di admin.erp menampilkan kesehatan feed tiap server klien.
 - [ ] 15.4 Job terjadwal penarik posting.
   - [ ] 15.4.1 Tarik `pending`, dan simpan dengan `UNIQUE(posting_id)`.
   - [ ] 15.4.2 Jurnal diambil dari `journal_lines`. Jangan menjurnal dari `details`.
-  - [ ] 15.4.3 Tanggal diambil dari `posting_date`, bukan jam server Windows.
+  - [ ] 15.4.3 Tanggal diambil dari `posting_date`, bukan jam server Windows. `occurred_at` dan `published_at` disimpan apa adanya, lengkap dengan offset zona waktunya.
+  - [ ] 15.4.4 Nilai diterima sebagai string desimal sesuai `currency.decimals`. Presisi kolom di old-finance harus sama atau lebih halus. Tidak boleh dibulatkan ulang.
 - [ ] 15.5 Posting `direct_payable` jenis perolehan → faktur di modul hutang **tanpa jurnal kedua**. Nomor faktur vendor ditempel belakangan.
 - [ ] 15.6 Ack: `posted` + nomor voucher/faktur, atau `rejected` + kode alasan.
 - [ ] 15.7 Tanpa fallback: kode akun, vendor, unit, atau entitas yang tidak dikenal → `rejected`, bukan default.
@@ -421,3 +472,25 @@ dicatat di PRD.
 - [ ] 16.8 Mode diganti `direct_payable` → `clearing` → koreksi atas penerimaan lama tetap ke Hutang.
 - [ ] 16.9 Old-finance mati satu jam → setelah hidup lagi, semua posting tersaji tanpa ada yang hilang.
 - [ ] 16.10 Halaman site di admin.erp menampilkan angka feed yang sama dengan layar pantau Core.
+- [ ] 16.11 Penerimaan dengan harga satuan berdesimal → jurnal seimbang, dan total di old-finance sama persis.
+- [ ] 16.12 Group aset tanpa pemetaan → masalahnya tampil di pratinjau sebelum konfirmasi, lengkap dengan jalan pintas → setelah dipetakan, "Validasi ulang" memindahkan posting ke `pending`.
+- [ ] 16.13 Pembaca dijalankan dari server lain di luar jaringan server klien → mode `pull` tetap berjalan lewat HTTPS.
+
+---
+
+### 17. [ ] Kode manual untuk master setup lain (setelah bridging)
+
+**Tempat:** `apps/core`, `modules/apperp/*` · **Setelah:** 16 · **Selesai bila:** master setup
+memakai kode yang diketik manual, dokumen dan identitas tetap memakai number sequence, dan tidak
+ada tenant yang rusak karena perubahan ini (K-24).
+
+- [ ] 17.1 Perkuat jaring test modul lebih dulu, sebelum menyentuh referensi number sequence.
+- [ ] 17.2 Core: tambah profil number sequence "Manual saja", padanan centang *Manual Nos.* tanpa *Default Nos.* di BC. Profil `manual-compatible` yang sudah ada tetap dipertahankan.
+- [ ] 17.3 Klasifikasikan setiap referensi di `app.yaml` modul aset (31 referensi) dan HR.
+  - [ ] 17.3.1 Tetap otomatis (dokumen dan identitas): aset, penerimaan, mutasi, perencanaan, permintaan pembelian, pemeliharaan, dekomisioning, penjualan, pemusnahan, pekerja, jabatan.
+  - [ ] 17.3.2 Pindah ke "Manual saja" (master setup): model, jenis, kondisi, pabrikan, tipe lokasi, lokasi, tipe atribut, profil penyusutan, item checklist, analisa, jenis pekerjaan dan variannya, tipe work order, tingkat layanan, trade, sebab kerusakan, tindakan perbaikan, dan sejenisnya.
+  - [ ] 17.3.3 Tulis hasil klasifikasi sebagai tabel di halaman ini sebelum mengubah apa pun.
+- [ ] 17.4 Ubah default referensi master ke profil "Manual saja" untuk tenant baru. Tenant yang sudah menyetel sequence-nya tidak diubah.
+- [ ] 17.5 Form master: field kode wajib diisi manual, dengan format dan keunikan per tenant.
+- [ ] 17.6 Referensi yang tidak lagi dipakai dibiarkan satu rilis (N-1), lalu dihapus dari `app.yaml`.
+- [ ] 17.7 Test: master baru tanpa kode ditolak, kode ganda ditolak, dan dokumen tetap mendapat nomor otomatis.
