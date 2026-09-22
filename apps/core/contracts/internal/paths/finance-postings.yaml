@@ -27,7 +27,21 @@ get:
       in: query
       required: false
       schema: { type: string, maxLength: 80, pattern: '^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*(\.\*)?$' }
-      description: Jenis lengkap (`asset.acquisition`) atau awalan dengan `.*` (`asset.*`).
+      example: asset.*
+      description: |
+        Saring menurut jenis posting. Kosongkan untuk menerima semua jenis yang diizinkan untuk
+        klien Anda; itu cara yang dianjurkan.
+
+        Isi dengan salah satu nilai di bawah, atau awalan yang diakhiri `.*` untuk semua jenis dari
+        satu modul, misalnya `asset.*`:
+
+        - `asset.acquisition` — penerimaan aset diselesaikan
+        - `asset.acquisition_adjustment` — nilai perolehan dikoreksi
+        - `asset.opening_balance` — saldo awal aset lama saat mulai memakai feed
+        - `asset.depreciation` — proses "Post penyusutan" satu periode
+        - `asset.depreciation_reversal` — penyusutan satu periode dibalik
+
+        Status tiap jenis ada di model `PostingType` dan di bagian **Jenis posting** pada panduan.
     - name: legal_entity
       in: query
       required: false

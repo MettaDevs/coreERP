@@ -255,6 +255,19 @@ Before adding or changing anything reachable from outside the module — any
    refs. One 10k-line spec guarantees merge conflicts between unrelated features.
    Core's `contracts/internal/` and `contracts/bundle.py` are the reference layout: a
    bundle check in CI proves the committed artifacts match their sources.
+11. **A list of values the reader must choose from is found by searching, not by reading
+   everything.** Readers type the field name into the docs search and click the first
+   hit. Give the list its own guide heading and its own schema in `components/schemas`,
+   name every value in the parameter that accepts it, and pin all the places that repeat
+   it with a test — `DocsPortalTest` does this for `posting_type`. Check it in the
+   rendered docs with the words a reader would type before calling it done.
+   - A list that grows is written with `examples`, not `enum`: rule 7 makes widening an
+     enum breaking.
+   - Guide headings carry no inline code. Scalar builds the search link from the whole
+     heading text but drops the code when it gives the rendered heading its id, so the
+     search result points at an anchor that does not exist. An underscore without
+     backticks is safe.
+   - Do not add an endpoint only to list static values; the owner chose documentation.
 
 #### Envelope fields cannot be added retroactively
 

@@ -63,6 +63,55 @@ class DocsPortalTest extends TestCase
         }
     }
 
+    public function test_daftar_jenis_posting_punya_bagian_sendiri_dan_sama_di_setiap_tempat(): void
+    {
+        // Pembaca menemukan daftar ini lewat pencarian docs: judul bagian di panduan dan model
+        // `PostingType`. Keduanya, parameter penyaring, dan contoh payload harus memuat daftar yang
+        // sama. Daftar yang hanya lengkap di satu tempat membuat pembaca menebak.
+        $spesifikasi = Yaml::parseFile(base_path('contracts/terbit/integrasi-finance.yaml'));
+
+        $daftar = $this->jenisDiTabel($this->bagianPanduan($spesifikasi['info']['description'], 'Jenis posting (posting_type)'));
+        $this->assertNotEmpty($daftar, 'Bagian Jenis posting tidak memuat tabel jenis.');
+
+        $model = $spesifikasi['components']['schemas']['PostingType'];
+        $this->assertSame($daftar, $model['examples']);
+        $this->assertSame($daftar, $this->jenisDiTabel($model['description']));
+        $this->assertSame(['$ref' => '#/components/schemas/PostingType'], $spesifikasi['components']['schemas']['FinancePosting']['properties']['posting_type']);
+
+        $parameter = collect($spesifikasi['paths']['/finance-postings']['get']['parameters'])->firstWhere('name', 'posting_type');
+        foreach ($daftar as $jenis) {
+            $this->assertStringContainsString("`{$jenis}`", $parameter['description'], "Parameter posting_type tidak menyebut {$jenis}.");
+        }
+
+        $contoh = $spesifikasi['paths']['/finance-postings']['get']['responses']['200']['content']['application/json']['examples'];
+        foreach ($contoh as $nama => $isi) {
+            foreach ($isi['value']['data'] as $posting) {
+                $this->assertContains($posting['posting_type'], $daftar, "Contoh {$nama} memakai jenis yang tidak ada di daftar.");
+            }
+        }
+    }
+
+    public function test_judul_panduan_tanpa_kode_supaya_hasil_pencarian_menuju_judulnya(): void
+    {
+        // Scalar membuat alamat hasil pencarian dari seluruh teks judul, tetapi membuang bagian
+        // kode saat memberi id pada judul yang tampil. Judul "Jenis posting (`posting_type`)"
+        // membuat hasil pencarian menunjuk `jenis-posting-posting-type`, sedangkan judulnya ber-id
+        // `jenis-posting`, sehingga pembaca yang mengkliknya tidak dibawa ke mana pun. Garis bawah
+        // tanpa backtick aman; keduanya diuji di Scalar pada 22 September 2026.
+        $berkas = glob(base_path('contracts/terbit/*.yaml'));
+        $this->assertNotEmpty($berkas);
+
+        foreach ($berkas as $satu) {
+            $panduan = (string) (Yaml::parseFile($satu)['info']['description'] ?? '');
+            $tanpaBlokKode = (string) preg_replace('/^```.*?^```/ms', '', $panduan);
+            preg_match_all('/^#{1,6} .*$/m', $tanpaBlokKode, $judul);
+
+            foreach ($judul[0] as $baris) {
+                $this->assertStringNotContainsString('`', $baris, basename($satu).": judul \"{$baris}\" memuat kode.");
+            }
+        }
+    }
+
     public function test_kontrak_internal_dan_referensi_scramble_tertutup_bagi_tamu_dan_anggota_biasa(): void
     {
         foreach (['/docs/kontrak/app.yaml', '/docs/kontrak/pusat-admin.yaml', '/docs/api', '/docs/api.json'] as $alamat) {
@@ -100,6 +149,32 @@ class DocsPortalTest extends TestCase
         $this->actingAs($this->adminPenyedia());
         $this->get('/docs/openapi/app-uji')->assertRedirect('https://contracts.example.test/app-uji/openapi.yaml');
         $this->get('/docs/openapi/not-an-app')->assertNotFound();
+    }
+
+    /** Isi satu bagian panduan, dari judulnya sampai judul setingkat berikutnya. */
+    private function bagianPanduan(string $panduan, string $judul): string
+    {
+        $pembuka = "## {$judul}\n";
+        $mulai = strpos($panduan, $pembuka);
+        $this->assertNotFalse($mulai, "Panduan tidak punya bagian \"{$judul}\".");
+
+        $sisa = substr($panduan, $mulai + strlen($pembuka));
+        $akhir = strpos($sisa, "\n## ");
+
+        return $akhir === false ? $sisa : substr($sisa, 0, $akhir);
+    }
+
+    /**
+     * Nilai jenis posting di kolom pertama tabel markdown, sesuai urutannya. Baris judul dan contoh
+     * pemakaian seperti `posting_type=asset.*` tidak berbentuk jenis, jadi tidak ikut.
+     *
+     * @return list<string>
+     */
+    private function jenisDiTabel(string $markdown): array
+    {
+        preg_match_all('/^\| `([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+)` \|/m', $markdown, $cocok);
+
+        return $cocok[1];
     }
 
     private function adminPenyedia(): User
