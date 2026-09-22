@@ -11,6 +11,7 @@ use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
 use App\Http\Controllers\Finance\CurrencyPrecisionController;
 use App\Http\Controllers\Finance\FinancePostingSettingController;
+use App\Http\Controllers\Finance\ReferenceAccountController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;
@@ -246,6 +247,9 @@ Route::middleware(['auth'])->group(function () {
     // Presisi uang per mata uang untuk feed posting finance; lihat docs/todo/feed-posting-finance.
     Route::get('settings/currencies', [CurrencyPrecisionController::class, 'index'])->name('currencies.index');
     Route::put('settings/currencies/{currency}', [CurrencyPrecisionController::class, 'update'])->name('currencies.update');
+    // Daftar akun referensi milik aplikasi finance pelanggan; lihat docs/todo/feed-posting-finance.
+    Route::get('settings/finance-accounts', [ReferenceAccountController::class, 'index'])->name('finance-accounts.index');
+    Route::get('settings/finance-accounts/template', [ReferenceAccountController::class, 'template'])->name('finance-accounts.template');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
     // Didaftarkan sebelum rute ber-parameter supaya "parameters" tidak pernah terbaca sebagai id workflow.
@@ -360,6 +364,10 @@ Route::middleware(['auth'])->group(function () {
         Route::put('organizations/{organization}/finance-posting', [FinancePostingSettingController::class, 'update'])->name('organizations.finance-posting.update');
         Route::post('organizations/{organization}/finance-posting/settlement-modes', [FinancePostingSettingController::class, 'storeMode'])->name('organizations.finance-posting.settlement-modes.store');
         Route::delete('organizations/{organization}/finance-posting/settlement-modes/{mode}', [FinancePostingSettingController::class, 'destroyMode'])->name('organizations.finance-posting.settlement-modes.destroy');
+        Route::post('finance-reference-accounts/imports', [ReferenceAccountController::class, 'import'])
+            ->middleware('throttle:20,1')
+            ->name('finance-reference-accounts.imports.store');
+        Route::patch('finance-reference-accounts/{account}', [ReferenceAccountController::class, 'update'])->name('finance-reference-accounts.update');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');

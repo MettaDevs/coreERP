@@ -2,6 +2,7 @@ import { Sidebar } from '@apperp/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    BookOpen,
     Briefcase,
     Building2,
     CalendarDays,
@@ -247,6 +248,11 @@ export function AppSidebar() {
                                         label: 'Mata uang',
                                         icon: Coins,
                                         href: '/settings/currencies',
+                                    },
+                                    {
+                                        label: 'Daftar akun',
+                                        icon: BookOpen,
+                                        href: '/settings/finance-accounts',
                                     },
                                     {
                                         label: 'Setup Address',

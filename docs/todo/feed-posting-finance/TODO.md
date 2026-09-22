@@ -112,31 +112,32 @@ sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan ditarik pe
 
 ---
 
-### 3. [ ] Core: daftar akun referensi
+### 3. [~] Core: daftar akun referensi
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** daftar akun milik finance pelanggan
 bisa diimpor, dicari, dan dipilih modul, dan ganti nama, ganti nomor, atau hapus-lalu-buat-ulang
 di sisi finance berperilaku seperti di PRD (K-05).
 
-- [ ] 3.1 Migration dan model.
-  - [ ] 3.1.1 Tabel `finance_reference_accounts`: `id`, `tenant_id`, `legal_entity_id` (nullable = berlaku untuk semua entitas), `external_id`, `code`, `name`, `type` (`balance_sheet` / `profit_loss`), `active`, `synced_at`, timestamps.
-  - [ ] 3.1.2 Unik (`tenant_id`, `legal_entity_id`, `external_id`).
-- [ ] 3.2 Impor CSV.
-  - [ ] 3.2.1 Templat kolom: `external_id,code,name,type,active`.
-  - [ ] 3.2.2 Upsert berdasarkan `external_id`. Nama dan nomor boleh berubah.
-  - [ ] 3.2.3 Akun yang hilang dari berkas **tidak** otomatis dinonaktifkan. Laporan impor menyebutnya, dan pengguna memutuskan.
-  - [ ] 3.2.4 Validasi: `type` wajib salah satu dari dua nilai, dan `external_id` tidak boleh ganda dalam satu berkas.
-  - [ ] 3.2.5 Laporan hasil: baru, berubah, tidak ada di berkas, ditolak (beserta baris dan alasannya).
-- [ ] 3.3 Layar Core: daftar akun, pencarian, impor, dan riwayat impor.
-- [ ] 3.4 Kontrak module `DaftarAkun`.
-  - [ ] 3.4.1 `cari(legalEntityId, kata)` untuk dropdown.
-  - [ ] 3.4.2 `satu(accountId)` mengembalikan `{id, external_id, code, name, type, active}`.
-  - [ ] 3.4.3 Bind di `CoreServices.php`.
-- [ ] 3.5 Test.
-  - [ ] 3.5.1 Ganti nama: pemetaan tetap, nama baru terbaca.
-  - [ ] 3.5.2 Ganti nomor dengan `external_id` sama: pemetaan tetap, nomor baru terbaca.
-  - [ ] 3.5.3 Hapus lalu buat ulang dengan `external_id` baru: akun lama tetap ada, pengguna menonaktifkannya, dan posting yang memakainya tertahan.
-  - [ ] 3.5.4 Akun tenant lain tidak terlihat.
+- [x] 3.1 Migration dan model.
+  - [x] 3.1.1 Tabel `finance_reference_accounts`: `id`, `tenant_id`, `legal_entity_id` (nullable = berlaku untuk semua entitas), `external_id`, `code`, `name`, `type` (`balance_sheet` / `profit_loss`), `active`, `synced_at`, timestamps.
+  - [x] 3.1.2 Unik (`tenant_id`, `legal_entity_id`, `external_id`), lewat dua indeks parsial karena `legal_entity_id` boleh kosong. Satu `external_id` tidak boleh terdaftar untuk semua entitas sekaligus khusus satu entitas.
+- [x] 3.2 Impor CSV (pratinjau lalu terapkan; satu baris salah menolak seluruh berkas).
+  - [x] 3.2.1 Templat kolom: `external_id,code,name,type,active`.
+  - [x] 3.2.2 Upsert berdasarkan `external_id`. Nama dan nomor boleh berubah.
+  - [x] 3.2.3 Akun yang hilang dari berkas **tidak** otomatis dinonaktifkan. Laporan impor menyebutnya, dan pengguna memutuskan.
+  - [x] 3.2.4 Validasi: `type` wajib salah satu dari dua nilai, dan `external_id` tidak boleh ganda dalam satu berkas.
+  - [x] 3.2.5 Laporan hasil: baru, berubah, tidak ada di berkas, ditolak (beserta baris dan alasannya).
+- [~] 3.3 Layar Core: daftar akun, pencarian, impor, dan riwayat impor (Data referensi › Daftar akun).
+- [x] 3.4 Kontrak module `DaftarAkun`.
+  - [x] 3.4.1 `cari(tenant, legalEntityId, kata)` untuk dropdown, hanya akun aktif.
+  - [x] 3.4.2 `satu(tenant, accountId)` mengembalikan `{id, external_id, code, name, type, active, legal_entity_id}`, termasuk akun nonaktif. Ditambah `banyak(tenant, ids)` untuk layar matriks.
+  - [x] 3.4.3 Bind di `CoreServices.php`.
+- [x] 3.5 Test (`ReferenceAccountTest`).
+  - [x] 3.5.1 Ganti nama: pemetaan tetap, nama baru terbaca.
+  - [x] 3.5.2 Ganti nomor dengan `external_id` sama: pemetaan tetap, nomor baru terbaca.
+  - [~] 3.5.3 Hapus lalu buat ulang dengan `external_id` baru: akun lama tetap ada, pengguna menonaktifkannya, dan posting yang memakainya tertahan. Bagian "tertahan" diuji di area 6.
+  - [x] 3.5.4 Akun tenant lain tidak terlihat.
+- [ ] 3.6 Verifikasi di browser: impor, pratinjau berkas salah, dan nonaktifkan akun.
 
 ---
 
