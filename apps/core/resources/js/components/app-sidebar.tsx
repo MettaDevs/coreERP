@@ -6,6 +6,7 @@ import {
     Building2,
     CalendarDays,
     Clock,
+    Coins,
     Contact,
     Database,
     FileOutput,
@@ -241,6 +242,11 @@ export function AppSidebar() {
                                         label: 'Satuan',
                                         icon: Ruler,
                                         href: '/settings/units-of-measure',
+                                    },
+                                    {
+                                        label: 'Mata uang',
+                                        icon: Coins,
+                                        href: '/settings/currencies',
                                     },
                                     {
                                         label: 'Setup Address',

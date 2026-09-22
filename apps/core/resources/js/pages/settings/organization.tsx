@@ -87,6 +87,7 @@ import {
     Network,
     Pencil,
     Plus,
+    Receipt,
     Search,
     Trash2,
 } from 'lucide-react';
@@ -96,6 +97,7 @@ import {
     OrganizationAddressesSection,
     OrganizationContactsSection,
 } from '@/components/organization/address-book-section';
+import { FinancePostingSection } from '@/components/organization/finance-posting-section';
 import { PrintIdentitySection } from '@/components/organization/print-identity-section';
 
 type OperatingUnit = { type: string; number: string | null };
@@ -440,6 +442,15 @@ function OrganizationExtraSectionContent({
         );
     }
 
+    if (section.value === 'finance-posting') {
+        return (
+            <FinancePostingSection
+                organizationId={organization.id}
+                canManage={canManage}
+            />
+        );
+    }
+
     return (
         <div className="rounded-lg border border-dashed border-border bg-card/40 p-4">
             <p className="text-sm text-muted-foreground">
@@ -541,6 +552,13 @@ function OrganizationDetailPage({
                   description:
                       'Nama pada kop, baris induk, NPWP/NIB, footer, dan logo pada semua dokumen yang dicetak.',
                   icon: Image,
+              },
+              {
+                  value: 'finance-posting',
+                  title: 'Posting ke Aplikasi Finance',
+                  description:
+                      'Aktif atau tidaknya pengiriman jurnal, tanggal cutover, dan kebijakan jurnal perolehan.',
+                  icon: Receipt,
               },
           ]
         : [

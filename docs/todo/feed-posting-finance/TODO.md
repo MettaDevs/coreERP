@@ -166,27 +166,28 @@ jaringan pembaca tidak berpengaruh (K-03).
 
 ---
 
-### 5. [ ] Core: setelan posting per entitas legal
+### 5. [~] Core: setelan posting per entitas legal
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** feed bisa diaktifkan per entitas
 legal dengan tanggal cutover, mode penyelesaian perolehan terbaca per tanggal, dan presisi mata uang
 terbaca per mata uang (K-10, K-16, K-20).
 
-- [ ] 5.1 Migration.
-  - [ ] 5.1.1 `finance_posting_settings`: `legal_entity_id` (unik), `tenant_id`, `enabled`, `cutover_date`.
-  - [ ] 5.1.2 `finance_settlement_modes`: `legal_entity_id`, `mode` (`direct_payable` / `clearing`), `effective_from`. Unik (`legal_entity_id`, `effective_from`).
-- [ ] 5.2 Layar Core di halaman entitas legal: aktif/tidak, tanggal cutover, dan riwayat mode beserta tanggal berlakunya.
-- [ ] 5.3 Kontrak module: `modePenyelesaian(legalEntityId, tanggal)` dan `cutover(legalEntityId)`.
-- [ ] 5.4 Test.
-  - [ ] 5.4.1 Mode terbaca sesuai tanggal berlaku.
-  - [ ] 5.4.2 Entitas tanpa baris mode menghasilkan default `direct_payable`.
-  - [ ] 5.4.3 Tanggal berlaku tidak boleh ganda.
-- [ ] 5.5 Presisi mata uang (K-20). Padanannya *Currency Card* BC. Master mata uang penuh tetap `FIN-20`.
-  - [ ] 5.5.1 Tabel `currency_precisions`: `tenant_id`, `currency_code` (ISO 4217), `amount_decimals`, `unit_amount_decimals`. Unik (`tenant_id`, `currency_code`).
-  - [ ] 5.5.2 Default IDR: `amount_decimals = 2` sampai konsultan memutuskan (0 atau 2), `unit_amount_decimals = 3`.
-  - [ ] 5.5.3 Layar Core untuk mengubahnya. Perubahan hanya berlaku untuk posting yang terbit sesudahnya.
-  - [ ] 5.5.4 Kontrak module `PresisiMataUang`: `nilai(currencyCode)`, `hargaSatuan(currencyCode)`, dan `bulatkan(nilai, currencyCode)`. Pembulatan setengah ke atas (*nearest*), seperti default BC.
-  - [ ] 5.5.5 Test: pembulatan 0 dan 2 desimal, nilai negatif, dan tiga baris 333.333,333 yang dijumlah tetap seimbang.
+- [x] 5.1 Migration.
+  - [x] 5.1.1 `finance_posting_settings`: `legal_entity_id` (unik), `tenant_id`, `enabled`, `cutover_date`. Database menolak feed aktif tanpa cutover.
+  - [x] 5.1.2 `finance_settlement_modes`: `legal_entity_id`, `mode` (`direct_payable` / `clearing`), `effective_from`. Unik (`legal_entity_id`, `effective_from`).
+- [~] 5.2 Layar Core di halaman entitas legal: aktif/tidak, tanggal cutover, dan riwayat mode beserta tanggal berlakunya.
+- [x] 5.3 Kontrak module `SetelanPostingFinance`: `modePenyelesaian(legalEntityId, tanggal)` dan `cutover(legalEntityId)`. Id entitas yang tidak ada dilempar sebagai `RuntimeException`.
+- [x] 5.4 Test (`FinancePostingSettingsTest`).
+  - [x] 5.4.1 Mode terbaca sesuai tanggal berlaku.
+  - [x] 5.4.2 Entitas tanpa baris mode menghasilkan default `direct_payable`.
+  - [x] 5.4.3 Tanggal berlaku tidak boleh ganda.
+- [x] 5.5 Presisi mata uang (K-20). Padanannya *Currency Card* BC. Master mata uang penuh tetap `FIN-20`.
+  - [x] 5.5.1 Tabel `currency_precisions`: `tenant_id`, `currency_code` (ISO 4217), `amount_decimals`, `unit_amount_decimals`. Unik (`tenant_id`, `currency_code`).
+  - [x] 5.5.2 Default IDR: `amount_decimals = 2` sampai konsultan memutuskan (0 atau 2), `unit_amount_decimals = 3`.
+  - [~] 5.5.3 Layar Core untuk mengubahnya (Data referensi › Mata uang). Perubahan hanya berlaku untuk posting yang terbit sesudahnya.
+  - [x] 5.5.4 Kontrak module `PresisiMataUang`: `nilai(tenant, currencyCode)`, `hargaSatuan(tenant, currencyCode)`, dan `bulatkan(tenant, nilai, currencyCode)`. Pembulatan setengah ke atas (*nearest*), seperti default BC.
+  - [x] 5.5.5 Test: pembulatan 0 dan 2 desimal, nilai negatif, dan tiga baris 333.333,333 yang dijumlah tetap seimbang.
+- [ ] 5.6 Verifikasi di browser: setelan posting di halaman entitas legal dan halaman Mata uang.
 
 ---
 

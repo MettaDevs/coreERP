@@ -9,6 +9,8 @@ use App\Http\Controllers\AppLaunchManifestController;
 use App\Http\Controllers\Auth\SsoBackchannelLogoutController;
 use App\Http\Controllers\Auth\SsoLoginController;
 use App\Http\Controllers\Calendar\WorkingTimeTemplateController;
+use App\Http\Controllers\Finance\CurrencyPrecisionController;
+use App\Http\Controllers\Finance\FinancePostingSettingController;
 use App\Http\Controllers\FiscalCalendar\FiscalCalendarController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationContactController;
 use App\Http\Controllers\GlobalAddressBook\OrganizationLocationController;
@@ -241,6 +243,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index');
     Route::get('reports/exports', [ReportExportController::class, 'page'])->name('report-exports.index');
     Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index');
+    // Presisi uang per mata uang untuk feed posting finance; lihat docs/todo/feed-posting-finance.
+    Route::get('settings/currencies', [CurrencyPrecisionController::class, 'index'])->name('currencies.index');
+    Route::put('settings/currencies/{currency}', [CurrencyPrecisionController::class, 'update'])->name('currencies.update');
     Route::get('settings/workflows', [WorkflowConfigurationController::class, 'index'])->name('workflows.index');
     Route::post('settings/workflows', [WorkflowConfigurationController::class, 'store'])->name('workflows.store');
     // Didaftarkan sebelum rute ber-parameter supaya "parameters" tidak pernah terbaca sebagai id workflow.
@@ -350,6 +355,11 @@ Route::middleware(['auth'])->group(function () {
         Route::post('organizations/{organization}/contacts', [OrganizationContactController::class, 'store'])->name('organizations.contacts.store');
         Route::put('organizations/{organization}/contacts/{contact}', [OrganizationContactController::class, 'update'])->name('organizations.contacts.update');
         Route::delete('organizations/{organization}/contacts/{contact}', [OrganizationContactController::class, 'destroy'])->name('organizations.contacts.destroy');
+        // Setelan feed posting finance per entitas legal: aktif, cutover, dan mode penyelesaian.
+        Route::get('organizations/{organization}/finance-posting', [FinancePostingSettingController::class, 'show'])->name('organizations.finance-posting.show');
+        Route::put('organizations/{organization}/finance-posting', [FinancePostingSettingController::class, 'update'])->name('organizations.finance-posting.update');
+        Route::post('organizations/{organization}/finance-posting/settlement-modes', [FinancePostingSettingController::class, 'storeMode'])->name('organizations.finance-posting.settlement-modes.store');
+        Route::delete('organizations/{organization}/finance-posting/settlement-modes/{mode}', [FinancePostingSettingController::class, 'destroyMode'])->name('organizations.finance-posting.settlement-modes.destroy');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');
