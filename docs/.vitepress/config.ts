@@ -40,6 +40,7 @@ export default withMermaid({
     'todo/opt-in-image-tunggal/README.md':
       'todo/opt-in-image-tunggal/index.md',
     'todo/registry-harbor/README.md': 'todo/registry-harbor/index.md',
+    'todo/feed-posting-finance/README.md': 'todo/feed-posting-finance/index.md',
     'todo/lisensi-mengunci/README.md': 'todo/lisensi-mengunci/index.md',
     'todo/pasang-satu-perintah/README.md':
       'todo/pasang-satu-perintah/index.md',
@@ -294,6 +295,20 @@ export default withMermaid({
                 {
                   text: 'Opt-in: satu image untuk semua klien',
                   link: '/todo/opt-in-image-tunggal/',
+                },
+              ],
+            },
+            {
+              text: 'Integrasi finance',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Feed posting finance (PRD)',
+                  link: '/todo/feed-posting-finance/',
+                },
+                {
+                  text: 'TODO feed posting finance',
+                  link: '/todo/feed-posting-finance/TODO',
                 },
               ],
             },
