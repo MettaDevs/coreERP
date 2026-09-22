@@ -5,6 +5,7 @@ namespace Tests\Feature\ControlPlane;
 use App\Models\ProviderAccess;
 use App\Models\User;
 use App\Support\Finance\MoneyPrecision;
+use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\Yaml\Yaml;
 use Tests\Concerns\CocokDenganKontrak;
@@ -74,18 +75,38 @@ class DocsPortalTest extends TestCase
         $this->get('/docs')->assertOk()->assertDontSee('App module (internal)', false);
     }
 
-    public function test_admin_penyedia_melihat_semua_spesifikasi(): void
+    public function test_admin_penyedia_melihat_semua_spesifikasi_termasuk_kontrak_app_di_katalog(): void
     {
-        $penyedia = User::factory()->create();
-        ProviderAccess::query()->create(['user_id' => $penyedia->id, 'role' => 'provider_admin']);
-        $this->actingAs($penyedia);
+        $this->seed(AppCatalogSeeder::class);
+        $this->actingAs($this->adminPenyedia());
 
         $this->get('/docs')->assertOk()
             ->assertSee('Integrasi · Finance', false)
             ->assertSee('App module (internal)', false)
             ->assertSee('Pusat admin (internal)', false)
-            ->assertSee('Layar CoreERP (internal)', false);
+            ->assertSee('Layar CoreERP (internal)', false)
+            ->assertSee('App Uji', false);
         $this->get('/docs?spec=pusat-admin')->assertOk()->assertSee(route('docs.kontrak', 'pusat-admin'), false);
         $this->get('/docs/kontrak/app.yaml')->assertOk();
+    }
+
+    public function test_kontrak_app_di_katalog_diarahkan_ke_url_yang_didaftarkan_app(): void
+    {
+        // Kontrak dimiliki repository app, jadi portal mengarahkan ke URL yang didaftarkan app —
+        // bukan menyajikan berkas dari repository platform ini.
+        $this->seed(AppCatalogSeeder::class);
+        $this->get('/docs/openapi/app-uji')->assertForbidden();
+
+        $this->actingAs($this->adminPenyedia());
+        $this->get('/docs/openapi/app-uji')->assertRedirect('https://contracts.example.test/app-uji/openapi.yaml');
+        $this->get('/docs/openapi/not-an-app')->assertNotFound();
+    }
+
+    private function adminPenyedia(): User
+    {
+        $penyedia = User::factory()->create();
+        ProviderAccess::query()->create(['user_id' => $penyedia->id, 'role' => 'provider_admin']);
+
+        return $penyedia;
     }
 }
