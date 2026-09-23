@@ -752,9 +752,9 @@ function feedStateHint(feed: FinanceFeed, reported: boolean): string | null {
         case 'unreadable':
             return 'Agen tidak mendapat ringkasan dari Core. Rilis Core di server ini mungkin belum memilikinya, atau core-app tidak menjawab.';
         case 'unused':
-            return 'Belum ada posting dan belum pernah ada tarikan dari aplikasi finance.';
+            return 'Belum ada posting dan aplikasi finance belum pernah melakukan pull.';
         case 'healthy':
-            return `Tidak ada yang ditolak atau tertahan, dan tidak ada yang menunggu ditarik lebih dari ${feed.pendingAlertHours} jam.`;
+            return `Tidak ada yang ditolak atau tertahan, dan tidak ada yang pending lebih dari ${feed.pendingAlertHours} jam.`;
         default:
             return null;
     }
@@ -767,9 +767,9 @@ function feedAlertText(alert: string, feed: FinanceFeed): string {
         case 'rejected':
             return `${COUNT.format(counts.rejected ?? 0)} posting ditolak aplikasi finance.`;
         case 'held':
-            return `${COUNT.format(counts.held ?? 0)} posting tertahan di CoreERP dan belum dapat ditarik aplikasi finance.`;
+            return `${COUNT.format(counts.held ?? 0)} posting tertahan di CoreERP dan belum dapat sampai ke aplikasi finance.`;
         case 'pending_old':
-            return `Posting tertua sudah menunggu ditarik ${durationText(feed.oldestPendingSeconds ?? 0)}, lebih lama dari ${feed.pendingAlertHours} jam.`;
+            return `Posting pending tertua sudah menunggu ${durationText(feed.oldestPendingSeconds ?? 0)}, lebih lama dari ${feed.pendingAlertHours} jam.`;
         default:
             return alert;
     }
@@ -850,7 +850,7 @@ function FinanceFeedSection({
                         })}
                     </div>
                     <dl>
-                        <Row label="Menunggu ditarik paling lama">
+                        <Row label="Pending tertua">
                             {feed.oldestPendingAt ? (
                                 <span
                                     className={
@@ -865,10 +865,10 @@ function FinanceFeedSection({
                                 'Tidak ada yang menunggu'
                             )}
                         </Row>
-                        <Row label="Tarikan terakhir">
+                        <Row label="Pull terakhir">
                             {feed.lastPulledAt
                                 ? `${dateTimeText(feed.lastPulledAt)}${pulled ? ` (${pulled})` : ''}`
-                                : 'Belum pernah ditarik'}
+                                : 'Belum pernah di-pull'}
                         </Row>
                     </dl>
                 </>

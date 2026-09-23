@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
  * finance area 14).
  *
  * Angkanya disusun Core di server klien (`finance-postings:summary`) dan dibawa agen: jumlah posting per status, jam
- * terbit posting `pending` tertua, dan jam tarikan terakhir pembaca. Konsol tidak pernah melihat isi jurnalnya (K-02);
+ * terbit posting `pending` tertua, dan jam pull terakhir pembaca. Konsol tidak pernah melihat isi jurnalnya (K-02);
  * rinciannya ada di layar Posting finance › Pantau posting pada aplikasi server itu. Yang dikerjakan di sini hanya
  * menilai angka itu, supaya layar dan test membaca penilaian yang sama.
  *
@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  * | --- | --- |
  * | `not_reported` | Belum ada laporan, atau laporan agen lama yang belum mengenal `finance_feed`. Sah: agen di server klien diperbarui sesudah konsol |
  * | `unreadable` | Agen mengenal bidangnya tetapi tidak mendapat ringkasan dari Core — belum ada rilis sehat, Core tidak menjawab, atau rilis Core belum punya perintahnya |
- * | `unused` | Belum ada satu posting pun dan belum pernah ada tarikan: feed belum dipakai di server ini |
+ * | `unused` | Belum ada satu posting pun dan belum pernah ada pull: feed belum dipakai di server ini |
  * | `attention` | Ada posting `rejected` atau `held`, atau posting `pending` tertua lebih tua dari `PENDING_ALERT_HOURS` |
  * | `healthy` | Selain itu |
  */
@@ -31,8 +31,8 @@ final class FinanceFeedHealth
     /**
      * Posting `pending` yang menunggu lebih lama dari ini menandai feed perlu perhatian.
      *
-     * Satu hari penuh. Pembaca menarik dengan job terjadwal, jadi posting yang masih `pending` sesudah sehari berarti
-     * pembacanya melewatkan tarikan sepanjang hari itu — bukan jeda singkat seperti aplikasi finance yang sedang
+     * Satu hari penuh. Pembaca melakukan pull dengan job terjadwal, jadi posting yang masih `pending` sesudah sehari
+     * berarti pembacanya melewatkan pull sepanjang hari itu — bukan jeda singkat seperti aplikasi finance yang sedang
      * diperbarui (K-03) — dan pembukuan hari itu di aplikasi finance sudah kehilangan jurnalnya. Ambang yang lebih
      * pendek menandai jeda yang pulih sendiri, dan tanda yang sering salah melatih operator mengabaikannya.
      *

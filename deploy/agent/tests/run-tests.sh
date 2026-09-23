@@ -1172,7 +1172,7 @@ uji_09d_ringkasan_feed() {
     sama 'Core ditanya lewat compose dan image yang dicatat update.sh' \
         "$(jq -c 'select(.args | index("finance-postings:summary")) | [.edition_image, .args]' "$FAKE_DOCKER_JSON_LOG")" "$diharapkan"
 
-    feed 'belum ada posting dan tarikan: nol dan null, bukan null' \
+    feed 'belum ada posting dan pull: nol dan null, bukan null' \
         '{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}'
 
     # Yang tidak didapat dari Core dilaporkan null. Laporannya sendiri tetap diterima.
@@ -1195,7 +1195,7 @@ jumlah pecahan~{"counts":{"held":1.5,"pending":0,"posted":0,"rejected":0,"manual
 jumlah berupa teks~{"counts":{"held":"1","pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null,"last_pulled_at":null}
 waktu dengan zona lain~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":"2026-09-20T10:00:00+07:00","last_pulled_at":null}
 waktu tanpa detik~{"counts":{"held":0,"pending":1,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":"2026-09-20T10:00Z","last_pulled_at":null}
-tarikan terakhir tidak disebut~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null}
+pull terakhir tidak disebut~{"counts":{"held":0,"pending":0,"posted":0,"rejected":0,"manual":0},"oldest_pending_at":null}
 KASUS
 
     # Core yang macet tidak menahan laporan: batasnya habis, finance_feed null, dan laporannya tetap terkirim jauh

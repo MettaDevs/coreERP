@@ -134,7 +134,7 @@ export function InstallStateBadge({ state }: { state: string }) {
 /**
  * Kesehatan feed posting finance satu server klien.
  *
- * Merah hanya `attention`: ada posting yang ditolak atau tertahan, atau yang menunggu ditarik terlalu lama — jurnal
+ * Merah hanya `attention`: ada posting yang ditolak atau tertahan, atau yang pending terlalu lama — jurnal
  * yang belum dibukukan aplikasi finance klinik, dan yang harus ditanyakan sebelum klinik menelepon. Kuning
  * `unreadable`, karena yang diketahui hanya bahwa Core tidak menjawab. Abu untuk yang belum dilaporkan atau belum
  * dipakai.

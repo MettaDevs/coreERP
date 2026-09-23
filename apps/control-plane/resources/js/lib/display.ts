@@ -125,7 +125,7 @@ export const installStateLabels: Record<string, string> = {
  */
 export const financePostingStatusLabels: Record<string, string> = {
     held: 'Tertahan',
-    pending: 'Menunggu ditarik',
+    pending: 'Menunggu aplikasi finance',
     rejected: 'Ditolak',
     manual: 'Manual',
     posted: 'Sudah dibukukan',

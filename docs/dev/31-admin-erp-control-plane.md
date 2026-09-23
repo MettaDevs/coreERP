@@ -119,7 +119,7 @@ kunci itu harus tetap sah.
 ### Kesehatan feed posting finance
 
 Laporan membawa `finance_feed`: jumlah posting finance per status, jam terbit posting `pending` tertua, dan jam
-tarikan terakhir oleh aplikasi finance klinik. Tidak ada nomor posting, akun, maupun nilai uang — jurnal keuangan
+pull terakhir oleh aplikasi finance klinik. Tidak ada nomor posting, akun, maupun nilai uang — jurnal keuangan
 klinik tidak keluar dari servernya (keputusan K-02 di
 [feed posting finance](../todo/feed-posting-finance/README.md)). Angkanya dijumlahkan untuk seluruh tenant di server
 itu.

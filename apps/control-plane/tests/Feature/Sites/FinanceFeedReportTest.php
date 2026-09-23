@@ -26,7 +26,7 @@ class FinanceFeedReportTest extends SiteTestCase
     public static function acceptedFeeds(): iterable
     {
         yield 'ringkasan lengkap' => [self::feed(['held' => 1, 'pending' => 3, 'posted' => 120, 'rejected' => 2, 'manual' => 4], '2026-09-20T03:00:00Z', '2026-09-23T07:55:00Z')];
-        yield 'belum ada posting dan tarikan' => [self::feed([], null, null)];
+        yield 'belum ada posting dan pull' => [self::feed([], null, null)];
         yield 'tidak terbaca dari Core' => [null];
     }
 
@@ -75,7 +75,7 @@ class FinanceFeedReportTest extends SiteTestCase
         yield 'jumlah berupa teks' => [[...$sah, 'counts' => [...$sah['counts'], 'rejected' => '2']]];
         yield 'jumlah pecahan' => [[...$sah, 'counts' => [...$sah['counts'], 'pending' => 1.5]]];
         yield 'counts tidak ada' => [array_diff_key($sah, ['counts' => true])];
-        yield 'tarikan terakhir tidak disebut' => [array_diff_key($sah, ['last_pulled_at' => true])];
+        yield 'pull terakhir tidak disebut' => [array_diff_key($sah, ['last_pulled_at' => true])];
         yield 'waktu dengan zona lain' => [[...$sah, 'oldest_pending_at' => '2026-09-20T10:00:00+07:00']];
         yield 'waktu hanya tanggal' => [[...$sah, 'last_pulled_at' => '2026-09-23']];
         yield 'objek kosong' => [(object) []];
@@ -130,18 +130,18 @@ class FinanceFeedReportTest extends SiteTestCase
      */
     public static function judgedFeeds(): iterable
     {
-        $tarikan = '2026-09-23T07:55:00Z';
+        $lastPull = '2026-09-23T07:55:00Z';
 
         yield 'belum pernah melapor' => [null, 'not_reported', [], null];
         yield 'agen lama tanpa finance_feed' => [[], 'not_reported', [], null];
         yield 'tidak terbaca dari Core' => [['finance_feed' => null], 'unreadable', [], null];
         yield 'belum dipakai' => [['finance_feed' => self::feed([], null, null)], 'unused', [], null];
-        yield 'posting manual saja tanpa tarikan' => [['finance_feed' => self::feed(['manual' => 3], null, null)], 'healthy', [], null];
-        yield 'sehat' => [['finance_feed' => self::feed(['pending' => 2, 'posted' => 40], '2026-09-23T05:00:00Z', $tarikan)], 'healthy', [], 10800];
-        yield 'ditolak' => [['finance_feed' => self::feed(['rejected' => 1, 'posted' => 40], null, $tarikan)], 'attention', ['rejected'], null];
+        yield 'posting manual saja tanpa pull' => [['finance_feed' => self::feed(['manual' => 3], null, null)], 'healthy', [], null];
+        yield 'sehat' => [['finance_feed' => self::feed(['pending' => 2, 'posted' => 40], '2026-09-23T05:00:00Z', $lastPull)], 'healthy', [], 10800];
+        yield 'ditolak' => [['finance_feed' => self::feed(['rejected' => 1, 'posted' => 40], null, $lastPull)], 'attention', ['rejected'], null];
         yield 'tertahan' => [['finance_feed' => self::feed(['held' => 2], null, null)], 'attention', ['held'], null];
-        yield 'pending tepat sehari' => [['finance_feed' => self::feed(['pending' => 1], '2026-09-22T08:00:00Z', $tarikan)], 'healthy', [], 86400];
-        yield 'pending lewat sehari' => [['finance_feed' => self::feed(['pending' => 1], '2026-09-22T07:59:59Z', $tarikan)], 'attention', ['pending_old'], 86401];
+        yield 'pending tepat sehari' => [['finance_feed' => self::feed(['pending' => 1], '2026-09-22T08:00:00Z', $lastPull)], 'healthy', [], 86400];
+        yield 'pending lewat sehari' => [['finance_feed' => self::feed(['pending' => 1], '2026-09-22T07:59:59Z', $lastPull)], 'attention', ['pending_old'], 86401];
         yield 'semuanya' => [['finance_feed' => self::feed(['held' => 1, 'pending' => 5, 'rejected' => 2], '2026-09-15T00:00:00Z', null)], 'attention', ['rejected', 'held', 'pending_old'], 720000];
     }
 

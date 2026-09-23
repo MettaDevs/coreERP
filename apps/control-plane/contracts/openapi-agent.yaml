@@ -696,7 +696,7 @@ components:
             pending:
               type: integer
               minimum: 0
-              description: Siap ditarik pembaca dan belum di-ack.
+              description: Siap di-pull atau dikirim ke pembaca, dan belum di-ack.
             posted:
               type: integer
               minimum: 0
@@ -722,8 +722,8 @@ components:
           format: date-time
           pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
           description: |
-            Jam (UTC) tarikan terakhir oleh klien integrasi mana pun di server itu, atau `null` bila belum
-            pernah ada tarikan. Pengiriman mode `push` tidak dihitung sebagai tarikan.
+            Jam (UTC) pull terakhir oleh klien integrasi mana pun di server itu, atau `null` bila belum
+            pernah ada pull. Pengiriman mode `push` tidak dihitung sebagai pull.
 
     SignedLicense:
       type: object

@@ -39,7 +39,7 @@ final class SiteReports
      * Kunci yang berubah tanpa ada yang terjadi pada servernya; tidak ikut menentukan apakah laporan "berubah".
      *
      * `finance_feed` ikut di sini karena angkanya bergerak bersama pekerjaan klinik — setiap posting yang terbit,
-     * setiap ack, dan setiap tarikan pembaca — bukan bersama keadaan server. Menjadikannya riwayat berarti satu
+     * setiap ack, dan setiap pull pembaca — bukan bersama keadaan server. Menjadikannya riwayat berarti satu
      * baris `site_reports` per beberapa menit per situs, padahal riwayat posting yang sebenarnya sudah dicatat Core
      * di server itu sendiri (`finance_posting_events`). Yang dibaca layar hanya laporan terakhir.
      */

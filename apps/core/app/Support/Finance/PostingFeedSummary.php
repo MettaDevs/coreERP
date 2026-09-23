@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
  * Ringkasan kesehatan feed posting finance untuk admin.erp (TODO feed posting finance 14.1, K-02).
  *
  * Yang keluar dari sini hanya angka dan waktu: jumlah posting per status, jam terbit posting `pending`
- * tertua, dan jam tarikan terakhir. Tidak ada nomor posting, dokumen sumber, akun, dimensi, vendor, maupun
+ * tertua, dan jam pull terakhir. Tidak ada nomor posting, dokumen sumber, akun, dimensi, vendor, maupun
  * nilai uang. Ringkasan ini dibawa agen situs ke admin.erp, sedangkan data keuangan tenant tidak boleh keluar
  * dari server tempat datanya berada (K-02). Pembacanya perintah `finance-postings:summary`.
  *
@@ -59,7 +59,7 @@ final class PostingFeedSummary
         return [
             'counts' => $counts,
             'oldest_pending_at' => $this->utc(FinancePosting::query()->where('status', FinancePosting::PENDING)->min('published_at')),
-            // Klien mode pull mana pun, termasuk yang sudah dicabut: jam tarikannya tetap tarikan terakhir yang terjadi.
+            // Klien mode pull mana pun, termasuk yang sudah dicabut: pull terakhirnya tetap pull terakhir yang terjadi.
             'last_pulled_at' => $this->utc(IntegrationClient::query()->max('last_pulled_at')),
         ];
     }
@@ -68,12 +68,12 @@ final class PostingFeedSummary
      * Kolom waktu Core disimpan tanpa zona, dalam zona aplikasi. Yang dikirim selalu UTC berakhiran `Z`, satu
      * bentuk yang diterima agen dan admin.erp.
      */
-    private function utc(mixed $nilai): ?string
+    private function utc(mixed $value): ?string
     {
-        if ($nilai === null) {
+        if ($value === null) {
             return null;
         }
 
-        return Carbon::parse((string) $nilai, (string) config('app.timezone'))->toIso8601ZuluString();
+        return Carbon::parse((string) $value, (string) config('app.timezone'))->toIso8601ZuluString();
     }
 }

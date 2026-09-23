@@ -78,7 +78,7 @@ class FinanceFeedSummaryTest extends TestCase
 
         $this->klien($this->le->tenant_id, 'Old-finance', '2026-09-23 07:00:00');
         $this->klien($leLain->tenant_id, 'Finance lain', '2026-09-23 08:30:00');
-        $this->klien($leLain->tenant_id, 'Belum pernah menarik', null);
+        $this->klien($leLain->tenant_id, 'Belum pernah pull', null);
 
         $this->assertSame([
             'counts' => ['held' => 1, 'pending' => 3, 'posted' => 1, 'rejected' => 2, 'manual' => 1],
@@ -88,7 +88,7 @@ class FinanceFeedSummaryTest extends TestCase
     }
 
     /**
-     * Jalur sungguhan untuk kolom yang dibaca ringkasan: jam tarikan diisi endpoint tarik, dan status diubah ack
+     * Jalur sungguhan untuk kolom yang dibaca ringkasan: jam pull diisi endpoint pull, dan status diubah ack
      * pembaca. Ringkasan yang membaca kolom lain akan tetap hijau pada test sebelumnya, yang mengisi kolomnya sendiri.
      */
     public function test_tarikan_dan_ack_pembaca_tercermin_di_ringkasan(): void

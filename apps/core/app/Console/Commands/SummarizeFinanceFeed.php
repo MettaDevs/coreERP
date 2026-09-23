@@ -25,9 +25,9 @@ final class SummarizeFinanceFeed extends Command
 
     protected $description = 'Cetak ringkasan feed posting finance — jumlah per status dan waktu, tanpa isi jurnal — sebagai JSON untuk agen situs.';
 
-    public function handle(PostingFeedSummary $ringkasan): int
+    public function handle(PostingFeedSummary $summary): int
     {
-        $this->line(json_encode($ringkasan->read(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        $this->line(json_encode($summary->read(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
 
         return self::SUCCESS;
     }
