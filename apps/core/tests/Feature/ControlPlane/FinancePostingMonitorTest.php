@@ -183,7 +183,7 @@ class FinancePostingMonitorTest extends TestCase
             ->assertJsonPath('data.source_document.app_name', 'App Uji');
         $this->assertArrayNotHasKey('url', $posting->payload['source_document']);
 
-        foreach (['https://contoh.test/x', '//contoh.test/x', 'management-aset/x', "/a\\b"] as $salah) {
+        foreach (['https://contoh.test/x', '//contoh.test/x', 'management-aset/x', '/a\\b'] as $salah) {
             try {
                 $this->terbitkan($this->perolehan(['posting_id' => 'AST-ACQ-'.Str::random(6), 'url' => $salah]));
                 $this->fail("Tautan {$salah} seharusnya ditolak.");
