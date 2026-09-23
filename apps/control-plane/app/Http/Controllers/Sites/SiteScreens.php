@@ -11,6 +11,7 @@ use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Models\SiteRelease;
 use ControlPlane\Sites\ClientServerSetup;
+use ControlPlane\Sites\FinanceFeedHealth;
 use ControlPlane\Sites\InstallProgress;
 use ControlPlane\Sites\LicenseTerms;
 use ControlPlane\Sites\SiteDns;
@@ -155,6 +156,8 @@ final class SiteScreens extends Controller
                      */
                     'notRequiredOnServer' => ($row->last_report['license_required'] ?? null) === false,
                 ],
+                // Dinilai di sini, bukan di layar: ambangnya satu, dan test membaca penilaian yang sama.
+                'financeFeed' => FinanceFeedHealth::fromReport($row->last_report),
             ],
             'history' => $history,
             // Daftar formulir "Minta operasi", dari server. `install` tidak ada di sana — lihat

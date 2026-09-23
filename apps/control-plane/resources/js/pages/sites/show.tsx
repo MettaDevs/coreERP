@@ -13,7 +13,7 @@ import {
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowUpCircle, ExternalLink } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
-import { InstallStateBadge } from '@/components/badges';
+import { FinanceFeedBadge, InstallStateBadge } from '@/components/badges';
 import CopyButton from '@/components/copy-button';
 import DnsStatus from '@/components/dns-status';
 import type { DnsInfo } from '@/components/dns-status';
@@ -23,6 +23,7 @@ import {
 } from '@/components/server-settings-fields';
 import Shell from '@/components/shell';
 import {
+    financePostingStatusLabels,
     labelFor,
     siteAuditLabels,
     siteOperationLabels,
@@ -31,7 +32,12 @@ import {
 import { progressDetail } from '@/lib/install-progress';
 import type { InstallProgress } from '@/lib/install-progress';
 import { newerRelease } from '@/lib/release';
-import { daysUntil, relativeTime } from '@/lib/time';
+import {
+    dateTimeText,
+    daysUntil,
+    durationText,
+    relativeTime,
+} from '@/lib/time';
 
 type Report = {
     containers?: { service: string; state: string; health?: string | null }[];
@@ -72,6 +78,17 @@ type License = {
     notRequiredOnServer: boolean;
 };
 
+/** Penilaian `FinanceFeedHealth` atas `finance_feed` di laporan agen terakhir. */
+type FinanceFeed = {
+    state: string;
+    counts: Record<string, number> | null;
+    oldestPendingAt: string | null;
+    oldestPendingSeconds: number | null;
+    lastPulledAt: string | null;
+    alerts: string[];
+    pendingAlertHours: number;
+};
+
 type Site = {
     id: string;
     name: string;
@@ -93,6 +110,7 @@ type Site = {
     enrolledAt: string | null;
     lastReport: Report | null;
     license: License;
+    financeFeed: FinanceFeed;
     progress: InstallProgress;
 };
 
@@ -717,6 +735,148 @@ function ContainerBadge({
     );
 }
 
+/** Urutan yang sama dengan layar Pantau posting di Core: yang perlu ditindaklanjuti lebih dulu. */
+const FEED_STATUSES = ['held', 'pending', 'rejected', 'manual', 'posted'];
+
+/** Status yang jumlahnya di atas nol menandai feed perlu perhatian. */
+const FEED_PROBLEM_STATUSES = ['held', 'rejected'];
+
+const COUNT = new Intl.NumberFormat('id');
+
+function feedStateHint(feed: FinanceFeed, reported: boolean): string | null {
+    switch (feed.state) {
+        case 'not_reported':
+            return reported
+                ? 'Agen di server ini belum mengirim ringkasan feed; agen versi lama belum mengenalnya.'
+                : 'Server ini belum pernah melapor.';
+        case 'unreadable':
+            return 'Agen tidak mendapat ringkasan dari Core. Rilis Core di server ini mungkin belum memilikinya, atau core-app tidak menjawab.';
+        case 'unused':
+            return 'Belum ada posting dan aplikasi finance belum pernah melakukan pull.';
+        case 'healthy':
+            return `Tidak ada yang ditolak atau tertahan, dan tidak ada yang pending lebih dari ${feed.pendingAlertHours} jam.`;
+        default:
+            return null;
+    }
+}
+
+function feedAlertText(alert: string, feed: FinanceFeed): string {
+    const counts = feed.counts ?? {};
+
+    switch (alert) {
+        case 'rejected':
+            return `${COUNT.format(counts.rejected ?? 0)} posting ditolak aplikasi finance.`;
+        case 'held':
+            return `${COUNT.format(counts.held ?? 0)} posting tertahan di CoreERP dan belum dapat sampai ke aplikasi finance.`;
+        case 'pending_old':
+            return `Posting pending tertua sudah menunggu ${durationText(feed.oldestPendingSeconds ?? 0)}, lebih lama dari ${feed.pendingAlertHours} jam.`;
+        default:
+            return alert;
+    }
+}
+
+/**
+ * Feed posting finance di server ini: angka dari Core yang dibawa laporan agen terakhir, dinilai `FinanceFeedHealth`.
+ *
+ * Isi jurnal tidak ada di sini, dan memang tidak boleh ada: data keuangan klinik tidak keluar dari servernya. Yang
+ * ditampilkan cukup untuk tahu apa yang harus ditanyakan; rincian dan tindak lanjutnya di layar Pantau posting pada
+ * aplikasi server itu. Umur posting tertua dihitung saat laporan terakhir, bukan saat halaman ini dibuka.
+ */
+function FinanceFeedSection({
+    feed,
+    reported,
+}: {
+    feed: FinanceFeed;
+    reported: boolean;
+}) {
+    const hint = feedStateHint(feed, reported);
+    const pendingOld = feed.alerts.includes('pending_old');
+    const pulled = relativeTime(feed.lastPulledAt);
+
+    return (
+        <Section
+            id="feed-finance"
+            title="Feed posting finance"
+            description="Ringkasan dari Core di server ini, dibawa laporan agen: jumlah dan waktu saja, tanpa isi jurnal. Rincian dan tindak lanjutnya di Posting finance › Pantau posting pada aplikasi server ini."
+        >
+            <div className="flex flex-wrap items-center gap-2">
+                <FinanceFeedBadge state={feed.state} />
+                {hint && (
+                    <span className="text-sm text-muted-foreground">
+                        {hint}
+                    </span>
+                )}
+            </div>
+
+            {feed.alerts.length > 0 && (
+                <ul className="list-disc space-y-1 ps-5 text-sm text-red-700 dark:text-red-300">
+                    {feed.alerts.map((alert) => (
+                        <li key={alert}>{feedAlertText(alert, feed)}</li>
+                    ))}
+                </ul>
+            )}
+
+            {feed.counts && (
+                <>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                        {FEED_STATUSES.map((status) => {
+                            const count = feed.counts?.[status] ?? 0;
+                            const problem =
+                                count > 0 &&
+                                FEED_PROBLEM_STATUSES.includes(status);
+
+                            return (
+                                <div
+                                    key={status}
+                                    className={
+                                        problem
+                                            ? 'rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/40'
+                                            : 'rounded-lg border p-3'
+                                    }
+                                >
+                                    <p className="text-xs text-muted-foreground">
+                                        {labelFor(
+                                            financePostingStatusLabels,
+                                            status,
+                                        )}
+                                    </p>
+                                    <p
+                                        className={`mt-1 text-lg font-semibold tabular-nums ${problem ? 'text-red-700 dark:text-red-200' : ''}`}
+                                    >
+                                        {COUNT.format(count)}
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <dl>
+                        <Row label="Pending tertua">
+                            {feed.oldestPendingAt ? (
+                                <span
+                                    className={
+                                        pendingOld
+                                            ? 'text-red-700 dark:text-red-300'
+                                            : undefined
+                                    }
+                                >
+                                    {`${durationText(feed.oldestPendingSeconds ?? 0)} (terbit ${dateTimeText(feed.oldestPendingAt)})`}
+                                </span>
+                            ) : (
+                                'Tidak ada yang menunggu'
+                            )}
+                        </Row>
+                        <Row label="Pull terakhir">
+                            {feed.lastPulledAt
+                                ? `${dateTimeText(feed.lastPulledAt)}${pulled ? ` (${pulled})` : ''}`
+                                : 'Belum pernah di-pull'}
+                        </Row>
+                    </dl>
+                </>
+            )}
+        </Section>
+    );
+}
+
 /**
  * Rincian satu server klien: ringkasan di atas, setelan dan laporan, tindakan, lalu riwayat.
  *
@@ -779,6 +939,22 @@ export default function Show({
                 >
                     Server ini tidak mewajibkan lisensi — periksa berkas .env di
                     server klien.
+                </div>
+            )}
+
+            {site.financeFeed.state === 'attention' && (
+                <div
+                    role="alert"
+                    className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm text-destructive dark:bg-red-950/40 dark:text-red-200"
+                >
+                    Feed posting finance di server ini perlu perhatian: ada
+                    jurnal yang belum dibukukan aplikasi finance klinik.{' '}
+                    <a
+                        href="#feed-finance"
+                        className="font-medium underline underline-offset-4"
+                    >
+                        Lihat rinciannya
+                    </a>
                 </div>
             )}
 
@@ -933,6 +1109,11 @@ export default function Show({
                     )}
                 </Section>
             </div>
+
+            <FinanceFeedSection
+                feed={site.financeFeed}
+                reported={report !== null}
+            />
 
             <div className="grid gap-6 lg:grid-cols-2">
                 {!revoked &&

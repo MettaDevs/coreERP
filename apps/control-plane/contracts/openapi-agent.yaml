@@ -657,6 +657,73 @@ components:
             bentuk lain atau bila kuncinya tidak ada, `null` bila `.env` tidak dapat dibaca. Nilainya
             dapat diubah root di server klien; situs on-prem dikelola yang melaporkan `false` berarti
             kunci lisensinya mati, dan admin.erp menampilkan peringatan.
+        finance_feed:
+          $ref: '#/components/schemas/FinanceFeed'
+
+    FinanceFeed:
+      type: [object, 'null']
+      additionalProperties: false
+      required: [counts, oldest_pending_at, last_pulled_at]
+      description: |
+        Ringkasan feed posting finance dari Core di server klien, untuk ditampilkan di halaman server klien.
+        **Hanya jumlah dan waktu**: tidak ada nomor posting, dokumen sumber, akun, dimensi, vendor, maupun
+        nilai uang. Dijumlahkan untuk seluruh tenant di server itu.
+
+        Agen membacanya dengan `php artisan finance-postings:summary` di container `core-app`, memakai compose
+        dan image yang dicatat `update.sh` sesudah terbukti sehat — jalan yang sama dengan
+        `tenant:bootstrap-site` — dengan batas waktu, lalu menyusun ulang objek ini kunci demi kunci dari
+        keluarannya. Kunci lain di keluaran Core tidak ikut terkirim. Keluaran perintah itu berbentuk skema ini
+        juga, dan `FinanceFeedSummaryTest` di Core mencocokkannya dengan skema ini.
+
+        `null` berarti agen mengenal bidang ini tetapi tidak mendapat ringkasan: belum ada rilis yang terbukti
+        sehat, `.env` tidak ada, Core tidak menjawab dalam batas waktunya, rilis Core belum punya perintahnya,
+        atau keluarannya tidak berbentuk seperti ini. Kuncinya tidak ada berarti agen lama yang belum mengenal
+        bidang ini; laporan itu tetap sah.
+
+        admin.erp tidak menjadikan perubahan bidang ini riwayat laporan: angkanya bergerak bersama transaksi
+        klinik, bukan bersama keadaan server.
+      properties:
+        counts:
+          type: object
+          additionalProperties: false
+          required: [held, pending, posted, rejected, manual]
+          description: Jumlah posting per status, termasuk status yang jumlahnya nol.
+          properties:
+            held:
+              type: integer
+              minimum: 0
+              description: Ditahan di Core karena pemetaan akun atau dimensi belum lengkap.
+            pending:
+              type: integer
+              minimum: 0
+              description: Siap di-pull atau dikirim ke pembaca, dan belum di-ack.
+            posted:
+              type: integer
+              minimum: 0
+              description: Sudah dibukukan pembaca.
+            rejected:
+              type: integer
+              minimum: 0
+              description: Ditolak pembaca dengan kode alasan.
+            manual:
+              type: integer
+              minimum: 0
+              description: Tidak dikirim — sebelum cutover, feed entitas legalnya mati, atau ditandai manual.
+        oldest_pending_at:
+          type: [string, 'null']
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          description: |
+            Jam terbit (UTC) posting `pending` tertua, atau `null` bila tidak ada yang `pending`. admin.erp
+            menghitung umurnya terhadap `server_time` laporan yang sama, sehingga selisih jam server klien
+            terhadap admin.erp tidak ikut, dan menandai feed bila umurnya melewati ambangnya.
+        last_pulled_at:
+          type: [string, 'null']
+          format: date-time
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+          description: |
+            Jam (UTC) pull terakhir oleh klien integrasi mana pun di server itu, atau `null` bila belum
+            pernah ada pull. Pengiriman mode `push` tidak dihitung sebagai pull.
 
     SignedLicense:
       type: object

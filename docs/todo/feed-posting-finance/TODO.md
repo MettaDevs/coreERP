@@ -48,7 +48,7 @@ bentuk dimensi BC (6.3.3), mode `push` (4.1, 6.10), tampilan masalah ala Journal
 
 ---
 
-### 1. [~] Core: nomor operating unit sebagai kode dimensi
+### 1. [x] Core: nomor operating unit sebagai kode dimensi
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** setiap operating unit bisa diberi
 nomor unik, nomor itu terbaca lewat kontrak module dan `/internal/v1/operating-units`, dan BU induk
@@ -84,7 +84,7 @@ dari sebuah department bisa ditemukan (K-07).
 
 ---
 
-### 2. [~] Core: vendor master gaya Dynamics
+### 2. [x] Core: vendor master gaya Dynamics
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** vendor bisa dibuat per entitas legal
 sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan dibaca pembaca lewat
@@ -117,7 +117,7 @@ sebagai party dengan peran `vendor`, dipilih modul lewat kontrak, dan dibaca pem
 
 ---
 
-### 3. [~] Core: daftar akun referensi
+### 3. [x] Core: daftar akun referensi
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** daftar akun milik finance pelanggan
 bisa diimpor, dicari, dan dipilih modul, dan ganti nama, ganti nomor, atau hapus-lalu-buat-ulang
@@ -140,7 +140,9 @@ di sisi finance berperilaku seperti di PRD (K-05).
 - [x] 3.5 Test (`ReferenceAccountTest`).
   - [x] 3.5.1 Ganti nama: pemetaan tetap, nama baru terbaca.
   - [x] 3.5.2 Ganti nomor dengan `external_id` sama: pemetaan tetap, nomor baru terbaca.
-  - [~] 3.5.3 Hapus lalu buat ulang dengan `external_id` baru: akun lama tetap ada, pengguna menonaktifkannya, dan posting yang memakainya tertahan. Bagian "tertahan" diuji di area 6.
+  - [x] 3.5.3 Hapus lalu buat ulang dengan `external_id` baru: akun lama tetap ada, pengguna menonaktifkannya, dan posting yang memakainya tertahan. Bagian "tertahan" diuji di area 6.
+    Akun lama yang hilang dari berkas tidak dinonaktifkan otomatis (`ReferenceAccountTest::test_akun_yang_hilang_dari_berkas_dilaporkan_tetapi_tidak_dinonaktifkan`),
+    dan akun nonaktif menahan posting (`FinancePostingFeedTest::test_pemetaan_kosong_akun_nonaktif_dan_unit_tanpa_nomor_menahan_posting`).
   - [x] 3.5.4 Akun tenant lain tidak terlihat.
 - [x] 3.6 Verifikasi di browser: impor, pratinjau berkas salah, dan nonaktifkan akun.
   Diverifikasi 23 September 2026: berkas salah ditolak seluruhnya dengan galat per baris dan tombol Terapkan nonaktif,
@@ -181,7 +183,7 @@ jaringan pembaca tidak berpengaruh (K-03).
 
 ---
 
-### 5. [~] Core: setelan posting per entitas legal
+### 5. [x] Core: setelan posting per entitas legal
 
 **Tempat:** `apps/core` · **Setelah:** — · **Selesai bila:** feed bisa diaktifkan per entitas
 legal dengan tanggal cutover, mode penyelesaian perolehan terbaca per tanggal, dan presisi mata uang
@@ -464,16 +466,29 @@ docs` bersih.
 
 ---
 
-### 14. [ ] Control-plane: pemantauan feed
+### 14. [x] Control-plane: pemantauan feed
 
 **Tempat:** `apps/control-plane`, `deploy/agent` · **Setelah:** 6 · **Selesai bila:** halaman
 site di admin.erp menampilkan kesehatan feed tiap server klien.
 
-- [ ] 14.1 Endpoint ringkasan di Core: jumlah per status, umur `pending` tertua, dan tarikan terakhir. Yang dibaca agent hanya angka ini, tanpa isi jurnal.
-- [ ] 14.2 `deploy/agent/coreerp-agent` membaca ringkasan dan menambahkan `finance_feed` ke laporan, beserta test agent.
-- [ ] 14.3 `apps/control-plane/contracts/openapi-agent.yaml` (skema `Report`) dan `SiteReports::TOP_LEVEL`.
-- [ ] 14.4 Tampilan di `apps/control-plane/resources/js/pages/sites/show.tsx`, dengan tanda merah kalau ada `rejected`/`held`, atau `pending` lebih tua dari ambang.
-- [ ] 14.5 Test di kedua sisi.
+- [x] 14.1 Endpoint ringkasan di Core: jumlah per status, umur `pending` tertua, dan pull terakhir. Yang dibaca agent hanya angka ini, tanpa isi jurnal.
+  Dibangun sebagai perintah `php artisan finance-postings:summary` (`PostingFeedSummary`) yang dijalankan agen di
+  container `core-app`, jalan yang sama dengan `tenant:bootstrap-site`, bukan endpoint HTTP. Tidak ada port, rute,
+  atau kredensial baru. Umur `pending` dikirim sebagai jam terbit (UTC), dan konsol menghitung umurnya terhadap
+  `server_time` laporan yang sama.
+- [x] 14.2 `deploy/agent/coreerp-agent` membaca ringkasan dan menambahkan `finance_feed` ke laporan, beserta test agent.
+  Agen menyusun ulang objeknya kunci demi kunci, jadi kunci yang kelak ditambahkan Core tidak ikut keluar. Batasnya
+  20 detik lewat `timeout`: Core yang macet tidak menahan laporan. Server lama baru mendapat agen ini bila
+  `pasang.sh` dijalankan ulang; sampai itu terjadi, layarnya menulis "Belum dilaporkan".
+- [x] 14.3 `apps/control-plane/contracts/openapi-agent.yaml` (skema `Report`) dan `SiteReports::TOP_LEVEL`.
+  `finance_feed` juga masuk `SiteReports::VOLATILE`: angkanya bergerak bersama transaksi klinik, jadi tidak dijadikan riwayat.
+- [x] 14.4 Tampilan di `apps/control-plane/resources/js/pages/sites/show.tsx`, dengan tanda merah kalau ada `rejected`/`held`, atau `pending` lebih tua dari ambang.
+  Ambangnya 24 jam (`FinanceFeedHealth::PENDING_ALERT_HOURS`). Laporan agen lama tampil "Belum dilaporkan", Core yang
+  tidak menjawab "Tidak terbaca", dan feed yang belum dipakai "Belum dipakai".
+- [x] 14.5 Test di kedua sisi.
+  `FinanceFeedSummaryTest` di Core, `FinanceFeedReportTest` di konsol, dan kasus 09d di `deploy/agent/tests/run-tests.sh`.
+- [ ] 14.6 Klien mode push belum terwakili: "Pull terakhir" hanya menghitung pull, jadi push yang gagal hanya terlihat
+  sebagai `pending` yang menua. Pertimbangkan jam kiriman push terakhir di ringkasan.
 
 ---
 

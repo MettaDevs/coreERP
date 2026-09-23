@@ -44,6 +44,50 @@ export function relativeTime(
     return format.format(value, 'year');
 }
 
+/**
+ * Tanggal dan jam dari waktu ISO 8601 yang membawa zona waktunya, dalam zona waktu peramban: "23 Sep 2026, 15.00".
+ *
+ * Waktu dari server klien dikirim dalam UTC. Menampilkannya apa adanya membuat operator di Jakarta membaca jam yang
+ * tujuh jam lebih awal dari yang dialami klinik.
+ */
+export function dateTimeText(iso: string | null): string | null {
+    if (!iso) {
+        return null;
+    }
+
+    const time = Date.parse(iso);
+
+    if (Number.isNaN(time)) {
+        return null;
+    }
+
+    return new Intl.DateTimeFormat('id', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+    }).format(time);
+}
+
+/** Lama waktu dalam dua satuan terbesar: "1 hari 3 jam", "5 jam 12 menit", "40 menit". */
+export function durationText(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+        return hours % 24 > 0
+            ? `${days} hari ${hours % 24} jam`
+            : `${days} hari`;
+    }
+
+    if (hours > 0) {
+        return minutes % 60 > 0
+            ? `${hours} jam ${minutes % 60} menit`
+            : `${hours} jam`;
+    }
+
+    return minutes > 0 ? `${minutes} menit` : 'kurang dari semenit';
+}
+
 /** Selisih hari kalender dari hari ini ke tanggal `Y-m-d`; negatif bila sudah lewat. */
 export function daysUntil(
     date: string | null,
