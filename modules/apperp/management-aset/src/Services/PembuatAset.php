@@ -8,7 +8,6 @@ use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
-use Modules\Apperp\ManagementAset\Models\master\LokasiAset;
 use Modules\Apperp\ManagementAset\Models\master\ProfilPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\TipeAtribut;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
@@ -253,22 +252,13 @@ class PembuatAset
     }
 
     /**
-     * Dimensi keuangan yang diwarisi aset dari lokasi fisiknya; padanan toggle
-     * "Update asset dimension" pada Functional location type di F&O. Lokasi yang tidak
-     * dipetakan ke unit organisasi mengembalikan null, dan aset tetap memakai unit
-     * penggunanya sendiri.
+     * Dimensi keuangan yang diwarisi aset dari lokasi fisiknya, termasuk dari lokasi induk
+     * terdekat bila lokasinya sendiri tidak dipetakan (K-08). `null` berarti aset memakai unit
+     * penggunanya sendiri. Aturannya satu, di `LocationDimension`, dipakai juga oleh mutasi.
      */
     public function dimensiLokasi(?string $locationId): ?string
     {
-        if (! $locationId) {
-            return null;
-        }
-
-        // `withTrashed()`: lokasi yang sudah diarsipkan tetap membawa pemetaan dimensinya,
-        // sama seperti sebelum query ini melewati model.
-        return LokasiAset::withTrashed()
-            ->where('id', $locationId)
-            ->toBase()->value('org_unit_id');
+        return app(LocationDimension::class)->resolve($locationId);
     }
 
     /**

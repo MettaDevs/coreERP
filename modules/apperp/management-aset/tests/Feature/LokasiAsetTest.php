@@ -2,13 +2,17 @@
 
 namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
+use App\Support\Modules\Contracts\PelaksanaUntukTenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Modules\Apperp\ManagementAset\Services\LocationDimension;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Modules\Apperp\ManagementAset\Tests\Concerns\MenerimaAset;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
@@ -123,6 +127,59 @@ class LokasiAsetTest extends TestCase
     }
 
     /**
+     * Lokasi tanpa pemetaan mewarisi unit dari lokasi induk terdekat (K-08, TODO 8.3, 8.6.2): satu
+     * poli bisa tersebar di beberapa ruang, dan cukup lantainya yang dipetakan. Aturan yang sama
+     * berlaku saat aset diterima dan saat dimutasi.
+     */
+    public function test_a_room_without_a_mapping_inherits_the_unit_of_its_nearest_mapped_parent(): void
+    {
+        $unitGedung = (string) Str::ulid();
+        $unitPoli = (string) Str::ulid();
+        $unitPengguna = (string) Str::ulid();
+        $legalEntity = (string) Str::ulid();
+        $gedung = $this->create('lokasi-aset', ['nama' => 'Gedung A', 'org_unit_id' => $unitGedung])->assertCreated()->json('data.id');
+        $lantai = $this->create('lokasi-aset', ['nama' => 'Lantai 2', 'parent_id' => $gedung])->assertCreated()->json('data.id');
+        $ruang = $this->create('lokasi-aset', ['nama' => 'Ruang 201', 'parent_id' => $lantai])->assertCreated()->json('data.id');
+        $lantaiPoli = $this->create('lokasi-aset', ['nama' => 'Lantai 3', 'parent_id' => $gedung, 'org_unit_id' => $unitPoli])->assertCreated()->json('data.id');
+        $ruangPoli = $this->create('lokasi-aset', ['nama' => 'Ruang 301', 'parent_id' => $lantaiPoli])->assertCreated()->json('data.id');
+
+        $classification = $this->classification();
+        $this->configureReadyBook($classification['group_aset_id']);
+        $aset = $this->terimaAset($this->tenantId, [
+            'legal_entity_id' => $legalEntity, 'nama' => 'Aset ruang uji', ...$classification,
+            'lokasi_aset_id' => $ruang, 'acquired_on' => '2026-08-01',
+            'acquisition_value' => 1000, 'currency_code' => 'IDR',
+            'usage_org_unit_id' => $unitPengguna,
+        ]);
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $aset, 'financial_dimension_org_unit_id' => $unitGedung]);
+
+        // Lantai tiga dipetakan sendiri, jadi ruang di bawahnya memakai unit lantai itu, bukan gedung.
+        $this->mutasikan($aset, $legalEntity, $unitPengguna, $ruangPoli, '2026-09-01', 'Pindah ke poli');
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $aset, 'financial_dimension_org_unit_id' => $unitPoli]);
+    }
+
+    /**
+     * Penulisan lokasi menolak siklus, jadi siklus di data berarti datanya rusak. Pendakian berhenti
+     * dan melaporkannya, bukan berputar selamanya atau menggagalkan penerimaan (TODO 8.3.3).
+     */
+    public function test_a_cycle_in_the_location_data_stops_the_climb_and_is_reported(): void
+    {
+        Exceptions::fake();
+        $atas = $this->create('lokasi-aset', ['nama' => 'Atas'])->assertCreated()->json('data.id');
+        $bawah = $this->create('lokasi-aset', ['nama' => 'Bawah', 'parent_id' => $atas])->assertCreated()->json('data.id');
+        DB::table('aset_m_lokasi_aset')->where('id', $atas)->update(['parent_id' => $bawah]);
+
+        DB::enableQueryLog();
+        $dimensi = $this->app->make(PelaksanaUntukTenant::class)
+            ->jalankanUntuk($this->tenantId, fn (): ?string => $this->app->make(LocationDimension::class)->resolve($bawah));
+        $pembacaan = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'aset_m_lokasi_aset'))->count();
+
+        $this->assertNull($dimensi);
+        $this->assertSame(2, $pembacaan, 'Siklus dua lokasi dikenali pada kunjungan kedua, tidak dipanjat sampai batas kedalaman.');
+        Exceptions::assertReported(fn (RuntimeException $kegagalan): bool => str_contains($kegagalan->getMessage(), 'berputar'));
+    }
+
+    /**
      * Satu dokumen mutasi, dibuat lalu langsung diselesaikan.
      *
      * Dulu pemindahan di test ini satu permintaan ke `POST /aset/{id}/penempatan`. Endpoint
@@ -180,7 +237,7 @@ class LokasiAsetTest extends TestCase
         DB::table('aset_m_buku_penyusutan')->insert([
             'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-ready-'.Str::ulid(),
             'kode' => 'B'.Str::random(8), 'nama' => 'Buku siap', 'aktif' => true,
-            'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => $profile,
+            'posting_layer' => 'current', 'depreciation_profile_id' => $profile,
             'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('aset_m_group_buku_penyusutan')->insert([

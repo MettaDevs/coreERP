@@ -48,7 +48,11 @@ class BukuPenyusutanController extends MasterDataController
 
         return [
             'posting_layer' => ['sometimes', Rule::in(BukuPenyusutan::POSTING_LAYERS)],
-            'export_to_backoffice' => ['sometimes', 'boolean'],
+            // Dilebur ke `posting_layer` (K-15): buku `none` tidak pernah di-post, selain itu
+            // di-post. Dua saklar yang maknanya tumpang tindih pernah menghasilkan pembalikan
+            // yang terekspor padahal aslinya tidak. Kiriman lama ditolak, bukan ditelan, supaya
+            // pengirimnya tahu saklarnya sudah tidak mengatur apa pun.
+            'export_to_backoffice' => ['prohibited'],
             'round_off_depreciation' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'depreciation_profile_id' => ['sometimes', 'nullable', 'ulid', $profileExists],
             'alternative_profile_id' => ['sometimes', 'nullable', 'ulid', $profileExists],
@@ -62,7 +66,7 @@ class BukuPenyusutanController extends MasterDataController
         }
 
         $configurationFields = [
-            'posting_layer', 'export_to_backoffice', 'round_off_depreciation',
+            'posting_layer', 'round_off_depreciation',
             'depreciation_profile_id', 'alternative_profile_id',
         ];
         $changed = array_filter(
@@ -89,21 +93,13 @@ class BukuPenyusutanController extends MasterDataController
                 $payload[$column] = $data[$column];
             }
         }
-        if (array_key_exists('export_to_backoffice', $data)) {
-            // Dinormalkan ke boolean asli agar replay() membandingkan nilai setipe.
-            $payload['export_to_backoffice'] = filter_var($data['export_to_backoffice'], FILTER_VALIDATE_BOOL);
-        } else {
-            // Finance/GL belum memiliki kontrak posting; bridge tidak boleh aktif
-            // hanya karena client tidak mengirim field opsional ini.
-            $payload['export_to_backoffice'] = false;
-        }
 
         return $payload;
     }
 
     protected function extraPresent(MasterData $record): array
     {
-        return $record->only(['posting_layer', 'export_to_backoffice', 'round_off_depreciation', 'depreciation_profile_id', 'alternative_profile_id']);
+        return $record->only(['posting_layer', 'round_off_depreciation', 'depreciation_profile_id', 'alternative_profile_id']);
     }
 
     private function valuesDiffer(mixed $left, mixed $right): bool

@@ -505,7 +505,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 
 ## Celah yang diketahui
 
-- **Belum ada module yang menerbitkan posting.** Modul aset baru menyiapkan kode group aset dan buku penyusutan yang diketik manual (TODO 8.7). Posting group aset (butir 8.1 sampai 8.6), lalu penerimaan, saldo awal, penyusutan, dan koreksi nilai (area 9 sampai 12) belum dikerjakan. Semua jenis di kontrak masih *Belum*.
+- **Belum ada module yang menerbitkan posting.** Modul aset sudah menyiapkan kode group aset dan buku penyusutan yang diketik manual (TODO 8.7) dan [posting group aset](/apps/management-aset/master/posting-group/) beserta pewarisan dimensi lokasi (area 8). Penerimaan, saldo awal, penyusutan, dan koreksi nilai (area 9 sampai 12) yang menerbitkan posting belum dikerjakan. Semua jenis di kontrak masih *Belum*.
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
 - **Endpoint pratinjau HTTP (TODO 7.6.5)** belum ada. Logikanya sudah tersedia sebagai `PenerbitPosting::pratinjau()`, dan layar module dapat memanggilnya lewat controller module-nya sendiri.
 - **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.

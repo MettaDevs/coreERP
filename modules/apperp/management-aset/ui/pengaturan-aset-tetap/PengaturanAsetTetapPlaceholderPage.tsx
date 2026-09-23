@@ -7,7 +7,9 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 
-type SetupKind = 'parameters' | 'posting-profiles';
+// Posting group aset sudah punya layarnya sendiri (`asset-posting-group`); yang tersisa di sini
+// hanya parameter aset tetap.
+type SetupKind = 'parameters';
 
 const CONTENT: Record<
     SetupKind,
@@ -25,14 +27,6 @@ const CONTENT: Record<
         emptyTitle: 'Pengaturan dasar belum tersedia',
         emptyDescription:
             'Pengaturan pembulatan saat ini disimpan pada Buku penyusutan. Pengaturan lain akan ditambahkan setelah kebutuhannya dipastikan.',
-    },
-    'posting-profiles': {
-        title: 'Profil posting aset',
-        description:
-            'Tempat untuk menyiapkan pemetaan transaksi aset sebelum modul Finance tersedia.',
-        emptyTitle: 'Pemetaan akun belum tersedia',
-        emptyDescription:
-            'Belum ada akun atau posting yang disimpan di app Aset. Pemetaan akun akan dibuat bersama modul Finance.',
     },
 };
 

@@ -152,8 +152,8 @@ class DepreciationEndToEndTest extends TestCase
         $jenis = $this->master('jenis-aset', ['nama' => 'Mobil']);
         $komersial = $this->profil('Komersial', ['method' => 'straight_line', 'useful_life_periods' => 10]);
         $fiskal = $this->profil('Fiskal', ['method' => 'straight_line', 'useful_life_periods' => 5]);
-        $bukuK = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'posting_layer' => 'current', 'export_to_backoffice' => true, 'depreciation_profile_id' => $komersial]);
-        $bukuF = $this->master('buku-penyusutan', ['nama' => 'Fiskal', 'posting_layer' => 'tax', 'export_to_backoffice' => false, 'depreciation_profile_id' => $fiskal]);
+        $bukuK = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'posting_layer' => 'current', 'depreciation_profile_id' => $komersial]);
+        $bukuF = $this->master('buku-penyusutan', ['nama' => 'Fiskal', 'posting_layer' => 'none', 'depreciation_profile_id' => $fiskal]);
         $this->matrix($group, [
             ['buku_id' => $bukuK, 'useful_life_periods' => 10, 'convention' => 'full_month'],
             ['buku_id' => $bukuF, 'useful_life_periods' => 5, 'convention' => 'full_month'],
@@ -168,7 +168,7 @@ class DepreciationEndToEndTest extends TestCase
         $this->assertSame(0.0, $this->netBookValue($books[5]));
         $this->assertSame(500.0, $this->netBookValue($books[10]));
 
-        // Buku fiskal tidak diekspor, jadi backoffice tidak menjurnal dua kali.
+        // Buku fiskal memorandum tidak diekspor, jadi backoffice tidak menjurnal dua kali.
         $exported = DB::table('aset_tr_export_penyusutan as e')
             ->join('aset_tr_penyusutan_aset as p', 'p.id', '=', 'e.depreciation_period_id')
             ->pluck('p.buku_aset_id')->unique();
@@ -262,14 +262,35 @@ class DepreciationEndToEndTest extends TestCase
         $this->assertSame(2, DB::table('aset_tr_penyusutan_aset')->count());
     }
 
+    /**
+     * Buku memorandum (`posting_layer = none`) tidak pernah menghasilkan ekspor, termasuk lewat
+     * pembalikan, dan pembalikan mengikuti periode aslinya (K-15, TODO 8.6.3). Sebelumnya
+     * pembalikan selalu diekspor, sehingga backoffice menerima pembalikan atas jurnal yang tidak
+     * pernah ia terima.
+     */
+    public function test_a_memorandum_book_never_exports_and_a_reversal_follows_its_original(): void
+    {
+        $memorandum = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200);
+        $this->reverse($this->finalizedPeriod($memorandum));
+        $this->assertSame(0, DB::table('aset_tr_export_penyusutan')->count());
+
+        $diPost = $this->scenario(['method' => 'straight_line', 'useful_life_periods' => 12], acquisition: 1200, export: true);
+        $asli = $this->finalizedPeriod($diPost);
+        $this->assertSame(1, DB::table('aset_tr_export_penyusutan')->where('depreciation_period_id', $asli)->count());
+        $this->reverse($asli);
+        $pembalikan = (string) DB::table('aset_tr_penyusutan_aset')->where('reverses_period_id', $asli)->value('id');
+        $this->assertSame(1, DB::table('aset_tr_export_penyusutan')->where('depreciation_period_id', $pembalikan)->count());
+        $this->assertSame(2, DB::table('aset_tr_export_penyusutan')->count());
+    }
+
     // ---- penyusun skenario -------------------------------------------------
 
     /**
      * Menyiapkan satu aset lengkap dengan bukunya dan mengembalikan id buku aset.
      *
-     * Ekspor ke backoffice mati kecuali diminta, mengikuti default produk: bridge ke
-     * Finance harus dipilih secara sadar. Test yang memeriksa isi payload ekspor wajib
-     * menyalakannya sendiri, supaya jelas bahwa ekspor itu bagian dari skenarionya.
+     * Bukunya memorandum (`posting_layer = none`) kecuali ekspor diminta. Test yang memeriksa
+     * isi payload ekspor wajib memintanya sendiri, supaya jelas bahwa ekspor itu bagian dari
+     * skenarionya.
      *
      * @param  array<string, mixed>  $profile
      */
@@ -287,7 +308,7 @@ class DepreciationEndToEndTest extends TestCase
         $buku = $this->master('buku-penyusutan', [
             'nama' => 'Buku '.Str::random(6),
             'depreciation_profile_id' => $profilId,
-            'export_to_backoffice' => $export,
+            'posting_layer' => $export ? 'current' : 'none',
         ]);
         $this->matrix($group, [[
             'buku_id' => $buku,
@@ -343,6 +364,21 @@ class DepreciationEndToEndTest extends TestCase
         $this->finalize($id);
 
         return (float) DB::table('aset_tr_penyusutan_aset')->where('id', $id)->value('amount');
+    }
+
+    private function finalizedPeriod(string $bookId): string
+    {
+        $periodId = (string) $this->propose($bookId, 1)->json('data.id');
+        $this->finalize($periodId);
+
+        return $periodId;
+    }
+
+    private function reverse(string $periodId): void
+    {
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penyusutan.correct'])
+            ->postJson('/api/modules/management-aset/v1/penyusutan/'.$periodId.'/reversal', ['reason' => 'Salah periode'])
+            ->assertCreated();
     }
 
     private function finalize(string $periodId): void

@@ -4,7 +4,7 @@ Halaman ini untuk developer. Penyiapannya — profil, buku, matriks — ada di [
 
 Penyusutan dijalankan **per periode, per buku**. Hasilnya baris di `aset_tr_penyusutan_aset` yang mencatat berapa yang disusutkan pada periode itu.
 
-Ada satu tabel pendamping, `aset_tr_export_penyusutan`, yang menyimpan hasil finalisasi dalam bentuk siap diserahkan ke pembukuan. App ini tidak memposting ke buku besar — ia menyiapkan datanya dan berhenti di situ, karena akun dan posting milik modul Finance.
+Ada satu tabel pendamping, `aset_tr_export_penyusutan`, yang menyimpan hasil finalisasi dalam bentuk siap diserahkan ke pembukuan. Ekspor ini jalur lama: ia digantikan proses "Post penyusutan" yang menerbitkan jurnal ke [feed posting finance](/dev/34-feed-posting-finance), dan berhenti ditulis pada TODO 11.4.
 
 ## Dua langkah, sengaja dipisah
 
@@ -39,6 +39,8 @@ Alasannya: angka penyusutan perlu diperiksa sebelum dikunci. Proposal boleh dija
 Kalau tidak ada penempatan yang berlaku, permintaan ditolak. Angka yang tidak jelas dibebankan ke siapa lebih buruk daripada tidak ada angka.
 
 **Finalisasi aman diulang.** Kalau periode sudah `final`, permintaan ulang tidak membuat transaksi atau export kedua; ia mengembalikan yang sudah ada. Jaringan yang putus setelah server selesai memproses tidak boleh menghasilkan pembukuan ganda.
+
+**Buku memorandum tidak diekspor, termasuk pembalikannya.** Periode buku `posting_layer = none` difinalkan tanpa baris ekspor. Pembalikan diekspor hanya bila periode aslinya dulu diekspor; sebelumnya pembalikan selalu diekspor, sehingga pembukuan menerima pembalikan atas jurnal yang tidak pernah ia terima (K-15).
 
 **Pembalikan adalah satu-satunya jalan mundur.** Periode `final` tidak bisa dihapus atau diedit. Membalik membuat catatan baru yang meniadakan yang lama, sehingga jejaknya tetap ada.
 

@@ -338,7 +338,7 @@ class RegisterAsetTest extends TestCase
         DB::table('aset_m_buku_penyusutan')->insert([
             'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-ready-'.Str::ulid(),
             'kode' => 'B'.Str::random(8), 'nama' => 'Buku siap', 'aktif' => true,
-            'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => $profile,
+            'posting_layer' => 'current', 'depreciation_profile_id' => $profile,
             'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('aset_m_group_buku_penyusutan')->insert([
@@ -360,7 +360,7 @@ class RegisterAsetTest extends TestCase
         DB::table('aset_m_buku_penyusutan')->insert([
             'id' => $book, 'tenant_id' => $this->tenantId, 'creation_key' => 'book-register-'.Str::ulid(),
             'kode' => 'B'.Str::random(8), 'nama' => 'Buku register', 'aktif' => true,
-            'posting_layer' => 'current', 'export_to_backoffice' => false, 'depreciation_profile_id' => null,
+            'posting_layer' => 'current', 'depreciation_profile_id' => null,
             'created_at' => $now, 'updated_at' => $now,
         ]);
         DB::table('aset_m_group_buku_penyusutan')->insert([

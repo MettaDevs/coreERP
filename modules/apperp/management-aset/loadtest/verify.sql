@@ -88,12 +88,14 @@ induk_hilang as (
 prefix_salah as (
     -- Prefix kode berasal dari reference Number Sequence yang berbeda per master. Prefix yang
     -- tertukar berarti satu master memakai reference milik master lain.
+    --
+    -- Group aset dan buku penyusutan tidak ada di sini: kodenya diketik pengguna (cbb0816), dan
+    -- buku `FISKAL`/`KOMERSIAL` lahir dari data awal standar Indonesia. Keduanya dijaga
+    -- `kode_diketik_tidak_sah` dan `duplikat_kode`, bukan oracle nomor.
     select
-        (select count(*) from aset_m_group_aset where kode not like 'GRPA%')
-      + (select count(*) from aset_m_jenis_aset where kode not like 'JNSA%')
+        (select count(*) from aset_m_jenis_aset where kode not like 'JNSA%')
       + (select count(*) from aset_m_model_aset where kode not like 'MDLA%')
       + (select count(*) from aset_m_tipe_lokasi_aset where kode not like 'TLKA%')
-      + (select count(*) from aset_m_buku_penyusutan where kode not like 'BKPY%')
       + (select count(*) from aset_m_kondisi_aset where kode not like 'KNDA%')
       + (select count(*) from aset_m_pabrikan_aset where kode not like 'PBRA%')
       + (select count(*) from aset_m_item_checklist_maintenance where kode not like 'ICMA%')
@@ -106,8 +108,7 @@ prefix_salah as (
 -- punya satu baris terbitan pada tenant DAN reference yang benar.
 nomor_tanpa_terbitan as (
     select
-        (select count(*) from aset_m_group_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.group-aset' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_jenis_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.jenis-aset' and i.formatted_value = t.kode))
+        (select count(*) from aset_m_jenis_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.jenis-aset' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_model_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.model-aset' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_pabrikan_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.pabrikan-aset' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_kondisi_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.kondisi-aset' and i.formatted_value = t.kode))
@@ -116,7 +117,6 @@ nomor_tanpa_terbitan as (
       + (select count(*) from aset_m_analisa_maintenance t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.analisa-maintenance' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_maintenance_job_type t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.maintenance-job-types' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_maintenance_checklist_variable t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.maintenance-checklist-variables' and i.formatted_value = t.kode))
-      + (select count(*) from aset_m_buku_penyusutan t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.buku-penyusutan' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_profil_penyusutan t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.profil-penyusutan' and i.formatted_value = t.kode))
       + (select count(*) from aset_m_tipe_atribut t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.tipe-atribut' and i.formatted_value = t.kode))
       + (select count(*) from aset_tr_aset t where not exists (select 1 from terbitan i where i.tenant_id = t.tenant_id and i.referensi = 'management-aset.aset' and i.formatted_value = t.kode))
@@ -268,6 +268,46 @@ work_order_child_tidak_sah as (
       + (select count(*) from aset_tr_pemeliharaan_aset_details d left join aset_tr_pemeliharaan_aset h on h.id = d.pemeliharaan_aset_id where h.id is null)
       + (select count(*) from aset_tr_pemeliharaan_aset_checklist c join aset_tr_pemeliharaan_aset_details d on d.id = c.pemeliharaan_aset_detail_id where c.tenant_id <> d.tenant_id)
       + (select count(*) from aset_tr_pemeliharaan_aset_status_log l join aset_tr_pemeliharaan_aset h on h.id = l.pemeliharaan_aset_id where l.tenant_id <> h.tenant_id) as n
+),
+kode_diketik_tidak_sah as (
+    -- Bentuk yang ditegakkan `MasterDataController::kodeManual()`, ditulis ulang di sini sebagai
+    -- data: huruf besar, angka, dan tanda hubung di antaranya, paling panjang 30.
+    select
+        (select count(*) from aset_m_group_aset where kode !~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' or length(kode) > 30)
+      + (select count(*) from aset_m_buku_penyusutan where kode !~ '^[A-Z0-9]+(-[A-Z0-9]+)*$' or length(kode) > 30) as n
+),
+posting_group_ganda as (
+    -- Ditahan skema, bukan kode: indeks unik parsial `(tenant_id, group_aset_id, effective_from)
+    -- WHERE deleted_at IS NULL`. Yang dijaga kode adalah jawabannya — tanpa kunci pada baris
+    -- group, pembuatan kedua menabrak indeks ini dan dijawab 500 (`server_errors` k6).
+    select count(*) as n from (
+        select tenant_id, group_aset_id, effective_from from aset_m_posting_group
+        where deleted_at is null group by 1, 2, 3 having count(*) > 1
+    ) d
+),
+posting_group_group_lintas_tenant as (
+    -- Ditahan skema: kunci asing komposit `(tenant_id, group_aset_id)`.
+    select count(*) as n
+    from aset_m_posting_group p
+    join aset_m_group_aset g on g.id = p.group_aset_id
+    where g.tenant_id <> p.tenant_id
+),
+posting_group_akun_asing as (
+    -- Satu-satunya yang ditahan kode: kolom akun menyimpan id daftar akun milik Core TANPA kunci
+    -- asing, dan hanya pemeriksaan `DaftarAkun` di controller yang menolak akun tenant lain atau
+    -- akun yang tidak ada.
+    select count(*) as n
+    from aset_m_posting_group p
+    cross join lateral (values
+        (p.acquisition_account_id), (p.accumulated_depreciation_account_id),
+        (p.depreciation_expense_account_id), (p.payable_account_id), (p.clearing_account_id),
+        (p.input_vat_account_id), (p.opening_balance_offset_account_id)
+    ) as k(account_id)
+    where k.account_id is not null
+      and not exists (
+          select 1 from finance_reference_accounts a
+          where a.id = k.account_id and a.tenant_id = p.tenant_id
+      )
 )
 select 'kode ganda dalam satu tenant' as pemeriksaan, n as pelanggaran into temporary table hasil_aset from duplikat_kode
 union all select 'creation_key ganda dalam satu tenant', n from duplikat_kunci
@@ -296,7 +336,11 @@ union all select 'kode atau kunci work order ganda', n from work_order_duplikat
 union all select 'prefix nomor work order salah', n from work_order_prefix_salah
 union all select 'detail/checklist/status log work order lintas tenant atau yatim', n from work_order_child_tidak_sah
 union all select 'transisi status work order di luar grafik', n from work_order_transisi_tidak_sah
-union all select 'akumulasi buku aset tidak sama dengan jumlah periode final', n from saldo_buku_tidak_cocok_periode;
+union all select 'akumulasi buku aset tidak sama dengan jumlah periode final', n from saldo_buku_tidak_cocok_periode
+union all select 'kode diketik group aset atau buku penyusutan tidak sah', n from kode_diketik_tidak_sah
+union all select 'posting group ganda untuk group dan tanggal yang sama', n from posting_group_ganda
+union all select 'posting group menunjuk group tenant lain', n from posting_group_group_lintas_tenant
+union all select 'posting group menunjuk akun tenant lain atau yang tidak ada', n from posting_group_akun_asing;
 
 select pemeriksaan, pelanggaran from hasil_aset order by pemeriksaan;
 
@@ -308,6 +352,7 @@ union all select 'aset_m_model_aset', count(*), count(distinct tenant_id) from a
 union all select 'aset_m_tipe_lokasi_aset', count(*), count(distinct tenant_id) from aset_m_tipe_lokasi_aset
 union all select 'aset_m_buku_penyusutan', count(*), count(distinct tenant_id) from aset_m_buku_penyusutan
 union all select 'aset_m_group_buku_penyusutan', count(*), count(distinct tenant_id) from aset_m_group_buku_penyusutan
+union all select 'aset_m_posting_group', count(*), count(distinct tenant_id) from aset_m_posting_group
 union all select 'aset_m_kondisi_aset', count(*), count(distinct tenant_id) from aset_m_kondisi_aset
 union all select 'aset_m_pabrikan_aset', count(*), count(distinct tenant_id) from aset_m_pabrikan_aset
 union all select 'aset_m_item_checklist_maintenance', count(*), count(distinct tenant_id) from aset_m_item_checklist_maintenance

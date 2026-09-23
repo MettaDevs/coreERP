@@ -26,6 +26,7 @@ Database ini hanya dimiliki Management Aset. Referensi tenant dan unit organisas
 | `m_tipe_atribut` | — |
 | `m_tipe_atribut_nilai` | `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut (tenant_id, id)` |
 | `m_jenis_aset_atribut` | `(tenant_id, jenis_aset_id)` → `m_jenis_aset`, `(tenant_id, tipe_atribut_id)` → `m_tipe_atribut` |
+| `m_posting_group` | `(tenant_id, group_aset_id)` → `m_group_aset (tenant_id, id)`; tujuh kolom akun menunjuk daftar akun referensi Core tanpa foreign key |
 
 Maintenance setup menambah tabel `m_maintenance_job_type`, `m_maintenance_job_type_variant`,
 `m_maintenance_job_type_default`, `m_maintenance_job_type_jenis_aset`,
@@ -80,6 +81,18 @@ tanggal berlaku, umur manfaat, tarif penyusutan, dan penanda aktif. `template_ke
 untuk seed idempoten; ia bukan nomor bisnis. `tr_aset.kelompok_harta_fiskal_id`
 adalah snapshot versi yang dipakai ketika aset diterima, sehingga perubahan referensi group
 tidak menulis ulang histori aset.
+
+`m_posting_group` bukan master berkode: identitasnya pasangan group dan `effective_from`, dengan
+indeks unik parsial `(tenant_id, group_aset_id, effective_from) WHERE deleted_at IS NULL`, sehingga
+tanggal yang barisnya diarsipkan boleh dipakai lagi. Tujuh kolom akunnya (`acquisition_account_id`,
+`accumulated_depreciation_account_id`, `depreciation_expense_account_id`, `payable_account_id`,
+`clearing_account_id`, `input_vat_account_id`, `opening_balance_offset_account_id`) menyimpan id
+`finance_reference_accounts` milik Core tanpa foreign key; keberadaan dan statusnya diperiksa lewat
+kontrak `DaftarAkun`.
+
+`m_buku_penyusutan.export_to_backoffice` tidak lagi dibaca maupun ditulis sejak saklarnya dilebur ke
+`posting_layer` (K-15). Kolomnya dibiarkan satu rilis supaya rilis sebelumnya tetap berjalan di atas
+skema ini (aturan N-1), lalu dibuang.
 
 `m_lokasi_aset.org_unit_id` dan `tr_aset.financial_dimension_org_unit_id` adalah ID opaque milik Core, jadi keduanya sengaja **tanpa foreign key**. Nilai pada aset disalin dari lokasinya saat penerimaan dan mutasi; ia snapshot keputusan saat itu, bukan lookup yang ikut berubah bila pemetaan lokasi diubah kemudian.
 

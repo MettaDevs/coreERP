@@ -45,8 +45,8 @@ class DepreciationBookTest extends TestCase
         $komersial = $this->profil('Garis lurus 60 bulan', 'straight_line', 60);
         $fiskal = $this->profil('Saldo menurun 25%', 'reducing_balance', 48, 25.0);
 
-        $bukuKomersial = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'posting_layer' => 'current', 'export_to_backoffice' => true, 'depreciation_profile_id' => $komersial]);
-        $bukuFiskal = $this->master('buku-penyusutan', ['nama' => 'Fiskal', 'posting_layer' => 'tax', 'export_to_backoffice' => false, 'depreciation_profile_id' => $fiskal]);
+        $bukuKomersial = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'posting_layer' => 'current', 'depreciation_profile_id' => $komersial]);
+        $bukuFiskal = $this->master('buku-penyusutan', ['nama' => 'Fiskal', 'posting_layer' => 'none', 'depreciation_profile_id' => $fiskal]);
 
         $this->matrix($group, [
             ['buku_id' => $bukuKomersial, 'useful_life_periods' => 60, 'convention' => 'full_month'],
@@ -62,11 +62,42 @@ class DepreciationBookTest extends TestCase
         $this->assertSame('2026-03-01', substr((string) $books->first()->depreciation_start_on, 0, 10));
     }
 
-    public function test_buku_baru_tidak_mengaktifkan_bridge_finance_secara_default(): void
+    /**
+     * Migration peleburan saklar (TODO 8.4.1): buku pajak menjadi memorandum, karena aplikasi
+     * finance hanya punya satu lapisan GL; buku lain memakai lapisannya apa adanya.
+     */
+    public function test_the_merge_migration_turns_tax_books_into_memorandum_books(): void
     {
-        $book = $this->master('buku-penyusutan', ['nama' => 'Buku tanpa bridge']);
+        $pajak = $this->master('buku-penyusutan', ['nama' => 'Pajak', 'posting_layer' => 'tax']);
+        $komersial = $this->master('buku-penyusutan', ['nama' => 'Komersial', 'posting_layer' => 'current']);
 
-        $this->assertFalse((bool) DB::table('aset_m_buku_penyusutan')->where('id', $book)->value('export_to_backoffice'));
+        (require dirname(__DIR__, 2).'/database/migrations/2026_09_23_110000_merge_export_switch_into_posting_layer.php')->up();
+
+        $this->assertSame('none', DB::table('aset_m_buku_penyusutan')->where('id', $pajak)->value('posting_layer'));
+        $this->assertSame('current', DB::table('aset_m_buku_penyusutan')->where('id', $komersial)->value('posting_layer'));
+    }
+
+    /**
+     * Sejak K-15 lapisan posting satu-satunya saklar: buku `none` tidak pernah di-post, selain itu
+     * di-post. Saklar ekspor yang lama ditolak, bukan ditelan, supaya pengirimnya tahu ia sudah
+     * tidak mengatur apa pun.
+     */
+    public function test_the_old_export_switch_is_refused_and_the_posting_layer_decides(): void
+    {
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('buku-penyusutan'))
+            ->withHeader('Idempotency-Key', 'buku-saklar-lama')
+            ->postJson('/api/modules/management-aset/v1/buku-penyusutan', $this->denganKodeKetik('buku-penyusutan', [
+                'nama' => 'Buku lama', 'export_to_backoffice' => true,
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('export_to_backoffice');
+
+        $book = $this->master('buku-penyusutan', ['nama' => 'Buku baru']);
+        $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('buku-penyusutan'))
+            ->getJson('/api/modules/management-aset/v1/buku-penyusutan/'.$book)
+            ->assertOk()
+            ->assertJsonPath('data.posting_layer', 'current')
+            ->assertJsonMissingPath('data.export_to_backoffice');
     }
 
     public function test_aset_di_bawah_ambang_kapitalisasi_tetap_tercatat_tetapi_tidak_menyusut(): void

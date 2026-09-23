@@ -137,6 +137,7 @@ export default withMermaid({
             { text: 'Pabrikan dan model', link: '/apps/management-aset/master/katalog-model/' },
             { text: 'Lokasi dan dimensi keuangan', link: '/apps/management-aset/master/lokasi/' },
             { text: 'Penyusutan: profil dan buku', link: '/apps/management-aset/master/depresiasi/' },
+            { text: 'Posting group aset', link: '/apps/management-aset/master/posting-group/' },
             { text: 'Setup maintenance', link: '/apps/management-aset/master/maintenance/' },
             { text: 'Master work order', link: '/apps/management-aset/master/work-order/' },
           ],

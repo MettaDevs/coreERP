@@ -27,6 +27,14 @@ Master biasa dengan kolom tambahan yang menentukan hitungan:
 | `useful_life_periods` | Masa manfaat dalam jumlah periode |
 | `rate_percent` | Persentase, untuk metode yang memakainya |
 
+## Buku penyusutan dan lapisan posting
+
+`posting_layer` pada buku adalah **satu-satunya saklar posting** (K-15 feed posting finance): buku `none` (memorandum) dihitung dan dilaporkan, tetapi tidak pernah di-post ke aplikasi finance; lapisan lain di-post.
+
+**Kenapa satu saklar:** dulu ada `export_to_backoffice` di samping lapisan posting. Dua saklar yang maknanya tumpang tindih pernah menghasilkan pembalikan yang terekspor padahal aslinya tidak. Saklar lama dilebur ke lapisan posting; API menolak field itu dengan 422, dan kolomnya dibiarkan satu rilis sebelum dibuang (aturan N-1).
+
+**Kenapa buku fiskal memorandum:** aplikasi finance pelanggan hanya punya satu lapisan GL. Buku fiskal yang ikut di-post akan menjurnal penyusutan aset yang sama untuk kedua kalinya. Migration peleburan menjadikan setiap buku `tax` sebagai `none`, dan buku `FISKAL` bawaan tenant baru lahir sebagai `none`.
+
 ## Matriks group × buku
 
 Inilah tempat keputusan sebenarnya dibuat. Untuk tiap kombinasi group aset dan buku, ditentukan:
