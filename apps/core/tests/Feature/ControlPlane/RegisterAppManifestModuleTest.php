@@ -43,10 +43,15 @@ class RegisterAppManifestModuleTest extends TestCase
         // `.api`), +4 permission (read/create/update/archive), +2 privilege
         // (maintain/retire), dan +1 reference nomor (`PNRA`). Duty tidak bertambah:
         // keduanya menempel pada `management-aset.aset.manage` yang sudah ada.
-        'entry_points' => 68,
-        'permissions' => 129,
-        'privileges' => 68,
-        'duties' => 36,
+        //
+        // 23 September 2026, posting group aset (feed posting finance area 8): +1 entry point
+        // (`fixed-asset-posting-profiles.api`), +3 permission (create/update/archive), +2
+        // privilege (maintain/retire), dan +1 duty (`fixed-asset-posting-profiles.manage`),
+        // tersendiri supaya role lama tidak diam-diam dapat mengubah akun jurnal.
+        'entry_points' => 69,
+        'permissions' => 132,
+        'privileges' => 70,
+        'duties' => 37,
         'number_sequence_references' => 31,
         'workflow_types' => 2,
         'reports' => 4,
