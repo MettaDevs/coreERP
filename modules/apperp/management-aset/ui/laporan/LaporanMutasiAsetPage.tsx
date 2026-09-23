@@ -5,11 +5,11 @@ import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
 export type MutationReportRow = {
-    nomor?: number;
+    nomor?: number | string;
     tanggal_mutasi?: string;
-    no_bukti?: string;
-    asset_kode?: string;
-    asset_nama?: string;
+    nomor_bukti?: string;
+    kode_aset?: string;
+    nama_aset?: string;
     spesifikasi?: string;
     lokasi_asal?: string;
     lokasi_tujuan?: string;
@@ -38,27 +38,27 @@ export default function LaporanMutasiAsetPage() {
                 cell: (row) => String(row.tanggal_mutasi ?? '-'),
             },
             {
-                id: 'no_bukti',
+                id: 'nomor_bukti',
                 header: 'No. Bukti Mutasi',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
-                        {String(row.no_bukti ?? '-')}
+                        {String(row.nomor_bukti ?? row.no_bukti ?? '-')}
                     </span>
                 ),
             },
             {
-                id: 'asset_kode',
+                id: 'kode_aset',
                 header: 'Kode Aset',
                 cell: (row) => (
                     <span className="font-mono text-xs">
-                        {String(row.asset_kode ?? '-')}
+                        {String(row.kode_aset ?? row.asset_kode ?? '-')}
                     </span>
                 ),
             },
             {
-                id: 'asset_nama',
+                id: 'nama_aset',
                 header: 'Nama Aset',
-                cell: (row) => String(row.asset_nama ?? '-'),
+                cell: (row) => String(row.nama_aset ?? row.asset_nama ?? '-'),
             },
             {
                 id: 'spesifikasi',
