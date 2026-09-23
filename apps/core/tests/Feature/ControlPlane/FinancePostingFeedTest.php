@@ -257,6 +257,97 @@ class FinancePostingFeedTest extends TestCase
         $this->assertSame(['pending', 'pending'], FinancePosting::query()->orderBy('posting_id')->pluck('status')->all());
     }
 
+    public function test_lowering_currency_precision_keeps_published_postings_at_their_own_precision(): void
+    {
+        FinanceReferenceAccount::query()->whereKey($this->akun['hutang'])->update(['active' => false]);
+        $this->assertSame('held', $this->terbitkan($this->perolehan())['status']);
+        $this->assertSame('manual', $this->terbitkan($this->perolehan(['posting_id' => 'AST-ACQ-LAMA', 'tanggal' => '2026-08-20']))['status']);
+
+        // Konsultan memutuskan IDR tanpa desimal (TODO 0.7) sesudah kedua posting terbit.
+        $this->actingAs($this->owner)->put('/settings/currencies/IDR', ['amount_decimals' => 0, 'unit_amount_decimals' => 3])
+            ->assertSessionHasNoErrors();
+
+        FinanceReferenceAccount::query()->whereKey($this->akun['hutang'])->update(['active' => true]);
+        $diperbaiki = app(PostingPublisher::class)->revalidate(FinancePosting::query()->where('posting_id', 'AST-ACQ-0001')->firstOrFail(), $this->owner->id);
+        $this->assertSame('pending', $diperbaiki->status);
+        $this->assertSame(2, $diperbaiki->payload['currency']['decimals']);
+        $this->assertSame('500000000.00', $diperbaiki->payload['journal_lines'][0]['debit']);
+
+        // Menyimpan setelan entitas menilai ulang posting lama sampai selesai, tidak berhenti dengan 500.
+        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le->id}/finance-posting", [
+            'enabled' => true, 'cutover_date' => '2026-08-01',
+        ])->assertOk()->assertJsonPath('meta.reevaluated_postings', 1);
+        $lama = FinancePosting::query()->where('posting_id', 'AST-ACQ-LAMA')->firstOrFail();
+        $this->assertSame(['pending', 2], [$lama->status, $lama->currency_decimals]);
+
+        // Module yang menerbitkan ulang dokumen yang sama, kini dibulatkan ke presisi baru, mendapat
+        // posting yang sudah ada, bukan penolakan "isi jurnal berbeda".
+        $ulang = $this->terbitkan($this->perolehan(['nilai' => '500000000']));
+        $this->assertFalse($ulang['created']);
+        $this->assertSame('500000000.00', $ulang['payload']['journal_lines'][0]['debit']);
+
+        // Posting yang terbit sesudah perubahan memakai presisi baru.
+        $baru = $this->terbitkan($this->perolehan(['posting_id' => 'AST-ACQ-BARU', 'nilai' => '750000000']));
+        $this->assertSame(0, $baru['payload']['currency']['decimals']);
+        $this->assertSame('750000000', $baru['payload']['journal_lines'][0]['debit']);
+    }
+
+    public function test_revalidation_and_cutover_reevaluation_keep_a_manual_mark_made_meanwhile(): void
+    {
+        FinanceReferenceAccount::query()->whereKey($this->akun['hutang'])->update(['active' => false]);
+        foreach (['AST-ACQ-0001', 'AST-ACQ-0002', 'AST-ACQ-0003'] as $postingId) {
+            $this->assertSame('held', $this->terbitkan($this->perolehan(['posting_id' => $postingId]))['status']);
+        }
+        FinanceReferenceAccount::query()->whereKey($this->akun['hutang'])->update(['active' => true]);
+        $penerbit = app(PostingPublisher::class);
+
+        // Validasi ulang membawa model yang dibaca sebelum pengguna lain menandainya manual.
+        $basi = FinancePosting::query()->where('posting_id', 'AST-ACQ-0001')->firstOrFail();
+        $penerbit->markManual(FinancePosting::query()->where('posting_id', 'AST-ACQ-0001')->firstOrFail(), 'Sudah dijurnal manual', $this->owner->id);
+        $this->assertSame('manual', $penerbit->revalidate($basi, $this->owner->id)->status);
+
+        // Penilaian ulang cutover memilih postingnya, lalu pengguna lain menandainya manual sebelum
+        // barisnya dikunci: sekali lewat jalur pembentukan ulang, sekali lewat jalur feed dimatikan.
+        $sasaran = null;
+        FinancePosting::retrieved(function (FinancePosting $posting) use (&$sasaran): void {
+            if ($posting->posting_id === $sasaran) {
+                $sasaran = null;
+                DB::table('finance_postings')->where('id', $posting->id)
+                    ->update(['status' => 'manual', 'manual_reason' => 'user', 'hold_reasons' => null]);
+            }
+        });
+        $sasaran = 'AST-ACQ-0002';
+        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le->id}/finance-posting", [
+            'enabled' => true, 'cutover_date' => '2026-08-15',
+        ])->assertOk();
+        $sasaran = 'AST-ACQ-0003';
+        $this->actingAs($this->owner)->putJson("/api/v1/organizations/{$this->le->id}/finance-posting", [
+            'enabled' => false, 'cutover_date' => '2026-08-15',
+        ])->assertOk();
+
+        $this->assertSame(
+            [['AST-ACQ-0001', 'manual', 'user'], ['AST-ACQ-0002', 'manual', 'user'], ['AST-ACQ-0003', 'manual', 'user']],
+            FinancePosting::query()->orderBy('posting_id')->get()
+                ->map(fn (FinancePosting $posting): array => [$posting->posting_id, $posting->status, $posting->manual_reason])->all(),
+        );
+    }
+
+    public function test_mapping_fix_url_must_be_a_path_inside_the_app(): void
+    {
+        foreach (['https://contoh.invalid/pemetaan', '//contoh.invalid/pemetaan', 'javascript:alert(1)', 'm/management-aset'] as $url) {
+            $masukan = $this->penyusutan();
+            $masukan['lines'][1]['account_id'] = null;
+            $masukan['lines'][1]['mapping'] = ['label' => 'Group KENDARAAN · akun akumulasi', 'fix_url' => $url];
+            try {
+                $this->terbitkan($masukan);
+                $this->fail(sprintf('fix_url %s harus ditolak.', $url));
+            } catch (PostingTidakSah $kegagalan) {
+                $this->assertStringContainsString('Baris 2 mapping.fix_url', $kegagalan->getMessage());
+            }
+        }
+        $this->assertSame(0, FinancePosting::query()->count());
+    }
+
     public function test_tarikan_hanya_pending_urut_tanggal_dan_disajikan_ulang_sampai_di_ack(): void
     {
         $token = $this->token();
