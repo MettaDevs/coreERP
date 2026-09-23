@@ -166,7 +166,7 @@ Pemeriksaannya berlapis, dan urutannya disengaja:
 - Nilai debit dan kredit adalah string desimal tanpa tanda dan tanpa pemisah ribuan. Bilangan bulat PHP diterima; float tidak. Setiap baris berisi tepat satu sisi yang tidak nol. Nilai negatif tidak ada: arah jurnal dibawa sisinya, jadi selisih negatif ditulis di sisi sebaliknya.
 - Nilai tidak boleh lebih halus dari presisi mata uang. Nilai yang lebih kasar dilengkapi nolnya — `"500000000"` menjadi `"500000000.00"` pada presisi dua.
 - Jurnal seimbang, dihitung dengan desimal pasti (`brick/math`), bukan float.
-- `mapping.label` wajib bila `mapping` diisi. `details` harus objek, bukan daftar.
+- `mapping.label` wajib bila `mapping` diisi, dan `mapping.fix_url`, bila ada, harus jalur di dalam aplikasi seperti `source_document.url`, karena keduanya menjadi tautan di layar pantau. `details` harus objek, bukan daftar.
 
 **Kenapa exception, bukan `held`.** Jurnal yang tidak seimbang adalah bug penerbit (K-22). Menyerahkannya ke pengguna berarti menyuruh orang mencari selisih yang dibuat kode. Exception membatalkan dokumen dan sampai ke SigNoz lewat [pelapor kesalahan](28-pelaporan-kesalahan.md) biasa.
 
@@ -227,7 +227,7 @@ Kuncinya `(tenant_id, posting_id)`. `publish()` mencari `posting_id` itu lebih d
 
 Dua permintaan yang menyimpan `posting_id` yang sama bersamaan diselesaikan indeks unik: yang kalah menangkap `UniqueConstraintViolationException` di dalam SAVEPOINT-nya, membaca posting pemenang, lalu membandingkan hash yang sama.
 
-`input_hash` hanya menangkap **isi akuntansi**: jenis, entitas legal, mata uang, tanggal posting, tanggal dokumen, mode sesudah pewarisan, `vendor_id`, posting yang dibalik atau dikoreksi, dan untuk setiap baris akun, debit, kredit, serta unit organisasinya (nilai sesudah dinormalkan ke presisi). Yang **tidak** ikut: `occurred_at`, seluruh `source_document` termasuk `url`, deskripsi baris, `mapping`, `details`, dan `vendor_invoice_reference`.
+`input_hash` hanya menangkap **isi akuntansi**: jenis, entitas legal, mata uang, tanggal posting, tanggal dokumen, mode sesudah pewarisan, `vendor_id`, posting yang dibalik atau dikoreksi, dan untuk setiap baris akun, debit, kredit, serta unit organisasinya (nilai sesudah dinormalkan ke presisi). Masukan untuk `posting_id` yang sudah ada dinormalkan dengan presisi posting itu sendiri (`currency_decimals`), bukan presisi mata uang hari ini. Module yang menerbitkan ulang dokumen yang sama setelah presisi diturunkan — nilainya kini dibulatkan ke presisi baru — tetap mendapat posting yang sama, bukan penolakan "isi berbeda". Yang **tidak** ikut: `occurred_at`, seluruh `source_document` termasuk `url`, deskripsi baris, `mapping`, `details`, dan `vendor_invoice_reference`.
 
 Akibatnya: menerbitkan ulang dengan deskripsi atau `details` yang berbeda mengembalikan posting lama tanpa memperbaruinya. Teks penjelas yang berubah tidak boleh menghasilkan jurnal kedua, dan juga tidak mengubah jurnal yang mungkin sudah di-pull pembaca.
 
@@ -242,9 +242,9 @@ Di sisi pembaca, idempotensinya `UNIQUE(posting_id)`. Posting yang sama bisa sam
 - Hanya untuk `held`. Controller menjawab 422 untuk status lain; kelasnya sendiri mengembalikan posting tanpa perubahan.
 - Posting dibentuk ulang dari `input` yang tersimpan, lewat `normalize()` dan `evaluate()` yang sama dengan penerbitan. `posting_id` dan `published_at` tetap; baris jurnal di `finance_posting_lines` ditulis ulang.
 - Hasilnya bisa `pending`, tetap `held` dengan daftar masalah yang diperbarui, atau `manual` bila setelan feed sudah berubah.
-- Karena seluruh masukan dinormalkan ulang, yang dibaca ulang bukan hanya akun, dimensi, dan cutover, tetapi juga presisi mata uang, kode entitas legal, dan salinan vendor.
-- Masukan yang dulu sah bisa kini ditolak — misalnya presisi mata uang diturunkan sehingga nilai yang tersimpan menjadi terlalu halus. Controller melaporkan `PostingTidakSah` itu ke pemantauan kesalahan, lalu menjawab 422 "Posting ini tidak dapat dibentuk ulang".
-- Perubahannya ditulis di dalam kunci baris (`lockForUpdate`). Posting yang di antaranya sudah `posted` atau `rejected`, atau yang sudah sampai ke pembaca, dibiarkan.
+- Karena seluruh masukan dinormalkan ulang, yang dibaca ulang bukan hanya akun, dimensi, dan cutover, tetapi juga kode entitas legal dan salinan vendor. Presisinya tidak: posting dibentuk ulang dengan `currency_decimals` miliknya, presisi saat ia terbit, karena perubahan presisi mata uang hanya berlaku untuk posting berikutnya (K-20).
+- Masukan yang dulu sah bisa kini ditolak — misalnya vendornya sudah diarsipkan. Controller melaporkan `PostingTidakSah` itu ke pemantauan kesalahan, lalu menjawab 422 "Posting ini tidak dapat dibentuk ulang".
+- Perubahannya ditulis di dalam kunci baris (`lockForUpdate`). Posting yang di antaranya sudah `posted` atau `rejected`, yang sudah sampai ke pembaca, atau yang baru ditandai manual oleh pengguna, dibiarkan. Posting dipilih sebelum dikunci, jadi tanda pengguna yang jatuh di antaranya hanya terlihat di dalam kunci.
 - Peristiwa `revalidated` dicatat bersama penggunanya.
 
 `posting_id` tidak berganti karena dokumennya sama, dan pembaca mengenali dokumen itu dari `posting_id`-nya.
@@ -268,11 +268,11 @@ Yang dipilih hanya posting entitas legal itu yang **belum pernah sampai ke pemba
 - `manual` dengan `manual_reason` `before_cutover` atau `feed_disabled`;
 - `pending` dengan `served_count` nol **dan** tanpa satu pun baris di `finance_posting_deliveries`. Kiriman yang masih menunggu jeda atau sudah gagal ikut dihitung: posting itu sudah pernah dicoba dikirim.
 
-Yang tidak pernah dipilih: `posted`, `rejected`, `manual` dengan `manual_reason = user`, dan `pending` yang sudah pernah di-pull atau dicoba dikirim. Status posting yang sudah disajikan tidak diubah diam-diam, karena pembacanya mungkin sudah membukukan. Tanda dari pengguna tidak dinilai ulang, karena keputusan pengguna tidak boleh dibatalkan diam-diam oleh perubahan setelan.
+Yang tidak pernah dipilih: `posted`, `rejected`, `manual` dengan `manual_reason = user`, dan `pending` yang sudah pernah di-pull atau dicoba dikirim. Status posting yang sudah disajikan tidak diubah diam-diam, karena pembacanya mungkin sudah membukukan. Tanda dari pengguna tidak dinilai ulang, karena keputusan pengguna tidak boleh dibatalkan diam-diam oleh perubahan setelan. Tanda yang jatuh sesudah posting dipilih pun dilewati: pembentukan ulang dan penjadian manual memeriksa `manual_reason = user` lagi di dalam kunci baris.
 
 Untuk setiap posting yang dipilih: feed mati → `manual` dengan `feed_disabled`; sebelum cutover → `manual` dengan `before_cutover`; selain itu posting yang bukan `pending` dibentuk ulang seperti validasi ulang, sehingga menjadi `pending` atau `held`. Posting `pending` yang tetap sah dibiarkan, termasuk `payload`-nya. Setiap posting yang dibentuk ulang atau dijadikan manual dicatat sebagai peristiwa `cutover_reevaluated`; `meta.reevaluated_postings` hanya menghitung yang statusnya berubah.
 
-Setelan disimpan lebih dulu, lalu penilaian ulang berjalan per posting, masing-masing dalam transaksinya sendiri — bukan satu transaksi bersama setelannya.
+Setelan disimpan lebih dulu, lalu penilaian ulang berjalan per posting, masing-masing dalam transaksinya sendiri — bukan satu transaksi bersama setelannya. Posting yang gagal dibentuk ulang (`PostingTidakSah`, misalnya vendornya sudah diarsipkan) dilaporkan ke pemantauan kesalahan dan dibiarkan di statusnya, dan penilaian ulang lanjut ke posting berikutnya.
 
 ## Ack dan konflik
 
@@ -295,7 +295,7 @@ Posting yang ditolak tidak diberi tanggal ulang (K-17). Tanggal akuntansi tidak 
 
 - Hanya `pending`. Query lebih dulu dipersempit ke prefix jenis milik klien, baru parameter diterapkan: `posting_type` berupa jenis lengkap atau prefix dengan `.*`; `legal_entity` berupa `company_code` atau id entitas legal (yang tidak dikenal menghasilkan daftar kosong, bukan kesalahan); `limit` bawaan 100 dan paling banyak 500; `status` hanya menerima `pending`.
 - Urutannya `posting_date`, lalu `published_at`, lalu `id`. `meta.has_more` memberi tahu masih ada posting sesudah halaman ini.
-- **Disajikan ulang pada setiap pull sampai di-ack, tanpa kursor.** Kursor "id terakhir" dapat melewatkan baris yang commit-nya terlambat; model ack tidak (K-03). Posting yang terbit di tengah pull, walaupun bertanggal lebih awal, muncul pada pull berikutnya di tempat urutannya.
+- **Disajikan ulang pada setiap pull sampai di-ack, tanpa cursor.** Cursor "id terakhir" dapat melewatkan baris yang commit-nya terlambat; model ack tidak (K-03). Posting yang terbit di tengah pull, walaupun bertanggal lebih awal, muncul pada pull berikutnya di tempat urutannya.
 - Posting yang ikut jawaban dinaikkan `served_count`-nya dan diisi `last_served_at`, dan klien diisi `last_pulled_at`.
 - `details` yang kosong dikirim sebagai objek `{}`, bukan `[]`. `FinancePosting::servedPayload()` melakukannya satu kali untuk pull dan push.
 
@@ -304,7 +304,7 @@ Posting yang ditolak tidak diberi tanggal ulang (K-17). Tanggal akuntansi tidak 
 `PostingPusher`, dijalankan `finance-postings:push` setiap menit dengan `onOneServer()` dan `withoutOverlapping()`. `--limit` membatasi jumlah posting per klien dalam satu putaran; sisanya menunggu putaran berikutnya.
 
 - Untuk setiap klien aktif bermode push: posting `pending` milik tenantnya, dipersempit prefix jenisnya, dikurangi posting yang untuk klien itu sudah `delivered` atau `failed`. Urutannya sama dengan pull.
-- Body-nya `payload` yang sama persis dengan satu elemen jawaban pull. Headernya `X-CoreERP-Event-Timestamp` (detik Unix), `X-CoreERP-Event-Signature` (HMAC-SHA256 heksadesimal atas `<timestamp>.<raw body>`, dengan signing secret klien sebagai kunci), dan `X-CoreERP-Client-Id`. Polanya sama dengan `PublishWorkflowEvents`, supaya pembaca yang sudah memverifikasi event workflow tidak perlu belajar cara kedua. Pembaca wajib menolak timestamp yang terlalu jauh dari jamnya sendiri, supaya kiriman yang disadap tidak dapat diputar ulang.
+- Body-nya `payload` yang sama persis dengan satu elemen jawaban pull. Headernya `X-CoreERP-Event-Timestamp` (detik Unix), `X-CoreERP-Event-Signature` (HMAC-SHA256 heksadesimal atas `<timestamp>.<raw body>`, dengan signing secret klien sebagai key), dan `X-CoreERP-Client-Id`. Polanya sama dengan `PublishWorkflowEvents`, supaya pembaca yang sudah memverifikasi event workflow tidak perlu belajar cara kedua. Pembaca wajib menolak timestamp yang terlalu jauh dari jamnya sendiri, supaya kiriman yang disadap tidak dapat diputar ulang.
 - Redirect tidak diikuti. Tujuan yang sudah lolos pemeriksaan bisa mengalihkan ke jaringan privat, dan pengalihan itu tidak pernah diperiksa. Jawaban 3xx dihitung gagal.
 
 | Jawaban pembaca | Kiriman | Posting |
@@ -338,7 +338,7 @@ Batas penjagaan push ada di bagian [Celah yang diketahui](#celah-yang-diketahui)
 
 Sistem di luar CoreERP masuk lewat klien integrasi, bukan kredensial app. Kredensial app (`AuthenticateAppService`) mensyaratkan hak dan pemasangan sebuah module, sedangkan aplikasi finance pelanggan bukan module. Layarnya **Identity & access › Klien integrasi** (`settings/integration-clients`), hanya untuk owner dan admin.
 
-**Token.** Bentuknya `<id klien>.<rahasia>`. Yang disimpan hanya digest SHA-256 rahasianya, dan token ditampilkan **sekali**, saat klien dibuat atau saat token baru diterbitkan; token lama langsung mati. `AuthenticateIntegrationClient` memakai id untuk memilih tepat satu klien aktif, lalu membandingkan digest dengan `hash_equals`, pola yang sama dengan `AuthenticateAppService`.
+**Token.** Bentuknya `<client_id>.<secret>`. Yang disimpan hanya digest SHA-256 secret-nya, dan token ditampilkan **sekali**, saat klien dibuat atau saat token baru diterbitkan; token lama langsung mati. `AuthenticateIntegrationClient` memakai id untuk memilih tepat satu klien aktif, lalu membandingkan digest dengan `hash_equals`, pola yang sama dengan `AuthenticateAppService`.
 
 **Urutan pemeriksaan per permintaan:** token (401) → allowlist IP (403) → scope rute (403) → salinan sandbox (503).
 
@@ -389,7 +389,7 @@ Buat satu kelas di module yang memegang kontrak `PenerbitPosting`, mengikuti pol
 - **`lines[].account_id`** adalah id akun dari `DaftarAkun`, diambil dari pemetaan module — bukan nomor akun, karena nomor dapat berubah pada impor ulang (K-05). Kirim `null` bila pemetaannya belum ada: posting akan `held`, bukan dilempar.
 - **Nilai** dibulatkan per baris lewat `PresisiMataUang::bulatkan()` sebelum dijumlah, lalu jurnal disusun dari nilai yang sudah bulat. Jangan memakai `round()` PHP atau float. Tidak ada nilai negatif: selisih negatif ditulis di sisi sebaliknya.
 - **`lines[].org_unit_id`** adalah operating unit yang menanggung baris itu, sumber kedua dimensinya. Untuk akun laba rugi, unit itu harus department.
-- **`lines[].mapping`**: `label` menamai asal akun baris itu, misalnya "Group KENDARAAN · akun aset", dan `fix_url` jalur layar pemetaan di module. Keduanya dipakai pesan masalah dan tombol "Buka pemetaan akun" di layar pantau dan pratinjau, dan tidak ikut `payload`. Kode Core hanya memeriksa panjang `fix_url`, tidak bentuknya, jadi tulis sendiri sebagai jalur relatif seperti `source_document.url`.
+- **`lines[].mapping`**: `label` menamai asal akun baris itu, misalnya "Group KENDARAAN · akun aset", dan `fix_url` jalur layar pemetaan di module. Keduanya dipakai pesan masalah dan tombol "Buka pemetaan akun" di layar pantau dan pratinjau, dan tidak ikut `payload`. `fix_url` yang bukan jalur di dalam aplikasi ditolak, sama seperti `source_document.url`.
 - **`details`** objek bebas, hanya informasi untuk pelacakan. Pembaca tidak boleh menjurnal dari sana. Harga satuan dengan presisi yang lebih halus hanya boleh muncul di sini, tidak pernah di baris jurnal.
 
 ### 3. Terbitkan di dalam transaksi dokumen
@@ -422,7 +422,7 @@ Aturan penulisannya dari gerbang kontrak di skill `coreerp-architecture` (aturan
 - Daftar yang dapat bertambah ditulis dengan `examples`, bukan `enum`. Menambah nilai `enum` merusak konsumen yang sudah ada.
 - Judul bagian panduan tidak memakai backtick. Scalar membentuk tautan hasil pencarian dari seluruh teks judul, tetapi membuang bagian kode saat memberi id pada judulnya, sehingga hasil pencarian menunjuk jangkar yang tidak ada.
 
-**Kolom Tersedia.** Jenis baru masuk dengan *Belum*. Setelah module-nya benar-benar menerbitkan jenis itu, ubah isinya menjadi *Terbit*, di tabel panduan dan di tabel `PostingType`. Ketika jenis pertama menjadi *Terbit*, kalimat di bawah kedua tabel ("Selama semuanya masih *Belum* …") tidak lagi benar dan harus ditulis ulang, begitu juga peringatan di kepala halaman ini.
+**Kolom Tersedia.** Jenis baru masuk dengan *Belum*. Setelah module-nya benar-benar menerbitkan jenis itu, ubah isinya menjadi *Sudah*, di tabel panduan dan di tabel `PostingType`. Ketika jenis pertama menjadi *Sudah*, kalimat di bawah kedua tabel ("Selama semuanya masih *Belum* …") tidak lagi benar dan harus ditulis ulang, begitu juga peringatan di kepala halaman ini.
 
 Lalu rakit ulang dari `apps/core`:
 
@@ -482,6 +482,9 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | Pratinjau memeriksa sama tanpa menyimpan | `FinancePostingFeedTest::test_pratinjau_memeriksa_sama_tanpa_menyimpan` |
 | Validasi ulang | `FinancePostingFeedTest::test_validasi_ulang_setelah_pemetaan_diperbaiki_memindahkan_held_ke_pending`, `FinancePostingMonitorTest::test_validasi_ulang_hanya_untuk_posting_tertahan` |
 | Cutover, feed mati, dan penilaian ulang | `FinancePostingFeedTest::test_sebelum_cutover_dan_feed_mati_menjadi_manual_lalu_dinilai_ulang_saat_setelan_berubah` |
+| Posting yang sudah terbit tetap pada presisinya saat presisi mata uang diturunkan | `FinancePostingFeedTest::test_lowering_currency_precision_keeps_published_postings_at_their_own_precision` |
+| Tanda manual yang jatuh di antara pemilihan dan kunci tidak tertimpa | `FinancePostingFeedTest::test_revalidation_and_cutover_reevaluation_keep_a_manual_mark_made_meanwhile` |
+| `mapping.fix_url` hanya jalur di dalam aplikasi | `FinancePostingFeedTest::test_mapping_fix_url_must_be_a_path_inside_the_app` |
 | Tandai manual: alasan, pelaku, dan tanda pengguna yang tidak dinilai ulang | `FinancePostingMonitorTest::test_tandai_manual_wajib_beralasan_dan_tercatat_dengan_pelaku_dan_alasannya` |
 | Status diperiksa ulang di dalam kunci baris | `FinancePostingMonitorTest::test_status_diperiksa_ulang_di_dalam_kunci_baris` |
 | `posted` tidak dapat ditandai manual | `FinancePostingMonitorTest::test_posting_yang_sudah_dibukukan_tidak_dapat_ditandai_manual` |
@@ -494,7 +497,7 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 | Push: jeda, gagal, redirect, dan urutan per klien | `FinancePostingFeedTest::test_push_5xx_dicoba_lagi_dengan_jeda_4xx_berhenti_dan_urutan_per_klien_dijaga`, `test_push_batas_waktu_habis_dan_redirect_menjadi_gagal` |
 | Salinan sandbox | `FinancePostingFeedTest::test_salinan_sandbox_tidak_mengirim_apa_pun`, `IntegrationClientTest::test_salinan_sandbox_menjawab_503_dengan_alasannya`, `test_kirim_uji_di_sandbox_tidak_mengirim_apa_pun` |
 | Token, pencabutan, IP, dan tenant dari klien | `IntegrationClientTest::test_klien_pull_menerima_token_sekali_dan_hanya_digest_yang_disimpan`, `test_token_salah_atau_dicabut_ditolak`, `test_menerbitkan_ulang_token_mematikan_token_lama`, `test_alamat_di_luar_allowlist_ditolak`, `test_tenant_tidak_dapat_ditimpa_lewat_header` |
-| URL push, SSRF di SaaS, dan signing secret | `IntegrationClientTest::test_klien_push_wajib_https_dan_rahasia_penanda_tangan_disimpan_terenkripsi`, `test_di_saas_url_push_ke_jaringan_privat_ditolak_tetapi_di_on_prem_boleh`, `test_pindah_mode_mengatur_rahasia_penanda_tangan`, `test_kirim_uji_ditandatangani_hmac_atas_stempel_dan_badan` |
+| URL push, SSRF di SaaS, dan signing secret | `IntegrationClientTest::test_klien_push_wajib_https_dan_rahasia_penanda_tangan_disimpan_terenkripsi`, `test_di_saas_url_push_ke_jaringan_privat_ditolak_tetapi_di_on_prem_boleh`, `test_pindah_mode_mengatur_rahasia_penanda_tangan`, `test_kirim_uji_ditandatangani_hmac_atas_stempel_dan_badan`, `test_test_push_to_an_unknown_host_reports_the_cause_without_curl_noise` |
 | Layar pantau: akses, saringan, detail, dan tautan dokumen | `FinancePostingMonitorTest::test_hanya_owner_dan_admin_yang_dapat_melihat_dan_menindak`, `test_saringan_status_jenis_entitas_tanggal_dan_pencarian`, `test_detail_memuat_baris_jurnal_masalah_per_baris_dan_riwayat_dengan_nama_pelaku`, `test_tautan_dokumen_sumber_hanya_jalur_relatif_dan_tidak_ikut_isi_untuk_pembaca` |
 | Setelan feed, mode per tanggal, dan presisi | `FinancePostingSettingsTest` |
 | Daftar jenis posting dan contoh payload di kontrak | `DocsPortalTest::test_daftar_jenis_posting_punya_bagian_sendiri_dan_sama_di_setiap_tempat`, `test_contoh_payload_di_panduan_cocok_dengan_skemanya_dan_seimbang` |
@@ -505,10 +508,8 @@ Jangan menjalankan dua phpunit bersamaan: keduanya memakai database test yang sa
 - **Belum ada module yang menerbitkan posting.** Modul aset baru menyiapkan kode group aset dan buku penyusutan yang diketik manual (TODO 8.7). Posting group aset (butir 8.1 sampai 8.6), lalu penerimaan, saldo awal, penyusutan, dan koreksi nilai (area 9 sampai 12) belum dikerjakan. Semua jenis di kontrak masih *Belum*.
 - **Izin granular layar pantau (TODO 7.4)** menunggu katalog izin Core. Sampai katalog itu ada, layar dan aksinya hanya untuk owner dan admin, termasuk untuk melihat.
 - **Endpoint pratinjau HTTP (TODO 7.6.5)** belum ada. Logikanya sudah tersedia sebagai `PenerbitPosting::pratinjau()`, dan layar module dapat memanggilnya lewat controller module-nya sendiri.
-- **Tidak ada aksi kirim ulang untuk kiriman push yang `failed`.** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.
-- **`mapping.fix_url` tidak diperiksa bentuknya**, berbeda dengan `source_document.url`. Nilainya menjadi tautan di layar pantau, jadi penjagaannya hari ini hanya disiplin module.
-- **Kunci baris pada penilaian ulang tidak memeriksa tanda pengguna.** Validasi ulang dan penilaian ulang cutover memilih posting lebih dulu, lalu mengunci barisnya. Di dalam kunci, yang diperiksa ulang hanya `posted`, `rejected`, dan "sudah sampai ke pembaca" — bukan `manual_reason = user`. Tanda manual yang jatuh di antara pemilihan dan kunci dapat tertimpa.
-- **Presisi mata uang yang diturunkan membuat posting lama tidak dapat dibentuk ulang.** Layar Mata uang menyebut perubahan presisi hanya berlaku untuk posting berikutnya, tetapi posting `held` dan `manual` milik Core dibentuk ulang dari `input` dengan presisi hari ini. `MoneyPrecision::scale()` menghitung nol di belakang koma, jadi `"500000000.00"` ditolak begitu presisi IDR menjadi nol. Validasi ulang menjawab 422 untuk posting itu. Penilaian ulang cutover tidak menangkap `PostingTidakSah` sama sekali: setelan yang sudah tersimpan tetap tersimpan, posting sesudahnya tidak dinilai ulang, dan permintaannya berakhir dengan kesalahan server. Itu berulang pada setiap penyimpanan setelan yang membuat posting tersebut layak dikirim, selama ia masih `held` atau `manual` milik Core. Kolom `currency_decimals` juga tidak ikut diperbarui ketika pembentukan ulang berhasil dengan presisi yang berbeda.
+- **Tidak ada aksi kirim ulang untuk kiriman push yang `failed` (TODO 7.3.4).** Postingnya tetap `pending` tetapi tidak dikirim lagi ke klien itu. Yang tersedia hari ini: Tandai manual, atau pembaca melakukan pull lewat API — endpoint pull tidak memeriksa mode klien, jadi klien push yang punya scope `finance-postings.read` tetap dapat melakukan pull.
+- **Pemeriksaan tujuan push hanya meresolusi IPv4 (TODO 4.8).** `PushDestination` memakai `gethostbynamel()`, dan klien HTTP meresolusi lagi saat mengirim. Di SaaS, host yang punya alamat IPv4 publik sekaligus IPv6 privat lolos, begitu juga DNS yang diganti di antara pemeriksaan dan pengiriman.
 - **Penjagaan sandbox pada mode push bergantung pada environment yang terikat.** `ActiveEnvironment` menjawab *boleh* ketika tidak tahu environment-nya (alasannya di docblock kelas itu). Hanya `ResolveEnvironment`, middleware permintaan HTTP, yang mengikat `ActiveEnvironment::KEY`; penjadwal tidak. Test sandbox mengikat kunci itu sendiri. `CopyEnvironment::disarm()` juga tidak menyentuh `integration_clients` maupun posting `pending` yang ikut tersalin. Penjadwal yang berjalan di atas database salinan akan mencoba mengirim.
 - **Pemantauan feed di admin.erp (TODO area 14)** belum ada. Kesehatan feed hanya terlihat di layar pantau tenant.
 
